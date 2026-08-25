@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
@@ -86,15 +87,22 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   return failures;
 }
 
-export function main(): void {
-  const failures = checkFoundationAdoption();
-  if (failures.length > 0) {
-    console.error('[check:foundation-adoption] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log('[check:foundation-adoption] OK');
-}
+export const runCheckFoundationAdoption = defineScript({
+  name: 'check:foundation-adoption',
+  flags: [],
+  run(context) {
+    const failures = checkFoundationAdoption();
+    if (failures.length > 0) {
+      console.error('[check:foundation-adoption] FAILED');
+      for (const failure of failures) console.error(`- ${failure}`);
+      throw new Error(`${failures.length} foundation adoption violation(s)`);
+    }
+    context.print('[check:foundation-adoption] OK');
+  },
+});
 
-if (process.argv[1]?.endsWith('check_foundation_adoption.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_foundation_adoption.ts') ||
+  isDirectScript(import.meta.url, 'check_foundation_adoption.js')
+)
+  void runCheckFoundationAdoption();
