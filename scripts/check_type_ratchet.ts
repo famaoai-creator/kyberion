@@ -53,9 +53,11 @@ function isTestFile(repoRelativePath: string): boolean {
 function isGeneratedFile(repoRelativePath: string): boolean {
   const segments = repoRelativePath.split('/');
   return (
+    /^libs\/core\/index-part-\d+\.ts$/u.test(repoRelativePath) ||
     segments.some((segment) =>
       new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
-    ) || repoRelativePath.endsWith('/next-env.d.ts')
+    ) ||
+    repoRelativePath.endsWith('/next-env.d.ts')
   );
 }
 
