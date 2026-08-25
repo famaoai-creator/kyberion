@@ -10,7 +10,8 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 
 export interface EnvRegistryValidationEntry {
   name: string;
@@ -46,7 +47,7 @@ const BOOLEAN_VALUE_RE = /^(1|0|true|false|yes|no|on|off)$/i;
 export function loadEnvRegistryEntries(): EnvRegistryValidationEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
   try {
-    const parsed = JSON.parse(String(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) || '{}'));
+    const parsed = readJson<{ entries?: unknown }>(REGISTRY_PATH);
     return Array.isArray(parsed.entries) ? (parsed.entries as EnvRegistryValidationEntry[]) : [];
   } catch {
     return [];
