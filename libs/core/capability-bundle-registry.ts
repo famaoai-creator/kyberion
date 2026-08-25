@@ -1,10 +1,8 @@
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 
-const ajv = createAjv();
 const CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/capability-bundle-registry.schema.json'
 );
@@ -33,10 +31,7 @@ let capabilityBundleRegistryValidateFn: ValidateFunction | null = null;
 
 function ensureCapabilityBundleRegistryValidator(): ValidateFunction {
   if (capabilityBundleRegistryValidateFn) return capabilityBundleRegistryValidateFn;
-  capabilityBundleRegistryValidateFn = compileSchemaFromPath(
-    ajv,
-    CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH
-  );
+  capabilityBundleRegistryValidateFn = compileSchema(CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH);
   return capabilityBundleRegistryValidateFn;
 }
 
