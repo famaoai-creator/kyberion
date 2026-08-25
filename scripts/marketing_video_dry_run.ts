@@ -16,6 +16,7 @@ import {
   validateVideoTechnicalArtifacts,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {
   format?: { duration?: string; size?: string };
@@ -384,7 +385,10 @@ async function main(): Promise<void> {
   logger.success(JSON.stringify(result));
 }
 
-if (process.argv[1] && /marketing_video_dry_run\.(ts|js)$/.test(process.argv[1])) {
+if (
+  isDirectScript(import.meta.url, 'marketing_video_dry_run.ts') ||
+  isDirectScript(import.meta.url, 'marketing_video_dry_run.js')
+) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

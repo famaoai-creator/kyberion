@@ -6,6 +6,7 @@ import {
 } from '@agent/core';
 import { createCheckpoint } from './refactor/mission-maintenance.js';
 import { listActiveMissions, loadState } from './refactor/mission-state.js';
+import { isDirectScript } from './lib/harness.js';
 function getGitHash(cwd: string): string {
   return safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim();
 }
@@ -68,9 +69,10 @@ async function runAutoCheckpoint(): Promise<number> {
   });
 }
 
-const isDirect = process.argv[1] && /auto_checkpoint\.(ts|js)$/.test(process.argv[1]);
-
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'auto_checkpoint.ts') ||
+  isDirectScript(import.meta.url, 'auto_checkpoint.js')
+) {
   runAutoCheckpoint().then(
     (code) => process.exit(code),
     (error) => {

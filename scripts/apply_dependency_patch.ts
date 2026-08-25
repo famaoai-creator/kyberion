@@ -33,6 +33,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 import { appendJsonLine } from '@agent/core/foundation';
 import { runDegradationWatch, type DegradationReport } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
@@ -353,8 +354,10 @@ async function main(): Promise<number> {
   return 1;
 }
 
-const isDirect = process.argv[1] && /apply_dependency_patch\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'apply_dependency_patch.ts') ||
+  isDirectScript(import.meta.url, 'apply_dependency_patch.js')
+) {
   main().then(
     (code) => process.exit(code),
     (error) => {

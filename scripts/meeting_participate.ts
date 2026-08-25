@@ -54,6 +54,7 @@ import {
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
 import '@agent/core/blackhole-audio-bus';
@@ -588,8 +589,10 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /meeting_participate\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'meeting_participate.ts') ||
+  isDirectScript(import.meta.url, 'meeting_participate.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
     process.exitCode = 1;
