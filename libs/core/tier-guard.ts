@@ -34,7 +34,14 @@ const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.j
 // tier-guard during module bootstrap. A top-level root lookup is otherwise
 // observable before this module's lexical bindings have finished initializing.
 function projectRoot(): string {
-  return pathResolver.rootDir();
+  try {
+    return pathResolver.rootDir();
+  } catch {
+    // The secure-io -> audit-chain -> tier-guard bootstrap cycle can invoke
+    // the guard before the path-resolver binding is initialized. The process
+    // root is the safe fallback for that one-time project-local probe.
+    return process.cwd();
+  }
 }
 
 function normalizePath(p: string): string {
