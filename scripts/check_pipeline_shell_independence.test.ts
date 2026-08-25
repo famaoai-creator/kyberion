@@ -90,7 +90,7 @@ describe('check_pipeline_shell_independence', () => {
             {
               op: 'system:shell',
               params: {
-                cmd: 'node dist/scripts/run_pipeline.js --input pipelines/verify-session.json',
+                cmd: 'printf report > active/shared/tmp/kyberion-report.json',
               },
             },
           ],
@@ -103,5 +103,72 @@ describe('check_pipeline_shell_independence', () => {
     const violations = scanPipelineShellIndependence([PROBE]);
 
     expect(violations).toEqual([]);
+  });
+
+  it('flags typed node, pnpm, and npx script wrappers', () => {
+    safeWriteFile(
+      PROBE,
+      JSON.stringify(
+        {
+          steps: [
+            {
+              op: 'system:exec',
+              params: { command: 'node', args: ['dist/scripts/task.js'] },
+            },
+            {
+              op: 'system:exec',
+              params: { command: 'pnpm', args: ['exec', 'tsx', 'scripts/task.ts'] },
+            },
+            {
+              op: 'system:exec',
+              params: { command: 'npx', args: ['tsx', 'scripts/task.ts'] },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const violations = scanPipelineShellIndependence([PROBE]);
+
+    expect(violations.filter((v) => v.pattern === 'script-wrapper')).toHaveLength(3);
+  });
+
+  it('flags raw shell wrappers and nested steps while allowing native health checks', () => {
+    safeWriteFile(
+      PROBE,
+      JSON.stringify(
+        {
+          steps: [
+            {
+              op: 'core:if',
+              params: {
+                then: [
+                  {
+                    op: 'system:shell',
+                    params: { cmd: 'node dist/libs/actuators/browser/index.js --input x.json' },
+                  },
+                  {
+                    op: 'system:shell',
+                    params: { cmd: 'npx tsx scripts/task.ts' },
+                  },
+                ],
+              },
+            },
+            {
+              op: 'system:cli_health_check',
+              params: { command: 'node' },
+            },
+          ],
+        },
+        null,
+        2
+      )
+    );
+
+    const violations = scanPipelineShellIndependence([PROBE]);
+
+    expect(violations.filter((v) => v.pattern === 'script-wrapper')).toHaveLength(2);
   });
 });

@@ -5,7 +5,8 @@
  * Flags pipeline shell commands that depend on host-specific substitutions or
  * process-substitution tricks (`$(pwd)`, `$(uname -s)`, `$(date)`, `<(...)`,
  * `>(...)`, `/dev/fd`, `mktemp`, direct shell interpreter escapes, implicit
- * host temp paths).
+ * host temp paths), or wrappers around repository scripts/actuators
+ * (`node dist/`, `npx tsx`, `pnpm exec|dlx`, `dist/libs/actuators/`).
  *
  * The goal is not to ban shell entirely; it is to keep pipelines portable by
  * forcing runtime context to come from pipeline inputs or helper scripts.
@@ -61,7 +62,9 @@ function listPipelineFiles(roots: string[] = PIPELINE_ROOTS): string[] {
   for (const root of roots) {
     walk(root);
   }
-  return files;
+  // `pipelines` already contains `pipelines/fragments`; keep the audit one
+  // finding per source file even when both roots are configured.
+  return [...new Set(files)].sort();
 }
 
 function scanValue(file: string, value: unknown, violations: ShellViolation[]): void {
@@ -89,6 +92,88 @@ function scanValue(file: string, value: unknown, violations: ShellViolation[]): 
   }
 }
 
+function isPipelineShellOp(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const op = (value as Record<string, unknown>).op;
+  return op === 'system:shell' || op === 'system:exec';
+}
+
+function getCommandAndArgs(params: Record<string, unknown>): {
+  command: string;
+  args: string[];
+} | null {
+  const commandValue = [params.cmd, params.command, params.shell_command].find(
+    (value): value is string => typeof value === 'string' && value.trim().length > 0
+  );
+  if (!commandValue) return null;
+  const args = Array.isArray(params.args)
+    ? params.args.filter((value): value is string => typeof value === 'string')
+    : [];
+  return { command: commandValue, args };
+}
+
+function detectScriptWrapper(command: string, args: readonly string[]): string | undefined {
+  const normalized = [command, ...args].join(' ').replace(/\s+/g, ' ').trim();
+  const executable = command.trim().split(/[\\/]/).pop()?.toLowerCase();
+
+  // Typed system:exec shape: command and args are separate fields.
+  if (executable === 'node') {
+    if (
+      args.some(
+        (arg) =>
+          /(?:^|\.\/?)(?:dist|scripts|libs\/actuators|presence|src|tests?)\//i.test(arg) ||
+          /\.(?:[cm]?js|mjs|cjs|ts|tsx)$/i.test(arg)
+      ) ||
+      args.some((arg) => arg === '-e' || arg === '--eval')
+    ) {
+      return normalized;
+    }
+  }
+  if (executable === 'npx' && args[0]?.toLowerCase() === 'tsx') return normalized;
+  if (executable === 'pnpm' && ['exec', 'dlx'].includes(args[0]?.toLowerCase() ?? '')) {
+    return normalized;
+  }
+  if (executable === 'tsx') return normalized;
+
+  // Raw system:shell shape, including environment assignments and chained commands.
+  if (
+    /(?:^|[;&|]\s*|\s)node\s+(?:(?:--import|--require)\s+[^;&|]+\s+)?(?:\.\/)?(?:dist|scripts|libs\/actuators|presence|src|tests?)\/[^;&|\s]+/iu.test(
+      normalized
+    ) ||
+    /(?:^|[;&|]\s*|\s)node\s+(?:-e|--eval)\b/iu.test(normalized) ||
+    /(?:^|[;&|]\s*|\s)npx\s+tsx\b/iu.test(normalized) ||
+    /(?:^|[;&|]\s*|\s)pnpm\s+(?:exec|dlx)\b/iu.test(normalized) ||
+    /(?:^|[;&|]\s*|\s)tsx\s+(?:\.\/)?scripts\//iu.test(normalized) ||
+    /dist\/libs\/actuators\//iu.test(normalized)
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
+
+function scanScriptWrappers(file: string, value: unknown, violations: ShellViolation[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) scanScriptWrappers(file, item, violations);
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+
+  const record = value as Record<string, unknown>;
+  if (isPipelineShellOp(record) && record.params && typeof record.params === 'object') {
+    const command = getCommandAndArgs(record.params as Record<string, unknown>);
+    if (command) {
+      const match = detectScriptWrapper(command.command, command.args);
+      if (match) {
+        violations.push({ file, pattern: 'script-wrapper', match });
+      }
+    }
+  }
+
+  for (const nested of Object.values(record)) {
+    scanScriptWrappers(file, nested, violations);
+  }
+}
+
 export function scanPipelineShellIndependence(
   files: string[] = listPipelineFiles()
 ): ShellViolation[] {
@@ -97,6 +182,7 @@ export function scanPipelineShellIndependence(
     if (!safeExistsSync(file)) continue;
     const data = loadJson<unknown>(file);
     scanValue(file, data, violations);
+    scanScriptWrappers(file, data, violations);
   }
   return violations;
 }
