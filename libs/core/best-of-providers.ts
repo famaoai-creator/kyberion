@@ -87,7 +87,8 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { appendJsonLine } from './foundation/json.js';
 import { checkProviderEgress } from './provider-egress-gate.js';
 import {
   peekProviderCapabilityRegistry,
@@ -353,7 +354,7 @@ function persistVerdictRecord(record: BestOfProvidersVerdictRecord, filePath: st
   try {
     const dir = path.dirname(filePath);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(filePath, record);
   } catch (err) {
     logger.warn(
       `[best-of-providers] failed to persist verdict record (non-fatal): ${err instanceof Error ? err.message : String(err)}`
