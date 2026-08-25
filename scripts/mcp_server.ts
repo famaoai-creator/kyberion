@@ -15,8 +15,18 @@
  */
 
 import { startMcpServerStdio } from '@agent/shared-network';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-startMcpServerStdio().catch((err) => {
-  process.stderr.write(`Kyberion MCP server fatal error: ${err}\n`);
-  process.exit(1);
+export const runMcpServer = defineScript({
+  name: 'mcp:server',
+  flags: [],
+  async run() {
+    await startMcpServerStdio();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'mcp_server.ts') ||
+  isDirectScript(import.meta.url, 'mcp_server.js')
+)
+  void runMcpServer();
