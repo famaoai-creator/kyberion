@@ -85,6 +85,7 @@
     "check:trace-docs": "node --import ./scripts/ts-loader.mjs scripts/generate_trace_docs.ts --check",
     "check:doc-examples": "node --import ./scripts/ts-loader.mjs scripts/check_doc_examples.ts",
     "check:first-win-smoke": "node --import ./scripts/ts-loader.mjs scripts/check_first_win_smoke.ts",
+    "check:pipeline-shell-independence": "node --import ./scripts/ts-loader.mjs scripts/check_pipeline_shell_independence.ts",
     "check:mos-no-write-api": "vitest run tests/process-boundary-governance.test.ts",
     "knowledge:sync": "node dist/scripts/run_pipeline.js --input pipelines/knowledge-sync.json",
     "storage:janitor": "node dist/scripts/run_pipeline.js --input pipelines/storage-janitor.json",
