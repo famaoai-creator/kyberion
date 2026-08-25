@@ -39,6 +39,7 @@
 
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 
 export type PiiSeverity = 'secret' | 'pii';
 export type PiiAction = 'block' | 'mask';
@@ -129,7 +130,7 @@ export function loadPiiRules(options: PiiRuleOptions = {}): PiiRule[] {
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(rulesPath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(rulesPath);
   } catch (err) {
     fail(`rules file ${rulesPath} is not valid JSON: ${err instanceof Error ? err.message : err}`);
   }
