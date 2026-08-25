@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonIfPresent } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
@@ -452,8 +452,7 @@ function appendJsonl(logicalPath: string, record: unknown): void {
 }
 
 function readJson<T>(logicalPath: string): T | null {
-  if (!safeExistsSync(logicalPath)) return null;
-  return JSON.parse(String(safeReadFile(logicalPath, { encoding: 'utf8' }) || 'null')) as T;
+  return readJsonIfPresent<T>(logicalPath);
 }
 
 function writeJson(logicalPath: string, value: unknown): void {

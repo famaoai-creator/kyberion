@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -253,11 +253,8 @@ export function getModelRolePerformance(
       const indexPath = modelPerformanceIndexPath();
       if (safeExistsSync(indexPath)) {
         byKey =
-          (
-            JSON.parse(String(safeReadFile(indexPath, { encoding: 'utf8' }))) as {
-              by_model_role?: Record<string, ModelRolePerformance>;
-            }
-          ).by_model_role || {};
+          readJson<{ by_model_role?: Record<string, ModelRolePerformance> }>(indexPath)
+            .by_model_role || {};
       }
     } catch {
       byKey = {};

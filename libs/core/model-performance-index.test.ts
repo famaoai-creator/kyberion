@@ -8,6 +8,7 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: (filePath: string) => mockFiles.has(filePath),
   safeMkdir: () => {},
   safeReadFile: (filePath: string) => mockFiles.get(filePath) || '',
+  loadJson: (filePath: string) => JSON.parse(mockFiles.get(filePath) || 'null'),
   safeWriteFile: (filePath: string, data: string) => mockFiles.set(filePath, data),
 }));
 
