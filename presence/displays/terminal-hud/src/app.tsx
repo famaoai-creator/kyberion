@@ -123,6 +123,20 @@ export function App({ initialPanel, initialLocale }: AppProps) {
     setConversation((current) => [...current, line].slice(-MAX_CONVERSATION_LINES * 3));
   }, []);
 
+  const toggleVoice = useCallback(async () => {
+    const outcome = await voice.toggle();
+    if (outcome.error) {
+      appendConversation({
+        who: 'sys',
+        text: i18n.tr('tui:tui_voice_unavailable', { reason: outcome.error }),
+      });
+    } else if (outcome.text !== undefined) {
+      setInputValue(outcome.text);
+      setInputFocused(true);
+      appendConversation({ who: 'sys', text: i18n.tr('tui:tui_voice_filled') });
+    }
+  }, [appendConversation, i18n, voice.toggle]);
+
   const submitInput = useCallback(
     async (raw: string) => {
       const text = raw.trim();
@@ -173,6 +187,9 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           setInputFocused(false);
           setInputValue('');
         }
+        if (key.ctrl && input.toLowerCase() === 'v') {
+          void toggleVoice();
+        }
         return;
       }
       if (showHelp) {
@@ -197,19 +214,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
         return;
       }
       if (input === 'v') {
-        void (async () => {
-          const outcome = await voice.toggle();
-          if (outcome.error) {
-            appendConversation({
-              who: 'sys',
-              text: i18n.tr('tui:tui_voice_unavailable', { reason: outcome.error }),
-            });
-          } else if (outcome.text !== undefined) {
-            setInputValue(outcome.text);
-            setInputFocused(true);
-            appendConversation({ who: 'sys', text: i18n.tr('tui:tui_voice_filled') });
-          }
-        })();
+        void toggleVoice();
         return;
       }
       if (input === 'L') {

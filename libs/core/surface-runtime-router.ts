@@ -148,21 +148,41 @@ export function shouldCompileSurfaceIntent(
   ) {
     return false;
   }
-  const resolution = resolveIntentResolutionPacket(originalText, {
+  // Mission-team handoff already has a dedicated delegation path and must
+  // not be replaced by a clarification response from the shared compiler.
+  if (input.missionId && input.teamRole) return false;
+  // Presence already owns an explicit receiver route that must remain a
+  // direct A2A handoff. Other surfaces still pass forced receivers through
+  // the shared compiler so a caller cannot bypass governed classification.
+  if (input.agentId === 'presence-surface-agent' && ruleBasedReceiver) return false;
+  const packet = resolveIntentResolutionPacket(originalText, {
     tier: input.scope?.tier,
     tenantId: input.scope?.tenant_slug,
   });
-  // An explicit route is still compiled so the shared contract can explain
-  // what will happen; it must not become an escape hatch around intent work.
-  if (input.forcedReceiver || ruleBasedReceiver) return true;
-  if (classifyTaskSessionIntent(originalText)) return true;
-  if (!resolution.selected_intent_id) return true;
+  const selectedShape = packet.selected_resolution?.shape;
+  const governedShape =
+    selectedShape === 'task_session' ||
+    selectedShape === 'mission' ||
+    selectedShape === 'project_bootstrap' ||
+    selectedShape === 'pipeline';
+  const approvalIntent = packet.candidates.some(
+    (candidate) =>
+      candidate.intent_id === packet.selected_intent_id &&
+      candidate.resolution?.result_shape === 'plan'
+  );
+  const confidentGovernedIntent = (packet.selected_confidence || 0) >= 0.8 && governedShape;
+
+  // Lightweight direct replies can keep their deterministic route. Governed
+  // shapes, unresolved requests, and approval-ready plans must pass through
+  // the shared compiler before any surface-specific delegation is selected.
+  if (!packet.selected_intent_id) return input.agentId !== 'slack-surface-agent';
   if (
-    ['task_session', 'mission', 'pipeline', 'browser_session'].includes(
-      resolution.selected_resolution?.shape || ''
-    )
+    confidentGovernedIntent ||
+    ((packet.selected_confidence || 0) >= 0.8 && approvalIntent) ||
+    classifyTaskSessionIntent(originalText)
   ) {
     return true;
   }
+  if (ruleBasedReceiver) return false;
   return originalText.length > 80 || originalText.includes('\n');
 }

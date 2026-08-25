@@ -13,6 +13,7 @@ import {
 import { withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 export interface ConciergeViewerContext {
   role: ChronosAccessRole;
@@ -188,6 +189,20 @@ export function conciergeHeadlessScope(viewer: ConciergeViewerContext): Headless
     organization_ids: viewer.organizationIds,
     project_ids: viewer.projectIds,
     tier_access: viewer.tierAccess,
+  };
+}
+
+export function toSurfaceAuthorizationContext(
+  viewer: ConciergeViewerContext
+): SurfaceAuthorizationContext {
+  return {
+    role: viewer.role,
+    tenantSlugs: viewer.tenantSlugs,
+    organizationIds: viewer.organizationIds,
+    projectIds: viewer.projectIds,
+    tierAccess: viewer.tierAccess,
+    principalId: viewer.principalId,
+    source: viewer.source,
   };
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  buildConciergeHeadlessManifest,
+  conciergeManifestForViewer,
   conciergeAvailableOperations,
 } from '../../../../lib/headless-projections';
 import { conciergeHeadlessScope } from '../../../../lib/viewer-context';
@@ -13,7 +13,7 @@ export function GET(req: NextRequest) {
   if (resolved.response) return resolved.response;
   return NextResponse.json({
     ok: true,
-    manifest: buildConciergeHeadlessManifest(),
+    manifest: conciergeManifestForViewer(resolved.context),
     viewer: {
       scope: conciergeHeadlessScope(resolved.context),
       available_operations: conciergeAvailableOperations(resolved.context),

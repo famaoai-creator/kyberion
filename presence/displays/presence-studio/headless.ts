@@ -1,6 +1,7 @@
 import {
   availableHeadlessOperationIds,
   createHeadlessEnvelope,
+  filterHeadlessManifestForViewer,
   listApprovalRequests,
   listArtifactRecords,
   listProjectRecords,
@@ -13,8 +14,11 @@ import {
   narrowPresenceStudioTenant,
   presenceStudioHeadlessScope,
   presenceStudioRecordInScope,
+  toSurfaceAuthorizationContext,
+  PresenceStudioViewerError,
   type PresenceStudioViewerContext,
 } from './security.js';
+import { authorizeSurfaceOperation } from '@agent/core/surface-authorization';
 
 const PRESENCE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
@@ -25,6 +29,7 @@ const PRESENCE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
     description: 'Read scoped projects, pending approvals, and outcomes for Presence Studio.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: { tenant: { type: 'string' } },
@@ -41,6 +46,7 @@ const PRESENCE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
     description: 'Read the scoped Presence Studio overview as A2UI messages.',
     effect: 'read',
     required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
     input_schema: {
       type: 'object',
       properties: { tenant: { type: 'string' } },
@@ -73,6 +79,38 @@ export function buildPresenceHeadlessManifest(): HeadlessApiManifest {
   };
 }
 
+export function presenceManifestForViewer(
+  viewer: PresenceStudioViewerContext
+): HeadlessApiManifest {
+  return filterHeadlessManifestForViewer(
+    toSurfaceAuthorizationContext(viewer),
+    buildPresenceHeadlessManifest()
+  );
+}
+
+export function authorizePresenceOperation(
+  viewer: PresenceStudioViewerContext,
+  operationId: string,
+  resource?: { tenantSlug?: string; organizationId?: string; projectId?: string; tier?: string }
+): void {
+  const operation = buildPresenceHeadlessManifest().operations.find(
+    (candidate) => candidate.operation_id === operationId
+  );
+  if (!operation)
+    throw new PresenceStudioViewerError(403, `unknown headless operation: ${operationId}`);
+  const decision = authorizeSurfaceOperation({
+    context: toSurfaceAuthorizationContext(viewer),
+    operation: {
+      operationId: operation.operation_id,
+      effect: operation.effect,
+      requiredRole: operation.required_role,
+      requiredPermissions: operation.required_permissions,
+    },
+    resource,
+  });
+  if (!decision.allowed) throw new PresenceStudioViewerError(403, decision.reason);
+}
+
 function scopedViewer(viewer: PresenceStudioViewerContext, requestedTenant?: string) {
   const tenantSlugs = narrowPresenceStudioTenant(viewer, requestedTenant);
   return { ...viewer, tenantSlugs };
@@ -98,19 +136,20 @@ export function presenceEnvelope<T>(
   data: T,
   viewer: PresenceStudioViewerContext
 ) {
-  const manifest = buildPresenceHeadlessManifest();
+  const manifest = presenceManifestForViewer(viewer);
   return createHeadlessEnvelope({
     surface: 'presence-studio',
     resource,
     data,
     scope: presenceStudioHeadlessScope(viewer),
     manifest,
+    authorizationContext: toSurfaceAuthorizationContext(viewer),
   });
 }
 
 export function presenceAvailableOperations(viewer: PresenceStudioViewerContext): string[] {
   return availableHeadlessOperationIds(
-    viewer.source === 'loopback' ? 'localadmin' : 'readonly',
+    toSurfaceAuthorizationContext(viewer),
     buildPresenceHeadlessManifest()
   );
 }
