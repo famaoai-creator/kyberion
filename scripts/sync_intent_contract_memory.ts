@@ -59,7 +59,7 @@ function entryKey(entry: {
 function getOptionValue(name: string, argv: string[]): string | undefined {
   const idx = argv.indexOf(name);
   if (idx < 0) return undefined;
-  const value = process.argv[idx + 1];
+  const value = argv[idx + 1];
   if (!value || value.startsWith('-')) return undefined;
   return value;
 }

@@ -35,6 +35,7 @@ import {
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -85,8 +86,7 @@ async function waitForApproval(
   throw new Error(`Timed out waiting for background-review approval on ${channel}/${threadTs}`);
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
+async function main(argv: string[]): Promise<void> {
   const missionId = flag(argv, '--mission-id').toUpperCase();
   const surface = flag(argv, '--surface') || 'slack';
   if (!missionId) usage();
@@ -271,7 +271,8 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
-});
+void defineScript({
+  name: 'background-review:mission-e2e',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();

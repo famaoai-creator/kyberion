@@ -6,6 +6,7 @@ import {
   readGwsAuthStatus,
   readM365AuthStatus,
 } from '@agent/core/calendar-workflow';
+import { defineScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -49,7 +50,9 @@ function getProvider(args: ArgMap): 'google-workspace' | 'm365' {
 }
 
 function printHelp(): void {
-  console.log('Usage: npm run calendar:workflow -- <status|list-calendars|agenda|freebusy|create-event> [options]');
+  console.log(
+    'Usage: npm run calendar:workflow -- <status|list-calendars|agenda|freebusy|create-event> [options]'
+  );
   console.log('');
   console.log('Commands:');
   console.log('  status        Check calendar auth readiness');
@@ -64,13 +67,19 @@ function printHelp(): void {
   console.log('  npm run calendar:workflow -- list-calendars');
   console.log('  npm run calendar:workflow -- list-calendars --provider m365');
   console.log('  npm run calendar:workflow -- agenda --calendar-id primary --days 7');
-  console.log('  npm run calendar:workflow -- agenda --provider m365 --calendar-id primary --days 7');
-  console.log('  npm run calendar:workflow -- freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00');
-  console.log('  npm run calendar:workflow -- create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet');
+  console.log(
+    '  npm run calendar:workflow -- agenda --provider m365 --calendar-id primary --days 7'
+  );
+  console.log(
+    '  npm run calendar:workflow -- freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00'
+  );
+  console.log(
+    '  npm run calendar:workflow -- create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet'
+  );
 }
 
-async function main() {
-  const { command, args } = parseArgs(process.argv.slice(2));
+async function main(argv: string[]) {
+  const { command, args } = parseArgs(argv);
 
   if (command === 'help' || command === '--help' || command === '-h') {
     printHelp();
@@ -144,9 +153,12 @@ async function main() {
       location: getString(args, '--location'),
       attendees: getStringList(args, '--attendees'),
       time_zone: getString(args, '--time-zone'),
-      send_updates: sendUpdatesValue === 'all' || sendUpdatesValue === 'externalOnly' || sendUpdatesValue === 'none'
-        ? sendUpdatesValue
-        : undefined,
+      send_updates:
+        sendUpdatesValue === 'all' ||
+        sendUpdatesValue === 'externalOnly' ||
+        sendUpdatesValue === 'none'
+          ? sendUpdatesValue
+          : undefined,
       with_meet: getBoolean(args, '--with-meet'),
       conference_request_id: getString(args, '--conference-request-id'),
     });
@@ -157,7 +169,8 @@ async function main() {
   throw new Error(`Unknown calendar workflow command: ${command}`);
 }
 
-main().catch((error) => {
-  console.error(error?.message || String(error));
-  process.exitCode = 1;
-});
+void defineScript({
+  name: 'calendar:workflow',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
