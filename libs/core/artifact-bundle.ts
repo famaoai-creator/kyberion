@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import {
   loadJson,
   safeExistsSync,
@@ -53,13 +52,12 @@ export interface ArtifactBundleFulfillmentReport {
   fulfilled: boolean;
 }
 
-const ajv = createAjv();
 const BUNDLE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/artifact-bundle.schema.json');
-let bundleValidateFn: ReturnType<typeof compileSchemaFromPath> | null = null;
+let bundleValidateFn: ReturnType<typeof compileSchema> | null = null;
 
 function ensureValidator() {
   if (bundleValidateFn) return bundleValidateFn;
-  bundleValidateFn = compileSchemaFromPath(ajv, BUNDLE_SCHEMA_PATH);
+  bundleValidateFn = compileSchema(BUNDLE_SCHEMA_PATH);
   return bundleValidateFn;
 }
 

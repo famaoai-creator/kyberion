@@ -1,8 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -39,14 +38,13 @@ export interface DistillCandidateRecord {
   scope?: MemoryScopeEnvelope;
 }
 
-const ajv = createAjv();
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/distill-candidate-record.schema.json');
 const DISTILL_DIR = pathResolver.shared('runtime/distill-candidates');
 let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

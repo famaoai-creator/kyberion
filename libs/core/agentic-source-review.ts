@@ -2,8 +2,7 @@ import * as path from 'node:path';
 
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { SourceAnalysisIr } from './source-analysis.js';
 import type { ReasoningParticipant } from './reasoning-participant.js';
 import type { TierLevel } from './types.js';
@@ -18,7 +17,7 @@ const RULE_PACK_PATH = pathResolver.knowledge(
 const REVIEW_PLAN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agentic-source-review-plan.schema.json'
 );
-const validateReviewPlanSchema = compileSchemaFromPath(createAjv(), REVIEW_PLAN_SCHEMA_PATH);
+const validateReviewPlanSchema = compileSchema(REVIEW_PLAN_SCHEMA_PATH);
 
 type ReviewStageStatus = 'complete' | 'pending_human_approval' | 'blocked' | 'manual_only';
 
