@@ -144,7 +144,16 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
       window.localStorage.setItem('chronos.theme-mode', theme);
     }, mode);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
-    await page.waitForTimeout(1_000);
+    // Chronos resolves the system preference and applies the requested theme
+    // in a client effect. A fixed delay was too short on slower CI runners,
+    // so the contrast sample could capture the light background during the
+    // dark-token first render (or vice versa).
+    await page.waitForFunction(
+      (expectedMode) => document.documentElement.dataset.theme === expectedMode,
+      mode,
+      { timeout: 10_000 }
+    );
+    await page.waitForTimeout(250);
     await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme;
