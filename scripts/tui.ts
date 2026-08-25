@@ -9,7 +9,12 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runTui } from '@presence/terminal-hud';
 import { setRegisteredEnv } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  setCurrentProcessArgv,
+} from './lib/harness.js';
 
 // Keep the interactive entrypoint in this process so stdin/stdout retain the
 // terminal's raw-mode capability. The old run_with_env wrapper used a
@@ -21,11 +26,12 @@ const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 export async function main(args: string[] = []): Promise<void> {
   const devMode = args.includes('--dev');
   if (devMode) {
-    process.argv = [
-      process.argv[0] || 'node',
-      process.argv[1] || 'scripts/tui.ts',
+    const currentArgv = currentProcessArgv();
+    setCurrentProcessArgv([
+      currentArgv[0] || 'node',
+      currentArgv[1] || 'scripts/tui.ts',
       ...args.filter((arg) => arg !== '--dev'),
-    ];
+    ]);
     await import(SOURCE_ENTRY);
     return;
   }
