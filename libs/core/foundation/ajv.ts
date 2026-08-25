@@ -41,9 +41,15 @@ function collectExternalRefs(value: unknown, refs: Set<string>): void {
   }
 }
 
-function registerSchema(validator: AjvLike, schemaPath: string, visited: Set<string>): void {
+function registerSchema(
+  validator: AjvLike,
+  schemaPath: string,
+  visited: Set<string>
+): Record<string, unknown> {
   const normalized = path.resolve(schemaPath);
-  if (visited.has(normalized)) return;
+  if (visited.has(normalized)) {
+    return readJson<Record<string, unknown>>(normalized);
+  }
   visited.add(normalized);
 
   const schema = readJson<Record<string, unknown>>(normalized);
@@ -59,12 +65,21 @@ function registerSchema(validator: AjvLike, schemaPath: string, visited: Set<str
   for (const schemaId of schemaIds) {
     if (!validator.getSchema(schemaId)) validator.addSchema(schema, schemaId);
   }
+  return schema;
 }
 
-export function compileSchema<T = unknown>(schemaPath: string): ValidateFunction<T> {
-  const validator = createAjv();
+export function compileSchema<T = unknown>(
+  schemaPath: string,
+  validator: AjvLike = createAjv()
+): ValidateFunction<T> {
   const normalized = path.resolve(schemaPath);
   const schemaId = pathToFileURL(normalized).href;
-  registerSchema(validator, normalized, new Set<string>());
-  return validator.getSchema(schemaId) as ValidateFunction<T>;
+  const schema = registerSchema(validator, normalized, new Set<string>());
+  const byPath = validator.getSchema<T>(schemaId);
+  if (byPath) return byPath;
+  if (typeof schema.$id === 'string' && schema.$id) {
+    const bySchemaId = validator.getSchema<T>(schema.$id);
+    if (bySchemaId) return bySchemaId;
+  }
+  return validator.compile<T>(schema);
 }
