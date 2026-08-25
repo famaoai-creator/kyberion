@@ -60,7 +60,8 @@
     {
       "id": "documentation-source-map",
       "scope": "pr",
-      "script": "check:documentation-source-map",
+      "executable": "node",
+      "args": ["dist/scripts/check_documentation_source_map.js"],
       "owner": "documentation",
       "rationale": "Keeps status, concept, and onboarding documentation anchored to one explicit source map."
     },
@@ -83,56 +84,73 @@
     {
       "id": "op-preflight-coverage",
       "scope": "pr",
-      "script": "check:op-preflight-coverage",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_op_preflight_coverage.ts"],
       "owner": "quality",
       "rationale": "Keeps actuator operations covered by preflight contracts."
     },
     {
       "id": "extension-order",
       "scope": "pr",
-      "script": "check:extension-order",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_extension_order.ts"],
       "owner": "architecture",
       "rationale": "Keeps extension registration deterministic and dependency-safe."
     },
     {
       "id": "module-invariants",
       "scope": "pr",
-      "script": "check:module-invariants",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_invariants.ts"],
       "owner": "architecture",
       "rationale": "Checks declared module invariants after the build."
     },
     {
       "id": "seam-multiplicity",
       "scope": "pr",
-      "script": "check:seam-multiplicity",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_seam_multiplicity.ts"],
       "owner": "architecture",
       "rationale": "Prevents new duplicate capability seams."
     },
     {
       "id": "capability-seams",
       "scope": "pr",
-      "script": "check:capability-seams",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_capability_seams.ts",
+        "--check"
+      ],
       "owner": "architecture",
       "rationale": "Checks capability seam registry coverage."
     },
     {
       "id": "capability-seams-ast",
       "scope": "pr",
-      "script": "check:capability-seams-ast",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_capability_seams_ast.ts"],
       "owner": "architecture",
       "rationale": "Checks capability seam adoption at the AST boundary."
     },
     {
       "id": "reasoning-provider-registry",
       "scope": "pr",
-      "script": "check:reasoning-provider-registry",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_reasoning_provider_registry.ts"
+      ],
       "owner": "operations",
       "rationale": "Keeps reasoning provider declarations aligned with the runtime registry."
     },
     {
       "id": "packaging-contract",
       "scope": "pr",
-      "script": "check:packaging-contract",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_packaging_contract.ts"],
       "owner": "quality",
       "rationale": "Checks package and artifact contracts after the build."
     },
@@ -147,273 +165,353 @@
     {
       "id": "esm",
       "scope": "pr",
-      "script": "check:esm",
+      "executable": "node",
+      "args": ["dist/scripts/check_esm_integrity.js"],
       "owner": "quality",
       "rationale": "Checks runtime ESM integrity."
     },
     {
       "id": "catalogs",
       "scope": "full",
-      "script": "check:catalogs",
+      "executable": "node",
+      "args": ["dist/scripts/check_catalog_integrity.js"],
       "owner": "governance",
       "rationale": "Checks catalog and knowledge index integrity."
     },
     {
       "id": "facet-purity",
       "scope": "full",
-      "script": "check:facet-purity",
+      "executable": "node",
+      "args": ["dist/scripts/check_facet_purity.js"],
       "owner": "quality",
       "rationale": "Checks facet purity boundaries."
     },
     {
       "id": "op-registry",
       "scope": "full",
-      "script": "check:op-registry",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_op_registry.ts", "--check"],
       "owner": "operations",
       "rationale": "Checks actuator operation registry freshness."
     },
     {
       "id": "vocabulary-types",
       "scope": "full",
-      "script": "check:vocabulary-types",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_vocabulary_types.ts",
+        "--check"
+      ],
       "owner": "experience",
       "rationale": "Checks generated vocabulary types."
     },
     {
       "id": "pseudo-locale",
       "scope": "full",
-      "script": "check:pseudo-locale",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_pseudo_locale.ts",
+        "--check"
+      ],
       "owner": "experience",
       "rationale": "Checks generated pseudo-locale output."
     },
     {
       "id": "deprecated-wisdom-ops",
       "scope": "full",
-      "script": "check:deprecated-wisdom-ops",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_deprecated_wisdom_ops.ts",
+        "--fail"
+      ],
       "owner": "governance",
       "rationale": "Prevents retired Wisdom aliases in pipeline catalogs."
     },
     {
       "id": "wisdom-forwarders",
       "scope": "full",
-      "script": "check:wisdom-forwarders",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_wisdom_forwarders.ts"],
       "owner": "operations",
       "rationale": "Checks Wisdom forwarder targets."
     },
     {
       "id": "env-registry",
       "scope": "full",
-      "script": "check:env-registry",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/generate_env_registry.ts",
+        "--check"
+      ],
       "owner": "operations",
       "rationale": "Checks environment registry freshness."
     },
     {
       "id": "knowledge-scope",
       "scope": "pr",
-      "script": "check:knowledge-scope",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_knowledge_scope_boundaries.ts"
+      ],
       "owner": "security",
       "rationale": "Checks tenant and knowledge scope boundaries."
     },
     {
       "id": "governance-rules",
       "scope": "full",
-      "script": "check:governance-rules",
+      "executable": "node",
+      "args": ["dist/scripts/check_governance_rules.js"],
       "owner": "governance",
       "rationale": "Checks governed catalog rules."
     },
     {
       "id": "work-scope-policy",
       "scope": "full",
-      "script": "check:work-scope-policy",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_work_scope_policy.ts"],
       "owner": "governance",
       "rationale": "Checks mandatory work-scope policy emitters."
     },
     {
       "id": "mission-gate-docs",
       "scope": "full",
-      "script": "check:mission-gate-docs",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_mission_gate_docs.ts"],
       "owner": "governance",
       "rationale": "Checks canonical mission-gate documentation."
     },
     {
       "id": "design-contrast",
       "scope": "full",
-      "script": "check:design-contrast",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_design_contrast.ts"],
       "owner": "experience",
       "rationale": "Checks design contrast contracts."
     },
     {
       "id": "design-ledger",
       "scope": "pr",
-      "script": "check:design-ledger",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_design_ledger.ts"],
       "owner": "experience",
       "rationale": "Checks design decision ledger integrity."
     },
     {
       "id": "chronos-dom-contrast",
       "scope": "full",
-      "script": "check:chronos-dom-contrast",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_chronos_dom_contrast.ts",
+        "--start"
+      ],
       "owner": "experience",
       "rationale": "Checks Chronos light, dark, and reduced-motion DOM contrast."
     },
     {
       "id": "ui-ux",
       "scope": "full",
-      "script": "check:ui-ux",
+      "executable": "node",
+      "args": ["dist/scripts/check_ui_ux_governance.js"],
       "owner": "experience",
       "rationale": "Checks shared UI and UX governance."
     },
     {
       "id": "i18n",
       "scope": "full",
-      "script": "check:i18n",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_i18n_hardcoding.ts"],
       "owner": "experience",
       "rationale": "Checks internationalization hardcoding ratchets."
     },
     {
       "id": "intent-domain-coverage",
       "scope": "full",
-      "script": "check:intent-domain-coverage",
+      "executable": "node",
+      "args": ["dist/scripts/check_intent_domain_coverage.js"],
       "owner": "intent",
       "rationale": "Checks intent domain coverage."
     },
     {
       "id": "contract-schemas",
       "scope": "full",
-      "script": "check:contract-schemas",
+      "executable": "node",
+      "args": ["dist/scripts/check_contract_schemas.js"],
       "owner": "quality",
       "rationale": "Checks contract schema coverage and validity."
     },
     {
       "id": "pii-rules",
       "scope": "full",
-      "script": "check:pii-rules",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/generate_pii_rules.ts", "--check"],
       "owner": "security",
       "rationale": "Checks generated PII rules."
     },
     {
       "id": "eval-distill",
       "scope": "full",
-      "script": "eval:distill",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/eval_distill.ts"],
       "owner": "quality",
       "rationale": "Runs the deterministic distill evaluation."
     },
     {
       "id": "contract-semver",
       "scope": "full",
-      "script": "check:contract-semver",
+      "executable": "node",
+      "args": ["dist/scripts/check_contract_semver.js"],
       "owner": "quality",
       "rationale": "Checks actuator contract semver compatibility."
     },
     {
       "id": "pipeline-shell-independence",
       "scope": "full",
-      "script": "check:pipeline-shell-independence",
+      "executable": "node",
+      "args": ["dist/scripts/check_pipeline_shell_independence.js"],
       "owner": "operations",
       "rationale": "Checks portable pipeline shell usage."
     },
     {
       "id": "workflow-catalog-refs",
       "scope": "full",
-      "script": "check:workflow-catalog-refs",
+      "executable": "node",
+      "args": ["dist/scripts/check_workflow_catalog_refs.js"],
       "owner": "governance",
       "rationale": "Checks workflow catalog references."
     },
     {
       "id": "process-registry",
       "scope": "full",
-      "script": "check:process-registry",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_process_definition_registry.ts"
+      ],
       "owner": "governance",
       "rationale": "Checks process definition registry bindings."
     },
     {
       "id": "mission-process-bindings",
       "scope": "full",
-      "script": "check:mission-process-bindings",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_mission_process_bindings.ts"],
       "owner": "governance",
       "rationale": "Checks mission process bindings."
     },
     {
       "id": "reference-drift",
       "scope": "full",
-      "script": "check:reference-drift",
+      "executable": "vitest",
+      "args": ["run", "tests/reference-drift-contract.test.ts"],
       "owner": "quality",
       "rationale": "Checks reference drift contracts."
     },
     {
       "id": "production-evidence-status",
       "scope": "full",
-      "script": "check:production-evidence-status",
+      "executable": "node",
+      "args": ["dist/scripts/check_production_evidence.js"],
       "owner": "release",
       "rationale": "Surfaces production evidence readiness without blocking local validation."
     },
     {
       "id": "production-evidence",
       "scope": "full",
-      "script": "check:production-evidence",
+      "executable": "vitest",
+      "args": ["run", "tests/production-evidence-register-contract.test.ts"],
       "owner": "release",
       "rationale": "Checks the production evidence register contract."
     },
     {
       "id": "first-win-smoke",
       "scope": "full",
-      "script": "check:first-win-smoke",
+      "executable": "node",
+      "args": ["dist/scripts/check_first_win_smoke.js"],
       "owner": "experience",
       "rationale": "Checks first-win smoke contract."
     },
     {
       "id": "first-win-lifecycle",
       "scope": "full",
-      "script": "check:first-win-lifecycle",
+      "executable": "node",
+      "args": ["dist/scripts/first_win_lifecycle_smoke.js", "--dry-run", "--json"],
       "owner": "experience",
       "rationale": "Checks first-win lifecycle dry-run."
     },
     {
       "id": "doc-examples",
       "scope": "full",
-      "script": "check:doc-examples",
+      "executable": "node",
+      "args": ["dist/scripts/check_doc_examples.js"],
       "owner": "documentation",
       "rationale": "Checks tagged documentation examples."
     },
     {
       "id": "tier-hygiene",
       "scope": "full",
-      "script": "check:tier-hygiene",
+      "executable": "node",
+      "args": ["dist/scripts/check_tier_hygiene.js"],
       "owner": "security",
       "rationale": "Checks tier hygiene boundaries."
     },
     {
       "id": "mos-no-write-api",
       "scope": "full",
-      "script": "check:mos-no-write-api",
+      "executable": "pnpm",
+      "args": [
+        "--filter",
+        "@presence/operator-surface",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        "vitest.config.mjs"
+      ],
       "owner": "security",
       "rationale": "Checks read-only operator-surface API boundaries."
     },
     {
       "id": "audit-continuity",
       "scope": "full",
-      "script": "check:audit-continuity",
+      "executable": "pnpm",
+      "args": ["run", "audit:verify", "--days", "7", "--warn-only"],
       "owner": "security",
       "rationale": "Checks audit continuity in warn-only observation mode."
     },
     {
       "id": "tenant-registry",
       "scope": "full",
-      "script": "check:tenant-registry",
+      "executable": "node",
+      "args": ["dist/scripts/check_tenant_registry_consistency.js"],
       "owner": "security",
       "rationale": "Checks tenant profile, confidential index, and customer overlay consistency."
     },
     {
       "id": "entity-governance",
       "scope": "full",
-      "script": "check:entity-governance",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_entity_governance.ts"],
       "owner": "governance",
       "rationale": "Checks entity and mission governance boundaries."
     },
     {
       "id": "event-wiring",
       "scope": "full",
-      "script": "check:event-wiring",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_event_wiring.ts"],
       "owner": "operations",
       "rationale": "Checks event wiring contracts."
     },
