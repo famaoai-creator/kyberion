@@ -153,7 +153,22 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
       mode,
       { timeout: 10_000 }
     );
-    await page.waitForTimeout(250);
+    await page.waitForFunction(
+      (expectedMode) => {
+        const main = document.querySelector('main');
+        const secondary = main
+          ? getComputedStyle(main).getPropertyValue('--kb-text-secondary')
+          : '';
+        return expectedMode === 'light'
+          ? secondary.includes('15, 23, 42')
+          : secondary.includes('248, 250, 252');
+      },
+      mode,
+      { timeout: 10_000 }
+    );
+    // Let the first operator-home projection settle before sampling its
+    // asynchronously rendered status copy.
+    await page.waitForTimeout(1_000);
     await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
       document.documentElement.style.colorScheme = theme;
