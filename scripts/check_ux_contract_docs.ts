@@ -1,4 +1,5 @@
 import { loadJson, pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const UX_CONTRACT_DOCS = [
   'README.md',
@@ -57,17 +58,24 @@ export function checkUxContractDocs(): string[] {
   return failures;
 }
 
-export function main(): void {
-  const failures = checkUxContractDocs();
-  if (failures.length > 0) {
-    console.error('[check:ux-contract-docs] FAILED');
-    for (const failure of failures) console.error(`- ${failure}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:ux-contract-docs] OK (${UX_CONTRACT_DOCS.length} documents and surface taglines)`
-  );
-}
+export const runCheckUxContractDocs = defineScript({
+  name: 'check:ux-contract-docs',
+  flags: [],
+  run(context) {
+    const failures = checkUxContractDocs();
+    if (failures.length > 0) {
+      console.error('[check:ux-contract-docs] FAILED');
+      for (const failure of failures) console.error(`- ${failure}`);
+      throw new Error(`${failures.length} UX contract violation(s)`);
+    }
+    context.print(
+      `[check:ux-contract-docs] OK (${UX_CONTRACT_DOCS.length} documents and surface taglines)`
+    );
+  },
+});
 
-if (process.argv[1]?.endsWith('check_ux_contract_docs.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_ux_contract_docs.ts') ||
+  isDirectScript(import.meta.url, 'check_ux_contract_docs.js')
+)
+  void runCheckUxContractDocs();

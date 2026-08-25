@@ -8,6 +8,7 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
@@ -167,38 +168,45 @@ export function checkModuleBoundaries(): {
   return { cycles, directionViolations, baseline, violations };
 }
 
-export function main(): void {
-  const writeBaseline = process.argv.includes('--write-baseline');
-  const report = checkModuleBoundaries();
-  if (writeBaseline) {
-    withExecutionContext('ecosystem_architect', () =>
-      safeWriteFile(
-        BASELINE_PATH,
-        JSON.stringify(
-          {
-            version: 1,
-            cycles: report.cycles.length,
-            direction_violations: report.directionViolations.length,
-          },
-          null,
-          2
-        ) + '\n'
-      )
+export const runCheckModuleBoundaries = defineScript({
+  name: 'check:module-boundaries',
+  flags: [],
+  run(context) {
+    const writeBaseline = context.argv.includes('--write-baseline');
+    const report = checkModuleBoundaries();
+    if (writeBaseline) {
+      withExecutionContext('ecosystem_architect', () =>
+        safeWriteFile(
+          BASELINE_PATH,
+          JSON.stringify(
+            {
+              version: 1,
+              cycles: report.cycles.length,
+              direction_violations: report.directionViolations.length,
+            },
+            null,
+            2
+          ) + '\n'
+        )
+      );
+      context.print(
+        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
+      );
+      return;
+    }
+    if (report.violations.length > 0) {
+      console.error('[check:module-boundaries] FAILED');
+      for (const violation of report.violations) console.error(`- ${violation}`);
+      throw new Error(`${report.violations.length} module boundary violation(s)`);
+    }
+    context.print(
+      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
     );
-    console.log(
-      `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
-    );
-    return;
-  }
-  if (report.violations.length > 0) {
-    console.error('[check:module-boundaries] FAILED');
-    for (const violation of report.violations) console.error(`- ${violation}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
-  );
-}
+  },
+});
 
-if (process.argv[1]?.endsWith('check_module_boundaries.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_module_boundaries.ts') ||
+  isDirectScript(import.meta.url, 'check_module_boundaries.js')
+)
+  void runCheckModuleBoundaries();
