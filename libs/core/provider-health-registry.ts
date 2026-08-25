@@ -7,8 +7,9 @@ import {
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { getRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 
 /**
  * Provider Health Registry v1.0
@@ -76,9 +77,7 @@ function ensureLoaded(now: number = Date.now()): void {
   demotions.clear();
   if (!safeExistsSync(filePath)) return;
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')) as {
-      demotions?: Demotion[];
-    };
+    const parsed = readJson<{ demotions?: Demotion[] }>(filePath);
     for (const entry of parsed.demotions || []) {
       if (!entry?.provider || !entry.instance || !Number.isFinite(entry.until)) continue;
       if (entry.until <= now) continue; // TTL recovery across restarts
