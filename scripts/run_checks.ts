@@ -84,12 +84,13 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
 }
 
 export function main(argv = process.argv.slice(2)): number {
+  const args = argv[0] === '--' ? argv.slice(1) : argv;
   const supportedFlags = new Set(['--scope', '--only', '--json']);
-  for (let index = 0; index < argv.length; index += 1) {
-    const flag = argv[index];
+  for (let index = 0; index < args.length; index += 1) {
+    const flag = args[index];
     if (!flag?.startsWith('--')) continue;
     if (!supportedFlags.has(flag)) {
-      const json = argv.includes('--json');
+      const json = args.includes('--json');
       const message = `unknown check option: ${flag}`;
       if (json)
         console.log(
@@ -100,9 +101,9 @@ export function main(argv = process.argv.slice(2)): number {
     }
     if (
       (flag === '--scope' || flag === '--only') &&
-      (!argv[index + 1] || argv[index + 1]!.startsWith('--'))
+      (!args[index + 1] || args[index + 1]!.startsWith('--'))
     ) {
-      const json = argv.includes('--json');
+      const json = args.includes('--json');
       const message = `${flag} requires a value`;
       if (json)
         console.log(
@@ -112,14 +113,16 @@ export function main(argv = process.argv.slice(2)): number {
       return 1;
     }
   }
-  const scopeIndex = argv.indexOf('--scope');
-  const scopeValue = scopeIndex >= 0 ? argv[scopeIndex + 1] : 'pr';
-  const onlyIndex = argv.indexOf('--only');
-  const only = onlyIndex >= 0 ? argv[onlyIndex + 1] : undefined;
-  const json = argv.includes('--json');
+  const scopeIndex = args.indexOf('--scope');
+  const scopeValue = scopeIndex >= 0 ? args[scopeIndex + 1] : 'pr';
+  const onlyIndex = args.indexOf('--only');
+  const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
+  const json = args.includes('--json');
   const error = (message: string): number => {
     if (json)
-      console.log(JSON.stringify({ scope: scopeValue, results: [], failed: 0, error }, null, 2));
+      console.log(
+        JSON.stringify({ scope: scopeValue, results: [], failed: 0, error: message }, null, 2)
+      );
     else console.error(`[check] ERROR ${message}`);
     return 1;
   };

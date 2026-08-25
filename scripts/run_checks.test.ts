@@ -49,6 +49,7 @@ describe('manifest-driven check runner', () => {
 
   it('fails closed for unknown options and missing option values', () => {
     expect(main(['--unknown'])).toBe(1);
+    expect(main(['--', '--scope', 'pr', '--only', 'missing'])).toBe(1);
     expect(main(['--scope'])).toBe(1);
     expect(main(['--only'])).toBe(1);
   });
