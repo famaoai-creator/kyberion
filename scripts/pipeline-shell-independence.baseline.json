@@ -37,16 +37,6 @@
       "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-60s-video.json"
     },
     {
-      "file": "knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json",
-      "pattern": "script-wrapper",
-      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-voice.json"
-    },
-    {
-      "file": "knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json",
-      "pattern": "script-wrapper",
-      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-video.json"
-    },
-    {
       "file": "knowledge/product/pipeline-templates/kyberion-vtuber-narrated-demo.json",
       "pattern": "script-wrapper",
       "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json"
@@ -270,11 +260,6 @@
       "file": "pipelines/inspect-workspace-surfaces.json",
       "pattern": "script-wrapper",
       "match": "node dist/scripts/surface_runtime.js --action status"
-    },
-    {
-      "file": "pipelines/kyberion-vtuber-narrated-demo-submit.json",
-      "pattern": "script-wrapper",
-      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json"
     },
     {
       "file": "pipelines/kyberion-vtuber-narrated-demo.json",
