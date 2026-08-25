@@ -1,4 +1,5 @@
 import { loadJson, pathResolver, safeExecResult } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Gate = {
   id: string;
@@ -83,7 +84,7 @@ export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?:
   return scoped;
 }
 
-export function main(argv = process.argv.slice(2)): number {
+export function main(argv: string[] = []): number {
   const args = argv[0] === '--' ? argv.slice(1) : argv;
   const supportedFlags = new Set(['--scope', '--only', '--json']);
   for (let index = 0; index < args.length; index += 1) {
@@ -157,4 +158,17 @@ export function main(argv = process.argv.slice(2)): number {
   return failed.length === 0 ? 0 : 1;
 }
 
-if (process.argv[1]?.endsWith('run_checks.ts')) process.exitCode = main();
+export const runChecks = defineScript({
+  name: 'check',
+  flags: [],
+  run(context) {
+    const status = main(context.argv);
+    if (status !== 0) throw new Error(`check command failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'run_checks.ts') ||
+  isDirectScript(import.meta.url, 'run_checks.js')
+)
+  void runChecks();
