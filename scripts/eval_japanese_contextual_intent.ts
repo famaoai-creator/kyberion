@@ -77,7 +77,7 @@ async function main(): Promise<void> {
         .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
         .join('\n')
     );
-    process.exit(1);
+    process.exitCode = 1;
   }
 
   const failures: string[] = [];
@@ -148,5 +148,5 @@ async function main(): Promise<void> {
 main().catch((error) => {
   console.error('[eval:japanese-contextual-intent] UNCAUGHT ERROR');
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

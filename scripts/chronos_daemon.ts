@@ -286,5 +286,5 @@ main().catch((err) => {
     recommendation: 'Restart chronos and inspect active/shared/logs/traces for the last failure.',
     dedupe_key: 'chronos-daemon:fatal',
   });
-  process.exit(1);
+  process.exitCode = 1;
 });

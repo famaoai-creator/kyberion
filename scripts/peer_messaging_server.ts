@@ -98,7 +98,7 @@ async function main(): Promise<void> {
       });
     } finally {
       await server.close();
-      process.exit(0);
+      process.exitCode = 0;
     }
   };
   process.once('SIGINT', shutdown);
@@ -107,5 +107,5 @@ async function main(): Promise<void> {
 
 main().catch((error: any) => {
   logger.error(error?.message || String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

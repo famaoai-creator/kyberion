@@ -107,7 +107,7 @@ if (
 )
   void main().catch((error) => {
     logger.error(error?.message ?? String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 
 export { main as runMeshHubInspect };
