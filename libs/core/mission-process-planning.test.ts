@@ -14,6 +14,11 @@ import {
   planProcessTemplateTasks,
 } from './mission-process-planning.js';
 import { assertValidMissionId } from './mission-creation.js';
+import {
+  buildPlannerRetryPrompt,
+  packetRequiresIndependentReview,
+  parsePlanningReviewVerdict,
+} from './mission-planning-packet.js';
 
 const missionId = 'MSN-PROCESS-PLAN-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -305,5 +310,44 @@ describe('mission process planning', () => {
     ) as MissionState;
     expect(state.process_template?.phase_specs?.length).toBe(6);
     expect(state.history?.some((entry) => entry.event === 'PLAN_TASKS')).toBe(true);
+  });
+});
+
+describe('mission planning packet helpers', () => {
+  it('parses the canonical fenced planning review verdict', () => {
+    const verdict = parsePlanningReviewVerdict(
+      '```json\n{"approve":true,"gaps":[],"rationale":"complete"}\n```'
+    );
+
+    expect(verdict).toMatchObject({
+      approve: true,
+      gaps: [],
+      rationale: 'complete',
+      parsed: { approve: true },
+    });
+  });
+
+  it('fails closed when a planning review verdict is absent or malformed', () => {
+    expect(parsePlanningReviewVerdict('no structured verdict')).toMatchObject({
+      approve: false,
+      gaps: ['planning review verdict block missing'],
+    });
+    expect(parsePlanningReviewVerdict('{"approve":"yes"}').approve).toBe(false);
+  });
+
+  it('requires independent review for high-risk task packets', () => {
+    const packet = {
+      next_tasks: [{ task_id: 'TASK-1', risk: 'high_stakes', description: 'review' }],
+    } as unknown as import('./channel-surface.js').PlanningPacket;
+
+    expect(packetRequiresIndependentReview(packet)).toBe(true);
+  });
+
+  it('keeps planner retry prompts bounded and explicit', () => {
+    const prompt = buildPlannerRetryPrompt('MSN-1', ['missing deliverable'], 'previous response');
+
+    expect(prompt).toContain('Return exactly one ```planning_packet``` block');
+    expect(prompt).toContain('- missing deliverable');
+    expect(prompt).toContain('previous response');
   });
 });
