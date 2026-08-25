@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
@@ -14,6 +13,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { createCustomer } from './customer_create.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function copyTree(srcDir: string, dstDir: string): void {
   safeMkdir(dstDir, { recursive: true });
@@ -76,11 +76,15 @@ export function migratePersonalCustomer(slug: string): string {
   return customerRoot;
 }
 
-function main(): void {
-  const slug = process.argv[2];
+function main(argv: string[]): void {
+  const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    console.error('Usage: customer_migrate_from_personal <slug>');
-    process.exit(slug ? 0 : 2);
+    const usage = 'Usage: customer_migrate_from_personal <slug>';
+    if (slug) {
+      console.error(usage);
+      throw new ScriptExitError(0);
+    }
+    throw new ScriptExitError(2, usage);
   }
 
   try {
@@ -89,13 +93,18 @@ function main(): void {
       `Migrated personal setup to ${path.relative(pathResolver.rootDir(), customerRoot)}`
     );
   } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
+    throw new Error(formatClassification(classifyError(err)));
   }
 }
 
-const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'customer_migrate_from_personal.ts') ||
+  isDirectScript(import.meta.url, 'customer_migrate_from_personal.js')
+)
+  void defineScript({
+    name: 'customer:migrate-from-personal',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();
