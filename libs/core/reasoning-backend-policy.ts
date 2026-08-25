@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync } from './secure-io.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
@@ -156,8 +155,6 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   },
 };
 
-let cachedPolicy: ReasoningBackendPolicy | null = null;
-let cachedPolicyPath: string | null = null;
 const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
   id: 'reasoning-backend-policy',
   path: POLICY_PATH,
@@ -173,16 +170,8 @@ function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
   }
 }
 
-function loadPolicyFile(): ReasoningBackendPolicy | null {
-  if (!safeExistsSync(POLICY_PATH)) return null;
-  return policyCatalog.load();
-}
-
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
-  if (cachedPolicy && cachedPolicyPath === POLICY_PATH) return cachedPolicy;
-  cachedPolicy = loadPolicyFile() ?? FALLBACK_POLICY;
-  cachedPolicyPath = POLICY_PATH;
-  return cachedPolicy;
+  return policyCatalog.load();
 }
 
 export function normalizeReasoningBackendMode(
@@ -306,7 +295,5 @@ export function resolveScopedBackendPolicy(
 }
 
 export function resetReasoningBackendPolicyCache(): void {
-  cachedPolicy = null;
-  cachedPolicyPath = null;
   policyCatalog.reset();
 }

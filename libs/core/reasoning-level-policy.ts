@@ -1,6 +1,5 @@
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync } from './secure-io.js';
 import { type StandardIntentDefinition, type IntentResolutionPacket } from './intent-resolution.js';
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-level-policy.json');
@@ -79,8 +78,6 @@ export interface ReasoningLevelPolicy {
   };
 }
 
-let cachedPolicy: ReasoningLevelPolicy | null = null;
-let cachedPolicyPath: string | null = null;
 const policyCatalog = defineCatalog<ReasoningLevelPolicy>({
   id: 'reasoning-level-policy',
   path: POLICY_PATH,
@@ -98,19 +95,8 @@ export function validateReasoningLevelPolicy(
   }
 }
 
-function loadPolicyFile(): ReasoningLevelPolicy | null {
-  if (!safeExistsSync(POLICY_PATH)) return null;
-  return policyCatalog.load();
-}
-
 export function loadReasoningLevelPolicy(): ReasoningLevelPolicy {
-  if (cachedPolicy && cachedPolicyPath === POLICY_PATH) return cachedPolicy;
-  cachedPolicy = loadPolicyFile();
-  if (!cachedPolicy) {
-    throw new Error(`Reasoning level policy missing at ${POLICY_PATH}`);
-  }
-  cachedPolicyPath = POLICY_PATH;
-  return cachedPolicy;
+  return policyCatalog.load();
 }
 
 function getSelectedIntent(input: {
@@ -237,6 +223,5 @@ export function resolveReasoningLevelDecision(
 }
 
 export function resetReasoningLevelPolicyCache(): void {
-  cachedPolicy = null;
-  cachedPolicyPath = null;
+  policyCatalog.reset();
 }
