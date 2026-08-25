@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   getRegisteredEnv,
   loadJson,
@@ -11,6 +10,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
   id: string;
@@ -152,7 +152,7 @@ function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) 
   };
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const args = parseArgs(argv);
   if (args.help) {
     printUsage();
@@ -185,11 +185,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(`Next: pnpm task:run ${scenario.id}`);
 }
 
-const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runTaskInit = defineScript({
+  name: 'task:init',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'task_init.ts') ||
+  isDirectScript(import.meta.url, 'task_init.js')
+)
+  void runTaskInit();
