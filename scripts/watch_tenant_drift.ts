@@ -32,6 +32,7 @@ import {
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core';
 import { readJsonFile } from './refactor/cli-input.js';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 
 interface DriftFinding {
   path: string;
@@ -152,8 +153,7 @@ export function recordTenantDriftAudit(report: DriftReport): void {
   });
 }
 
-function main(): number {
-  const args = process.argv.slice(2);
+function main(args: string[] = []): number {
   const json = args.includes('--json');
   const quiet = args.includes('--quiet');
   const alert = args.includes('--alert');
@@ -193,10 +193,14 @@ function main(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /watch_tenant_drift\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  process.exit(main());
-}
+void defineScript({
+  name: 'watch:tenant-drift',
+  flags: [],
+  run: ({ argv }) => {
+    const status = main(argv);
+    if (status !== 0) throw new ScriptExitError(status, 'tenant drift detected');
+  },
+})();
 
 export { buildTenantDriftAlert, scan as scanTenantDrift };
 export type { DriftFinding, DriftReport };
