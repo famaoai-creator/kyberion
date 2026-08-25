@@ -21,6 +21,7 @@ import {
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
 } from './design-token-utils.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ajv = createAjv();
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -675,44 +676,48 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
   }
 }
 
-function main() {
-  const violations: string[] = [];
-  const warnings: string[] = [];
-  for (const check of CHECKS) {
-    validateCatalog(check, violations, warnings);
-  }
-  validateDesignTokenCatalog(violations);
-  validateCapabilitiesGuideDrift(violations);
-
-  const indexUpToDate = generateIndex(true);
-  if (!indexUpToDate) {
-    violations.push(
-      'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
-    );
-  }
-
-  if (warnings.length > 0) {
-    console.warn('[check:catalogs] warnings (non-fatal):');
-    for (const warning of warnings.sort()) {
-      console.warn(`- ${warning}`);
+export const runCheckCatalogIntegrity = defineScript({
+  name: 'check:catalogs',
+  flags: [],
+  run(context) {
+    const violations: string[] = [];
+    const warnings: string[] = [];
+    for (const check of CHECKS) {
+      validateCatalog(check, violations, warnings);
     }
-  }
+    validateDesignTokenCatalog(violations);
+    validateCapabilitiesGuideDrift(violations);
 
-  if (violations.length > 0) {
-    console.error('[check:catalogs] violations detected:');
-    for (const violation of violations.sort()) {
-      console.error(`- ${violation}`);
+    const indexUpToDate = generateIndex(true);
+    if (!indexUpToDate) {
+      violations.push(
+        'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+      );
     }
-    process.exitCode = 1;
-    return;
-  }
 
-  console.log('[check:catalogs] OK');
-}
+    if (warnings.length > 0) {
+      console.warn('[check:catalogs] warnings (non-fatal):');
+      for (const warning of warnings.sort()) {
+        console.warn(`- ${warning}`);
+      }
+    }
+
+    if (violations.length > 0) {
+      console.error('[check:catalogs] violations detected:');
+      for (const violation of violations.sort()) {
+        console.error(`- ${violation}`);
+      }
+      throw new Error(`${violations.length} catalog integrity violation(s)`);
+    }
+
+    context.print('[check:catalogs] OK');
+  },
+});
 
 // Guarded so importing the pure collectors above does not run the whole
 // repository check as a side effect.
-const isDirectRun =
-  process.argv[1]?.endsWith('check_catalog_integrity.ts') ||
-  process.argv[1]?.endsWith('check_catalog_integrity.js');
-if (isDirectRun) main();
+if (
+  isDirectScript(import.meta.url, 'check_catalog_integrity.ts') ||
+  isDirectScript(import.meta.url, 'check_catalog_integrity.js')
+)
+  void runCheckCatalogIntegrity();
