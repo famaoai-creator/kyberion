@@ -68,6 +68,8 @@ function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
 }
 
+let activeMissionControllerArgs: string[] = [];
+
 // --- Sub-module imports ---
 import {
   type ResolvedMissionCliInput,
@@ -77,6 +79,7 @@ import {
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
 import { type MissionRelationships } from './refactor/mission-types.js';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -920,8 +923,10 @@ function listMissions(filterStatus?: string) {
 
 function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
   return withOrganizationContext(organizationId, () => {
-    const summaryOnly = process.argv.includes('--summary') || process.argv.includes('--compact');
-    const selectedOnly = process.argv.includes('--selected-only');
+    const summaryOnly =
+      activeMissionControllerArgs.includes('--summary') ||
+      activeMissionControllerArgs.includes('--compact');
+    const selectedOnly = activeMissionControllerArgs.includes('--selected-only');
     const organizationProfile = loadOrganizationProfile();
     const catalogs =
       listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
@@ -1004,11 +1009,13 @@ function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
 }
 
 function listOrganizationProfiles(organizationId?: string) {
-  const jsonOutput = process.argv.includes('--json');
-  const summaryOnly = process.argv.includes('--summary') || process.argv.includes('--compact');
-  const activeOnly = process.argv.includes('--active-only');
-  const readyOnly = process.argv.includes('--ready-only');
-  const missingOnly = process.argv.includes('--missing-only');
+  const jsonOutput = activeMissionControllerArgs.includes('--json');
+  const summaryOnly =
+    activeMissionControllerArgs.includes('--summary') ||
+    activeMissionControllerArgs.includes('--compact');
+  const activeOnly = activeMissionControllerArgs.includes('--active-only');
+  const readyOnly = activeMissionControllerArgs.includes('--ready-only');
+  const missingOnly = activeMissionControllerArgs.includes('--missing-only');
   const sourceFilter = getOptionValue('--source')?.trim();
   const customerRoot = path.join(ROOT_DIR, 'customer');
   const activeCustomer = customerResolver.activeCustomer();
@@ -1476,7 +1483,7 @@ function showMissionStatus(id: string, follow: boolean = false) {
 function showReasoningBackendStatus() {
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
-    process.argv.includes('--refresh-providers') ||
+    activeMissionControllerArgs.includes('--refresh-providers') ||
     registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
   const providers = discoverProviders(forceRefresh).filter((provider) =>
     ['claude', 'gemini', 'codex'].includes(provider.provider)
@@ -2072,15 +2079,16 @@ async function approveScopeChange(
 /**
  * 7. Main Entry
  */
-export async function main() {
-  const requestedAction = process.argv[2];
-  const isHelpFlag = process.argv.includes('--help') || process.argv.includes('-h');
+export async function main(args: string[] = currentProcessArgv()): Promise<void> {
+  activeMissionControllerArgs = [...args];
+  const requestedAction = args[0];
+  const isHelpFlag = args.includes('--help') || args.includes('-h');
   if (isHelpFlag && requestedAction !== 'help') {
     showHelp();
     return;
   }
 
-  const earlyPositionalArgs = extractMissionControllerPositionalArgs(process.argv);
+  const earlyPositionalArgs = extractMissionControllerPositionalArgs(args);
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
   if (earlyPositionalArgs[1]) {
     process.env.MISSION_ID = earlyPositionalArgs[1].toUpperCase();
@@ -2095,7 +2103,7 @@ export async function main() {
   installReasoningBackends();
   killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
-  const positionalArgs = extractMissionControllerPositionalArgs(process.argv);
+  const positionalArgs = extractMissionControllerPositionalArgs(args);
 
   const action = positionalArgs[0];
   const arg1 = positionalArgs[1];
@@ -2106,10 +2114,10 @@ export async function main() {
   const arg6 = positionalArgs[6];
   const arg7 = positionalArgs[7];
 
-  const hasRefresh = process.argv.includes('--refresh');
-  const hasDryRun = process.argv.includes('--dry-run');
+  const hasRefresh = args.includes('--refresh');
+  const hasDryRun = args.includes('--dry-run');
   await runMissionControllerAction({
-    argv: process.argv,
+    argv: args,
     action,
     arg1,
     arg2,
@@ -2181,7 +2189,14 @@ export async function main() {
   });
 }
 
-main().catch((err) => {
-  logger.error(err.message);
-  process.exit(1);
+export const runMissionController = defineScript({
+  name: 'mission:controller',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'mission_controller.ts') ||
+  isDirectScript(import.meta.url, 'mission_controller.js')
+)
+  void runMissionController();
