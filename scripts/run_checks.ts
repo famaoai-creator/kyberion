@@ -175,7 +175,14 @@ export function main(argv: string[] = []): number {
   if (json) console.log(JSON.stringify({ scope, results, failed: failed.length }, null, 2));
   else {
     console.log(`[check] scope=${scope} gates=${results.length} failed=${failed.length}`);
-    for (const result of results) console.log(`- ${result.status.toUpperCase()} ${result.id}`);
+    for (const result of results) {
+      console.log(`- ${result.status.toUpperCase()} ${result.id}`);
+      if (result.status === 'failed') {
+        if (result.stderr) console.log(`  stderr: ${result.stderr}`);
+        if (result.stdout) console.log(`  stdout: ${result.stdout}`);
+        if (result.error) console.log(`  error: ${result.error}`);
+      }
+    }
   }
   return failed.length === 0 ? 0 : 1;
 }
