@@ -10,6 +10,7 @@ import {
 import { scanPipelineShellIndependence } from './check_pipeline_shell_independence.js';
 
 const PROBE = pathResolver.sharedTmp('pipeline-shell-independence-probe.json');
+type PipelineFixture = { steps: Array<{ id?: string; op?: string }> };
 
 describe('check_pipeline_shell_independence', () => {
   let savedPersona: string | undefined;
@@ -180,12 +181,12 @@ describe('check_pipeline_shell_independence', () => {
   });
 
   it('locks the selected SX-11 migrations to their declared native actuator ops', () => {
-    const promoNarratedDemo = loadJson<any>(
+    const promoNarratedDemo = loadJson<PipelineFixture>(
       pathResolver.rootResolve(
         'knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json'
       )
     );
-    const vtuberSubmit = loadJson<any>(
+    const vtuberSubmit = loadJson<PipelineFixture>(
       pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json')
     );
     const selectedFiles = [
@@ -195,13 +196,13 @@ describe('check_pipeline_shell_independence', () => {
       pathResolver.rootResolve('pipelines/kyberion-vtuber-narrated-demo-submit.json'),
     ];
 
-    expect(promoNarratedDemo.steps.find((step: any) => step.id === 'generate_voice')).toMatchObject(
-      { op: 'voice:generate_voice' }
-    );
-    expect(promoNarratedDemo.steps.find((step: any) => step.id === 'generate_video')).toMatchObject(
-      { op: 'video-composition:create_narrated_video_from_content_brief' }
-    );
-    expect(vtuberSubmit.steps.find((step: any) => step.id === 'generate_voice')).toMatchObject({
+    expect(promoNarratedDemo.steps.find((step) => step.id === 'generate_voice')).toMatchObject({
+      op: 'voice:generate_voice',
+    });
+    expect(promoNarratedDemo.steps.find((step) => step.id === 'generate_video')).toMatchObject({
+      op: 'video-composition:create_narrated_video_from_content_brief',
+    });
+    expect(vtuberSubmit.steps.find((step) => step.id === 'generate_voice')).toMatchObject({
       op: 'voice:generate_voice',
     });
 
