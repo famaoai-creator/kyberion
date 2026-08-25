@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
@@ -50,11 +51,7 @@ let cachedDefaultLocale: SupportedLocale | undefined;
 function loadCatalogDefaultLocale(): SupportedLocale {
   if (cachedDefaultLocale !== undefined) return cachedDefaultLocale;
   try {
-    const raw = safeReadFile(VOCABULARY_PATH, {
-      encoding: 'utf8',
-      label: 'user-facing vocabulary (locale default)',
-    }) as string;
-    const parsed = JSON.parse(String(raw)) as { default_locale?: string };
+    const parsed = readJson<{ default_locale?: string }>(VOCABULARY_PATH);
     cachedDefaultLocale = normalizeLocale(parsed?.default_locale) ?? 'en';
   } catch {
     cachedDefaultLocale = 'en';
@@ -77,7 +74,7 @@ function resolveIdentityLocale(identityPathOverride?: string): SupportedLocale |
     const identityPath =
       identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json');
     if (!safeExistsSync(identityPath)) return null;
-    const parsed = JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'));
+    const parsed = readJson<Record<string, unknown>>(identityPath);
     const language = String(parsed?.language || '')
       .trim()
       .toLowerCase();
@@ -131,10 +128,7 @@ function resolveScopedLocale(scope?: LocaleContext['scope']): SupportedLocale | 
   for (const candidate of candidates) {
     try {
       if (!safeExistsSync(candidate)) continue;
-      const parsed = JSON.parse(String(safeReadFile(candidate, { encoding: 'utf8' }) || '{}')) as {
-        locale?: string;
-        default_locale?: string;
-      };
+      const parsed = readJson<{ locale?: string; default_locale?: string }>(candidate);
       const locale = normalizeLocale(parsed.locale || parsed.default_locale);
       if (locale) return locale;
     } catch {
