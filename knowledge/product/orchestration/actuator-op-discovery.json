@@ -2761,6 +2761,10 @@
           "kind": "capture"
         },
         {
+          "op": "baseline_check",
+          "kind": "capture"
+        },
+        {
           "op": "exec",
           "kind": "capture",
           "input_schema": {
