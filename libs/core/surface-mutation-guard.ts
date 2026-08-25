@@ -24,9 +24,15 @@ export interface SurfaceMutationDecision {
   reason: string;
 }
 
+/** Extract a bearer credential without deciding whether it is authorized. */
+export function extractSurfaceBearerToken(authorization: string | null | undefined): string {
+  return typeof authorization === 'string' && authorization.startsWith('Bearer ')
+    ? authorization.slice(7).trim()
+    : '';
+}
+
 function resolveBearerToken(request: SurfaceMutationRequest): string {
-  const authHeader = request.getHeader('authorization') || '';
-  return authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+  return extractSurfaceBearerToken(request.getHeader('authorization'));
 }
 
 function matchesConfiguredToken(candidate: string, configured: string | undefined): boolean {
