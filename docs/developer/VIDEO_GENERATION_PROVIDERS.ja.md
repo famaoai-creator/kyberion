@@ -61,5 +61,5 @@
 
 ```bash
 pnpm generate:env-registry
-pnpm run check:env-registry
+pnpm run check -- --scope full --only env-registry
 ```
