@@ -10,6 +10,7 @@ import {
   safeExistsSync,
   safeReadFile,
   inspectMeshHub,
+  type SurfaceAsyncChannel,
   isSurfaceOutboxDue,
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
@@ -205,7 +206,13 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   }
 }
 
-const DOCTOR_SURFACES = ['slack', 'telegram', 'imessage', 'discord', 'chronos'];
+const DOCTOR_SURFACES: SurfaceAsyncChannel[] = [
+  'slack',
+  'telegram',
+  'imessage',
+  'discord',
+  'chronos',
+];
 
 export function collectSurfaceDeliveryDoctorLines(): string[] {
   const summaries = DOCTOR_SURFACES.map((surface) => {
