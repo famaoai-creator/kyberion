@@ -2,6 +2,38 @@
   "version": 1,
   "gates": [
     {
+      "id": "pinned-deps",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_pinned_deps.ts"],
+      "owner": "release",
+      "rationale": "Keeps the package manager, overrides, and lockfile dependency policy pinned."
+    },
+    {
+      "id": "install-script-allowlist",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_install_script_allowlist.ts"],
+      "owner": "release",
+      "rationale": "Keeps native install scripts limited to the reviewed workspace allowlist."
+    },
+    {
+      "id": "lockfile-commit-gate",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_lockfile_commit_gate.ts"],
+      "owner": "release",
+      "rationale": "Requires explicit review evidence before a lockfile change is accepted."
+    },
+    {
+      "id": "golden",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["dist/scripts/check_golden_output.js"],
+      "owner": "quality",
+      "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
+    },
+    {
       "id": "foundation-adoption",
       "scope": "pr",
       "executable": "node",

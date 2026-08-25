@@ -14,7 +14,8 @@ describe('Release operations contract', () => {
     expect(workflow).toContain('permissions:');
     expect(workflow).toContain('contents: write');
     expect(workflow).toContain('pnpm run validate');
-    expect(workflow).toContain('pnpm run check:golden');
+    expect(workflow).toContain('pnpm run check -- --scope release');
+    expect(workflow).not.toContain('pnpm run check:golden');
     expect(workflow).toContain(
       'pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md'
     );

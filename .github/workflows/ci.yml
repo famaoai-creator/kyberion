@@ -32,12 +32,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check dependency pinning and install-script policy
-        run: |
-          pnpm run check:pinned-deps
-          pnpm run check:install-script-allowlist
-          pnpm run check:lockfile-commit-gate
-
       - name: Build project
         run: pnpm run build
 

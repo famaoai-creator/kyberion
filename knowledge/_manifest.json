@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 16924,
+      "size": 18126,
       "type": "json"
     },
     {
@@ -1665,7 +1665,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 17040,
+      "size": 17057,
       "type": "md"
     },
     {

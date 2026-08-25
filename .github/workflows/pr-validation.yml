@@ -49,12 +49,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check dependency pinning and install-script policy
-        run: |
-          pnpm run check:pinned-deps
-          pnpm run check:install-script-allowlist
-          pnpm run check:lockfile-commit-gate
-
       - name: Build @agent/core
         run: pnpm --filter '@agent/core' build
 
@@ -87,11 +81,6 @@ jobs:
 
       - name: Run governance boundary tests
         run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts
-
-      - name: Check golden outputs
-        env:
-          KYBERION_REASONING_BACKEND: stub
-        run: pnpm run check:golden
 
       - name: Security scan
         run: pnpm audit --audit-level=moderate
