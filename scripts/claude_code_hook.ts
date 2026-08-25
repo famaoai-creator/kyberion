@@ -26,6 +26,7 @@ import {
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { currentProcessArgv } from './lib/harness.js';
 
 async function readStdin(): Promise<string> {
   if (process.stdin.isTTY) return '';
@@ -34,8 +35,8 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString('utf8').trim();
 }
 
-async function main(): Promise<void> {
-  const event = process.argv[2] ?? '';
+async function main(args: string[] = currentProcessArgv()): Promise<void> {
+  const event = args[2] ?? '';
   const raw = await readStdin();
   let payload: Record<string, unknown> = {};
   try {
@@ -107,9 +108,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
+const hookArgv = currentProcessArgv();
+main(hookArgv).catch((err) => {
   // Fail open: emit an allow decision for PreToolUse so a hook bug never wedges the session.
-  if (process.argv[2] === 'PreToolUse') {
+  if (hookArgv[2] === 'PreToolUse') {
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
@@ -122,5 +124,5 @@ main().catch((err) => {
   } else {
     process.stderr.write(`[claude_code_hook] ${String(err)}\n`);
   }
-  process.exit(0);
+  process.exitCode = 0;
 });
