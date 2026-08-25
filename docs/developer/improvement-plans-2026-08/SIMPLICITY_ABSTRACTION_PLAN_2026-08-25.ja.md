@@ -306,7 +306,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | actuator ABI                                             | 4                                                           | 1      | SX-10    |
 | op 入力 schema カバレッジ                                | 13%                                                         | 100%   | SX-10    |
 | `system:exec` スクリプト包み                             | 68                                                          | 0      | SX-11    |
-| 最大ファイル行数                                         | 6,740                                                       | ≤1,500 | SX-12    |
+| 最大ファイル行数                                         | 6,643                                                       | ≤1,500 | SX-12    |
 | `index.ts` barrel 行数                                   | 20                                                          | ≤300   | SX-12    |
 | 状態「正本」文書                                         | 6                                                           | 1      | SX-13    |
 | docs/developer 配下 md                                   | 240                                                         | <100   | SX-13    |
@@ -341,7 +341,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 > | SX-09 | PARTIAL | `ChannelAdapter`/`runChannelTurn` を追加し、4 bridgeの共通turn lifecycleとthreadContextを採用。provider-neutralなthread formatterと、text-only channelへ4項目のintent contract・approval/clarificationのnext action・consequenceを配送する共通formatterを追加し、4 bridgeの会話入口から不要な `as any` キャストを除去した。Bearer headerの解釈は`surface-mutation-guard`の共通adapterへ寄せ、Chronos/Concierge/Presence Studio/computer-surface/terminal bridgeで再利用するようにした。今回、Presence Studio固有tokenも共通credential resolverを通すようにし、`SurfaceAsyncChannel` を正本channel集合に閉じた型と実行時guardへ変更した。viewer resolver 3系統、bridge固有thread履歴、read-model・配送統合は未完。 |
 > | SX-10 | PARTIAL | `runActuatorCli` を SDK dispatch へ移行し、`executePipelineFile()` と html-to-pptx の in-process 経路を追加。今回、actuator scaffoldが旧`dispatchDecisionOp` ABIを生成せず、SDK `actuator`をCLIと`run_pipeline`で共有する入口へ変更し、CLIの入力/JSON/schema/handler失敗を`process.exit`直呼びではなくcallerのerror boundaryへ返すようにした。全 ABI/schema 統合は未完。 |
 > | SX-11 | PARTIAL | `runAdfLifecycle` と canonical repair を実行入口へ接続し、`core:include` に fragment context/result envelope を追加。raw command形式に加えて`command + args`形式の`node dist`/`pnpm exec`/`npx tsx` wrapperも拒否するguardrailを追加した。super-nerveの重複repair・語彙移行は未完。 |
-> | SX-12 | PARTIAL | 21 seam の生成入口を `createSeam<T>()` に統一し、`libs/core/index.ts` を11個の境界付きpartへ分割、planning packet/review helpersを `mission-planning-packet.ts` へ抽出した。最大god moduleは6,739行で、store/façade・状態機械の統合は未完。 |
+> | SX-12 | PARTIAL | 21 seam の生成入口を `createSeam<T>()` に統一し、`libs/core/index.ts` を11個の境界付きpartへ分割、planning packet/review helpersを `mission-planning-packet.ts` へ抽出した。今回、workerのpayload/task契約を `mission-orchestration-worker-contracts.ts` へ抽出し、最大god moduleは6,643行まで減少した。store/façade・状態機械の統合と1,500行目標は未完。 |
 > | SX-13 | PARTIAL | 2026-08 計画群36文書へ metadata checker/gate を追加し frontmatter を補正。GlossaryをFirst-win / Contributor / FDEの3層へ再編し、Work ShapeとExecution Shapeの直交性および不足用語を明記した。状態正本・完了計画アーカイブ・知識コーパス整理は未完。 |
 
 > **SX-11 実装追記 (2026-08-25)**: `runValidatedSteps` のtyped-flow validation failureを`runAdfLifecycle`のcanonical auto-repair hookへ接続し、repair後の再preflightと1回限りの失敗記録を同一ライフサイクルで扱うようにした。super-nerveの重複repairと語彙移行は未完。
@@ -349,6 +349,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 > **SX-09 実装追記 (2026-08-25)**: 登録token/API token/localadmin tokenの認証判定をcoreの`resolveSurfaceViewerToken`へ集約し、Chronos role判定とConcierge viewer解決から共有境界を利用するようにした。surface固有のtenant/tier narrowingとpresence-studioの別HTTP adapter統合は未完。
 > **SX-13 実装追記 (2026-08-25)**: `docs/documentation-source-map.json` と `check:documentation-source-map` を追加し、状態・概念・オンボーディングのカテゴリ別正本、スコープ付き正本、補足/履歴資料、入口リンクを機械検証できるようにした。GlossaryはFirst-win / Contributor / FDEの3層へ再編した。完了計画のアーカイブとknowledgeコーパス整理は未完のためPARTIALを維持する。
 > **SX-14 実装追記 (2026-08-25)**: `kyberion`起動境界でenv registryのrequired欠損をfail-closed検証する`validateKyberionStartupEnvironment`を追加し、値を出さないエラー契約をテストした。現行registryにrequired項目がないため、実運用の必須項目キュレーションは未完。
+> **SX-06/SX-12 実装追記 (2026-08-25)**: production scriptsの直接`process.argv`/`process.exit()`を0件へ固定するscript-integrity ratchetを追加し、workerのpayload/task契約を`mission-orchestration-worker-contracts.ts`へ抽出した。worker本体は6,643行まで減少したが、SX-12の1,500行目標および残存god module分割は未完。
 > | SX-14 | PARTIAL | front-door UX contract lint と env registry 品質修正を追加し、enabled surface の `tagline_key` が語彙 catalog に存在することをPR gateで検査。README/Quickstart/Operator UX Guideの外部4語（request/plan/result/next action）は4/4で揃った。今回、`validateEnvAgainstRegistry(..., { strict: true })` が未登録変数と型不正をwarningではなくerrorとして返し、`KYBERION_ENV_REGISTRY_STRICT=1` のCLI起動でfail-closedになるテストを追加した。env全件の品質是正は未完。 |
 
 ## 参照
