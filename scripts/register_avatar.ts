@@ -6,6 +6,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -21,8 +22,8 @@ function parseArgs(argv: string[]): Record<string, string> {
   return result;
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2));
+function main(argv: string[]) {
+  const args = parseArgs(argv);
   const srcAvatar = path.resolve(args['src-avatar'] || 'active/shared/tmp/avatar.png');
   const destAvatarDir = path.resolve(args['dest-avatar-dir'] || 'knowledge/personal');
   const destAvatar = path.resolve(args['dest-avatar'] || path.join(destAvatarDir, 'avatar.png'));
@@ -36,8 +37,7 @@ function main() {
     args['avatar-path'] || path.relative(destAvatarDir, destAvatar) || 'avatar.png';
 
   if (!safeExistsSync(srcAvatar)) {
-    console.error(`Source avatar not found at ${srcAvatar}`);
-    process.exit(1);
+    throw new Error(`Source avatar not found at ${srcAvatar}`);
   }
 
   console.log(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
@@ -76,12 +76,23 @@ function main() {
       console.log('Updating identity file to register avatar...');
       safeWriteFile(identityJsonPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
     } catch (err: any) {
-      console.error(`Failed to parse identity JSON: ${err.message}`);
-      process.exit(1);
+      throw new Error(`Failed to parse identity JSON: ${err.message}`);
     }
   }
 
   console.log('Successfully registered avatar in personal profile!');
 }
 
-main();
+export const runRegisterAvatar = defineScript({
+  name: 'avatar:register',
+  flags: [],
+  run(context) {
+    return main(context.argv);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'register_avatar.ts') ||
+  isDirectScript(import.meta.url, 'register_avatar.js')
+)
+  void runRegisterAvatar();
