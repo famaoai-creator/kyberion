@@ -4,6 +4,7 @@ import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type SetupCountEntry = [label: string, value: number];
 
@@ -207,8 +208,8 @@ function buildRecommendedSurfaces(
   ];
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'setup_report', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('persona', {
       type: 'string',
@@ -262,10 +263,14 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /setup_report\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runSetupReportCli = defineScript({
+  name: 'setup:report',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'setup_report.ts') ||
+  isDirectScript(import.meta.url, 'setup_report.js')
+)
+  void runSetupReportCli();
