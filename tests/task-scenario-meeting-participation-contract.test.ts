@@ -19,7 +19,7 @@ describe('meeting-participation-request TaskScenario contract', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.rootResolve('schemas/task-scenario.schema.json')
+      pathResolver.rootResolve('knowledge/product/schemas/task-scenario.schema.json')
     );
     const scenario = readJson(
       'knowledge/product/task-scenarios/meeting-participation-request.json'

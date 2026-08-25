@@ -44,7 +44,9 @@ export interface WorkItemContext {
     | 'improvement_experiment';
 }
 
-const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve('schemas/work-item.schema.json');
+const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/governed-work-item.schema.json'
+);
 let workItemValidator: ValidateFunction | null = null;
 
 function validateWorkItem(value: unknown): void {

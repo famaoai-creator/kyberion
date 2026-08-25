@@ -11,7 +11,7 @@ import {
 import { compileSchema } from '@agent/core/foundation';
 
 export const videoCompositionActionValidate = compileSchema(
-  pathResolver.rootResolve('schemas/video-composition-action.schema.json')
+  pathResolver.rootResolve('knowledge/product/schemas/video-composition-action.schema.json')
 );
 export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/video-composition-actuator/manifest.json'

@@ -2,7 +2,7 @@
 
 *SSoT Index Version: 2.0.0 | Generated snapshot*
 
-> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
+> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `knowledge/product/schemas/volatile-knowledge.schema.json`.
 
 ## 📁 General
 - [Ecosystem Architecture & Knowledge Map](./Ecosystem_Map.md) (public | Kyberion Sovereign Entity)

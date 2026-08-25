@@ -59,7 +59,9 @@ export interface MemoryCandidate {
   };
 }
 
-const SCHEMA_PATH = pathResolver.rootResolve('schemas/memory-candidate.schema.json');
+const SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/memory-candidate.schema.json'
+);
 const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
 

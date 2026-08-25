@@ -2,7 +2,7 @@
   "actuator_id": "ios-actuator",
   "version": "1.1.0",
   "description": "simctl-driven iOS Simulator Actuator",
-  "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "simctl_retry",
@@ -18,7 +18,7 @@
   "capabilities": [
     {
       "op": "pipeline",
-      "schema_ref": "schemas/mobile-device-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
       "platforms": ["darwin"],
       "prerequisites": {
         "binaries": ["xcrun", "xcodebuild"],

@@ -11,7 +11,7 @@
  *     manifest.json
  *     package.json
  *     src/index.ts
- *     schemas/<name>-action.schema.json
+ *     knowledge/product/schemas/<name>-action.schema.json
  *     examples/README.md
  *
  * Pattern from Paper2Any's `dfa create` scaffolding CLI (Apache 2.0).
@@ -62,7 +62,7 @@ function buildManifest(fullName: string, description: string, name: string): str
       actuator_id: fullName,
       version: '1.0.0',
       description,
-      contract_schema: `schemas/${name}-action.schema.json`,
+      contract_schema: `knowledge/product/schemas/${name}-action.schema.json`,
       resilience_tier: 'adaptive_retry',
       recovery_policy: {
         fallback_strategy: 'sequential_alternatives',
@@ -72,7 +72,7 @@ function buildManifest(fullName: string, description: string, name: string): str
       capabilities: [
         {
           op: 'execute',
-          schema_ref: `schemas/${name}-action.schema.json`,
+          schema_ref: `knowledge/product/schemas/${name}-action.schema.json`,
           platforms: ['darwin', 'linux', 'win32'],
         },
       ],
@@ -265,7 +265,7 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
       'manifest.json',
       'package.json',
       'src/index.ts',
-      `schemas/${name}-action.schema.json`,
+      `knowledge/product/schemas/${name}-action.schema.json`,
       'examples/README.md',
     ],
     name: fullName,

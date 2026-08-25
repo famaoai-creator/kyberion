@@ -2,7 +2,7 @@
   "actuator_id": "artifact-actuator",
   "version": "1.0.0",
   "description": "Governed Artifact and Delivery Pack Manager",
-  "contract_schema": "schemas/artifact-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/artifact-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "artifact_io_retry",

@@ -27,7 +27,7 @@ const DEFAULT_FALLBACK_CATEGORIES = [
 ] as const;
 
 const ACTUATOR_MANIFEST_SCHEMA_PATH = pathResolver.rootResolve(
-  'schemas/actuator-manifest.schema.json'
+  'knowledge/product/schemas/actuator-manifest.schema.json'
 );
 const manifestCatalogs = new Map<string, GovernedCatalog<RecoveryManifest>>();
 

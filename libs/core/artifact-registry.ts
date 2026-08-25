@@ -33,7 +33,7 @@ export interface ArtifactOwnershipQuery {
 }
 
 const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
-  'schemas/artifact-record.schema.json'
+  'knowledge/product/schemas/artifact-ownership-record.schema.json'
 );
 const ARTIFACT_REGISTRY_PATH = pathResolver.shared('runtime/artifacts/registry.jsonl');
 

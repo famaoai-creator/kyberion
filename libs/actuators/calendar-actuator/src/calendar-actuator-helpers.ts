@@ -27,7 +27,7 @@ export type CalendarAction = {
 
 const addFormats = (addFormatsModule as any).default || addFormatsModule;
 const CALENDAR_SCHEMA_PATH = pathResolver.rootResolve(
-  'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
+  'libs/actuators/calendar-actuator/knowledge/product/schemas/calendar-action.schema.json'
 );
 
 let cachedValidator: ValidateFunction | null = null;

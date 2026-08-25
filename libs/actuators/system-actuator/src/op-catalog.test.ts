@@ -60,9 +60,12 @@ describe('system-actuator op catalog', () => {
   it('keeps the contract schema aligned with routed public ops', () => {
     const schema = JSON.parse(
       String(
-        safeReadFile(pathResolver.rootResolve('schemas/system-pipeline.schema.json'), {
-          encoding: 'utf8',
-        }) || '{}'
+        safeReadFile(
+          pathResolver.rootResolve('knowledge/product/schemas/system-pipeline.schema.json'),
+          {
+            encoding: 'utf8',
+          }
+        ) || '{}'
       )
     );
     const enumValues = new Set<string>(

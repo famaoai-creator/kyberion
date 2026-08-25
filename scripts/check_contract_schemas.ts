@@ -890,7 +890,7 @@ function createChecks(): ContractCheck[] {
   return [
     {
       id: 'intent-resolution',
-      schemaPath: 'schemas/intent-resolution.schema.json',
+      schemaPath: 'knowledge/product/schemas/intent-resolution.schema.json',
       validPayloads: [resolveIntentResolutionContract('今週の進捗レポートを作って')],
       invalidPayloads: [
         {
@@ -944,7 +944,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'track-policy-override',
-      schemaPath: 'schemas/track-policy-override.schema.json',
+      schemaPath: 'knowledge/product/schemas/track-policy-override.schema.json',
       validPayloads: [
         {
           track_types: {
@@ -971,7 +971,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'next-action',
-      schemaPath: 'schemas/next-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/next-action.schema.json',
       validPayloads: [
         createNextActionContract({
           actionId: 'act-schema-1',
@@ -994,7 +994,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'memory-candidate',
-      schemaPath: 'schemas/memory-candidate.schema.json',
+      schemaPath: 'knowledge/product/schemas/memory-candidate.schema.json',
       validPayloads: [
         {
           candidate_id: 'mem-cand-1',
@@ -1026,7 +1026,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'outcome-contract',
-      schemaPath: 'schemas/outcome-contract.schema.json',
+      schemaPath: 'knowledge/product/schemas/outcome-contract.schema.json',
       validPayloads: [
         createOutcomeContract({
           outcomeId: 'outcome-schema-1',
@@ -1052,7 +1052,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'artifact-record',
-      schemaPath: 'schemas/artifact-record.schema.json',
+      schemaPath: 'knowledge/product/schemas/artifact-ownership-record.schema.json',
       validPayloads: [
         {
           artifact_id: 'ART-schema-1',
@@ -1577,7 +1577,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-queue-entry',
-      schemaPath: 'schemas/mission-queue.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-queue.schema.json',
       validPayloads: [
         {
           mission_id: 'MSN-SCHEMA-1',
@@ -1627,7 +1627,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'approval-action',
-      schemaPath: 'schemas/approval-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/approval-action.schema.json',
       validPayloads: [
         {
           action: 'create',
@@ -1653,7 +1653,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'secret-action',
-      schemaPath: 'schemas/secret-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/secret-action.schema.json',
       validPayloads: [
         {
           action: 'set',
@@ -1676,7 +1676,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'artifact-action',
-      schemaPath: 'schemas/artifact-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/artifact-action.schema.json',
       validPayloads: [
         {
           action: 'write_delivery_pack',
@@ -1697,7 +1697,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'agent-action',
-      schemaPath: 'schemas/agent-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/agent-action.schema.json',
       validPayloads: [
         {
           action: 'spawn',
@@ -1716,7 +1716,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'service-action',
-      schemaPath: 'schemas/service-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/service-action.schema.json',
       validPayloads: [
         {
           service_id: 'github',
@@ -1762,7 +1762,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'blockchain-action',
-      schemaPath: 'schemas/blockchain-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/blockchain-action.schema.json',
       validPayloads: [
         {
           action: 'anchor_mission',
@@ -1788,7 +1788,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'presence-action',
-      schemaPath: 'schemas/presence-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/presence-action.schema.json',
       validPayloads: [
         {
           action: 'dispatch',
@@ -1818,7 +1818,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'process-action',
-      schemaPath: 'schemas/process-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/process-action.schema.json',
       validPayloads: [
         {
           action: 'spawn',
@@ -1847,7 +1847,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'terminal-action',
-      schemaPath: 'schemas/terminal-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/terminal-action.schema.json',
       validPayloads: [
         {
           action: 'spawn',
@@ -1873,7 +1873,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'vision-action',
-      schemaPath: 'schemas/vision-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/vision-action.schema.json',
       validPayloads: [
         {
           action: 'inspect_image',
@@ -1903,7 +1903,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'wisdom-action',
-      schemaPath: 'schemas/wisdom-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/wisdom-action.schema.json',
       validPayloads: [
         {
           action: 'knowledge_search',
@@ -1927,7 +1927,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'voice-action',
-      schemaPath: 'schemas/voice-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/voice-action.schema.json',
       validPayloads: [
         {
           action: 'generate_voice',
@@ -2119,7 +2119,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'media-generation-action',
-      schemaPath: 'schemas/media-generation-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/media-generation-action.schema.json',
       validPayloads: [
         {
           action: 'generate_image',
@@ -2209,7 +2209,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'computer-action',
-      schemaPath: 'schemas/computer-action.schema.json',
+      schemaPath: 'knowledge/product/schemas/computer-action.schema.json',
       validPayloads: [
         {
           actions: [
@@ -2240,7 +2240,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'a2a-envelope',
-      schemaPath: 'schemas/a2a-envelope.schema.json',
+      schemaPath: 'knowledge/product/schemas/a2a-envelope.schema.json',
       validPayloads: [
         {
           a2a_version: '1.0',
@@ -2474,7 +2474,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'bridge-request',
-      schemaPath: 'schemas/bridge-request.schema.json',
+      schemaPath: 'knowledge/product/schemas/bridge-request.schema.json',
       validPayloads: [
         {
           intent: 'request_marketing_material',
@@ -2494,7 +2494,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-contract',
-      schemaPath: 'schemas/mission-contract.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-contract.schema.json',
       validPayloads: [
         {
           mission_id: 'msn-schema-1',
@@ -2522,7 +2522,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'mission-state',
-      schemaPath: 'schemas/mission-state.schema.json',
+      schemaPath: 'knowledge/product/schemas/mission-state.schema.json',
       validPayloads: [
         {
           mission_id: 'MSN-STATE-001',
@@ -2718,7 +2718,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'design-spec',
-      schemaPath: 'schemas/design-spec.schema.json',
+      schemaPath: 'knowledge/product/schemas/design-spec.schema.json',
       validPayloads: [
         {
           version: 'v1',
@@ -2745,7 +2745,7 @@ function createChecks(): ContractCheck[] {
     },
     {
       id: 'task-plan',
-      schemaPath: 'schemas/task-plan.schema.json',
+      schemaPath: 'knowledge/product/schemas/task-plan.schema.json',
       validPayloads: [
         {
           version: 'v1',
@@ -4008,7 +4008,7 @@ function main() {
 
   const a2uiValidate = compileSchemaFromPath(
     ajv2020,
-    pathResolver.rootResolve('schemas/a2ui-message.schema.json')
+    pathResolver.rootResolve('knowledge/product/schemas/a2ui-message.schema.json')
   );
   const a2uiMessages = [
     {

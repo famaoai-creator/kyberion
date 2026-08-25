@@ -108,7 +108,10 @@ describe('outcome-contract', () => {
 
   it('emits contracts that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/outcome-contract.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/outcome-contract.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const contract = createOutcomeContract({
       requestedResult: 'Generate weekly report',

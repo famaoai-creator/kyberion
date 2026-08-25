@@ -31,10 +31,10 @@ describe('foundation helpers', () => {
 
   it('registers external refs before compiling actuator schemas', () => {
     const validateVoiceAction = compileSchema(
-      path.resolve(process.cwd(), 'schemas/voice-action.schema.json')
+      path.resolve(process.cwd(), 'knowledge/product/schemas/voice-action.schema.json')
     );
     const validateVideoAction = compileSchema(
-      path.resolve(process.cwd(), 'schemas/video-composition-action.schema.json')
+      path.resolve(process.cwd(), 'knowledge/product/schemas/video-composition-action.schema.json')
     );
 
     expect(validateVoiceAction({ action: 'health', params: {} })).toBe(true);

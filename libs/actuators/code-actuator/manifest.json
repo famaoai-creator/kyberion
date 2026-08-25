@@ -2,7 +2,7 @@
   "actuator_id": "code-actuator",
   "version": "2.2.0",
   "description": "ADF-driven code analysis and refactoring pipeline engine",
-  "contract_schema": "schemas/code-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/code-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "code_io_retry",
@@ -18,7 +18,7 @@
   "capabilities": [
     {
       "op": "pipeline",
-      "schema_ref": "schemas/code-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/code-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     },
     {
@@ -36,7 +36,7 @@
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] },
     {
       "op": "impact_analysis",
-      "schema_ref": "schemas/impact-analysis.schema.json",
+      "schema_ref": "knowledge/product/schemas/impact-analysis.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     }
   ]

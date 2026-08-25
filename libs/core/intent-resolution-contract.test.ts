@@ -138,7 +138,10 @@ describe('intent-resolution-contract', () => {
 
   it('emits contracts that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/intent-resolution.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/intent-resolution.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const contract = resolveIntentResolutionContract('今週の進捗レポートを作って');
     const valid = validate(contract);

@@ -10,7 +10,7 @@
       "version": "1.1.0",
       "capability_count": 7,
       "ops": ["a2a", "ask", "delegate", "health", "list", "spawn", "team_plan"],
-      "contract_schema": "schemas/agent-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/agent-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -21,7 +21,7 @@
       "version": "1.1.0",
       "capability_count": 1,
       "ops": ["pipeline"],
-      "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
       "prerequisites_summary": "bin:adb, env:ANDROID_HOME, os:darwin, os:linux, os:win32"
     },
     {
@@ -39,7 +39,7 @@
         "load",
         "request_review"
       ],
-      "contract_schema": "schemas/approval-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/approval-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -50,7 +50,7 @@
       "version": "1.0.0",
       "capability_count": 4,
       "ops": ["append_event", "read_json", "write_delivery_pack", "write_json"],
-      "contract_schema": "schemas/artifact-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/artifact-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -61,7 +61,7 @@
       "version": "1.1.0",
       "capability_count": 3,
       "ops": ["anchor_mission", "anchor_trust", "verify_anchor"],
-      "contract_schema": "schemas/blockchain-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/blockchain-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -72,7 +72,7 @@
       "version": "1.1.0",
       "capability_count": 2,
       "ops": ["computer_interaction", "pipeline"],
-      "contract_schema": "schemas/browser-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/browser-automation-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -92,7 +92,7 @@
         "ios_test",
         "scaffold_app"
       ],
-      "contract_schema": "schemas/build-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/build-pipeline.schema.json",
       "prerequisites_summary": "bin:xcodebuild, bin:xcodegen, bin:xcrun, env:ANDROID_HOME, os:darwin, os:linux, os:win32"
     },
     {
@@ -103,7 +103,7 @@
       "version": "1.1.0",
       "capability_count": 4,
       "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
-      "contract_schema": "schemas/calendar-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/calendar-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -114,7 +114,7 @@
       "version": "2.2.0",
       "capability_count": 4,
       "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
-      "contract_schema": "schemas/code-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/code-pipeline.schema.json",
       "prerequisites_summary": "bin:semgrep, os:darwin, os:linux"
     },
     {
@@ -125,7 +125,7 @@
       "version": "1.0.0",
       "capability_count": 1,
       "ops": ["deploy_release"],
-      "contract_schema": "schemas/deployment-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/deployment-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -136,7 +136,7 @@
       "version": "1.1.0",
       "capability_count": 3,
       "ops": ["create_draft", "send", "send_from_file"],
-      "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
+      "contract_schema": "libs/actuators/email-actuator/knowledge/product/schemas/email-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -147,7 +147,7 @@
       "version": "1.1.0",
       "capability_count": 1,
       "ops": ["pipeline"],
-      "contract_schema": "schemas/file-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/file-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -175,7 +175,7 @@
       "version": "1.1.0",
       "capability_count": 1,
       "ops": ["pipeline"],
-      "contract_schema": "schemas/mobile-device-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
       "prerequisites_summary": "bin:xcodebuild, bin:xcrun, os:darwin"
     },
     {
@@ -186,7 +186,7 @@
       "version": "1.2.0",
       "capability_count": 1,
       "ops": ["pipeline"],
-      "contract_schema": "schemas/media-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -210,7 +210,7 @@
         "submit_generation",
         "wait_generation_job"
       ],
-      "contract_schema": "schemas/media-generation-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/media-generation-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -221,7 +221,7 @@
       "version": "1.1.0",
       "capability_count": 6,
       "ops": ["chat", "join", "leave", "listen", "speak", "status"],
-      "contract_schema": "schemas/meeting-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/meeting-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -242,7 +242,7 @@
       "version": "1.0.0",
       "capability_count": 2,
       "ops": ["pipeline", "reconcile"],
-      "contract_schema": "schemas/modeling-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/modeling-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -253,7 +253,7 @@
       "version": "2.2.0",
       "capability_count": 1,
       "ops": ["pipeline"],
-      "contract_schema": "schemas/network-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/network-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -264,7 +264,7 @@
       "version": "1.0.0",
       "capability_count": 2,
       "ops": ["pipeline", "reconcile"],
-      "contract_schema": "schemas/orchestrator-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/orchestrator-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -275,7 +275,7 @@
       "version": "1.0.0",
       "capability_count": 3,
       "ops": ["dispatch", "dispatch_timeline", "receive_event"],
-      "contract_schema": "schemas/presence-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/presence-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -286,7 +286,7 @@
       "version": "1.0.0",
       "capability_count": 4,
       "ops": ["list", "spawn", "status", "stop"],
-      "contract_schema": "schemas/process-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/process-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -297,7 +297,7 @@
       "version": "1.1.0",
       "capability_count": 4,
       "ops": ["delete", "get", "list", "set"],
-      "contract_schema": "schemas/secret-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/secret-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -308,7 +308,7 @@
       "version": "1.3.0",
       "capability_count": 7,
       "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
-      "contract_schema": "schemas/service-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/service-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -346,7 +346,7 @@
         "test_screen_mp4_roundtrip",
         "test_screen_stream"
       ],
-      "contract_schema": "schemas/system-pipeline.schema.json",
+      "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -357,7 +357,7 @@
       "version": "1.0.0",
       "capability_count": 5,
       "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
-      "contract_schema": "schemas/terminal-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/terminal-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -388,7 +388,7 @@
       "version": "1.4.0",
       "capability_count": 3,
       "ops": ["describe_image", "inspect_image", "ocr_image"],
-      "contract_schema": "schemas/vision-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/vision-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -412,7 +412,7 @@
         "speak_local",
         "verify_tts_loopback"
       ],
-      "contract_schema": "schemas/voice-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/voice-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -505,7 +505,7 @@
         "write_file",
         "yaml_update"
       ],
-      "contract_schema": "schemas/wisdom-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/wisdom-action.schema.json",
       "prerequisites_summary": "-"
     },
     {
@@ -531,7 +531,7 @@
         "todo-rollover",
         "weekly-open"
       ],
-      "contract_schema": "schemas/working-memory-action.schema.json",
+      "contract_schema": "knowledge/product/schemas/working-memory-action.schema.json",
       "prerequisites_summary": "-"
     }
   ]

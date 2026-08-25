@@ -140,7 +140,10 @@ describe('project and artifact registries', () => {
 
   it('emits artifact records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/artifact-record.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/artifact-ownership-record.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const artifact = {
       artifact_id: 'ART-TEST-SCHEMA',

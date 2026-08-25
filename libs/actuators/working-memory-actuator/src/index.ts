@@ -66,7 +66,7 @@ export interface VolatileSidecar {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const SCHEMA_REF = '../../../schemas/volatile-knowledge.schema.json';
+const SCHEMA_REF = '../../../knowledge/product/schemas/volatile-knowledge.schema.json';
 
 function isoNow(): string {
   return new Date().toISOString();

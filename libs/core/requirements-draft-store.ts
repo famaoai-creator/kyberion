@@ -5,7 +5,7 @@
  *
  * The canonical location is
  *   active/missions/<mission_id>/evidence/requirements-draft.json
- * conforming to schemas/requirements-draft.schema.json.
+ * conforming to knowledge/product/schemas/requirements-draft.schema.json.
  */
 
 import * as path from 'node:path';

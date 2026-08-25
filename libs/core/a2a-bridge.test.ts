@@ -611,7 +611,7 @@ describe('a2a-bridge', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json')
+      path.resolve(process.cwd(), 'knowledge/product/schemas/a2a-envelope.schema.json')
     );
 
     expect(
@@ -636,7 +636,7 @@ describe('a2a-bridge', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.resolve(process.cwd(), 'schemas/a2a-envelope.schema.json')
+      path.resolve(process.cwd(), 'knowledge/product/schemas/a2a-envelope.schema.json')
     );
 
     expect(

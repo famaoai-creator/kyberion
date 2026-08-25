@@ -99,7 +99,7 @@ function readJson(filePath: string): JsonObject {
 function ensureOverrideValidator(): ValidateFunction {
   if (overrideValidator) return overrideValidator;
   overrideValidator = compileSchema(
-    pathResolver.rootResolve('schemas/track-policy-override.schema.json')
+    pathResolver.rootResolve('knowledge/product/schemas/track-policy-override.schema.json')
   );
   return overrideValidator;
 }

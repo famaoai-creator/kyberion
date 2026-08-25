@@ -3,7 +3,7 @@
   "version": "1.1.0",
   "description": "Local Ledger Anchoring Simulation",
   "simulated": true,
-  "contract_schema": "schemas/blockchain-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/blockchain-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "local_append_retry",

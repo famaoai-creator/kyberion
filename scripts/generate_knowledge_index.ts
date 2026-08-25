@@ -194,7 +194,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   // For checkOnly mode, we don't compare the Last Updated string, so we generate a normalized version
   let md = `# Ecosystem Knowledge Base Index\n\n`;
   md += `*SSoT Index Version: 2.0.0 | Generated snapshot*\n\n`;
-  md += `> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [\`active/INDEX.volatile.md\`](../active/INDEX.volatile.md) (non-SSoT, refreshed by \`pnpm pipeline --input pipelines/volatile-index.json\`). Schema: \`schemas/volatile-knowledge.schema.json\`.\n\n`;
+  md += `> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [\`active/INDEX.volatile.md\`](../active/INDEX.volatile.md) (non-SSoT, refreshed by \`pnpm pipeline --input pipelines/volatile-index.json\`). Schema: \`knowledge/product/schemas/volatile-knowledge.schema.json\`.\n\n`;
 
   for (const dir of dirs) {
     md += `## 📁 ${dir}\n`;

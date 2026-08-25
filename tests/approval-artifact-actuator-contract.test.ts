@@ -157,7 +157,9 @@ describe('Approval and artifact actuator contracts', () => {
 
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = ajv.compile(loadJson('schemas/secret-mutation-approval.schema.json'));
+    const validate = ajv.compile(
+      loadJson('knowledge/product/schemas/secret-mutation-approval.schema.json')
+    );
     const canonical = {
       request_id: request.id,
       kind: request.kind,
