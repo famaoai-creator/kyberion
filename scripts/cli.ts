@@ -160,6 +160,7 @@ interface WebAppProfileIndexRecord {
 
 const rootDir = pathResolver.rootDir();
 const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrator');
+let activeCliArgs: string[] = [];
 
 /**
  * @deprecated Thin wrapper over `@agent/core`'s `resolveLocale`. `--locale`
@@ -170,7 +171,7 @@ const ORCHESTRATOR_PACKET_DIR = path.join(rootDir, 'active/shared/tmp/orchestrat
  * `'en'`). This is the I18N-01 unification: every locale resolver now
  * agrees on the same result for the same environment.
  */
-function resolveLocale(args: string[] = process.argv.slice(2)): SupportedLocale {
+function resolveLocale(args: string[] = activeCliArgs): SupportedLocale {
   const localeArgIndex = args.indexOf('--locale');
   const localeArg = localeArgIndex >= 0 ? args[localeArgIndex + 1] : undefined;
   return resolveUnifiedLocale({ explicit: localeArg });
@@ -1759,6 +1760,7 @@ export function shouldBootstrapRuntime(args: string[]): boolean {
 }
 
 export async function main(args: string[] = []) {
+  activeCliArgs = [...args];
   const missionId = process.env.MISSION_ID;
   printMissionContextBanner(missionId);
 
