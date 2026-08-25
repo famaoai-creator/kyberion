@@ -7,6 +7,7 @@ import {
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { safeExistsSync, safeReadFile } from '@agent/core';
+import { defineScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -54,8 +55,8 @@ function readTextFileIfExists(filePath: string): string {
   return String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
 }
 
-async function main() {
-  const { command, args } = parseArgs(process.argv.slice(2));
+async function main(argv: string[]) {
+  const { command, args } = parseArgs(argv);
 
   if (command === 'help' || command === '--help' || command === '-h') {
     printHelp();
@@ -140,7 +141,8 @@ async function main() {
   throw new Error(`Unknown email workflow command: ${command}`);
 }
 
-main().catch((error) => {
-  console.error(error?.message || String(error));
-  process.exitCode = 1;
-});
+void defineScript({
+  name: 'email:workflow',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
