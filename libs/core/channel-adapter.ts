@@ -20,6 +20,30 @@ export interface ChannelTypingHandle {
   stop(): void | Promise<void>;
 }
 
+export interface ChannelThreadContextEntry {
+  role: 'user' | 'assistant';
+  authorLabel: string;
+  text: string;
+}
+
+/** Format provider-neutral recent history for a channel turn. */
+export function formatChannelThreadContext(
+  channelLabel: string,
+  entries: readonly ChannelThreadContextEntry[]
+): string | undefined {
+  const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
+  if (!recent.length) return undefined;
+
+  return [
+    `Recent ${channelLabel} thread context:`,
+    ...recent.map((entry) =>
+      entry.role === 'assistant'
+        ? `Assistant: ${entry.text}`
+        : `User (${entry.authorLabel}): ${entry.text}`
+    ),
+  ].join('\n');
+}
+
 /** Provider-specific I/O boundary shared by Slack, Telegram, Discord, and iMessage. */
 export interface ChannelAdapter {
   readonly channel: SurfaceAsyncChannel;
