@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver, rootDir } from './path-resolver.js';
@@ -215,12 +215,7 @@ function resolveMissionOrchestrationScope(
       : undefined);
   const statePath = locatedMissionPath ? `${locatedMissionPath}/mission-state.json` : undefined;
   try {
-    const state = statePath
-      ? (JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-          string,
-          unknown
-        >)
-      : {};
+    const state = statePath ? readJson<Record<string, unknown>>(statePath) : {};
     const authority = normalizeEventScope({
       mission_id: missionId,
       tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],

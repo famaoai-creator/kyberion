@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
   safeExistsSync,
@@ -645,7 +646,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
   const { markdown, json } = resolveLatestEmailDraftPaths();
   if (safeExistsSync(json)) {
     try {
-      const parsed = JSON.parse(String(safeReadFile(json, { encoding: 'utf8' }) || ''));
+      const parsed = readJson<Record<string, unknown>>(json);
       if (parsed && typeof parsed === 'object') {
         const jsonStat = safeStat(json);
         return {

@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -126,11 +126,8 @@ export function getAgentRolePerformance(
       const indexPath = agentPerformanceIndexPath();
       if (safeExistsSync(indexPath)) {
         byKey =
-          (
-            JSON.parse(String(safeReadFile(indexPath, { encoding: 'utf8' }))) as {
-              by_agent_role?: Record<string, AgentRolePerformance>;
-            }
-          ).by_agent_role || {};
+          readJson<{ by_agent_role?: Record<string, AgentRolePerformance> }>(indexPath)
+            .by_agent_role || {};
       }
     } catch {
       byKey = {};

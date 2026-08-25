@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
@@ -1003,8 +1003,9 @@ export function readJanitorLastRunMs(): number | null {
   const markerPath = shared(JANITOR_MARKER_SUBPATH);
   if (!safeExistsSync(markerPath)) return null;
   try {
-    const parsed = JSON.parse(String(safeReadFile(markerPath, { encoding: 'utf8' })));
-    const ts = Date.parse(parsed?.completed_at);
+    const parsed = readJson<Record<string, unknown>>(markerPath);
+    const ts =
+      typeof parsed.completed_at === 'string' ? Date.parse(parsed.completed_at) : Number.NaN;
     return Number.isFinite(ts) ? ts : null;
   } catch {
     return null;

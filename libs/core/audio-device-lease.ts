@@ -8,6 +8,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
 
 export interface AudioDeviceLeaseRecord {
@@ -105,7 +106,7 @@ export class AudioDeviceLeaseManager {
 
   private isStale(lockPath: string): boolean {
     try {
-      const parsed: unknown = JSON.parse(String(safeReadFile(lockPath, { encoding: 'utf8' })));
+      const parsed: unknown = readJson<unknown>(lockPath);
       if (!isRecord(parsed) || typeof parsed.expires_at !== 'string') return true;
       return Date.parse(parsed.expires_at) <= this.now();
     } catch {
