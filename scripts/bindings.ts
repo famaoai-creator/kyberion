@@ -25,6 +25,7 @@ import '../libs/core/task-session.js';
 import '../libs/core/voice-bridge.js';
 import '../libs/core/vad-registry.js';
 import '../libs/core/environment-capability.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function loadCoreSeamBindings(): SeamBindingSnapshot[] {
   return coreSeamCatalog.list();
@@ -50,16 +51,22 @@ function renderHuman(bindings: SeamBindingSnapshot[]): string {
   return lines.join('\n');
 }
 
-if (/(?:^|[/\\])bindings\.ts$/u.test(process.argv[1] ?? '')) {
-  const dump = process.argv.includes('--dump');
-  const json = process.argv.includes('--json');
-  if (!dump) {
-    console.error(usage());
-    process.exitCode = 2;
-  } else {
+export const runBindings = defineScript({
+  name: 'bindings',
+  flags: [],
+  run(context) {
+    const dump = context.argv.includes('--dump');
+    const json = context.argv.includes('--json');
+    if (!dump) throw new Error(usage());
     const bindings = loadCoreSeamBindings();
     process.stdout.write(
       json ? `${JSON.stringify(bindings, null, 2)}\n` : `${renderHuman(bindings)}\n`
     );
-  }
-}
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'bindings.ts') ||
+  isDirectScript(import.meta.url, 'bindings.js')
+)
+  void runBindings();

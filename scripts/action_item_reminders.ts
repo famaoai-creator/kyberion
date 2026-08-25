@@ -15,9 +15,9 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { listMissionSummaries } from './refactor/mission-read-model.js';
 import { generateReminderMessageOp } from '../libs/actuators/meeting-actuator/src/meeting-intelligence-ops.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface ActionItemReminderSweepReport {
   generated_at: string;
@@ -202,10 +202,10 @@ function computeDaysOverdue(dueAt?: string, now = new Date()): number {
   return Math.max(0, Math.floor((now.getTime() - parsed) / (24 * 60 * 60 * 1000)));
 }
 
-async function main(): Promise<void> {
+async function main(argv: string[]): Promise<void> {
   const getArgValue = (flag: string): string | undefined => {
-    const index = process.argv.indexOf(flag);
-    return index >= 0 ? process.argv[index + 1] : undefined;
+    const index = argv.indexOf(flag);
+    return index >= 0 ? argv[index + 1] : undefined;
   };
   const toneValue = getArgValue('--tone');
   const languageValue = getArgValue('--language');
@@ -220,12 +220,14 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(report, null, 2));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.stack || error.message : String(error));
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'action_item_reminders.ts') ||
+  isDirectScript(import.meta.url, 'action_item_reminders.js')
+)
+  void defineScript({
+    name: 'action-item-reminders',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

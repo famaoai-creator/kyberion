@@ -9,6 +9,7 @@
  */
 
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function printUsage(): void {
   console.log(
@@ -22,7 +23,7 @@ function parseArgs(argv: string[]): {
   maxHints: number;
   help: boolean;
 } {
-  const args = argv.slice(2);
+  const args = argv;
   const help = args.includes('--help') || args.includes('-h') || args.includes('help');
   let direction: 'cowork-to-kyberion' | 'kyberion-to-cowork' | 'both' = 'both';
   const paths: string[] = [];
@@ -46,32 +47,43 @@ function parseArgs(argv: string[]): {
   return { direction, paths, maxHints, help };
 }
 
-const { direction, paths, maxHints, help } = parseArgs(process.argv);
+export const runCoworkKnowledgeBridge = defineScript({
+  name: 'knowledge:cowork-sync',
+  flags: [],
+  run(context) {
+    const { direction, paths, maxHints, help } = parseArgs(context.argv);
+    if (help) {
+      printUsage();
+      return;
+    }
 
-if (help) {
-  printUsage();
-  process.exit(0);
-}
+    const result = runCoworkKnowledgeSync({
+      direction,
+      coworkArtifactPaths: paths,
+      maxHints,
+    });
 
-const result = runCoworkKnowledgeSync({
-  direction,
-  coworkArtifactPaths: paths,
-  maxHints,
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+
+    if (result.ingest) {
+      process.stderr.write(
+        `[cowork-sync] Ingest: ${result.ingest.enqueued} enqueued, ${result.ingest.skipped_duplicate} skipped (dup), ${result.ingest.skipped_tier_violation} skipped (tier)\n`
+      );
+    }
+    if (result.supply) {
+      process.stderr.write(
+        `[cowork-sync] Supply: ${result.supply.delivered} hints delivered, ${result.supply.skipped_unchanged} unchanged\n`
+      );
+    }
+    if (result.ingest?.errors.length || result.supply?.errors.length) {
+      const errs = [...(result.ingest?.errors ?? []), ...(result.supply?.errors ?? [])];
+      process.stderr.write(`[cowork-sync] Errors:\n${errs.map((e) => `  - ${e}`).join('\n')}\n`);
+    }
+  },
 });
 
-process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-
-if (result.ingest) {
-  process.stderr.write(
-    `[cowork-sync] Ingest: ${result.ingest.enqueued} enqueued, ${result.ingest.skipped_duplicate} skipped (dup), ${result.ingest.skipped_tier_violation} skipped (tier)\n`
-  );
-}
-if (result.supply) {
-  process.stderr.write(
-    `[cowork-sync] Supply: ${result.supply.delivered} hints delivered, ${result.supply.skipped_unchanged} unchanged\n`
-  );
-}
-if (result.ingest?.errors.length || result.supply?.errors.length) {
-  const errs = [...(result.ingest?.errors ?? []), ...(result.supply?.errors ?? [])];
-  process.stderr.write(`[cowork-sync] Errors:\n${errs.map((e) => `  - ${e}`).join('\n')}\n`);
-}
+if (
+  isDirectScript(import.meta.url, 'cowork_knowledge_bridge.ts') ||
+  isDirectScript(import.meta.url, 'cowork_knowledge_bridge.js')
+)
+  void runCoworkKnowledgeBridge();

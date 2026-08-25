@@ -7,7 +7,7 @@
  */
 
 import { formatEnvValidationReport, loadEnvRegistryEntries, validateEnv } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface EnvConfigReport {
   generated_at: string;
@@ -77,4 +77,11 @@ if (
   isDirectScript(import.meta.url, 'env_config_report.ts') ||
   isDirectScript(import.meta.url, 'env_config_report.js')
 )
-  process.exitCode = main();
+  void defineScript({
+    name: 'config:report',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`config:report failed with exit code ${status}`);
+    },
+  })();
