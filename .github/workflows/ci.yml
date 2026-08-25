@@ -44,19 +44,6 @@ jobs:
       - name: Run manifest-driven full checks
         run: pnpm run check -- --scope full
 
-      # These checkers import @agent/core through its package entrypoint.
-      # Run them after the build so fresh runners have dist/index.js.
-      - name: Check operation preflight and seam bindings
-        run: |
-          pnpm run check:op-preflight-coverage
-          pnpm run check:extension-order
-          pnpm run check:design-ledger
-          pnpm run check:module-invariants
-          pnpm run check:seam-multiplicity
-          pnpm run check:capability-seams
-          pnpm run check:capability-seams-ast
-          pnpm run check:reasoning-provider-registry
-
       # After build: the checker imports @agent/core, which resolves to the
       # package dist. Running it pre-build broke every main push since the
       # step was introduced (ERR_MODULE_NOT_FOUND).
@@ -72,74 +59,6 @@ jobs:
 
       - name: TypeScript type check
         run: pnpm run typecheck
-
-      - name: Check ESM integrity
-        run: pnpm run check:esm
-
-      - name: Check packaging contract
-        run: pnpm run check:packaging-contract
-
-      - name: Check contract schemas
-        run: pnpm run check:contract-schemas
-
-      # MG-02: every mandatory mission-gate trigger declared by policy must
-      # remain reachable from the work-scope decision implementation.
-      - name: Check work-scope policy emitters
-        run: pnpm run check:work-scope-policy
-
-      # MG-10: keep operator-facing guidance on the canonical two-dimensional
-      # mission gate and prevent retired Rule 7 wording from returning.
-      - name: Check mission-gate documentation
-        run: pnpm run check:mission-gate-docs
-
-      # Knowledge snapshots drift when governed data changes without
-      # regeneration (2026-07-08: agent-profile-index / service-endpoints /
-      # capabilities guide all drifted). check:catalogs includes the
-      # knowledge-index freshness check.
-      - name: Check knowledge catalogs & index freshness
-        run: pnpm run check:catalogs
-
-      # DA-01: the tenant reference systems (tenant profiles / confidential
-      # index / customer dirs) must agree; asymmetries require a documented
-      # exception in tenant-registry-exceptions.json.
-      - name: Check tenant registry consistency
-        run: pnpm run check:tenant-registry
-
-      # EG-09/EG-12: entity scope, workspace registry, mission hygiene, and
-      # repository tracking boundaries must not drift in a clean checkout.
-      - name: Check entity governance boundaries
-        run: pnpm run check:entity-governance
-
-      # DS-01 / UX-05: prevent new operator-surface color literals and
-      # dashboard status vocabulary bypasses after the generated-token gate.
-      - name: Check UI/UX governance drift
-        run: pnpm run check:ui-ux
-
-      # I18N-03: ratchet against new hardcoded Japanese string literals in
-      # implementation code (baseline-frozen; only increases fail).
-      - name: Check i18n hardcoding ratchet
-        run: pnpm run check:i18n
-
-      # Actuator op registry / discovery catalog must be regenerated when
-      # actuator manifests or dispatch ops change (REVIEW_CODEX_2026-07-11:
-      # scaffold-to-registry drift was previously unchecked).
-      - name: Check actuator op registry drift
-        run: pnpm run check:op-registry
-
-      # Deprecated Wisdom aliases must stay out of canonical pipeline catalogs;
-      # compatibility remains available only at the typed dispatcher boundary.
-      - name: Check deprecated Wisdom operation usage
-        run: pnpm run check:deprecated-wisdom-ops
-
-      # KYBERION_* env references must stay registered in the env registry
-      # (OP-05: unregistered vars are invisible to startup validation).
-      - name: Check env registry drift
-        run: pnpm run check:env-registry
-
-      # KS-16 / KO-04: knowledge readers must remain behind the canonical
-      # tenant scope choke points on every pull request and main push.
-      - name: Check knowledge scope boundaries
-        run: pnpm run check:knowledge-scope
 
       - name: Validate capability discovery
         run: node dist/scripts/capability_discovery.js > /dev/null
