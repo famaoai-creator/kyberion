@@ -32,6 +32,22 @@ export function resolveCommand(
   return manifest.commands.find((entry) => entry.command === command);
 }
 
+export function formatCliManifestHelp(manifest = loadCliManifest()): string {
+  const rows = [...manifest.commands]
+    .sort((left, right) => left.command.localeCompare(right.command))
+    .map((command) => {
+      const label = command.command || '<home>';
+      return `  ${label.padEnd(28)} ${command.noun} ${command.verb} [${command.audience}]`;
+    });
+  return [
+    'Kyberion commands (governed registry):',
+    '',
+    ...rows,
+    '',
+    'Use `kyberion <command> --help` for command-specific options.',
+  ].join('\n');
+}
+
 /** Validate required registered settings before dispatching any CLI command. */
 export function assertRequiredEnvironment(report: {
   errors: readonly Readonly<{ name: string; issue: string }>[];
@@ -51,6 +67,10 @@ export function validateKyberionStartupEnvironment(
 }
 
 export async function main(args = process.argv.slice(2)): Promise<void> {
+  if (args[0] === '--help' || args[0] === '-h') {
+    console.log(formatCliManifestHelp());
+    return;
+  }
   validateKyberionStartupEnvironment();
   const entrypoint = selectEntrypoint(args[0] ?? '');
   if (entrypoint.id === 'operator-cli') {
