@@ -1859,6 +1859,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_MLX_WHISPER_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "mlx-community/whisper-large-v3-turbo",
+      "description": "Model identifier used by the managed MLX Whisper streaming adapter.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_MOS_PRINCIPAL",
       "category": "runtime",
       "type": "string",
@@ -2710,6 +2719,40 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_STT_COMPUTE_TYPE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Compute type passed to faster-whisper; CPU defaults to int8 and non-CPU devices default to float16.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_DEVICE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "cpu",
+      "description": "Device selected by the faster-whisper speech-to-text bridge, such as cpu or cuda.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_LANGUAGE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Language hint for local Whisper speech-to-text adapters; managed streaming adapters default to ja when unset.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "small",
+      "description": "Model identifier or size used by faster-whisper when STT_MODEL_DIR is not set.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_STT_MODEL_DIR",
       "category": "path",
       "type": "path",
@@ -2740,6 +2783,14 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_STT_WINDOW_SEC",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Audio window length in seconds for streaming Whisper adapters; defaults are adapter-specific.",
+      "documented": true
     },
     {
       "name": "KYBERION_STYLE_KEYS",

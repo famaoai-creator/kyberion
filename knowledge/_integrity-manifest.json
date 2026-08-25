@@ -1383,7 +1383,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 81888,
+      "size": 83609,
       "type": "json"
     },
     {
@@ -5349,7 +5349,7 @@
     {
       "path": "product/pipeline-templates/kyberion-promo-narrated-demo.json",
       "tier": "public",
-      "size": 10155,
+      "size": 12698,
       "type": "json"
     },
     {

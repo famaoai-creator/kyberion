@@ -16,8 +16,9 @@
  *
  * Usage:
  *   pnpm generate:env-registry          — rewrite the three artifacts
- *   pnpm check:env-registry             — fail if any artifact drifted
- *   KYBERION_ENV_REGISTRY_STRICT=1 pnpm check:env-registry
+ *   pnpm run check -- --scope full --only env-registry
+ *                                      — fail if any artifact drifted
+ *   KYBERION_ENV_REGISTRY_STRICT=1 pnpm run check -- --scope full --only env-registry
  *                                      — also fail while entries remain undocumented
  */
 
@@ -52,11 +53,20 @@ export interface EnvRegistryFile {
 export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] {
   const failures: string[] = [];
   for (const entry of registry.entries) {
+    if (entry.required && entry.documented !== true) {
+      failures.push(`${entry.name}: required entries must be documented`);
+    }
     if ((entry.required || entry.documented) && !entry.description.trim()) {
       failures.push(`${entry.name}: required/documented entries must have a description`);
     }
     if (entry.required && entry.category === 'secret') {
       failures.push(`${entry.name}: secrets may not be required through the shared registry`);
+    }
+    if (entry.category === 'secret' && entry.default !== undefined && entry.default !== null) {
+      failures.push(`${entry.name}: secrets may not define a registry default`);
+    }
+    if (entry.category === 'secret' && entry.type !== 'string') {
+      failures.push(`${entry.name}: secrets must use the opaque string type`);
     }
   }
   return failures;
@@ -67,7 +77,7 @@ const ENV_EXAMPLE_PATH = pathResolver.rootResolve('docs/developer/env.example');
 const CONFIGURATION_DOC_PATH = pathResolver.rootResolve('docs/developer/CONFIGURATION.md');
 
 const SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'pipelines', 'tests'];
-const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs']);
+const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.py']);
 const EXCLUDED_PATH_SEGMENTS = [
   '/node_modules/',
   '/dist/',
@@ -90,7 +100,7 @@ export function classifyEnvName(name: string): { category: EnvCategory; type: En
   // Token counts are tuning values, not credentials. Keep this before the
   // generic TOKEN secret rule so context-window settings cannot be mislabeled
   // as secrets in generated configuration docs.
-  if (/(?:_TOKENS|_COUNT|_LIMIT|_MAX|_MIN|_SIZE|_TTL|_RETRIES|_FACTOR)$/.test(name)) {
+  if (/(?:_TOKENS|_COUNT|_LIMIT|_MAX|_MIN|_SIZE|_TTL|_RETRIES|_FACTOR|_SEC|_SECONDS)$/.test(name)) {
     return { category: 'tuning', type: 'number' };
   }
   if (/SECRET|TOKEN|_KEY$|_KEY_|PASSWORD|CREDENTIAL/.test(name)) {
@@ -119,7 +129,7 @@ export function discoverEnvNames(rootDir: string): string[] {
       if (!SCAN_EXTENSIONS.has(path.extname(filePath))) continue;
       if (
         filePath.endsWith('.d.ts') ||
-        /(?:\.test|\.spec)\.[cm]?[jt]sx?$/.test(filePath) ||
+        /(?:\.test|\.spec)\.[^.]+$/.test(filePath) ||
         filePath.includes(`${path.sep}__tests__${path.sep}`)
       ) {
         continue;
@@ -192,11 +202,13 @@ function renderConfigurationDoc(registry: EnvRegistryFile): string {
     '# Kyberion Configuration Surface',
     '',
     '> Generated from `knowledge/product/governance/env-registry.json` by `pnpm generate:env-registry` — do not edit by hand.',
-    '> `pnpm check:env-registry` (part of `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
+    '> `pnpm run check -- --scope full --only env-registry` (included in `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
     '',
     '## What belongs where',
     '',
     '- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/env-validator.ts` (warn by default; missing required values are errors).',
+    '- **Registry fields**: `required: true` is reserved for an unconditional startup prerequisite and must also be `documented: true`; conditional capability prerequisites stay in the environment manifests. `documented: false` is an honest discovery state, not a runtime failure.',
+    '- **Secrets**: may be documented by name and purpose, but their values never belong in this registry and they cannot be marked required here. Secret requirements are enforced by the selected capability or command.',
     '- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.',
     '',
     'Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).',
