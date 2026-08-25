@@ -36,18 +36,18 @@ function validateSince(value: unknown, days?: number): string | undefined {
   return since;
 }
 
-function readArgValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  if (index >= 0 && process.argv[index + 1] && !process.argv[index + 1].startsWith('--')) {
-    return process.argv[index + 1];
+function readArgValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index >= 0 && args[index + 1] && !args[index + 1].startsWith('--')) {
+    return args[index + 1];
   }
   const prefix = `${name}=`;
-  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  const match = args.find((arg) => arg.startsWith(prefix));
   return match ? match.slice(prefix.length) : undefined;
 }
 
-function hasArg(name: string): boolean {
-  return process.argv.includes(name) || process.argv.some((arg) => arg.startsWith(`${name}=`));
+function hasArg(args: string[], name: string): boolean {
+  return args.includes(name) || args.some((arg) => arg.startsWith(`${name}=`));
 }
 
 async function main(args: string[] = []): Promise<number> {
@@ -68,16 +68,16 @@ async function main(args: string[] = []): Promise<number> {
 
   const report = collectAuditVerifyReport({
     since: validateSince(
-      argv.since ?? readArgValue('--since'),
+      argv.since ?? readArgValue(args, '--since'),
       argv.days
         ? Number(argv.days)
-        : readArgValue('--days')
-          ? Number(readArgValue('--days'))
+        : readArgValue(args, '--days')
+          ? Number(readArgValue(args, '--days'))
           : undefined
     ),
-    ledgers: parseLedgerArgs(argv.ledger ?? readArgValue('--ledger')),
+    ledgers: parseLedgerArgs(argv.ledger ?? readArgValue(args, '--ledger')),
   });
-  if (argv.json || hasArg('--json')) {
+  if (argv.json || hasArg(args, '--json')) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     for (const line of formatAuditVerifyReport(report)) console.log(line);
@@ -87,7 +87,7 @@ async function main(args: string[] = []): Promise<number> {
   // switches go through a warn observation period first. Set
   // KYBERION_AUDIT_CONTINUITY_ENFORCE=true (or drop --warn-only) to enforce.
   const warnOnly =
-    (argv.warnOnly || hasArg('--warn-only')) &&
+    (argv.warnOnly || hasArg(args, '--warn-only')) &&
     getRegisteredEnvText('KYBERION_AUDIT_CONTINUITY_ENFORCE') !== 'true';
   if (!report.ok && warnOnly) {
     console.warn(
