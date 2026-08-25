@@ -4,7 +4,6 @@
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
   loadJson,
@@ -20,6 +19,7 @@ import {
 import { applyOnboardingContextBinding, writeTenantProfile } from '@agent/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -298,8 +298,7 @@ function flag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-function main(): number {
-  const argv = process.argv.slice(2);
+function main(argv: string[]): number {
   if (argv.includes('--help') || argv.length === 0) {
     console.log(
       'Usage: pnpm company:onboard --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
@@ -322,5 +321,15 @@ function main(): number {
   return 0;
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
-if (isMainModule) process.exit(main());
+if (
+  isDirectScript(import.meta.url, 'company_onboarding.ts') ||
+  isDirectScript(import.meta.url, 'company_onboarding.js')
+)
+  void defineScript({
+    name: 'company:onboard',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`company onboarding failed with exit code ${status}`);
+    },
+  })();
