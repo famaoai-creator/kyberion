@@ -2,6 +2,7 @@ import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
 import { logger, narrowSurfaceViewerTenant } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -45,7 +46,9 @@ function isPrivateIpv6(hostname: string): boolean {
 }
 
 export function getPresenceStudioAuthToken(): string {
-  return String(process.env.PRESENCE_STUDIO_TOKEN || process.env.KYBERION_API_TOKEN || '');
+  return String(
+    process.env.PRESENCE_STUDIO_TOKEN || getRegisteredEnvText('KYBERION_API_TOKEN') || ''
+  );
 }
 
 export function getPresenceStudioClientAddress(req: Pick<Request, 'socket'>): string {
@@ -245,7 +248,7 @@ export function resolvePresenceStudioViewerContext(
   const auth = authorizePresenceStudioRequest(req);
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
 
-  const tenant = String(process.env.KYBERION_TENANT || '').trim();
+  const tenant = String(getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   if (isLoopbackAddress(getPresenceStudioClientAddress(req))) {
     return {
       principalId: 'human:presence-studio-localadmin',

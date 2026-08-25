@@ -10,6 +10,7 @@ import {
   auditChain,
   classifyError,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { fileURLToPath } from 'node:url';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
@@ -83,13 +84,14 @@ export async function listRunningAgents() {
   console.log('-'.repeat(header.length + 10));
 
   for (const agent of agents) {
-    const statusIcon = {
-      ready: '🟢',
-      busy: '🟡',
-      booting: '⚪',
-      error: '🔴',
-      shutdown: '📁',
-    }[agent.status] || '  ';
+    const statusIcon =
+      {
+        ready: '🟢',
+        busy: '🟡',
+        booting: '⚪',
+        error: '🔴',
+        shutdown: '📁',
+      }[agent.status] || '  ';
 
     console.log(
       `${agent.agentId.padEnd(30)} ${statusIcon} ${agent.status.padEnd(10)} ${agent.provider.padEnd(12)} ${agent.modelId.padEnd(25)} ${agent.missionId || '-'}`
@@ -112,7 +114,8 @@ export async function listManifests() {
 
   for (const m of manifests) {
     const autoIcon = m.autoSpawn ? '✅' : '  ';
-    const description = m.systemPrompt.split('\n')[0].slice(0, 50) + (m.systemPrompt.length > 50 ? '...' : '');
+    const description =
+      m.systemPrompt.split('\n')[0].slice(0, 50) + (m.systemPrompt.length > 50 ? '...' : '');
     console.log(
       `${m.agentId.padEnd(30)} ${autoIcon} ${String(m.trustRequired).padEnd(6)} ${description}`
     );
@@ -120,7 +123,10 @@ export async function listManifests() {
   console.log('');
 }
 
-export async function spawnAgent(manifestId: string, overrides: { provider?: any, modelId?: string, missionId?: string }) {
+export async function spawnAgent(
+  manifestId: string,
+  overrides: { provider?: any; modelId?: string; missionId?: string }
+) {
   const manifest = getAgentManifest(manifestId);
   if (!manifest) throw new Error(`Agent manifest "${manifestId}" not found.`);
 
@@ -138,22 +144,24 @@ export async function spawnAgent(manifestId: string, overrides: { provider?: any
   } catch (err: any) {
     const classification = classifyError(err);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'operator',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
       action: 'agent.manual_spawn',
       operation: manifestId,
       result: 'failed',
-      metadata: { manifestId, overrides, classification }
+      metadata: { manifestId, overrides, classification },
     });
-    logger.error(`[AGENT_RUNTIME] spawn failed (${classification.category}): ${err?.message || err}`);
+    logger.error(
+      `[AGENT_RUNTIME] spawn failed (${classification.category}): ${err?.message || err}`
+    );
     throw err;
   }
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
     action: 'agent.manual_spawn',
     operation: handle.agentId,
     result: 'completed',
-    metadata: { manifestId, overrides }
+    metadata: { manifestId, overrides },
   });
 
   logger.success(`✅ Agent spawned: ${handle.agentId}`);
@@ -165,9 +173,9 @@ export async function shutdownAgent(agentId: string) {
   if (!agent) throw new Error(`Agent "${agentId}" not found.`);
 
   await agentLifecycle.shutdown(agentId);
-  
+
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
     action: 'agent.manual_shutdown',
     operation: agentId,
     result: 'completed',
@@ -182,7 +190,16 @@ export async function inspectAgent(agentId: string) {
     // Try to find in registry even if lifecycle handle is gone
     const record = agentRegistry.get(agentId);
     if (!record) throw new Error(`Agent "${agentId}" not found.`);
-    console.log(JSON.stringify({ record, note: 'Agent is registered but not actively managed by lifecycle (likely shutdown or error)' }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          record,
+          note: 'Agent is registered but not actively managed by lifecycle (likely shutdown or error)',
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -192,7 +209,7 @@ export async function inspectAgent(agentId: string) {
   console.log(`  Provider: ${snapshot.agent.provider}`);
   console.log(`  Model:    ${snapshot.agent.modelId}`);
   console.log(`  Mission:  ${snapshot.agent.missionId || '-'}`);
-  
+
   if (snapshot.metrics) {
     console.log('\n  Metrics:');
     console.log(`    Turns:           ${snapshot.metrics.turnCount}`);
@@ -203,7 +220,9 @@ export async function inspectAgent(agentId: string) {
   if (snapshot.logs && snapshot.logs.length > 0) {
     console.log('\n  Recent Logs (last 5):');
     for (const log of snapshot.logs.slice(-5)) {
-      console.log(`    [${new Date(log.ts).toISOString().slice(11, 19)}] [${log.type}] ${log.content.slice(0, 80)}`);
+      console.log(
+        `    [${new Date(log.ts).toISOString().slice(11, 19)}] [${log.type}] ${log.content.slice(0, 80)}`
+      );
     }
   }
   console.log('');

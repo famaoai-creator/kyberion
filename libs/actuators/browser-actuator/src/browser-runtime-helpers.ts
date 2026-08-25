@@ -372,9 +372,7 @@ function assertNavigationAllowed(
 function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as BrowserSessionMetadata;
+    return loadJson<BrowserSessionMetadata>(filePath);
   } catch {
     return null;
   }

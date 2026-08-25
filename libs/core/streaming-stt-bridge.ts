@@ -12,6 +12,7 @@
  * file) or vendor SDK (Deepgram WS, Google STT streaming — left as
  * stub bindings).
  */
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
@@ -87,7 +88,7 @@ export function resetStreamingSttBridges(): void {
 }
 
 export function getStreamingSttBridge(
-  id: string = process.env.KYBERION_STREAMING_STT_BRIDGE ?? 'stub'
+  id: string = getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') ?? 'stub'
 ): StreamingSpeechToTextBridge {
   if (id === 'stub') return new StubStreamingSpeechToTextBridge();
   const factory = streamingSttSeam.getOptional(id);

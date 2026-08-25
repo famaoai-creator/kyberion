@@ -6,6 +6,7 @@ import {
   loadPeerConversationSession,
   sendPeerConversationMessageToPeer,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
@@ -40,7 +41,7 @@ async function main(): Promise<void> {
     .option('catalog', { type: 'string' })
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: getRegisteredEnvText('KYBERION_TENANT_ID') || '',
       description: 'Tenant used to resolve the confidential peer catalog',
     })
     .option('timeout-ms', { type: 'number', default: 5000 })

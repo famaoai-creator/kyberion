@@ -105,12 +105,7 @@ export async function executePipeline(
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -189,12 +184,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture_data']: await retry(
-          async () =>
-            JSON.parse(
-              safeReadFile(path.resolve(rootDir, resolve(params.path)), {
-                encoding: 'utf8',
-              }) as string
-            ),
+          async () => loadJson<unknown>(path.resolve(rootDir, resolve(params.path))),
           buildRetryOptions()
         ),
       };
@@ -945,9 +935,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         params.contract ??
         ctx[params.contract_from || 'quality_contract'] ??
         (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
-          ? JSON.parse(
-              safeReadFile(pathResolver.rootResolve(contractPath), { encoding: 'utf8' }) as string
-            )
+          ? loadJson<SoftwareQualityContract>(pathResolver.rootResolve(contractPath))
           : null);
       if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];

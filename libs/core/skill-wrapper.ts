@@ -60,7 +60,7 @@ function buildOutput<T>(
 
 function printOutput<T>(output: SkillOutput<T>) {
   const isHuman =
-    process.env.KYBERION_FORMAT === 'human' || process.argv.includes('--format=human');
+    getRegisteredEnvText('KYBERION_FORMAT') === 'human' || process.argv.includes('--format=human');
 
   // Persistence for Feedback Loop: Save the latest response via Secure IO
   try {
@@ -187,3 +187,4 @@ export async function runSkillAsyncCli<T>(skillName: string, fn: () => Promise<T
 }
 
 export const runAsyncSkill = runSkillAsync;
+import { getRegisteredEnvText } from './foundation/env.js';

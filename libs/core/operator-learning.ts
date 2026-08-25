@@ -3,6 +3,7 @@ import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { logger } from './core.js';
 import { createAjv as createFoundationAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -497,24 +498,27 @@ const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegi
 
 function getOperatorLearningDispatchRegistryPath(): string {
   return (
-    process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
     DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH
   );
 }
 
 function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
-  if (process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim())
+    return null;
   const configured =
-    process.env.KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
   return safeExistsSync(configured) ? configured : null;
 }
 
 function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
-  if (process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim())
+    return null;
   const configured =
-    process.env.KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
-    DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    getRegisteredEnvText(
+      'KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH'
+    )?.trim() || DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
   return safeExistsSync(configured) ? configured : null;
 }
 

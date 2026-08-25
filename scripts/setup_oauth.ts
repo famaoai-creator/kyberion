@@ -9,11 +9,14 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
-const serviceId = String(process.env.KYBERION_OAUTH_SERVICE_ID || process.argv[2] || '').trim();
-const callbackHost = process.env.KYBERION_OAUTH_CALLBACK_HOST || '127.0.0.1';
-const callbackPort = Number(process.env.KYBERION_OAUTH_CALLBACK_PORT || 8787);
-const callbackPath = process.env.KYBERION_OAUTH_CALLBACK_PATH || '/oauth/callback';
+const serviceId = String(
+  getRegisteredEnvText('KYBERION_OAUTH_SERVICE_ID') || process.argv[2] || ''
+).trim();
+const callbackHost = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
+const callbackPort = Number(getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PORT') || 8787);
+const callbackPath = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PATH') || '/oauth/callback';
 const redirectUri = `http://${callbackHost}:${callbackPort}${callbackPath}`;
 
 if (!serviceId) {

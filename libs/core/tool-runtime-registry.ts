@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExecResult,
@@ -591,7 +592,9 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: ToolRuntimeRegistry | null = null;
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_TOOL_RUNTIME_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  );
 }
 
 function loadRegistryFromPath(registryPath: string): ToolRuntimeRegistry {

@@ -9,6 +9,7 @@ import {
   withExecutionContext,
   type ScopeContext,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   runKnowledgeValidationSweep,
   proposeKnowledgeRankingWeightRecalculation,
@@ -34,7 +35,7 @@ export interface KnowledgeScopeReconciliationReport {
 
 function reportPath(): string {
   return pathResolver.rootResolve(
-    process.env.KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH')?.trim() ||
       'active/shared/runtime/reports/knowledge-scope-reconciliation-latest.json'
   );
 }

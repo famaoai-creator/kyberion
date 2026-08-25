@@ -10,16 +10,17 @@ import {
   missionDir,
   writeMissionTeamPlan,
 } from '@agent/core';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { readJsonFile } from './refactor/cli-input.js';
 import { withOrganizationContext } from './refactor/organization-context.js';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
   const previousRole = process.env.MISSION_ROLE;
-  const previousPersona = process.env.KYBERION_PERSONA;
+  const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
 
   process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
-  if (!process.env.KYBERION_PERSONA && assignedPersona) {
-    process.env.KYBERION_PERSONA = assignedPersona;
+  if (!getRegisteredEnvText('KYBERION_PERSONA') && assignedPersona) {
+    setRegisteredEnv('KYBERION_PERSONA', assignedPersona);
   }
 
   try {
@@ -27,8 +28,7 @@ function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () 
   } finally {
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
-    if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
-    else process.env.KYBERION_PERSONA = previousPersona;
+    setRegisteredEnv('KYBERION_PERSONA', previousPersona);
   }
 }
 

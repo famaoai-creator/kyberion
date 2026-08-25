@@ -14,7 +14,7 @@ import {
   saveRequirementsDraft,
   saveTestPlan,
 } from '@agent/core';
-import type { SoftwareQualityContract } from '@agent/core';
+import type { RequirementsDraft, SoftwareQualityContract } from '@agent/core';
 
 export interface ExtractRequirementsInput {
   mission_id: string;
@@ -141,22 +141,14 @@ export async function extractTestPlan(input: {
     readRequirementsDraft(input.mission_id) ??
     (input.requirements_draft_path &&
     safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
-            encoding: 'utf8',
-          }) as string
-        )
+      ? loadJson<RequirementsDraft>(pathResolver.rootResolve(input.requirements_draft_path))
       : null);
   if (!requirementsDraft) throw new Error('[extract_test_plan] requirements draft not found');
 
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
-            encoding: 'utf8',
-          }) as string
-        )
+      ? loadJson<unknown>(pathResolver.rootResolve(input.design_spec_path))
       : undefined);
   const extracted = await backend.extractTestPlan({
     requirementsDraft,

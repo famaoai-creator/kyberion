@@ -24,6 +24,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
 
@@ -89,11 +90,9 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   }
 
   // Fail fast on a broken template rather than at first mission creation.
-  const profile = JSON.parse(
-    safeReadFile(path.join(customerDir, 'organization-profile.json'), {
-      encoding: 'utf8',
-    }) as string
-  ) as { team_defaults?: { team_template_catalog_id?: string } };
+  const profile = readJson<{ team_defaults?: { team_template_catalog_id?: string } }>(
+    path.join(customerDir, 'organization-profile.json')
+  );
   const catalogId = profile.team_defaults?.team_template_catalog_id ?? 'default';
   const catalogRel = path.join(
     'knowledge',
@@ -128,7 +127,7 @@ function main(): number {
   // Operator-run scaffolding CLI: same execution context as the onboarding
   // wizard, which also writes under customer/ (see scripts/onboarding_wizard.ts).
   process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
-  process.env.KYBERION_PERSONA = process.env.KYBERION_PERSONA || 'sovereign';
+  setRegisteredEnv('KYBERION_PERSONA', getRegisteredEnvText('KYBERION_PERSONA') || 'sovereign');
   const argv = process.argv.slice(2);
   const vertical = getFlag(argv, '--vertical');
   const slug = getFlag(argv, '--slug');

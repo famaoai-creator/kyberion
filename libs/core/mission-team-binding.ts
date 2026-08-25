@@ -3,6 +3,7 @@ import { assertMissionIdArgument, findMissionPath, missionDir } from './path-res
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
+import { readJson } from './foundation/json.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -348,11 +349,11 @@ export function loadMissionStaffingAssignments(
 ): MissionStaffingAssignments | null {
   const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
-  const parsed = JSON.parse(
-    safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }) as string
-  ) as Omit<MissionStaffingAssignments, 'assignments'> & {
-    assignments?: Array<Partial<MissionStaffingAssignment>>;
-  };
+  const parsed = readJson<
+    Omit<MissionStaffingAssignments, 'assignments'> & {
+      assignments?: Array<Partial<MissionStaffingAssignment>>;
+    }
+  >(paths.staffingAssignmentsPath);
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];

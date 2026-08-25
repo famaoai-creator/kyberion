@@ -21,6 +21,7 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
@@ -963,9 +964,7 @@ function findRestoredManifests(target: string): string[] {
 function restoreMissionGitBundles(target: string): void {
   const [manifestPath] = findRestoredManifests(target);
   if (!manifestPath) return;
-  const manifest = JSON.parse(
-    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
-  ) as RestoredBackupManifest;
+  const manifest = readJson<RestoredBackupManifest>(manifestPath);
   if (manifest.format !== 'kyberion-backup-v1') return;
 
   for (const entry of manifest.mission_git_repos || []) {
@@ -1255,7 +1254,7 @@ export function main(argv = process.argv.slice(2)): void {
       scope,
       actorRole: 'infrastructure_sentinel',
       principal: { kind: 'service', id: 'backup-restore' },
-      requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+      requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
       metadata: {
         archive: portableProtocolServicePathRef(result.archive),
         target: portableProtocolServicePathRef(result.target),
@@ -1270,7 +1269,7 @@ export function main(argv = process.argv.slice(2)): void {
         scope,
         actorRole: 'infrastructure_sentinel',
         principal: { kind: 'service', id: 'backup-restore' },
-        requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+        requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
         metadata: { quarantine_count: result.quarantinePaths.length },
       });
       if (!quarantineReceipt) console.warn('[backup] quarantine lifecycle receipt unavailable');

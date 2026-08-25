@@ -19,12 +19,16 @@ import {
   type SupportedLocale,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   withExecutionContext,
   withLock,
 } from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
+import {
+  createAjv,
+  getRegisteredEnvText,
+  readJson,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -322,9 +326,7 @@ function loadState(): OnboardingState | null {
   const filePath = statePath();
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as OnboardingState;
+    const parsed = readJson<OnboardingState>(filePath);
     if (parsed.identity && !parsed.identity.persona) {
       parsed.identity.persona = 'sovereign';
     }
@@ -631,7 +633,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
   if (interactive && !expressMode) {
     const choices = listReasoningBackendChoices();
     const persisted =
-      process.env.KYBERION_REASONING_BACKEND?.trim() || readPersistedReasoningBackend();
+      getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim() || readPersistedReasoningBackend();
     console.log('');
     console.log(
       t(
@@ -668,7 +670,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
       }
       if (proceed) {
         const envLocal = persistReasoningBackend(selection);
-        process.env.KYBERION_REASONING_BACKEND = selection;
+        setRegisteredEnv('KYBERION_REASONING_BACKEND', selection);
         reasoning = { ...reasoning, backend_hint: selection };
         console.log(
           t(
@@ -1064,7 +1066,7 @@ function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPha
 
 async function runOnboarding() {
   process.env.MISSION_ROLE = 'sovereign_concierge';
-  process.env.KYBERION_PERSONA = 'sovereign';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
   let customerSlug = customerResolver.activeCustomer();
 
@@ -1077,7 +1079,7 @@ async function runOnboarding() {
           createCustomer(slugInput);
           switchCustomer(slugInput);
           customerSlug = slugInput.trim();
-          process.env.KYBERION_CUSTOMER = customerSlug;
+          setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
         } catch (error) {
           console.log(chalk.red(String(error)));
         }
@@ -1091,7 +1093,7 @@ async function runOnboarding() {
     shouldRefuseNonInteractiveOnboarding({
       interactive,
       express: expressMode,
-      allowDefaults: process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK,
+      allowDefaults: getRegisteredEnvText('KYBERION_ONBOARDING_NON_INTERACTIVE_OK'),
     })
   ) {
     console.error(

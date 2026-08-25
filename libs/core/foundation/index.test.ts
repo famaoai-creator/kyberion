@@ -4,7 +4,14 @@ import { compileSchema } from './ajv.js';
 import { defineCatalog } from './governed-catalog.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
-import { clamp, normalizeText, parseIso, slugify } from './index.js';
+import {
+  clamp,
+  getRegisteredEnv,
+  normalizeText,
+  parseIso,
+  setRegisteredEnv,
+  slugify,
+} from './index.js';
 
 describe('foundation helpers', () => {
   it('keeps deterministic text and numeric semantics in one place', () => {
@@ -48,5 +55,14 @@ describe('foundation helpers', () => {
     safeWriteFile(catalogPath, JSON.stringify({ version: 200 }));
     expect(catalog.load()).toEqual({ version: 200 });
     safeRmSync(directory, { recursive: true, force: true });
+  });
+
+  it('scopes environment setup and restore through the foundation boundary', () => {
+    const environment: Record<string, string | undefined> = {};
+    setRegisteredEnv('KYBERION_FOUNDATION_TEST', 'enabled', environment);
+    expect(getRegisteredEnv('KYBERION_FOUNDATION_TEST', { env: environment })).toBe('enabled');
+    expect(environment.KYBERION_FOUNDATION_TEST).toBe('enabled');
+    setRegisteredEnv('KYBERION_FOUNDATION_TEST', undefined, environment);
+    expect(environment.KYBERION_FOUNDATION_TEST).toBeUndefined();
   });
 });

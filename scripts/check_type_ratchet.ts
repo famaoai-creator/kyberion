@@ -12,6 +12,7 @@ import {
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
@@ -21,7 +22,7 @@ const DEFAULT_SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'tests'
 // A Docker build context contains locally generated files the baseline has
 // never seen, so counts diverge for environmental reasons, not type-safety
 // regressions. Image builds skip with a loud notice; CI keeps enforcing.
-if (process.env.KYBERION_SKIP_TYPE_RATCHET === '1') {
+if (getRegisteredEnvText('KYBERION_SKIP_TYPE_RATCHET') === '1') {
   console.log(
     '[check:type-ratchet] skipped (KYBERION_SKIP_TYPE_RATCHET=1 — image/context build; CI enforces the ratchet on the git tree)'
   );

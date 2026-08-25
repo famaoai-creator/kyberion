@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadJson, pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type TaskScenario = {
   id: string;
@@ -40,7 +41,7 @@ const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-sc
 const PERSONAL_TASK_PROFILE_DIR = pathResolver.rootResolve('knowledge/personal/task-profiles');
 
 function resolveScenarioDir(): string {
-  const override = process.env.KYBERION_TASK_SCENARIO_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_TASK_SCENARIO_DIR')?.trim();
   return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
 }
 

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -110,7 +111,7 @@ function usageAggregatePath(scope?: ScopeContext): string {
   }
   if (!shared) shared = nestedResolver?.shared?.bind(nestedResolver);
   if (!shared) return '';
-  const configured = process.env.KYBERION_KNOWLEDGE_USAGE_PATH?.trim();
+  const configured = getRegisteredEnvText('KYBERION_KNOWLEDGE_USAGE_PATH')?.trim();
   let base: string;
   if (configured) {
     if (path.isAbsolute(configured)) {
@@ -189,7 +190,7 @@ function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
 }
 
 function usageYieldFor(source: string, scope?: ScopeContext): number | undefined {
-  const cacheKey = `${process.env.KYBERION_KNOWLEDGE_USAGE_PATH || 'default'}:${JSON.stringify(scope || {})}`;
+  const cacheKey = `${getRegisteredEnvText('KYBERION_KNOWLEDGE_USAGE_PATH') || 'default'}:${JSON.stringify(scope || {})}`;
   const now = Date.now();
   let cached = usageYieldCache.get(cacheKey);
   if (!cached || cached.expiresAt <= now) {
@@ -329,7 +330,7 @@ function computeTextHash(text: string): string {
 }
 
 function cacheDir(): string {
-  const override = process.env.KYBERION_KI_CACHE_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_KI_CACHE_DIR')?.trim();
   if (override) return override;
   const root = path.dirname(pathResolver.knowledge());
   return path.join(root, 'active', 'shared', 'cache');
@@ -378,7 +379,7 @@ function touchScopeUsage(scopeHash: string): void {
 }
 
 function resolveCacheBudgetBytes(): number {
-  const raw = Number(process.env.KYBERION_KI_CACHE_MAX_MB || '');
+  const raw = Number(getRegisteredEnvText('KYBERION_KI_CACHE_MAX_MB') || '');
   const mb = Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_CACHE_BUDGET_MB;
   return mb * 1024 * 1024;
 }

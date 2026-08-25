@@ -14,6 +14,7 @@ import {
 } from './artifact-review.js';
 import { auditChain } from './audit-chain.js';
 import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
@@ -647,7 +648,8 @@ export function generateMissionWorkReconciliationScaffold(input: {
     mission_id: missionId,
     generated_at: new Date().toISOString(),
     source: { repository: '.', branch, commit },
-    adopted_by: process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller',
+    adopted_by:
+      getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller',
     reason: input.reason || `Adopt verified existing work for ${missionId}.`,
     tasks: tasks.map((task) => ({
       task_id: String(task.task_id || ''),
@@ -695,7 +697,8 @@ export async function reconcileMissionExistingWork(input: {
       `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`
     );
   }
-  const actorId = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
+  const actorId =
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
   if (manifest.adopted_by !== actorId) {
     throw new Error(
       `Manifest adopted_by ${manifest.adopted_by} does not match execution actor ${actorId}`

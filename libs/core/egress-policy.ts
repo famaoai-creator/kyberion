@@ -1,5 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
@@ -163,7 +165,8 @@ export function evaluateAudienceEgress(
 }
 
 export function loadEgressPolicy(): EgressPolicyFile {
-  const policyPath = process.env.KYBERION_EGRESS_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  const policyPath =
+    getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
   if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
   if (!safeExistsSync(policyPath)) {
     cachedPolicyPath = policyPath;
@@ -178,7 +181,7 @@ export function loadEgressPolicy(): EgressPolicyFile {
   }
   const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
   const parsed = JSON.parse(raw) as EgressPolicyFile;
-  const modeOverride = process.env.KYBERION_EGRESS_POLICY?.trim();
+  const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
   cachedPolicyPath = policyPath;
   cachedPolicy = {
     version: parsed.version || '1',
@@ -215,11 +218,9 @@ export function loadAllowedEgressDomains(): string[] {
   };
 
   try {
-    const securityPolicy = JSON.parse(
-      safeReadFile(SECURITY_POLICY_PATH, { encoding: 'utf8' }) as string
-    ) as {
+    const securityPolicy = readJson<{
       network_guardrails?: { allowed_domains?: string[] };
-    };
+    }>(SECURITY_POLICY_PATH);
     for (const domain of securityPolicy.network_guardrails?.allowed_domains ?? []) {
       addDomain(domain);
     }

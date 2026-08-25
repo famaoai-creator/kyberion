@@ -1,5 +1,6 @@
 import { logger } from './core.js';
-import { loadJson, safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
@@ -48,9 +49,7 @@ function loadTrustPolicy(): TrustPolicyFile {
   if (_cachedTrustPolicy) return _cachedTrustPolicy;
   try {
     const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
-    _cachedTrustPolicy = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as TrustPolicyFile;
+    _cachedTrustPolicy = readJson<TrustPolicyFile>(filePath);
   } catch (err) {
     const defaults: TrustPolicyFile = {
       scoring: {

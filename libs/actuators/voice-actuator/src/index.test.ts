@@ -444,6 +444,7 @@ vi.mock('node:crypto', async (importOriginal) => {
 
 vi.mock('@agent/core/foundation', () => ({
   compileSchema: mocks.compileSchemaFromPath,
+  getRegisteredEnvText: (name: string) => process.env[name],
 }));
 
 describe('voice actuator', () => {

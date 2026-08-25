@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
@@ -121,9 +121,7 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 export function loadWorkScopePolicy(): WorkScopePolicy {
-  const value = JSON.parse(
-    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as WorkScopePolicy;
+  const value = readJson<WorkScopePolicy>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])

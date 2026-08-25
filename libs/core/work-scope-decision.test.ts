@@ -154,8 +154,10 @@ describe('work-scope-decision', () => {
     expect(validate(policy)).toBe(true);
     expect(loadWorkScopePolicy().version).toBe('1.0.0');
 
-    const secureIo = await import('./secure-io.js');
-    const spy = vi.spyOn(secureIo, 'safeReadFile').mockReturnValue('{"version":1}') as unknown as {
+    const foundationJson = await import('./foundation/json.js');
+    const spy = vi
+      .spyOn(foundationJson, 'readJson')
+      .mockReturnValue({ version: 1 } as unknown) as unknown as {
       mockRestore(): void;
     };
     expect(() => loadWorkScopePolicy()).toThrow('Invalid work-scope-policy');

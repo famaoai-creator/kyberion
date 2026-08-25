@@ -1,4 +1,5 @@
 import * as crypto from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -105,13 +106,14 @@ function normalizeNamespace(namespace?: string): string {
 }
 
 function meshHubRuntimeRoot(namespace?: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const baseRoot = getRegisteredEnvText('KYBERION_MESH_HUB_RUNTIME_ROOT') || DEFAULT_RUNTIME_ROOT;
   const suffix = normalizeNamespace(namespace);
   return suffix ? `${baseRoot}/${suffix}` : baseRoot;
 }
 
 function meshHubObservabilityRoot(namespace?: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
+  const baseRoot =
+    getRegisteredEnvText('KYBERION_MESH_HUB_OBSERVABILITY_ROOT') || DEFAULT_OBSERVABILITY_ROOT;
   const suffix = normalizeNamespace(namespace);
   return suffix ? `${baseRoot}/${suffix}` : baseRoot;
 }

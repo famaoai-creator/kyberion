@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
@@ -126,9 +127,7 @@ export function surfaceResourceId(surfaceId: string): string {
 }
 
 function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
-  const value = JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as SurfaceRuntimeManifest;
+  const value = readJson<SurfaceRuntimeManifest>(filePath);
   const validate = ensureSurfaceManifestValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])
@@ -164,9 +163,7 @@ export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): Surfa
     if (directoryManifest) return directoryManifest;
   }
   if (safeExistsSync(resolvedManifestPath)) {
-    const value = JSON.parse(
-      safeReadFile(resolvedManifestPath, { encoding: 'utf8' }) as string
-    ) as SurfaceRuntimeManifest;
+    const value = readJson<SurfaceRuntimeManifest>(resolvedManifestPath);
     const validate = ensureSurfaceManifestValidator();
     if (!validate(value)) {
       const errors = (validate.errors || [])

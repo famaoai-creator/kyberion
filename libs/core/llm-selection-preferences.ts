@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import { discoverProviders } from './provider-discovery.js';
 import {
@@ -122,7 +123,7 @@ function modelIdsFor(
 }
 
 function defaultSelection(policy: ReasoningRoutePolicy): LlmSelectionPreferences {
-  const requested = process.env.KYBERION_REASONING_BACKEND?.trim();
+  const requested = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
   const provider =
     requested && policy.runtime_adapters[requested] ? requested : DEFAULT_SELECTION.provider;
   const adapter = policy.runtime_adapters[provider];

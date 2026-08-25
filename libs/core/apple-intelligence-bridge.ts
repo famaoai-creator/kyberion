@@ -1,6 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -113,7 +114,7 @@ export function setAfmRunnerForTests(customRunner: AfmRunner | null): void {
 }
 
 function bridgeDisabledByEnv(): boolean {
-  const flag = String(process.env.KYBERION_APPLE_FM || '').toLowerCase();
+  const flag = String(getRegisteredEnvText('KYBERION_APPLE_FM') || '').toLowerCase();
   return flag === '0' || flag === 'false' || flag === 'off';
 }
 
@@ -546,8 +547,8 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
 export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boolean> {
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'apple-speech')) return true;
   if (
-    process.env.KYBERION_STT_COMMAND?.trim() ||
-    process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+    getRegisteredEnvText('KYBERION_STT_COMMAND')?.trim() ||
+    getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
   ) {
     return false;
   }

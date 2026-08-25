@@ -10,6 +10,7 @@ import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as customerResolver from './customer-resolver.js';
 import { grantAccess, grantAccessGuarded } from './secret-guard.js';
 import { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
@@ -1393,7 +1394,7 @@ export async function finishMission(
   // USER'S goal is satisfied, not that all planned tasks ran. Unsatisfied
   // reconciliation feeds its gaps back into the team as work — the mission
   // only finishes when the outcome contract holds or the operator decides.
-  const goalLoopMaxRounds = Number(process.env.KYBERION_GOAL_LOOP_MAX_ROUNDS ?? 2);
+  const goalLoopMaxRounds = Number(getRegisteredEnvText('KYBERION_GOAL_LOOP_MAX_ROUNDS') ?? 2);
   if (
     goalLoopMaxRounds > 0 &&
     !completionReconciliation.satisfied &&

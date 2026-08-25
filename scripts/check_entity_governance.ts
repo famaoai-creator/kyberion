@@ -10,6 +10,7 @@ import {
   listProjectRecords,
   withExecutionContext,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 
 export interface EntityGovernanceReport {
@@ -288,7 +289,7 @@ export function main(): void {
   console.log(JSON.stringify(report, null, 2));
   const strictWarnings =
     process.argv.includes('--strict-warnings') ||
-    process.env.KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS === 'true';
+    getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === 'true';
   if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
 }
 

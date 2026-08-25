@@ -16,6 +16,7 @@ import {
 import { initializeMissionTeamBindings } from './mission-team-binding.js';
 import { ledger } from './ledger.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { inferMissionOutcomeContract } from './outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from './tenant-registry.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -164,7 +165,7 @@ export async function createMission(args: {
   } = args;
   const tenantSlug = normalizeTenantSlug(rawTenantSlug);
   if (tier === 'confidential' && !tenantSlug) {
-    const policy = process.env.KYBERION_TENANT_SCOPE_REQUIRED || 'strict';
+    const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
     const message =
       `[SCOPE_CONTEXT_INVALID] Confidential mission '${id}' requires --tenant-slug (registered tenant). ` +
       `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;
@@ -176,7 +177,10 @@ export async function createMission(args: {
       `[mission-creation] invalid tenant slug '${rawTenantSlug}'; must match ^[a-z][a-z0-9-]{1,30}$`
     );
   }
-  if (tenantSlug && (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)) {
+  if (
+    tenantSlug &&
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
+  ) {
     resolveTenant(tenantSlug, { rootDir });
   }
   withExecutionContext(
@@ -510,7 +514,7 @@ export async function startMission(args: {
   let state = loadState(upperId);
   const finalTier = state ? state.tier : tier;
   if (finalTier === 'confidential' && !(state?.tenant_slug?.trim() || tenantSlug)) {
-    const policy = process.env.KYBERION_TENANT_SCOPE_REQUIRED || 'strict';
+    const policy = getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') || 'strict';
     const message =
       `[SCOPE_CONTEXT_INVALID] Confidential mission '${upperId}' requires --tenant-slug (registered tenant) before start. ` +
       `hint: pass --tenant-slug <registered-slug>, set KYBERION_TENANT, or bind with pnpm onboarding:context bind.`;

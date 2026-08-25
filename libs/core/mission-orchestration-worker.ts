@@ -104,6 +104,8 @@ import { TraceContext, persistTrace } from './src/trace.js';
 import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from './gap-phase.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeExec,
   safeExistsSync,
@@ -2581,7 +2583,7 @@ async function dispatchGoalDrivenMissionTask(
 let warnedMissionTaskTraceFailureOnce = false;
 
 function missionTaskTraceDirOverride(): string | undefined {
-  const override = process.env.KYBERION_MISSION_TASK_TRACE_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_MISSION_TASK_TRACE_DIR')?.trim();
   return override ? pathResolver.rootResolve(override) : undefined;
 }
 
@@ -4044,7 +4046,7 @@ export function isDraftRefineCandidate(input: {
   teamRole: string;
   task: PlannedNextTask;
 }): boolean {
-  if (process.env.KYBERION_DRAFT_REFINE === '0') return false;
+  if (getRegisteredEnvText('KYBERION_DRAFT_REFINE') === '0') return false;
   const role = String(input.teamRole || '').toLowerCase();
   if (role === 'reviewer' || role === 'qa' || role === 'planner') return false;
   const risk = String(input.task.risk || '').toLowerCase();
@@ -4104,7 +4106,7 @@ async function applyDraftRefineToDeliverable(input: {
 }
 
 export function isBestOfNCandidate(input: { teamRole: string; task: PlannedNextTask }): boolean {
-  if (process.env.KYBERION_BEST_OF_N === '0') return false;
+  if (getRegisteredEnvText('KYBERION_BEST_OF_N') === '0') return false;
   const role = String(input.teamRole || '').toLowerCase();
   if (role === 'reviewer' || role === 'qa' || role === 'planner') return false;
   const risk = String(input.task.risk || '').toLowerCase();
@@ -4499,7 +4501,7 @@ export interface PersistedPhaseGateDefinition {
 }
 
 export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
-  const raw = String(process.env.KYBERION_PHASE_GATE_MODE || 'warn').toLowerCase();
+  const raw = String(getRegisteredEnvText('KYBERION_PHASE_GATE_MODE') || 'warn').toLowerCase();
   if (raw === 'enforce') return 'enforce';
   if (raw === 'off') return 'off';
   return 'warn';
@@ -4512,9 +4514,7 @@ export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPha
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = JSON.parse(
-          safeReadFile(`${defsDir}/${entry}`, { encoding: 'utf8' }) as string
-        );
+        const parsed = readJson<unknown>(`${defsDir}/${entry}`);
         if (!parsed || typeof parsed !== 'object') return null;
         const gate = (parsed as Record<string, unknown>).gate;
         if (!gate || typeof gate !== 'object') return null;
@@ -5930,9 +5930,7 @@ async function recordPlanningPacketGate(input: {
     evidenceDir: `${missionDir(input.missionId, 'public')}/gates`,
   });
   if (evaluation.evidence_path) {
-    const current = JSON.parse(
-      safeReadFile(evaluation.evidence_path, { encoding: 'utf8' }) as string
-    ) as Record<string, unknown>;
+    const current = readJson<Record<string, unknown>>(evaluation.evidence_path);
     writeProvisionedJson({
       missionId: input.missionId,
       filePath: evaluation.evidence_path,

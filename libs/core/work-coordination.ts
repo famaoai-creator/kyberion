@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { slugify } from './foundation/text.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
@@ -398,7 +399,7 @@ function randomId(prefix: string): string {
 function coordinationNamespace(): string {
   return (
     coordinationNamespaceOverride ||
-    String(process.env.KYBERION_WORK_COORDINATION_NAMESPACE || '').trim()
+    String(getRegisteredEnvText('KYBERION_WORK_COORDINATION_NAMESPACE') || '').trim()
   );
 }
 
@@ -874,7 +875,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
   const context = normalizeWorkItemContext(input.context || {}, input.projectId);
   if (
     context.tenant_slug &&
-    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+    (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
   ) {
     resolveTenant(context.tenant_slug, {
       rootDir: coordinationRootOverride || undefined,
@@ -911,7 +912,7 @@ function createWorkItemInternal(input: CreateWorkItemInput): WorkItem {
     payload: { project_id: item.project_id, priority: item.priority, source: item.source },
   });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'work-coordination',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'work-coordination',
     action: 'work_item.created',
     operation: `create:${item.item_id}`,
     result: 'completed',

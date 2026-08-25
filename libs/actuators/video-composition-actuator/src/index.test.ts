@@ -164,6 +164,7 @@ vi.mock('@agent/core', async () => {
 
 vi.mock('@agent/core/foundation', () => ({
   compileSchema: mocks.compileSchemaFromPath,
+  getRegisteredEnvText: (name: string) => process.env[name],
 }));
 
 describe('video-composition-actuator', () => {

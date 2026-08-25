@@ -43,6 +43,7 @@ import {
   type OsKnowledgeTier,
   type ResourceScope,
 } from '@agent/core';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -700,7 +701,7 @@ async function executeCliRequest(input: ServiceAction) {
 }
 
 function isUnsafeCliAllowed(): boolean {
-  return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
+  return getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_CLI', { defaultValue: false }) === true;
 }
 
 function assertUnsafeCliAllowed() {

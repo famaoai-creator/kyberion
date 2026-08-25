@@ -1,6 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { loadJson, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
@@ -189,7 +190,10 @@ function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[]
 }
 
 function defaultTenantId(): string | undefined {
-  const tenant = process.env.KYBERION_TENANT?.trim() || process.env.KYBERION_CUSTOMER?.trim() || '';
+  const tenant =
+    getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
+    getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() ||
+    '';
   return tenant || undefined;
 }
 

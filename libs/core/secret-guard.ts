@@ -4,6 +4,7 @@ import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { resolveSecretSync } from './secret-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   decryptConnectionDocument,
   encryptConnectionDocument,
@@ -57,8 +58,8 @@ const _loadPersonalSecrets = () => {
         const serviceName = item.toUpperCase();
         const subFiles = safeReaddir(fullPath).filter((f) => f.endsWith('.json'));
         for (const subFile of subFiles) {
-          const content = JSON.parse(
-            safeReadFile(path.join(fullPath, subFile), { encoding: 'utf8' }) as string
+          const content = secureIo.withSensitivePathMediation(() =>
+            readJson<unknown>(path.join(fullPath, subFile))
           );
           _mapContentToSecrets(serviceName, content);
         }

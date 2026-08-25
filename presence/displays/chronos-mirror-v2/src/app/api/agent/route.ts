@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 import { guardRequest } from '../../../lib/api-guard';
@@ -29,6 +30,7 @@ async function loadChronosCore() {
     orchestrationEvents,
     toolRuntimeRegistry,
     coreLogger,
+    foundation,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
@@ -42,11 +44,13 @@ async function loadChronosCore() {
     import('@agent/core/mission-orchestration-events'),
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
+    import('@agent/core/foundation'),
   ]);
 
   return {
     logger: coreLogger.logger,
     pathResolver: pathResolverModule.pathResolver,
+    readJson: foundation.readJson,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
     safeReadFile: secureIo.safeReadFile,
@@ -85,7 +89,7 @@ const PROJECT_ROOT = projectPathResolver.rootDir();
 
 const CHRONOS_AGENT_ID = 'chronos-mirror';
 const CHRONOS_IDLE_TIMEOUT_MS = Number(
-  process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000
+  getRegisteredEnvText('KYBERION_CHRONOS_IDLE_TIMEOUT_MS') || 10 * 60 * 1000
 );
 const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\s+(\S+)/;
 const QUICK_ACTION_PATTERN = /^chronos:\/\/quick-action\/([a-z-]+)$/;
@@ -1328,9 +1332,7 @@ export async function POST(req: NextRequest) {
       sessionId,
       requesterId: body.requesterId || 'chronos-ui',
     });
-    const requestArtifact = JSON.parse(
-      safeReadFile(requestArtifactPath, { encoding: 'utf8' }) as string
-    );
+    const requestArtifact = core.readJson<{ correlation_id: string }>(requestArtifactPath);
 
     const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
