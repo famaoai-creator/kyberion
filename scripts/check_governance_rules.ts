@@ -267,6 +267,16 @@ const CHECKS: GovernanceRuleCheck[] = [
     schemaPath: 'knowledge/product/schemas/ci-gates.schema.json',
     dataPath: 'knowledge/product/governance/ci-gates.json',
   },
+  {
+    id: 'media-aws-icon-rules',
+    schemaPath: 'knowledge/product/schemas/media-aws-icon-rules.schema.json',
+    dataPath: 'knowledge/product/governance/media-aws-icon-rules.json',
+  },
+  {
+    id: 'media-tone-style-map',
+    schemaPath: 'knowledge/product/schemas/media-tone-style-map.schema.json',
+    dataPath: 'knowledge/product/governance/media-tone-style-map.json',
+  },
 ];
 
 export function findDeterministicCatalogViolations(): string[] {
