@@ -207,8 +207,8 @@
       "path": "libs/actuators/system-actuator",
       "d": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
       "s": "implemented",
-      "version": "1.4.0",
-      "capability_count": 25
+      "version": "1.5.0",
+      "capability_count": 26
     },
     {
       "n": "terminal-actuator",
@@ -247,7 +247,7 @@
       "path": "libs/actuators/wisdom-actuator",
       "d": "Knowledge-tier search, injection, import/export, and decision-support operations",
       "s": "implemented",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "capability_count": 81
     },
     {

@@ -745,7 +745,7 @@ function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
   });
 }
 
-async function main() {
+export async function runBaselineCheck() {
   killSwitch.startMonitor();
 
   // KM-01 fallback: without a resident chronos daemon the scheduled janitor
@@ -1102,16 +1102,21 @@ async function main() {
       orphan_count: nhiOrphans.length,
     },
   };
-
-  console.log(JSON.stringify(report, null, 2));
-
-  // Exit with non-zero if L0-L2 is fundamentally broken
-  if (status === 'needs_recovery' && result.circuitBroken) {
-    process.exit(1);
-  }
+  return report;
 }
 
-main().catch((err) => {
-  console.error(JSON.stringify({ status: 'fatal_error', error: err.message }));
-  process.exit(1);
-});
+// Keep the CLI entrypoint thin so the same governed check can be called by a
+// typed actuator operation without spawning a script from an ADF step.
+if (/run_baseline_check\.(?:js|ts)$/u.test(path.basename(process.argv[1] || ''))) {
+  runBaselineCheck()
+    .then((report) => {
+      console.log(JSON.stringify(report, null, 2));
+      if (report.status === 'needs_recovery' && report.circuit_broken) {
+        process.exitCode = 1;
+      }
+    })
+    .catch((err) => {
+      console.error(JSON.stringify({ status: 'fatal_error', error: err.message }));
+      process.exitCode = 1;
+    });
+}

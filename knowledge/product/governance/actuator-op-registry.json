@@ -424,6 +424,7 @@
     "system": {
       "capture": [
         "audit_verify",
+        "baseline_check",
         "chrome_tab_list",
         "cli_health_check",
         "clipboard_read",

@@ -13,11 +13,10 @@
   "steps": [
     {
       "id": "run-sentinel",
-      "role": "sink",
-      "op": "system:exec",
+      "role": "source",
+      "op": "system:baseline_check",
       "params": {
-        "command": "node",
-        "args": ["dist/scripts/run_baseline_check.js"]
+        "export_as": "baseline_check"
       }
     }
   ]

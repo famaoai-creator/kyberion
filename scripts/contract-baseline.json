@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-17T22:20:21.207Z",
+  "generated_at": "2026-08-25T01:23:07.062Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -215,9 +215,10 @@
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.4.0",
+      "version": "1.5.0",
       "ops": [
         "audit_verify",
+        "baseline_check",
         "computer_interaction",
         "control_media_devices",
         "cost_report",
@@ -244,7 +245,7 @@
         "test_screen_stream"
       ],
       "contract_schema": "schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "0044bcddded50306e1d5791c059a4e297462f491162498f045a1c3f7fb120dc1"
+      "contract_schema_sha256": "54191600f1b4e0241025e3109fd3d4ee03c76502a14b7c3cfb48a9ce04b0ed33"
     },
     {
       "actuator_id": "terminal-actuator",

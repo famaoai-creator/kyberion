@@ -62,6 +62,7 @@ import { getRegisteredEnv } from '@agent/core/foundation';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
+import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
 import {
   activateApplication,
   detectFocusedInput,
@@ -958,6 +959,10 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'pulse_status': {
       const { ledger } = await import('@agent/core');
       return { ...ctx, [params.export_as || 'ledger_valid']: ledger.verifyIntegrity() };
+    }
+    case 'baseline_check': {
+      const report = await runBaselineCheck();
+      return { ...ctx, [params.export_as || 'baseline_check']: report };
     }
     case 'list_missions': {
       const missionRoot = pathResolver.rootResolve('active/missions');
