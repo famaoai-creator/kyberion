@@ -7,6 +7,7 @@
  */
 
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
@@ -82,10 +83,7 @@ function loadState(sessionId: string): BackgroundReviewNudgeState {
   const filePath = statePath(normalized);
   if (!safeExistsSync(filePath)) return defaultState(normalized);
   try {
-    return normalizeState(
-      JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')),
-      normalized
-    );
+    return normalizeState(readJson<unknown>(filePath), normalized);
   } catch {
     // A corrupt nudge file must not block the main worker; start a clean
     // counter while preserving the same logical session identity.
