@@ -58,6 +58,14 @@ vi.mock('@agent/core', async () => {
   };
 });
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T => JSON.parse(String(mocks.safeReadFile(filePath))) as T,
+  };
+});
+
 vi.mock('@actuator/system', () => ({
   handleAction: mocks.handleSystemAction,
 }));

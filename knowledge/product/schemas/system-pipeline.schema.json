@@ -106,6 +106,7 @@
               "system:glob_files",
               "system:scan_directory",
               "system:pulse_status",
+              "system:baseline_check",
               "system:exec",
               "system:shell",
               "system:cli_health_check",
