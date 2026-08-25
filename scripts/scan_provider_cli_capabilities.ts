@@ -11,21 +11,22 @@ import {
   scanProviderCapabilities,
   type ProbedProviderCapabilities,
 } from '@agent/core';
+import { defineScript } from './lib/harness.js';
 
-function main(): void {
-  const outPathArgIndex = process.argv.indexOf('--out');
-  const outPath = outPathArgIndex >= 0 && process.argv[outPathArgIndex + 1]
-    ? process.argv[outPathArgIndex + 1]
-    : pathResolver.rootResolve('active/shared/runtime/provider-capabilities.json');
+function main(args: string[]): void {
+  const outPathArgIndex = args.indexOf('--out');
+  const outPath =
+    outPathArgIndex >= 0 && args[outPathArgIndex + 1]
+      ? args[outPathArgIndex + 1]
+      : pathResolver.rootResolve('active/shared/runtime/provider-capabilities.json');
 
   const registry = loadCapabilityRegistry();
   const providerAvailability = probeProviderAvailability();
   const discovered = scanProviderCapabilities(registry);
-  const discoveredProviders = new Map(discoverProviders(true).map((provider) => [provider.provider, provider]));
-  const providers = [...new Set([
-    ...providerAvailability.keys(),
-    ...discoveredProviders.keys(),
-  ])]
+  const discoveredProviders = new Map(
+    discoverProviders(true).map((provider) => [provider.provider, provider])
+  );
+  const providers = [...new Set([...providerAvailability.keys(), ...discoveredProviders.keys()])]
     .sort()
     .map((provider) => {
       const installedProvider = discoveredProviders.get(provider);
@@ -53,7 +54,7 @@ function main(): void {
 
   // probe -> knowledge loop: optionally merge what was discovered into the knowledge catalog
   // (knowledge/product/orchestration/provider-capabilities.json), preserving manual edits.
-  if (process.argv.includes('--write-knowledge')) {
+  if (args.includes('--write-knowledge')) {
     const probed: Record<string, ProbedProviderCapabilities> = {};
     for (const provider of discoveredProviders.values()) {
       if (!provider.installed) continue;
@@ -67,10 +68,16 @@ function main(): void {
       updatedBy: 'scan_provider_cli_capabilities',
       note: 'Refreshed from CLI discovery; union-merged so manual entries are preserved.',
     });
-    console.error(`[scan] merged ${Object.keys(probed).length} provider(s) into the knowledge capability catalog`);
+    console.error(
+      `[scan] merged ${Object.keys(probed).length} provider(s) into the knowledge capability catalog`
+    );
   }
 
   console.log(JSON.stringify(summary, null, 2));
 }
 
-main();
+void defineScript({
+  name: 'scan:provider-cli-capabilities',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();

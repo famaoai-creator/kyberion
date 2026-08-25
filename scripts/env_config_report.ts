@@ -50,7 +50,7 @@ function parseArgs(argv: string[]): { json: boolean; failOnUndocumented: boolean
   };
 }
 
-export function main(argv = process.argv.slice(2)): number {
+export function main(argv: string[] = []): number {
   const options = parseArgs(argv);
   const report = buildEnvConfigReport();
   if (options.json) {

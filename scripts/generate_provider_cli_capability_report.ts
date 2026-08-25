@@ -9,6 +9,7 @@ import {
 import { readJsonFile } from './refactor/cli-input.js';
 import * as path from 'node:path';
 import type { CapabilityRegistryEntry } from '@agent/core';
+import { defineScript } from './lib/harness.js';
 
 type AdapterEntry = {
   adapter_id: string;
@@ -35,11 +36,11 @@ function readJson<T>(relativePath: string): T {
   return readJsonFile(pathResolver.rootResolve(relativePath));
 }
 
-function parseArg(name: string, fallback?: string): string {
-  const prefixed = process.argv.find((arg) => arg.startsWith(`${name}=`));
+function parseArg(args: string[], name: string, fallback?: string): string {
+  const prefixed = args.find((arg) => arg.startsWith(`${name}=`));
   if (prefixed) return prefixed.slice(name.length + 1);
-  const idx = process.argv.indexOf(name);
-  if (idx >= 0 && process.argv[idx + 1]) return process.argv[idx + 1];
+  const idx = args.indexOf(name);
+  if (idx >= 0 && args[idx + 1]) return args[idx + 1];
   if (fallback !== undefined) return fallback;
   throw new Error(`Missing required argument: ${name}`);
 }
@@ -51,7 +52,7 @@ function formatTableRow(cols: string[]): string {
 function buildReport(
   capabilities: CapabilityRegistryEntry[],
   adapters: AdapterEntry[],
-  providerAvailability: Map<string, { ok: boolean; evidence: string }>,
+  providerAvailability: Map<string, { ok: boolean; evidence: string }>
 ): string {
   const policy = resolveProviderCliCapabilityReportPolicy();
   const adapterByCapability = new Map(adapters.map((adapter) => [adapter.capability_id, adapter]));
@@ -84,7 +85,8 @@ function buildReport(
   md += `- Available providers: ${availableProviderNames.join(', ') || 'none'}\n\n`;
 
   md += `## ${policy.capability_inventory_title}\n\n`;
-  md += '| Provider | Capability | Kind | Risk | Replayability | Status | Provider Probe | Adapter |\n';
+  md +=
+    '| Provider | Capability | Kind | Risk | Replayability | Status | Provider Probe | Adapter |\n';
   md += '|---|---|---|---|---|---|---|---|\n';
 
   for (const capability of [...capabilities].sort((a, b) => {
@@ -94,31 +96,37 @@ function buildReport(
   })) {
     const adapter = adapterByCapability.get(capability.capability_id);
     const probe = providerAvailability.get(capability.source.provider);
-    md += formatTableRow([
-      capability.source.provider,
-      capability.capability_id,
-      capability.kind,
-      capability.risk_class,
-      capability.replayability,
-      capability.status,
-      probe?.ok ? 'available' : 'missing',
-      adapter ? adapter.adapter_id : 'missing',
-    ]) + '\n';
+    md +=
+      formatTableRow([
+        capability.source.provider,
+        capability.capability_id,
+        capability.kind,
+        capability.risk_class,
+        capability.replayability,
+        capability.status,
+        probe?.ok ? 'available' : 'missing',
+        adapter ? adapter.adapter_id : 'missing',
+      ]) + '\n';
   }
 
   md += `\n## ${policy.provider_title_prefix}\n\n`;
-  for (const [provider, providerCapabilities] of [...byProvider.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [provider, providerCapabilities] of [...byProvider.entries()].sort((a, b) =>
+    a[0].localeCompare(b[0])
+  )) {
     md += `### ${provider}\n\n`;
     md += `Provider probe: ${providerAvailability.get(provider)?.ok ? 'available' : 'missing'}\n\n`;
     md += '| Capability | Source | Intent Shapes | Fallback |\n';
     md += '|---|---|---|---|\n';
-    for (const capability of providerCapabilities.sort((a, b) => a.capability_id.localeCompare(b.capability_id))) {
-      md += formatTableRow([
-        capability.capability_id,
-        capability.source.name,
-        capability.preferred_usage.workflow_shapes.join(', '),
-        capability.fallback_path.target,
-      ]) + '\n';
+    for (const capability of providerCapabilities.sort((a, b) =>
+      a.capability_id.localeCompare(b.capability_id)
+    )) {
+      md +=
+        formatTableRow([
+          capability.capability_id,
+          capability.source.name,
+          capability.preferred_usage.workflow_shapes.join(', '),
+          capability.fallback_path.target,
+        ]) + '\n';
     }
     md += '\n';
   }
@@ -126,7 +134,9 @@ function buildReport(
   if (missingAdapter.length > 0) {
     md += `## ${policy.missing_adapter_title}\n\n`;
     md += `${policy.missing_adapter_message}\n\n`;
-    for (const capability of missingAdapter.sort((a, b) => a.capability_id.localeCompare(b.capability_id))) {
+    for (const capability of missingAdapter.sort((a, b) =>
+      a.capability_id.localeCompare(b.capability_id)
+    )) {
       md += `- ${capability.capability_id} (${capability.source.provider})\n`;
     }
     md += '\n';
@@ -139,10 +149,16 @@ function buildReport(
   return md;
 }
 
-function main(): void {
-  const outPath = parseArg('--out', pathResolver.knowledge('product/architecture/provider-cli-capability-report.md'));
+function main(args: string[]): void {
+  const outPath = parseArg(
+    args,
+    '--out',
+    pathResolver.knowledge('product/architecture/provider-cli-capability-report.md')
+  );
   const capabilityRegistry = loadCapabilityRegistry();
-  const adapterRegistry = readJson<AdapterRegistry>('knowledge/product/governance/harness-adapter-registry.json');
+  const adapterRegistry = readJson<AdapterRegistry>(
+    'knowledge/product/governance/harness-adapter-registry.json'
+  );
   const capabilities = capabilityRegistry.capabilities;
   const adapters = adapterRegistry.profiles;
   const providerAvailability = probeProviderAvailability();
@@ -161,4 +177,8 @@ function main(): void {
   console.log(`[generate:provider-cli-capability-report] wrote report to ${outPath}`);
 }
 
-main();
+void defineScript({
+  name: 'generate:provider-cli-capability-report',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
