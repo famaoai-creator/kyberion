@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "name": "Context Analysis Configuration",
   "description": "Parameters for co-occurrence analysis and graph generation.",

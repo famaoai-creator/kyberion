@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/surface-query-overlay-catalog.schema.json",
   "version": "1.0.0",
   "base_config_path": "product/presence/surface-query-providers.json",
   "personal_overlay_path": "personal/presence/surface-query-providers.json",

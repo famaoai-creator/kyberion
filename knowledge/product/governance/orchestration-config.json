@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "name": "Ecosystem Orchestration Governance",
   "defaults": {
@@ -16,7 +17,17 @@
   },
   "plugins": {
     "registry": "knowledge/product/orchestration/plugin-registry.json",
-    "allowed_categories": ["core", "engineering", "audit", "connector", "media", "intelligence", "ux", "business", "utilities"]
+    "allowed_categories": [
+      "core",
+      "engineering",
+      "audit",
+      "connector",
+      "media",
+      "intelligence",
+      "ux",
+      "business",
+      "utilities"
+    ]
   },
   "jobs": [
     {

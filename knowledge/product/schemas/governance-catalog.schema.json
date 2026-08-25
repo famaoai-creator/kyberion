@@ -1,0 +1,13 @@
+{
+  "$id": "https://kyberion.internal/schemas/governance-catalog.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Governance catalog envelope",
+  "description": "Minimal envelope for governance JSON that has not yet received a domain-specific schema.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "type": "boolean" },
+    "version": { "type": ["string", "number"] }
+  },
+  "additionalProperties": true
+}

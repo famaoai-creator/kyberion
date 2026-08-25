@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/document-contents-policy.schema.json",
   "version": "1.0.0",
   "title_by_locale": {
     "ja": "目次",

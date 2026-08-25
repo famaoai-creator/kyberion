@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-review-gate-registry.schema.json",
   "version": "1.0.0",
   "defaults": {
     "review_mode": "standard"

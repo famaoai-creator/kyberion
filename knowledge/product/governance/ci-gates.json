@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/ci-gates.schema.json",
   "version": 1,
   "gates": [
     {

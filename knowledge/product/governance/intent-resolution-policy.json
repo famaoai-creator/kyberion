@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-resolution-policy.schema.json",
   "version": "1.0.0",
   "catalog_scoring": {
     "exact_intent_id_confidence": 1,
@@ -18,9 +19,7 @@
       "intent_id": "capture-photo",
       "confidence": 0.88,
       "source": "legacy",
-      "reasons": [
-        "legacy capture-photo heuristic"
-      ],
+      "reasons": ["legacy capture-photo heuristic"],
       "patterns": [
         {
           "type": "regex",
@@ -38,12 +37,8 @@
       "intent_id": "inspect-service",
       "confidence": 0.86,
       "source": "heuristic",
-      "reasons": [
-        "service operation heuristic"
-      ],
-      "patterns": [
-        { "type": "regex", "value": "(status|状態|ログ|logs?)" }
-      ],
+      "reasons": ["service operation heuristic"],
+      "patterns": [{ "type": "regex", "value": "(status|状態|ログ|logs?)" }],
       "resolution": {
         "shape": "task_session",
         "task_kind": "service_operation",
@@ -55,12 +50,8 @@
       "intent_id": "restart-service",
       "confidence": 0.9,
       "source": "heuristic",
-      "reasons": [
-        "service restart heuristic"
-      ],
-      "patterns": [
-        { "type": "regex", "value": "(再起動|restart|reboot)" }
-      ],
+      "reasons": ["service restart heuristic"],
+      "patterns": [{ "type": "regex", "value": "(再起動|restart|reboot)" }],
       "resolution": {
         "shape": "task_session",
         "task_kind": "service_operation",

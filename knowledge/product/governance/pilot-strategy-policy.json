@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/pilot-strategy-policy.schema.json",
   "version": "1.0.0",
   "title": "Kyberion AI Consulting: Go-to-Market Strategy",
   "target": "Japanese Mid-sized Enterprise (SMB) Managers",

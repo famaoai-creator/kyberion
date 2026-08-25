@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/tracker-sheet-policy.schema.json",
   "version": "1.0.0",
   "sheet_titles": {
     "overview": "Overview",

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/package-policy.schema.json",
   "ignore_deps": ["@agent/core", "typescript", "ts-node"],
   "normalization": {
     "private": true,

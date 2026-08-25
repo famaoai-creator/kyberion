@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "Defines when and how to create a Track, and which lifecycle model to apply.",
   "track_types": {
@@ -139,15 +140,7 @@
   },
   "lifecycle_models": {
     "default-sdlc": {
-      "phases": [
-        "initiate",
-        "define",
-        "design",
-        "build",
-        "validate",
-        "transfer_run",
-        "close"
-      ],
+      "phases": ["initiate", "define", "design", "build", "validate", "transfer_run", "close"],
       "gates_per_phase": {
         "initiate": ["gate-initiation-approval"],
         "define": ["gate-requirements-baseline"],
@@ -159,13 +152,7 @@
       }
     },
     "incident-response": {
-      "phases": [
-        "triage",
-        "containment",
-        "remediation",
-        "validation",
-        "postmortem"
-      ],
+      "phases": ["triage", "containment", "remediation", "validation", "postmortem"],
       "gates_per_phase": {
         "triage": ["INCIDENT_SEVERITY_GATE"],
         "remediation": ["REMEDIATION_APPROVAL_GATE"],
@@ -173,13 +160,7 @@
       }
     },
     "change-control": {
-      "phases": [
-        "request",
-        "impact_review",
-        "approval",
-        "implementation",
-        "verification"
-      ],
+      "phases": ["request", "impact_review", "approval", "implementation", "verification"],
       "gates_per_phase": {
         "impact_review": ["CHANGE_IMPACT_GATE"],
         "approval": ["CHANGE_APPROVAL_GATE"],

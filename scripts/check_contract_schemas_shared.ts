@@ -10,7 +10,12 @@ export type ContractCheck = {
 };
 
 export function readGovernanceJson(relativePath: string): unknown {
-  return readJsonFile(pathResolver.rootResolve(relativePath));
+  const payload = readJsonFile<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
+  if (payload && typeof payload === 'object' && !Array.isArray(payload) && '$schema' in payload) {
+    const { $schema: _schema, ...contract } = payload;
+    return contract;
+  }
+  return payload;
 }
 
 const GOLDEN_SCENARIO_CATALOG_ALLOWLIST = new Set([

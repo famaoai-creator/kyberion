@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/harness-adapter-registry.schema.json",
   "version": "1.0.0",
   "profiles": [
     {
@@ -165,8 +166,7 @@
       "enabled": true,
       "owner": "platform_architecture",
       "notes": "Skill execution is treated as a governed utility surface backed by provider-side plugin semantics."
-    }
-    ,
+    },
     {
       "adapter_id": "claude-cowork.desktop",
       "provider": "claude-desktop",
