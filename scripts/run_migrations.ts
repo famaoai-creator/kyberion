@@ -15,12 +15,12 @@
 
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { readJson } from '@agent/core/foundation';
 import {
   logger,
   pathResolver,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -53,7 +53,8 @@ function resolveMigrationDir(input: string | undefined): string {
 }
 
 function resolveStatePath(input: string | undefined): string {
-  if (!input || input.trim().length === 0) return pathResolver.shared('runtime/migrations.applied.json');
+  if (!input || input.trim().length === 0)
+    return pathResolver.shared('runtime/migrations.applied.json');
   return path.isAbsolute(input) ? input : pathResolver.rootResolve(input);
 }
 
@@ -74,7 +75,7 @@ function listMigrationFiles(dir: string): string[] {
 function readState(statePath: string): MigrationState {
   if (!safeExistsSync(statePath)) return { applied: [] };
   try {
-    const parsed = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}'));
+    const parsed = readJson<{ applied?: unknown }>(statePath);
     if (Array.isArray(parsed.applied)) {
       return { applied: parsed.applied.filter((value: unknown) => typeof value === 'string') };
     }
@@ -109,7 +110,9 @@ async function runMigration(filePath: string, dryRun: boolean): Promise<Migratio
   if (typeof migration.migrate !== 'function') {
     throw new Error(`Migration ${migration.id} does not export migrate()`);
   }
-  logger.info(`→ ${dryRun ? 'dry-run ' : ''}migration ${migration.id}: ${migration.description ?? ''}`);
+  logger.info(
+    `→ ${dryRun ? 'dry-run ' : ''}migration ${migration.id}: ${migration.description ?? ''}`
+  );
   await migration.migrate({ dryRun });
   return migration;
 }
@@ -119,12 +122,16 @@ async function rollbackMigration(filePath: string, dryRun: boolean): Promise<Mig
   if (typeof migration.rollback !== 'function') {
     throw new Error(`Migration ${migration.id} does not export rollback()`);
   }
-  logger.info(`→ ${dryRun ? 'dry-run ' : ''}rollback ${migration.id}: ${migration.description ?? ''}`);
+  logger.info(
+    `→ ${dryRun ? 'dry-run ' : ''}rollback ${migration.id}: ${migration.description ?? ''}`
+  );
   await migration.rollback({ dryRun });
   return migration;
 }
 
-export async function runMigrations(opts: RunnerOptions): Promise<{ applied: string[]; pending: string[] }> {
+export async function runMigrations(
+  opts: RunnerOptions
+): Promise<{ applied: string[]; pending: string[] }> {
   const files = listMigrationFiles(opts.dir);
   const state = readState(opts.statePath);
   const applied = new Set(state.applied);
@@ -148,7 +155,9 @@ export async function runMigrations(opts: RunnerOptions): Promise<{ applied: str
     }
     const targetFile = files.find((file) => migrationIdFromFile(file) === latestAppliedId);
     if (!targetFile) {
-      throw new Error(`Cannot rollback ${latestAppliedId}: migration script not found in ${opts.dir}`);
+      throw new Error(
+        `Cannot rollback ${latestAppliedId}: migration script not found in ${opts.dir}`
+      );
     }
     await rollbackMigration(targetFile, opts.dryRun);
     if (!opts.dryRun) {
