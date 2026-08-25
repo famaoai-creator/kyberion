@@ -2,6 +2,53 @@
 
 This glossary translates Kyberion's ecosystem language into practical terms for contributors and operators.
 
+## How to use this glossary
+
+- **First-win vocabulary**: the six terms needed to understand the basic intent-to-result loop.
+- **Contributor vocabulary**: the canonical terms most contributors encounter while changing the repository.
+- **FDE full glossary**: the complete reference below, including governance, tenancy, runtime, and delivery terms.
+
+### First-win vocabulary
+
+Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to learn first.
+
+### Contributor vocabulary
+
+| Term | Canonical definition |
+| --- | --- |
+| Intent | The human request expressed in natural language. |
+| Resolution | The structured interpretation of an intent. |
+| Plan | A human-readable execution summary. |
+| Result | The user-facing outcome of execution. |
+| Mission | A bounded unit of work with lifecycle state and evidence. |
+| Task Session | A lighter-weight durable execution contract. |
+| Artifact | The concrete output of work. |
+| Work Shape | The operating mode of a work item. |
+| Execution Shape | The selected execution rung for an intent. |
+| WorkItem | The canonical unit of executable work. |
+| WorkItem Context | The typed identity chain on a work item. |
+| Mission Context Pack | The bounded context delivered to a mission task. |
+| Handoff Packet | The explicit transfer record between workers or phases. |
+| Knowledge Slice | A task-profile-driven knowledge placement rule. |
+| Knowledge Card | A concise, frontmatter-backed knowledge artifact. |
+| Semantic Brief | A content brief that leaves presentation choices to the design layer. |
+| Design Cascade | The ordered resolution of creative design defaults. |
+| Actuator | A concrete execution component. |
+| Procedure | Distilled operational knowledge or a reusable method. |
+| Pipeline | A declarative, governed execution graph. |
+| ADF | A human-readable structured execution contract. |
+| Tenant | An isolation boundary identified by a tenant slug. |
+| Viewer Context | The server-resolved principal and allowed tenant scope. |
+| Approval Contract | The human-approval boundary for consequential actions. |
+| Gateway | The generic delivery contract shared by surfaces. |
+| Trace | The root observability record for an execution. |
+| Span | A timed operation within a trace. |
+| Event | A point-in-time occurrence within a span. |
+| Lease | A durable authority grant with an expiry. |
+| Mission Controller | The governed mission lifecycle entry point. |
+
+### FDE full glossary
+
 ## Core concepts
 
 ### Sovereign
@@ -60,6 +107,10 @@ A human-facing interaction contract that carries clarification prompts, status s
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
 
+### Mission Context Pack
+
+The bounded, role-scoped context assembled for a mission task: governed instructions, typed scope, relevant knowledge, and task-specific evidence. It is an input pack, not a replacement for the mission record.
+
 ### Task Session
 
 A lighter-weight durable execution contract used for conversational work such as document generation, service inspection, capture flows, and interactive browser assistance.
@@ -88,9 +139,17 @@ The top-level framing of Kyberion as a system where leadership provides intent a
 
 A durable authority grant over a mission, task, bridge, or resource. Leases define who currently holds control and when that control expires.
 
+### Handoff Packet
+
+The explicit transfer record used when responsibility moves between workers or phases. It carries the current state, evidence, open risks, and the next owner's acceptance boundary.
+
 ### Task Contract
 
 A structured unit of delegated work inside a mission. Task contracts define objective, write scope, expected outputs, and acceptance criteria.
+
+### Semantic Brief
+
+A content and intent brief for a visual or other designed artifact. It states meaning, audience, and constraints while leaving presentation choices to the governed design layer.
 
 ### Existing Work Reconciliation
 
@@ -352,6 +411,8 @@ The `work_shape` field classifying a work item's operating mode: `solution_proje
 
 The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs; `work_shape` describes the operating mode of a `WorkItem`, so the two fields are not interchangeable.
 
+These are orthogonal axes: changing the operating mode does not by itself choose the execution rung, and choosing a rung does not redefine the operating mode.
+
 ### WorkItem
 
 The canonical unit of executable work shared by all views and surfaces (`libs/core/work-coordination.ts`). Work items are claimed, leased, and transitioned by agents; every view (kanban, activity board, organization view) is a projection of the same records.
@@ -401,6 +462,14 @@ Zero-LLM full-text search over conversation, mission, and trace history on SQLit
 ### Knowledge Slice
 
 A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `knowledge/product/schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
+
+### Knowledge Card
+
+A concise, frontmatter-backed knowledge artifact placed in the appropriate governed knowledge tier so later mission context retrieval can find and reuse it.
+
+### Design Cascade
+
+The ordered resolution of creative design defaults from explicit mission choices through theme, pattern, and engine defaults. It keeps semantic content separate from per-element style literals.
 
 ### Trace / Span / Event
 
