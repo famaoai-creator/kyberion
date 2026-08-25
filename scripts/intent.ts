@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import {
   auditChain,
   customerResolver,
@@ -620,7 +620,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'intent.ts') || isDirectScript(import.meta.url, 'intent.js');
 if (isDirect) {
   main().catch((err: any) => {
     console.error(`[intent] ${err?.message || err}`);

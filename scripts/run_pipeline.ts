@@ -558,6 +558,7 @@ function formatFlowValidationErrors(errors: FlowValidationError[]): string {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
 
@@ -3568,7 +3569,8 @@ export async function main() {
 }
 
 const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'run_pipeline.ts') ||
+  isDirectScript(import.meta.url, 'run_pipeline.js');
 
 if (isDirectRun) {
   main().catch((err) => {
