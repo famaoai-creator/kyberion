@@ -334,7 +334,7 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 - PI-03: `pnpm vitest run libs/core/skill-plugin-loader.test.ts libs/core/approval-gate.test.ts`
 - PI-04: `pnpm vitest run libs/core/worker-context-compaction.test.ts`(5 連続圧縮 golden・overflow 1 回)
 - PI-06: `pnpm run generate:trace-docs && pnpm run check:reference-drift`
-- PI-12: `pnpm run check:pinned-deps check:install-script-allowlist release:local`
+- PI-12: `pnpm check -- --scope pr` (pinned dependency, install-script allowlist, and lockfile gates are manifest entries)
 - PI-13: `pnpm vitest run libs/core/testing/reasoning-backend-conformance.test.ts`(stub)/ `PROVIDER_LIVE=1`(live)
 
 ## 8. 関連

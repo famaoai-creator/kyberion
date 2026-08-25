@@ -48,8 +48,18 @@ describe('Workflow operations contract', () => {
 
   it('runs golden output checks in PR validation once stable snapshots exist', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
-    expect(prValidation).toContain('KYBERION_REASONING_BACKEND: stub');
-    expect(prValidation).toContain('pnpm run check:golden');
+    const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
+      gates: Array<{ id: string; scope: string }>;
+    };
+    expect(gates.gates).toContainEqual({
+      id: 'golden',
+      scope: 'pr',
+      executable: 'node',
+      args: ['dist/scripts/check_golden_output.js'],
+      owner: 'quality',
+      rationale: expect.any(String),
+    });
+    expect(prValidation).not.toContain('pnpm run check:golden');
   });
 
   it('documents the distinction between local terminal residue and managed surfaces', () => {

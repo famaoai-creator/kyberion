@@ -8,8 +8,9 @@
  * which catches structural breakage).
  *
  * Modes:
- *   pnpm check:golden                      # check mode (CI)
- *   pnpm check:golden -- --rebaseline      # update golden snapshots after intentional changes
+ *   pnpm check -- --scope pr --only golden  # check mode (CI)
+ *   node dist/scripts/check_golden_output.js --rebaseline
+ *                                            # update snapshots after intentional changes
  *
  * Registry: tests/golden/pipelines.json — list of pipelines to gate.
  * Snapshots: tests/golden/snapshots/{pipeline-id}.json
