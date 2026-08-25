@@ -9,6 +9,7 @@ import {
   type ReasoningRouteUserConfig,
   inspectReasoningRoutes,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { readJson } from '@agent/core/foundation';
 import {
   getRegisteredEnv,
@@ -28,12 +29,12 @@ const HELP = `Usage:
   pnpm reasoning:config rollback [--dry-run]
 `;
 
-function hasFlag(name: string): boolean {
-  return process.argv.includes(name);
+function hasFlag(argv: string[], name: string): boolean {
+  return argv.includes(name);
 }
-function option(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+function option(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  return index >= 0 ? argv[index + 1] : undefined;
 }
 
 function jsonOutput(value: unknown): void {
@@ -94,8 +95,8 @@ function listRoutes(asJson: boolean): void {
   }
 }
 
-function explainRoute(asJson: boolean): void {
-  const role = normalizeReasoningRole(option('--role'));
+function explainRoute(argv: string[], asJson: boolean): void {
+  const role = normalizeReasoningRole(option(argv, '--role'));
   const route = resolveReasoningRoute({ role });
   if (asJson) return jsonOutput(route);
   console.log(`role=${route.role}`);
@@ -130,12 +131,12 @@ function validateRoutes(asJson: boolean): void {
       console.log(
         `${entry.role}: ${entry.valid ? `ok (${entry.selected})` : `ERROR ${entry.error}`}`
       );
-  if (!result.valid) process.exitCode = 1;
+  if (!result.valid) throw new ScriptExitError(1, '', true);
 }
 
-function bindRole(): void {
-  const role = normalizeReasoningRole(process.argv[3]);
-  const binding = process.argv[4]?.trim();
+function bindRole(argv: string[]): void {
+  const role = normalizeReasoningRole(argv[1]);
+  const binding = argv[2]?.trim();
   if (!binding) throw new Error('bind-role requires <profile|mode:model>');
   const config = loadReasoningRouteUserConfig();
   const profile =
@@ -150,13 +151,13 @@ function bindRole(): void {
     };
   }
   config.roles = { ...(config.roles || {}), [role]: { ...(config.roles?.[role] || {}), profile } };
-  saveWithBackup(config, hasFlag('--dry-run'), `bind-role:${role}`);
+  saveWithBackup(config, hasFlag(argv, '--dry-run'), `bind-role:${role}`);
 }
 
-function setFallback(): void {
-  const role = normalizeReasoningRole(option('--role'));
-  const raw = process.argv.find(
-    (value, index) => index > 2 && value.includes(',') && !value.startsWith('--')
+function setFallback(argv: string[]): void {
+  const role = normalizeReasoningRole(option(argv, '--role'));
+  const raw = argv.find(
+    (value, index) => index > 0 && value.includes(',') && !value.startsWith('--')
   );
   const candidates =
     raw
@@ -169,17 +170,17 @@ function setFallback(): void {
     ...(config.roles || {}),
     [role]: { ...(config.roles?.[role] || {}), candidates },
   };
-  saveWithBackup(config, hasFlag('--dry-run'), `set-fallback:${role}`);
+  saveWithBackup(config, hasFlag(argv, '--dry-run'), `set-fallback:${role}`);
 }
 
-function rollback(): void {
+function rollback(argv: string[]): void {
   const path = reasoningRouteUserConfigPath();
   const backup = `${path}.previous`;
   if (!safeExistsSync(backup)) throw new Error(`No rollback snapshot at ${backup}`);
   const restored = readJson<ReasoningRouteUserConfig>(backup);
   validateReasoningRouteUserConfig(restored, backup);
   validateConfigResolves(restored);
-  if (hasFlag('--dry-run'))
+  if (hasFlag(argv, '--dry-run'))
     return jsonOutput({ dry_run: true, restore: backup, target: path, config: restored });
   saveWithBackup(restored, false, 'rollback');
   console.log(`Restored ${path}`);
@@ -197,24 +198,31 @@ async function doctor(asJson: boolean): Promise<void> {
     console.log('Next actions:');
     for (const action of report.nextActions) console.log(`- ${action}`);
   }
-  if (!report.valid) process.exitCode = 1;
+  if (!report.valid) throw new ScriptExitError(1, '', true);
 }
 
-async function main(): Promise<void> {
-  const command = process.argv[2];
-  const asJson = hasFlag('--json');
+export async function main(argv: string[] = []): Promise<void> {
+  const command = argv[0];
+  const asJson = hasFlag(argv, '--json');
   if (!command || command === '--help' || command === 'help') return console.log(HELP);
   if (command === 'list') return listRoutes(asJson);
-  if (command === 'explain') return explainRoute(asJson);
+  if (command === 'explain') return explainRoute(argv, asJson);
   if (command === 'validate') return validateRoutes(asJson);
   if (command === 'doctor') return doctor(asJson);
-  if (command === 'bind-role') return bindRole();
-  if (command === 'set-fallback') return setFallback();
-  if (command === 'rollback') return rollback();
+  if (command === 'bind-role') return bindRole(argv);
+  if (command === 'set-fallback') return setFallback(argv);
+  if (command === 'rollback') return rollback(argv);
   throw new Error(`Unknown command ${command}\n${HELP}`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+export const runReasoningConfig = defineScript({
+  name: 'reasoning:config',
+  flags: [],
+  run: async ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'reasoning_config.ts') ||
+  isDirectScript(import.meta.url, 'reasoning_config.js')
+)
+  void runReasoningConfig();
