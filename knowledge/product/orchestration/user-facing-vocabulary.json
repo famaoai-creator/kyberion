@@ -3244,9 +3244,9 @@
         "qps-ploc": "⟦  őṗėñ-ȧřŧïƒȧƈŧ <ṗȧŧħ> Őṗėñ ȧ ɠėñėřȧŧėḓ ȧřŧïƒȧƈŧ ẇïŧħ ŧħė ŐŞ ḓėƒȧůŀŧ ṽïėẇėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
       },
       "cli_help_intent": {
-        "en": "  intent [--clarify] \"<utterance>\"   Resolve free text into an intent or clarification packet",
-        "ja": "  intent [--clarify] \"<発話>\"   自由文を intent または明確化パケットへ解決",
-        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Řėşőŀṽė ƒřėė ŧėẋŧ ïñŧő ȧñ ïñŧėñŧ őř ƈŀȧřïƒïƈȧŧïőñ ṗȧƈķėŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+        "en": "  intent [--clarify] \"<utterance>\"   Deprecated: use `pnpm kyberion ask --explain \"<utterance>\"`",
+        "ja": "  intent [--clarify] \"<発話>\"   非推奨: `pnpm kyberion ask --explain \"<発話>\"` を使用",
+        "qps-ploc": "⟦  ïñŧėñŧ [--ƈŀȧřïƒẏ] \"<ůŧŧėřȧñƈė>\"   Dėṗřėƈȧŧėḓ: ůşė `ṗñṗɱ ķẏɓėřïõñ ȧşķ --ėẋṗŀȧïñ` ŀőřėɱ⟧"
       },
       "cli_help_task_summary": {
         "en": "  task <plan|start> \"<request>\"  Plan a cross-tool task or create a governed task session",

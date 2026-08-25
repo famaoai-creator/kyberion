@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+const legacyIntentAsk = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('./kyberion_home.js', () => ({ main: legacyIntentAsk }));
 import {
   assertApprovedNextActionCommand,
   parseOffboardArgs,
@@ -12,9 +14,22 @@ import {
   searchActuators,
   shouldBootstrapRuntime,
   stripNpmSeparatorArg,
+  routeLegacyIntentToAsk,
 } from './cli.js';
 
 describe('Kyberion CLI helpers', () => {
+  it('routes legacy intent resolution to the canonical ask explanation path', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await routeLegacyIntentToAsk('prepare the weekly report');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[DEPRECATED] `pnpm cli intent` is now routed to `pnpm kyberion ask --explain`; use the latter directly.'
+    );
+    expect(legacyIntentAsk).toHaveBeenCalledWith(['ask', 'prepare the weekly report', '--explain']);
+    legacyIntentAsk.mockClear();
+  });
+
   it('normalizes compact actuator index entries', () => {
     const actuators = normalizeActuators({
       s: [

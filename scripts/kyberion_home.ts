@@ -1510,23 +1510,23 @@ function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }):
   console.log(ui('recorder:recorder_deal_requirements_command'));
 }
 
-export async function main(): Promise<void> {
+export async function main(args = process.argv.slice(2)): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
   }
-  const localeFlagIndex = process.argv.indexOf('--locale');
-  if (localeFlagIndex >= 0 && process.argv[localeFlagIndex + 1]) {
-    cliLocale = resolveLocale({ explicit: process.argv[localeFlagIndex + 1] });
+  const localeFlagIndex = args.indexOf('--locale');
+  if (localeFlagIndex >= 0 && args[localeFlagIndex + 1]) {
+    cliLocale = resolveLocale({ explicit: args[localeFlagIndex + 1] });
   }
   // yargs intercepts a literal `help` positional with its own dump — answer
   // with the command table (what the home screen advertises) instead.
-  if (process.argv[2] === 'help') {
+  if (args[0] === 'help') {
     printCommands();
     return;
   }
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(['node', 'kyberion_home', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('explain', {
       type: 'boolean',
