@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { compileSchema } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
+const Ajv = (AjvModule as unknown as { default?: typeof AjvModule }).default ?? AjvModule;
 
 describe('schema-loader compatibility boundary', () => {
   const schemaPath = path.resolve(process.cwd(), 'schemas/video-composition-action.schema.json');
