@@ -12,6 +12,8 @@ import {
 } from '@agent/core';
 import { safeReaddir, safeLstat } from '@agent/core';
 import { appendJsonLine } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type AuditVulnEntry = {
   name?: string;
@@ -372,12 +374,14 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
     unresolved_summary: summarizeUnresolved(findings, previousState),
   };
 
-  safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  appendJsonLine(ledgerPath, result);
+  withExecutionContext('ecosystem_architect', () => {
+    safeMkdir(path.dirname(ledgerPath), { recursive: true });
+    appendJsonLine(ledgerPath, result);
+  });
   return result;
 }
 
-async function runScan(): Promise<number> {
+export async function runScan(): Promise<number> {
   const audit = safeExecResult('pnpm', ['audit', '--json'], { maxOutputMB: 20 });
   const outdated = safeExecResult('pnpm', ['outdated', '--json'], { maxOutputMB: 20 });
 
@@ -407,15 +411,18 @@ async function runScan(): Promise<number> {
   return 0;
 }
 
-const isDirect = process.argv[1] && /scan_dependency_vulns\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  runScan().then(
-    (code) => process.exit(code),
-    (error) => {
-      logger.error(`[vuln-scan] failed: ${(error as Error).message || error}`);
-      process.exit(1);
-    }
-  );
-}
+export const runDependencyVulnerabilityScan = defineScript({
+  name: 'dependency-vulnerability-scan',
+  flags: [],
+  async run() {
+    const code = await runScan();
+    if (code !== 0) throw new Error(`dependency vulnerability scan failed with exit code ${code}`);
+    return code;
+  },
+});
 
-export { runScan };
+if (
+  isDirectScript(import.meta.url, 'scan_dependency_vulns.ts') ||
+  isDirectScript(import.meta.url, 'scan_dependency_vulns.js')
+)
+  void runDependencyVulnerabilityScan();
