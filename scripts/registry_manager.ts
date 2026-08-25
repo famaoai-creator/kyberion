@@ -1,10 +1,10 @@
 import * as path from 'node:path';
 import { loadJson, safeWriteFile, safeExistsSync, safeMkdir, pathResolver } from '@agent/core';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+import { defineScript } from './lib/harness.js';
 
-async function main() {
-  const argv = await yargs(hideBin(process.argv))
+async function main(args: string[]) {
+  const argv = await yargs(args)
     .option('adapter', {
       type: 'string',
       demandOption: true,
@@ -96,7 +96,8 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error(`[REGISTRY_MANAGER_ERROR] ${err.message}`);
-  process.exit(1);
-});
+void defineScript({
+  name: 'registry:manage',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
