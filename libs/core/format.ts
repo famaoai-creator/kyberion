@@ -22,9 +22,10 @@
  */
 
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 
 export type DateTimeFormatStyle = 'date' | 'time' | 'datetime' | 'short' | 'long';
 
@@ -252,7 +253,7 @@ export function resolveTimeZone(ctx?: ResolveTimeZoneContext): string {
     const identityPath =
       ctx?.identityPath ?? path.join(resolveActiveProfileRoot(), 'my-identity.json');
     if (safeExistsSync(identityPath)) {
-      const parsed = JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'));
+      const parsed = readJson<Record<string, unknown>>(identityPath);
       const timeZone = String(parsed?.timeZone || parsed?.timezone || '').trim();
       if (timeZone) return timeZone;
     }
