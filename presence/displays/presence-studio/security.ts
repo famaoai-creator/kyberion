@@ -1,7 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { logger, narrowSurfaceViewerTenant } from '@agent/core';
+import { extractSurfaceBearerToken, logger, narrowSurfaceViewerTenant } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const LOCALHOST_NAMES = new Set([
@@ -73,11 +73,7 @@ export function isLoopbackOrPrivateAddress(address: string): boolean {
 }
 
 export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): string {
-  const authHeader = req.headers.authorization;
-  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim();
-  }
-  return '';
+  return extractSurfaceBearerToken(req.headers.authorization);
 }
 
 export function checkPresenceStudioRateLimit(

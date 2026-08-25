@@ -122,6 +122,24 @@ export function forbiddenGitCoexecutionMutation(command: string): string | undef
   return checks.find(([pattern]) => pattern.test(command))?.[1];
 }
 
+function isScriptWrapperCommand(command: string, args: readonly string[]): boolean {
+  const normalizedCommand = [command, ...args].join(' ');
+  const typedWrapper =
+    (command.trim() === 'node' && args[0]?.startsWith('dist/')) ||
+    (command.trim() === 'npx' && args[0] === 'tsx') ||
+    (command.trim() === 'pnpm' && (args[0] === 'exec' || args[0] === 'dlx'));
+
+  // Keep the existing raw command-string behavior in addition to the typed
+  // command/args shape above.
+  return (
+    typedWrapper ||
+    /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
+      normalizedCommand
+    ) ||
+    /dist\/libs\/actuators\//iu.test(normalizedCommand)
+  );
+}
+
 export function validatePipelineGuardrails(
   pipeline: PipelineAdf,
   sourcePath = 'pipeline'
@@ -245,12 +263,7 @@ export function validatePipelineGuardrails(
               path: `${stepPath}.params.cmd`,
             });
           }
-          if (
-            /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
-              normalizedCommand
-            ) ||
-            /dist\/libs\/actuators\//iu.test(normalizedCommand)
-          ) {
+          if (isScriptWrapperCommand(command, commandArgs)) {
             findings.push({
               code: 'script-wrapper-forbidden',
               severity: 'error',
