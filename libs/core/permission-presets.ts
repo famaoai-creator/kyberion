@@ -1,6 +1,6 @@
 /** DH-11: named permission bundles are data; custom is derived, never stored. */
 
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import type { ProviderPermissionProfileName } from './provider-permission-profiles.js';
 import { resolveSandboxPolicy, type SandboxMode, type SandboxPolicy } from './sandbox-policy.js';
@@ -29,25 +29,25 @@ interface PresetRegistryFile {
 const REGISTRY_PATH = pathResolver.rootResolve(
   'knowledge/product/governance/permission-presets.json'
 );
-let cachedRegistry: PresetRegistryFile | undefined;
+const registryCatalog = defineCatalog<PresetRegistryFile>({
+  id: 'permission-presets',
+  path: REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/permission-presets.schema.json'),
+});
 
 function readRegistry(): PresetRegistryFile {
-  if (cachedRegistry) return cachedRegistry;
-  if (!safeExistsSync(REGISTRY_PATH)) {
-    throw new Error(`[PERMISSION_PRESET_REGISTRY] missing registry: ${REGISTRY_PATH}`);
-  }
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' })));
-  } catch {
-    throw new Error(`[PERMISSION_PRESET_REGISTRY] invalid JSON: ${REGISTRY_PATH}`);
+    const candidate = registryCatalog.load();
+    if (candidate.version !== 1) {
+      throw new Error(`[PERMISSION_PRESET_REGISTRY] unsupported registry: ${REGISTRY_PATH}`);
+    }
+    return candidate;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('unsupported registry')) throw error;
+    throw new Error(`[PERMISSION_PRESET_REGISTRY] invalid or missing registry: ${REGISTRY_PATH}`, {
+      cause: error,
+    });
   }
-  const candidate = parsed as Partial<PresetRegistryFile>;
-  if (candidate.version !== 1 || !candidate.presets || typeof candidate.presets !== 'object') {
-    throw new Error(`[PERMISSION_PRESET_REGISTRY] unsupported registry: ${REGISTRY_PATH}`);
-  }
-  cachedRegistry = candidate as PresetRegistryFile;
-  return cachedRegistry;
 }
 
 function buildResolved(
@@ -95,5 +95,5 @@ export function derivePermissionPreset(input: {
 }
 
 export function resetPermissionPresetRegistryCache(): void {
-  cachedRegistry = undefined;
+  registryCatalog.reset();
 }
