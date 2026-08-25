@@ -1,4 +1,5 @@
-import { loadJson, pathResolver, safeExistsSync } from '@agent/core';
+import { pathResolver, safeExistsSync } from '@agent/core';
+import { defineCatalog } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface CliEntrypoint {
@@ -18,12 +19,18 @@ export interface CliCommand {
 
 export interface CliManifest {
   version: number;
-  commands?: CliCommand[];
+  commands: CliCommand[];
   entrypoints: CliEntrypoint[];
 }
 
+const cliManifestCatalog = defineCatalog<CliManifest>({
+  id: 'cli-commands',
+  path: () => pathResolver.knowledge('product/governance/cli-commands.json'),
+  schema: pathResolver.knowledge('product/schemas/cli-commands.schema.json'),
+});
+
 export function loadCliManifest(): CliManifest {
-  return loadJson<CliManifest>(pathResolver.knowledge('product/governance/cli-commands.json'));
+  return cliManifestCatalog.load();
 }
 
 export function checkCliManifest(manifest = loadCliManifest()): string[] {
@@ -38,6 +45,7 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
   const ids = new Set<string>();
   const commands = new Map<string, string>();
   const commandIds = new Set<string>();
+  const registeredCommands = new Set<string>();
   if (!Array.isArray(manifest.commands) || manifest.commands.length === 0) {
     failures.push('commands must be a non-empty command registry');
   } else {
@@ -46,6 +54,7 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
         failures.push(`command id must be unique: ${command.id || '<missing>'}`);
       }
       commandIds.add(command.id);
+      registeredCommands.add(command.command);
       if (!command.noun || !command.verb || !command.entry) {
         failures.push(`command ${command.id || '<missing>'} must declare noun, verb, and entry`);
       }
@@ -79,6 +88,11 @@ export function checkCliManifest(manifest = loadCliManifest()): string[] {
     }
     if (commands.get(command.command) !== command.entry) {
       failures.push(`command registry route mismatch: ${command.command} -> ${command.entry}`);
+    }
+  }
+  for (const [command] of commands) {
+    if (!registeredCommands.has(command)) {
+      failures.push(`entrypoint command missing registry entry: ${command}`);
     }
   }
   for (const required of ['operator-home', 'operator-cli']) {

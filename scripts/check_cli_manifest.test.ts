@@ -6,9 +6,32 @@ describe('CLI manifest', () => {
     expect(checkCliManifest(loadCliManifest())).toEqual([]);
   });
 
+  it('requires a command registry entry for every routed command', () => {
+    const failures = checkCliManifest({
+      version: 1,
+      commands: [
+        {
+          id: 'operator-home.default',
+          command: '',
+          noun: 'home',
+          verb: 'default',
+          entry: 'operator-home',
+          audience: 'user',
+        },
+      ],
+      entrypoints: [
+        { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: ['', 'ask'] },
+        { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+      ],
+    });
+    expect(failures).toContain('entrypoint command missing registry entry: ask');
+    expect(failures).toContain('entrypoint command missing registry entry: help');
+  });
+
   it('rejects duplicate command ownership and missing modules', () => {
     const failures = checkCliManifest({
       version: 1,
+      commands: [],
       entrypoints: [
         { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: ['', 'ask'] },
         { id: 'operator-cli', module: 'missing.ts', commands: ['ask'] },

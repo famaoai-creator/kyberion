@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { loadJson, pathResolver } from '@agent/core';
+import { loadCliManifest, type CliCommand } from './check_cli_manifest.js';
 
 interface CliEntrypoint {
   id: string;
@@ -7,34 +7,28 @@ interface CliEntrypoint {
   commands: string[];
 }
 
-interface CliCommand {
-  id: string;
-  command: string;
-  noun: string;
-  verb: string;
-  entry: string;
-  audience: 'user' | 'operator' | 'dev';
+export function selectEntrypoint(command: string, manifest = loadCliManifest()): CliEntrypoint {
+  const registered = manifest.commands.find((candidate) => candidate.command === command);
+  if (!registered) throw new Error(`Unknown kyberion command: ${command}`);
+  const entrypoint = manifest.entrypoints.find((candidate) => candidate.id === registered.entry);
+  if (!entrypoint) {
+    throw new Error(
+      `CLI command ${command || '<default>'} references missing entrypoint: ${registered.entry}`
+    );
+  }
+  if (!entrypoint.commands.includes(command)) {
+    throw new Error(
+      `CLI command registry mismatch: ${command || '<default>'} -> ${registered.entry}`
+    );
+  }
+  return entrypoint;
 }
 
-interface CliManifest {
-  version: number;
-  commands?: CliCommand[];
-  entrypoints: CliEntrypoint[];
-}
-
-function loadManifest(): CliManifest {
-  return loadJson<CliManifest>(pathResolver.knowledge('product/governance/cli-commands.json'));
-}
-
-export function selectEntrypoint(command: string, manifest = loadManifest()): CliEntrypoint {
-  const entrypoint = manifest.entrypoints.find((candidate) => candidate.commands.includes(command));
-  if (entrypoint) return entrypoint;
-  if (!command) return manifest.entrypoints.find((candidate) => candidate.id === 'operator-home')!;
-  throw new Error(`Unknown kyberion command: ${command}`);
-}
-
-export function resolveCommand(command: string, manifest = loadManifest()): CliCommand | undefined {
-  return manifest.commands?.find((entry) => entry.command === command);
+export function resolveCommand(
+  command: string,
+  manifest = loadCliManifest()
+): CliCommand | undefined {
+  return manifest.commands.find((entry) => entry.command === command);
 }
 
 export async function main(args = process.argv.slice(2)): Promise<void> {

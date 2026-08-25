@@ -6619,6 +6619,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cli-commands.schema.json",
+      "tier": "public",
+      "size": 1585,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cognitive-routing-decision.schema.json",
       "tier": "public",
       "size": 1300,
