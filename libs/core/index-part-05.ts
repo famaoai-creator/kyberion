@@ -298,6 +298,7 @@ export {
 
 export type {
   EnvRegistryValidationEntry,
+  EnvValidationOptions,
   EnvValidationIssue,
   EnvValidationReport,
   RegisteredEnvReadOptions,
