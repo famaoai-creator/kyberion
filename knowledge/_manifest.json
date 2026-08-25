@@ -7651,6 +7651,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/outcome-catalog.schema.json",
+      "tier": "public",
+      "size": 881,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/participant-context.schema.json",
       "tier": "public",
       "size": 1027,

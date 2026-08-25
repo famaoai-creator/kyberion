@@ -15,12 +15,14 @@ import {
   type WorkflowExecutionShape,
 } from './execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/specialist-catalog.json'
 );
 const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
+const OUTCOME_CATALOG_PATH = pathResolver.knowledge('product/governance/outcome-catalog.json');
 
 export interface OutcomeDefinition {
   id: string;
@@ -337,12 +339,16 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
 }
 
 export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
-  const parsed = loadJson<OutcomeCatalogFile>(
-    pathResolver.knowledge('product/governance/outcome-catalog.json')
-  );
+  const parsed = outcomeCatalog.load();
   const entries = parsed.outcomes || {};
   return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
 }
+
+const outcomeCatalog = defineCatalog<OutcomeCatalogFile>({
+  id: 'outcome-catalog',
+  path: OUTCOME_CATALOG_PATH,
+  schema: 'knowledge/product/schemas/outcome-catalog.schema.json',
+});
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
   const parsed = safeExistsSync(pathResolver.rootResolve(DEFAULT_SPECIALIST_CATALOG_DIR))
