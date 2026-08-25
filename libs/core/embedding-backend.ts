@@ -24,7 +24,7 @@ function hashToken(token: string): number {
   return hash >>> 0;
 }
 
-function normalizeText(text: string): string[] {
+function normalizeEmbeddingText(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -34,7 +34,7 @@ function normalizeText(text: string): string[] {
 
 function embedText(text: string): Float32Array {
   const vector = new Float32Array(VECTOR_SIZE);
-  const tokens = normalizeText(text);
+  const tokens = normalizeEmbeddingText(text);
   if (tokens.length === 0) return vector;
 
   for (const token of tokens) {

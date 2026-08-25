@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * KC-06: claim-based delegation completion notifications.
  *
@@ -131,7 +132,7 @@ export function enqueueDelegationNotification(input: {
   }
   withLockSync('delegation-notifications', () => {
     ensureQueueDir();
-    safeAppendFileSync(resolveQueuePath(), `${JSON.stringify(notification)}\n`, 'utf8');
+    appendJsonLine(resolveQueuePath(), notification);
   });
   return notification;
 }

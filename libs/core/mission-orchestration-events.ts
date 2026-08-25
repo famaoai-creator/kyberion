@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver, rootDir } from './path-resolver.js';
@@ -91,13 +92,10 @@ export function emitMissionOrchestrationObservation(event: Record<string, unknow
   if (!obsDir) return;
   safeMkdir(EVENTS_DIR);
   safeMkdir(obsDir);
-  safeAppendFileSync(
-    `${obsDir}/orchestration-events.jsonl`,
-    `${JSON.stringify({
-      ts: new Date().toISOString(),
-      ...sharedEvent,
-    })}\n`
-  );
+  appendJsonLine(`${obsDir}/orchestration-events.jsonl`, {
+    ts: new Date().toISOString(),
+    ...sharedEvent,
+  });
 }
 
 function missionPayloadPath(

@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import {
   loadJson,
   safeReadFile,
@@ -654,7 +655,7 @@ export class MetricsCollector {
         safeMkdir(this._metricsDir, { recursive: true });
       }
       const filePath = path.join(this._metricsDir, this._metricsFile);
-      safeAppendFileSync(filePath, JSON.stringify(entry) + '\n');
+      appendJsonLine(filePath, entry);
     } catch (err) {
       logger.warn(`suppressed error in _appendToFile: ${err}`);
     }
@@ -663,10 +664,7 @@ export class MetricsCollector {
   private _appendResourceUsage(entry: ResourceUsageRecord) {
     try {
       if (!safeExistsSync(this._metricsDir)) safeMkdir(this._metricsDir, { recursive: true });
-      safeAppendFileSync(
-        path.join(this._metricsDir, this._resourceUsageFile),
-        `${JSON.stringify(entry)}\n`
-      );
+      appendJsonLine(path.join(this._metricsDir, this._resourceUsageFile), entry);
     } catch (_) {
       /* metrics are best-effort and must not block the operation */
     }

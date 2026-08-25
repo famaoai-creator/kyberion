@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { Buffer } from 'node:buffer';
@@ -1120,7 +1121,7 @@ export function persistBrowserExtensionObservation(observation: unknown): {
     } catch {
       // The per-procedure file does not exist yet.
     }
-    safeAppendFile(filePath, `${JSON.stringify(redacted)}\n`);
+    appendJsonLine(filePath, redacted);
     return { path: filePath, errors: [] };
   } catch (err) {
     return {

@@ -4,7 +4,6 @@ import {
   safeExec,
   safeReadFile,
   safeWriteFile,
-  safeAppendFile,
   safeExistsSync,
   safeMkdir,
   safeOpenAppendFile,
@@ -43,6 +42,7 @@ import {
   type OsKnowledgeTier,
   type ResourceScope,
 } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
@@ -130,7 +130,7 @@ function emitRecoveryStimulus(serviceId: string) {
       evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }],
     },
   };
-  safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+  appendJsonLine(STIMULI_PATH, stimulus);
 }
 
 function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<RetryPolicy> {

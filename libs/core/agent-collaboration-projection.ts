@@ -96,7 +96,7 @@ const JSONL_SOURCES: Array<{ file: string; source: CollaborationSource }> = [
   { file: 'agent-runtime-supervisor-events.jsonl', source: 'runtime' },
 ];
 
-function asRecord(value: unknown): JsonRecord | null {
+function toRecordOrNull(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
@@ -109,7 +109,7 @@ function readJsonl(filePath: string): JsonRecord[] {
       .filter(Boolean)
       .flatMap((line) => {
         try {
-          const value = asRecord(JSON.parse(line));
+          const value = toRecordOrNull(JSON.parse(line));
           return value ? [value] : [];
         } catch {
           return [];
@@ -148,7 +148,7 @@ function eventFromRecord(
   source: CollaborationSource,
   seq: number
 ): AgentCollaborationEvent | null {
-  const payload = asRecord(record.payload) || {};
+  const payload = toRecordOrNull(record.payload) || {};
   const eventType = stringValue(record, 'event_type', 'type', 'decision') || 'unknown';
   const sourceEventId =
     stringValue(record, 'event_id', 'source_event_id', 'request_id') || `${source}:${seq}`;
@@ -265,8 +265,8 @@ function readWorkerEvents(): AgentCollaborationEvent[] {
   }
   return files.flatMap((file, fileIndex) =>
     readJsonl(file).flatMap((record, index) => {
-      const source = asRecord(record.source) || {};
-      const payload = asRecord(record.payload) || {};
+      const source = toRecordOrNull(record.source) || {};
+      const payload = toRecordOrNull(record.payload) || {};
       const event = eventFromRecord(
         {
           ...record,

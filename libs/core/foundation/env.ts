@@ -8,10 +8,23 @@ export interface FoundationEnvEntry {
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
+let cachedEntries: FoundationEnvEntry[] | null = null;
+let loadingEntries = false;
 
 function entries(): FoundationEnvEntry[] {
-  const parsed = readJsonIfPresent<{ entries?: FoundationEnvEntry[] }>(REGISTRY_PATH);
-  return Array.isArray(parsed?.entries) ? parsed.entries : [];
+  if (cachedEntries) return cachedEntries;
+  // The registry is read through secure-io. secure-io itself consults the
+  // registered environment while evaluating sensitive-path policy, so the
+  // first lookup must fail open to raw values until the registry is loaded.
+  if (loadingEntries) return [];
+  loadingEntries = true;
+  try {
+    const parsed = readJsonIfPresent<{ entries?: FoundationEnvEntry[] }>(REGISTRY_PATH);
+    cachedEntries = Array.isArray(parsed?.entries) ? parsed.entries : [];
+    return cachedEntries;
+  } finally {
+    loadingEntries = false;
+  }
 }
 
 export function getRegisteredEnv<T = string>(

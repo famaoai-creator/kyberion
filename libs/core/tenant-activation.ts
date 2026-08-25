@@ -4,6 +4,7 @@ import { loadOrganizationOperationalState } from './organization-operating-model
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
+import { isRecord } from './foundation/text.js';
 
 export const TENANT_ACTIVATION_CHECKS = [
   'registry',
@@ -149,10 +150,6 @@ function normalizeProbeRefs(input: TenantActivationInput): TenantActivationProbe
       return ref ? [[check, ref]] : [];
     })
   ) as TenantActivationProbeRefs;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isTenantActivationRecord(value: unknown): value is TenantActivationRecord {

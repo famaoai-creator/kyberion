@@ -8,6 +8,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
+import { isRecord } from './foundation/text.js';
 
 export interface AudioDeviceLeaseRecord {
   lease_id: string;
@@ -111,8 +112,4 @@ export class AudioDeviceLeaseManager {
       return true;
     }
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

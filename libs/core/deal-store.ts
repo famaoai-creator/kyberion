@@ -1,3 +1,5 @@
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -83,14 +85,10 @@ function dealLogPath(tenantSlug: string): string {
   return path.join(dealsDir(tenantSlug), 'deal-log.jsonl');
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void {
   try {
     safeMkdir(dealsDir(tenantSlug), { recursive: true });
-    safeAppendFileSync(dealLogPath(tenantSlug), `${JSON.stringify({ ts: nowIso(), ...event })}\n`);
+    appendJsonLine(dealLogPath(tenantSlug), { ts: nowIso(), ...event });
   } catch {
     // deal log is observability; never block the deal transition itself
   }

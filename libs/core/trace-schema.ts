@@ -380,7 +380,7 @@ interface TraceReplayRecord {
   [key: string]: unknown;
 }
 
-function isRecord(value: unknown): value is TraceReplayRecord {
+function isTraceRecord(value: unknown): value is TraceReplayRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -395,7 +395,7 @@ function validateReplayEvent(
   path: string
 ): TraceSchemaIssue[] {
   if (attributes === undefined) return [];
-  if (!isRecord(attributes)) return [{ path, message: 'event attributes must be an object' }];
+  if (!isTraceRecord(attributes)) return [{ path, message: 'event attributes must be an object' }];
   const definition = getTraceSpanDefinition(spanName)?.events[eventName];
   if (!definition?.attributes) return [];
   return Object.entries(attributes).flatMap(([key, value]) => {
@@ -424,11 +424,11 @@ export function validateTraceReplay(
   options: TraceReplayValidationOptions = {}
 ): TraceSchemaIssue[] {
   const issues: TraceSchemaIssue[] = [];
-  if (!isRecord(trace)) return [{ path: 'trace', message: 'trace must be an object' }];
+  if (!isTraceRecord(trace)) return [{ path: 'trace', message: 'trace must be an object' }];
   if (typeof trace.traceId !== 'string' || !trace.traceId.trim()) {
     issues.push({ path: 'trace.traceId', message: 'traceId must be a non-empty string' });
   }
-  if (!isRecord(trace.rootSpan)) {
+  if (!isTraceRecord(trace.rootSpan)) {
     issues.push({ path: 'trace.rootSpan', message: 'rootSpan must be an object' });
     return issues;
   }
@@ -459,20 +459,20 @@ export function validateTraceReplay(
         }))
       );
     }
-    if (kind && name === kind && isRecord(span.attributes)) {
+    if (kind && name === kind && isTraceRecord(span.attributes)) {
       issues.push(...validateTraceAttributes(name, span.attributes));
     }
     if (span.status !== 'ok' && span.status !== 'error' && span.status !== 'in_progress') {
       issues.push({ path: `${path}.status`, message: 'status is invalid' });
     }
-    if (span.attributes !== undefined && !isRecord(span.attributes)) {
+    if (span.attributes !== undefined && !isTraceRecord(span.attributes)) {
       issues.push({ path: `${path}.attributes`, message: 'attributes must be an object' });
     }
     if (!Array.isArray(span.events)) {
       issues.push({ path: `${path}.events`, message: 'events must be an array' });
     } else {
       for (const [index, event] of span.events.entries()) {
-        if (!isRecord(event) || typeof event.name !== 'string' || !event.name.trim()) {
+        if (!isTraceRecord(event) || typeof event.name !== 'string' || !event.name.trim()) {
           issues.push({ path: `${path}.events[${index}]`, message: 'event name is required' });
           continue;
         }
@@ -491,7 +491,7 @@ export function validateTraceReplay(
     } else {
       for (const [index, artifact] of span.artifacts.entries()) {
         const artifactPath = `${path}.artifacts[${index}]`;
-        if (!isRecord(artifact)) {
+        if (!isTraceRecord(artifact)) {
           issues.push({ path: artifactPath, message: 'artifact must be an object' });
           continue;
         }
@@ -529,7 +529,7 @@ export function validateTraceReplay(
       return;
     }
     for (const [index, child] of span.children.entries()) {
-      if (!isRecord(child)) {
+      if (!isTraceRecord(child)) {
         issues.push({
           path: `${path}.children[${index}]`,
           message: 'child span must be an object',

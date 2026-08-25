@@ -1,3 +1,5 @@
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Action Item Store — persists meeting-derived action items to the
  * mission's evidence directory and supports query / update operations.
@@ -18,25 +20,11 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeReadFile,
-  safeAppendFileSync,
-  safeMkdir,
-  safeExistsSync,
-} from './secure-io.js';
+import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
 
-export type ActionItemStatus =
-  | 'pending'
-  | 'in_progress'
-  | 'completed'
-  | 'blocked'
-  | 'cancelled';
+export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
-export type ActionItemAssigneeKind =
-  | 'operator_self'
-  | 'team_member'
-  | 'external'
-  | 'unassigned';
+export type ActionItemAssigneeKind = 'operator_self' | 'team_member' | 'external' | 'unassigned';
 
 export interface ActionItemAssignee {
   kind: ActionItemAssigneeKind;
@@ -75,17 +63,10 @@ export interface ActionItemMeetingRef {
 }
 
 export type ActionItemModality =
-  | 'declarative'
-  | 'conditional'
-  | 'hypothetical'
-  | 'rhetorical'
-  | 'humor';
+  'declarative' | 'conditional' | 'hypothetical' | 'rhetorical' | 'humor';
 
 export type ActionItemReviewState =
-  | 'auto_committed'
-  | 'pending_speaker_review'
-  | 'speaker_confirmed'
-  | 'speaker_rejected';
+  'auto_committed' | 'pending_speaker_review' | 'speaker_confirmed' | 'speaker_rejected';
 
 export interface ActionItemProvenance {
   speaker_label?: string;
@@ -163,16 +144,12 @@ export interface ActionItemLifecycleSummary {
 
 const ITEM_ID_RE = /^AI-[A-Z0-9-]{2,40}$/;
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function storePathFor(missionId: string): string {
   const evidenceDir = pathResolver.missionEvidenceDir(missionId);
   if (!evidenceDir) {
     // Fall back to a writable evidence dir layout the caller can create.
     return pathResolver.rootResolve(
-      `active/missions/confidential/${missionId}/evidence/action-items.jsonl`,
+      `active/missions/confidential/${missionId}/evidence/action-items.jsonl`
     );
   }
   return path.join(evidenceDir, 'action-items.jsonl');
@@ -253,12 +230,14 @@ function reduceLatest(items: ActionItem[]): Map<string, ActionItem> {
 function appendRecord(missionId: string, record: ActionItem): void {
   const file = storePathFor(missionId);
   safeMkdir(path.dirname(file), { recursive: true });
-  safeAppendFileSync(file, JSON.stringify(record) + '\n');
+  appendJsonLine(file, record);
 }
 
 function validateBasic(item: ActionItem): void {
   if (!ITEM_ID_RE.test(item.item_id)) {
-    throw new Error(`[action-item-store] invalid item_id '${item.item_id}'; expected ^AI-[A-Z0-9-]{4,40}$`);
+    throw new Error(
+      `[action-item-store] invalid item_id '${item.item_id}'; expected ^AI-[A-Z0-9-]{4,40}$`
+    );
   }
   if (!item.mission_id) throw new Error('[action-item-store] mission_id is required');
   if (!item.title || item.title.length < 5) {
@@ -273,10 +252,12 @@ function validateBasic(item: ActionItem): void {
  * Record a new action item. Throws if the item_id already exists for
  * this mission (use `updateActionItemStatus` for transitions).
  */
-export function recordActionItem(item: Omit<ActionItem, 'created_at' | 'status'> & {
-  created_at?: string;
-  status?: ActionItemStatus;
-}): ActionItem {
+export function recordActionItem(
+  item: Omit<ActionItem, 'created_at' | 'status'> & {
+    created_at?: string;
+    status?: ActionItemStatus;
+  }
+): ActionItem {
   const ts = nowIso();
   const full: ActionItem = {
     ...item,
@@ -288,7 +269,7 @@ export function recordActionItem(item: Omit<ActionItem, 'created_at' | 'status'>
   const existing = reduceLatest(readAll(full.mission_id));
   if (existing.has(full.item_id)) {
     throw new Error(
-      `[action-item-store] item_id '${full.item_id}' already exists in mission '${full.mission_id}'; use updateActionItemStatus`,
+      `[action-item-store] item_id '${full.item_id}' already exists in mission '${full.mission_id}'; use updateActionItemStatus`
     );
   }
   appendRecord(full.mission_id, full);
@@ -316,9 +297,7 @@ export function updateActionItemStatus(input: {
     status: input.status,
     updated_at: nowIso(),
     ...(input.completed_at ? { completed_at: input.completed_at } : {}),
-    ...(input.status === 'completed' && !input.completed_at
-      ? { completed_at: nowIso() }
-      : {}),
+    ...(input.status === 'completed' && !input.completed_at ? { completed_at: nowIso() } : {}),
     ...(input.status === 'blocked'
       ? { blocked_reason: input.blocked_reason ?? input.execution?.result_summary ?? 'blocked' }
       : {}),
@@ -344,9 +323,7 @@ export function appendReminder(input: {
   const reminders = current.reminders ?? [];
   if (
     reminders.some(
-      (r) =>
-        r.sent_at === input.reminder.sent_at &&
-        r.channel === input.reminder.channel,
+      (r) => r.sent_at === input.reminder.sent_at && r.channel === input.reminder.channel
     )
   ) {
     return current;
@@ -365,9 +342,7 @@ export function appendReminder(input: {
  */
 export function listActionItems(missionId: string): ActionItem[] {
   const view = reduceLatest(readAll(missionId));
-  return Array.from(view.values()).sort((a, b) =>
-    a.item_id.localeCompare(b.item_id),
-  );
+  return Array.from(view.values()).sort((a, b) => a.item_id.localeCompare(b.item_id));
 }
 
 export function summarizeActionItemLifecycle(missionId: string): ActionItemLifecycleSummary {
@@ -393,8 +368,7 @@ export function summarizeActionItemLifecycle(missionId: string): ActionItemLifec
       blockedItems.push({
         item_id: item.item_id,
         owner_kind: item.assignee.kind,
-        blocked_reason:
-          item.blocked_reason ?? item.execution?.result_summary ?? 'blocked',
+        blocked_reason: item.blocked_reason ?? item.execution?.result_summary ?? 'blocked',
       });
     }
   }
@@ -456,7 +430,7 @@ export function listOperatorSelfPending(missionId: string): ActionItem[] {
     (item) =>
       item.assignee.kind === 'operator_self' &&
       item.status === 'pending' &&
-      isEligibleForExecution(item),
+      isEligibleForExecution(item)
   );
 }
 
@@ -482,7 +456,7 @@ export function listOthersPending(missionId: string): ActionItem[] {
  */
 export function listPendingSpeakerReview(missionId: string): ActionItem[] {
   return listActionItems(missionId).filter(
-    (item) => (item.review_state ?? 'auto_committed') === 'pending_speaker_review',
+    (item) => (item.review_state ?? 'auto_committed') === 'pending_speaker_review'
   );
 }
 
@@ -505,7 +479,9 @@ export function confirmActionItemBySpeaker(input: {
     review_state: input.decision,
     updated_at: nowIso(),
     ...(input.decision === 'speaker_rejected' ? { status: 'cancelled' as ActionItemStatus } : {}),
-    ...(input.note ? { summary: `${current.summary ?? ''}\n[speaker_note] ${input.note}`.trim() } : {}),
+    ...(input.note
+      ? { summary: `${current.summary ?? ''}\n[speaker_note] ${input.note}`.trim() }
+      : {}),
   };
   appendRecord(input.mission_id, updated);
   return updated;
@@ -521,7 +497,7 @@ export function listPartialStatePending(missionId: string): ActionItem[] {
     (item) =>
       item.policy?.partial_state === true &&
       item.status !== 'completed' &&
-      item.status !== 'cancelled',
+      item.status !== 'cancelled'
   );
 }
 
@@ -557,9 +533,7 @@ export function clearPartialState(input: {
 export function listRestrictedPending(missionId: string): ActionItem[] {
   return listActionItems(missionId).filter(
     (item) =>
-      item.policy?.restricted === true &&
-      item.status !== 'completed' &&
-      item.status !== 'cancelled',
+      item.policy?.restricted === true && item.status !== 'completed' && item.status !== 'cancelled'
   );
 }
 
@@ -571,7 +545,10 @@ export function nextActionItemId(missionId: string, hint?: string): string {
   const existing = listActionItems(missionId);
   const n = existing.length + 1;
   const suffix = hint
-    ? hint.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+    ? hint
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 8)
     : '';
   return `AI-${missionId.replace(/^MSN-/, '')}-${n}${suffix ? `-${suffix}` : ''}`.slice(0, 40);
 }

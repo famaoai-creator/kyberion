@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedLogsProcess } from './path-resolver.js';
 import {
@@ -64,7 +65,7 @@ export class ProcessLogger {
       const dir = nodePath.dirname(filePath);
       safeMkdir(dir, { recursive: true });
       this.maybeRotate(filePath);
-      safeAppendFileSync(filePath, JSON.stringify(entry) + '\n');
+      appendJsonLine(filePath, entry);
     } catch {
       // silently swallow write errors so the logger never throws
     }
@@ -116,7 +117,10 @@ export class ProcessLogger {
   }
 }
 
-export function createProcessLogger(name: string, options: ProcessLoggerOptions = {}): ProcessLogger {
+export function createProcessLogger(
+  name: string,
+  options: ProcessLoggerOptions = {}
+): ProcessLogger {
   const existing = REGISTRY.get(name);
   if (existing) return existing;
   const log = new ProcessLogger(name, options);

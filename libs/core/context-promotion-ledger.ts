@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { safeAppendFileSync, safeMkdir } from './secure-io.js';
@@ -103,7 +104,7 @@ export function recordContextPromotion(
       }
     })();
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  safeAppendFileSync(ledgerPath, `${JSON.stringify(authorization)}\n`);
+  appendJsonLine(ledgerPath, authorization);
   return authorization;
 }
 

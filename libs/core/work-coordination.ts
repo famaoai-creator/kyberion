@@ -1,7 +1,9 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { slugify } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
@@ -374,10 +376,6 @@ function withCoordinationRoot<T>(rootDir: string | undefined, fn: () => T): T {
   }
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function normalizeWorkItemContext(
   input: WorkItemContext,
   fallbackProjectId?: string
@@ -449,7 +447,7 @@ function readJsonl<T>(logicalPath: string): T[] {
 function appendJsonl(logicalPath: string, record: unknown): void {
   withExecutionContext('infrastructure_sentinel', () => {
     ensureStore();
-    safeAppendFileSync(logicalPath, `${JSON.stringify(record)}\n`, 'utf8');
+    appendJsonLine(logicalPath, record);
   });
 }
 

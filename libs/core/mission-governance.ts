@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * scripts/refactor/mission-governance.ts
  * Governance, trust, and observability helpers for mission orchestration.
@@ -359,11 +360,5 @@ export function recordAgentRuntimeEvent(
 ): void {
   const dir = path.dirname(agentRuntimeEventPath);
   if (!safeExistsSync(dir)) safeWriteFile(agentRuntimeEventPath, '');
-  safeAppendFileSync(
-    agentRuntimeEventPath,
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      ...event,
-    }) + '\n'
-  );
+  appendJsonLine(agentRuntimeEventPath, { ts: new Date().toISOString(), ...event });
 }

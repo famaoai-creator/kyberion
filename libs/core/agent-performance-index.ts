@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -67,10 +68,7 @@ export function recordAgentRoleOutcomes(outcomes: AgentRoleOutcome[]): void {
   if (outcomes.length === 0) return;
   const outcomesPath = agentRoleOutcomesPath();
   safeMkdir(path.dirname(outcomesPath), { recursive: true });
-  safeAppendFileSync(
-    outcomesPath,
-    outcomes.map((outcome) => JSON.stringify(outcome)).join('\n') + '\n'
-  );
+  for (const outcome of outcomes) appendJsonLine(outcomesPath, outcome);
   rebuildAgentPerformanceIndex();
 }
 

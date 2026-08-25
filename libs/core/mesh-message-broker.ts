@@ -4,6 +4,7 @@ import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshDeliveryRecord,
@@ -86,10 +87,6 @@ const DEFAULT_RETRY_POLICY: MeshRetryPolicy = {
 };
 const DEFAULT_WRITER_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 const writerRegistry = new Map<string, string>();
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function nowMs(iso: string): number {
   return new Date(iso).getTime();

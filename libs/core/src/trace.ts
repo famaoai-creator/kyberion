@@ -1,3 +1,4 @@
+import { appendJsonLine } from '../foundation/json.js';
 /**
  * Kyberion Trace Model
  * OpenTelemetry-inspired tracing with artifact and knowledge references.
@@ -260,7 +261,7 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
   const file = path.join(dir, `traces-${day}.jsonl`);
   const safeTrace = sanitizeTraceForPersistence(trace);
   const record = { ...safeTrace, _persistedAt: new Date().toISOString() };
-  safeAppendFileSync(file, JSON.stringify(record) + '\n');
+  appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
   void exportTraceOtlp(safeTrace).catch(() => undefined);

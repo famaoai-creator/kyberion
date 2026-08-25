@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -78,7 +79,7 @@ export function appendReasoningFailoverEvent(
       ...event,
       error_summary: truncateErrorSummary(event.error_summary),
     };
-    safeAppendFileSync(eventsPath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(eventsPath, record);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[reasoning-failover] failed to append failover event: ${detail}`);

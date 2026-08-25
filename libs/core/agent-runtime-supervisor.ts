@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
@@ -123,13 +124,10 @@ export function appendSupervisorEvent(event: Record<string, unknown>): void {
     const obsDir = resolveSharedObservabilityDir(EVENTS_DIR);
     if (!obsDir) return;
     safeMkdir(obsDir);
-    safeAppendFileSync(
-      `${obsDir}/agent-runtime-supervisor-events.jsonl`,
-      `${JSON.stringify({
-        ts: new Date().toISOString(),
-        ...event,
-      })}\n`
-    );
+    appendJsonLine(`${obsDir}/agent-runtime-supervisor-events.jsonl`, {
+      ts: new Date().toISOString(),
+      ...event,
+    });
   } catch (error: any) {
     // Some narrow authority roles can ensure/stop runtimes without observability write scope.
     // Runtime control should still succeed even if supervisor event logging is unavailable.

@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
@@ -89,7 +90,7 @@ function ensureLogDir(): void {
 
 function appendEvent(event: Record<string, unknown>): void {
   ensureLogDir();
-  safeAppendFileSync(IMESSAGE_LOG_PATH, `${JSON.stringify(event)}\n`, 'utf8');
+  appendJsonLine(IMESSAGE_LOG_PATH, event);
 }
 
 /** Derive capability truth from the installed imsg subcommand help text. */

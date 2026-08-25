@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * MissionEvidenceDoc — typed JSON document under a mission's
  * `evidence/` directory.
@@ -113,10 +114,7 @@ export class MissionEvidenceDoc<T> {
           const tier = audit.tier ?? 'confidential';
           const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
           const date = new Date().toISOString().slice(0, 10);
-          safeAppendFileSync(
-            path.join(auditDir, `audit-${date}.jsonl`),
-            JSON.stringify(entry) + '\n'
-          );
+          appendJsonLine(path.join(auditDir, `audit-${date}.jsonl`), entry);
         } catch (err: any) {
           logger.warn(`[mission-evidence-doc] mission audit write failed: ${err?.message ?? err}`);
         }

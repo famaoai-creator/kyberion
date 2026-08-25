@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
@@ -500,6 +501,6 @@ export function appendMissionExecutionLedgerEntry(
     mission_id: missionId,
     ...entryPayload,
   };
-  safeAppendFileSync(paths.executionLedgerPath, `${JSON.stringify(entry)}\n`);
+  appendJsonLine(paths.executionLedgerPath, entry);
   return paths.executionLedgerPath;
 }

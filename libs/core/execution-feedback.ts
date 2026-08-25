@@ -184,7 +184,7 @@ export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput
   };
   const scenarioId = match[1];
   const label = match[2];
-  const detail = normalizeText(match[3]);
+  const detail = normalizeFeedbackText(match[3]);
   return {
     scenario_id: scenarioId,
     intent_id: scenarioId.slice('use-case-'.length),
@@ -231,7 +231,7 @@ function loadStoreFromDisk(): ExecutionFeedbackStore {
   }
 }
 
-function normalizeText(value: string | undefined): string | undefined {
+function normalizeFeedbackText(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   return normalized.slice(0, MAX_FEEDBACK_TEXT_LENGTH);
@@ -257,8 +257,12 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     recorded_at: new Date().toISOString(),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
     ...(input.surface?.trim() ? { surface: input.surface.trim() } : {}),
-    ...(normalizeText(input.comment) ? { comment: normalizeText(input.comment) } : {}),
-    ...(normalizeText(input.correction) ? { correction: normalizeText(input.correction) } : {}),
+    ...(normalizeFeedbackText(input.comment)
+      ? { comment: normalizeFeedbackText(input.comment) }
+      : {}),
+    ...(normalizeFeedbackText(input.correction)
+      ? { correction: normalizeFeedbackText(input.correction) }
+      : {}),
   };
   const store = loadStoreFromDisk();
   const nextStore = validateStore({

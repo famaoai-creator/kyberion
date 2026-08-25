@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import {
   safeAppendFileSync,
   safeExec,
@@ -160,7 +161,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     suppressed,
     ...input,
   };
-  safeAppendFileSync(alertLogPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8' });
+  appendJsonLine(alertLogPath, record);
 
   if (suppressed) {
     return {

@@ -15,6 +15,7 @@ import {
   type MeshTargetSelector,
 } from './mesh-hub-contract.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { nowIso } from './foundation/time.js';
 
 export interface MeshHubPeerInspection {
   peer_id: string;
@@ -67,10 +68,6 @@ export interface MeshHubInspectionOptions {
   tenantId?: string;
   now?: string | Date;
   namespace?: string;
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function normalizeIso(value?: string | Date): string {

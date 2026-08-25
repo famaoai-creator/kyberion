@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { randomUUID } from 'node:crypto';
@@ -350,7 +351,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!nextValidation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${nextValidation.errors.join('; ')}`);
   }
-  safeAppendFileSync(queuePath, `${JSON.stringify(nextCandidate)}\n`);
+  appendJsonLine(queuePath, nextCandidate);
   return queuePath;
 }
 

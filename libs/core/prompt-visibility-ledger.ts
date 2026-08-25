@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { assertModuleInvariant } from './invariants.js';
@@ -76,7 +77,7 @@ export function appendPromptVisibilityRecord(
   };
   assertRecordShape(record);
   safeMkdir(path.dirname(file), { recursive: true });
-  safeAppendFileSync(file, `${JSON.stringify(record)}\n`);
+  appendJsonLine(file, record);
   return record;
 }
 

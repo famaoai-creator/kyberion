@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { logger } from './core.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -478,7 +479,7 @@ class AuditChainImpl {
       if (!safeExistsSync(this.auditDir)) {
         safeMkdir(this.auditDir, { recursive: true });
       }
-      safeAppendFileSync(this.getFilePath(), JSON.stringify(entry) + '\n');
+      appendJsonLine(this.getFilePath(), entry);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -503,10 +504,7 @@ class AuditChainImpl {
           safeMkdir(tenantAuditDir, { recursive: true });
         }
         const date = new Date().toISOString().slice(0, 10);
-        safeAppendFileSync(
-          path.join(tenantAuditDir, `audit-${date}.jsonl`),
-          JSON.stringify(entry) + '\n'
-        );
+        appendJsonLine(path.join(tenantAuditDir, `audit-${date}.jsonl`), entry);
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
       }

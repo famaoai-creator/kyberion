@@ -76,7 +76,7 @@ function sanitizeQuestion(value: unknown, fallbackId: string): GuidedCoordinatio
   };
 }
 
-function normalizeText(value: unknown): string {
+function normalizeCoordinationText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
@@ -115,7 +115,9 @@ function inferCoordinationKind(
 
 function inferObjective(seed: GuidedCoordinationBriefSeed): string {
   return (
-    normalizeText(seed.goalSummary) || normalizeText(seed.summaryHint) || seed.requestText.trim()
+    normalizeCoordinationText(seed.goalSummary) ||
+    normalizeCoordinationText(seed.summaryHint) ||
+    seed.requestText.trim()
   );
 }
 

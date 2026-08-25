@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -211,7 +212,7 @@ export function appendProvisionedEntryRecord(input: {
     leasePath,
     fn: () => {
       ensureJournalDir(input.missionId, input.scope);
-      safeAppendFileSync(recordPath, `${JSON.stringify(record)}\n`);
+      appendJsonLine(recordPath, record);
       return record;
     },
   });
@@ -469,10 +470,7 @@ export function appendMissionOrchestrationJournalEntry(input: {
     ownerId: `process:${process.pid}`,
     leasePath,
     fn: () => {
-      safeAppendFileSync(
-        `${journalMissionPath}/coordination/orchestration-journal.jsonl`,
-        `${JSON.stringify(entry)}\n`
-      );
+      appendJsonLine(`${journalMissionPath}/coordination/orchestration-journal.jsonl`, entry);
       return entry;
     },
   });

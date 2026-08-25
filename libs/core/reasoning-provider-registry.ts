@@ -16,6 +16,7 @@ import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { safeExistsSync } from './secure-io.js';
 import { assertModuleInvariant } from './invariants.js';
+import { isRecord } from './foundation/text.js';
 
 export interface ReasoningProviderCapabilities {
   reasoning: boolean;
@@ -125,10 +126,6 @@ let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
 const CONFORMANCE_CHECK_NAMES = ['prompt', 'structured_output', 'abort', 'usage'] as const;
 const CONFORMANCE_STATUSES = ['verified', 'declared', 'unavailable', 'failed'] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function parseBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
