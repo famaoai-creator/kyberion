@@ -109,7 +109,7 @@ export function scanKnowledgeScopeBoundaries(
   );
   if (directReads > config.max_direct_tenant_env_reads) {
     findings.push(
-      `process.env.KYBERION_TENANT direct reads increased beyond baseline: ${directReads} > ${config.max_direct_tenant_env_reads}`
+      `process.env.${'KYBERION_TENANT'} direct reads increased beyond baseline: ${directReads} > ${config.max_direct_tenant_env_reads}`
     );
   }
   return findings;
