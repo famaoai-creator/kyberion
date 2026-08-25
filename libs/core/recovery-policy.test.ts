@@ -21,6 +21,16 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T => loadJsonMock(filePath) as T,
+    readJsonIfPresent: <T>(filePath: string): T | null => loadJsonMock(filePath) as T | null,
+  };
+});
+
 vi.mock('./error-classifier.js', () => ({
   classifyError: (error: Error) => ({
     category: /TIMEOUT|ETIMEDOUT/i.test(error.message)

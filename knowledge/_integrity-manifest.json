@@ -1065,7 +1065,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 17002,
+      "size": 17044,
       "type": "json"
     },
     {
@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 18174,
+      "size": 18202,
       "type": "json"
     },
     {
@@ -3273,7 +3273,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 92384,
+      "size": 92481,
       "type": "json"
     },
     {
@@ -6639,7 +6639,7 @@
     {
       "path": "product/schemas/ci-gates.schema.json",
       "tier": "public",
-      "size": 1057,
+      "size": 1118,
       "type": "json"
     },
     {
@@ -6843,7 +6843,7 @@
     {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
-      "size": 889,
+      "size": 777,
       "type": "json"
     },
     {

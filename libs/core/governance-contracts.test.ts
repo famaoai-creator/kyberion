@@ -33,6 +33,13 @@ function readPayloadsFromDir(relativeDir: string): unknown[] {
     );
 }
 
+function readContractPayload(filePath: string): unknown {
+  const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as unknown;
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return payload;
+  const { $schema: _schema, ...contract } = payload as Record<string, unknown>;
+  return contract;
+}
+
 const CASES: GovernanceSchemaCase[] = [
   {
     name: 'intent-policy',
@@ -800,9 +807,7 @@ describe('governance contracts', () => {
       const ajv = new AjvCtor({ allErrors: true });
       addFormats(ajv);
       const validate = compileSchemaFromPath(ajv, path.resolve(root, testCase.schemaPath));
-      const payload = JSON.parse(
-        safeReadFile(path.resolve(root, testCase.dataPath), { encoding: 'utf8' }) as string
-      );
+      const payload = readContractPayload(path.resolve(root, testCase.dataPath));
 
       expect(validate(payload)).toBe(true);
     });

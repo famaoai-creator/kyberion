@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import {
   getPresentationPreferenceProfile,
   getPresentationPreferenceRegistry,
@@ -35,11 +36,16 @@ describe('presentation preference registry', () => {
         'knowledge/product/schemas/presentation-preference-registry.schema.json'
       )
     );
-    const registry = JSON.parse(
-      safeReadFile(
-        path.resolve(process.cwd(), 'knowledge/product/governance/presentation-preference-registry.json'),
-        { encoding: 'utf8' }
-      ) as string
+    const registry = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(
+          path.resolve(
+            process.cwd(),
+            'knowledge/product/governance/presentation-preference-registry.json'
+          ),
+          { encoding: 'utf8' }
+        ) as string
+      )
     );
 
     expect(validate(registry)).toBe(true);
@@ -90,9 +96,9 @@ describe('presentation preference registry', () => {
     const registry = getPresentationPreferenceRegistry();
     expect(registry.default_profile_id).toBe('personal-exec-clean');
     expect(getPresentationPreferenceProfile().profile_id).toBe('personal-exec-clean');
-    expect(getPresentationPreferenceProfile().slide_pattern_selection_policy?.default_pattern_id).toBe(
-      'summary-three-points'
-    );
+    expect(
+      getPresentationPreferenceProfile().slide_pattern_selection_policy?.default_pattern_id
+    ).toBe('summary-three-points');
   });
 
   it('registers a presentation preference profile in the personal registry', () => {
@@ -165,9 +171,7 @@ describe('presentation preference registry', () => {
     );
 
     expect(profilePath).toBe(registrationPath);
-    const registry = JSON.parse(
-      safeReadFile(registrationPath, { encoding: 'utf8' }) as string
-    ) as {
+    const registry = JSON.parse(safeReadFile(registrationPath, { encoding: 'utf8' }) as string) as {
       default_profile_id: string;
       profiles: Array<{
         profile_id: string;
@@ -185,6 +189,8 @@ describe('presentation preference registry', () => {
   });
 
   it('exposes the registry path helper', () => {
-    expect(getPresentationPreferenceRegistryPath()).toContain('presentation-preference-registry.json');
+    expect(getPresentationPreferenceRegistryPath()).toContain(
+      'presentation-preference-registry.json'
+    );
   });
 });

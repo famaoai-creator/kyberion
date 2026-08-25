@@ -346,6 +346,7 @@
         "generate_reminder_message",
         "join",
         "leave",
+        "run_action_item_reminder_sweep",
         "speak",
         "track_pending_action_items"
       ]

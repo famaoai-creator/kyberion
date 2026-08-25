@@ -8,6 +8,7 @@ type Gate = {
   executable?: string;
   args?: string[];
   script?: string;
+  timeout_ms?: number;
   owner: string;
   rationale: string;
 };
@@ -48,6 +49,12 @@ export function validateGateManifest(manifest: GateManifest, availableScripts?: 
     if (hasExecutable) {
       if (!Array.isArray(gate.args)) {
         throw new Error(`ci gate ${gate.id} executable gates must declare args`);
+      }
+      if (
+        gate.timeout_ms !== undefined &&
+        (!Number.isSafeInteger(gate.timeout_ms) || gate.timeout_ms <= 0)
+      ) {
+        throw new Error(`ci gate ${gate.id} timeout_ms must be a positive integer`);
       }
       const command = [gate.executable, ...gate.args].join(' ');
       if (/run_checks|pnpm\s+(run\s+)?(check|validate)|run_pipeline/.test(command)) {
@@ -146,12 +153,22 @@ export function main(argv: string[] = []): number {
   const results = gates.map((gate) => {
     const result = gate.script
       ? safeExecResult('pnpm', ['run', gate.script], { cwd: pathResolver.rootDir() })
-      : safeExecResult(gate.executable!, gate.args || [], { cwd: pathResolver.rootDir() });
+      : safeExecResult(gate.executable!, gate.args || [], {
+          cwd: pathResolver.rootDir(),
+          ...(gate.timeout_ms !== undefined ? { timeoutMs: gate.timeout_ms } : {}),
+        });
     return {
       id: gate.id,
       owner: gate.owner,
       status: result.status === 0 ? 'passed' : 'failed',
       exitCode: result.status,
+      ...(result.status !== 0
+        ? {
+            stderr: result.stderr.trim().slice(-2000),
+            stdout: result.stdout.trim().slice(-2000),
+            error: result.error?.message,
+          }
+        : {}),
     };
   });
   const failed = results.filter((result) => result.status === 'failed');
