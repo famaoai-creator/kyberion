@@ -11,7 +11,7 @@ import {
   classifyError,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
 
@@ -228,11 +228,11 @@ export async function inspectAgent(agentId: string) {
   console.log('');
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
-
-if (isMainModule) {
-  main().catch((err: any) => {
+if (
+  isDirectScript(import.meta.url, 'agent_runtime_manager.ts') ||
+  isDirectScript(import.meta.url, 'agent_runtime_manager.js')
+)
+  void main().catch((err: any) => {
     logger.error(err.message);
     process.exit(1);
   });
-}

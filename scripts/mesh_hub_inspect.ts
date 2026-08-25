@@ -5,6 +5,7 @@ import {
   inspectMeshHub,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 type MeshHubInspectionSection =
   'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters' | 'topics';
@@ -100,12 +101,13 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /mesh_hub_inspect\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
+if (
+  isDirectScript(import.meta.url, 'mesh_hub_inspect.ts') ||
+  isDirectScript(import.meta.url, 'mesh_hub_inspect.js')
+)
+  void main().catch((error) => {
     logger.error(error?.message ?? String(error));
     process.exit(1);
   });
-}
 
 export { main as runMeshHubInspect };

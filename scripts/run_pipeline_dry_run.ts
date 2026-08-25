@@ -1,6 +1,7 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { assessPipelineDryRun } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { isDirectScript } from './lib/harness.js';
 
 export async function runPipelineDryRun(
   inputPath: string
@@ -43,4 +44,8 @@ export async function main(): Promise<void> {
   process.exitCode = report.verdict === 'blocked' ? 1 : 0;
 }
 
-if (process.argv[1] && /run_pipeline_dry_run\.(ts|js)$/u.test(process.argv[1])) void main();
+if (
+  isDirectScript(import.meta.url, 'run_pipeline_dry_run.ts') ||
+  isDirectScript(import.meta.url, 'run_pipeline_dry_run.js')
+)
+  void main();
