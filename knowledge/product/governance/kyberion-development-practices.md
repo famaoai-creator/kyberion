@@ -114,7 +114,7 @@ build:actuators`.
   env and cross-contaminate.
 - Full local battery: `pnpm vitest run libs/core/ scripts/ tests/
 libs/actuators/` — plus `pnpm check:catalogs` and, if you touched
-  pipelines or goldens, `pnpm run check:golden`.
+  pipelines or goldens, `pnpm check -- --scope pr --only golden`.
 
 ## 5. Governance & policy mechanics
 
