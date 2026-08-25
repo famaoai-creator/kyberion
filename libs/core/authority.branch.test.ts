@@ -18,6 +18,13 @@ vi.mock('./fs-primitives.js', () => ({
 vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.rawExistsSync,
   safeReadFile: mocks.rawReadTextFile,
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    try {
+      return JSON.parse(String(mocks.rawReadTextFile(filePath))) as T;
+    } catch {
+      return null;
+    }
+  },
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -28,6 +35,7 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     active: mocks.active,
     knowledge: mocks.knowledge,
+    rootResolve: vi.fn((p: string) => `/repo/${p}`),
     shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
     findMissionPath: mocks.findMissionPath,
   },

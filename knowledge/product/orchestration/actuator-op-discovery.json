@@ -2205,6 +2205,10 @@
           "kind": "apply"
         },
         {
+          "op": "run_action_item_reminder_sweep",
+          "kind": "apply"
+        },
+        {
           "op": "join",
           "kind": "apply"
         },

@@ -15,6 +15,7 @@ vi.mock('./secure-io.js', async () => {
     safeWriteFile: fsModule.writeFileSync,
     safeAppendFileSync: fsModule.appendFileSync,
     safeMkdir: fsModule.mkdirSync,
+    loadJsonIfPresent: () => null,
     rawExistsSync: fsModule.existsSync,
     rawReadTextFile: (filePath: string) => fsModule.readFileSync(filePath, 'utf8'),
   };

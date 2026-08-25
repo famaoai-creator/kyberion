@@ -17,6 +17,7 @@ export const MEETING_ACTUATOR_APPLY_OPS = [
   'extract_action_items',
   'generate_facilitation_script',
   'generate_reminder_message',
+  'run_action_item_reminder_sweep',
   'join',
   'leave',
   'speak',
