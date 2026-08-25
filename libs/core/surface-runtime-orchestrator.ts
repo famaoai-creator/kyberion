@@ -2684,9 +2684,14 @@ export async function runSurfaceMessageConversation(
     const text = (result as { text?: unknown })?.text;
     if (typeof text === 'string' && text.trim()) {
       const allowConversationalReply = isSimpleGreetingText(input.text);
+      const approvalRequired =
+        result.intentResolution?.authority_level === 'approval_required' ||
+        (result.approvalRequests?.length ?? 0) > 0 ||
+        (result.missionProposals?.length ?? 0) > 0;
       const verdict = validateSurfaceUxContract({
         text,
         allow_conversational_reply: allowConversationalReply,
+        approval_required: approvalRequired,
       });
       if (!verdict.valid) {
         const repairedText = repairSurfaceUxContractText(text);
@@ -2694,6 +2699,7 @@ export async function runSurfaceMessageConversation(
           const repairedVerdict = validateSurfaceUxContract({
             text: repairedText,
             allow_conversational_reply: allowConversationalReply,
+            approval_required: approvalRequired,
           });
           if (repairedVerdict.valid) {
             (result as { text?: string }).text = repairedText;
