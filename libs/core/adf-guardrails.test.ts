@@ -21,6 +21,22 @@ describe('validatePipelineGuardrails', () => {
     );
   });
 
+  it('blocks typed command plus args wrappers, not only shell command strings', () => {
+    const report = validatePipelineGuardrails({
+      steps: [
+        { op: 'system:exec', params: { command: 'node', args: ['dist/scripts/task.js'] } },
+        {
+          op: 'system:exec',
+          params: { command: 'pnpm', args: ['exec', 'tsx', 'scripts/task.ts'] },
+        },
+      ],
+    });
+    expect(report.ok).toBe(false);
+    expect(
+      report.findings.filter((finding) => finding.code === 'script-wrapper-forbidden')
+    ).toHaveLength(2);
+  });
+
   it('warns when a dynamic include cannot be expanded during preflight', () => {
     const report = validatePipelineGuardrails({
       steps: [{ op: 'core:include', params: { fragment: '{{fragment_ref}}' } }],

@@ -232,7 +232,11 @@ export function validatePipelineGuardrails(
           (value): value is string => typeof value === 'string' && value.trim().length > 0
         );
         if (command) {
-          const forbidden = forbiddenGitCoexecutionMutation(command);
+          const commandArgs = Array.isArray(params.args)
+            ? params.args.filter((value): value is string => typeof value === 'string')
+            : [];
+          const normalizedCommand = [command, ...commandArgs].join(' ');
+          const forbidden = forbiddenGitCoexecutionMutation(normalizedCommand);
           if (forbidden) {
             findings.push({
               code: 'git-coexecution-mutation-forbidden',
@@ -243,9 +247,9 @@ export function validatePipelineGuardrails(
           }
           if (
             /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
-              command
+              normalizedCommand
             ) ||
-            /dist\/libs\/actuators\//iu.test(command)
+            /dist\/libs\/actuators\//iu.test(normalizedCommand)
           ) {
             findings.push({
               code: 'script-wrapper-forbidden',
