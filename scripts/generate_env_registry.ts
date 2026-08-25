@@ -49,6 +49,19 @@ export interface EnvRegistryFile {
   entries: EnvRegistryEntry[];
 }
 
+export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] {
+  const failures: string[] = [];
+  for (const entry of registry.entries) {
+    if ((entry.required || entry.documented) && !entry.description.trim()) {
+      failures.push(`${entry.name}: required/documented entries must have a description`);
+    }
+    if (entry.required && entry.category === 'secret') {
+      failures.push(`${entry.name}: secrets may not be required through the shared registry`);
+    }
+  }
+  return failures;
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
 const ENV_EXAMPLE_PATH = pathResolver.rootResolve('docs/developer/env.example');
 const CONFIGURATION_DOC_PATH = pathResolver.rootResolve('docs/developer/CONFIGURATION.md');
@@ -225,6 +238,10 @@ export const main = defineGenerator({
       ? readJson<EnvRegistryFile>(REGISTRY_PATH)
       : null;
     const built = mergeRegistry(discovered, existing);
+    const qualityFailures = validateEnvRegistryQuality(built);
+    if (qualityFailures.length > 0) {
+      throw new Error(`env registry quality violations: ${qualityFailures.join('; ')}`);
+    }
     if (strictDocumentation && context.check) {
       const undocumented = built.entries.filter((entry) => !entry.documented);
       if (undocumented.length > 0) {

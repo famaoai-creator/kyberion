@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { classifyEnvName, mergeRegistry, type EnvRegistryFile } from './generate_env_registry.js';
+import {
+  classifyEnvName,
+  mergeRegistry,
+  validateEnvRegistryQuality,
+  type EnvRegistryFile,
+} from './generate_env_registry.js';
 
 describe('classifyEnvName', () => {
   it('classifies secrets, paths, flags, tuning, and providers', () => {
@@ -61,5 +66,44 @@ describe('mergeRegistry', () => {
     const merged = mergeRegistry(['KYBERION_A'], null);
     expect(merged.version).toBe('1.0.0');
     expect(merged.entries).toHaveLength(1);
+  });
+});
+
+describe('validateEnvRegistryQuality', () => {
+  const base = (entry: Partial<EnvRegistryFile['entries'][number]>): EnvRegistryFile => ({
+    version: '1.0.0',
+    description: 'test',
+    entries: [
+      {
+        name: 'KYBERION_TEST',
+        category: 'runtime',
+        type: 'string',
+        required: false,
+        description: '',
+        documented: false,
+        ...entry,
+      },
+    ],
+  });
+
+  it('requires descriptions for required or documented variables', () => {
+    expect(validateEnvRegistryQuality(base({ required: true }))).toEqual([
+      'KYBERION_TEST: required/documented entries must have a description',
+    ]);
+    expect(validateEnvRegistryQuality(base({ documented: true }))).toEqual([
+      'KYBERION_TEST: required/documented entries must have a description',
+    ]);
+  });
+
+  it('rejects required secrets', () => {
+    expect(
+      validateEnvRegistryQuality(
+        base({ category: 'secret', required: true, description: 'test secret' })
+      )
+    ).toEqual(['KYBERION_TEST: secrets may not be required through the shared registry']);
+  });
+
+  it('accepts optional undocumented discovery entries', () => {
+    expect(validateEnvRegistryQuality(base({}))).toEqual([]);
   });
 });
