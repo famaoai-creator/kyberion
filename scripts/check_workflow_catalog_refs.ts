@@ -22,6 +22,7 @@ import {
   pathResolver,
   safeExistsSync,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
 
@@ -87,4 +88,18 @@ function main(): number {
   return 0;
 }
 
-process.exit(main());
+export const runCheckWorkflowCatalogRefs = defineScript({
+  name: 'check:workflow-catalog-refs',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0)
+      throw new Error(`workflow catalog reference check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_workflow_catalog_refs.ts') ||
+  isDirectScript(import.meta.url, 'check_workflow_catalog_refs.js')
+)
+  void runCheckWorkflowCatalogRefs();

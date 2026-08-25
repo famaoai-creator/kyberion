@@ -10,6 +10,7 @@ import {
   type WebThemePack,
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Palette = Record<string, string>;
 
@@ -199,7 +200,7 @@ function checkDerivedWebThemePacks(): string[] {
   return violations;
 }
 
-function main(): void {
+function main(): number {
   const brandTokens = parseJson<{ tokens: { colors: { light: Palette; dark: Palette } } }>(
     pathResolver.rootResolve('knowledge/public/design-patterns/brand-tokens/kyberion.json')
   );
@@ -269,10 +270,24 @@ function main(): void {
   if (violations.length > 0) {
     console.error('[check:design-contrast] violations detected:');
     for (const violation of violations) console.error(`- ${violation}`);
-    process.exit(1);
+    return 1;
   }
 
   console.log('[check:design-contrast] OK');
+  return 0;
 }
 
-main();
+export const runCheckDesignContrast = defineScript({
+  name: 'check:design-contrast',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0) throw new Error(`design contrast check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_design_contrast.ts') ||
+  isDirectScript(import.meta.url, 'check_design_contrast.js')
+)
+  void runCheckDesignContrast();

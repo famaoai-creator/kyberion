@@ -16,6 +16,7 @@
 
 import { pathResolver } from '@agent/core';
 import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ClauseFailure {
   clause: string;
@@ -109,16 +110,35 @@ function checkNoSecretValues(): void {
   });
 }
 
-checkImageTierIsolation();
-checkNoSecretValues();
+function main(): number {
+  failures.length = 0;
+  checkImageTierIsolation();
+  checkNoSecretValues();
 
-if (failures.length > 0) {
-  for (const failure of failures) {
-    console.error(`[check:packaging-contract] ${failure.clause}: ${failure.detail}`);
+  if (failures.length > 0) {
+    for (const failure of failures) {
+      console.error(`[check:packaging-contract] ${failure.clause}: ${failure.detail}`);
+    }
+    console.error(
+      `[check:packaging-contract] FAILED — ${failures.length} clause violation(s). See docs/PACKAGING_CONTRACT.md §Distribution contract.`
+    );
+    return 1;
   }
-  console.error(
-    `[check:packaging-contract] FAILED — ${failures.length} clause violation(s). See docs/PACKAGING_CONTRACT.md §Distribution contract.`
-  );
-  process.exit(1);
+  console.log('[check:packaging-contract] OK');
+  return 0;
 }
-console.log('[check:packaging-contract] OK');
+
+export const runCheckPackagingContract = defineScript({
+  name: 'check:packaging-contract',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0) throw new Error(`packaging contract check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_packaging_contract.ts') ||
+  isDirectScript(import.meta.url, 'check_packaging_contract.js')
+)
+  void runCheckPackagingContract();

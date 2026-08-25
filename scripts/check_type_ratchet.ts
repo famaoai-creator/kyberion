@@ -22,13 +22,6 @@ const DEFAULT_SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'tests'
 // A Docker build context contains locally generated files the baseline has
 // never seen, so counts diverge for environmental reasons, not type-safety
 // regressions. Image builds skip with a loud notice; CI keeps enforcing.
-if (getRegisteredEnvText('KYBERION_SKIP_TYPE_RATCHET') === '1') {
-  console.log(
-    '[check:type-ratchet] skipped (KYBERION_SKIP_TYPE_RATCHET=1 — image/context build; CI enforces the ratchet on the git tree)'
-  );
-  process.exit(0);
-}
-
 type RatchetBucket = {
   any_keywords: number;
   as_any: number;
@@ -203,6 +196,12 @@ export const runCheckTypeRatchet = defineScript({
   name: 'check:type-ratchet',
   flags: [],
   run(context) {
+    if (getRegisteredEnvText('KYBERION_SKIP_TYPE_RATCHET') === '1') {
+      context.print(
+        '[check:type-ratchet] skipped (KYBERION_SKIP_TYPE_RATCHET=1 — image/context build; CI enforces the ratchet on the git tree)'
+      );
+      return;
+    }
     const writeBaseline = context.argv.includes('--write-baseline');
     const report = checkTypeRatchet({ writeBaseline });
 
