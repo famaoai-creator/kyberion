@@ -237,6 +237,9 @@ import {
   resolveZoneCoord,
   resolveZoneRegionText,
   takeLinesThatFit,
+  type FittedTextBox,
+  type ZoneAnchors,
+  type ZoneRegionSpec,
 } from './media-layout-catalog.js';
 
 const auditedThemePalettes = new Set<string>();

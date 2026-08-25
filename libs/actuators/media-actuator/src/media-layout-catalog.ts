@@ -590,7 +590,7 @@ function resolveTypeFloors(tenantSlug?: string): TypeFloors {
   }
 }
 
-interface FittedTextBox {
+export interface FittedTextBox {
   fontSize: number;
   designedFontSize: number;
   lineSpacingPct: number;
@@ -642,7 +642,7 @@ function fitBodyText(
  * the same regardless of content. Zones defined with `regions` are built from
  * their JSON alone, so adding one is adding data.
  */
-interface ZoneRegionSpec {
+export interface ZoneRegionSpec {
   id: string;
   type: 'text' | 'panel';
   source: string;
@@ -659,7 +659,7 @@ interface ZoneRegionSpec {
 }
 
 /** Anchors a region's geometry may reference, resolved from the chrome. */
-interface ZoneAnchors {
+export interface ZoneAnchors {
   body_x: number;
   body_y: number;
   body_w: number;
