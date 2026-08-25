@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import {
   pathResolver,
   loadJson,
+  extractSurfaceBearerToken,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -53,8 +54,7 @@ function isLoopback(req: express.Request): boolean {
 }
 
 function authorizeSurface(req: express.Request, res: express.Response): boolean {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  const token = extractSurfaceBearerToken(req.headers.authorization);
   const configured =
     getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');
   if (
