@@ -1,0 +1,380 @@
+{
+  "version": 1,
+  "violations": [
+    {
+      "file": "knowledge/product/pipeline-templates/dev-productivity-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node -e \"const ts = parseInt('{{ts_file_count}}'); const tests = parseInt('{{test_file_count}}'); const fixme = parseInt('{{fixme_count}}'); console.log(Math.round((tests / ts) * 100 - fixme))\""
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/generate-video-smoke.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/github-issue-ingest.json",
+      "pattern": "script-wrapper",
+      "match": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; node dist/scripts/mission_controller.js start \"${title}\" personal; done"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-voice.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-howto-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-video.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-promo-60s-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-60s-voice.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-promo-60s-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-60s-video.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-voice.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-promo-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-promo-video.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-vtuber-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/kyberion-vtuber-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-video.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/live-voice-smoke.json",
+      "pattern": "script-wrapper",
+      "match": "test -f dist/libs/actuators/voice-actuator/src/index.js && test -f dist/libs/actuators/meeting-actuator/src/index.js && command -v say >/dev/null && echo '[live-voice-smoke] runtime ready'"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/mobile-webview-handoff-runner-android.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run android-actuator -- --input libs/actuators/android-actuator/examples/android-runtime-webview-handoff-template.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/mobile-webview-handoff-runner-android.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/android-runtime-session-handoff-import.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/mobile-webview-handoff-runner-ios.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run ios-actuator -- --input libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/mobile-webview-handoff-runner-ios.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/ios-runtime-session-handoff-import.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/video-production.json",
+      "pattern": "script-wrapper",
+      "match": "MISSION_ROLE=mission_controller node --import ./scripts/ts-loader.mjs scripts/marketing_video_dry_run.ts --campaign-brief {{campaign_brief}} --brand-profile {{brand_profile}} --output-root {{mission_artifact_root}} --channel {{channel}} --risk-level {{risk_level}}"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/web-session-handoff-runner.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json"
+    },
+    {
+      "file": "knowledge/product/pipeline-templates/web-session-handoff-runner.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json"
+    },
+    {
+      "file": "pipelines/action-item-reminders.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/action_item_reminders.js --tone {{tone}} --language {{language}} --max-items {{max_items}} --report-path {{report_path}}"
+    },
+    {
+      "file": "pipelines/ai-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/run_ai_audit.js"
+    },
+    {
+      "file": "pipelines/assimilate-gateway-capability.json",
+      "pattern": "script-wrapper",
+      "match": "KYBERION_PERSONA=sovereign node dist/scripts/registry_manager.js --adapter active/shared/tmp/{{service_name}}-gateway-adapter.json --tier {{tier}} --type gateway"
+    },
+    {
+      "file": "pipelines/assimilate-harness-capability.json",
+      "pattern": "script-wrapper",
+      "match": "KYBERION_PERSONA=sovereign node dist/scripts/registry_manager.js --adapter active/shared/tmp/{{tool_name}}-adapter.json --tier {{tier}} --type harness"
+    },
+    {
+      "file": "pipelines/auto-checkpoint.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/auto_checkpoint.ts"
+    },
+    {
+      "file": "pipelines/backup-daily.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/backup.ts create --scope all --encrypt --prune --retain-daily 7 --retain-weekly 4"
+    },
+    {
+      "file": "pipelines/backup-restore-drill.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/backup.ts drill --dir {{backup_dir}} --target {{restore_target}} --prepare-checkout --force"
+    },
+    {
+      "file": "pipelines/campaign-suite.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/campaign_suite.js --brief {{brief_path}}"
+    },
+    {
+      "file": "pipelines/ce-adoption-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run libs/core/ce-adoption.test.ts libs/core/worker-event-stream.test.ts libs/core/work-coordination.test.ts"
+    },
+    {
+      "file": "pipelines/chaos-network-partition.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js --check-error-classification network || true"
+    },
+    {
+      "file": "pipelines/cloudflare-os-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run libs/core/cloudflare-os-control-plane.test.ts libs/core/cloudflare-os-surface.test.ts libs/core/share-grant-graph.test.ts libs/core/share-grant-authorizer.test.ts libs/core/provenance-taint.test.ts libs/core/egress-audience-floor.test.ts libs/core/oauth-broker.test.ts tests/vitest-network-guard.test.ts presence/displays/presence-studio/security.test.ts presence/displays/presence-studio/os-control-plane-route.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route-surface.integration.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/share-grants/route.test.ts presence/displays/chronos-mirror-v2/src/components/CloudflareOsPanel.test.ts --testTimeout=30000"
+    },
+    {
+      "file": "pipelines/cloudflare-os-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run libs/actuators/service-actuator/src/index.test.ts libs/actuators/service-actuator/src/reconcile-integration.test.ts"
+    },
+    {
+      "file": "pipelines/cloudflare-os-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run presence/displays/computer-surface/src/os-control-plane.test.ts"
+    },
+    {
+      "file": "pipelines/dependency-vuln-scan.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/scan_dependency_vulns.ts"
+    },
+    {
+      "file": "pipelines/first-win-lifecycle-weekly.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/first_win_lifecycle_smoke.js --dry-run --json"
+    },
+    {
+      "file": "pipelines/fragments/avatar-onboarding.json",
+      "pattern": "script-wrapper",
+      "match": "npx tsx scripts/capture_photo.ts \"{{capture_output_path}}\""
+    },
+    {
+      "file": "pipelines/fragments/avatar-onboarding.json",
+      "pattern": "script-wrapper",
+      "match": "npx tsx scripts/generate_avatar.ts --input-photo \"{{capture_output_path}}\" --output-path \"{{avatar_output_path}}\" --prompt \"{{avatar_prompt}}\" --bridge-preference \"{{bridge_preference}}\""
+    },
+    {
+      "file": "pipelines/fragments/avatar-onboarding.json",
+      "pattern": "script-wrapper",
+      "match": "npx tsx scripts/register_avatar.ts --src-avatar \"{{avatar_output_path}}\" --dest-avatar \"knowledge/personal/avatar.png\" --identity-path \"{{identity_path}}\" --avatar-path \"knowledge/personal/avatar.png\" --profile-name \"{{profile_name}}\" --language \"{{profile_language}}\" --interaction-style \"{{interaction_style}}\""
+    },
+    {
+      "file": "pipelines/fragments/capability-docs-sync.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/check_doc_examples.js"
+    },
+    {
+      "file": "pipelines/fragments/mission-bootstrap.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/mission_controller.js create {{tier}} {{tenant_id}} {{mission_type}} {{vision_ref}} {{persona}}"
+    },
+    {
+      "file": "pipelines/fragments/music-video-compose.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_path}}"
+    },
+    {
+      "file": "pipelines/fragments/narrated-video-preflight.json",
+      "pattern": "script-wrapper",
+      "match": "command -v ffmpeg >/dev/null && command -v ffprobe >/dev/null && command -v say >/dev/null && test -f dist/libs/actuators/voice-actuator/src/index.js && test -f dist/libs/actuators/video-composition-actuator/src/index.js && echo ok"
+    },
+    {
+      "file": "pipelines/fragments/policy-compliance-scan.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/compliance_checker.js --dir {{target_dir}} --tier {{target_tier}}"
+    },
+    {
+      "file": "pipelines/fragments/secret-rotation-flow.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run secret-actuator -- --action check_expiry --service {{service_id}}"
+    },
+    {
+      "file": "pipelines/fragments/secret-rotation-flow.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/cli.js run secret-actuator -- --action rotate --service {{service_id}}"
+    },
+    {
+      "file": "pipelines/fragments/software-qa-lifecycle.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/software_quality_report.js --contract {{contract_path}} --inventory {{inventory_path}} --execution {{execution_path}} --output {{report_path}} --defects {{defects_path}} --publish-summary {{operator_summary_path}} --required-risks {{required_risk_refs}}"
+    },
+    {
+      "file": "pipelines/full-health-report.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json"
+    },
+    {
+      "file": "pipelines/full-health-report.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json"
+    },
+    {
+      "file": "pipelines/full-health-report.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/dev-productivity-audit.json"
+    },
+    {
+      "file": "pipelines/health-degradation-watch.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/health_degradation_watch.ts"
+    },
+    {
+      "file": "pipelines/i18n-drift-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/check_i18n_hardcoding.ts --json"
+    },
+    {
+      "file": "pipelines/i18n-drift-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/check_catalog_integrity.ts"
+    },
+    {
+      "file": "pipelines/i18n-drift-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/report_i18n_translation_coverage.ts --json --alert-on-regression"
+    },
+    {
+      "file": "pipelines/inspect-mission-inventory.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/mission_controller.js list"
+    },
+    {
+      "file": "pipelines/inspect-workspace-surfaces.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/surface_runtime.js --action status"
+    },
+    {
+      "file": "pipelines/kyberion-vtuber-narrated-demo-submit.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json"
+    },
+    {
+      "file": "pipelines/kyberion-vtuber-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-voice.json"
+    },
+    {
+      "file": "pipelines/kyberion-vtuber-narrated-demo.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-vtuber-video.json"
+    },
+    {
+      "file": "pipelines/launch-first-run-onboarding.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/onboarding_apply.js --identity active/shared/tmp/launch-first-run-onboarding-identity.json"
+    },
+    {
+      "file": "pipelines/mesh-delivery.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/mesh_delivery_driver.js --json"
+    },
+    {
+      "file": "pipelines/project-management-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts"
+    },
+    {
+      "file": "pipelines/promote-procedure.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/promote_procedure.js --recording \"${recording_ref}\" --procedure-id \"${procedure_id}\" --intent-phrases \"${intent_phrases}\" --status \"${status}\""
+    },
+    {
+      "file": "pipelines/qm02-trigger-validation.json",
+      "pattern": "script-wrapper",
+      "match": "pnpm exec vitest run libs/core/trigger-runner.test.ts libs/core/managed-process.watch.test.ts libs/core/src/pipeline-scheduler.test.ts"
+    },
+    {
+      "file": "pipelines/service-lifecycle-smoke.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/agent_runtime_supervisor_status.js"
+    },
+    {
+      "file": "pipelines/setup-oauth.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/setup_oauth.ts"
+    },
+    {
+      "file": "pipelines/soak-endurance-live.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/soak_endurance.ts --live --cycles 1 --fail-on-regression --json"
+    },
+    {
+      "file": "pipelines/soak-endurance.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/soak_endurance.ts --cycles 8 --fail-on-regression --json"
+    },
+    {
+      "file": "pipelines/soak-restart-e2e.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/soak_restart_e2e.ts"
+    },
+    {
+      "file": "pipelines/system-upgrade-check.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'"
+    },
+    {
+      "file": "pipelines/tenant-drift-watch.json",
+      "pattern": "script-wrapper",
+      "match": "node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --quiet --alert"
+    },
+    {
+      "file": "pipelines/trial-narrated-report.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/voice-actuator/src/index.js --input {{voice_action_path}} --output {{audio_path}}"
+    },
+    {
+      "file": "pipelines/trial-narrated-report.json",
+      "pattern": "script-wrapper",
+      "match": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH={{video_render_policy_json}} node dist/libs/actuators/video-composition-actuator/src/index.js --audio {{audio_path}} --output {{video_output_path}}"
+    },
+    {
+      "file": "pipelines/ui-ux-governance-audit.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/check_ui_ux_governance.js --json"
+    },
+    {
+      "file": "pipelines/ui-voice-browser-smoke.json",
+      "pattern": "script-wrapper",
+      "match": "node presence/displays/presence-studio/server.ts &"
+    },
+    {
+      "file": "pipelines/ui-voice-browser-smoke.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/libs/actuators/meeting-actuator/src/index.js --check-consent"
+    },
+    {
+      "file": "pipelines/voice-onboarding.json",
+      "pattern": "script-wrapper",
+      "match": "node dist/scripts/voice_consent.js grant --mission {{mission_id}} --operator {{operator_handle}} --scope meeting speak --force"
+    }
+  ]
+}
