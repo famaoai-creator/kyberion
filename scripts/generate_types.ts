@@ -2,6 +2,7 @@ import { compileFromFile } from 'json-schema-to-typescript';
 import { pathResolver } from '@agent/core';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface GenerationTarget {
   schemaPath: string;
@@ -190,7 +191,16 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(err.message);
-  process.exit(1);
+export const runGenerateTypes = defineScript({
+  name: 'generate:types',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'generate_types.ts') ||
+  isDirectScript(import.meta.url, 'generate_types.js')
+)
+  void runGenerateTypes();
