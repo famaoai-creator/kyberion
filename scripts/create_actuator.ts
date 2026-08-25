@@ -158,7 +158,7 @@ export async function main(): Promise<void> {
   await runActuatorCli({ name: '${fullName}', actuator });
 }
 
-if (process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('index.ts')) {
+if (import.meta.main) {
   main().catch((err: unknown) => {
     logger.error(err instanceof Error ? err.message : String(err));
     process.exitCode = 1;
