@@ -91,6 +91,8 @@
     "analysis:job": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/analysis-job.json",
     "judgment:job": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/judgment-job.json",
     "check:wire-error-boundary": "node dist/scripts/check_wire_error_boundary.js",
+    "check:contract-schemas": "node dist/scripts/check_contract_schemas.js",
+    "check:contract-semver": "node dist/scripts/check_contract_semver.js",
     "check:pr-title": "pnpm exec tsx scripts/check_pr_title.ts",
     "pr:create": "node --import ./scripts/ts-loader.mjs scripts/publish_pull_request.ts",
     "check:commit-subject": "node --import ./scripts/ts-loader.mjs scripts/check_commit_subject.ts",
