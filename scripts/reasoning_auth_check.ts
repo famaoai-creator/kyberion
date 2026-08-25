@@ -2,28 +2,43 @@ import {
   checkAllReasoningBackendAuth,
   checkReasoningBackendAuth,
 } from '@agent/core/reasoning-auth-preflight';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-function hasFlag(name: string): boolean {
-  return process.argv.includes(name);
+function hasFlag(argv: string[], name: string): boolean {
+  return argv.includes(name);
 }
 
-function option(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+function option(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  return index >= 0 ? argv[index + 1] : undefined;
 }
 
-const backend = option('--backend');
-const results = backend ? [checkReasoningBackendAuth(backend)] : checkAllReasoningBackendAuth();
+export const runReasoningAuthCheck = defineScript({
+  name: 'reasoning:auth-check',
+  flags: [],
+  run(context) {
+    const backend = option(context.argv, '--backend');
+    const results = backend ? [checkReasoningBackendAuth(backend)] : checkAllReasoningBackendAuth();
 
-if (hasFlag('--json')) {
-  console.log(JSON.stringify({ results }, null, 2));
-} else {
-  for (const result of results) {
-    const missing = result.missing_environment.length
-      ? ` missing=${result.missing_environment.join(',')}`
-      : '';
-    console.log(`${result.mode}: ${result.status}${missing} — ${result.note}`);
-  }
-}
+    if (hasFlag(context.argv, '--json')) {
+      context.print({ results });
+    } else {
+      for (const result of results) {
+        const missing = result.missing_environment.length
+          ? ` missing=${result.missing_environment.join(',')}`
+          : '';
+        console.log(`${result.mode}: ${result.status}${missing} — ${result.note}`);
+      }
+    }
 
-if (results.some((result) => result.status === 'missing')) process.exitCode = 1;
+    if (results.some((result) => result.status === 'missing')) {
+      throw new Error('one or more reasoning backends are missing required configuration');
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reasoning_auth_check.ts') ||
+  isDirectScript(import.meta.url, 'reasoning_auth_check.js')
+)
+  void runReasoningAuthCheck();
