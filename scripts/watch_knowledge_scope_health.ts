@@ -17,6 +17,7 @@ import {
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type HealthRow = {
   tenant_slug: string;
@@ -256,24 +257,34 @@ function buildHealthAlert(report: KnowledgeScopeHealthReport): OpsAlertInput {
   };
 }
 
-const isDirect =
-  process.argv[1] != null && /watch_knowledge_scope_health\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  const report = scanKnowledgeScopeHealth({ persistHistory: process.argv.includes('--alert') });
-  if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-  else
-    console.log(
-      `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
-    );
-  if (process.argv.includes('--alert') && report.alerts.length > 0) {
-    const receipt = sendOpsAlert(buildHealthAlert(report));
-    if (!process.argv.includes('--quiet')) {
-      console.warn(
-        `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
+export const runKnowledgeScopeHealth = defineScript({
+  name: 'knowledge:scope-health',
+  flags: [],
+  run: ({ argv }) => {
+    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
+    if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
+    else
+      console.log(
+        `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
       );
+    if (argv.includes('--alert') && report.alerts.length > 0) {
+      const receipt = sendOpsAlert(buildHealthAlert(report));
+      if (!argv.includes('--quiet')) {
+        console.warn(
+          `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
+        );
+      }
     }
-  }
-  if (process.argv.includes('--fail') && report.status !== 'healthy') process.exitCode = 1;
-}
+    if (argv.includes('--fail') && report.status !== 'healthy') {
+      throw new ScriptExitError(1, '', true);
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'watch_knowledge_scope_health.ts') ||
+  isDirectScript(import.meta.url, 'watch_knowledge_scope_health.js')
+)
+  void runKnowledgeScopeHealth();
 
 export { buildHealthAlert };

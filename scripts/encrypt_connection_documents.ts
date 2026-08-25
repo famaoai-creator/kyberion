@@ -25,6 +25,7 @@ import {
   safeWriteFile,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function migrateConnectionDocuments(input: { decrypt: boolean; connectionsDir?: string }): {
   encrypted: number;
@@ -71,8 +72,8 @@ export function migrateConnectionDocuments(input: { decrypt: boolean; connection
   return counts;
 }
 
-async function main(): Promise<number> {
-  const decrypt = process.argv.includes('--decrypt');
+async function main(argv: string[] = []): Promise<number> {
+  const decrypt = argv.includes('--decrypt');
   if (!decrypt && resolveSecretEncryptionMode() === 'none') {
     logger.error(
       '[secrets:encrypt] KYBERION_SECRET_ENCRYPTION is not set — refusing to encrypt ' +
@@ -89,13 +90,25 @@ async function main(): Promise<number> {
   return 0;
 }
 
-const isDirect = process.argv[1] && /encrypt_connection_documents\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().then(
-    (code) => process.exit(code),
-    (error) => {
-      logger.error(`[secrets:encrypt] failed: ${(error as Error).message || error}`);
-      process.exit(1);
+export const runEncryptConnectionDocuments = defineScript({
+  name: 'secrets:encrypt',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      const code = await main(argv);
+      if (code !== 0) throw new ScriptExitError(code, '', true);
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      throw new ScriptExitError(
+        1,
+        `[secrets:encrypt] failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
-}
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'encrypt_connection_documents.ts') ||
+  isDirectScript(import.meta.url, 'encrypt_connection_documents.js')
+)
+  void runEncryptConnectionDocuments();
