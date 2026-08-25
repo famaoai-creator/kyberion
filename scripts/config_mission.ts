@@ -33,6 +33,7 @@ import {
 } from '@agent/core';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -263,7 +264,7 @@ function cmdCreate(argv: string[]): void {
   if (errors.length > 0) {
     console.error('\n❌ Input validation failed:\n');
     for (const e of errors) console.error(`  • ${e}`);
-    process.exit(1);
+    throw new ScriptExitError(1, 'Input validation failed');
   }
 
   const instanceId = generateInstanceId();
@@ -561,12 +562,13 @@ function printUsage(): void {
   console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
-async function main(): Promise<void> {
-  const [, , command, ...rest] = process.argv;
+async function main(args: string[] = []): Promise<void> {
+  const [command, ...rest] = args;
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printUsage();
-    process.exit(command ? 0 : 2);
+    if (!command) throw new ScriptExitError(2);
+    return;
   }
 
   switch (command) {
@@ -588,11 +590,12 @@ async function main(): Promise<void> {
     default:
       console.error(`Unknown command: ${command ?? '(none)'}`);
       printUsage();
-      process.exit(1);
+      throw new ScriptExitError(1, `Unknown command: ${command ?? '(none)'}`);
   }
 }
 
-main().catch((err) => {
-  logger.error(String(err));
-  process.exit(1);
-});
+void defineScript({
+  name: 'config:mission',
+  flags: [],
+  run: ({ argv }) => main(argv),
+})();
