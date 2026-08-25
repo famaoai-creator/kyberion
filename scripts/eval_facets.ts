@@ -76,7 +76,7 @@ export function evaluateFacetFixtures(
     });
 }
 
-export function main(argv = process.argv.slice(2)): number {
+export function main(argv: string[] = []): number {
   const results = evaluateFacetFixtures();
   const report = {
     schema_version: 'facet-eval.v1',
