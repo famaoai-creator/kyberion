@@ -1,0 +1,816 @@
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  validateAndRepairAdf,
+  recordGovernanceAction,
+  TraceContext,
+  finalizeAndPersist,
+  persistTrace,
+  classifyError,
+  logger,
+  safeExec,
+  safeReadFile,
+  safeExistsSync,
+  safeWriteFile,
+  safeMkdir,
+  retry,
+  resolveVars,
+  evaluateCondition,
+  capabilityEntry,
+  findMissionPath,
+  missionEvidenceDir,
+  pathResolver,
+  installReasoningBackends,
+  getReasoningBackend,
+  getReasoningRuntimeInstructions,
+  renderRuntimeInstructions,
+  buildWorkingPrinciplesLines,
+  executeReportContract,
+  getReasoningPayloadScope,
+  delegateStructured,
+  createApprovalRequest,
+  loadApprovalRequest,
+  isApprovalRequestExpired,
+  selectJudgeRoute,
+  resolveMaxRouteHops,
+  detectRouteCycle,
+  resolveFacets,
+  renderFacets,
+  resolveStepReasoningRoute,
+  runFeedbackLoop,
+  determineActuatorStepType,
+  resolveActuatorOperation,
+  resolveActuatorOperationTimeout,
+  getSemanticDecideDegradations,
+  appendSemanticDegradationRun,
+  recordAdhocPipelineRun,
+  PROMOTION_CANDIDATE_MIN_RUNS,
+  safeExecResult,
+  runJanitor,
+  checkActuatorCapabilities,
+  compactStepOutputContext,
+  killSwitch,
+  validateOpInput,
+  getRegisteredEnv,
+  resolveIdentityContext,
+  executeAdfSteps,
+  runAdfLifecycle,
+  skipAdfStep,
+  type AdfStep,
+  type AdfStepHandlers,
+  type AdfStepHooks,
+  type AdfRunResult,
+  type AdfSkippedStep,
+  type ReasoningCallOptions,
+  type ReasoningPromptVisibilityContext,
+  executeProgrammaticToolCall,
+  getDefaultWorkerEventStream,
+  getDefaultLifecycleHookEngine,
+  fireLifecycleHooks,
+  withActuatorForwardingPort,
+  type ActuatorForwardRequest,
+  type ActuatorForwardingPort,
+  withReasoningPayloadScope,
+  runToolCallBatch,
+  resolveOpAccessClaims,
+  type ResourceClaim,
+  type OpInputDomain,
+  createPipelineRunJournal,
+  openPipelineRunJournal,
+  loadPipelineRunJournal,
+  newPipelineRunId,
+  hashPipelineOutput,
+  type PipelineRunJournalHandle,
+  type PipelineRunJournalState,
+  type PipelineRunSuspendedPayload,
+  deriveExecutionGraph,
+  createGraphRunArtifact,
+  recordGraphRunNode,
+  persistGraphRunArtifact,
+  type GraphRunArtifact,
+  assessPipelineDryRun,
+} from '@agent/core';
+
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { z } from 'zod';
+import { tryRepairJson } from '@agent/core/json-repair';
+import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
+import {
+  markRouterActive,
+  markRouterInactive,
+  resetRouterSync,
+} from '@agent/core/blackhole-routing-guard';
+import * as nodePath from 'node:path';
+import {
+  derivePipelineStatus,
+  type PipelineAdfStep,
+  type PipelineStepReasoning,
+  ROLE_FROM_TYPE,
+} from '@agent/core/pipeline-contract';
+import {
+  formatPipelineFailure,
+  logNextActionForPipelineFailure,
+  type PipelineFailure,
+} from './pipeline-result-reporting.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import * as path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
+import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { runStepHooks } from './refactor/step-hooks.js';
+
+import {
+  registeredEnv,
+  resolveStepType,
+  resolveExportKey,
+  runTsFallbackPipeline,
+  recordFallbackOutcome,
+  tryPermissionFallback,
+  finalizePipelineTrace,
+  normalizeStepBudget,
+  normalizeReasoningPolicy,
+  summarizeReasoningPolicy,
+  buildReasoningPolicyNote,
+  resolvePipelineReasoningOptions,
+  resolvePipelineFacetNote,
+  runPipelineReportPhase,
+  isReasoningBudgetExceeded,
+  validateFlow,
+  formatFlowValidationErrors,
+  dispatchCache,
+  moduleCache,
+  resolvePipelineHumanPresence,
+  PipelineSuspendedError,
+  resolveParamsRecursive,
+  ActuatorStepFailedError,
+  loadActuatorDispatch,
+  normalizePipelineOp,
+  validatePipelineOpInput,
+  resolveLogMessage,
+  resolveActuatorManifestPath,
+  assertPipelineStepCapabilityAvailable,
+  globToRegExp,
+  matchesArtifactPattern,
+  resolveFragmentPath,
+  shouldUseSubagentForReasoningStep,
+  coercePositiveInt,
+  runParallelBatches,
+  runInlineSystemExec,
+  runInlineSystemWriteFile,
+  runInlineSystemShell,
+  runInlineCoreWait,
+  runInlineCoreJanitor,
+  runInlineCoreTransform,
+  CONTROL_ACTIONS,
+} from './pipeline-execution-part-bootstrap.js';
+import type {
+  RunStepResult,
+  NormalizedStepBudget,
+  ReasoningStepPolicy,
+  FlowValidationError,
+  DispatchFunc,
+  RunStepsOptions,
+} from './pipeline-execution-part-bootstrap.js';
+import {
+  resolveEngineStepType,
+  prepareEngineSteps,
+  parseFragmentJson,
+  isSkip,
+  dispatchReasoningLeaf,
+  buildPipelinePromptVisibilityContext,
+  dispatchProgrammaticToolCall,
+  hasBoundApproval,
+  dispatchLeafOp,
+  findStepByIdRecursive,
+} from './pipeline-execution-part-control.js';
+import { runWithRepair, runSteps, runStepsInternal } from './pipeline-execution-part-execution.js';
+
+/** Validate Typed Flow channel integrity before allowing any step side effects. */
+export class TypedFlowValidationError extends Error {
+  constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
+    super(formatFlowValidationErrors(flowErrors));
+    this.name = 'TypedFlowValidationError';
+  }
+}
+
+export async function runValidatedSteps(
+  steps: PipelineAdfStep[],
+  initialCtx: Record<string, unknown> = {},
+  opts: RunStepsOptions = {}
+) {
+  try {
+    return (
+      await runAdfLifecycle({
+        draft: () => steps,
+        preflight: (draft) => {
+          const flowErrors = validateFlow(draft, initialCtx);
+          if (flowErrors.length > 0) throw new TypedFlowValidationError(flowErrors);
+          return draft;
+        },
+        // SX-11 / AGENTS.md: invalid pipeline contracts use the canonical
+        // repair agent as the lifecycle's one auto-repair hook. The one-shot
+        // guard prevents an unchanged repair from becoming a retry loop.
+        autoRepair:
+          opts.pipelinePath && !opts._adfRepairAttempted
+            ? async (draft) => {
+                const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf');
+                if (!repair.repaired) {
+                  throw new TypedFlowValidationError(validateFlow(draft, initialCtx));
+                }
+                return (await readValidatedWorkflowAdf(opts.pipelinePath!)).steps;
+              }
+            : undefined,
+        commit: (prepared) => prepared,
+        execute: (committed) => runSteps(committed, initialCtx, opts),
+      })
+    ).result;
+  } catch (error) {
+    if (!(error instanceof TypedFlowValidationError)) throw error;
+
+    const message = error.message;
+    for (const flowError of error.flowErrors) {
+      logger.warn(`[FLOW_VALIDATION] ${formatFlowValidationErrors([flowError])}.`);
+    }
+    opts.trace?.addEvent('pipeline.validation_failed', {
+      validation_type: 'typed_flow',
+      error: message,
+      error_count: error.flowErrors.length,
+    });
+    return {
+      status: 'failed' as const,
+      results: [{ op: 'flow:validate', status: 'failed' as const, error: message }],
+      context: { ...initialCtx },
+    };
+  }
+}
+
+export interface ExecutePipelineFileOptions {
+  context?: Record<string, unknown>;
+  trace?: TraceContext;
+  quiet?: boolean;
+  hasHuman?: boolean;
+}
+
+/**
+ * Library entry for callers that already run inside the Kyberion process.
+ *
+ * The CLI remains responsible for durable resume journals and terminal exit
+ * codes. This entry deliberately shares the same validated input, ADF
+ * lifecycle, actuator dispatch, trace finalization, and feedback loop rather
+ * than spawning a second `run_pipeline` process.
+ */
+export async function executePipelineFile(
+  inputPath: string,
+  options: ExecutePipelineFileOptions = {}
+) {
+  const pipeline = await readValidatedWorkflowAdf(inputPath);
+  const pipelineId = String(
+    pipeline.pipeline_id || pipeline.id || nodePath.basename(inputPath, nodePath.extname(inputPath))
+  );
+  const baseContext = (pipeline.context || {}) as Record<string, unknown>;
+  const missionId =
+    String(options.context?.mission_id || baseContext.mission_id || process.env.MISSION_ID || '') ||
+    undefined;
+  const autoContext: Record<string, unknown> = {
+    repo_root: pathResolver.rootDir(),
+    platform_name: process.platform,
+    node_options: process.env.NODE_OPTIONS || '',
+    run_utc_now: new Date().toISOString(),
+    __pipeline_options: pipeline.options || {},
+  };
+  if (missionId) {
+    const missionPath = findMissionPath(missionId);
+    const evidenceDir = missionEvidenceDir(missionId);
+    if (missionPath) {
+      autoContext.mission_dir =
+        nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
+      autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
+    }
+    if (evidenceDir) {
+      autoContext.mission_evidence_dir =
+        nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
+    }
+  }
+  if (pipeline.knowledge_scope) autoContext._knowledge_scope = pipeline.knowledge_scope;
+  const mergedContext = { ...baseContext, ...autoContext, ...(options.context || {}) };
+  const trace =
+    options.trace ||
+    new TraceContext(`pipeline:${pipelineId}`, {
+      ...(missionId ? { missionId } : {}),
+      pipelineId,
+    });
+  trace.addArtifact('file', inputPath, 'Pipeline ADF input');
+  const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+  const run = () =>
+    runValidatedSteps(steps, mergedContext, {
+      trace,
+      pipelinePath: inputPath,
+      quiet: options.quiet,
+      hasHuman: options.hasHuman,
+    });
+  const missionTier = String(autoContext.mission_tier || '');
+  const payloadTier: 'public' | 'confidential' | 'personal' =
+    missionTier === 'personal'
+      ? 'personal'
+      : missionTier === 'confidential'
+        ? 'confidential'
+        : 'public';
+  const result =
+    payloadTier === 'public'
+      ? await run()
+      : await withReasoningPayloadScope(
+          {
+            tier: payloadTier,
+            tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+            purpose: `pipeline ${pipelineId}`,
+          },
+          run
+        );
+  const failed = result.results.some((entry) => entry.status === 'failed');
+  const persisted = finalizePipelineTrace(trace, !failed);
+  result.context.trace_summary = persisted.trace.rootSpan.status;
+  result.context.trace_persisted_path =
+    nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
+  runFeedbackLoop(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
+  return { ...result, trace, persistedPath: persisted.path };
+}
+
+export async function main() {
+  // Propagate resolved identity to process.env so spawned subprocesses inherit them.
+  const identity = resolveIdentityContext();
+  if (identity.role && !process.env.MISSION_ROLE) {
+    process.env.MISSION_ROLE = identity.role;
+  }
+  if (identity.persona && !getRegisteredEnvText('KYBERION_PERSONA')) {
+    setRegisteredEnv('KYBERION_PERSONA', identity.persona);
+  }
+
+  const argv = await createStandardYargs()
+    .option('input', { alias: 'i', type: 'string', required: false })
+    .option('dry-run', {
+      type: 'boolean',
+      default: false,
+      describe: 'Statically assess the pipeline without dispatching tools or providers',
+    })
+    .option('json', {
+      type: 'boolean',
+      default: false,
+      describe: 'Emit machine-readable JSON for dry-run output',
+    })
+    .option('resume', {
+      type: 'string',
+      describe: 'Resume a durable pipeline run by run id',
+    })
+    .option('context', {
+      alias: 'c',
+      type: 'string',
+      describe: 'JSON string merged into pipeline.context (overrides)',
+    })
+    .option('quiet', {
+      type: 'boolean',
+      default: false,
+      describe: 'Suppress step-by-step progress output',
+    })
+    .parseSync();
+
+  let resumeState: PipelineRunJournalState | undefined;
+  if (argv.resume) {
+    resumeState = loadPipelineRunJournal(String(argv.resume), process.env.MISSION_ID);
+    if (!argv.input) argv.input = resumeState.started?.input_path;
+  }
+  if (!argv.input) throw new Error('Either --input or --resume is required.');
+
+  if (argv['dry-run']) {
+    try {
+      const pipeline = await readValidatedWorkflowAdf(argv.input as string);
+      const report = assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
+      if (argv.json) {
+        process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      } else {
+        process.stdout.write(`[pipeline-dry-run] ${report.verdict}: ${report.pipeline_id}\n`);
+        for (const check of report.checks) {
+          process.stdout.write(`- ${check.status}: ${check.message}\n`);
+        }
+        for (const action of report.next_actions) process.stdout.write(`next: ${action}\n`);
+      }
+      process.exitCode = report.verdict === 'blocked' ? 1 : 0;
+      return;
+    } catch (error) {
+      const report = {
+        version: '1.0' as const,
+        pipeline_id: String(argv.input),
+        verdict: 'blocked' as const,
+        side_effects: 'none' as const,
+        checks: [
+          {
+            id: 'contract-validation',
+            status: 'blocked' as const,
+            message: error instanceof Error ? error.message : String(error),
+          },
+        ],
+        next_actions: ['Fix the pipeline ADF/guardrail validation errors and rerun the dry-run.'],
+      };
+      if (argv.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      else process.stderr.write(`[pipeline-dry-run] blocked: ${report.checks[0].message}\n`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  // Bootstrap reasoning + voice backends before any actuator dispatch.
+  installReasoningBackends();
+  installPythonVoiceBridgeIfAvailable();
+  killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
+
+  // Safety guard: restore BlackHole mic routing on Ctrl+C or SIGTERM.
+  // The pipeline's `||` fallback only fires on non-zero exit codes, not SIGINT.
+  // Without this, a user pressing Ctrl+C during a meeting join pipeline would
+  // leave their system microphone locked to BlackHole.
+  const cleanupAndExit = (code: number) => {
+    resetRouterSync();
+    process.exitCode = code;
+  };
+  process.once('SIGINT', () => cleanupAndExit(130));
+  process.once('SIGTERM', () => cleanupAndExit(143));
+
+  const pipeline = await readValidatedWorkflowAdf(argv.input as string);
+
+  const baseContext = (pipeline.context || {}) as Record<string, unknown>;
+  let overrideContext: Record<string, unknown> = {};
+  if (argv.context) {
+    try {
+      overrideContext = JSON.parse(argv.context as string);
+    } catch (err: any) {
+      logger.error(`❌ [PIPELINE] Invalid --context JSON: ${err.message}`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+  const firstNonEmpty = (...candidates: (string | undefined)[]): string | undefined =>
+    candidates.find((v): v is string => typeof v === 'string' && v.length > 0);
+  const missionId = firstNonEmpty(
+    overrideContext.mission_id as string | undefined,
+    baseContext.mission_id as string | undefined,
+    process.env.MISSION_ID
+  );
+  const autoContext: Record<string, unknown> = {};
+  // Propagate missionId to env so tier-guard can resolve ${MISSION_ID} in default_allow paths.
+  if (missionId && !process.env.MISSION_ID) {
+    process.env.MISSION_ID = missionId;
+  }
+  if (missionId) {
+    const missionPath = findMissionPath(missionId);
+    const evidenceDir = missionEvidenceDir(missionId);
+    if (missionPath) {
+      autoContext.mission_dir =
+        nodePath.relative(pathResolver.rootDir(), missionPath) || missionPath;
+      autoContext.mission_tier = nodePath.basename(nodePath.dirname(missionPath));
+    }
+    if (evidenceDir) {
+      autoContext.mission_evidence_dir =
+        nodePath.relative(pathResolver.rootDir(), evidenceDir) || evidenceDir;
+    }
+  }
+  autoContext.browser_session_id = `${pipeline.pipeline_id || path.basename(String(argv.input), path.extname(String(argv.input)))}`;
+  autoContext.repo_root = pathResolver.rootDir();
+  autoContext.platform_name = process.platform;
+  autoContext.node_options = process.env.NODE_OPTIONS || '';
+  autoContext.run_utc_now = new Date().toISOString();
+  autoContext.__pipeline_options = pipeline.options || {};
+
+  // Propagate pipeline knowledge_scope so wisdom:query uses the right tier/customer index.
+  // Falls back to public-only scope when not declared.
+  if (pipeline.knowledge_scope) {
+    autoContext._knowledge_scope = pipeline.knowledge_scope;
+  } else if (autoContext.mission_tier && autoContext.mission_tier !== 'public') {
+    // Infer scope from mission tier when pipeline doesn't declare one explicitly
+    const inferredScope: Record<string, unknown> = {
+      tiers: ['public', autoContext.mission_tier],
+    };
+    const customer = registeredEnv('KYBERION_CUSTOMER')?.trim();
+    if (customer) inferredScope.customerId = customer;
+    autoContext._knowledge_scope = inferredScope;
+  }
+  const mergedContext = { ...baseContext, ...autoContext, ...overrideContext };
+  // Restore only declared output channels from completed journal nodes. The
+  // journal never carries the full mutable context.
+  for (const node of resumeState?.completed_nodes.values() || []) {
+    Object.assign(mergedContext, node.output_channels_snapshot);
+    Object.assign(mergedContext, node.control_state_snapshot || {});
+  }
+
+  logger.info(
+    `🚀 [PIPELINE] Running ${argv.input.match(/\.(ts|js|mjs|cjs)$/u) ? 'workflow module' : 'ADF pipeline'}: ${pipeline.name || argv.input}`
+  );
+  logger.info(`   [PIPELINE] Mission ID: ${missionId || 'NONE'}`);
+  logger.info(`   [PIPELINE] Evidence Dir: ${autoContext.mission_evidence_dir || 'UNDEFINED'}`);
+
+  const pipelineId = String(
+    pipeline.pipeline_id ||
+      pipeline.id ||
+      path.basename(String(argv.input), path.extname(String(argv.input)))
+  );
+  const trace = new TraceContext(`pipeline:${pipelineId}`, {
+    ...(missionId ? { missionId } : {}),
+    pipelineId,
+  });
+  trace.addArtifact('file', String(argv.input), 'Pipeline ADF input');
+  getDefaultWorkerEventStream().emit(
+    'turn_begin',
+    { kind: 'pipeline', pipeline_id: pipelineId, input: String(argv.input) },
+    { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+  );
+
+  let runJournal: PipelineRunJournalHandle | undefined;
+  let settledLifecycleHookEmitted = false;
+  let agentStartAdmitted = false;
+  try {
+    const stepsToRun = (pipeline.steps || []).map((step) => ({
+      ...step,
+      params: step.params || {},
+    }));
+    const runId = resumeState?.run_id || newPipelineRunId();
+    const activeRunJournal = resumeState
+      ? openPipelineRunJournal(resumeState)
+      : createPipelineRunJournal(
+          runId,
+          {
+            pipeline_id: pipelineId,
+            input_path: String(argv.input),
+            ...(missionId ? { mission_id: missionId } : {}),
+            step_ids: stepsToRun.map((step, index) => step.id || `__step_${index}`),
+          },
+          missionId
+        );
+    runJournal = activeRunJournal;
+    if (resumeState) {
+      activeRunJournal.append('run_resumed', { resumed_at: new Date().toISOString() });
+    }
+    const sessionStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'session_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+      }
+    );
+    if (sessionStart.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
+      );
+    }
+    // PI-08: expose the governed agent-entry boundary before any pipeline
+    // step can reach a reasoning/model-backed operation. Only metadata is
+    // exposed here; prompt content remains at its ledgered call boundary.
+    const beforeAgentStart = await fireLifecycleHooks(
+      getDefaultLifecycleHookEngine(),
+      'before_agent_start',
+      {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        ...(missionId ? { mission_id: missionId } : {}),
+        systemPromptOptions: {
+          pipelineId,
+          ...(missionId ? { missionId } : {}),
+          promptVisibility: 'ledgered',
+          resumed: Boolean(resumeState),
+          stepCount: stepsToRun.length,
+        },
+      }
+    );
+    if (beforeAgentStart.blocked) {
+      throw new Error(
+        `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
+      );
+    }
+    agentStartAdmitted = true;
+    // SA-04: declare the payload tier once, at the mission boundary, so every
+    // reasoning call made anywhere inside this run inherits it. Annotating each
+    // call site individually would be missed the first time someone adds a new
+    // one; the mission already knows its tier, so it is the honest place to say
+    // it. A run with no mission stays unscoped (public work, previous behaviour).
+    const missionTier = String(autoContext.mission_tier || '');
+    const payloadTier: 'public' | 'confidential' | 'personal' =
+      missionTier === 'personal'
+        ? 'personal'
+        : missionTier === 'confidential'
+          ? 'confidential'
+          : 'public';
+    const runSteps = () =>
+      runValidatedSteps(stepsToRun, mergedContext, {
+        trace,
+        pipelinePath: argv.input as string,
+        quiet: argv.quiet as boolean,
+        hasHuman: resolvePipelineHumanPresence(),
+        runJournal: activeRunJournal,
+        resumeState,
+        runId,
+      });
+    const result =
+      payloadTier === 'public'
+        ? await runSteps()
+        : await withReasoningPayloadScope(
+            {
+              tier: payloadTier,
+              tenant_slug: registeredEnv('KYBERION_CUSTOMER')?.trim() || undefined,
+              purpose: `pipeline ${pipelineId}`,
+            },
+            runSteps
+          );
+    const failed = result.results.find((entry) => entry.status === 'failed');
+    const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
+    const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
+    const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
+    // PI-08: settled is deliberately after fallback/repair work. It is a
+    // receipt point, not another execution gate, so a blocking hook is
+    // recorded but cannot retroactively change the completed result.
+    if (agentStartAdmitted && !settledLifecycleHookEmitted) {
+      settledLifecycleHookEmitted = true;
+      const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        status: pipelineStatus,
+        recovered,
+      });
+      if (settled.blocked) {
+        logger.warn(
+          `[PI-08] task_settled observer blocked after result was finalized: ${settled.reasons.join('; ')}`
+        );
+      }
+    }
+    const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+      status: pipelineStatus,
+    });
+    if (sessionEnd.blocked) {
+      throw new Error(
+        `[SAFETY_LIMIT][HOOK_BLOCKED] session_end blocked: ${sessionEnd.reasons.join('; ')}`
+      );
+    }
+    const persisted = finalizePipelineTrace(trace, recovered);
+    result.context.trace_summary = persisted.trace.rootSpan.status;
+    result.context.trace_persisted_path =
+      nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
+    logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
+    activeRunJournal.append('run_finished', { status: pipelineStatus });
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      { kind: 'pipeline', pipeline_id: pipelineId, status: pipelineStatus, recovered },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
+    runFeedbackLoop(pipelineId, pipelineStatus, persisted.trace);
+    // LC-09: surface semantic-decision degradations in the run summary —
+    // a pipeline that "succeeded" on deterministic fallbacks every time is
+    // otherwise indistinguishable from one whose LLM decisions worked.
+    const semanticDegradations = getSemanticDecideDegradations();
+    if (semanticDegradations.length > 0) {
+      const byReason = semanticDegradations.reduce<Record<string, number>>((acc, entry) => {
+        acc[entry.reason] = (acc[entry.reason] || 0) + 1;
+        return acc;
+      }, {});
+      appendSemanticDegradationRun(pipelineId, byReason);
+      logger.warn(
+        `   [PIPELINE] llm_decide degraded ${semanticDegradations.length}x (${Object.entries(
+          byReason
+        )
+          .map(([reason, count]) => `${reason}=${count}`)
+          .join(', ')}) — deterministic fallbacks were used.`
+      );
+    }
+    if (result.status === 'succeeded' || recovered) {
+      logger.success(`✅ [PIPELINE] Completed: ${pipeline.name || argv.input}`);
+      // LC-02: success-first, promote-on-reuse. An ad-hoc ADF (outside the
+      // pipelines/ catalog) that just succeeded is a promotion candidate —
+      // one advisory line, never forced.
+      const inputRelative = nodePath
+        .relative(pathResolver.rootDir(), nodePath.resolve(String(argv.input)))
+        .replace(/\\/g, '/');
+      if (!inputRelative.startsWith('pipelines/') && !inputRelative.startsWith('..')) {
+        const successCount = recordAdhocPipelineRun(inputRelative);
+        if (successCount >= PROMOTION_CANDIDATE_MIN_RUNS) {
+          logger.warn(
+            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative}`
+          );
+        } else {
+          logger.info(
+            `   [PIPELINE] Reusable? Promote this run into the catalog: pnpm pipeline:promote --input ${inputRelative}`
+          );
+        }
+      }
+      if (autoContext.__pipeline_options && (autoContext.__pipeline_options as any).keep_alive) {
+        logger.info(
+          '   [PROCESS] Browser session kept alive per pipeline options. Terminal will remain open.'
+        );
+      } else {
+        process.exitCode = 0;
+        return;
+      }
+    } else {
+      if (failed) {
+        logger.error(`❌ [PIPELINE] Failed step: ${failed.op} :: ${failure!.summary}`);
+        logNextActionForPipelineFailure(failure!, String(argv.input));
+      }
+      logger.error(`❌ [PIPELINE] Failed: ${pipeline.name || argv.input}`);
+      process.exitCode = 1;
+      return;
+    }
+  } catch (err: any) {
+    if (err instanceof PipelineSuspendedError) {
+      trace.addEvent('pipeline.suspended', {
+        step_id: err.suspension.step_id,
+        approval_request_id: err.suspension.approval_request_id,
+        on_timeout: err.suspension.on_timeout,
+        ...(err.suspension.timeout_at ? { timeout_at: err.suspension.timeout_at } : {}),
+      });
+      if (runJournal) runJournal.append('run_suspended', { ...err.suspension });
+      getDefaultWorkerEventStream().emit(
+        'turn_end',
+        {
+          kind: 'pipeline',
+          pipeline_id: pipelineId,
+          status: 'suspended',
+          approval_request_id: err.suspension.approval_request_id,
+        },
+        { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+      );
+      const persisted = finalizeAndPersist(trace);
+      logger.info(
+        `   [PIPELINE] Suspended: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
+      );
+      logger.warn(
+        `⏸️ [PIPELINE] Awaiting decision ${err.suspension.approval_request_id}. Resume with --resume ${runJournal?.runId || 'the run id'}.`
+      );
+      process.exitCode = 0;
+      return;
+    }
+    const failure = formatPipelineFailure(err);
+    const recovered = tryPermissionFallback(pipeline, failure, trace);
+    if (agentStartAdmitted && !settledLifecycleHookEmitted) {
+      settledLifecycleHookEmitted = true;
+      const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        status: recovered ? 'succeeded' : 'failed',
+        recovered,
+        error: err?.message ?? String(err),
+      });
+      if (settled.blocked) {
+        logger.warn(
+          `[PI-08] task_settled observer blocked after failure was finalized: ${settled.reasons.join('; ')}`
+        );
+      }
+    }
+    getDefaultWorkerEventStream().emit(
+      'turn_end',
+      {
+        kind: 'pipeline',
+        pipeline_id: pipelineId,
+        status: recovered ? 'succeeded' : 'failed',
+        recovered,
+        error: err?.message ?? String(err),
+      },
+      { pipeline_id: pipelineId, ...(missionId ? { mission_id: missionId } : {}) }
+    );
+    if (recovered) {
+      const persisted = finalizePipelineTrace(trace, true);
+      runFeedbackLoop(pipelineId, 'succeeded', persisted.trace);
+      logger.info(
+        `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
+      );
+      process.exitCode = 0;
+      return;
+    }
+    trace.addEvent('pipeline.error', {
+      error: err?.message ?? String(err),
+      error_category: failure.classification.category,
+      error_rule_id: failure.classification.ruleId,
+    });
+    if (runJournal) {
+      runJournal.append('run_finished', {
+        status: recovered ? 'succeeded' : 'failed',
+        error: err?.message ?? String(err),
+      });
+    }
+    const persisted = finalizeAndPersist(trace);
+    runFeedbackLoop(pipelineId, 'failed', persisted.trace);
+    logger.info(
+      `   [PIPELINE] Trace: ${nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
+    );
+    logger.error(`❌ [PIPELINE] Error: ${failure.summary}`);
+    logNextActionForPipelineFailure(failure, String(argv.input));
+    process.exitCode = 1;
+    return;
+  }
+}
+
+export const isDirectRun =
+  isDirectScript(import.meta.url, 'run_pipeline.ts') ||
+  isDirectScript(import.meta.url, 'run_pipeline.js');
+
+if (isDirectRun) {
+  main().catch((err) => {
+    logger.error(err.message);
+    process.exitCode = 1;
+  });
+}
