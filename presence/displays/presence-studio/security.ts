@@ -4,8 +4,8 @@ import { z } from 'zod';
 import {
   extractSurfaceBearerToken,
   logger,
-  matchesChronosToken,
   narrowSurfaceViewerTenant,
+  resolveSurfaceViewerToken,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
@@ -81,6 +81,14 @@ export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): strin
   return extractSurfaceBearerToken(req.headers.authorization);
 }
 
+function resolvePresenceStudioCredential(presented: string) {
+  const configured = getPresenceStudioAuthToken();
+  return resolveSurfaceViewerToken(presented, {
+    apiToken: process.env.PRESENCE_STUDIO_TOKEN ? undefined : configured,
+    configuredCredentials: configured ? [{ token: configured, role: 'readonly' as const }] : [],
+  });
+}
+
 export function checkPresenceStudioRateLimit(
   req: Pick<Request, 'method' | 'socket'>,
   options?: { limit?: number; windowMs?: number }
@@ -140,7 +148,8 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
       };
     }
     const presented = extractPresenceStudioToken(req);
-    if (matchesChronosToken(presented, token)) {
+    const resolution = resolvePresenceStudioCredential(presented);
+    if (resolution) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
@@ -153,7 +162,8 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   const token = getPresenceStudioAuthToken();
   if (token) {
     const presented = extractPresenceStudioToken(req);
-    if (matchesChronosToken(presented, token)) {
+    const resolution = resolvePresenceStudioCredential(presented);
+    if (resolution) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {

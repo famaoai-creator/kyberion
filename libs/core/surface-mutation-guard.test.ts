@@ -52,6 +52,11 @@ describe('surface-mutation-guard', () => {
     expect(
       resolveSurfaceViewerToken('admin-token', { localadminToken: 'admin-token' })
     ).toMatchObject({ role: 'localadmin' });
+    expect(
+      resolveSurfaceViewerToken('presence-token', {
+        configuredCredentials: [{ token: 'presence-token', role: 'readonly' }],
+      })
+    ).toMatchObject({ role: 'readonly' });
   });
 
   it('extracts bearer credentials without broadening the accepted header form', () => {
