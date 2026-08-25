@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-25T09:57:42.209Z",
+  "generated_at": "2026-08-25T16:43:31.740Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -69,10 +69,10 @@
     },
     {
       "actuator_id": "calendar-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["create_event", "list_calendars", "list_events", "query_freebusy"],
       "contract_schema": "knowledge/product/schemas/calendar-action.schema.json",
-      "contract_schema_sha256": null
+      "contract_schema_sha256": "42ffbddbef6166a58ff14c9fbe29df7b4714e2a98fd8d213bfef2704aee20d0a"
     },
     {
       "actuator_id": "code-actuator",
@@ -215,7 +215,7 @@
     },
     {
       "actuator_id": "system-actuator",
-      "version": "1.5.0",
+      "version": "1.6.0",
       "ops": [
         "audit_verify",
         "baseline_check",
@@ -245,7 +245,7 @@
         "test_screen_stream"
       ],
       "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
-      "contract_schema_sha256": "54191600f1b4e0241025e3109fd3d4ee03c76502a14b7c3cfb48a9ce04b0ed33"
+      "contract_schema_sha256": "4862a4c4ea9179aa58c8ffbe82c96f34d2550900657d3848e066955480333c90"
     },
     {
       "actuator_id": "terminal-actuator",
