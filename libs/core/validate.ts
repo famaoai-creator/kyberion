@@ -11,7 +11,7 @@ import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const schemasDir: string = path.resolve(currentDir, '../../schemas');
+const schemasDir: string = path.resolve(currentDir, '../../knowledge/product/schemas');
 const schemaCache: Record<string, JsonSchema> = {};
 
 export function loadSchema(schemaName: string): JsonSchema {

@@ -349,6 +349,7 @@
         "scripts/check_chronos_dom_contrast.ts",
         "--start"
       ],
+      "timeout_ms": 120000,
       "owner": "experience",
       "rationale": "Checks Chronos light, dark, and reduced-motion DOM contrast."
     },

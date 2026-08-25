@@ -2,10 +2,19 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
-import { buildOrganizationWorkLoopSummary, loadOutcomeCatalog, loadSpecialistCatalog, resolveWorkDesign } from './work-design.js';
-import { createDistillCandidateRecord, saveDistillCandidateRecord } from './distill-candidate-registry.js';
+import {
+  buildOrganizationWorkLoopSummary,
+  loadOutcomeCatalog,
+  loadSpecialistCatalog,
+  resolveWorkDesign,
+} from './work-design.js';
+import {
+  createDistillCandidateRecord,
+  saveDistillCandidateRecord,
+} from './distill-candidate-registry.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -103,7 +112,9 @@ describe('work-design', () => {
       outcomeIds: ['artifact:docx'],
       tier: 'confidential',
     });
-    expect(resolved.reusable_refs.some((item) => item.candidate_id === candidate.candidate_id)).toBe(true);
+    expect(
+      resolved.reusable_refs.some((item) => item.candidate_id === candidate.candidate_id)
+    ).toBe(true);
   });
 
   it('builds an organization work loop summary from task inputs', () => {
@@ -149,12 +160,18 @@ describe('work-design', () => {
     expect(summary.workflow_design.pattern).toBe('single_track_execution');
     expect(summary.review_design.review_mode).toBe('standard');
     expect(summary.process_design.intake_requirements).toContain('incident basis');
-    expect(summary.process_design.operator_checklist).toContain('capture evidence and reusable findings');
+    expect(summary.process_design.operator_checklist).toContain(
+      'capture evidence and reusable findings'
+    );
     expect(summary.runtime_design.owner_model).toBe('single_owner_multi_worker');
     expect(summary.runtime_design.assignment_policy).toBe('lease_aware_capability');
     expect(summary.runtime_design.coordination.bus).toBe('mission_coordination_bus');
-    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('resolve_target_binding');
-    expect(summary.execution_boundary.llm_zone.forbidden).toContain('invent_review_target_bindings');
+    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain(
+      'resolve_target_binding'
+    );
+    expect(summary.execution_boundary.llm_zone.forbidden).toContain(
+      'invent_review_target_bindings'
+    );
   });
 
   it('builds a protected benchmark execution boundary for harness evolution', () => {
@@ -173,8 +190,12 @@ describe('work-design', () => {
     ]);
     expect(summary.workflow_design.workflow_id).toBe('single-track-default');
     expect(summary.process_design.intake_requirements).toContain('target harness');
-    expect(summary.execution_boundary.llm_zone.forbidden).toContain('edit_fixed_adapter_boundary_without_approval');
-    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain('compile_experiment_contract');
+    expect(summary.execution_boundary.llm_zone.forbidden).toContain(
+      'edit_fixed_adapter_boundary_without_approval'
+    );
+    expect(summary.execution_boundary.compiler_zone.responsibilities).toContain(
+      'compile_experiment_contract'
+    );
     expect(summary.teaming.specialist_id).toBe('harness-engineer');
   });
 
@@ -191,8 +212,12 @@ describe('work-design', () => {
     expect(summary.workflow_design.pattern).toBe('stage_gated_delivery');
     expect(summary.review_design.review_mode).toBe('strict');
     expect(summary.review_design.required_gate_ids).toContain('SECURITY_READY');
-    expect(summary.process_design.operator_checklist).toContain('confirm project root and default track');
-    expect(summary.process_design.operator_checklist).toContain('prepare the first governed work items');
+    expect(summary.process_design.operator_checklist).toContain(
+      'confirm project root and default track'
+    );
+    expect(summary.process_design.operator_checklist).toContain(
+      'prepare the first governed work items'
+    );
   });
 
   it('surfaces advisory scope drift without changing the selected execution shape', () => {
@@ -213,7 +238,7 @@ describe('work-design', () => {
     expect(summary.work_scope_decision?.promotion_required).toBe(true);
     expect(summary.work_scope_decision?.mandatory_triggers).toEqual([]);
     expect(summary.work_scope_decision?.accumulation_triggers).toEqual(
-      expect.arrayContaining(['artifact_estimate_5plus', 'stakeholder_count_3plus']),
+      expect.arrayContaining(['artifact_estimate_5plus', 'stakeholder_count_3plus'])
     );
   });
 
@@ -221,11 +246,16 @@ describe('work-design', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/work-policy.schema.json'));
-    const workPolicy = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/product/governance/work-policy.json'), {
-        encoding: 'utf8',
-      }) as string,
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/work-policy.schema.json')
+    );
+    const workPolicy = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(path.resolve(root, 'knowledge/product/governance/work-policy.json'), {
+          encoding: 'utf8',
+        }) as string
+      )
     );
 
     expect(validate(workPolicy)).toBe(true);
@@ -247,7 +277,7 @@ describe('work-design', () => {
           execution_shape_rules: [],
           intent_label_rules: [],
         },
-      }),
+      })
     ).toBe(false);
   });
 });

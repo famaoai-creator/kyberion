@@ -68,6 +68,32 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     safeStat: mocks.safeStat,
+    loadJson: <T>(filePath: string): T => {
+      const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+      return JSON.parse(String(raw)) as T;
+    },
+  };
+});
+
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T => {
+      const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+      if (raw === undefined || raw === '') return actual.readJson<T>(filePath);
+      return JSON.parse(String(raw)) as T;
+    },
+    readJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+        if (raw === undefined || raw === '') return actual.readJsonIfPresent<T>(filePath);
+        return JSON.parse(String(raw)) as T;
+      } catch {
+        return null;
+      }
+    },
   };
 });
 

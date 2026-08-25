@@ -1,6 +1,7 @@
 import AjvModule from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import { pathResolver } from './path-resolver.js';
 import { describe, expect, it } from 'vitest';
 import {
@@ -36,10 +37,12 @@ describe('provider-config', () => {
       ajv,
       pathResolver.knowledge('product/schemas/provider-config.schema.json')
     );
-    const config = JSON.parse(
-      safeReadFile(pathResolver.knowledge('product/governance/provider-config.json'), {
-        encoding: 'utf8',
-      }) as string
+    const config = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(pathResolver.knowledge('product/governance/provider-config.json'), {
+          encoding: 'utf8',
+        }) as string
+      )
     );
     expect(validate(config)).toBe(true);
   });

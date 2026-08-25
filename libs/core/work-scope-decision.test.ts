@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import {
   loadWorkScopePolicy,
   resolveWorkScopeDecision,
@@ -145,10 +146,12 @@ describe('work-scope-decision', () => {
       ajv,
       path.resolve(root, 'knowledge/product/schemas/work-scope-policy.schema.json')
     );
-    const policy = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/product/governance/work-scope-policy.json'), {
-        encoding: 'utf8',
-      }) as string
+    const policy = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(path.resolve(root, 'knowledge/product/governance/work-scope-policy.json'), {
+          encoding: 'utf8',
+        }) as string
+      )
     );
 
     expect(validate(policy)).toBe(true);

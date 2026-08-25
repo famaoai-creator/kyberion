@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile, safeRmSync } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { compileUserIntentFlow } from './intent-contract.js';
@@ -10,15 +11,21 @@ import { compileUserIntentFlow } from './intent-contract.js';
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('japanese-contextual-intent corpus', () => {
-  const corpusPath = pathResolver.knowledge('product/governance/japanese-contextual-intent-corpus.json');
-  const schemaPath = pathResolver.knowledge('product/schemas/japanese-contextual-intent-corpus.schema.json');
+  const corpusPath = pathResolver.knowledge(
+    'product/governance/japanese-contextual-intent-corpus.json'
+  );
+  const schemaPath = pathResolver.knowledge(
+    'product/schemas/japanese-contextual-intent-corpus.schema.json'
+  );
   const memoryPath = pathResolver.shared('runtime/test-contextual-intent-memory.json');
 
   it('matches the schema and covers the contextual intent regression set', async () => {
     process.env.KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH = memoryPath;
     safeRmSync(memoryPath);
 
-    const corpus = JSON.parse(safeReadFile(corpusPath, { encoding: 'utf8' }) as string);
+    const corpus = withoutSchemaMetadata(
+      JSON.parse(safeReadFile(corpusPath, { encoding: 'utf8' }) as string)
+    );
     const validate = compileSchemaFromPath(new Ajv({ allErrors: true }), schemaPath);
     expect(validate(corpus), JSON.stringify(validate.errors || [])).toBe(true);
     expect(corpus.items).toHaveLength(50);

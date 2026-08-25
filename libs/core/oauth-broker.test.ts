@@ -28,6 +28,15 @@ vi.mock('./secure-io.js', async () => {
     safeCreateExclusiveFileSync: mocks.safeCreateExclusiveFileSync,
     safeUnlinkSync: mocks.safeUnlinkSync,
     safeFsyncFile: mocks.safeFsyncFile,
+    loadJson: <T>(filePath: string): T =>
+      JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T,
+    loadJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        return JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+      } catch {
+        return null;
+      }
+    },
   };
 });
 

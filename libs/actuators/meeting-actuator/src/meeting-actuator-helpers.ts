@@ -51,6 +51,7 @@ import {
   extractActionItemsOp,
   generateFacilitationScriptOp,
   generateReminderMessageOp,
+  runActionItemReminderSweepOp,
   trackPendingActionItemsOp,
 } from './meeting-intelligence-ops.js';
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
@@ -461,6 +462,21 @@ async function executeMeetingPipeline(
               'reminder_message'
             );
           }
+          case 'run_action_item_reminder_sweep':
+            return meetingExport(
+              context,
+              params,
+              await runActionItemReminderSweepOp({
+                ...(Array.isArray(params.mission_ids)
+                  ? { mission_ids: params.mission_ids.map(String) }
+                  : {}),
+                tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
+                language: String(params.language || 'ja'),
+                max_items_per_mission: Number(params.max_items || 20),
+                ...(params.report_path ? { report_path: String(params.report_path) } : {}),
+              }),
+              'reminder_sweep_report'
+            );
           case 'execute_self_action_items': {
             if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
             const result = await executeSelfActionItemsOp({

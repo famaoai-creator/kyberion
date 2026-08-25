@@ -34,6 +34,14 @@ vi.mock('./secure-io.js', () => ({
   safeReaddir: mockSafeReaddir,
   safeWriteFile: mockSafeWriteFile,
   safeMkdir: mockSafeMkdir,
+  loadJson: <T>(filePath: string): T => JSON.parse(String(mockSafeReadFile(filePath))) as T,
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    try {
+      return JSON.parse(String(mockSafeReadFile(filePath))) as T;
+    } catch {
+      return null;
+    }
+  },
 }));
 
 vi.mock('./path-resolver.js', () => ({

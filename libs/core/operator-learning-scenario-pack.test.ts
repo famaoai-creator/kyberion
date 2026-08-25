@@ -8,15 +8,18 @@ import {
 } from './operator-learning.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
 function loadScenarioPack() {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/governance/operator-learning-scenario-pack.json'),
-      { encoding: 'utf8' }
-    ) as string
+  return withoutSchemaMetadata(
+    JSON.parse(
+      safeReadFile(
+        pathResolver.knowledge('product/governance/operator-learning-scenario-pack.json'),
+        { encoding: 'utf8' }
+      ) as string
+    )
   );
 }
 
@@ -69,9 +72,7 @@ describe('operator-learning scenario pack', () => {
       expect(log.normalized_intent.intent_id).toBe(scenario.expected_intent_id);
       expect(log.normalized_intent.task_family).toBe(scenario.expected_task_family);
       expect(log.route.shape).toBe(scenario.expected_route_shape);
-      expect(flattenSignals(log)).toEqual(
-        expect.arrayContaining(scenario.expected_signals)
-      );
+      expect(flattenSignals(log)).toEqual(expect.arrayContaining(scenario.expected_signals));
 
       if (scenario.expected_verification_result) {
         expect(log.verification.result).toBe(scenario.expected_verification_result);

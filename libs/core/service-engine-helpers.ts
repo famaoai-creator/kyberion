@@ -370,7 +370,7 @@ export function isCliAllowedForOperation(
   preset: Record<string, any>,
   operation: Record<string, any>
 ): boolean {
-  if (getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') === 'true') return true;
+  if (['true', '1'].includes(getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') || '')) return true;
   return (
     Boolean(operation.allow_unsafe_cli) ||
     Boolean(preset.allow_unsafe_cli) ||

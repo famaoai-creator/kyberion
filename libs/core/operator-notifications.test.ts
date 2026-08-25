@@ -14,6 +14,14 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    } catch {
+      return null;
+    }
+  },
   loadJson: <T>(filePath: string): T => JSON.parse(String(fs.readFileSync(filePath, 'utf8'))) as T,
   safeWriteFile: (filePath: string, data: string | Buffer) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });

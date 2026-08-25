@@ -17,6 +17,7 @@ async function loadFreshAuditChain(at: Date) {
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     rootDir: () => testRoot,
+    rootResolve: (sub = '') => path.join(testRoot, sub),
   },
   rootDir: () => testRoot,
 }));
@@ -46,6 +47,14 @@ vi.mock('./secure-io.js', async () => {
     safeWriteFile: (p: string, data: string) => {
       actualFs.mkdirSync(path.dirname(p), { recursive: true });
       actualFs.writeFileSync(p, data);
+    },
+    loadJsonIfPresent: <T>(p: string): T | null => {
+      if (!actualFs.existsSync(p)) return null;
+      try {
+        return JSON.parse(actualFs.readFileSync(p, 'utf8')) as T;
+      } catch {
+        return null;
+      }
     },
   };
 });

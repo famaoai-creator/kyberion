@@ -53,6 +53,10 @@ describe('promoteBrowserProcedure', () => {
       return actualRead(filePath, options);
     });
     vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
+    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
+      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
 
@@ -83,6 +87,12 @@ describe('promoteBrowserProcedure', () => {
         return JSON.stringify({ ...recording, review: { ...recording.review, status: 'pending' } });
       }
       return actualRead(filePath, options);
+    });
+    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
+        return { ...recording, review: { ...recording.review, status: 'pending' } };
+      }
+      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
     });
     expect(() =>
       promoteBrowserProcedure({
