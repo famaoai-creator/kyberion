@@ -134,8 +134,9 @@ async function collectSlackThreadContext(
         text: String(message.text || ''),
       }));
     return formatChannelThreadContext('Slack', entries);
-  } catch (error: any) {
-    logger.warn(`⚠️ [SlackBridge] Failed to fetch thread history: ${error?.message || error}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`⚠️ [SlackBridge] Failed to fetch thread history: ${message}`);
     return undefined;
   }
 }
