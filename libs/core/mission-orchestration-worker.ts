@@ -29,7 +29,7 @@ import {
   type PlanningPacket,
 } from './channel-surface.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
-import { extractPlanningPacketBlocks, validatePlanningPacket } from './planning-packet-contract.js';
+import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import {
   buildPlannerKickoffPrompt,
   buildPlannerRetryPrompt,
@@ -37,16 +37,11 @@ import {
   collectPlanningPacketTaskContractErrors,
   packetRequiresIndependentReview,
   parsePlanningReviewVerdict,
-  readProcessTemplateSeededTasks,
   type PlanningReviewVerdict,
 } from './mission-planning-packet.js';
 import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import { renderStructuredOutputSchemaPrompt } from './structured-output-contracts.js';
-import {
-  evaluateMissionGate,
-  writeMissionGateRecord,
-  type MissionGateDefinition,
-} from './mission-gate-engine.js';
+import { evaluateMissionGate, writeMissionGateRecord } from './mission-gate-engine.js';
 import { resolveArtifactReviewerProfile } from './mission-review-gates.js';
 import {
   buildArtifactReviewReceipt,
@@ -116,10 +111,9 @@ import {
   loadJson,
   safeMkdir,
   safeReadFile,
-  safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
-import { emitMissionTaskEvent, missionTaskEventsPath } from './mission-task-events.js';
+import { emitMissionTaskEvent } from './mission-task-events.js';
 import {
   enqueueMissionOrchestrationEvent,
   emitMissionOrchestrationObservation,
@@ -128,7 +122,6 @@ import {
   type MissionOrchestrationEvent,
 } from './mission-orchestration-events.js';
 import {
-  appendMissionOrchestrationJournalEntry,
   appendMissionOrchestrationJournalStatus,
   loadMissionOrchestrationJournal,
   loadMissionOrchestrationReplayPlan,
@@ -136,6 +129,21 @@ import {
   writeProvisionedJson,
   writeProvisionedText,
 } from './mission-orchestration-journal.js';
+import { createMissionProgressController } from './mission-orchestration-progress.js';
+import {
+  evaluateMissionPhaseExitGates,
+  loadMissionStateSnapshot,
+  missionClassOf,
+  missionRiskProfileOf,
+  resolvePhaseGateMode,
+  summarizeMissionGateState,
+} from './mission-orchestration-phase-gates.js';
+
+export {
+  evaluateMissionPhaseExitGates,
+  loadMissionPhaseGateDefinitions,
+  resolvePhaseGateMode,
+} from './mission-orchestration-phase-gates.js';
 import { recoverMissionRequestedTasks } from './mission-task-recovery.js';
 import {
   emitIntentSnapshot,
@@ -296,16 +304,6 @@ async function emitWorkerKickoffSnapshot(missionId: string, payload: SlackPayloa
 }
 
 const MISSION_CONTROLLER_TIMEOUT_MS = 600_000;
-
-const PLANNED_NEXT_TASK_STATUS_PRIORITY: Record<string, number> = {
-  requested: 0,
-  planned: 1,
-  rework: 2,
-  blocked: 3,
-  reviewed: 4,
-  accepted: 5,
-  completed: 6,
-};
 
 function validatePlannedNextTasks(rawTasks: unknown, missionId: string): PlannedNextTask[] {
   if (!Array.isArray(rawTasks)) {
@@ -597,21 +595,10 @@ function validatePlannedNextTasks(rawTasks: unknown, missionId: string): Planned
   return tasks;
 }
 
-function missionClassOf(missionId: string): string | undefined {
-  const state = loadMissionStateSnapshot(missionId);
-  const missionClass = String(
-    (state?.classification as Record<string, unknown> | undefined)?.mission_class || ''
-  ).trim();
-  return missionClass || undefined;
-}
-
-function missionRiskProfileOf(missionId: string): string | undefined {
-  const state = loadMissionStateSnapshot(missionId);
-  const riskProfile = String(
-    (state?.classification as Record<string, unknown> | undefined)?.risk_profile || ''
-  ).trim();
-  return riskProfile || undefined;
-}
+const missionProgressController = createMissionProgressController({
+  validatePlannedNextTasks,
+  summarizeMissionGateState,
+});
 
 interface DispatchMissionTaskOutcome {
   task_id: string;
@@ -4332,476 +4319,24 @@ function buildReviewDiffLines(missionId: string, task: PlannedNextTask): string[
   return [`- Diff under review (evidence/prs/${target}/diff.patch):`, '```diff', ...lines, '```'];
 }
 
-type MissionGateRecord = {
-  gate_id?: string;
-  verdict?: 'pass' | 'fail';
-  reason?: string;
-  failure_count?: number;
-  checked_at?: string;
-  should_realign?: boolean;
-  next_status?: string;
-};
-
-function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
-  const missionPath = missionDir(missionId, 'public');
-  const statePath = `${missionPath}/mission-state.json`;
-  if (!safeExistsSync(statePath)) return null;
-  try {
-    const parsed = loadJson<unknown>(statePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
-}
-
-function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
-  const missionPath = missionDir(missionId, 'public');
-  const gateDir = `${missionPath}/gates`;
-  if (!safeExistsSync(gateDir)) return [];
-  return safeReaddir(gateDir)
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => {
-      try {
-        const parsed = loadJson<unknown>(`${gateDir}/${entry}`);
-        return parsed && typeof parsed === 'object' ? (parsed as MissionGateRecord) : null;
-      } catch {
-        return null;
-      }
-    })
-    .filter((entry): entry is MissionGateRecord => Boolean(entry));
-}
-
-function summarizeMissionGateState(missionId: string): { lines: string[]; reworkCount: number } {
-  const records = loadMissionGateRecords(missionId);
-  const latestByGate = new Map<string, MissionGateRecord>();
-  for (const record of records) {
-    const gateId = String(record.gate_id || '').trim();
-    if (!gateId) continue;
-    latestByGate.set(gateId, record);
-  }
-  const state = loadMissionStateSnapshot(missionId);
-  const reworkCount =
-    Number(
-      state?.context && typeof state.context === 'object'
-        ? (state.context as Record<string, unknown>).mission_finish_gate_failure_count
-        : 0
-    ) || 0;
-
-  const lines = Array.from(latestByGate.entries()).map(([gateId, record]) => {
-    const icon = record.verdict === 'pass' ? '✅' : '❌';
-    const suffix = record.should_realign ? ' realign' : '';
-    const note = record.reason ? ` - ${record.reason}` : '';
-    return `${icon} ${gateId}${suffix}${note}`;
-  });
-
-  return { lines, reworkCount };
-}
-
-// ── MO-02 Task 4: phase exit gates ─────────────────────────────────────────
-// Process templates declare entry/exit gates per phase; planning persists
-// them to gates/definitions/. Until now nothing evaluated them at runtime.
-// Exit gates are evaluated before the completion event fires. Rollout is
-// staged per the repo's warn→enforce rule: default mode 'warn' records and
-// notifies without blocking; KYBERION_PHASE_GATE_MODE=enforce blocks the
-// completion event and, after repeated failures, recommends realignment
-// (circuit breaker). 'off' disables evaluation entirely.
-
-export interface PersistedPhaseGateDefinition {
-  phase: string;
-  position: 'entry' | 'exit';
-  gate: MissionGateDefinition;
-}
-
-export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
-  const raw = String(getRegisteredEnvText('KYBERION_PHASE_GATE_MODE') || 'warn').toLowerCase();
-  if (raw === 'enforce') return 'enforce';
-  if (raw === 'off') return 'off';
-  return 'warn';
-}
-
-export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPhaseGateDefinition[] {
-  const defsDir = `${missionDir(missionId, 'public')}/gates/definitions`;
-  if (!safeExistsSync(defsDir)) return [];
-  return safeReaddir(defsDir)
-    .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => {
-      try {
-        const parsed = readJson<unknown>(`${defsDir}/${entry}`);
-        if (!parsed || typeof parsed !== 'object') return null;
-        const gate = (parsed as Record<string, unknown>).gate;
-        if (!gate || typeof gate !== 'object') return null;
-        return {
-          phase: String((parsed as Record<string, unknown>).phase || ''),
-          position: (parsed as Record<string, unknown>).position === 'entry' ? 'entry' : 'exit',
-          gate: gate as MissionGateDefinition,
-        } satisfies PersistedPhaseGateDefinition;
-      } catch {
-        return null;
-      }
-    })
-    .filter((entry): entry is PersistedPhaseGateDefinition => Boolean(entry));
-}
-
-// reviewer_approved template checks carry only { task_id } — the runtime
-// outcome lives in NEXT_TASKS.json. Resolve it here so the gate engine sees
-// the review verdict instead of failing on missing params.
-function enrichGateWithTaskOutcomes(
-  missionId: string,
-  gate: MissionGateDefinition
-): MissionGateDefinition {
-  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
-  let tasks: Array<Record<string, unknown>> = [];
-  try {
-    const parsed = loadJson<unknown>(nextTasksPath);
-    if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
-  } catch {
-    /* no task board — checks keep their declared params */
-  }
-  const checks = (gate.checks || []).map((check) => {
-    if (check.kind !== 'reviewer_approved') return check;
-    const params = { ...(check.params || {}) } as Record<string, unknown>;
-    if (params.approved !== undefined || params.verdict !== undefined) return check;
-    const taskId = String(params.task_id || params.taskId || '');
-    if (!taskId) return check;
-    const task = tasks.find((entry) => String(entry.task_id || '') === taskId);
-    const status = String(task?.status || '');
-    return {
-      ...check,
-      params: {
-        ...params,
-        approved: status === 'completed' || status === 'accepted',
-        reason:
-          status === ''
-            ? `Review task ${taskId} not found in NEXT_TASKS.json`
-            : `Review task ${taskId} status: ${status}`,
-      },
-    };
-  });
-  return { ...gate, checks };
-}
-
-export interface PhaseExitGateOutcome {
-  passed: boolean;
-  evaluated: number;
-  failures: Array<{ gate_id: string; phase: string; reasons: string[]; prior_failures: number }>;
-}
-
-export async function evaluateMissionPhaseExitGates(
-  missionId: string
-): Promise<PhaseExitGateOutcome> {
-  const definitions = loadMissionPhaseGateDefinitions(missionId).filter(
-    (definition) => definition.position === 'exit'
-  );
-  const priorRecords = loadMissionGateRecords(missionId);
-  const failures: PhaseExitGateOutcome['failures'] = [];
-  const driftSummary = evaluateMissionIntentDrift(missionId);
-  const hasPersistedDriftGate = definitions.some(
-    (definition) => definition.gate.id === 'INTENT_DRIFT'
-  );
-  for (const definition of definitions) {
-    const priorFailures = priorRecords.filter(
-      (record) => record.gate_id === definition.gate.id && record.verdict === 'fail'
-    ).length;
-    const evaluation =
-      definition.gate.id === 'INTENT_DRIFT' && driftSummary
-        ? {
-            verdict: driftSummary.passed ? ('pass' as const) : ('fail' as const),
-            reasons: driftSummary.passed ? [] : [driftSummary.message],
-          }
-        : await evaluateMissionGate({
-            missionId,
-            gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
-            evidenceDir: `${missionDir(missionId, 'public')}/gates`,
-          });
-    if (definition.gate.id === 'INTENT_DRIFT' && driftSummary) {
-      writeMissionGateRecord({
-        missionId,
-        gateId: 'INTENT_DRIFT',
-        evidenceDir: `${missionDir(missionId, 'public')}/gates`,
-        payload: {
-          phase: definition.phase,
-          position: 'exit',
-          source: 'phase_exit',
-          verdict: evaluation.verdict,
-          reason: driftSummary.message,
-          drift_score: driftSummary.drift_score,
-          checked_at: driftSummary.checked_at,
-        },
-      });
-    }
-    if (evaluation.verdict !== 'pass') {
-      failures.push({
-        gate_id: definition.gate.id,
-        phase: definition.phase,
-        reasons: evaluation.reasons,
-        prior_failures: priorFailures,
-      });
-    }
-  }
-  // Make INTENT_DRIFT a built-in execution gate for workflows that predate
-  // the catalog entry. Missions with no user-origin snapshot remain a clean
-  // no-op, preserving deterministic CLI-only and fixture missions.
-  if (!hasPersistedDriftGate && driftSummary && driftSummary.verdict !== 'no_history') {
-    const priorFailures = priorRecords.filter(
-      (record) => record.gate_id === 'INTENT_DRIFT' && record.verdict === 'fail'
-    ).length;
-    writeMissionGateRecord({
-      missionId,
-      gateId: 'INTENT_DRIFT',
-      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
-      payload: {
-        phase: latestSnapshot(missionId)?.stage || 'execution',
-        position: 'exit',
-        source: 'phase_exit',
-        verdict: driftSummary.passed ? 'pass' : 'fail',
-        reason: driftSummary.message,
-        drift_score: driftSummary.drift_score,
-        checked_at: driftSummary.checked_at,
-      },
-    });
-    if (!driftSummary.passed) {
-      failures.push({
-        gate_id: 'INTENT_DRIFT',
-        phase: latestSnapshot(missionId)?.stage || 'execution',
-        reasons: [driftSummary.message],
-        prior_failures: priorFailures,
-      });
-    }
-  }
-  return {
-    passed: failures.length === 0,
-    evaluated:
-      definitions.length +
-      (!hasPersistedDriftGate && driftSummary && driftSummary.verdict !== 'no_history' ? 1 : 0),
-    failures,
-  };
-}
-
 function syncPlanningArtifacts(missionId: string): void {
-  const missionPath = missionDir(missionId, 'public');
-  const planPath = `${missionPath}/PLAN.md`;
-  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
-  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
-
-  if (
-    !safeExistsSync(planPath) ||
-    !safeExistsSync(nextTasksPath) ||
-    !safeExistsSync(taskBoardPath)
-  ) {
-    return;
-  }
-
-  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
-  const gateSummary = summarizeMissionGateState(missionId);
-  const gateSection =
-    gateSummary.lines.length > 0
-      ? [
-          '',
-          '### Gate Status',
-          ...gateSummary.lines,
-          `Rework count: ${gateSummary.reworkCount}`,
-        ].join('\n')
-      : '';
-  const updatedTaskBoard = currentTaskBoard
-    .replace('## Status: Planned', '## Status: Planning Ready')
-    .replace('- [ ] Step 1: Research and Strategy', '- [x] Step 1: Research and Strategy')
-    .replace(/(?:\n### Gate Status[\s\S]*?)?$/u, gateSection);
-
-  if (updatedTaskBoard !== currentTaskBoard) {
-    writeProvisionedText({
-      missionId,
-      filePath: taskBoardPath,
-      targetPath: 'TASK_BOARD.md',
-      provisioned: provisionMissionEntry(updatedTaskBoard),
-    });
-  }
-
-  const nextTasks = loadJson<unknown>(nextTasksPath);
-  ledger.record('MISSION_PLAN_READY', {
-    mission_id: missionId,
-    role: 'planner',
-    summary_path: 'PLAN.md',
-    next_tasks_path: 'NEXT_TASKS.json',
-    planned_task_count: Array.isArray(nextTasks) ? nextTasks.length : 0,
-  });
-  emitMissionTaskEvent({
-    event_type: 'task_submitted',
-    mission_id: missionId,
-    task_id: 'planner-initial-plan',
-    agent_id: 'nerve-agent',
-    team_role: 'planner',
-    decision: 'task_submitted',
-    why: 'Planner produced PLAN.md and NEXT_TASKS.json for the mission kickoff.',
-    policy_used: 'mission_orchestration_control_plane_v1',
-    evidence: ['PLAN.md', 'NEXT_TASKS.json'],
-    payload: {
-      summary_path: 'PLAN.md',
-      next_tasks_path: 'NEXT_TASKS.json',
-    },
-  });
-  emitMissionTaskEvent({
-    event_type: 'task_completed',
-    mission_id: missionId,
-    task_id: 'planner-initial-plan',
-    agent_id: 'nerve-agent',
-    team_role: 'planner',
-    decision: 'task_completed',
-    why: 'Planner initial planning task completed with mission plan and next tasks.',
-    policy_used: 'mission_orchestration_control_plane_v1',
-    evidence: ['PLAN.md', 'NEXT_TASKS.json'],
-    payload: {
-      completion: 'planning_artifacts_ready',
-    },
-  });
+  missionProgressController.syncPlanningArtifacts(missionId);
 }
 
 export function persistPlanningPacket(missionId: string, packet: PlanningPacket): void {
-  const validation = validatePlanningPacket(packet);
-  if (!validation.valid || !validation.value) {
-    throw new Error(`Invalid planning packet for ${missionId}: ${validation.errors.join('; ')}`);
-  }
-  const missionPath = missionDir(missionId, 'public');
-  writeProvisionedText({
-    missionId,
-    filePath: `${missionPath}/PLAN.md`,
-    targetPath: 'PLAN.md',
-    provisioned: provisionMissionEntry(validation.value.plan_markdown.trimEnd() + '\n'),
-  });
-  const derivedTasks = validation.value.next_tasks.map((task, index) => {
-    const taskId =
-      typeof task.task_id === 'string' && task.task_id.trim()
-        ? task.task_id.trim()
-        : `task-${index + 1}`;
-    const description = task.description.trim();
-    const deliverable =
-      typeof task.deliverable === 'string' && task.deliverable.trim()
-        ? task.deliverable.trim()
-        : undefined;
-    const targetPath =
-      typeof task.target_path === 'string' && task.target_path.trim()
-        ? task.target_path.trim()
-        : undefined;
-    const dependencies = Array.isArray(task.dependencies)
-      ? [
-          ...new Set(
-            task.dependencies.map((dependency) => String(dependency || '').trim()).filter(Boolean)
-          ),
-        ]
-      : [];
-    const acceptanceCriteria =
-      Array.isArray(task.acceptance_criteria) && task.acceptance_criteria.length > 0
-        ? task.acceptance_criteria
-            .map((criterion) => String(criterion || '').trim())
-            .filter(Boolean)
-        : [description];
-    const expectedOutputFormat =
-      task.expected_output_format || (targetPath ? 'files' : deliverable ? 'files' : 'text');
-    const estimatedScope =
-      task.estimated_scope ||
-      (description.length > 240 || dependencies.length > 1 || targetPath?.includes('/')
-        ? 'L'
-        : description.length > 120 || deliverable || dependencies.length === 1
-          ? 'M'
-          : 'S');
-    const risk =
-      task.risk || (estimatedScope === 'L' ? 'high' : estimatedScope === 'M' ? 'medium' : 'low');
-    return {
-      task_id: taskId,
-      status: 'planned' as const,
-      assigned_to: {
-        role: task.team_role,
-      },
-      description,
-      ...(deliverable ? { deliverable } : {}),
-      ...(targetPath ? { target_path: targetPath } : {}),
-      dependencies,
-      acceptance_criteria: acceptanceCriteria,
-      risk,
-      expected_output_format: expectedOutputFormat,
-      estimated_scope: estimatedScope,
-      ...(typeof task.review_target === 'string' && task.review_target.trim()
-        ? { review_target: task.review_target.trim() }
-        : {}),
-    };
-  });
-  const nextTasks = validation.value.next_tasks.map((task, index) => ({
-    ...derivedTasks[index],
-  }));
-  // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
-  // the planner may add tasks around them but never drop or restructure them.
-  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
-  const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
-  if (seededTasks.length > 0) {
-    const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
-    const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
-    writeProvisionedJson({
-      missionId,
-      filePath: nextTasksPath,
-      targetPath: 'NEXT_TASKS.json',
-      provisioned: provisionMissionEntry([...seededTasks, ...additions]),
-    });
-    ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
-      mission_id: missionId,
-      seeded_task_count: seededTasks.length,
-      planner_addition_count: additions.length,
-      dropped_planner_task_count: nextTasks.length - additions.length,
-    });
-    return;
-  }
-  writeProvisionedJson({
-    missionId,
-    filePath: nextTasksPath,
-    targetPath: 'NEXT_TASKS.json',
-    provisioned: provisionMissionEntry(nextTasks),
-  });
+  missionProgressController.persistPlanningPacket(missionId, packet);
 }
 
 function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
-  return loadAllNextTasks(missionId).filter((task) => {
-    const status = String(task.status || 'planned');
-    return status === 'planned' || status === 'rework';
-  });
+  return missionProgressController.loadPlannedNextTasks(missionId);
 }
 
 function loadAllNextTasks(missionId: string): PlannedNextTask[] {
-  const missionPath = missionDir(missionId, 'public');
-  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
-  if (!safeExistsSync(nextTasksPath)) return [];
-  const tasks = loadJson<unknown>(nextTasksPath);
-  return validatePlannedNextTasks(tasks, missionId);
+  return missionProgressController.loadAllNextTasks(missionId);
 }
 
 function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
-  const missionPath = missionDir(missionId, 'public');
-  const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
-  const existingTasks = safeExistsSync(nextTasksPath)
-    ? validatePlannedNextTasks(loadJson<unknown>(nextTasksPath), missionId)
-    : [];
-  const existingById = new Map(existingTasks.map((task) => [task.task_id, task]));
-  const mergedTasks = tasks.map((task) => {
-    const existing = existingById.get(task.task_id);
-    if (!existing) return task;
-    const existingPriority =
-      PLANNED_NEXT_TASK_STATUS_PRIORITY[String(existing.status || 'planned')] ?? 0;
-    const incomingPriority =
-      PLANNED_NEXT_TASK_STATUS_PRIORITY[String(task.status || 'planned')] ?? 0;
-    const status = existingPriority > incomingPriority ? existing.status : task.status;
-    const rework_count = Math.max(
-      Number(existing.rework_count || 0),
-      Number(task.rework_count || 0)
-    );
-    return {
-      ...task,
-      ...(status ? { status } : {}),
-      ...(rework_count > 0 ? { rework_count } : {}),
-    };
-  });
-  writeProvisionedJson({
-    missionId,
-    filePath: nextTasksPath,
-    targetPath: 'NEXT_TASKS.json',
-    provisioned: provisionMissionEntry(mergedTasks),
-  });
+  missionProgressController.writeNextTasks(missionId, tasks);
 }
 
 function restoreMissionGraphRunTaskSnapshots(
@@ -4832,148 +4367,12 @@ function restoreMissionGraphRunTaskSnapshots(
   }
 }
 
-function readExistingTaskEventKeys(missionId: string): Set<string> {
-  const taskEventsPath = missionTaskEventsPath(missionId);
-  if (!safeExistsSync(taskEventsPath)) return new Set();
-  const raw = safeReadFile(taskEventsPath, { encoding: 'utf8' }) as string;
-  return new Set(
-    raw
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => {
-        try {
-          const parsed = JSON.parse(line) as { event_type?: string; task_id?: string };
-          return parsed.event_type && parsed.task_id
-            ? `${parsed.event_type}:${parsed.task_id}`
-            : null;
-        } catch {
-          return null;
-        }
-      })
-      .filter((value): value is string => Boolean(value))
-  );
-}
-
-function reconcileTaskOutcomeEvents(missionId: string): void {
-  const tasks = loadAllNextTasks(missionId).filter(
-    (task) => task.status && task.status !== 'planned' && task.status !== 'requested'
-  );
-  const seen = readExistingTaskEventKeys(missionId);
-
-  for (const task of tasks) {
-    const eventType = task.status ? TASK_EVENT_STATUS_MAP[task.status] : undefined;
-    const teamRole = task.assigned_to?.role;
-    if (!eventType || !teamRole) continue;
-    const dedupeKey = `${eventType}:${task.task_id}`;
-    if (seen.has(dedupeKey)) continue;
-    emitMissionTaskEvent({
-      event_type: eventType,
-      mission_id: missionId,
-      task_id: task.task_id,
-      agent_id: task.assigned_to?.agent_id,
-      team_role: teamRole,
-      decision: eventType,
-      why: `Task ${task.task_id} transitioned to ${task.status}.`,
-      policy_used: 'mission_orchestration_control_plane_v1',
-      evidence: task.deliverable ? [String(task.deliverable)] : [],
-      payload: {
-        description: task.description,
-        deliverable: task.deliverable,
-        status: task.status,
-      },
-    });
-    seen.add(dedupeKey);
-  }
-}
-
 export function reconcileMissionProgress(missionId: string): void {
-  const missionPath = missionDir(missionId, 'public');
-  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
-  if (!safeExistsSync(taskBoardPath)) return;
-
-  const tasks = loadAllNextTasks(missionId);
-  const acceptedCount = tasks.filter((task) => task.status === 'accepted').length;
-  const reviewedCount = tasks.filter((task) => task.status === 'reviewed').length;
-  const completedCount = tasks.filter((task) => task.status === 'completed').length;
-  const requestedCount = tasks.filter((task) => task.status === 'requested').length;
-
-  reconcileTaskOutcomeEvents(missionId);
-
-  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
-  const gateSummary = summarizeMissionGateState(missionId);
-  const gateSection =
-    gateSummary.lines.length > 0
-      ? [
-          '',
-          '### Gate Status',
-          ...gateSummary.lines,
-          `Rework count: ${gateSummary.reworkCount}`,
-        ].join('\n')
-      : '';
-  let updatedTaskBoard = currentTaskBoard;
-
-  if (acceptedCount > 0) {
-    updatedTaskBoard = updatedTaskBoard
-      .replace(/## Status: .+/u, '## Status: Review Accepted')
-      .replace('- [~] Step 2: Implementation', '- [x] Step 2: Implementation')
-      .replace('- [ ] Step 2: Implementation', '- [x] Step 2: Implementation')
-      .replace('- [ ] Step 3: Validation', '- [x] Step 3: Validation');
-  } else if (reviewedCount > 0 || completedCount > 0) {
-    updatedTaskBoard = updatedTaskBoard
-      .replace(/## Status: .+/u, '## Status: Validation Ready')
-      .replace('- [~] Step 2: Implementation', '- [x] Step 2: Implementation')
-      .replace('- [ ] Step 2: Implementation', '- [x] Step 2: Implementation')
-      .replace('- [ ] Step 3: Validation', '- [~] Step 3: Validation');
-  } else if (requestedCount > 0) {
-    updatedTaskBoard = updatedTaskBoard
-      .replace(/## Status: .+/u, '## Status: Execution Ready')
-      .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
-  }
-
-  if (gateSection) {
-    if (/### Gate Status[\s\S]*$/u.test(updatedTaskBoard)) {
-      updatedTaskBoard = updatedTaskBoard.replace(/(?:\n### Gate Status[\s\S]*)$/u, gateSection);
-    } else {
-      updatedTaskBoard = `${updatedTaskBoard.trimEnd()}${gateSection}\n`;
-    }
-  }
-
-  if (updatedTaskBoard !== currentTaskBoard) {
-    writeProvisionedText({
-      missionId,
-      filePath: taskBoardPath,
-      targetPath: 'TASK_BOARD.md',
-      provisioned: provisionMissionEntry(updatedTaskBoard),
-    });
-  }
-
-  if (acceptedCount > 0 || reviewedCount > 0 || completedCount > 0) {
-    ledger.record('MISSION_TASK_OUTCOMES_RECONCILED', {
-      mission_id: missionId,
-      accepted_count: acceptedCount,
-      reviewed_count: reviewedCount,
-      completed_count: completedCount,
-      requested_count: requestedCount,
-    });
-  }
+  missionProgressController.reconcileMissionProgress(missionId);
 }
 
 function markTaskBoardInProgress(missionId: string): void {
-  const missionPath = missionDir(missionId, 'public');
-  const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
-  if (!safeExistsSync(taskBoardPath)) return;
-  const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
-  const updatedTaskBoard = currentTaskBoard
-    .replace('## Status: Planning Ready', '## Status: Execution Ready')
-    .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
-  if (updatedTaskBoard !== currentTaskBoard) {
-    writeProvisionedText({
-      missionId,
-      filePath: taskBoardPath,
-      targetPath: 'TASK_BOARD.md',
-      provisioned: provisionMissionEntry(updatedTaskBoard),
-    });
-  }
+  missionProgressController.markTaskBoardInProgress(missionId);
 }
 
 async function dispatchMissionNextTasksCore(
@@ -6007,13 +5406,7 @@ function summarizeMissionTaskOutcomes(missionId: string): {
   completedCount: number;
   requestedCount: number;
 } {
-  const tasks = loadAllNextTasks(missionId);
-  return {
-    acceptedCount: tasks.filter((task) => task.status === 'accepted').length,
-    reviewedCount: tasks.filter((task) => task.status === 'reviewed').length,
-    completedCount: tasks.filter((task) => task.status === 'completed').length,
-    requestedCount: tasks.filter((task) => task.status === 'requested').length,
-  };
+  return missionProgressController.summarizeMissionTaskOutcomes(missionId);
 }
 
 async function handleMissionIssueRequested(event: MissionOrchestrationEvent<SlackPayload>) {
