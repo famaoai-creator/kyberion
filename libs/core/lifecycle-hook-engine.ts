@@ -18,9 +18,10 @@
  */
 
 import { logger } from './core.js';
+import { readJson } from './foundation/json.js';
 import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExecResult, safeExistsSync } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import {
   createApprovalRequest,
@@ -466,7 +467,7 @@ export function loadLifecycleHookEngine(
   if (!safeExistsSync(configPath)) return engine;
   let config: LifecycleHookConfigFile;
   try {
-    config = JSON.parse(String(safeReadFile(configPath, { encoding: 'utf-8' })));
+    config = readJson<LifecycleHookConfigFile>(configPath);
   } catch (err) {
     logger.warn(
       `[lifecycle-hooks] unreadable config ${configPath}: ${err instanceof Error ? err.message : String(err)}`

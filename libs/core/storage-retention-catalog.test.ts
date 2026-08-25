@@ -9,6 +9,7 @@ import AjvModule from 'ajv';
 vi.mock('./secure-io.js', () => ({
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeReadFile: (p: string, _opts: any) => fs.readFileSync(p, 'utf8'),
+  loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
 }));
 
 vi.mock('./core.js', () => ({
