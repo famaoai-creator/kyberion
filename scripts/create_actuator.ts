@@ -161,7 +161,7 @@ export async function main(): Promise<void> {
 if (process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('index.ts')) {
   main().catch((err: unknown) => {
     logger.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 `;
