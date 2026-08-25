@@ -61,5 +61,5 @@ if (
 )
   void main().catch((err) => {
     console.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });

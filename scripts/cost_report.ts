@@ -67,4 +67,4 @@ if (
   isDirectScript(import.meta.url, 'cost_report.ts') ||
   isDirectScript(import.meta.url, 'cost_report.js')
 )
-  process.exit(main());
+  process.exitCode = main();

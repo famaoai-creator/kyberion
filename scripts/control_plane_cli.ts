@@ -1218,5 +1218,5 @@ main().catch((error) => {
   if (error instanceof ControlPlaneClientError && error.suggestedCommand) {
     process.stderr.write(`Suggested fix: ${error.suggestedCommand}\n`);
   }
-  process.exit(1);
+  process.exitCode = 1;
 });

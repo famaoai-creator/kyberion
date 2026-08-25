@@ -30,9 +30,10 @@ async function main(): Promise<void> {
   const outputDir = path.resolve(String(argv.output));
   safeMkdir(outputDir, { recursive: true });
 
-  const intents = (Array.isArray(argv.intent) && argv.intent.length > 0
-    ? argv.intent.map(String)
-    : DEFAULT_INTENTS);
+  const intents =
+    Array.isArray(argv.intent) && argv.intent.length > 0
+      ? argv.intent.map(String)
+      : DEFAULT_INTENTS;
 
   const report: Array<{
     intent: string;
@@ -85,14 +86,19 @@ async function main(): Promise<void> {
   }
 
   const summaryPath = path.join(outputDir, 'summary.json');
-  safeWriteFile(summaryPath, JSON.stringify({
-    generated_at: new Date().toISOString(),
-    intents: report,
-  }, null, 2));
+  safeWriteFile(
+    summaryPath,
+    JSON.stringify(
+      {
+        generated_at: new Date().toISOString(),
+        intents: report,
+      },
+      null,
+      2
+    )
+  );
 
-  const summaryText = safeExistsSync(summaryPath)
-    ? readTextFile(summaryPath)
-    : '';
+  const summaryText = safeExistsSync(summaryPath) ? readTextFile(summaryPath) : '';
   console.log(summaryText);
 
   if (failed > 0) {
@@ -102,5 +108,5 @@ async function main(): Promise<void> {
 
 main().catch((error: any) => {
   logger.error(error?.message || String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

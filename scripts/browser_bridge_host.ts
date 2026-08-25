@@ -977,4 +977,4 @@ process.stdin.on('end', () => {
   inputEnded = true;
   exitWhenDrained();
 });
-process.stdin.on('error', () => process.exit(1));
+process.stdin.on('error', () => (process.exitCode = 1));
