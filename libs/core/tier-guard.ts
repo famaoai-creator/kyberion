@@ -28,8 +28,14 @@ export const TIERS: TierWeightMap = {
   public: 1,
 };
 
-const PROJECT_ROOT = pathResolver.rootDir();
 const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
+
+// Resolve lazily because foundation/env -> foundation/json -> secure-io imports
+// tier-guard during module bootstrap. A top-level root lookup is otherwise
+// observable before this module's lexical bindings have finished initializing.
+function projectRoot(): string {
+  return pathResolver.rootDir();
+}
 
 function normalizePath(p: string): string {
   // Policy paths use POSIX separators even when Kyberion runs on Windows.
@@ -536,7 +542,7 @@ function recordGroupAccess(input: {
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
+  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
   const currentMission = process.env.MISSION_ID;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -642,7 +648,7 @@ export function detectTier(filePath: string): TierLevel {
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
+  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
 
   if (isOutsideProjectRoot(relativePath)) {
     return {

@@ -29,6 +29,10 @@ vi.mock('./secure-io.js', () => ({
     return files.get(p)!;
   },
   loadJson: <T>(p: string) => JSON.parse(files.get(p) || '{}') as T,
+  loadJsonIfPresent: <T>(p: string) => {
+    const value = files.get(p);
+    return value === undefined ? null : (JSON.parse(value) as T);
+  },
   safeWriteFile: (p: string, data: string) => {
     files.set(p, data);
   },
