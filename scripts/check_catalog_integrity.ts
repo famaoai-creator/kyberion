@@ -691,7 +691,7 @@ export const runCheckCatalogIntegrity = defineScript({
     const indexUpToDate = generateIndex(true);
     if (!indexUpToDate) {
       violations.push(
-        'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+        'knowledge: _index.md or _integrity-manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
       );
     }
 

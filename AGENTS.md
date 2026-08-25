@@ -61,17 +61,17 @@ The work loop is: **capture intent → agree on the goal before changing anythin
 
 ## 4. References
 
-| Document                                                                                                       | Content                      |
-| -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| [docs/INITIALIZATION.md](./docs/INITIALIZATION.md)                                                             | First-time setup walkthrough |
-| [docs/GLOSSARY.md](./docs/GLOSSARY.md)                                                                         | Key terms                    |
-| [docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)                                                               | Directory structure          |
-| [docs/QUICKSTART.md](./docs/QUICKSTART.md)                                                                     | Quick start                  |
-| [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)                                                               | Actuator catalog             |
-| [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md)                                                       | Daily operations             |
-| [pipelines/README.md](./pipelines/README.md)                                                                   | Pipeline catalog             |
-| [phases/](./knowledge/product/governance/phases/)                                                              | Per-phase runbooks           |
-| [architecture/agent-mission-control-model.md](./knowledge/product/architecture/agent-mission-control-model.md) | Mission control model        |
-| [docs/SURFACES.md](./docs/SURFACES.md)                                                                         | Surface / entry-point map    |
-| [architecture/multi-tenant-operations.md](./knowledge/product/architecture/multi-tenant-operations.md)         | Multi-tenant isolation model |
-| [improvement-plans-2026-07/STATUS.ja.md](./docs/developer/improvement-plans-2026-07/STATUS.ja.md)              | Implementation status ledger |
+| Document                                                                                                       | Content                             |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [docs/INITIALIZATION.md](./docs/INITIALIZATION.md)                                                             | First-time setup walkthrough        |
+| [docs/GLOSSARY.md](./docs/GLOSSARY.md)                                                                         | Key terms                           |
+| [docs/COMPONENT_MAP.md](./docs/COMPONENT_MAP.md)                                                               | Directory structure                 |
+| [docs/QUICKSTART.md](./docs/QUICKSTART.md)                                                                     | Quick start                         |
+| [CAPABILITIES_GUIDE.md](./CAPABILITIES_GUIDE.md)                                                               | Actuator catalog                    |
+| [docs/OPERATOR_UX_GUIDE.md](./docs/OPERATOR_UX_GUIDE.md)                                                       | Daily operations                    |
+| [pipelines/README.md](./pipelines/README.md)                                                                   | Pipeline catalog                    |
+| [phases/](./knowledge/product/governance/phases/)                                                              | Per-phase runbooks                  |
+| [architecture/agent-mission-control-model.md](./knowledge/product/architecture/agent-mission-control-model.md) | Mission control model               |
+| [docs/SURFACES.md](./docs/SURFACES.md)                                                                         | Surface / entry-point map           |
+| [architecture/multi-tenant-operations.md](./knowledge/product/architecture/multi-tenant-operations.md)         | Multi-tenant isolation model        |
+| [improvement-plans-2026-08/README.ja.md](./docs/developer/improvement-plans-2026-08/README.ja.md)              | Current implementation-status index |

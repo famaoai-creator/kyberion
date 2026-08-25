@@ -4,7 +4,7 @@
 > **根拠**: リポジトリ全体調査(libs/core・libs/actuators・satellites/presence・scripts/pipelines・テスト/CI・docs の6領域を並列調査)
 > **位置づけ**: [PRODUCTIZATION_ROADMAP](../../PRODUCTIZATION_ROADMAP.md) Phase B(30日連続運用に耐える)/ Phase C'(貢献容易性)に寄与する下位計画。
 > **登録**: [docs/ROADMAP.md](../../ROADMAP.md) §1 に登録済み。
-> **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 全計画をコード実態と突合して監査)。各計画文書内の記述と矛盾する場合は STATUS を正とする。
+> **履歴台帳**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 までの計画をコード実態と突合した凍結記録)。現在の実装状況は [2026-08 の状態索引](../improvement-plans-2026-08/README.ja.md) と各計画文書を参照する。
 > **最新の横断レビュー**: [REVIEW_CODEX_2026-07-11.ja.md](./REVIEW_CODEX_2026-07-11.ja.md)(UX・拡張性・セキュリティ・運用の再監査と優先バックログ)。
 > **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
 > **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。

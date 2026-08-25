@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_version": 1,
+  "purpose": "Explicitly records content-first knowledge that predates the task-card frontmatter contract. These paths remain searchable through scoped knowledge-slices but are not treated as metadata-bearing knowledge cards.",
+  "last_reviewed": "2026-08-25",
+  "excluded_paths": [
+    "_index.md",
+    "README.md",
+    "public/**",
+    "product/architecture/**",
+    "product/orchestration/**",
+    "product/schemas/README-*.md",
+    "product/governance/**",
+    "product/roles/**",
+    "product/classifiers/README.md",
+    "product/config-missions/README.md",
+    "product/prompts/README.md",
+    "product/pipeline-templates/README.md",
+    "product/scaffolds/**",
+    "product/sales/contract-templates/basic-service-agreement.md",
+    "product/evolution/reconstruction-learnings-2026-03-07.md",
+    "personal/**"
+  ]
+}

@@ -5,13 +5,13 @@
 ## 背景と課題
 
 - **テスト汚染が実ナレッジの1.5倍**: `knowledge/personal/missions/` に **`MSN-TEST-LIFE-*` テストミッション 50 ディレクトリ = 1,387 ファイル**が混入し、その中に **ネストした `.git` リポジトリが 33 個**ある。実ナレッジは約 877 `.md` なのに、生カウントは 3,350 に膨張。`context_ranker.scanKnowledgeFiles` は `knowledge/` 全域を走査するため、ランキングコーパスがジャンクで汚染され、走査時間も無駄になっている。ロードマップの G-DC-1「開発者が1時間で構造を理解できる」の直接の阻害要因。
-- **SSoT インデックスが手書きでドリフト**: `knowledge/_index.md`(691行)と `knowledge/_manifest.json`(747行)を生成するスクリプトが存在せず、手動メンテ。ファイルの増減に追随できていない(DOC_INVENTORY と同型の陳腐化)。
+- **SSoT インデックスが手書きでドリフト**: `knowledge/_index.md`(691行)と `knowledge/_integrity-manifest.json`(747行)を生成するスクリプトが存在せず、手動メンテ。ファイルの増減に追随できていない(DOC_INVENTORY と同型の陳腐化)。
 - ネストした `.git` は走査ツール・secure-io・バックアップの異常動作リスクでもある。
 
 ## ゴール(受入条件)
 
 1. `knowledge/` 配下からテスト成果物が一掃され、テストは専用の fixture 領域(`tests/fixtures/` またはテスト実行時の一時領域)に書くようになる。再発を防ぐガードが入る。
-2. `_index.md` / `_manifest.json` が生成スクリプトで再生成され、CI でドリフト検出される。
+2. `_index.md` / `_integrity-manifest.json` が生成スクリプトで再生成され、CI でドリフト検出される。
 3. `knowledge/` の実ファイル数が把握可能になり、ランキングコーパスから汚染が消える。
 
 ## 実装タスク
@@ -29,7 +29,7 @@
 
 ### Task 3: インデックス生成の自動化 — `claude-sonnet-4`
 
-1. `scripts/generate_knowledge_index.ts` を新設: `knowledge/` を走査(tier 別)し、frontmatter(title/tags/importance)から `_index.md` と `_manifest.json` を生成する。**現行の手書きフォーマットを読み、同じ構造で出力する**(読み手の互換維持)。confidential tier はタイトルのみ・内容非転記(tier 隔離)。
+1. `scripts/generate_knowledge_index.ts` を新設: `knowledge/` を走査(tier 別)し、frontmatter(title/tags/importance)から `_index.md` と `_integrity-manifest.json` を生成する。**現行の手書きフォーマットを読み、同じ構造で出力する**(読み手の互換維持)。confidential tier はタイトルのみ・内容非転記(tier 隔離)。
 2. 生成結果と現行ファイルの diff を確認し、手書き時代の有用な注記(生成できない説明文)があれば frontmatter か固定ヘッダとして残す。
 3. `check:catalogs` 系に「生成結果とコミット済みインデックスの一致」検査を追加。`.husky` の knowledge 同期フック(既存の echo)をこのスクリプト実行に置き換えるかは IP-03 Task 4 と調整する。
 
@@ -37,7 +37,7 @@
 
 - **完了済み(Task 1 & 2)**: `MSN-TEST-LIFE-*` ディレクトリを生成していたテスト(`tests/a2a-lifecycle.test.ts`)を、`KYBERION_KNOWLEDGE_ROOT` 環境変数を用いて `active/shared/tmp/test-knowledge` へ出力するように修正した。`knowledge/personal/missions/` 配下に蓄積されていた `MSN-TEST-LIFE-*` 228件（およびネストされた `.git`）を一掃した。
 - **完了済み(Task 2)**: `scripts/check_tier_hygiene.ts` のディレクトリ走査ロジックに拡張を加え、`knowledge/` 配下にネストされた `.git` ディレクトリおよび `MSN-TEST-*` ディレクトリが存在した場合に `check:tier-hygiene` が違反として失敗するようガードを追加した。
-- **完了済み(Task 3)**: `scripts/generate_knowledge_index.ts` を新設し、Tierごとに `knowledge/` 内のマークダウンを走査して `_manifest.json` と `_index.md` を自動生成する機構を実装した。`scripts/check_catalog_integrity.ts` に `--check` モードでのインデックス最新性検査を組み込み、CI（`validate` チェーン）でドリフトを検知可能とした。**tier 不変条件のため `personal/` と `confidential/` は索引対象から除外**（ルートの索引は public 扱いであり、上位 tier のパス・タイトルを載せない。AGENTS.md §1）。走査・書き込みは secure-io 経由で、`withExecutionContext('mission_controller') + KYBERION_SUDO` により昇格して実行する（`pnpm generate:knowledge-index`）。
+- **完了済み(Task 3)**: `scripts/generate_knowledge_index.ts` を新設し、Tierごとに `knowledge/` 内のマークダウンを走査して `_integrity-manifest.json` と `_index.md` を自動生成する機構を実装した。`scripts/check_catalog_integrity.ts` に `--check` モードでのインデックス最新性検査を組み込み、CI（`validate` チェーン）でドリフトを検知可能とした。**tier 不変条件のため `personal/` と `confidential/` は索引対象から除外**（ルートの索引は public 扱いであり、上位 tier のパス・タイトルを載せない。AGENTS.md §1）。走査・書き込みは secure-io 経由で、`withExecutionContext('mission_controller') + KYBERION_SUDO` により昇格して実行する（`pnpm generate:knowledge-index`）。
 
 ## リスクと注意
 
