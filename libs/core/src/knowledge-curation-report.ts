@@ -25,6 +25,7 @@
  */
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -173,7 +174,7 @@ function readArchiveHistory(tenantSlug?: string): ArchiveHistoryEntry[] {
   const filePath = archiveHistoryPath(tenantSlug);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+    const parsed = readJson<unknown>(filePath);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (entry): entry is ArchiveHistoryEntry =>
@@ -319,8 +320,7 @@ export function loadCurationSloConfig(): CurationSloConfig {
   const filePath = sloConfigPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_SLO_CONFIG };
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as Partial<CurationSloConfig>;
+    const parsed = readJson<Partial<CurationSloConfig>>(filePath);
     const freshnessByKind: Record<string, number> = {};
     if (parsed.freshness_days_by_kind && typeof parsed.freshness_days_by_kind === 'object') {
       for (const [kind, days] of Object.entries(parsed.freshness_days_by_kind)) {
@@ -353,8 +353,7 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
   const filePath = taxonomyPath();
   if (!safeExistsSync(filePath)) return [];
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { directory_defaults?: TaxonomyDirectoryDefault[] };
+    const parsed = readJson<{ directory_defaults?: TaxonomyDirectoryDefault[] }>(filePath);
     return Array.isArray(parsed.directory_defaults) ? parsed.directory_defaults : [];
   } catch {
     return [];

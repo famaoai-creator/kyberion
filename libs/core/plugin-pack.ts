@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -123,7 +123,7 @@ export function loadPluginPackRegistry(override?: string): PluginPackRegistry {
   const file = registryPath(override);
   if (!safeExistsSync(file)) return { version: '1', packs: [] };
   try {
-    const parsed = JSON.parse(String(safeReadFile(file, { encoding: 'utf8' })));
+    const parsed = readJson<Partial<PluginPackRegistry>>(file);
     if (parsed && parsed.version === '1' && Array.isArray(parsed.packs)) {
       return parsed as PluginPackRegistry;
     }
@@ -253,10 +253,7 @@ function manifestPluginId(dir: string): string | undefined {
     const manifestPath = path.join(dir, name);
     if (!safeExistsSync(manifestPath)) continue;
     try {
-      const parsed = JSON.parse(String(safeReadFile(manifestPath, { encoding: 'utf8' }))) as Record<
-        string,
-        unknown
-      >;
+      const parsed = readJson<Record<string, unknown>>(manifestPath);
       const candidate =
         typeof parsed.plugin_id === 'string'
           ? parsed.plugin_id.trim()

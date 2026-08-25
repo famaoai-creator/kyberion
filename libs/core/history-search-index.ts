@@ -10,6 +10,7 @@ import {
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -540,10 +541,7 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
   }
   let state: Record<string, unknown>;
   try {
-    state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-      string,
-      unknown
-    >;
+    state = readJson<Record<string, unknown>>(statePath);
   } catch {
     throw new Error(`[POLICY_VIOLATION] Mission state is unreadable: ${missionId}`);
   }
@@ -588,10 +586,7 @@ function matchesMission(raw: unknown, missionId: string): boolean {
 function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryIndexEntry[] {
   const entries: HistoryIndexEntry[] = [];
   const statePath = path.join(scope.missionPath, 'mission-state.json');
-  const state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-    string,
-    unknown
-  >;
+  const state = readJson<Record<string, unknown>>(statePath);
   const history = Array.isArray(state.history) ? state.history : [];
   history.forEach((raw, index) => {
     const item = raw as Record<string, unknown>;
@@ -818,10 +813,7 @@ function collectPublicMissionEntries(): HistoryIndexEntry[] {
     if (!safeExistsSync(statePath)) continue;
     let state: Record<string, unknown>;
     try {
-      state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-        string,
-        unknown
-      >;
+      state = readJson<Record<string, unknown>>(statePath);
     } catch {
       continue;
     }

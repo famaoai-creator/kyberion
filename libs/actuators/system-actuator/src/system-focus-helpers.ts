@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { safeReadFile, safeWriteFile, safeMkdir, safeExistsSync, pathResolver } from '@agent/core';
+import { safeWriteFile, safeMkdir, safeExistsSync, pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { activateApplication, detectFocusedInput } from '@agent/core/os-automation';
 
@@ -17,7 +18,7 @@ function loadFocusTargetStore(): Record<string, any> {
     return {};
   }
   try {
-    return JSON.parse(String(safeReadFile(FOCUS_TARGET_STORE_PATH, { encoding: 'utf8' }) || '{}'));
+    return readJson<Record<string, any>>(FOCUS_TARGET_STORE_PATH);
   } catch {
     return {};
   }
@@ -52,7 +53,11 @@ function loadRememberedFocusTarget(targetId?: string) {
   return store[targetId] || null;
 }
 
-function windowTitleMatches(expected: string, actual: string, matchPolicy: 'strict' | 'prefix' | 'contains') {
+function windowTitleMatches(
+  expected: string,
+  actual: string,
+  matchPolicy: 'strict' | 'prefix' | 'contains'
+) {
   switch (matchPolicy) {
     case 'prefix':
       return actual.startsWith(expected);
@@ -75,7 +80,7 @@ function getFocusedTargetMismatches(
     windowTitle?: string;
     role?: string;
   },
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   if (!rememberedTarget) {
     return [];
@@ -83,10 +88,17 @@ function getFocusedTargetMismatches(
 
   const mismatches: string[] = [];
   if (rememberedTarget.application && focusedInput.application !== rememberedTarget.application) {
-    mismatches.push(`application expected "${rememberedTarget.application}" got "${focusedInput.application || ''}"`);
+    mismatches.push(
+      `application expected "${rememberedTarget.application}" got "${focusedInput.application || ''}"`
+    );
   }
-  if (rememberedTarget.windowTitle && !windowTitleMatches(rememberedTarget.windowTitle, focusedInput.windowTitle || '', matchPolicy)) {
-    mismatches.push(`windowTitle expected "${rememberedTarget.windowTitle}" got "${focusedInput.windowTitle || ''}"`);
+  if (
+    rememberedTarget.windowTitle &&
+    !windowTitleMatches(rememberedTarget.windowTitle, focusedInput.windowTitle || '', matchPolicy)
+  ) {
+    mismatches.push(
+      `windowTitle expected "${rememberedTarget.windowTitle}" got "${focusedInput.windowTitle || ''}"`
+    );
   }
   if (rememberedTarget.role && focusedInput.role && focusedInput.role !== rememberedTarget.role) {
     mismatches.push(`role expected "${rememberedTarget.role}" got "${focusedInput.role}"`);
@@ -106,7 +118,7 @@ function assertFocusedTargetMatches(
     role?: string;
   },
   targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   if (!rememberedTarget || !targetId) {
     return;
@@ -126,7 +138,7 @@ function detectFocusedInputWithGuard(
     role?: string;
   } | null,
   targetId?: string,
-  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict',
+  matchPolicy: 'strict' | 'prefix' | 'contains' = 'strict'
 ) {
   let focusedInput = detectFocusedInput();
   const initialMismatch = getFocusedTargetMismatches(rememberedTarget, focusedInput, matchPolicy);

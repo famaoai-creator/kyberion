@@ -1000,6 +1000,14 @@ vi.mock('@agent/core', () => ({
   pathResolver,
 }));
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: loadJson,
+  };
+});
+
 vi.mock('@agent/core/os-automation', () => ({
   activateApplication,
   detectFocusedInput,

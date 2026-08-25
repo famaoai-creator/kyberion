@@ -1,4 +1,4 @@
-import { appendJsonLine } from '../foundation/json.js';
+import { appendJsonLine, readJson } from '../foundation/json.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
  * aggregation — the return half of the loop KP-01 opened up.
@@ -145,10 +145,10 @@ function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {
   const filePath = feedbackPolicyPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP };
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as {
+    const parsed = readJson<{
       defaults?: Partial<KnowledgeFeedbackCap>;
       tenant_overrides?: Record<string, Partial<KnowledgeFeedbackCap>>;
-    };
+    }>(filePath);
     const override = scope?.tenant_slug ? parsed.tenant_overrides?.[scope.tenant_slug] : undefined;
     const values = {
       ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP,

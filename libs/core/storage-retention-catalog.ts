@@ -22,8 +22,9 @@
  */
 
 import * as nodePath from 'node:path';
+import { readJson } from './foundation/json.js';
 import { rootDir } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import { logger } from './core.js';
 
 export const RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
@@ -230,7 +231,7 @@ export function loadRetentionCatalog(
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(catalogPath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(catalogPath);
   } catch (err) {
     return fallback(
       `retention catalog corrupt at ${catalogPath}: ${err instanceof Error ? err.message : String(err)}`
