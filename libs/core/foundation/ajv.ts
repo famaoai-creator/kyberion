@@ -2,7 +2,11 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readJson } from './json.js';
+import { safeReadFile } from '../secure-io.js';
+
+function readSchema<T>(schemaPath: string): T {
+  return JSON.parse(String(safeReadFile(schemaPath, { encoding: 'utf8' }) || '')) as T;
+}
 
 type AjvLike = {
   addSchema(schema: object, id: string): void;
@@ -48,11 +52,11 @@ function registerSchema(
 ): Record<string, unknown> {
   const normalized = path.resolve(schemaPath);
   if (visited.has(normalized)) {
-    return readJson<Record<string, unknown>>(normalized);
+    return readSchema<Record<string, unknown>>(normalized);
   }
   visited.add(normalized);
 
-  const schema = readJson<Record<string, unknown>>(normalized);
+  const schema = readSchema<Record<string, unknown>>(normalized);
   const refs = new Set<string>();
   collectExternalRefs(schema, refs);
   for (const ref of refs) {

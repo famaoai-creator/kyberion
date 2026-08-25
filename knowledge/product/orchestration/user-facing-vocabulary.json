@@ -5629,27 +5629,27 @@
       "dock.intent_resolution.title": {
         "en": "Request understanding",
         "ja": "依頼の整理",
-        "qps-ploc": "⟦Řėɋůėşŧ ůñḓėřşŧȧñḓïñɠ ŀőřė⟧"
+        "qps-ploc": "⟦Řėɋůėşŧ ůñḓėřşŧȧñḓïñɠ ŀőřėɱ ⟧"
       },
       "dock.intent_resolution.understood": {
         "en": "What I understood",
         "ja": "理解した内容",
-        "qps-ploc": "⟦Ẇħȧŧ Ï ůñḓėřşŧőőḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ẇħȧŧ Ï ůñḓėřşŧőőḓ ŀőřėɱ⟧"
       },
       "dock.intent_resolution.missing": {
         "en": "Missing information",
         "ja": "不足している情報",
-        "qps-ploc": "⟦Ɱïşşïñɠ ïñƒőřɱȧŧïőñ ŀőřė⟧"
+        "qps-ploc": "⟦Ɱïşşïñɠ ïñƒőřɱȧŧïőñ ŀőřėɱ ⟧"
       },
       "dock.intent_resolution.none": {
         "en": "Nothing else is needed",
         "ja": "追加確認はありません",
-        "qps-ploc": "⟦Ñőŧħïñɠ ėŀşė ïş ñėėḓėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ñőŧħïñɠ ėŀşė ïş ñėėḓėḓ ŀőřėɱ ï⟧"
       },
       "dock.intent_resolution.next": {
         "en": "Next step",
         "ja": "次の一手",
-        "qps-ploc": "⟦Ñėẋŧ şŧėṗ ŀőřė⟧"
+        "qps-ploc": "⟦Ñėẋŧ şŧėṗ ŀőř⟧"
       },
       "dock.intent_resolution.outcome": {
         "en": "Expected result",
@@ -5659,22 +5659,22 @@
       "dock.intent_resolution.authority_autonomous": {
         "en": "Can proceed",
         "ja": "そのまま進められます",
-        "qps-ploc": "⟦Ƈȧñ ṗřőƈėėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ƈȧñ ṗřőƈėėḓ ŀőř⟧"
       },
       "dock.intent_resolution.authority_approval": {
         "en": "Approval required",
         "ja": "承認が必要です",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůïřėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ řėɋůïřėḓ ŀőřėɱ⟧"
       },
       "dock.intent_resolution.authority_clarification": {
         "en": "Your input is needed",
         "ja": "確認が必要です",
-        "qps-ploc": "⟦Ẏőůř ïñṗůŧ ïş ñėėḓėḓ ŀőřė⟧"
+        "qps-ploc": "⟦Ẏőůř ïñṗůŧ ïş ñėėḓėḓ ŀőřėɱ ⟧"
       },
       "dock.intent_resolution.waiting_approval": {
         "en": "Waiting for your approval; nothing has been executed.",
         "ja": "承認待ちです。まだ実行していません。",
-        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ȧṗṗřőṽȧŀ; ñőŧħïñɠ ħȧş ƀėėñ ėẋėƈůŧėḓ.⟧"
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ȧṗṗřőṽȧŀ; ñőŧħïñɠ ħȧş ƀėėñ ėẋėƈůŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "dock.confirm_proceed": {
         "en": "Yes, please proceed.",
