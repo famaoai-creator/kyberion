@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { clearScopeEnv, resolveScopeResolution, writeScopeEnv } from '@agent/core';
 import type { ScopeContextInput } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function value(args: string[], flag: string): string | undefined {
   const index = args.indexOf(flag);
@@ -19,41 +20,46 @@ function inputFromArgs(args: string[]): ScopeContextInput {
   };
 }
 
-function usage(): never {
-  console.error(
-    'Usage: pnpm scope show [--json] | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope clear'
-  );
-  process.exit(1);
-}
-
-const args = process.argv.slice(2);
-const command = args[0] || 'show';
-try {
-  if (command === 'clear') {
-    clearScopeEnv();
-    console.log('Cleared persisted scope.');
-  } else if (command === 'use') {
-    const resolution = resolveScopeResolution(inputFromArgs(args.slice(1)));
-    const errors =
-      resolution.scope.tier === 'confidential' && !resolution.scope.tenant_slug
-        ? ['tenant_slug is required for a confidential scope']
-        : [];
-    if (errors.length) throw new Error(`[SCOPE_CONTEXT_INVALID] ${errors.join('; ')}`);
-    const filePath = writeScopeEnv(resolution.scope);
-    console.log(JSON.stringify({ ...resolution, persisted_path: filePath }, null, 2));
-  } else if (command === 'show') {
-    const resolution = resolveScopeResolution();
-    if (args.includes('--json')) console.log(JSON.stringify(resolution, null, 2));
-    else {
-      console.log(`tier=${resolution.scope.tier}`);
-      console.log(`tenant=${resolution.scope.tenant_slug || '(shared)'}`);
-      console.log(`organization=${resolution.scope.organization_id || '(none)'}`);
-      console.log(`project=${resolution.scope.project_id || '(none)'}`);
-      console.log(`roots=${resolution.knowledge_roots.join(',')}`);
-      console.log(`provenance=${JSON.stringify(resolution.provenance)}`);
+export const main = defineScript({
+  name: 'scope',
+  flags: ['json'],
+  run(context) {
+    const args = context.positional;
+    const command = args[0] || 'show';
+    if (command === 'clear') {
+      clearScopeEnv();
+      context.print('Cleared persisted scope.');
+      return;
     }
-  } else usage();
-} catch (error) {
-  console.error(String(error instanceof Error ? error.message : error));
-  process.exit(1);
+    if (command === 'use') {
+      const resolution = resolveScopeResolution(inputFromArgs(args.slice(1)));
+      if (resolution.scope.tier === 'confidential' && !resolution.scope.tenant_slug) {
+        throw new Error('[SCOPE_CONTEXT_INVALID] tenant_slug is required for a confidential scope');
+      }
+      const filePath = writeScopeEnv(resolution.scope);
+      context.print({ ...resolution, persisted_path: filePath });
+      return;
+    }
+    if (command === 'show') {
+      const resolution = resolveScopeResolution();
+      if (context.json) {
+        context.print(resolution);
+      } else {
+        context.print(`tier=${resolution.scope.tier}`);
+        context.print(`tenant=${resolution.scope.tenant_slug || '(shared)'}`);
+        context.print(`organization=${resolution.scope.organization_id || '(none)'}`);
+        context.print(`project=${resolution.scope.project_id || '(none)'}`);
+        context.print(`roots=${resolution.knowledge_roots.join(',')}`);
+        context.print(`provenance=${JSON.stringify(resolution.provenance)}`);
+      }
+      return;
+    }
+    throw new Error(
+      'Usage: pnpm scope show [--json] | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope clear'
+    );
+  },
+});
+
+if (isDirectScript(import.meta.url, 'scope.ts') || isDirectScript(import.meta.url, 'scope.js')) {
+  void main();
 }
