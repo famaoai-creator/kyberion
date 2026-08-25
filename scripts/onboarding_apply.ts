@@ -1,8 +1,6 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
 import {
   compileSchemaFromPath,
   loadJson,
@@ -33,6 +31,7 @@ import {
   persistPersona,
   readPersistedPersona,
 } from './reasoning_backend_selection.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
@@ -400,8 +399,8 @@ export function buildApplySummary(
   return lines.join('\n');
 }
 
-export async function main() {
-  const argv = await yargs(hideBin(process.argv))
+export async function main(argv: string[] = []) {
+  const parsed = await yargs(argv)
     .option('identity', {
       type: 'string',
       describe: 'Path to identity JSON (or pipe JSON via stdin)',
@@ -418,10 +417,10 @@ export async function main() {
   process.env.MISSION_ROLE = 'sovereign_concierge';
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 
-  const input = await readInput(argv.identity as string | undefined);
+  const input = await readInput(parsed.identity as string | undefined);
   validateInput(input);
 
-  if (argv['dry-run']) {
+  if (parsed['dry-run']) {
     console.log(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
     return;
   }
@@ -480,7 +479,7 @@ export async function main() {
     summary_path: summaryPath(),
     runbook_skill_path: runbookSkill.skillPath,
   };
-  if (argv.json) {
+  if (parsed.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
@@ -492,11 +491,23 @@ export async function main() {
   );
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+export const runOnboardingApply = defineScript({
+  name: 'onboarding:apply',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      return await main(argv);
+    } catch (error) {
+      throw new ScriptExitError(
+        1,
+        `onboarding_apply failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
 
-if (isMainModule) {
-  main().catch((err) => {
-    console.error('onboarding_apply failed:', err.message || err);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'onboarding_apply.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_apply.js')
+)
+  void runOnboardingApply();
