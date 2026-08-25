@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type ProcessDefinitionKind =
   'mission_workflow_catalog' | 'scenario_pack' | 'playbook_directory' | 'phase_directory';
@@ -44,16 +45,14 @@ export interface ProcessDefinitionRegistryAudit {
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/process-definition-registry.json');
 
-function readJson(path: string): Record<string, unknown> {
-  return loadJson<Record<string, unknown>>(path);
-}
+const registryCatalog = defineCatalog<ProcessDefinitionRegistry>({
+  id: 'process-definition-registry',
+  path: REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/process-definition-registry.schema.json'),
+});
 
 export function loadProcessDefinitionRegistry(): ProcessDefinitionRegistry {
-  const parsed = readJson(REGISTRY_PATH) as unknown as ProcessDefinitionRegistry;
-  if (!parsed || typeof parsed.version !== 'string' || !Array.isArray(parsed.sources)) {
-    throw new Error('Invalid process-definition-registry: version and sources are required');
-  }
-  return parsed;
+  return registryCatalog.load();
 }
 
 function rootPath(relativePath: string): string {
@@ -129,7 +128,7 @@ export function auditProcessDefinitionRegistry(
       sources.push(audit);
       continue;
     }
-    const payload = readJson(resolved);
+    const payload = loadJson<Record<string, unknown>>(resolved);
     const actualCounts: Record<string, number> = {};
     for (const key of Object.keys(source.expected_counts ?? {})) {
       actualCounts[key] = countJsonArray(payload, key);

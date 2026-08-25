@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface ServiceAuthorityMapEntry {
   id: string;
@@ -20,35 +18,27 @@ const PUBLIC_MAP_PATH = pathResolver.knowledge('product/governance/service-autho
 const PERSONAL_MAP_PATH = pathResolver.knowledge('personal/governance/service-authority-map.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-authority-map.schema.json');
 
-let validateFn: ValidateFunction | null = null;
 let cachedMap: ServiceAuthorityMap | null = null;
 let cachedMapKey: string | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
+const publicMapCatalog = defineCatalog<ServiceAuthorityMap>({
+  id: 'service-authority-map',
+  path: PUBLIC_MAP_PATH,
+  schema: SCHEMA_PATH,
+});
 
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const personalMapCatalog = defineCatalog<ServiceAuthorityMap>({
+  id: 'service-authority-map.personal',
+  path: PERSONAL_MAP_PATH,
+  schema: SCHEMA_PATH,
+});
 
-function validateMap(value: unknown, label: string): ServiceAuthorityMap {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid service authority map at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as ServiceAuthorityMap;
-}
-
-function loadMapFile(mapPath: string): ServiceAuthorityMap | null {
+function loadMapFile(
+  mapPath: string,
+  catalog: typeof publicMapCatalog
+): ServiceAuthorityMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(loadJson(mapPath), mapPath);
+  return catalog.load();
 }
 
 function mergeMaps(base: ServiceAuthorityMap, overlay: ServiceAuthorityMap): ServiceAuthorityMap {
@@ -65,8 +55,14 @@ export function loadServiceAuthorityMap(): ServiceAuthorityMap {
   const cacheKey = `${PUBLIC_MAP_PATH}::${PERSONAL_MAP_PATH}`;
   if (cachedMap && cachedMapKey === cacheKey) return cachedMap;
 
-  const base = loadMapFile(PUBLIC_MAP_PATH) ?? { version: '1.0.0', services: [] };
-  const personal = loadMapFile(PERSONAL_MAP_PATH) ?? { version: base.version, services: [] };
+  const base = loadMapFile(PUBLIC_MAP_PATH, publicMapCatalog) ?? {
+    version: '1.0.0',
+    services: [],
+  };
+  const personal = loadMapFile(PERSONAL_MAP_PATH, personalMapCatalog) ?? {
+    version: base.version,
+    services: [],
+  };
   const merged = mergeMaps(base, personal);
 
   cachedMap = merged;
