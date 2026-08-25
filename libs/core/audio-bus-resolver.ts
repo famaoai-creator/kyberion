@@ -13,7 +13,7 @@ import type { AudioBus } from './audio-bus.js';
 import { StubAudioBus } from './audio-bus.js';
 import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 import { PulseAudioBus } from './pulse-audio-bus.js';
-import { getRegisteredEnv } from './env-validator.js';
+import { getRegisteredEnv } from './foundation/env.js';
 
 function kyberionEnv(name: string): string | undefined {
   const value = getRegisteredEnv(name);
