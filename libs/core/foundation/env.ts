@@ -20,6 +20,10 @@ function entries(): FoundationEnvEntry[] {
   loadingEntries = true;
   try {
     const parsed = readJsonIfPresent<{ entries?: FoundationEnvEntry[] }>(REGISTRY_PATH);
+    // A secure-io import cycle may transiently make the registry unreadable
+    // during module bootstrap. Do not permanently cache that provisional
+    // miss; the next governed read can retry after initialization completes.
+    if (parsed === null) return [];
     cachedEntries = Array.isArray(parsed?.entries) ? parsed.entries : [];
     return cachedEntries;
   } finally {
