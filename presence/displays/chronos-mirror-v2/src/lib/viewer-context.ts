@@ -135,11 +135,14 @@ export function resolveViewerTierAccess(
   requested?: readonly OsKnowledgeTier[]
 ): OsKnowledgeTier[] {
   try {
-    const resolved = resolveSurfaceViewerTierAccess(role, requested);
-    if (resolved.includes('personal')) {
+    // Registrations that omit `tier_access` receive the masked role default
+    // (personal is never exposed through Chronos); only an explicit request
+    // for a tier outside the masked policy is rejected.
+    if (!requested) return defaultTierAccess(role);
+    if (requested.includes('personal')) {
       throw new Error(`Chronos viewer tier access exceeds the ${role} role policy.`);
     }
-    return resolved;
+    return resolveSurfaceViewerTierAccess(role, requested);
   } catch (error) {
     throw new ViewerContextError(
       error instanceof Error && 'status' in error && error.status === 401 ? 401 : 403,
