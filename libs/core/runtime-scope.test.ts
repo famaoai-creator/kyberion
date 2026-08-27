@@ -18,6 +18,9 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.safeExistsSync,
   loadJson: mocks.loadJson,
 }));
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string): T => mocks.loadJson(filePath) as T,
+}));
 vi.mock('./project-registry.js', () => ({
   loadProjectRecord: mocks.loadProjectRecord,
 }));

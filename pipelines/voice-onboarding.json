@@ -209,21 +209,14 @@
           {
             "id": "grant_voice_consent",
             "role": "source",
-            "op": "system:exec",
-            "produces": { "channel": "voice_consent_result", "type": "ShellResult" },
+            "op": "core:grant_voice_consent",
+            "budget": { "approval_required": true },
+            "produces": { "channel": "voice_consent_result", "type": "VoiceConsentResult" },
             "params": {
-              "command": "node",
-              "args": [
-                "dist/scripts/voice_consent.js",
-                "grant",
-                "--mission",
-                "{{mission_id}}",
-                "--operator",
-                "{{operator_handle}}",
-                "--scope",
-                "meeting speak",
-                "--force"
-              ]
+              "mission_id": "{{mission_id}}",
+              "operator": "{{operator_handle}}",
+              "scope": "meeting speak",
+              "force": true
             }
           },
           {

@@ -1,17 +1,17 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/cognitive-routing-decision.schema.json');
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cognitive-routing-decision.schema.json'
+);
 
 export type CognitiveTier = 'zero_llm' | 'fast_llm' | 'heavy_reasoning';
 
-export type CognitiveBackendPreference = 'deterministic_pipeline' | 'fast_reasoning' | 'heavy_reasoning';
+export type CognitiveBackendPreference =
+  'deterministic_pipeline' | 'fast_reasoning' | 'heavy_reasoning';
 
 export interface CognitiveRouteCandidate {
   mission_id: string;
@@ -122,14 +122,14 @@ let cachedSchemaRaw: string | null = null;
 
 function ensureValidator(): CognitiveRouteDecisionValidator {
   if (validateFn && cachedSchemaPath === SCHEMA_PATH) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   cachedSchemaPath = SCHEMA_PATH;
   return validateFn;
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
   return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim(),
+    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
   );
 }
 
@@ -184,10 +184,17 @@ function scoreMarkers(text: string, markers: string[]): { score: number; matches
 }
 
 function getMetadata(input: CognitiveRouteCandidate): Record<string, unknown> {
-  return (input.metadata && typeof input.metadata === 'object' ? input.metadata : {}) as Record<string, unknown>;
+  return (input.metadata && typeof input.metadata === 'object' ? input.metadata : {}) as Record<
+    string,
+    unknown
+  >;
 }
 
-function hasDeterministicReference(input: CognitiveRouteCandidate, metadata: Record<string, unknown>, text: string): boolean {
+function hasDeterministicReference(
+  input: CognitiveRouteCandidate,
+  metadata: Record<string, unknown>,
+  text: string
+): boolean {
   const explicitMode = textValue(metadata.execution_mode);
   if (explicitMode === 'deterministic_pipeline') return true;
   for (const key of DETERMINISTIC_REF_KEYS) {
@@ -217,7 +224,9 @@ function resolveRiskScore(text: string): { risk: number; uncertainty: number; re
   const uncertaintyScore = Math.min(100, uncertainty.score * 16 + (fastPath.score === 0 ? 8 : 0));
   const reasonParts = [
     highRisk.matches.length ? `high-risk markers: ${highRisk.matches.slice(0, 3).join(', ')}` : '',
-    uncertainty.matches.length ? `uncertainty markers: ${uncertainty.matches.slice(0, 3).join(', ')}` : '',
+    uncertainty.matches.length
+      ? `uncertainty markers: ${uncertainty.matches.slice(0, 3).join(', ')}`
+      : '',
     fastPath.matches.length ? `fast-path markers: ${fastPath.matches.slice(0, 3).join(', ')}` : '',
   ].filter(Boolean);
   return {
@@ -251,7 +260,8 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
     return validateDecision(decision);
   }
 
-  const preferHeavy = heavySignals.score >= 2 || riskSignals.risk >= 36 || riskSignals.uncertainty >= 34;
+  const preferHeavy =
+    heavySignals.score >= 2 || riskSignals.risk >= 36 || riskSignals.uncertainty >= 34;
 
   const decision: Record<string, unknown> = {
     tier: preferHeavy ? 'heavy_reasoning' : 'fast_llm',
@@ -260,8 +270,10 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
     risk: Math.max(riskSignals.risk, preferHeavy ? 48 : fastPathSignals.score > 0 ? 8 : 16),
     uncertainty: Math.max(riskSignals.uncertainty, preferHeavy ? 42 : 12),
     reason: preferHeavy
-      ? (riskSignals.reason || 'high-risk or uncertain mission task detected')
-      : (fastPathSignals.matches.length ? `fast-path task markers: ${fastPathSignals.matches.slice(0, 3).join(', ')}` : 'routine task suitable for minimal reasoning'),
+      ? riskSignals.reason || 'high-risk or uncertain mission task detected'
+      : fastPathSignals.matches.length
+        ? `fast-path task markers: ${fastPathSignals.matches.slice(0, 3).join(', ')}`
+        : 'routine task suitable for minimal reasoning',
     mission_id: input.mission_id,
   };
   if (input.item_id) decision.item_id = input.item_id;
@@ -271,7 +283,9 @@ function selectTier(input: CognitiveRouteCandidate, text: string): CognitiveRout
   return validateDecision(decision);
 }
 
-export function buildCognitiveRouteDecision(input: CognitiveRouteCandidate): CognitiveRouteDecision {
+export function buildCognitiveRouteDecision(
+  input: CognitiveRouteCandidate
+): CognitiveRouteDecision {
   const metadata = getMetadata(input);
   const text = lowerText([
     input.mission_id,
@@ -293,7 +307,7 @@ export function buildCognitiveRouteDecision(input: CognitiveRouteCandidate): Cog
 
 export function formatCognitiveRouteDecision(
   decision: CognitiveRouteDecision,
-  options: FormatCognitiveRouteDecisionOptions = {},
+  options: FormatCognitiveRouteDecisionOptions = {}
 ): string {
   const parts = [
     `tier=${decision.tier}`,

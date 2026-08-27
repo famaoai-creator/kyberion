@@ -1,25 +1,35 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { createHash } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
+import { normalizeText } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
-import type { AgentRoutingDecision, CompileUserIntentFlowInput, IntentContract, UserIntentFlow } from './intent-contract.js';
+import type {
+  AgentRoutingDecision,
+  CompileUserIntentFlowInput,
+  IntentContract,
+  UserIntentFlow,
+} from './intent-contract.js';
 import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
 import type { ReasoningLevelDecision } from './reasoning-level-policy.js';
 import type { ReasoningModelRoute } from './reasoning-model-routing.js';
 import { loadReasoningLevelPolicy } from './reasoning-level-policy.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CACHE_PATH = pathResolver.shared('runtime/intent-flow-cache.json');
 const CACHE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-flow-cache.schema.json');
-const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-contract.schema.json');
-const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge('product/schemas/organization-work-loop.schema.json');
-const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge('product/schemas/actuator-execution-brief.schema.json');
+const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-contract.schema.json'
+);
+const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/organization-work-loop.schema.json'
+);
+const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/actuator-execution-brief.schema.json'
+);
 const CACHE_SCHEMA_VERSION = '1.0.0';
 const INTENT_CONTRACT_SCHEMA_VERSION = 'https://kyberion.local/schemas/intent-contract.schema.json';
 const REDACTED_PROMPT_VALUE = '<redacted>';
@@ -98,25 +108,25 @@ let cachedStorePath: string | null = null;
 
 function ensureCacheValidator(): ValidateFunction {
   if (cacheValidateFn) return cacheValidateFn;
-  cacheValidateFn = compileSchemaFromPath(ajv, CACHE_SCHEMA_PATH);
+  cacheValidateFn = compileSchema(CACHE_SCHEMA_PATH);
   return cacheValidateFn;
 }
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
-  intentContractValidateFn = compileSchemaFromPath(ajv, INTENT_CONTRACT_SCHEMA_PATH);
+  intentContractValidateFn = compileSchema(INTENT_CONTRACT_SCHEMA_PATH);
   return intentContractValidateFn;
 }
 
 function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
-  workLoopValidateFn = compileSchemaFromPath(ajv, WORK_LOOP_SCHEMA_PATH);
+  workLoopValidateFn = compileSchema(WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
 }
 
 function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
-  executionBriefValidateFn = compileSchemaFromPath(ajv, EXECUTION_BRIEF_SCHEMA_PATH);
+  executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
 }
 
@@ -134,12 +144,16 @@ function validateCacheStore(value: unknown, label = CACHE_PATH): IntentFlowCache
   return value as IntentFlowCacheStore;
 }
 
-function validateStoredExecutionBrief(value: unknown): value is ActuatorExecutionBrief & { request_text: string } {
+function validateStoredExecutionBrief(
+  value: unknown
+): value is ActuatorExecutionBrief & { request_text: string } {
   const validate = ensureExecutionBriefValidator();
   return Boolean(validate(value));
 }
 
-function validateStoredIntentContract(value: unknown): value is IntentContract & { source_text: string } {
+function validateStoredIntentContract(
+  value: unknown
+): value is IntentContract & { source_text: string } {
   const validate = ensureIntentContractValidator();
   return Boolean(validate(value));
 }
@@ -175,18 +189,8 @@ function sha256Hex(value: unknown): string {
   return `sha256:${createHash('sha256').update(stableStringify(value)).digest('hex')}`;
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function cacheExpiry(ttlMs: number): string {
   return new Date(Date.now() + ttlMs).toISOString();
-}
-
-function normalizeText(value: string): string {
-  return String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ');
 }
 
 function confidenceBand(confidence?: number): ConfidenceBand {
@@ -219,13 +223,17 @@ const ALLOWED_RUNTIME_CONTEXT_KEYS = new Set([
   'workflow_shape',
 ]);
 
-function normalizeRuntimeContextFingerprint(value: Record<string, unknown> | undefined): Record<string, unknown> | null {
+function normalizeRuntimeContextFingerprint(
+  value: Record<string, unknown> | undefined
+): Record<string, unknown> | null {
   if (!value || typeof value !== 'object') return {};
   const keys = Object.keys(value);
   const fingerprint: Record<string, unknown> = {};
   for (const key of keys) {
     if (!ALLOWED_RUNTIME_CONTEXT_KEYS.has(key)) return null;
-    if (/(token|secret|password|credential|cookie|bearer|api[_-]?key|auth|session|jwt)/i.test(key)) {
+    if (
+      /(token|secret|password|credential|cookie|bearer|api[_-]?key|auth|session|jwt)/i.test(key)
+    ) {
       return null;
     }
     const raw = value[key];
@@ -257,7 +265,9 @@ function normalizeServiceBindings(bindings: string[] | undefined): string[] {
   return [...new Set((bindings || []).map((value) => normalizeText(value)).filter(Boolean))].sort();
 }
 
-function isCacheableTier(tier: CompileUserIntentFlowInput['tier']): tier is 'public' | 'confidential' {
+function isCacheableTier(
+  tier: CompileUserIntentFlowInput['tier']
+): tier is 'public' | 'confidential' {
   return tier === 'public' || tier === 'confidential';
 }
 
@@ -284,14 +294,22 @@ export function buildIntentFlowCacheEligibility(input: {
   const selectedIntent = input.selectedIntent;
   const selectedConfidence = input.resolutionPacket.selected_confidence;
   if (!selectedIntent || typeof selectedConfidence !== 'number' || selectedConfidence < 0.85) {
-    return { eligible: false, reason: 'selected intent is missing or below the fast-lane confidence threshold', ttlMs };
+    return {
+      eligible: false,
+      reason: 'selected intent is missing or below the fast-lane confidence threshold',
+      ttlMs,
+    };
   }
   if (selectedIntent.risk_profile !== 'low') {
     return { eligible: false, reason: 'selected intent risk is not low', ttlMs };
   }
   const runtimeContextFingerprint = normalizeRuntimeContextFingerprint(input.runtimeContext);
   if (runtimeContextFingerprint === null) {
-    return { eligible: false, reason: 'runtime context cannot be safely reduced to the allowlist', ttlMs };
+    return {
+      eligible: false,
+      reason: 'runtime context cannot be safely reduced to the allowlist',
+      ttlMs,
+    };
   }
   const recommendedModelId = input.shadowModelRoute.recommended_model_id;
   if (!recommendedModelId) {
@@ -377,13 +395,18 @@ function restoreCachedFlow(payload: CachedIntentFlowPayload, inputText: string):
 
 function validateCachedFlowPayload(payload: CachedIntentFlowPayload): string | null {
   if (payload.source !== 'llm') return 'cached flow source must be llm';
-  if (!validateStoredExecutionBrief(payload.executionBrief)) return 'cached execution brief failed validation';
-  if (!validateStoredIntentContract(payload.intentContract)) return 'cached intent contract failed validation';
+  if (!validateStoredExecutionBrief(payload.executionBrief))
+    return 'cached execution brief failed validation';
+  if (!validateStoredIntentContract(payload.intentContract))
+    return 'cached intent contract failed validation';
   if (!validateStoredWorkLoop(payload.workLoop)) return 'cached work loop failed validation';
   if (!payload.reasoningDecision || typeof payload.reasoningDecision.level !== 'string') {
     return 'cached reasoning decision is invalid';
   }
-  if (!payload.shadowModelRoute || typeof payload.shadowModelRoute.model_route_status !== 'string') {
+  if (
+    !payload.shadowModelRoute ||
+    typeof payload.shadowModelRoute.model_route_status !== 'string'
+  ) {
     return 'cached shadow model route is invalid';
   }
   return null;
@@ -457,13 +480,25 @@ export function storeIntentFlowCache(input: {
     return { status: 'disabled', reason: eligibility.reason };
   }
   if (flow.source !== 'llm') {
-    return { status: 'disabled', reason: 'only llm flows are cacheable', cacheKeyHash: eligibility.cacheKeyHash };
+    return {
+      status: 'disabled',
+      reason: 'only llm flows are cacheable',
+      cacheKeyHash: eligibility.cacheKeyHash,
+    };
   }
   if (flow.intentContract.approval.requires_approval) {
-    return { status: 'disabled', reason: 'approval-required flows are not cacheable', cacheKeyHash: eligibility.cacheKeyHash };
+    return {
+      status: 'disabled',
+      reason: 'approval-required flows are not cacheable',
+      cacheKeyHash: eligibility.cacheKeyHash,
+    };
   }
   if (flow.intentContract.clarification_needed) {
-    return { status: 'disabled', reason: 'clarification-required flows are not cacheable', cacheKeyHash: eligibility.cacheKeyHash };
+    return {
+      status: 'disabled',
+      reason: 'clarification-required flows are not cacheable',
+      cacheKeyHash: eligibility.cacheKeyHash,
+    };
   }
   const payload: CachedIntentFlowPayload = {
     source: 'llm',
@@ -496,7 +531,9 @@ export function storeIntentFlowCache(input: {
       entries: [],
     };
   }
-  const nextEntries = store.entries.filter((entry) => entry.cache_key_hash !== eligibility.cacheKeyHash);
+  const nextEntries = store.entries.filter(
+    (entry) => entry.cache_key_hash !== eligibility.cacheKeyHash
+  );
   const nextStore: IntentFlowCacheStore = {
     version: CACHE_SCHEMA_VERSION,
     updated_at: nowIso(),

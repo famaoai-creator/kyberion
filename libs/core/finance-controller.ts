@@ -1,12 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
-import {
-  resolveFinancialModel,
-  summarizeFinancialModel,
-  type FinancialModel,
-} from './financial-model.js';
-import { resolveOkrTracker, summarizeOkrTracker, type OkrTracker } from './okr-tracker.js';
+import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
+import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
 
 export interface FinanceControllerCostReport {
   totalCostUsd: number | null;

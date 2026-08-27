@@ -1,7 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import { appendJsonLine } from './foundation/json.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 export interface ArtifactOwnershipRecord {
   artifact_id: string;
@@ -31,10 +32,8 @@ export interface ArtifactOwnershipQuery {
   includeTmp?: boolean;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
-  'schemas/artifact-record.schema.json'
+  'knowledge/product/schemas/artifact-ownership-record.schema.json'
 );
 const ARTIFACT_REGISTRY_PATH = pathResolver.shared('runtime/artifacts/registry.jsonl');
 
@@ -42,7 +41,7 @@ let artifactOwnershipValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (artifactOwnershipValidateFn) return artifactOwnershipValidateFn;
-  artifactOwnershipValidateFn = compileSchemaFromPath(ajv, ARTIFACT_OWNERSHIP_SCHEMA_PATH);
+  artifactOwnershipValidateFn = compileSchema(ARTIFACT_OWNERSHIP_SCHEMA_PATH);
   return artifactOwnershipValidateFn;
 }
 
@@ -134,7 +133,7 @@ export function appendArtifactOwnershipRecord(
 
   const registryDir = pathResolver.shared('runtime/artifacts');
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  safeAppendFileSync(ARTIFACT_REGISTRY_PATH, `${JSON.stringify(record)}\n`);
+  appendJsonLine(ARTIFACT_REGISTRY_PATH, record);
   return ARTIFACT_REGISTRY_PATH;
 }
 

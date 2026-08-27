@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/model-adaptation-policy.schema.json",
   "version": "1.0.0",
   "lifecycle": {
     "steps": ["detect", "profile", "evaluate", "adapt", "shadow", "promote_or_rollback"]

@@ -1,7 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -10,8 +11,6 @@ import {
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/standard-intents.schema.json'
 );
@@ -148,25 +147,22 @@ const resolvedIntentCatalogCache = new Map<string, StandardIntentDefinition[]>()
 
 function ensureStandardIntentValidator(): ValidateFunction {
   if (standardIntentValidateFn) return standardIntentValidateFn;
-  standardIntentValidateFn = compileSchemaFromPath(ajv, STANDARD_INTENTS_SCHEMA_PATH);
+  standardIntentValidateFn = compileSchema(STANDARD_INTENTS_SCHEMA_PATH);
   return standardIntentValidateFn;
 }
 
 function ensureIntentResolutionPolicyValidator(): ValidateFunction {
   if (intentResolutionPolicyValidateFn) return intentResolutionPolicyValidateFn;
-  intentResolutionPolicyValidateFn = compileSchemaFromPath(
-    ajv,
-    INTENT_RESOLUTION_POLICY_SCHEMA_PATH
-  );
+  intentResolutionPolicyValidateFn = compileSchema(INTENT_RESOLUTION_POLICY_SCHEMA_PATH);
   return intentResolutionPolicyValidateFn;
 }
 
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
   const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: StandardIntentDefinition[];
-  };
+  }>(filePath);
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -180,9 +176,9 @@ export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
 
 function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[] {
   if (!safeExistsSync(filePath)) return [];
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: StandardIntentDefinition[];
-  };
+  }>(filePath);
   const validate = ensureStandardIntentValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -194,7 +190,10 @@ function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[]
 }
 
 function defaultTenantId(): string | undefined {
-  const tenant = process.env.KYBERION_TENANT?.trim() || process.env.KYBERION_CUSTOMER?.trim() || '';
+  const tenant =
+    getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
+    getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() ||
+    '';
   return tenant || undefined;
 }
 
@@ -307,9 +306,7 @@ export function loadResolvedStandardIntentCatalog(
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
   const filePath = pathResolver.knowledge('product/governance/intent-resolution-policy.json');
-  const parsed = JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as IntentResolutionPolicyFile;
+  const parsed = loadJson<IntentResolutionPolicyFile>(filePath);
   const validate = ensureIntentResolutionPolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -324,9 +321,9 @@ function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
 function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
   if (intentDomainOntologyCache) return intentDomainOntologyCache;
   const filePath = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+  const parsed = loadJson<{
     intents?: IntentDomainOntologyEntry[];
-  };
+  }>(filePath);
   const mapped = new Map<string, IntentDomainOntologyEntry>();
   for (const entry of parsed.intents || []) {
     if (!entry.intent_id) continue;

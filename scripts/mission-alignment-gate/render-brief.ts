@@ -14,10 +14,12 @@
  *
  * スキーマは README.md 参照。
  */
-import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { reviewLayerMarkup } from '../report-review/review-layer.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 /** MO-11: the brief schema (README.md). Every field is optional — the renderer
  *  degrades to “—” rather than failing on a partially drafted brief. */
@@ -343,32 +345,37 @@ function renderGateSection(
 }
 
 /** CLI: static preview only. Deciding requires serve-brief (see below). */
-function main(): void {
-  const src = process.argv[2];
-  if (!src) {
-    console.error('usage: render-brief <mission-brief.json> [out.html]');
-    process.exitCode = 1;
-    return;
-  }
-  const out = process.argv[3] || src.replace(/\.json$/iu, '') + '.html';
-  if (!safeExistsSync(src)) {
-    console.error(`brief not found: ${src}`);
-    process.exitCode = 1;
-    return;
-  }
-  const brief = JSON.parse(safeReadFile(src, { encoding: 'utf8' }) as string) as MissionBrief;
-  const rendered = renderMissionBriefHtml(brief);
-  safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
-  console.log(`rendered mission brief → ${out}`);
-  console.log(missingStaticPreviewMessage());
-  console.log(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);
-  console.log(
-    `  KYBERION_PERSONA=<p> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <ID>`
-  );
-}
+export const runRenderBrief = defineScript({
+  name: 'mission-alignment:render-brief',
+  flags: [],
+  run: ({ argv, print }) => {
+    const src = argv[0];
+    if (!src) {
+      throw new ScriptExitError(1, 'usage: render-brief <mission-brief.json> [out.html]');
+    }
+    const out = argv[1] || src.replace(/\.json$/iu, '') + '.html';
+    if (!safeExistsSync(src)) {
+      throw new ScriptExitError(1, `brief not found: ${src}`);
+    }
+    const brief = readJson<MissionBrief>(src);
+    const rendered = renderMissionBriefHtml(brief);
+    safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
+    print(`rendered mission brief → ${out}`);
+    print(missingStaticPreviewMessage());
+    print(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);
+    print(
+      `  KYBERION_PERSONA=<p> node_modules/.bin/tsx scripts/mission-alignment-gate/serve-brief.ts --mission <ID>`
+    );
+    return out;
+  },
+});
 
 function missingStaticPreviewMessage(): string {
   return `${mt('mission_alignment:static_preview_notice')} ${mt('mission_alignment:static_preview_commands')}`;
 }
 
-if (process.argv[1] && /render-brief\.(ts|js)$/u.test(process.argv[1])) main();
+if (
+  isDirectScript(import.meta.url, 'render-brief.ts') ||
+  isDirectScript(import.meta.url, 'render-brief.js')
+)
+  void runRenderBrief();

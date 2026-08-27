@@ -18,11 +18,16 @@ describe('Workflow operations contract', () => {
     expect(ci).toContain('node dist/scripts/vital_check.js --format json --exit-on-missing=false');
   });
 
-  it('keeps validate on the docs example check as well as the other release gates', () => {
-    const packageJson = read('package.json');
-    expect(packageJson).toContain('pnpm run check:doc-examples');
-    expect(packageJson).toContain('pnpm run check:first-win-smoke');
-    expect(packageJson).toContain('pnpm run check:mos-no-write-api');
+  it('keeps the manifest-driven validator on the docs and read-only surface gates', () => {
+    const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
+      gates: Array<{ id: string; scope: string }>;
+    };
+    const fullGateIds = new Set(
+      gates.gates.filter((gate) => gate.scope === 'full').map((gate) => gate.id)
+    );
+    for (const id of ['doc-examples', 'first-win-smoke', 'mos-no-write-api']) {
+      expect(fullGateIds.has(id), id).toBe(true);
+    }
   });
 
   it('does not invoke removed skills/bootstrap/schema scripts from CI workflows', () => {
@@ -43,8 +48,18 @@ describe('Workflow operations contract', () => {
 
   it('runs golden output checks in PR validation once stable snapshots exist', () => {
     const prValidation = read('.github/workflows/pr-validation.yml');
-    expect(prValidation).toContain('KYBERION_REASONING_BACKEND: stub');
-    expect(prValidation).toContain('pnpm run check:golden');
+    const gates = JSON.parse(read('knowledge/product/governance/ci-gates.json')) as {
+      gates: Array<{ id: string; scope: string }>;
+    };
+    expect(gates.gates).toContainEqual({
+      id: 'golden',
+      scope: 'pr',
+      executable: 'node',
+      args: ['dist/scripts/check_golden_output.js'],
+      owner: 'quality',
+      rationale: expect.any(String),
+    });
+    expect(prValidation).not.toContain('pnpm run check:golden');
   });
 
   it('documents the distinction between local terminal residue and managed surfaces', () => {
@@ -59,8 +74,8 @@ describe('Workflow operations contract', () => {
     expect(crossOs).toContain('pnpm run check:contract-schemas');
     expect(crossOs).toContain('pnpm run test:core');
     expect(crossOs).toContain('pnpm run test:meeting-dry-run');
-    expect(crossOs).toContain('pnpm run cli:preview -- pipelines/baseline-check.json');
-    expect(crossOs).toContain('pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json');
+    expect(crossOs).toContain('pnpm run cli -- preview pipelines/baseline-check.json');
+    expect(crossOs).toContain('pnpm run cli -- preview pipelines/meeting-proxy-workflow.json');
     expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
     expect(crossOs).not.toContain('|| true');
   });

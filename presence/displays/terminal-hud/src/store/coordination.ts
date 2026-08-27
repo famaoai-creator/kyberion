@@ -9,12 +9,18 @@ import {
   currentScope,
   pathResolver,
   type AgentRuntimeSupervisorSnapshot,
+  type SurfaceAsyncChannel,
 } from '@agent/core';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
 
-const OUTBOX_SURFACES = ['slack', 'telegram', 'discord', 'imessage'];
+const OUTBOX_SURFACES: readonly SurfaceAsyncChannel[] = [
+  'slack',
+  'telegram',
+  'discord',
+  'imessage',
+];
 
 export interface CoordinationData {
   runtimes: AgentRuntimeSupervisorSnapshot[] | null; // null = supervisor daemon offline

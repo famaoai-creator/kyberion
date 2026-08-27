@@ -5,6 +5,7 @@ import {
   recordProtocolServiceLifecycle,
   type PeerMessageEnvelope,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 async function main(): Promise<void> {
   assertProtocolServiceRegistered('peer-messaging');
@@ -16,22 +17,22 @@ async function main(): Promise<void> {
     })
     .option('port', {
       type: 'number',
-      default: Number(process.env.KYBERION_PEER_PORT || 4100),
+      default: Number(getRegisteredEnvText('KYBERION_PEER_PORT') || 4100),
       description: 'HTTP port to bind',
     })
     .option('host', {
       type: 'string',
-      default: process.env.KYBERION_PEER_HOST || '127.0.0.1',
+      default: getRegisteredEnvText('KYBERION_PEER_HOST') || '127.0.0.1',
       description: 'HTTP bind host (use 0.0.0.0 for LAN reachability)',
     })
     .option('shared-secret', {
       type: 'string',
-      default: process.env.KYBERION_PEER_SHARED_SECRET || '',
+      default: getRegisteredEnvText('KYBERION_PEER_SHARED_SECRET') || '',
       description: 'HMAC shared secret used to verify inbound messages',
     })
     .option('tenant-id', {
       type: 'string',
-      default: process.env.KYBERION_TENANT_ID || '',
+      default: getRegisteredEnvText('KYBERION_TENANT_ID') || '',
       description: 'Tenant scope for this peer listener',
     })
     .option('echo', {
@@ -97,7 +98,7 @@ async function main(): Promise<void> {
       });
     } finally {
       await server.close();
-      process.exit(0);
+      process.exitCode = 0;
     }
   };
   process.once('SIGINT', shutdown);
@@ -106,5 +107,5 @@ async function main(): Promise<void> {
 
 main().catch((error: any) => {
   logger.error(error?.message || String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

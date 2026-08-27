@@ -14,8 +14,9 @@
  */
 
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { executeServicePreset } from './service-engine.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface StreamingTextToSpeechBridge {
   readonly bridge_id: string;
@@ -77,7 +78,7 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
     for await (const segment of text) {
       prompt += segment;
     }
-    const voice = this.opts.voice || process.env.KYBERION_GEMINI_TTS_VOICE || 'Kore';
+    const voice = this.opts.voice || getRegisteredEnvText('KYBERION_GEMINI_TTS_VOICE') || 'Kore';
     const result = await executeServicePreset(
       'gemini',
       'generate_tts',
@@ -104,7 +105,7 @@ export class GeminiStreamingTextToSpeechBridge implements StreamingTextToSpeechB
   }
 }
 
-const streamingTtsSeam = defineSeam<() => StreamingTextToSpeechBridge>({
+const streamingTtsSeam = createSeam<() => StreamingTextToSpeechBridge>({
   key: 'streaming-tts-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
@@ -132,7 +133,7 @@ export function resetStreamingTtsBridges(): void {
 }
 
 export function getStreamingTtsBridge(
-  id: string = process.env.KYBERION_STREAMING_TTS_BRIDGE ?? 'stub'
+  id: string = getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE') ?? 'stub'
 ): StreamingTextToSpeechBridge {
   if (id === 'stub') return new StubStreamingTextToSpeechBridge();
   if (id === 'gemini') return new GeminiStreamingTextToSpeechBridge();

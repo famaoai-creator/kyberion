@@ -1,8 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
@@ -10,14 +11,13 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from './runtime-supervisor.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const SURFACE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/runtime-surface-manifest.schema.json'
 );
@@ -92,7 +92,7 @@ let surfaceManifestValidateFn: ValidateFunction | null = null;
 
 function ensureSurfaceManifestValidator(): ValidateFunction {
   if (surfaceManifestValidateFn) return surfaceManifestValidateFn;
-  surfaceManifestValidateFn = compileSchemaFromPath(ajv, SURFACE_MANIFEST_SCHEMA_PATH);
+  surfaceManifestValidateFn = compileSchema(SURFACE_MANIFEST_SCHEMA_PATH);
   return surfaceManifestValidateFn;
 }
 
@@ -127,9 +127,7 @@ export function surfaceResourceId(surfaceId: string): string {
 }
 
 function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
-  const value = JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as SurfaceRuntimeManifest;
+  const value = readJson<SurfaceRuntimeManifest>(filePath);
   const validate = ensureSurfaceManifestValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])
@@ -165,9 +163,7 @@ export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): Surfa
     if (directoryManifest) return directoryManifest;
   }
   if (safeExistsSync(resolvedManifestPath)) {
-    const value = JSON.parse(
-      safeReadFile(resolvedManifestPath, { encoding: 'utf8' }) as string
-    ) as SurfaceRuntimeManifest;
+    const value = readJson<SurfaceRuntimeManifest>(resolvedManifestPath);
     const validate = ensureSurfaceManifestValidator();
     if (!validate(value)) {
       const errors = (validate.errors || [])
@@ -231,7 +227,7 @@ export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntime
   if (!safeExistsSync(statePath)) {
     return { version: 1, surfaces: {} };
   }
-  return JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as SurfaceRuntimeState;
+  return loadJson<SurfaceRuntimeState>(statePath);
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {

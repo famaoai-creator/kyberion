@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { DEFAULT_SPECIALIST_ID } from './specialist-ids.js';
 import { listDistillCandidateRecords } from './distill-candidate-registry.js';
@@ -15,14 +15,14 @@ import {
   type WorkflowExecutionShape,
 } from './execution-shape.js';
 import { resolveWorkScopeDecision, type WorkScopeDecision } from './work-scope-decision.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const DEFAULT_SPECIALIST_CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/specialist-catalog.json'
 );
 const DEFAULT_SPECIALIST_CATALOG_DIR = pathResolver.knowledge('product/orchestration/specialists');
+const OUTCOME_CATALOG_PATH = pathResolver.knowledge('product/governance/outcome-catalog.json');
 
 export interface OutcomeDefinition {
   id: string;
@@ -112,41 +112,6 @@ interface WorkDesignRulesFile {
   }>;
 }
 
-interface ProcessDesignRuleInput {
-  intentId?: string;
-  taskType?: string;
-  shape?: string;
-}
-
-interface ExecutionShapeRuleInput {
-  intentId?: string;
-  taskType?: string;
-  shape?: string;
-  catalogShape?: string;
-}
-
-interface IntentLabelRuleInput {
-  intentId?: string;
-  taskType?: string;
-  queryType?: string;
-}
-
-interface ProcessChecklistRule {
-  items: string[];
-  match?: RoutingMatch;
-}
-
-interface ExecutionShapeRule {
-  match?: RoutingMatch;
-  shape: WorkflowExecutionShape;
-}
-
-interface IntentLabelRule {
-  match?: RoutingMatch;
-  label?: string;
-  label_from?: 'intentId' | 'taskType' | 'queryType';
-}
-
 interface WorkPolicyFile {
   version: string;
   specialist_routing: SpecialistRoutingPolicyFile;
@@ -158,7 +123,7 @@ let workPolicyValidateFn: ValidateFunction | null = null;
 
 function ensureWorkPolicyValidator(): ValidateFunction {
   if (workPolicyValidateFn) return workPolicyValidateFn;
-  workPolicyValidateFn = compileSchemaFromPath(ajv, WORK_POLICY_SCHEMA_PATH);
+  workPolicyValidateFn = compileSchema(WORK_POLICY_SCHEMA_PATH);
   return workPolicyValidateFn;
 }
 
@@ -339,12 +304,16 @@ function loadSpecialistCatalogDirectory(dirPath: string): SpecialistCatalogFile 
 }
 
 export function loadOutcomeCatalog(): Record<string, OutcomeDefinition> {
-  const parsed = loadJson<OutcomeCatalogFile>(
-    pathResolver.knowledge('product/governance/outcome-catalog.json')
-  );
+  const parsed = outcomeCatalog.load();
   const entries = parsed.outcomes || {};
   return Object.fromEntries(Object.entries(entries).map(([id, value]) => [id, { id, ...value }]));
 }
+
+const outcomeCatalog = defineCatalog<OutcomeCatalogFile>({
+  id: 'outcome-catalog',
+  path: OUTCOME_CATALOG_PATH,
+  schema: 'knowledge/product/schemas/outcome-catalog.schema.json',
+});
 
 export function loadSpecialistCatalog(): Record<string, SpecialistDefinition> {
   const parsed = safeExistsSync(pathResolver.rootResolve(DEFAULT_SPECIALIST_CATALOG_DIR))

@@ -6,41 +6,50 @@
  * operator input bar (text + voice). Implementation lives in
  * presence/displays/terminal-hud (@presence/terminal-hud).
  */
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runTui } from '@presence/terminal-hud';
+import { setRegisteredEnv } from '@agent/core/foundation';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  setCurrentProcessArgv,
+} from './lib/harness.js';
 
 // Keep the interactive entrypoint in this process so stdin/stdout retain the
 // terminal's raw-mode capability. The old run_with_env wrapper used a
 // synchronous captured child process, which is correct for snapshots but not
 // for an Ink application.
-process.env.KYBERION_PERSONA = 'sovereign';
+setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
 const SOURCE_ENTRY = '../presence/displays/terminal-hud/src/main.js';
 
-export async function main(): Promise<void> {
-  const devMode = process.argv.includes('--dev');
+export async function main(args: string[] = []): Promise<void> {
+  const devMode = args.includes('--dev');
   if (devMode) {
-    process.argv = process.argv.filter((arg) => arg !== '--dev');
+    const currentArgv = currentProcessArgv();
+    setCurrentProcessArgv([
+      currentArgv[0] || 'node',
+      currentArgv[1] || 'scripts/tui.ts',
+      ...args.filter((arg) => arg !== '--dev'),
+    ]);
     await import(SOURCE_ENTRY);
     return;
   }
 
-  const argv = await createStandardYargs()
+  const options = await createStandardYargs()
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })
     .strict()
-    .parse();
+    .parse(args);
 
-  await runTui({ once: argv.once, panel: argv.panel });
+  await runTui({ once: options.once, panel: options.panel });
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+export const runTuiScript = defineScript({
+  name: 'tui',
+  flags: [],
+  run: async ({ argv }) => main(argv),
+});
 
-if (isMainModule) {
-  main().catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`tui failed: ${message}\n`);
-    process.exit(1);
-  });
-}
+if (isDirectScript(import.meta.url, 'tui.ts') || isDirectScript(import.meta.url, 'tui.js'))
+  void runTuiScript();

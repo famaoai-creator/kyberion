@@ -29,23 +29,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check dependency pinning and install-script policy
-        run: |
-          pnpm run check:pinned-deps
-          pnpm run check:install-script-allowlist
-          pnpm run check:lockfile-commit-gate
-
       - name: Build project
         run: pnpm run build
 
       - name: Validate release surface
         run: pnpm run validate
 
-      - name: Run full test suite
-        run: pnpm run test:all
+      - name: Run manifest-driven release checks
+        run: pnpm run check -- --scope release
 
-      - name: Check golden outputs
-        run: pnpm run check:golden
+      - name: Run full test suite
+        run: pnpm exec vitest run
 
       - name: Extract release notes from changelog
         run: pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md

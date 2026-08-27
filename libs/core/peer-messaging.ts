@@ -5,6 +5,8 @@ import * as http from 'node:http';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
@@ -141,10 +143,6 @@ const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
 const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '::1']);
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -307,10 +305,10 @@ export function peerNetworkCatalogPath(tenantId: string): string {
 
 export function resolvePeerNetworkCatalogPath(options: PeerMessagingCatalogOptions = {}): string {
   if (options.catalogPath) return options.catalogPath;
-  if (process.env.KYBERION_PEER_NETWORK_CATALOG?.trim()) {
-    return process.env.KYBERION_PEER_NETWORK_CATALOG.trim();
+  if (getRegisteredEnvText('KYBERION_PEER_NETWORK_CATALOG')?.trim()) {
+    return getRegisteredEnvText('KYBERION_PEER_NETWORK_CATALOG')!.trim();
   }
-  const tenantId = options.tenantId?.trim() || process.env.KYBERION_TENANT_ID?.trim();
+  const tenantId = options.tenantId?.trim() || getRegisteredEnvText('KYBERION_TENANT_ID')?.trim();
   return tenantId ? peerNetworkCatalogPath(tenantId) : DEFAULT_CATALOG_PATH;
 }
 

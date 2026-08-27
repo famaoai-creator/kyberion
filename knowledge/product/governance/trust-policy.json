@@ -1,11 +1,12 @@
 {
+  "$schema": "../schemas/trust-policy.schema.json",
   "version": "1.0.0",
   "description": "Trust engine and kill switch parameters. All numeric thresholds and weights are read from here at runtime. Edit this file to tune trust scoring, decay, propagation, and anomaly detection without code changes.",
   "scoring": {
     "weights": {
       "policyCompliance": 0.25,
       "securityPosture": 0.25,
-      "outputQuality": 0.20,
+      "outputQuality": 0.2,
       "resourceEfficiency": 0.15,
       "collaborationHealth": 0.15
     },
@@ -16,7 +17,7 @@
     { "min_score": 700, "tier": "trusted" },
     { "min_score": 500, "tier": "standard" },
     { "min_score": 300, "tier": "probationary" },
-    { "min_score": 0,   "tier": "untrusted" }
+    { "min_score": 0, "tier": "untrusted" }
   ],
   "decay": {
     "rate_per_hour": 2,

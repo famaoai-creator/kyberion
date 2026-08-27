@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   buildProjectBootstrapWorkItems,
   listProjectRecords,
@@ -21,6 +22,10 @@ import {
   saveProjectTrackRecord,
   type ProjectTrackRecord,
 } from './project-track-registry.js';
+
+function kyberionEnv(name: string): string | undefined {
+  return getRegisteredEnvText(name);
+}
 import { missionSeedRecordPath, saveMissionSeedRecord } from './mission-seed-registry.js';
 import {
   createTaskSession,
@@ -34,6 +39,7 @@ import { listMissionsInSearchDirs, loadState, saveState } from './mission-state.
 import type { MissionState } from './mission-types.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { validateWritePermission } from './tier-guard.js';
 import {
   removeMissionFromProjectLedger,
@@ -252,7 +258,7 @@ export function createManagedProjectTrack(
     });
     reconcileProjectOperationalState(projectId, { apply: true });
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.track_created',
       operation: `create:${trackId}`,
       result: 'completed',
@@ -297,7 +303,7 @@ export function updateManagedProjectTrack(
   try {
     reconcileProjectOperationalState(current.project_id, { apply: true });
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.track_updated',
       operation: `update:${current.track_id}`,
       result: 'completed',
@@ -513,12 +519,9 @@ export function ensureProjectOsScaffold(
   rootDir = pathResolver.rootDir()
 ): string {
   const targetDir = pathResolver.projectOsDir(projectId, tier, tenantSlug, rootDir);
-  const artifactMap = JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'),
-      { encoding: 'utf8' }
-    ) as string
-  ) as { lifecycle?: Array<{ phase: string; required?: string[] }> };
+  const artifactMap = readJson<{
+    lifecycle?: Array<{ phase: string; required?: string[] }>;
+  }>(pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'));
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
   for (const phase of artifactMap.lifecycle || []) {
     const phaseDir = path.join(targetDir, PROJECT_OS_PHASE_DIRS[phase.phase] || phase.phase);
@@ -557,7 +560,7 @@ export function buildManagedProjectRecord(input: ManagedProjectCreateInput): Pro
   if (
     input.tier === 'confidential' &&
     input.tenant_slug &&
-    (process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST)
+    (kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST)
   ) {
     resolveTenant(input.tenant_slug, { rootDir: input.rootDir });
   }
@@ -599,7 +602,7 @@ function createManagedProjectInternal(
     throw new Error(`Project already exists: ${projectId}`);
   const record = buildManagedProjectRecord(input);
   const enforceEntityGovernance =
-    process.env.KYBERION_ENTITY_GOVERNANCE === 'enforce' || !process.env.VITEST;
+    kyberionEnv('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !process.env.VITEST;
   const organizationState =
     enforceEntityGovernance && input.organization_id
       ? loadOrganizationOperationalState(input.organization_id, {
@@ -646,7 +649,7 @@ function createManagedProjectInternal(
   }
   if (!deferAudit) {
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.created',
       operation: `create:${projectId}`,
       result: 'completed',
@@ -683,7 +686,7 @@ export function updateManagedProject(
   } satisfies ProjectRecord;
   saveProjectRecord(next);
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'project_controller',
+    agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
     action: 'project.updated',
     operation: `update:${current.project_id}`,
     result: 'completed',
@@ -1007,7 +1010,7 @@ export function reconcileProjectOperationalState(
       repairedPaths.push(saveProjectOperationalState(nextState));
     }
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.state_reconciled',
       operation: `reconcile:${project.project_id}`,
       result: 'completed',
@@ -1175,7 +1178,7 @@ export async function reassignMissionToProject(input: {
   await syncProjectLedger(missionId, pathResolver.rootDir());
   reconcileProjectOperationalState(targetProjectId, { apply: true });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'project_controller',
+    agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
     action: 'mission.project_reassigned',
     operation: `reassign:${missionId}`,
     result: 'completed',
@@ -1375,7 +1378,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
     }
     commitCompleted = true;
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.created',
       operation: `create:${projectId}`,
       result: 'completed',
@@ -1386,7 +1389,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
       },
     });
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'project_controller',
+      agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
       action: 'project.bootstrap_created',
       operation: `bootstrap:${projectId}`,
       result: 'completed',
@@ -1419,7 +1422,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
     }
     try {
       auditChain.record({
-        agentId: process.env.KYBERION_PERSONA || 'project_controller',
+        agentId: kyberionEnv('KYBERION_PERSONA') || 'project_controller',
         action: 'project.bootstrap_rollback',
         operation: `rollback:${projectId}`,
         result: 'completed',

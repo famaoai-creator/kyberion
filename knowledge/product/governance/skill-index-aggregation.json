@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/aggregation-job.schema.json",
+  "$schema": "../schemas/aggregation-job.schema.json",
   "action": "aggregate",
   "target_dir": "libs/actuators",
   "output_file": "knowledge/product/orchestration/global_actuator_index.json",

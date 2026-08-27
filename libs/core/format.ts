@@ -20,9 +20,12 @@
  * derived from their options (this module runs inside render loops such as
  * MissionIntelligence's per-second dashboard tick).
  */
+
+import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 
 export type DateTimeFormatStyle = 'date' | 'time' | 'datetime' | 'short' | 'long';
 
@@ -240,7 +243,7 @@ export interface ResolveTimeZoneContext {
  *      — as of I18N-05 the identity schema does not yet define this field,
  *      so this step is a no-op until a future schema revision adds it; the
  *      read is defensive/forward-compatible and never throws.
- *   3. `process.env.KYBERION_TIMEZONE`
+ *   3. the `KYBERION_TIMEZONE` setting
  *   4. `'Asia/Tokyo'`
  */
 export function resolveTimeZone(ctx?: ResolveTimeZoneContext): string {
@@ -250,7 +253,7 @@ export function resolveTimeZone(ctx?: ResolveTimeZoneContext): string {
     const identityPath =
       ctx?.identityPath ?? path.join(resolveActiveProfileRoot(), 'my-identity.json');
     if (safeExistsSync(identityPath)) {
-      const parsed = JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'));
+      const parsed = readJson<Record<string, unknown>>(identityPath);
       const timeZone = String(parsed?.timeZone || parsed?.timezone || '').trim();
       if (timeZone) return timeZone;
     }
@@ -258,7 +261,7 @@ export function resolveTimeZone(ctx?: ResolveTimeZoneContext): string {
     // Fall through to env/default below.
   }
 
-  const envTimeZone = process.env.KYBERION_TIMEZONE?.trim();
+  const envTimeZone = getRegisteredEnvText('KYBERION_TIMEZONE')?.trim();
   if (envTimeZone) return envTimeZone;
 
   return DEFAULT_TIMEZONE;

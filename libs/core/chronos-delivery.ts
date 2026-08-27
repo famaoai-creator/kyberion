@@ -1,7 +1,12 @@
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
-const ALLOWED_DELIVERY_SURFACES = new Set(['slack', 'telegram', 'discord', 'imessage']);
+const ALLOWED_DELIVERY_SURFACES = new Set<SurfaceAsyncChannel>([
+  'slack',
+  'telegram',
+  'discord',
+  'imessage',
+]);
 const PLACEHOLDER_PATTERN = /\{\{\s*([A-Za-z0-9_.-]+)\s*\}\}/gu;
 
 export interface ChronosDeliveryTarget {
@@ -41,15 +46,16 @@ function resolvePath(root: Record<string, unknown>, key: string): unknown {
 export function validateChronosDeliveryTarget(
   target: ChronosDeliveryTarget
 ): ChronosDeliveryTarget {
-  const surface = String(target.surface || '')
+  const surfaceValue = String(target.surface || '')
     .trim()
     .toLowerCase();
+  if (!ALLOWED_DELIVERY_SURFACES.has(surfaceValue as SurfaceAsyncChannel)) {
+    throw new Error(`[POLICY_VIOLATION] Unsupported Chronos delivery surface: ${surfaceValue}`);
+  }
+  const surface = surfaceValue as SurfaceAsyncChannel;
   const channel = String(target.channel || '').trim();
   const threadTs = String(target.thread_ts || '').trim();
   const template = target.template === undefined ? undefined : String(target.template);
-  if (!ALLOWED_DELIVERY_SURFACES.has(surface)) {
-    throw new Error(`[POLICY_VIOLATION] Unsupported Chronos delivery surface: ${surface}`);
-  }
   if (!channel || channel.length > 500 || channel.includes('\u0000')) {
     throw new Error('[POLICY_VIOLATION] Chronos delivery channel must be bounded and non-empty.');
   }

@@ -45,6 +45,7 @@ import {
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ReadinessRule = {
   required_keys_any?: string[];
@@ -745,7 +746,7 @@ function getProviderCapabilitiesSnapshot(): ProviderCapabilitiesSnapshot {
   });
 }
 
-async function main() {
+export async function runBaselineCheck() {
   killSwitch.startMonitor();
 
   // KM-01 fallback: without a resident chronos daemon the scheduled janitor
@@ -1102,16 +1103,39 @@ async function main() {
       orphan_count: nhiOrphans.length,
     },
   };
-
-  console.log(JSON.stringify(report, null, 2));
-
-  // Exit with non-zero if L0-L2 is fundamentally broken
-  if (status === 'needs_recovery' && result.circuitBroken) {
-    process.exit(1);
-  }
+  return report;
 }
 
-main().catch((err) => {
-  console.error(JSON.stringify({ status: 'fatal_error', error: err.message }));
-  process.exit(1);
+// Keep the CLI entrypoint thin so the same governed check can be called by a
+// typed actuator operation without spawning a script from an ADF step.
+export const runBaselineCheckCli = defineScript({
+  name: 'baseline-check',
+  flags: [],
+  async run(context) {
+    try {
+      const report = await runBaselineCheck();
+      context.print(report);
+      if (report.status === 'needs_recovery' && report.circuit_broken) {
+        process.exitCode = 1;
+      }
+      return report;
+    } catch (error) {
+      const fatalReport = {
+        status: 'fatal_error' as const,
+        circuit_broken: true,
+        failed_layer: null,
+        details: {},
+        error: error instanceof Error ? error.message : String(error),
+      };
+      context.print(fatalReport);
+      process.exitCode = 1;
+      return fatalReport;
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'run_baseline_check.ts') ||
+  isDirectScript(import.meta.url, 'run_baseline_check.js')
+)
+  void runBaselineCheckCli();

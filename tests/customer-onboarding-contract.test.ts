@@ -17,6 +17,9 @@ describe('Customer onboarding contract', () => {
     const quickstart = read('docs/QUICKSTART.md');
     const ux = read('docs/OPERATOR_UX_GUIDE.md');
     const cli = read('scripts/cli.ts');
+    // SX: the help renderer was split out of scripts/cli.ts into
+    // scripts/cli-presentation.ts; the cli still owns the entrypoint.
+    const cliPresentation = read('scripts/cli-presentation.ts');
     const dashboard = read('scripts/sovereign_dashboard.ts');
     const localDev = read('docs/developer/LOCAL_DEV.md');
 
@@ -38,7 +41,9 @@ describe('Customer onboarding contract', () => {
     // the cli must still render it via its key.
     const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
     expect(vocabulary).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
-    expect(cli).toContain("t('cli_help_onboard', locale)");
+    expect(cli).toContain("from './cli-presentation.js'");
+    expect(cli).toContain('printHelp');
+    expect(cliPresentation).toContain("t('cli_help_onboard', locale)");
     expect(dashboard).toContain('customer/{slug}/ preferred when KYBERION_CUSTOMER is set');
     expect(localDev).toContain(
       'Customer-specific identity, connections, and onboarding artifacts resolve under customer/{slug}/ when set'

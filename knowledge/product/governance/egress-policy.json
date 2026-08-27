@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/egress-policy.schema.json",
   "version": "1",
   "mode": "warn",
   "manual_allowed_domains": [

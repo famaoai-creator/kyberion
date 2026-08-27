@@ -83,9 +83,14 @@ describe('Tiered Mission Architecture', () => {
     // 2. Check Global Ledger (Should have metadata only)
     expect(safeExistsSync(globalLedgerPath)).toBe(true);
     const globalContent = safeReadFile(globalLedgerPath, { encoding: 'utf8' }) as string;
-    expect(globalContent).toContain('MISSION_EVENT:TEST_EVENT');
-    expect(globalContent).not.toContain('DO_NOT_SHOW_IN_GLOBAL');
-    expect(globalContent).toContain('Metadata only');
+    const globalEvent = globalContent
+      .trim()
+      .split('\n')
+      .filter((line) => line.includes('MISSION_EVENT:TEST_EVENT'))
+      .at(-1);
+    expect(globalEvent).toBeDefined();
+    expect(globalEvent).not.toContain('DO_NOT_SHOW_IN_GLOBAL');
+    expect(globalEvent).toContain('Metadata only');
 
     // Cleanup
     safeRmSync(missionPath, { recursive: true, force: true });

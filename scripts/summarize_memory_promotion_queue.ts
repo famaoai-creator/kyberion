@@ -8,15 +8,16 @@
 
 import { pathResolver, safeWriteFile } from '@agent/core';
 import { formatMemoryPromotionQueueMarkdown, summarizeMemoryPromotionQueue } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { summarizeMemoryPromotionQueue };
 
-function main() {
-  const jsonOnly = process.argv.includes('--json');
-  const statusArgIndex = process.argv.indexOf('--status');
-  const outputArgIndex = process.argv.indexOf('--output');
-  const status = statusArgIndex >= 0 ? process.argv[statusArgIndex + 1] : undefined;
-  const outputPath = outputArgIndex >= 0 ? process.argv[outputArgIndex + 1] : undefined;
+export function main(argv: string[] = []): void {
+  const jsonOnly = argv.includes('--json');
+  const statusArgIndex = argv.indexOf('--status');
+  const outputArgIndex = argv.indexOf('--output');
+  const status = statusArgIndex >= 0 ? argv[statusArgIndex + 1] : undefined;
+  const outputPath = outputArgIndex >= 0 ? argv[outputArgIndex + 1] : undefined;
   const rows = summarizeMemoryPromotionQueue(status);
 
   if (outputPath) {
@@ -36,6 +37,14 @@ function main() {
   console.log(formatMemoryPromotionQueueMarkdown(rows));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
+export const runSummarizeMemoryPromotionQueue = defineScript({
+  name: 'memory:summarize-promotion-queue',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'summarize_memory_promotion_queue.ts') ||
+  isDirectScript(import.meta.url, 'summarize_memory_promotion_queue.js')
+)
+  void runSummarizeMemoryPromotionQueue();

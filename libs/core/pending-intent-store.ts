@@ -1,6 +1,13 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  loadJson,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 
 export interface PendingIntentRecord {
@@ -22,11 +29,18 @@ const PENDING_INTENT_SUBDIR = 'pending-intents';
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 
 function normalizeSegment(value: string): string {
-  return value.trim().replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'pending';
+  return (
+    value
+      .trim()
+      .replace(/[^A-Za-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'pending'
+  );
 }
 
 export function getPendingIntentPath(correlationId: string): string {
-  return pathResolver.sharedTmp(path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`));
+  return pathResolver.sharedTmp(
+    path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`)
+  );
 }
 
 function ensurePendingIntentDir(): void {
@@ -80,7 +94,9 @@ export function savePendingIntent(
     expires_at: input.expires_at || new Date(Date.now() + ttlMs).toISOString(),
     source_text: input.source_text,
     intent_id: input.intent_id,
-    required_inputs: Array.from(new Set(input.required_inputs.map((item) => String(item).trim()).filter(Boolean))),
+    required_inputs: Array.from(
+      new Set(input.required_inputs.map((item) => String(item).trim()).filter(Boolean))
+    ),
     source_surface: input.source_surface,
     thread_context: input.thread_context,
     clarification_packet: input.clarification_packet,
@@ -95,9 +111,7 @@ export function loadPendingIntent(correlationId: string): PendingIntentRecord | 
   if (!safeExistsSync(filePath)) return null;
   let parsed: PendingIntentRecord | null = null;
   try {
-    parsed = normalizePendingIntent(
-      JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string)
-    );
+    parsed = normalizePendingIntent(loadJson<unknown>(filePath));
   } catch {
     clearPendingIntent(correlationId);
     return null;

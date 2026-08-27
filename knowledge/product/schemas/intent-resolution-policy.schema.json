@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "catalog_scoring": {
       "type": "object",
@@ -106,10 +107,7 @@
         "patterns": {
           "type": "array",
           "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "$ref": "#/$defs/textRule" }
-            ]
+            "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }]
           }
         },
         "resolution": { "$ref": "#/$defs/resolution" }

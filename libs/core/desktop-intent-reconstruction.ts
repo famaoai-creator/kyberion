@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { createHash } from 'node:crypto';
 import type { DesktopRecording, DesktopRecordingStep } from './desktop-recording.js';
 import { chooseNativeOps } from './native-op-mapping.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 
 export interface DesktopIntentStep {
@@ -30,13 +30,11 @@ export interface DesktopIntentDraft {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 let validateIntentFn: ValidateFunction | null = null;
 
 function intentValidator(): ValidateFunction {
   if (!validateIntentFn)
-    validateIntentFn = compileSchemaFromPath(
-      new Ajv({ allErrors: true }),
+    validateIntentFn = compileSchema(
       pathResolver.knowledge('product/schemas/desktop-intent.schema.json')
     );
   return validateIntentFn;

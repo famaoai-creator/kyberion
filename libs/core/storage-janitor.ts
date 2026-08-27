@@ -1,3 +1,4 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
@@ -9,7 +10,6 @@ import {
   safeUnlinkSync,
   safeExistsSync,
   safeWriteFile,
-  safeAppendFileSync,
   safeMkdir,
   safeMoveSync,
   safeRmSync,
@@ -294,11 +294,10 @@ function readTrashIndex(): Map<string, number> {
 
 function recordTrashEntry(originalRepoRelative: string): void {
   try {
-    safeAppendFileSync(
-      trashIndexPath(),
-      `${JSON.stringify({ path: originalRepoRelative, trashed_at: new Date().toISOString() })}\n`,
-      { encoding: 'utf8' }
-    );
+    appendJsonLine(trashIndexPath(), {
+      path: originalRepoRelative,
+      trashed_at: new Date().toISOString(),
+    });
   } catch (err) {
     // Losing the record only costs precision (mtime fallback), never data.
     logger.warn(
@@ -337,11 +336,10 @@ function pruneTrashIndex(trashedAt: Map<string, number>): void {
  */
 export function appendRetentionAudit(record: Record<string, unknown>): void {
   try {
-    safeAppendFileSync(
-      sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME),
-      `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
-      { encoding: 'utf8' }
-    );
+    appendJsonLine(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME), {
+      ts: new Date().toISOString(),
+      ...record,
+    });
   } catch (err) {
     logger.warn(
       `[JANITOR] failed to append retention audit record: ${err instanceof Error ? err.message : String(err)}`
@@ -1004,8 +1002,9 @@ export function readJanitorLastRunMs(): number | null {
   const markerPath = shared(JANITOR_MARKER_SUBPATH);
   if (!safeExistsSync(markerPath)) return null;
   try {
-    const parsed = JSON.parse(String(safeReadFile(markerPath, { encoding: 'utf8' })));
-    const ts = Date.parse(parsed?.completed_at);
+    const parsed = readJson<Record<string, unknown>>(markerPath);
+    const ts =
+      typeof parsed.completed_at === 'string' ? Date.parse(parsed.completed_at) : Number.NaN;
     return Number.isFinite(ts) ? ts : null;
   } catch {
     return null;

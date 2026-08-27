@@ -16,16 +16,16 @@
  * before the pipeline reaches this step.
  */
 
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -54,7 +54,7 @@ export interface DeploymentAdapter {
   deploy(input: DeployInput): Promise<DeployResult>;
 }
 
-const deploymentAdapterSeam = defineSeam<DeploymentAdapter>({
+const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
   key: 'deployment-adapter',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
@@ -150,7 +150,7 @@ function loadShellDeploymentAdapterConfig(
   return withExecutionContext('ecosystem_architect', () => {
     const configPath = resolveDeploymentConfigPath(env);
     if (!configPath || !safeExistsSync(configPath)) return null;
-    const parsed = JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(configPath);
     const validate = ensureDeploymentConfigValidator();
     if (!validate(parsed)) {
       const errors = (validate.errors || [])
@@ -272,8 +272,6 @@ export function installShellDeploymentAdapterFromConfigIfAvailable(
   logger.success(`[deployment-adapter] installed ShellDeploymentAdapter from ${loaded.path}`);
   return true;
 }
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const DEPLOYMENT_CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/deployment-adapter-config.schema.json'
 );
@@ -282,6 +280,6 @@ let deploymentConfigValidateFn: ValidateFunction | null = null;
 
 function ensureDeploymentConfigValidator(): ValidateFunction {
   if (deploymentConfigValidateFn) return deploymentConfigValidateFn;
-  deploymentConfigValidateFn = compileSchemaFromPath(ajv, DEPLOYMENT_CONFIG_SCHEMA_PATH);
+  deploymentConfigValidateFn = compileSchema(DEPLOYMENT_CONFIG_SCHEMA_PATH);
   return deploymentConfigValidateFn;
 }

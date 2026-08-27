@@ -26,14 +26,14 @@ import {
   createStandardYargs,
   logger,
   pathResolver,
-  safeAppendFileSync,
   safeExecResult,
-  safeExistsSync,
   safeJsonParse,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
+import { appendJsonLine } from '@agent/core/foundation';
 import { runDegradationWatch, type DegradationReport } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 
@@ -168,7 +168,7 @@ function applyPlanToPackage(pkg: RootPackageJson, packageName: string, plan: Pat
 
 function appendLedger(ledgerPath: string, record: Record<string, unknown>): void {
   safeMkdir(path.dirname(ledgerPath), { recursive: true });
-  safeAppendFileSync(ledgerPath, `${JSON.stringify(record)}\n`);
+  appendJsonLine(ledgerPath, record);
 }
 
 function auditStillVulnerable(auditStdout: string, packageName: string): boolean {
@@ -353,13 +353,15 @@ async function main(): Promise<number> {
   return 1;
 }
 
-const isDirect = process.argv[1] && /apply_dependency_patch\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'apply_dependency_patch.ts') ||
+  isDirectScript(import.meta.url, 'apply_dependency_patch.js')
+) {
   main().then(
-    (code) => process.exit(code),
+    (code) => (process.exitCode = code),
     (error) => {
       logger.error(`[patch] failed: ${(error as Error).message || error}`);
-      process.exit(1);
+      process.exitCode = 1;
     }
   );
 }

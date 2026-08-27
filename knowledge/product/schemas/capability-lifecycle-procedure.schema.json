@@ -13,6 +13,7 @@
     "policy_refs"
   ],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string",
       "minLength": 1

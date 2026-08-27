@@ -26,7 +26,6 @@ import {
   delegateCoordinatedAgentTask,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ensureDefaultOpPreflight,
   runOpPreflight,
@@ -34,8 +33,6 @@ import {
 import type { AgentProvider } from '@agent/core/agent-registry';
 import type { AgentTaskEnvelope, CoordinatedAgentTaskEnvelope } from '@agent/core';
 import type { A2AMessage } from '@agent/core/a2a-bridge';
-import { safeReadFile } from '@agent/core';
-import * as path from 'node:path';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
 const DEFAULT_AGENT_RETRY = {

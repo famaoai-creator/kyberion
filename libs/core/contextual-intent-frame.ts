@@ -1,10 +1,11 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { resolveDefaultScheduleSource, type ScheduleSourceKind } from './contextual-intent-memory.js';
+import {
+  resolveDefaultScheduleSource,
+  type ScheduleSourceKind,
+} from './contextual-intent-memory.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-frame.schema.json'
 );
@@ -19,7 +20,8 @@ export interface ContextualIntentFrame {
   object: 'calendar_events' | 'calendar_schedule' | 'unknown';
   subject: 'operator_self' | 'team' | 'unknown';
   date_range?: {
-    value: 'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom';
+    value:
+      'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom';
     normalized?: {
       timezone?: string;
       start_iso?: string;
@@ -47,7 +49,7 @@ let contextualIntentFrameValidateFn: ValidateFunction | null = null;
 
 function ensureContextualIntentFrameValidator(): ValidateFunction {
   if (contextualIntentFrameValidateFn) return contextualIntentFrameValidateFn;
-  contextualIntentFrameValidateFn = compileSchemaFromPath(ajv, CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH);
+  contextualIntentFrameValidateFn = compileSchema(CONTEXTUAL_INTENT_FRAME_SCHEMA_PATH);
   return contextualIntentFrameValidateFn;
 }
 
@@ -62,7 +64,11 @@ function inferAction(text: string): ContextualIntentAction {
     )
   )
     return 'change';
-  if (/(教えて|見せて|確認|見る|空き|予定|会議|ミーティング|打ち合わせ|アポイント|agenda|available|availability|show|see)/i.test(text))
+  if (
+    /(教えて|見せて|確認|見る|空き|予定|会議|ミーティング|打ち合わせ|アポイント|agenda|available|availability|show|see)/i.test(
+      text
+    )
+  )
     return 'read';
   return 'unknown';
 }
@@ -92,7 +98,11 @@ function inferObject(text: string): ContextualIntentFrame['object'] {
     )
   )
     return 'calendar_schedule';
-  if (/(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|calendar|agenda|availability)/i.test(text))
+  if (
+    /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|calendar|agenda|availability)/i.test(
+      text
+    )
+  )
     return 'calendar_events';
   return 'unknown';
 }
@@ -100,7 +110,11 @@ function inferObject(text: string): ContextualIntentFrame['object'] {
 function inferSubject(text: string): ContextualIntentFrame['subject'] {
   if (/(私|自分|俺|僕|私の|自分の|my|me|mine|operator|本人)/i.test(text)) return 'operator_self';
   if (/(チーム|みんな|全員|team|our)/i.test(text)) return 'team';
-  if (/(予定|スケジュール|日程|空き時間|会議|ミーティング|アポイント|打ち合わせ|カレンダー|calendar|リスケ|調整|変更|ずら|移動|修正|schedule)/i.test(text))
+  if (
+    /(予定|スケジュール|日程|空き時間|会議|ミーティング|アポイント|打ち合わせ|カレンダー|calendar|リスケ|調整|変更|ずら|移動|修正|schedule)/i.test(
+      text
+    )
+  )
     return 'operator_self';
   return 'unknown';
 }
@@ -144,7 +158,8 @@ export function buildContextualIntentFrame(sourceText: string): ContextualIntent
   const dateRangeConfidence = dateRange ? 0.92 : 0.36;
 
   const assumptions: string[] = [];
-  if (subject === 'operator_self') assumptions.push('Treat the request as the operator\'s own calendar unless stated otherwise.');
+  if (subject === 'operator_self')
+    assumptions.push("Treat the request as the operator's own calendar unless stated otherwise.");
   if (action === 'read') assumptions.push('Do not mutate the calendar.');
   if (selected) assumptions.push(`Prefer ${selected} as the source binding.`);
 
@@ -186,9 +201,11 @@ export function buildContextualIntentFrame(sourceText: string): ContextualIntent
   };
 }
 
-export function validateContextualIntentFrame(
-  value: unknown
-): { valid: boolean; errors: string[]; value?: ContextualIntentFrame } {
+export function validateContextualIntentFrame(value: unknown): {
+  valid: boolean;
+  errors: string[];
+  value?: ContextualIntentFrame;
+} {
   const validate = ensureContextualIntentFrameValidator();
   const valid = validate(value);
   return {

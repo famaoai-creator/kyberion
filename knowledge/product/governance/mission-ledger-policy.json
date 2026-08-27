@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-ledger-policy.schema.json",
   "version": "1.0.0",
   "section_title": "Mission Ledger",
   "table_headers": {

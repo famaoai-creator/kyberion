@@ -8,6 +8,38 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
+const PRESENCE_SCHEMA = {
+  type: 'object',
+  properties: {
+    channel: { type: 'string' },
+    mode: { enum: ['emitter', 'listener', 'conversational'] },
+    payload: {
+      type: 'object',
+      properties: {
+        text: { type: 'string' },
+        attachments: { type: 'array' },
+        threadId: { type: 'string' },
+        targetPersona: { type: 'string' },
+        from: { type: 'string' },
+        event_type: { type: 'string' },
+        event_data: {},
+        timeline: {},
+        person_slug: { type: 'string' },
+        org: { type: 'string' },
+        summary: { type: 'string' },
+        tone_shifts: { type: 'array', items: { type: 'string' } },
+      },
+      additionalProperties: false,
+    },
+  },
+  required: ['channel', 'payload'],
+  additionalProperties: false,
+} as const;
+
+const PRESENCE_EXAMPLE = [
+  { channel: 'operator', payload: { text: 'status update', threadId: 'thread-1' } },
+];
+
 export const PRESENCE_ACTUATOR_CAPTURE_OPS = [] as const;
 
 export const PRESENCE_ACTUATOR_TRANSFORM_OPS = [] as const;
@@ -20,7 +52,7 @@ export const PRESENCE_ACTUATOR_APPLY_OPS = [
 ] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
-  return { op, kind };
+  return { op, kind, input_schema: PRESENCE_SCHEMA, examples: PRESENCE_EXAMPLE };
 }
 
 export function describeOps() {

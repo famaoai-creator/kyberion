@@ -9,7 +9,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readJson(relativePath: string): unknown {
   return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string,
+    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string
   ) as unknown;
 }
 
@@ -17,7 +17,9 @@ describe('meeting-to-proposal-pptx TaskScenario contract', () => {
   it('stays aligned with the canonical TaskScenario schema', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schemaPath = pathResolver.rootResolve('schemas/task-scenario.schema.json');
+    const schemaPath = pathResolver.rootResolve(
+      'knowledge/product/schemas/task-scenario.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const scenario = readJson('knowledge/product/task-scenarios/meeting-to-proposal-pptx.json');
 

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-tone-style-map.schema.json",
   "version": "1.0.0",
   "tones": [
     {

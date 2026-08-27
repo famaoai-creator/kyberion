@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "queue": {
       "type": "object",
@@ -22,7 +23,11 @@
         "default_crossfade_ms": { "type": "integer", "minimum": 0, "maximum": 500 },
         "preserve_paralinguistic_tags": { "type": "boolean" }
       },
-      "required": ["default_max_chunk_chars", "default_crossfade_ms", "preserve_paralinguistic_tags"]
+      "required": [
+        "default_max_chunk_chars",
+        "default_crossfade_ms",
+        "preserve_paralinguistic_tags"
+      ]
     },
     "progress": {
       "type": "object",
@@ -48,7 +53,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "default_personal_voice_mode": { "type": "string", "enum": ["allow_fallback", "require_personal_voice"] },
+        "default_personal_voice_mode": {
+          "type": "string",
+          "enum": ["allow_fallback", "require_personal_voice"]
+        },
         "enforce_clone_engine_for_personal_tier": { "type": "boolean" }
       },
       "required": ["default_personal_voice_mode", "enforce_clone_engine_for_personal_tier"]

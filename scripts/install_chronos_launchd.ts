@@ -30,6 +30,7 @@ import {
   safeExistsSync,
   safeWriteFile,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export const CHRONOS_LAUNCHD_LABEL = 'com.kyberion.chronos';
 
@@ -214,10 +215,12 @@ async function main(): Promise<void> {
   );
 }
 
-const isDirect = process.argv[1] && /install_chronos_launchd\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'install_chronos_launchd.ts') ||
+  isDirectScript(import.meta.url, 'install_chronos_launchd.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

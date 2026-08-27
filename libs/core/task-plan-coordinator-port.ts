@@ -1,5 +1,5 @@
 import type { AgentExecutionPort } from './agent-execution-port.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export type TaskExecutionStatus =
   'pending' | 'running' | 'succeeded' | 'failed' | 'skipped_upstream_failed';
@@ -44,7 +44,7 @@ export interface TaskPlanCoordinatorPort {
   execute(params: ExecuteTaskPlanParams): Promise<ExecuteTaskPlanResult>;
 }
 
-const taskPlanCoordinatorSeam = defineSeam<TaskPlanCoordinatorPort>({
+const taskPlanCoordinatorSeam = createSeam<TaskPlanCoordinatorPort>({
   key: 'task-plan-coordinator',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

@@ -1,0 +1,129 @@
+import path from 'node:path';
+import { getAllFiles } from '@agent/core/fs-utils';
+import { pathResolver, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
+
+const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
+/**
+ * Files that legitimately read `process.env.KYBERION_*` directly because they
+ * run on a runtime that cannot import `@agent/core` (Next.js edge middleware).
+ * Each entry must keep its truthy-value parsing in sync with
+ * `libs/core/foundation/env.ts`.
+ */
+const EDGE_RUNTIME_ENV_READ_ALLOWLIST: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map([
+  ['presence/displays/chronos-mirror-v2/src/middleware.ts', new Map([['KYBERION_TRUST_PROXY', 1]])],
+]);
+const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
+const JSON_LOADER_RATCHET = 0;
+const JSONL_APPEND_RATCHET = 0;
+const ENV_RATCHET = 0;
+const JSONL_APPEND_PATTERN = new RegExp(
+  [
+    'safeAppendFile',
+    '(?:Sync)?',
+    '\\(',
+    '[\\s\\S]{0,280}?',
+    'JSON\\.stringify',
+    '[\\s\\S]{0,120}?',
+    '\\\\n',
+  ].join(''),
+  'gu'
+);
+
+function sourceFiles(): string[] {
+  return SOURCE_ROOTS.flatMap((relativeRoot) => {
+    const root = pathResolver.rootResolve(relativeRoot);
+    return getAllFiles(root).filter((filePath) => {
+      if (!SOURCE_EXTENSIONS.has(path.extname(filePath))) return false;
+      return (
+        !/(?:\.test|\.spec)\.[cm]?[jt]sx?$/.test(filePath) &&
+        !filePath.includes(`${path.sep}dist${path.sep}`)
+      );
+    });
+  });
+}
+
+export function checkFoundationAdoption(files = sourceFiles()): string[] {
+  const failures: string[] = [];
+  let jsonLoaderViolations = 0;
+  let jsonlAppendViolations = 0;
+  let ajvViolations = 0;
+  let envReads = 0;
+  let catalogDefinitions = 0;
+  let catalogDefinitionsWithoutSchema = 0;
+
+  for (const filePath of files) {
+    const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    jsonLoaderViolations += [...source.matchAll(/JSON\.parse\(\s*safeReadFile\(/gu)].length;
+    if (
+      !filePath.endsWith(`${path.sep}foundation${path.sep}json.ts`) &&
+      path.basename(filePath) !== 'check_foundation_adoption.ts'
+    ) {
+      jsonlAppendViolations += [...source.matchAll(JSONL_APPEND_PATTERN)].length;
+    }
+    if (
+      !filePath.endsWith(`${path.sep}foundation${path.sep}ajv.ts`) &&
+      /new\s+\w*Ajv\w*\s*\(/u.test(source)
+    ) {
+      ajvViolations += 1;
+    }
+    const relativePath = path
+      .relative(pathResolver.rootResolve('.'), filePath)
+      .split(path.sep)
+      .join('/');
+    const allowedReads = EDGE_RUNTIME_ENV_READ_ALLOWLIST.get(relativePath);
+    for (const match of source.matchAll(/process\.env\.(KYBERION_[A-Z0-9_]+)/gu)) {
+      const remaining = allowedReads?.get(match[1]) ?? 0;
+      if (remaining > 0) {
+        (allowedReads as Map<string, number>).set(match[1], remaining - 1);
+        continue;
+      }
+      envReads += 1;
+    }
+    for (const match of source.matchAll(/defineCatalog(?:<[^>]+>)?\(\{/gu)) {
+      catalogDefinitions += 1;
+      const suffix = source.slice(match.index ?? 0, (match.index ?? 0) + 1200);
+      if (!/\bschema\s*:/u.test(suffix)) catalogDefinitionsWithoutSchema += 1;
+    }
+  }
+
+  if (jsonLoaderViolations > JSON_LOADER_RATCHET) {
+    failures.push(
+      `shared JSON loader pattern increased: ${jsonLoaderViolations} > ${JSON_LOADER_RATCHET}`
+    );
+  }
+  if (jsonlAppendViolations > JSONL_APPEND_RATCHET) {
+    failures.push(
+      `shared JSONL append pattern increased: ${jsonlAppendViolations} > ${JSONL_APPEND_RATCHET}`
+    );
+  }
+  if (ajvViolations > 0) failures.push(`Ajv constructor outside foundation: ${ajvViolations}`);
+  if (envReads > ENV_RATCHET)
+    failures.push(`KYBERION env reads increased: ${envReads} > ${ENV_RATCHET}`);
+  if (catalogDefinitionsWithoutSchema > 0) {
+    failures.push(
+      `defineCatalog calls without schema: ${catalogDefinitionsWithoutSchema}/${catalogDefinitions}`
+    );
+  }
+  return failures;
+}
+
+export const runCheckFoundationAdoption = defineScript({
+  name: 'check:foundation-adoption',
+  flags: [],
+  run(context) {
+    const failures = checkFoundationAdoption();
+    if (failures.length > 0) {
+      console.error('[check:foundation-adoption] FAILED');
+      for (const failure of failures) console.error(`- ${failure}`);
+      throw new Error(`${failures.length} foundation adoption violation(s)`);
+    }
+    context.print('[check:foundation-adoption] OK');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_foundation_adoption.ts') ||
+  isDirectScript(import.meta.url, 'check_foundation_adoption.js')
+)
+  void runCheckFoundationAdoption();

@@ -1,12 +1,10 @@
 {
+  "$schema": "../schemas/media-drawio-edge-policy.schema.json",
   "version": "1.0.0",
   "edge_labels": [
     {
       "label": "uses",
-      "style_parts": [
-        "dashed=1",
-        "strokeOpacity=55"
-      ]
+      "style_parts": ["dashed=1", "strokeOpacity=55"]
     },
     {
       "label": "source",

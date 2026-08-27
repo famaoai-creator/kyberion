@@ -38,21 +38,13 @@
     {
       "id": "run_reminder_sweep",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "reminder_sweep_raw", "type": "ShellResult" },
+      "op": "meeting:run_action_item_reminder_sweep",
+      "produces": { "channel": "reminder_sweep_raw", "type": "ActionItemReminderSweepReport" },
       "params": {
-        "command": "node",
-        "args": [
-          "dist/scripts/action_item_reminders.js",
-          "--tone",
-          "{{tone}}",
-          "--language",
-          "{{language}}",
-          "--max-items",
-          "{{max_items}}",
-          "--report-path",
-          "{{report_path}}"
-        ]
+        "tone": "{{tone}}",
+        "language": "{{language}}",
+        "max_items": "{{max_items}}",
+        "report_path": "{{report_path}}"
       }
     },
     {

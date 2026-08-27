@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  isSurfaceAsyncChannel,
   listChannelDirectoryEntries,
   loadNotificationPreferences,
   saveNotificationPreferences,
@@ -81,8 +82,10 @@ export async function POST(req: NextRequest) {
     }
 
     const knownChannels = new Set(listChannelDirectoryEntries().map((entry) => entry.channel));
-    const notifiable = (NOTIFIABLE_SURFACES as readonly string[]).includes(surface);
-    if (!notifiable || !knownChannels.has(surface)) {
+    const channel = isSurfaceAsyncChannel(surface) ? surface : undefined;
+    const notifiable =
+      channel !== undefined && (NOTIFIABLE_SURFACES as readonly string[]).includes(channel);
+    if (!channel || !notifiable || !knownChannels.has(channel)) {
       return NextResponse.json(
         { ok: false, error: t('api.notification_surface') },
         { status: 400 }
@@ -95,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     const saved = withPreferences((prefs) => {
       prefs.default_channel = {
-        surface: surface as NotificationChannelTarget['surface'],
+        surface: channel as NotificationChannelTarget['surface'],
         target,
       };
       saveNotificationPreferences(prefs);

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/onboarding-summary-policy.schema.json",
   "version": "1.0.0",
   "title": "Kyberion Onboarding Summary",
   "sections": {

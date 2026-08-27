@@ -23,11 +23,20 @@
       }
     },
     {
+      "id": "load_identity_input",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "onboarding_input", "type": "OnboardingInput" },
+      "params": { "path": "active/shared/tmp/launch-first-run-onboarding-identity.json" }
+    },
+    {
       "id": "apply_onboarding",
-      "role": "sink",
-      "op": "system:shell",
+      "role": "source",
+      "op": "core:apply_onboarding",
+      "consumes": "onboarding_input",
+      "produces": { "channel": "onboarding_result", "type": "OnboardingResult" },
       "params": {
-        "cmd": "node dist/scripts/onboarding_apply.js --identity active/shared/tmp/launch-first-run-onboarding-identity.json"
+        "input": "{{onboarding_input}}"
       }
     }
   ]

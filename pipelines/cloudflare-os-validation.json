@@ -12,16 +12,37 @@
     },
     {
       "id": "os-control-plane-tests",
-      "op": "system:shell",
+      "op": "core:run_vitest",
+      "produces": { "channel": "os_control_plane_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run libs/core/cloudflare-os-control-plane.test.ts libs/core/cloudflare-os-surface.test.ts libs/core/share-grant-graph.test.ts libs/core/share-grant-authorizer.test.ts libs/core/provenance-taint.test.ts libs/core/egress-audience-floor.test.ts libs/core/oauth-broker.test.ts tests/vitest-network-guard.test.ts presence/displays/presence-studio/security.test.ts presence/displays/presence-studio/os-control-plane-route.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route-surface.integration.test.ts presence/displays/chronos-mirror-v2/src/app/api/os/share-grants/route.test.ts presence/displays/chronos-mirror-v2/src/components/CloudflareOsPanel.test.ts --testTimeout=30000"
+        "files": [
+          "libs/core/cloudflare-os-control-plane.test.ts",
+          "libs/core/cloudflare-os-surface.test.ts",
+          "libs/core/share-grant-graph.test.ts",
+          "libs/core/share-grant-authorizer.test.ts",
+          "libs/core/provenance-taint.test.ts",
+          "libs/core/egress-audience-floor.test.ts",
+          "libs/core/oauth-broker.test.ts",
+          "tests/vitest-network-guard.test.ts",
+          "presence/displays/presence-studio/security.test.ts",
+          "presence/displays/presence-studio/os-control-plane-route.test.ts",
+          "presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route.test.ts",
+          "presence/displays/chronos-mirror-v2/src/app/api/os/control-plane/route-surface.integration.test.ts",
+          "presence/displays/chronos-mirror-v2/src/app/api/os/share-grants/route.test.ts",
+          "presence/displays/chronos-mirror-v2/src/components/CloudflareOsPanel.test.ts"
+        ],
+        "test_timeout_ms": 30000
       }
     },
     {
       "id": "service-actuator-os-integration-tests",
-      "op": "system:shell",
+      "op": "core:run_vitest",
+      "produces": { "channel": "service_actuator_os_integration_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run libs/actuators/service-actuator/src/index.test.ts libs/actuators/service-actuator/src/reconcile-integration.test.ts"
+        "files": [
+          "libs/actuators/service-actuator/src/index.test.ts",
+          "libs/actuators/service-actuator/src/reconcile-integration.test.ts"
+        ]
       }
     },
     {
@@ -33,9 +54,10 @@
     },
     {
       "id": "computer-surface-os-projection-tests",
-      "op": "system:shell",
+      "op": "core:run_vitest",
+      "produces": { "channel": "computer_surface_os_projection_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run presence/displays/computer-surface/src/os-control-plane.test.ts"
+        "files": ["presence/displays/computer-surface/src/os-control-plane.test.ts"]
       }
     }
   ]

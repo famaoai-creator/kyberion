@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "shell-command-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "require_approval_message": { "type": "string" },
+        "deny_message": { "type": "string" }
+      },
+      "required": ["require_approval_message", "deny_message"]
+    },
+    "allowlist": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+    "denylist": { "type": "array", "items": { "$ref": "#/$defs/rule" } }
+  },
+  "required": ["version", "defaults", "allowlist", "denylist"],
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "command_regex": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "executables": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      },
+      "required": ["id", "reason"]
+    }
+  }
+}

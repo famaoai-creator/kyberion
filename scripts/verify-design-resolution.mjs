@@ -6,12 +6,13 @@
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { resolveTenantDesign, safeExistsSync, safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url));
 const rootDir = resolve(moduleDir, '..');
 
 function safeRead(p) {
-  return JSON.parse(String(safeReadFile(resolve(rootDir, p), { encoding: 'utf8' }) || ''));
+  return readJson(resolve(rootDir, p));
 }
 
 function resolveLayoutTemplate(brief, tenantResolution) {
@@ -116,7 +117,9 @@ for (const scenario of SCENARIOS) {
   const tenant = resolveTenantDesign({ rootDir, brandName, designSystemId: dsId });
   if (tenant.source === 'tenant') {
     console.log(`  テナントマッチ   : ✅ ${tenant.matchedPath}`);
-    console.log(`  theme            : ${tenant.tenantOverride?.theme || tenant.themePack?.theme?.name || ''}`);
+    console.log(
+      `  theme            : ${tenant.tenantOverride?.theme || tenant.themePack?.theme?.name || ''}`
+    );
   } else {
     console.log(`  テナントマッチ   : なし（デフォルト使用）`);
   }

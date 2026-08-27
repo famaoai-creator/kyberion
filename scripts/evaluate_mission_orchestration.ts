@@ -1,4 +1,3 @@
-import AjvModule from 'ajv';
 import * as path from 'node:path';
 import {
   buildMissionOrchestrationEvaluationReport,
@@ -6,10 +5,10 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 
 interface ScenarioRunRecord {
   scenario_id: string;
@@ -26,25 +25,26 @@ interface ScenarioRunRecord {
 }
 
 function readJson<T>(filePath: string): T {
-  return readJsonFile(filePath);
+  return readFoundationJson<T>(filePath);
 }
 
 function compileSchema(schemaPath: string) {
   return ajv.compile(readJson<Record<string, unknown>>(schemaPath));
 }
 
-function parseArg(name: string, fallback?: string): string {
-  const prefixed = process.argv.find((arg) => arg.startsWith(`${name}=`));
+function parseArg(argv: string[], name: string, fallback?: string): string {
+  const prefixed = argv.find((arg) => arg.startsWith(`${name}=`));
   if (prefixed) return prefixed.slice(name.length + 1);
-  const idx = process.argv.indexOf(name);
-  if (idx >= 0 && process.argv[idx + 1]) return process.argv[idx + 1];
+  const idx = argv.indexOf(name);
+  if (idx >= 0 && argv[idx + 1]) return argv[idx + 1];
   if (fallback !== undefined) return fallback;
   throw new Error(`Missing required argument: ${name}`);
 }
 
-function main() {
-  const runsPath = parseArg('--runs');
+export function main(argv: string[] = []): void {
+  const runsPath = parseArg(argv, '--runs');
   const outPath = parseArg(
+    argv,
     '--out',
     pathResolver.shared('evaluations/mission-orchestration/evaluation-report.json')
   );
@@ -80,4 +80,14 @@ function main() {
   );
 }
 
-main();
+export const runEvaluateMissionOrchestration = defineScript({
+  name: 'evaluate:mission-orchestration',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'evaluate_mission_orchestration.ts') ||
+  isDirectScript(import.meta.url, 'evaluate_mission_orchestration.js')
+)
+  void runEvaluateMissionOrchestration();

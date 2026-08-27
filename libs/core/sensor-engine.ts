@@ -1,13 +1,17 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * libs/core/sensor-engine.ts
  * Kyberion Autonomous Nerve System (KANS) - Sensor Engine v1.0
  * [SECURE-IO COMPLIANT]
- * 
- * Provides an abstract foundation for both Reactive (Streaming) and 
+ *
+ * Provides an abstract foundation for both Reactive (Streaming) and
  * Proactive (Polling) sensory organs.
  */
 
-import { logger, safeAppendFileSync, pathResolver } from './index.js';
+import { createLogger } from './logger.js';
+import { pathResolver } from './path-resolver.js';
+
+const logger = createLogger('sensor-engine');
 
 export type SensorType = 'streaming' | 'polling' | 'event-driven';
 
@@ -53,22 +57,22 @@ export abstract class KyberionSensor {
       ttl: event.ttl || 3600,
       origin: {
         channel: 'sensor',
-        source_id: this.config.id
+        source_id: this.config.id,
       },
       signal: {
         intent: event.intent,
         priority: event.priority || 5,
-        payload: event.payload
+        payload: event.payload,
       },
       control: {
         status: 'pending',
         feedback: 'auto',
-        evidence: []
-      }
+        evidence: [],
+      },
     };
 
     try {
-      safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+      appendJsonLine(STIMULI_PATH, stimulus);
       logger.info(`📡 [SENSOR:${this.config.id}] Emitted: ${event.intent}`);
     } catch (err) {
       logger.error(`❌ [SENSOR:${this.config.id}] Failed to emit stimulus: ${err}`);
@@ -79,7 +83,7 @@ export abstract class KyberionSensor {
     return {
       id: this.config.id,
       status: this.isRunning ? 'ACTIVE' : 'INACTIVE',
-      config: this.config
+      config: this.config,
     };
   }
 }
@@ -94,7 +98,7 @@ export abstract class PollingSensor extends KyberionSensor {
     if (this.isRunning) return;
     this.isRunning = true;
     logger.info(`🚀 [SENSOR:${this.config.id}] Polling started every ${this.config.interval_ms}ms`);
-    
+
     this.timer = setInterval(async () => {
       try {
         await this.poll();
@@ -103,7 +107,7 @@ export abstract class PollingSensor extends KyberionSensor {
       }
     }, this.config.interval_ms || 60000);
     this.timer.unref?.();
-    
+
     // Initial poll
     await this.poll();
   }

@@ -12,7 +12,6 @@
  * Also callable standalone via the cowork-integration-review pipeline.
  */
 
-import * as nodePath from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 

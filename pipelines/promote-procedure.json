@@ -35,9 +35,12 @@
     {
       "id": "promote",
       "role": "sink",
-      "op": "system:shell",
+      "op": "core:run_promote_procedure",
       "params": {
-        "cmd": "node dist/scripts/promote_procedure.js --recording \"${recording_ref}\" --procedure-id \"${procedure_id}\" --intent-phrases \"${intent_phrases}\" --status \"${status}\""
+        "recording_ref": "{{recording_ref}}",
+        "procedure_id": "{{procedure_id}}",
+        "intent_phrases": "{{intent_phrases}}",
+        "status": "{{status}}"
       }
     }
   ]

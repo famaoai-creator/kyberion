@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PresenceStudioViewerError, resolvePresenceStudioViewerContext } from './security.js';
+import {
+  PresenceStudioViewerError,
+  requirePresenceStudioLocalAdmin,
+  resolvePresenceStudioViewerContext,
+} from './security.js';
 
 function request(remoteAddress: string, authorization?: string) {
   return {
@@ -42,5 +46,22 @@ describe('Presence Studio OS viewer scope', () => {
       tenantSlugs: ['tenant-remote'],
       source: 'token',
     });
+  });
+
+  it('denies held-action mutations for readonly token viewers', () => {
+    expect(() =>
+      requirePresenceStudioLocalAdmin({
+        principalId: 'human:presence-studio-token',
+        tenantSlugs: ['tenant-remote'],
+        source: 'token',
+      })
+    ).toThrow(/localadmin/);
+    expect(() =>
+      requirePresenceStudioLocalAdmin({
+        principalId: 'human:presence-studio-localadmin',
+        tenantSlugs: ['tenant-local'],
+        source: 'loopback',
+      })
+    ).not.toThrow();
   });
 });

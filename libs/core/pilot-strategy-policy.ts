@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface PilotStrategyPolicyCatalog {
   version: string;
@@ -18,15 +15,8 @@ export interface PilotStrategyPolicyCatalog {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/pilot-strategy-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/pilot-strategy-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: PilotStrategyPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_CATALOG: PilotStrategyPolicyCatalog = {
   version: '1.0.0',
@@ -42,40 +32,15 @@ const FALLBACK_CATALOG: PilotStrategyPolicyCatalog = {
   },
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): PilotStrategyPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid pilot strategy policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as PilotStrategyPolicyCatalog;
-}
+const catalog = defineCatalog<PilotStrategyPolicyCatalog>({
+  id: 'pilot-strategy-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_CATALOG,
+});
 
 export function loadPilotStrategyPolicyCatalog(): PilotStrategyPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = FALLBACK_CATALOG;
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolvePilotStrategyPolicy(): PilotStrategyPolicyCatalog {
@@ -83,6 +48,5 @@ export function resolvePilotStrategyPolicy(): PilotStrategyPolicyCatalog {
 }
 
 export function resetPilotStrategyPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

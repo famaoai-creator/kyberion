@@ -1,7 +1,9 @@
 import { loadEnvironmentManifest, logger, probeManifest } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
-import { formatSetupSummaryLine } from './setup-report.js';
+import { formatSetupSummaryLine } from './setup-report-format.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 import '@agent/core/environment-capability-probes';
 import {
@@ -62,15 +64,16 @@ export async function runReasoningSetup(): Promise<{ must: number; should: numbe
   return summary.counts;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'reasoning_setup', ...args])
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
   const counts = await runReasoningSetup();
   if (argv.json) {
     logger.info(JSON.stringify({ status: 'ok', counts }, null, 2));
-    process.exit(counts.must === 0 && counts.should === 0 ? 0 : 1);
+    if (counts.must > 0 || counts.should > 0) throw new ScriptExitError(1, '', true);
+    return;
   }
 
   // Interactive backend selection needs a real terminal on both ends —
@@ -80,10 +83,10 @@ async function main(): Promise<void> {
   // choice instead of re-discovering (possibly differently) on every start.
   const interactiveCapable = process.stdin.isTTY && process.stdout.isTTY;
   const persistedBackend =
-    process.env.KYBERION_REASONING_BACKEND?.trim() || readPersistedReasoningBackend();
+    getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim() || readPersistedReasoningBackend();
   if (
     interactiveCapable &&
-    (counts.must > 0 || process.argv.includes('--interactive') || !persistedBackend)
+    (counts.must > 0 || args.includes('--interactive') || !persistedBackend)
   ) {
     const rl = (await import('node:readline')).createInterface({
       input: process.stdin,
@@ -124,13 +127,17 @@ async function main(): Promise<void> {
     }
   }
 
-  process.exit(counts.must === 0 && counts.should === 0 ? 0 : 1);
+  if (counts.must > 0 || counts.should > 0) throw new ScriptExitError(1, '', true);
 }
 
-const isDirect = process.argv[1] && /reasoning_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runReasoningSetupCli = defineScript({
+  name: 'reasoning:setup',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'reasoning_setup.ts') ||
+  isDirectScript(import.meta.url, 'reasoning_setup.js')
+)
+  void runReasoningSetupCli();

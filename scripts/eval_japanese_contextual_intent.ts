@@ -1,14 +1,10 @@
-import AjvModule from 'ajv';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core';
+import { defineCatalog } from '@agent/core/foundation';
 import {
   buildContextualIntentFrame,
   compileUserIntentFlow,
   resolveIntentResolutionPacket,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
-
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
 
 type CorpusItem = {
   id: string;
@@ -17,8 +13,10 @@ type CorpusItem = {
     action: 'read' | 'change' | 'unknown';
     object: 'calendar_events' | 'calendar_schedule' | 'unknown';
     subject: 'operator_self' | 'team' | 'unknown';
-    date_range?: 'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom';
-    source_binding?: 'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';
+    date_range?:
+      'today' | 'tomorrow' | 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom';
+    source_binding?:
+      'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';
   };
   expected_route: {
     intent_id: string;
@@ -40,11 +38,16 @@ function compareExpectedFrame(
   expected: CorpusItem['expected_frame']
 ): string[] {
   const failures: string[] = [];
-  if (actual.action !== expected.action) failures.push(`action expected ${expected.action}, got ${actual.action}`);
-  if (actual.object !== expected.object) failures.push(`object expected ${expected.object}, got ${actual.object}`);
-  if (actual.subject !== expected.subject) failures.push(`subject expected ${expected.subject}, got ${actual.subject}`);
+  if (actual.action !== expected.action)
+    failures.push(`action expected ${expected.action}, got ${actual.action}`);
+  if (actual.object !== expected.object)
+    failures.push(`object expected ${expected.object}, got ${actual.object}`);
+  if (actual.subject !== expected.subject)
+    failures.push(`subject expected ${expected.subject}, got ${actual.subject}`);
   if (expected.date_range && actual.date_range?.value !== expected.date_range) {
-    failures.push(`date_range expected ${expected.date_range}, got ${actual.date_range?.value || 'missing'}`);
+    failures.push(
+      `date_range expected ${expected.date_range}, got ${actual.date_range?.value || 'missing'}`
+    );
   }
   if (expected.source_binding && actual.source_binding.selected !== expected.source_binding) {
     failures.push(
@@ -55,15 +58,23 @@ function compareExpectedFrame(
 }
 
 async function main(): Promise<void> {
-  const corpusPath = pathResolver.knowledge('product/governance/japanese-contextual-intent-corpus.json');
-  const schemaPath = pathResolver.knowledge('product/schemas/japanese-contextual-intent-corpus.schema.json');
-  const corpus = readJsonFile<CorpusFile>(corpusPath);
-  const validate = compileSchemaFromPath(ajv, schemaPath);
-
-  if (!validate(corpus)) {
-    console.error('[eval:japanese-contextual-intent] invalid corpus schema');
-    console.error((validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('\n'));
-    process.exit(1);
+  const corpusPath = pathResolver.knowledge(
+    'product/governance/japanese-contextual-intent-corpus.json'
+  );
+  const schemaPath = pathResolver.knowledge(
+    'product/schemas/japanese-contextual-intent-corpus.schema.json'
+  );
+  let corpus: CorpusFile;
+  try {
+    corpus = defineCatalog<CorpusFile>({
+      id: 'japanese-contextual-intent-corpus',
+      path: corpusPath,
+      schema: schemaPath,
+    }).load();
+  } catch (error) {
+    console.error(`[eval:japanese-contextual-intent] invalid corpus schema: ${String(error)}`);
+    process.exitCode = 1;
+    return;
   }
 
   const failures: string[] = [];
@@ -85,7 +96,9 @@ async function main(): Promise<void> {
 
     const routeFailures: string[] = [];
     if (packet.selected_intent_id !== item.expected_route.intent_id) {
-      routeFailures.push(`intent expected ${item.expected_route.intent_id}, got ${packet.selected_intent_id || 'missing'}`);
+      routeFailures.push(
+        `intent expected ${item.expected_route.intent_id}, got ${packet.selected_intent_id || 'missing'}`
+      );
     }
     if (packet.selected_resolution?.shape !== item.expected_route.execution_shape) {
       routeFailures.push(
@@ -132,5 +145,5 @@ async function main(): Promise<void> {
 main().catch((error) => {
   console.error('[eval:japanese-contextual-intent] UNCAUGHT ERROR');
   console.error(error);
-  process.exit(1);
+  process.exitCode = 1;
 });

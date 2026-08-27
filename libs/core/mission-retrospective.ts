@@ -1,8 +1,8 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -356,7 +356,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
 function enqueueProposal(proposal: ProcessImprovementProposal): void {
   const queuePath = processImprovementQueuePath();
   safeMkdir(path.dirname(queuePath), { recursive: true });
-  safeAppendFileSync(queuePath, `${JSON.stringify(proposal)}\n`);
+  appendJsonLine(queuePath, proposal);
 }
 
 export function listProcessImprovementProposals(): ProcessImprovementProposal[] {

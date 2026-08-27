@@ -35,5 +35,5 @@
 ## 関連正本
 
 - [ORCHESTRATION_HARNESS_MODEL](../../../docs/developer/ORCHESTRATION_HARNESS_MODEL.ja.md) — 分解・ブリフ・評価ループの原則体系
-- [AR-07](../../../docs/developer/improvement-plans-2026-07/AR-07_SEMANTIC_INLOOP_OPS.ja.md) — in-loop semantic op のタクソノミ
-- [LOOP_CLOSURE_PLAN](../../../docs/developer/improvement-plans-2026-07/LOOP_CLOSURE_PLAN_2026-07-13.ja.md) — 本 rubric を含む4ループ計画
+- [AR-07](../../../docs/developer/improvement-plans-archive/2026-07/AR-07_SEMANTIC_INLOOP_OPS.ja.md) — in-loop semantic op のタクソノミ
+- [LOOP_CLOSURE_PLAN](../../../docs/developer/improvement-plans-archive/2026-07/LOOP_CLOSURE_PLAN_2026-07-13.ja.md) — 本 rubric を含む4ループ計画

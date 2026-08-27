@@ -18,6 +18,7 @@
  * on demand or with `--watch <seconds>`.
  */
 import * as path from 'node:path';
+import { isDirectScript } from './lib/harness.js';
 import {
   createStandardYargs,
   customerResolver,
@@ -46,6 +47,7 @@ import {
   isValidTenantSlug,
   readCanonicalWorkGraph,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson as readFoundationJson } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -159,7 +161,7 @@ interface OfficeSnapshot {
 function readJson<T>(filePath: string): T | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+    return readFoundationJson<T>(filePath);
   } catch {
     return null;
   }
@@ -326,7 +328,7 @@ function missionMatchesTenant(
 
 export function collectOfficeSnapshot(): OfficeSnapshot {
   const customerSlug = customerResolver.activeCustomer();
-  const requestedTenantSlug = normalizeTenantSlug(process.env.KYBERION_TENANT);
+  const requestedTenantSlug = normalizeTenantSlug(getRegisteredEnvText('KYBERION_TENANT'));
   const rootDir = pathResolver.rootDir();
   let tenantRegistryReadable = true;
   const tenantProfiles = (() => {
@@ -1300,7 +1302,8 @@ async function main(): Promise<void> {
 }
 
 const isDirectRun =
-  process.argv[1]?.endsWith('virtual_office.ts') || process.argv[1]?.endsWith('virtual_office.js');
+  isDirectScript(import.meta.url, 'virtual_office.ts') ||
+  isDirectScript(import.meta.url, 'virtual_office.js');
 if (isDirectRun) {
   main().catch((error) => {
     console.error(error);

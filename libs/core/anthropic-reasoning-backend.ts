@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { llmSemaphore } from './semaphore.js';
 import { metrics } from './metrics.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
@@ -394,7 +395,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     this.effort = options.effort;
     this.enableNativeDeferredTools =
       options.enableNativeDeferredTools === true ||
-      process.env.KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS === '1';
+      getRegisteredEnvText('KYBERION_ANTHROPIC_NATIVE_DEFERRED_TOOLS') === '1';
   }
 
   /**

@@ -1,0 +1,241 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Video Composition Actuator Request",
+  "description": "Compile governed composed-video bundles from a video-composition-adf contract.",
+  "anyOf": [
+    {
+      "$ref": "./video-composition-adf.schema.json"
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": {
+          "enum": [
+            "prepare_video_composition",
+            "compile_narrated_video_brief",
+            "compile_video_content_brief",
+            "lint_video_composition",
+            "create_narrated_video_from_content_brief",
+            "create_narrated_intro_movie",
+            "list_video_composition_templates",
+            "get_video_composition_job_status",
+            "await_video_composition_job",
+            "cancel_video_composition_job",
+            "get_video_composition_queue"
+          ]
+        },
+        "params": { "type": "object" }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "compile_narrated_video_brief" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["narrated_video_brief"],
+          "properties": {
+            "narrated_video_brief": {
+              "$ref": "./narrated-video-brief.schema.json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "compile_video_content_brief" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["video_content_brief"],
+          "properties": {
+            "video_content_brief": {
+              "$ref": "./video-content-brief.schema.json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "create_narrated_video_from_content_brief" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["video_content_brief", "narration_artifact_ref"],
+          "properties": {
+            "video_content_brief": {
+              "$ref": "./video-content-brief.schema.json"
+            },
+            "narration_artifact_ref": { "type": "string", "minLength": 1 },
+            "job_id": { "type": "string", "minLength": 1 },
+            "bundle_dir": { "type": "string", "minLength": 1 },
+            "output": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
+                "target_path": { "type": "string", "minLength": 1 },
+                "bundle_dir": { "type": "string", "minLength": 1 },
+                "await_completion": { "type": "boolean" },
+                "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },
+                "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "params"],
+      "properties": {
+        "action": { "const": "create_narrated_intro_movie" },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["narrated_video_brief"],
+          "properties": {
+            "narrated_video_brief": {
+              "$ref": "./narrated-video-brief.schema.json"
+            },
+            "job_id": { "type": "string", "minLength": 1 },
+            "bundle_dir": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["action", "steps"],
+      "properties": {
+        "action": { "const": "pipeline" },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "anyOf": [
+              {
+                "$ref": "./video-composition-adf.schema.json"
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": {
+                    "enum": [
+                      "prepare_video_composition",
+                      "compile_narrated_video_brief",
+                      "compile_video_content_brief",
+                      "create_narrated_video_from_content_brief",
+                      "create_narrated_intro_movie",
+                      "list_video_composition_templates",
+                      "get_video_composition_job_status",
+                      "await_video_composition_job",
+                      "cancel_video_composition_job",
+                      "get_video_composition_queue"
+                    ]
+                  },
+                  "params": { "type": "object" }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "compile_narrated_video_brief" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["narrated_video_brief"],
+                    "properties": {
+                      "narrated_video_brief": {
+                        "$ref": "./narrated-video-brief.schema.json"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "compile_video_content_brief" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["video_content_brief"],
+                    "properties": {
+                      "video_content_brief": {
+                        "$ref": "./video-content-brief.schema.json"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "create_narrated_video_from_content_brief" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["video_content_brief", "narration_artifact_ref"],
+                    "properties": {
+                      "video_content_brief": {
+                        "$ref": "./video-content-brief.schema.json"
+                      },
+                      "narration_artifact_ref": { "type": "string", "minLength": 1 },
+                      "job_id": { "type": "string", "minLength": 1 },
+                      "bundle_dir": { "type": "string", "minLength": 1 },
+                      "output": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "format": { "type": "string", "enum": ["mp4", "mov", "webm"] },
+                          "target_path": { "type": "string", "minLength": 1 },
+                          "bundle_dir": { "type": "string", "minLength": 1 },
+                          "await_completion": { "type": "boolean" },
+                          "duration_sec": { "type": "number", "minimum": 3, "maximum": 300 },
+                          "fps": { "type": "integer", "minimum": 1, "maximum": 60 }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["action", "params"],
+                "properties": {
+                  "action": { "const": "create_narrated_intro_movie" },
+                  "params": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["narrated_video_brief"],
+                    "properties": {
+                      "narrated_video_brief": {
+                        "$ref": "./narrated-video-brief.schema.json"
+                      },
+                      "job_id": { "type": "string", "minLength": 1 },
+                      "bundle_dir": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

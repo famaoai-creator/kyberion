@@ -1,10 +1,10 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
-import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type EmailBackendOperation = 'create_draft' | 'send';
 
@@ -33,7 +33,10 @@ function buildJxaScript(op: 'create_draft' | 'send', params: EmailParams): strin
     .replace(/\\/g, '\\\\')
     .replace(/"/g, '\\"')
     .replace(/\n/g, '\\n');
-  const fromAddr = (params.from ?? process.env.KYBERION_EMAIL_FROM ?? '').replace(/"/g, '\\"');
+  const fromAddr = (params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? '').replace(
+    /"/g,
+    '\\"'
+  );
 
   const sendLine = op === 'send' ? 'msg.send()' : '// draft only';
 
@@ -126,9 +129,9 @@ export class SmtpEmailProvider implements EmailProvider {
 
   isAvailable(): boolean {
     return Boolean(
-      process.env.KYBERION_SMTP_HOST &&
-      process.env.KYBERION_SMTP_USER &&
-      process.env.KYBERION_SMTP_PASS
+      getRegisteredEnvText('KYBERION_SMTP_HOST') &&
+      getRegisteredEnvText('KYBERION_SMTP_USER') &&
+      getRegisteredEnvText('KYBERION_SMTP_PASS')
     );
   }
 
@@ -144,11 +147,11 @@ export class SmtpEmailProvider implements EmailProvider {
   }
 
   async send(params: EmailParams): Promise<EmailResult> {
-    const host = process.env.KYBERION_SMTP_HOST;
-    const user = process.env.KYBERION_SMTP_USER;
-    const pass = process.env.KYBERION_SMTP_PASS;
-    const port = parseInt(process.env.KYBERION_SMTP_PORT ?? '587', 10);
-    const from = params.from ?? process.env.KYBERION_EMAIL_FROM ?? user ?? '';
+    const host = getRegisteredEnvText('KYBERION_SMTP_HOST');
+    const user = getRegisteredEnvText('KYBERION_SMTP_USER');
+    const pass = getRegisteredEnvText('KYBERION_SMTP_PASS');
+    const port = parseInt(getRegisteredEnvText('KYBERION_SMTP_PORT') ?? '587', 10);
+    const from = params.from ?? getRegisteredEnvText('KYBERION_EMAIL_FROM') ?? user ?? '';
     const to = params.to ?? '';
     const subject = params.subject ?? '(no subject)';
     const body = params.body ?? '';

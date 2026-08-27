@@ -22,15 +22,12 @@ vi.mock('@agent/core/cli-utils', () => ({
 }));
 
 describe('run_doctor', () => {
-  const exitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation(((code?: number) => undefined as never) as any);
   const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
   const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
   beforeEach(() => {
     vi.clearAllMocks();
-    exitSpy.mockImplementation(((code?: number) => undefined as never) as any);
+    process.exitCode = undefined;
     const yargsStub = {
       option: vi.fn(() => yargsStub),
       parseSync: vi.fn(() => ({})),
@@ -72,7 +69,7 @@ describe('run_doctor', () => {
   });
 
   afterEach(() => {
-    exitSpy.mockReset();
+    process.exitCode = undefined;
     logSpy.mockReset();
     errorSpy.mockReset();
   });
@@ -84,13 +81,29 @@ describe('run_doctor', () => {
 
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('kyberion-runtime-baseline');
     expect(mocks.loadEnvironmentManifest).toHaveBeenCalledWith('reasoning-backend');
-    expect(exitSpy).toHaveBeenCalledWith(0);
+    expect(process.exitCode).toBe(0);
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('reasoning-backend'));
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('pnpm setup:report --persona first-time-user')
     );
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Maintenance: janitor'));
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Governance controls:'));
+  });
+
+  it('emits the same doctor report as structured JSON when requested', async () => {
+    const yargsStub = {
+      option: vi.fn(() => yargsStub),
+      parseSync: vi.fn(() => ({ json: true })),
+    };
+    mocks.createStandardYargs.mockReturnValue(yargsStub);
+
+    const { runDoctor } = await import('./run_doctor.js');
+
+    await runDoctor(['--json']);
+
+    const payload = JSON.parse(String(logSpy.mock.calls[0]?.[0])) as { summaries?: unknown[] };
+    expect(payload.summaries).toEqual(expect.any(Array));
+    expect(process.exitCode).toBe(0);
   });
 
   it('expands the meeting runtime preset to the meeting participation manifest', async () => {
@@ -184,7 +197,7 @@ describe('run_doctor', () => {
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('pnpm setup:report --persona first-time-user')
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 
   it('routes missing reasoning backend setup to reasoning:setup instead of env bootstrap', async () => {
@@ -222,6 +235,6 @@ describe('run_doctor', () => {
     expect(logSpy).not.toHaveBeenCalledWith(
       expect.stringContaining('pnpm env:bootstrap --manifest reasoning-backend --apply')
     );
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(process.exitCode).toBe(1);
   });
 });

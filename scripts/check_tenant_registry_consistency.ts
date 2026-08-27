@@ -29,19 +29,19 @@
  * reproducibility.
  */
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   listTenantProfileSlugs,
   pathResolver,
   resolveTenant,
   safeExistsSync,
-  safeReadFile,
   safeReaddir,
   safeStat,
   listProjectRecords,
   isValidTenantSlug,
   TENANT_SLUG_PATTERN,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
@@ -87,7 +87,7 @@ export interface CheckOptions {
 
 function readJsonIfExists<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return readJson<T>(filePath);
 }
 
 export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsSnapshot {
@@ -304,12 +304,21 @@ export function runCheck(options: CheckOptions = {}): { exitCode: number; output
   return { exitCode: 0, output: output.join('\n') };
 }
 
-const isDirectExecution =
-  process.argv[1] != null && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+export const runCheckTenantRegistry = defineScript({
+  name: 'check:tenant-registry',
+  flags: [],
+  run(context) {
+    const { exitCode, output } = runCheck();
+    if (exitCode === 0) context.print(output);
+    else {
+      console.error(output);
+      process.exitCode = exitCode;
+    }
+  },
+});
 
-if (isDirectExecution) {
-  const { exitCode, output } = runCheck();
-  if (exitCode === 0) console.log(output);
-  else console.error(output);
-  process.exit(exitCode);
-}
+if (
+  isDirectScript(import.meta.url, 'check_tenant_registry_consistency.ts') ||
+  isDirectScript(import.meta.url, 'check_tenant_registry_consistency.js')
+)
+  void runCheckTenantRegistry();

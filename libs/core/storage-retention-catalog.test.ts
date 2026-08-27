@@ -9,6 +9,36 @@ import AjvModule from 'ajv';
 vi.mock('./secure-io.js', () => ({
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeReadFile: (p: string, _opts: any) => fs.readFileSync(p, 'utf8'),
+  loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+}));
+
+// Explicit test fixture for the foundation JSON boundary; production code
+// must obtain this implementation through secure-io, never a global raw-fs
+// adapter.
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.appendFileSync(p, data);
+    },
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+    writeFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, data);
+    },
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 vi.mock('./core.js', () => ({

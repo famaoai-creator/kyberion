@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface IntentOutcomePattern {
   intent_id: string;
@@ -17,7 +17,7 @@ interface IntentOutcomePatternCatalog {
 
 export function loadIntentOutcomePatterns(): IntentOutcomePattern[] {
   const filePath = pathResolver.knowledge('product/governance/intent-outcome-patterns.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as IntentOutcomePatternCatalog;
+  const parsed = loadJson<IntentOutcomePatternCatalog>(filePath);
   return Array.isArray(parsed.patterns) ? parsed.patterns : [];
 }
 

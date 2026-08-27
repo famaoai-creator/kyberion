@@ -1,15 +1,45 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   approvalRequestLogicalPath,
+  buildBridgeEmptyReplyText,
   createSurfaceApprovalRequest,
   loadApprovalRequest,
+  pathResolver,
+  resolveOperatorLocale,
   safeRmSync,
   withExecutionContext,
 } from '@agent/core';
+import type { SurfaceConversationMessageInput, SurfaceConversationResult } from '@agent/core';
+
+const captured = vi.hoisted(() => ({
+  conversationInputs: [] as { threadContext?: string; text: string }[],
+  replyText: 'ok',
+}));
+
+vi.mock('@agent/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core')>();
+  return {
+    ...actual,
+    runSurfaceMessageConversation: async (input: SurfaceConversationMessageInput) => {
+      captured.conversationInputs.push({
+        threadContext: input.threadContext,
+        text: input.text,
+      });
+      return {
+        text: captured.replyText,
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+      } satisfies SurfaceConversationResult;
+    },
+  };
+});
 
 import {
   buildTelegramThreadContextFromEntries,
   handleTelegramCallbackQuery,
+  handleTelegramUpdate,
   type TelegramThreadHistoryEntry,
 } from './index.js';
 
@@ -24,6 +54,21 @@ afterEach(() => {
   });
   delete process.env.KYBERION_SURFACE_ALLOWLISTS;
   delete process.env.TEST_APPROVAL_ID;
+});
+
+const historyChatId = `tg-m1-${RUN_ID}`;
+
+afterEach(() => {
+  captured.conversationInputs.length = 0;
+  captured.replyText = 'ok';
+  withExecutionContext('surface_runtime', () => {
+    safeRmSync(
+      pathResolver.resolve(
+        `active/shared/runtime/telegram-bridge/thread-history/${historyChatId}.jsonl`
+      ),
+      { force: true }
+    );
+  });
 });
 
 describe('telegram bridge thread context', () => {
@@ -58,6 +103,59 @@ describe('telegram bridge thread context', () => {
 
   it('returns undefined for empty history', () => {
     expect(buildTelegramThreadContextFromEntries([])).toBeUndefined();
+  });
+
+  it('never leaks the incoming message into its own thread context', async () => {
+    // m1: the user entry used to be appended BEFORE the context was built, so
+    // the message appeared in its own context and evicted a real prior turn
+    // from the 6-entry window.
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['77'] });
+    const send = (messageId: number, text: string) =>
+      handleTelegramUpdate(
+        {
+          message: {
+            message_id: messageId,
+            date: 1_700_000_000 + messageId,
+            chat: { id: historyChatId },
+            from: { id: '77', username: 'alice' },
+            text,
+          },
+        },
+        { dryRun: true }
+      );
+
+    await send(1, '最初の相談');
+    await send(2, 'それで、どうなりましたか');
+
+    expect(captured.conversationInputs).toHaveLength(2);
+    expect(captured.conversationInputs[0].threadContext).toBeUndefined();
+    expect(captured.conversationInputs[1].threadContext).toContain('User (alice): 最初の相談');
+    expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
+  });
+
+  it('answers a whitespace-only conversation reply with the empty-reply text', async () => {
+    // The shared channel-adapter delivery gate trims before sending, so a
+    // whitespace-only reply is silence and must take the empty-reply path.
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['77'] });
+    captured.replyText = '   \n\t  ';
+
+    const receipt = await handleTelegramUpdate(
+      {
+        message: {
+          message_id: 9,
+          date: 1_700_000_009,
+          chat: { id: historyChatId },
+          from: { id: '77', username: 'alice' },
+          text: 'こんにちは',
+        },
+      },
+      { dryRun: true }
+    );
+
+    expect(receipt).toMatchObject({ ok: true, chatId: historyChatId });
+    expect(receipt.reply?.text).toBe(
+      buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+    );
   });
 
   it('routes a Telegram callback query through the shared approval decision API', async () => {

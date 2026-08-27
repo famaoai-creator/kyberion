@@ -313,7 +313,7 @@ describe('agent-actuator team composition actions', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/agent-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/agent-action.schema.json')
     );
 
     expect(
@@ -365,7 +365,7 @@ describe('agent-actuator team composition actions', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/agent-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/agent-action.schema.json')
     );
 
     expect(

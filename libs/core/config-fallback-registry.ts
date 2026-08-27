@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import * as nodePath from 'node:path';
 
@@ -35,7 +35,7 @@ function readRegistry(): FallbackRegistry {
   try {
     const p = path.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
     if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string) as FallbackRegistry;
+    return loadJson<FallbackRegistry>(p);
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -45,7 +45,9 @@ function writeRegistry(registry: FallbackRegistry): void {
   try {
     const p = path.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
     safeWriteFile(p, JSON.stringify(registry, null, 2));
-  } catch { /* silent — observability must never break the caller */ }
+  } catch {
+    /* silent — observability must never break the caller */
+  }
 }
 
 /**
@@ -64,7 +66,7 @@ export function recordConfigFallback(opts: {
     const errorMsg = String(error instanceof Error ? error.message : error).slice(0, 500);
 
     const registry = readRegistry();
-    const existing = registry.entries.find(e => e.knowledge_path === knowledgePath);
+    const existing = registry.entries.find((e) => e.knowledge_path === knowledgePath);
 
     if (existing) {
       existing.last_seen = now;
@@ -88,7 +90,9 @@ export function recordConfigFallback(opts: {
     }
 
     writeRegistry(registry);
-  } catch { /* never propagate */ }
+  } catch {
+    /* never propagate */
+  }
 }
 
 /** Read all registry entries. Used by the reconcile script and pipeline. */
@@ -108,14 +112,16 @@ export function markResolved(knowledgePaths: string[]): void {
       }
     }
     writeRegistry(registry);
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 /** Remove all resolved entries. Called after a successful reconcile cycle. */
 export function pruneResolved(): number {
   const registry = readRegistry();
   const before = registry.entries.length;
-  registry.entries = registry.entries.filter(e => !e.resolved);
+  registry.entries = registry.entries.filter((e) => !e.resolved);
   writeRegistry(registry);
   return before - registry.entries.length;
 }

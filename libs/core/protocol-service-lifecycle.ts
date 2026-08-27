@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { isRecord } from './foundation/text.js';
 import { getProtocolServiceRegistryEntry } from './protocol-service-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
@@ -102,10 +103,6 @@ function safeSegment(value: string, label: string): string {
     throw new Error(`[PROTOCOL_LIFECYCLE_INVALID_${label.toUpperCase()}]`);
   }
   return normalized;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function sameScope(left: EventScope, right: EventScope): boolean {

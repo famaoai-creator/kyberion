@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync } from '@agent/core/secure-io';
 
 import { collectTraceFeed } from './trace-feed';
 
@@ -45,9 +45,7 @@ export function collectProviderDemotions(
 ): ProviderDemotionStatus[] {
   if (!safeExistsSync(statePath)) return [];
   try {
-    const parsed = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as {
-      demotions?: ProviderDemotionStatus[];
-    };
+    const parsed = loadJson<{ demotions?: ProviderDemotionStatus[] }>(statePath);
     return (parsed.demotions || []).filter(
       (entry) => entry?.provider && Number.isFinite(entry.until) && entry.until > now
     );

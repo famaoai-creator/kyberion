@@ -1,8 +1,9 @@
-import { Ajv, type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -20,7 +21,6 @@ import {
   type ThinkingLevel,
 } from './backend-capability-profile.js';
 
-const ajv = new Ajv({ allErrors: true });
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-route-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-route-policy.schema.json');
 const USER_SCHEMA_PATH = pathResolver.knowledge(
@@ -162,7 +162,7 @@ let validateUserConfigFn: ValidateFunction | null = null;
 let cachedPolicy: ReasoningRoutePolicy | null = null;
 
 function validator(): ValidateFunction {
-  if (!validatePolicyFn) validatePolicyFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  if (!validatePolicyFn) validatePolicyFn = compileSchema(SCHEMA_PATH);
   return validatePolicyFn;
 }
 
@@ -180,18 +180,13 @@ export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
   if (cachedPolicy) return cachedPolicy;
   if (!safeExistsSync(POLICY_PATH))
     throw new Error(`Missing reasoning route policy: ${POLICY_PATH}`);
-  cachedPolicy = validatePolicy(
-    JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string),
-    POLICY_PATH
-  );
+  cachedPolicy = validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
   return cachedPolicy;
 }
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
   if (!safeExistsSync(USER_CONFIG_PATH)) return {};
-  const value = JSON.parse(
-    safeReadFile(USER_CONFIG_PATH, { encoding: 'utf8' }) as string
-  ) as ReasoningRouteUserConfig;
+  const value = readJson<ReasoningRouteUserConfig>(USER_CONFIG_PATH);
   validateReasoningRouteUserConfig(value, USER_CONFIG_PATH);
   return value;
 }
@@ -200,7 +195,7 @@ export function validateReasoningRouteUserConfig(
   value: unknown,
   label = USER_CONFIG_PATH
 ): ReasoningRouteUserConfig {
-  if (!validateUserConfigFn) validateUserConfigFn = compileSchemaFromPath(ajv, USER_SCHEMA_PATH);
+  if (!validateUserConfigFn) validateUserConfigFn = compileSchema(USER_SCHEMA_PATH);
   if (!validateUserConfigFn(value)) {
     const errors = (validateUserConfigFn.errors || []).map(
       (error) => `${error.instancePath || '/'} ${error.message || 'invalid'}`
@@ -264,10 +259,10 @@ function loadOperatorLlmSelection(): { provider: string; model_id?: string } | n
   const filePath = path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
   if (!safeExistsSync(filePath)) return null;
   try {
-    const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    const value = loadJson<{
       provider?: unknown;
       model_id?: unknown;
-    };
+    }>(filePath);
     if (typeof value.provider !== 'string' || !value.provider.trim()) return null;
     return {
       provider: value.provider.trim(),

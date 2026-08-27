@@ -11,7 +11,10 @@ describe('mission-contract schema', () => {
   it('accepts valid mission contracts', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/mission-contract.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-contract.schema.json')
+    );
 
     expect(
       validate({
@@ -29,21 +32,24 @@ describe('mission-contract schema', () => {
           approved_by_sovereign: true,
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects invalid mission contracts', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/mission-contract.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-contract.schema.json')
+    );
 
     expect(
       validate({
         mission_id: 'Invalid Space',
         tier: 'confidential',
         skill: 'design',
-      }),
+      })
     ).toBe(false);
   });
 });

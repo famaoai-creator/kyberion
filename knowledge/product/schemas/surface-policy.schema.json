@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "_status": { "type": "string" },
     "_replacement": { "type": "string" },
     "version": { "type": "string" },

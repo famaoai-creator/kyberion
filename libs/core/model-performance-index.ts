@@ -1,13 +1,8 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
 /**
  * Model×role performance feedback used by future team staffing.
@@ -115,7 +110,7 @@ function readJsonl<T>(filePath: string): T[] {
 function appendJsonl(filePath: string, records: unknown[]): void {
   if (records.length === 0) return;
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeAppendFileSync(filePath, records.map((record) => JSON.stringify(record)).join('\n') + '\n');
+  for (const record of records) appendJsonLine(filePath, record);
 }
 
 export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
@@ -252,11 +247,8 @@ export function getModelRolePerformance(
       const indexPath = modelPerformanceIndexPath();
       if (safeExistsSync(indexPath)) {
         byKey =
-          (
-            JSON.parse(String(safeReadFile(indexPath, { encoding: 'utf8' }))) as {
-              by_model_role?: Record<string, ModelRolePerformance>;
-            }
-          ).by_model_role || {};
+          readJson<{ by_model_role?: Record<string, ModelRolePerformance> }>(indexPath)
+            .by_model_role || {};
       }
     } catch {
       byKey = {};

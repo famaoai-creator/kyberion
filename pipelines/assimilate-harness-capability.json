@@ -53,10 +53,12 @@
     {
       "id": "register_capability",
       "role": "source",
-      "op": "system:shell",
+      "op": "core:run_registry_manager",
       "produces": { "channel": "registry_result", "type": "ShellResult" },
       "params": {
-        "cmd": "KYBERION_PERSONA=sovereign node dist/scripts/registry_manager.js --adapter active/shared/tmp/{{tool_name}}-adapter.json --tier {{tier}} --type harness"
+        "adapter": "active/shared/tmp/{{tool_name}}-adapter.json",
+        "tier": "{{tier}}",
+        "type": "harness"
       }
     },
     {

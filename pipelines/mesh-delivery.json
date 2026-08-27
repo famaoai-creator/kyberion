@@ -9,11 +9,10 @@
   },
   "steps": [
     {
-      "op": "system:exec",
+      "op": "core:run_mesh_delivery",
       "params": {
-        "command": "node",
-        "args": ["dist/scripts/mesh_delivery_driver.js", "--json"],
-        "export_as": "mesh_delivery_report"
+        "sender_peer_id": "{{sender_peer_id}}",
+        "limit": 10
       }
     }
   ]

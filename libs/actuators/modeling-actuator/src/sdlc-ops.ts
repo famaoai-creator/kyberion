@@ -4,6 +4,7 @@ import {
   evaluateQaReadyGate,
   evaluateRequirementsCompletenessGate,
   getReasoningBackend,
+  loadJson,
   pathResolver,
   readDesignSpec,
   readRequirementsDraft,
@@ -13,19 +14,14 @@ import {
   saveRequirementsDraft,
   saveTestPlan,
 } from '@agent/core';
-import type { SoftwareQualityContract } from '@agent/core';
+import type { RequirementsDraft, SoftwareQualityContract } from '@agent/core';
 
 export interface ExtractRequirementsInput {
   mission_id: string;
   project_name: string;
   source_path: string;
   source_type?:
-    | 'call_recording'
-    | 'call_transcript'
-    | 'meeting_notes'
-    | 'document_pack'
-    | 'chat_log'
-    | 'mixed';
+    'call_recording' | 'call_transcript' | 'meeting_notes' | 'document_pack' | 'chat_log' | 'mixed';
   language?: string;
   customer_name?: string;
   customer_person_slug?: string;
@@ -48,7 +44,7 @@ export async function extractRequirements(input: ExtractRequirementsInput) {
   if (input.prior_draft_ref) {
     const priorAbs = pathResolver.rootResolve(input.prior_draft_ref);
     if (safeExistsSync(priorAbs)) {
-      priorDraft = JSON.parse(safeReadFile(priorAbs, { encoding: 'utf8' }) as string);
+      priorDraft = loadJson<unknown>(priorAbs);
     }
   }
 
@@ -104,7 +100,7 @@ export async function extractDesignSpec(input: {
     `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
   const abs = pathResolver.rootResolve(requirementsPath);
   const requirementsDraft = safeExistsSync(abs)
-    ? JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string)
+    ? loadJson<unknown>(abs)
     : readRequirementsDraft(input.mission_id);
   if (!requirementsDraft) {
     throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
@@ -145,22 +141,14 @@ export async function extractTestPlan(input: {
     readRequirementsDraft(input.mission_id) ??
     (input.requirements_draft_path &&
     safeExistsSync(pathResolver.rootResolve(input.requirements_draft_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.requirements_draft_path), {
-            encoding: 'utf8',
-          }) as string
-        )
+      ? loadJson<RequirementsDraft>(pathResolver.rootResolve(input.requirements_draft_path))
       : null);
   if (!requirementsDraft) throw new Error('[extract_test_plan] requirements draft not found');
 
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(pathResolver.rootResolve(input.design_spec_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.design_spec_path), {
-            encoding: 'utf8',
-          }) as string
-        )
+      ? loadJson<unknown>(pathResolver.rootResolve(input.design_spec_path))
       : undefined);
   const extracted = await backend.extractTestPlan({
     requirementsDraft,

@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { registerFoundationIo } from '@agent/core/foundation';
 
 /**
  * E2E-06 Task 8: customer dialogue end-to-end.
@@ -34,6 +35,7 @@ const realFsSecureIo = vi.hoisted(() => ({
       return null;
     }
   },
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   safeStat: (filePath: string) => fs.statSync(filePath),
   safeWriteFile: (filePath: string, data: string | Buffer) => {
@@ -43,6 +45,25 @@ const realFsSecureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('../libs/core/secure-io.js', () => realFsSecureIo);
+
+// Replacing the whole secure-io module also replaces its module-evaluation
+// side effect: the real `secure-io.ts` is what installs the foundation I/O
+// bridge (`registerFoundationIo`) that `foundation/json` and every governed
+// catalog read through. Without it every catalog load in this suite throws
+// `secure_foundation_io_not_registered` (and `loadVocabularyCatalog` swallows
+// that into a silent English fallback). Install the same real-fs bridge the
+// mock provides, exactly as the other direct-import suites do — this is the
+// governed implementation for this fixture root, never a fallback that would
+// let production code bypass secure-io.
+registerFoundationIo({
+  loadJson: realFsSecureIo.loadJson,
+  loadJsonIfPresent: realFsSecureIo.loadJsonIfPresent,
+  appendFile: realFsSecureIo.safeAppendFileSync,
+  exists: realFsSecureIo.safeExistsSync,
+  readFile: (filePath: string) => realFsSecureIo.safeReadFile(filePath) as string,
+  stat: (filePath: string) => realFsSecureIo.safeStat(filePath),
+  writeFile: realFsSecureIo.safeWriteFile,
+});
 
 vi.mock('../libs/core/core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
@@ -87,6 +108,7 @@ let core: typeof import('../libs/core/customer-conversation.js') &
 
 describe('customer dialogue (E2E-06)', () => {
   beforeAll(async () => {
+    vi.resetModules();
     tmpRoot = path.join(os.tmpdir(), `kyberion-e2e06-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
@@ -142,9 +164,22 @@ describe('customer dialogue (E2E-06)', () => {
       'user-facing-vocabulary.json'
     );
     fs.mkdirSync(path.dirname(vocabularyPath), { recursive: true });
+    const vocabularySchemaPath = path.join(
+      tmpRoot,
+      'knowledge',
+      'product',
+      'schemas',
+      'user-facing-vocabulary.schema.json'
+    );
+    fs.mkdirSync(path.dirname(vocabularySchemaPath), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/user-facing-vocabulary.schema.json'),
+      vocabularySchemaPath
+    );
     fs.writeFileSync(
       vocabularyPath,
       JSON.stringify({
+        version: '1.0.0',
         default_locale: 'en',
         required_locales: ['en', 'ja'],
         domains: {

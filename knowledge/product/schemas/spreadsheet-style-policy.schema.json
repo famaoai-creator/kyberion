@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "role_indices"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "role_indices": {
       "type": "object",

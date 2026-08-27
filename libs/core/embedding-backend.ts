@@ -1,4 +1,4 @@
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface EmbeddingBackend {
   name: string;
@@ -8,7 +8,7 @@ export interface EmbeddingBackend {
 }
 
 const VECTOR_SIZE = 64;
-const embeddingBackendSeam = defineSeam<EmbeddingBackend>({
+const embeddingBackendSeam = createSeam<EmbeddingBackend>({
   key: 'embedding-backend',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,
@@ -24,7 +24,7 @@ function hashToken(token: string): number {
   return hash >>> 0;
 }
 
-function normalizeText(text: string): string[] {
+function normalizeEmbeddingText(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -34,7 +34,7 @@ function normalizeText(text: string): string[] {
 
 function embedText(text: string): Float32Array {
   const vector = new Float32Array(VECTOR_SIZE);
-  const tokens = normalizeText(text);
+  const tokens = normalizeEmbeddingText(text);
   if (tokens.length === 0) return vector;
 
   for (const token of tokens) {
@@ -60,7 +60,7 @@ function embedText(text: string): Float32Array {
 export function getEmbeddingBackend(): EmbeddingBackend | null {
   const registeredBackend = embeddingBackendSeam.getOptional();
   if (registeredBackend) return registeredBackend;
-  if (process.env.KYBERION_DISABLE_EMBEDDINGS === '1') return null;
+  if (getRegisteredEnvText('KYBERION_DISABLE_EMBEDDINGS') === '1') return null;
   return {
     name: 'local-hash-embedding',
     async embed(text: string): Promise<Float32Array> {
@@ -122,3 +122,4 @@ export function reciprocalRankFusion(
   }
   return scores;
 }
+import { getRegisteredEnvText } from './foundation/env.js';

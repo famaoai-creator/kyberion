@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
+import { readJson as readFoundationJson } from './foundation/json.js';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
@@ -160,7 +161,7 @@ function onboardingPath(name: string): string {
 
 function readJson<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+  return readFoundationJson<T>(filePath);
 }
 
 function writeJson(filePath: string, value: unknown): void {

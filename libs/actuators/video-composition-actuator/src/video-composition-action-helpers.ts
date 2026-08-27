@@ -18,6 +18,7 @@ import {
   renderNarratedFallbackVideo,
   renderVideoCompositionBundleAsync,
   safeExec,
+  safeExecResult,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -29,6 +30,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflightSync,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { VideoCompositionADF } from '@agent/core';
@@ -43,7 +45,6 @@ import {
   packetHistory,
   resolveActionParams,
   resolveAwaitCompletion,
-  isPlainObject,
   runtime,
   trackLifecycleDiagnostics,
   upsertJobDiagnostics,
@@ -103,6 +104,18 @@ type VideoCompositionAction =
         path: string;
         require_audio?: boolean;
         require_video?: boolean;
+        export_as?: string;
+      };
+    }
+  | {
+      action: 'validate_narrated_video_artifact';
+      params: {
+        narration_path: string;
+        video_output_path: string;
+        video_bundle_dir: string;
+        mission_evidence_dir: string;
+        video_slug: string;
+        tolerance_sec?: number;
         export_as?: string;
       };
     }
@@ -514,6 +527,128 @@ async function verifyRenderedVideoArtifact(params: {
   };
 }
 
+async function validateNarratedVideoArtifact(params: {
+  // Dispatched from the untyped action router; every field is coerced and
+  // existence-checked below, so the contract is enforced at runtime.
+  narration_path?: string;
+  video_output_path?: string;
+  video_bundle_dir?: string;
+  mission_evidence_dir?: string;
+  video_slug?: string;
+  tolerance_sec?: number;
+  export_as?: string;
+}) {
+  const rootDir = pathResolver.rootDir();
+  const resolveArtifactPath = (value: string) =>
+    pathResolver.rootResolve(String(value || '').trim());
+  const narrationPath = resolveArtifactPath(params.narration_path);
+  const videoPath = resolveArtifactPath(params.video_output_path);
+  const bundleDir = resolveArtifactPath(params.video_bundle_dir);
+  const evidenceDir = resolveArtifactPath(params.mission_evidence_dir);
+  const videoSlug = String(params.video_slug || '').trim();
+  if (!videoSlug) throw new Error('validate_narrated_video_artifact requires video_slug');
+
+  for (const [label, artifactPath] of [
+    ['narration', narrationPath],
+    ['video', videoPath],
+    ['bundle index', path.join(bundleDir, 'index.html')],
+    ['bundle render plan', path.join(bundleDir, 'render-plan.json')],
+  ] as const) {
+    if (!safeExistsSync(artifactPath)) {
+      throw new Error(`validate_narrated_video_artifact missing ${label}: ${artifactPath}`);
+    }
+  }
+
+  const streamVerification = await verifyRenderedVideoArtifact({
+    path: videoPath,
+    require_audio: true,
+    require_video: true,
+  });
+  const frameDir = path.join(evidenceDir, `${videoSlug}-frames`);
+  safeMkdir(frameDir, { recursive: true });
+  const framePaths = [
+    path.join(frameDir, 'frame-000.png'),
+    path.join(frameDir, 'frame-001.png'),
+    path.join(frameDir, 'frame-002.png'),
+  ];
+  const frameCommands: string[][] = [
+    ['-y', '-i', videoPath, '-vf', "select='eq(n,0)'", '-vframes', '1', framePaths[0]],
+    ['-y', '-ss', '00:00:06', '-i', videoPath, '-vframes', '1', framePaths[1]],
+    ['-y', '-ss', '00:00:11', '-i', videoPath, '-vframes', '1', framePaths[2]],
+  ];
+  for (const args of frameCommands) {
+    safeExec('ffmpeg', args, { cwd: rootDir, timeoutMs: 120_000 });
+  }
+  for (const framePath of framePaths) {
+    if (!safeExistsSync(framePath)) {
+      throw new Error(`validate_narrated_video_artifact failed to extract frame: ${framePath}`);
+    }
+  }
+
+  const blackFrameCheck = safeExecResult(
+    'ffmpeg',
+    [
+      '-hide_banner',
+      '-i',
+      videoPath,
+      '-vf',
+      'blackdetect=d=0.5:pic_th=0.98:pix_th=0.10',
+      '-an',
+      '-f',
+      'null',
+      '-',
+    ],
+    { cwd: rootDir, timeoutMs: 120_000 }
+  );
+  if (blackFrameCheck.status !== 0) {
+    throw new Error(
+      `validate_narrated_video_artifact black-frame probe failed: ${blackFrameCheck.stderr.trim()}`
+    );
+  }
+  if (`${blackFrameCheck.stdout}\n${blackFrameCheck.stderr}`.includes('black_start')) {
+    throw new Error(`validate_narrated_video_artifact detected a black frame in ${videoPath}`);
+  }
+
+  const probeDuration = (artifactPath: string) => {
+    const output = safeExec(
+      'ffprobe',
+      ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=nw=1:nk=1', artifactPath],
+      { cwd: rootDir, timeoutMs: 30_000 }
+    ).trim();
+    const duration = Number(output);
+    if (!Number.isFinite(duration)) {
+      throw new Error(`validate_narrated_video_artifact could not read duration: ${artifactPath}`);
+    }
+    return duration;
+  };
+  const videoDurationSec = probeDuration(videoPath);
+  const narrationDurationSec = probeDuration(narrationPath);
+  const toleranceSec = Math.max(0, Number(params.tolerance_sec ?? 5));
+  const durationDeltaSec = Math.abs(videoDurationSec - narrationDurationSec);
+  if (durationDeltaSec > toleranceSec) {
+    throw new Error(
+      `validate_narrated_video_artifact duration mismatch: video=${videoDurationSec} audio=${narrationDurationSec} delta=${durationDeltaSec} tolerance=${toleranceSec}`
+    );
+  }
+
+  return {
+    status: 'succeeded',
+    kind: 'narrated_video_artifact_validation',
+    narration_path: narrationPath,
+    video_output_path: videoPath,
+    video_bundle_dir: bundleDir,
+    frame_paths: framePaths,
+    has_audio: streamVerification.has_audio,
+    has_video: streamVerification.has_video,
+    black_frame_check: 'passed',
+    video_duration_sec: videoDurationSec,
+    narration_duration_sec: narrationDurationSec,
+    duration_delta_sec: durationDeltaSec,
+    duration_tolerance_sec: toleranceSec,
+    ...(params.export_as ? { export_as: params.export_as } : {}),
+  };
+}
+
 async function isRenderableVideoArtifact(artifactPath: string): Promise<boolean> {
   if (!artifactPath || !safeExistsSync(artifactPath)) {
     return false;
@@ -709,7 +844,7 @@ async function prepareVideoComposition(params: {
   const awaitCompletion = resolveAwaitCompletion(adf, policy);
   const bundlePreview = compileVideoCompositionADF(adf, { bundleDir: params.bundle_dir });
   const jobTicketPath = path.join(bundlePreview.bundle_dir, 'job-state.json');
-  const runMode = String(process.env.KYBERION_VIDEO_RENDER_RUN_MODE || 'foreground');
+  const runMode = String(getRegisteredEnvText('KYBERION_VIDEO_RENDER_RUN_MODE') || 'foreground');
   const detachedBackground =
     adf.output?.detached_background === true &&
     awaitCompletion === false &&
@@ -1067,6 +1202,9 @@ export async function handleSingleAction(input: VideoCompositionAction) {
   if (action === 'verify_rendered_video_artifact') {
     return verifyRenderedVideoArtifact(params);
   }
+  if (action === 'validate_narrated_video_artifact') {
+    return validateNarratedVideoArtifact(params);
+  }
   if (action === 'list_video_composition_templates') {
     return listVideoCompositionTemplates();
   }
@@ -1100,7 +1238,7 @@ export async function handleAction(input: VideoCompositionAction) {
   return handleSingleAction(input);
 }
 
-export async function dispatchDecisionOp(
+export async function dispatchVideoCompositionOperation(
   op: string,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>

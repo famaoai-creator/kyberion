@@ -1,6 +1,6 @@
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   claimWorkItem,
   expireWorkItemLeases,
@@ -13,12 +13,7 @@ export interface MissionRequestedTaskRecoveryRecord {
   task_id: string;
   work_item_id?: string;
   status:
-    | 'waiting'
-    | 'reissued'
-    | 'missing_dispatch'
-    | 'missing_work_item'
-    | 'terminal'
-    | 'skipped';
+    'waiting' | 'reissued' | 'missing_dispatch' | 'missing_work_item' | 'terminal' | 'skipped';
   lease_id?: string;
   lease_expires_at?: string;
   attempt_count?: number;
@@ -43,7 +38,7 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
   const filePath = nextTasksPath(missionId);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

@@ -1,5 +1,6 @@
 import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
 import { consumeTenantBudget, TenantRateLimitExceededError } from './tenant-rate-limiter.js';
 
@@ -16,7 +17,7 @@ import { consumeTenantBudget, TenantRateLimitExceededError } from './tenant-rate
 
 /** Delegation hops taken to reach this process (0 = operator-started root). */
 export function currentDelegationDepth(): number {
-  const depth = Number(process.env.KYBERION_DELEGATION_DEPTH);
+  const depth = Number(getRegisteredEnvText('KYBERION_DELEGATION_DEPTH'));
   return Number.isFinite(depth) && depth > 0 ? Math.floor(depth) : 0;
 }
 
@@ -30,8 +31,8 @@ export function assertOperationPolicy(input: {
   message?: string;
   context?: Record<string, unknown>;
 }): PolicyDecision {
-  const agentId = process.env.KYBERION_PERSONA || 'unknown';
-  const ring = Number(process.env.KYBERION_AGENT_RING);
+  const agentId = getRegisteredEnvText('KYBERION_PERSONA') || 'unknown';
+  const ring = Number(getRegisteredEnvText('KYBERION_AGENT_RING'));
   const decision = policyEngine.evaluate({
     agentId,
     operation: input.operation,
@@ -62,7 +63,7 @@ export function assertOperationPolicy(input: {
   if (!budget.allowed) {
     throw new TenantRateLimitExceededError(
       budget,
-      process.env.KYBERION_TENANT?.trim() || 'unknown'
+      getRegisteredEnvText('KYBERION_TENANT')?.trim() || 'unknown'
     );
   }
   return decision;

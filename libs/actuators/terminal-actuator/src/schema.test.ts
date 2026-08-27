@@ -11,7 +11,10 @@ describe('terminal-actuator schema', () => {
   it('accepts supported terminal actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/terminal-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/terminal-action.schema.json')
+    );
 
     expect(
       validate({
@@ -20,7 +23,7 @@ describe('terminal-actuator schema', () => {
           shell: '/bin/zsh',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -32,20 +35,23 @@ describe('terminal-actuator schema', () => {
           rows: 40,
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported terminal actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/terminal-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/terminal-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/shell-command-policy.schema.json",
   "version": "1",
   "defaults": {
     "require_approval_message": "Shell command requires approval under Kyberion governance.",

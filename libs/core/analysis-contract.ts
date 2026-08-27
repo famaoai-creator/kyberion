@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface AnalysisExecutionContractDefinition {
   contract_id: string;
@@ -19,12 +19,16 @@ let analysisExecutionContractCache: AnalysisExecutionContractDefinition[] | null
 export function loadAnalysisExecutionContracts(): AnalysisExecutionContractDefinition[] {
   if (analysisExecutionContractCache) return analysisExecutionContractCache;
   const filePath = pathResolver.knowledge('product/governance/analysis-execution-contracts.json');
-  const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as AnalysisExecutionContractFile;
+  const parsed = loadJson<AnalysisExecutionContractFile>(filePath);
   analysisExecutionContractCache = Array.isArray(parsed.contracts) ? parsed.contracts : [];
   return analysisExecutionContractCache;
 }
 
-export function resolveAnalysisExecutionContract(intentId?: string): AnalysisExecutionContractDefinition | null {
+export function resolveAnalysisExecutionContract(
+  intentId?: string
+): AnalysisExecutionContractDefinition | null {
   if (!intentId) return null;
-  return loadAnalysisExecutionContracts().find((contract) => contract.intent_id === intentId) || null;
+  return (
+    loadAnalysisExecutionContracts().find((contract) => contract.intent_id === intentId) || null
+  );
 }

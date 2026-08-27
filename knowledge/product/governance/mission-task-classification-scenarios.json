@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-task-classification-scenarios.schema.json",
   "version": "1.0.0",
   "purpose": "regression-fixture",
   "scenarios": [

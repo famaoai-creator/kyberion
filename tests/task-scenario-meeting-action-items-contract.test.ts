@@ -9,7 +9,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readJson(relativePath: string): unknown {
   return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string,
+    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string
   ) as unknown;
 }
 
@@ -17,7 +17,9 @@ describe('meeting-action-items TaskScenario contract', () => {
   it('stays aligned with the meeting postprocess MVP contract', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schemaPath = pathResolver.rootResolve('schemas/task-scenario.schema.json');
+    const schemaPath = pathResolver.rootResolve(
+      'knowledge/product/schemas/task-scenario.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const scenario = readJson('knowledge/product/task-scenarios/meeting-action-items.json');
 
@@ -30,7 +32,8 @@ describe('meeting-action-items TaskScenario contract', () => {
         source: 'meeting-actuator',
       },
       repeat_run: {
-        pipeline_template: 'knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json',
+        pipeline_template:
+          'knowledge/product/pipeline-templates/meeting-facilitation-postprocess.json',
         params_from_profile: true,
         profile_input: 'knowledge/personal/task-profiles/meeting-action-items.json',
       },

@@ -1,19 +1,25 @@
 import * as path from 'node:path';
-import { 
-  pathResolver, 
-  validateReadPermission, 
-  validateWritePermission, 
-  scanForConfidentialMarkers,
-  logger
-} from '@agent/core';
+import { validateWritePermission, scanForConfidentialMarkers, safeReadFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-async function main() {
-  const argv = await yargs(hideBin(process.argv))
-    .option('dir', { type: 'string', demandOption: true, describe: 'Directory to scan for compliance' })
-    .option('tier', { type: 'string', choices: ['public', 'confidential', 'personal'], default: 'public', describe: 'Target tier for the files' })
+export async function runComplianceScan(args: string[] = []): Promise<{
+  status: 'passed' | 'failed';
+  violations: string[];
+}> {
+  const argv = await yargs(args)
+    .option('dir', {
+      type: 'string',
+      demandOption: true,
+      describe: 'Directory to scan for compliance',
+    })
+    .option('tier', {
+      type: 'string',
+      choices: ['public', 'confidential', 'personal'],
+      default: 'public',
+      describe: 'Target tier for the files',
+    })
     .parse();
 
   const targetDir = path.resolve(process.cwd(), argv.dir);
@@ -29,10 +35,12 @@ async function main() {
 
     // 2. Check Content-based Markers (PII, Secrets, Confidentiality)
     try {
-      const content = (await import('node:fs')).readFileSync(file, 'utf8');
+      const content = String(safeReadFile(file, { encoding: 'utf8' }));
       const scan = scanForConfidentialMarkers(content);
       if (scan.hasMarkers) {
-        violations.push(`[CONTENT_VIOLATION] ${file}: Detected sensitive markers: ${scan.markers.join(', ')}`);
+        violations.push(
+          `[CONTENT_VIOLATION] ${file}: Detected sensitive markers: ${scan.markers.join(', ')}`
+        );
       }
     } catch (err) {
       // Skip non-text files or read errors
@@ -40,14 +48,23 @@ async function main() {
   }
 
   if (violations.length > 0) {
-    console.log(JSON.stringify({ status: 'failed', violations }, null, 2));
-    process.exit(1);
-  } else {
-    console.log(JSON.stringify({ status: 'passed' }, null, 2));
+    return { status: 'failed', violations };
   }
+  return { status: 'passed', violations: [] };
 }
 
-main().catch(err => {
-  logger.error(err.message);
-  process.exit(1);
-});
+if (
+  isDirectScript(import.meta.url, 'compliance_checker.ts') ||
+  isDirectScript(import.meta.url, 'compliance_checker.js')
+) {
+  void defineScript({
+    name: 'compliance:check',
+    flags: [],
+    async run({ argv, print }) {
+      const result = await runComplianceScan(argv);
+      print(result);
+      if (result.status === 'failed')
+        throw new ScriptExitError(1, 'Compliance violations detected');
+    },
+  })();
+}

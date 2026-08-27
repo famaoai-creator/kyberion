@@ -1,13 +1,7 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeUnlink,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, loadJson, safeUnlink, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -77,7 +71,7 @@ export function appendReasoningFailoverEvent(
       ...event,
       error_summary: truncateErrorSummary(event.error_summary),
     };
-    safeAppendFileSync(eventsPath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(eventsPath, record);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[reasoning-failover] failed to append failover event: ${detail}`);
@@ -111,7 +105,7 @@ export function readReasoningFailover(): ReasoningFailoverMarker | null {
   try {
     const markerPath = reasoningFailoverMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    const parsed = JSON.parse(safeReadFile(markerPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<Partial<ReasoningFailoverMarker>>(markerPath);
     if (parsed && typeof parsed.from_mode === 'string' && typeof parsed.to_mode === 'string') {
       return parsed as ReasoningFailoverMarker;
     }

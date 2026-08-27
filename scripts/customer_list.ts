@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
@@ -10,6 +9,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CustomerEntry {
   slug: string;
@@ -62,22 +62,23 @@ export function printText(entries: CustomerEntry[]): void {
   }
 }
 
-function main(): void {
-  const json = process.argv.includes('--json');
-  try {
-    const entries = listCustomers();
-    if (json) {
-      console.log(JSON.stringify(entries, null, 2));
-      return;
+export const main = defineScript({
+  name: 'customer:list',
+  flags: ['json'],
+  run(context) {
+    try {
+      const entries = listCustomers();
+      if (context.json) context.print(entries);
+      else printText(entries);
+    } catch (err) {
+      throw new Error(formatClassification(classifyError(err)));
     }
-    printText(entries);
-  } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
-  }
-}
+  },
+});
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main();
+if (
+  isDirectScript(import.meta.url, 'customer_list.ts') ||
+  isDirectScript(import.meta.url, 'customer_list.js')
+) {
+  void main();
 }

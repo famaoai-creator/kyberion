@@ -2,15 +2,16 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
+import { loadJson, safeExistsSync, validateUrl } from './secure-io.js';
 import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,
   type EgressPayloadContext,
 } from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /**
  * Standardized network utilities for Kyberion Components.
@@ -21,7 +22,9 @@ function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
   try {
     const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
     if (safeExistsSync(policyPath)) {
-      const policy = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string);
+      const policy = loadJson<{ network_guardrails?: { max_request_size_kb?: unknown } }>(
+        policyPath
+      );
       const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);
       if (!Number.isNaN(maxRequestSizeKb) && maxRequestSizeKb > 0) {
         return { maxRequestSizeKb };
@@ -129,13 +132,13 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   const egressDecision = evaluateEgressPolicy(url, egressContext);
   if (egressDecision.verdict === 'deny') {
     recordGovernanceAction(
-      process.env.KYBERION_PERSONA || 'unknown',
+      getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       'egress',
       `${hostname}:denied`,
       true
     );
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'failed',
@@ -162,7 +165,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
   if (egressDecision.verdict === 'warn') {
     logger.warn(`[NETWORK_POLICY] ${egressDecision.reason}`);
     recordGovernanceAction(
-      process.env.KYBERION_PERSONA || 'unknown',
+      getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       'egress',
       `${hostname}:warn`,
       false
@@ -172,7 +175,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
     // produced no durable evidence for the warn→enforce decision. Mirror
     // the deny path into the audit chain (pnpm egress:report aggregates it).
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'allowed',
@@ -206,7 +209,7 @@ export async function secureFetch<T = any>(options: SecureFetchOptions): Promise
       headers: finalHeaders,
     });
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       action: 'egress_request',
       operation: 'secure_fetch',
       result: 'completed',

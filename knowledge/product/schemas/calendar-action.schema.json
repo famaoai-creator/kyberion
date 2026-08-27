@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Calendar Actuator Action",
+  "type": "object",
+  "required": ["op"],
+  "additionalProperties": false,
+  "properties": {
+    "op": {
+      "enum": ["list_calendars", "list_events", "query_freebusy", "create_event"]
+    },
+    "params": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attendees": { "type": "array", "items": { "type": "string" } },
+        "backend": { "type": "string" },
+        "backends": { "type": "array", "items": { "type": "string" } },
+        "calendar_id": { "type": "string" },
+        "calendar_names": { "type": "array", "items": { "type": "string" } },
+        "calendar_targets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "backend": { "type": "string" },
+              "calendar_id": { "type": "string" },
+              "calendar_name": { "type": "string" }
+            }
+          }
+        },
+        "conference_request_id": { "type": "string" },
+        "description": { "type": "string" },
+        "end_date": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" },
+        "query": { "type": "string" },
+        "start_date": { "type": "string", "format": "date-time" },
+        "time_zone": { "type": "string" },
+        "title": { "type": "string" },
+        "with_meet": { "type": "boolean" }
+      }
+    }
+  }
+}

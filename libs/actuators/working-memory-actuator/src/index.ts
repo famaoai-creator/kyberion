@@ -9,6 +9,7 @@
 import * as path from 'node:path';
 import {
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -61,11 +62,17 @@ export interface VolatileSidecar {
   pinned: boolean;
 }
 
+export const actuator = defineCatalogBackedActuator({
+  id: 'working-memory-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const SCHEMA_REF = '../../../schemas/volatile-knowledge.schema.json';
+const SCHEMA_REF = '../../../knowledge/product/schemas/volatile-knowledge.schema.json';
 
 function isoNow(): string {
   return new Date().toISOString();
@@ -115,7 +122,7 @@ function loadSidecar(mdPath: string): VolatileSidecar | null {
   const sp = sidecarPath(mdPath);
   if (!safeExistsSync(sp)) return null;
   try {
-    return JSON.parse(safeReadFile(sp, { encoding: 'utf8' }) as string) as VolatileSidecar;
+    return loadJson<VolatileSidecar>(sp);
   } catch {
     return null;
   }
@@ -570,10 +577,12 @@ function opList(params: Record<string, unknown>): unknown {
   const indexPath = pr.active('INDEX.volatile.json');
   if (!safeExistsSync(indexPath)) return [];
   try {
-    const all = JSON.parse(safeReadFile(indexPath, { encoding: 'utf8' }) as string) as Array<{
-      mdPath: string;
-      sidecar: VolatileSidecar;
-    }>;
+    const all = loadJson<
+      Array<{
+        mdPath: string;
+        sidecar: VolatileSidecar;
+      }>
+    >(indexPath);
     return all.filter((entry) => {
       if (params.scope && entry.sidecar.scope !== params.scope) return false;
       if (params.cadence && entry.sidecar.cadence !== params.cadence) return false;
@@ -606,9 +615,7 @@ function opRunGc(params: Record<string, unknown>): unknown {
       if (entry.endsWith('.volatile.json')) {
         let sidecar: VolatileSidecar;
         try {
-          sidecar = JSON.parse(
-            safeReadFile(fullPath, { encoding: 'utf8' }) as string
-          ) as VolatileSidecar;
+          sidecar = loadJson<VolatileSidecar>(fullPath);
         } catch {
           results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
           continue;
@@ -661,9 +668,7 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
       const fullPath = path.join(dir, entry);
       if (entry.endsWith('.volatile.json')) {
         try {
-          const sidecar = JSON.parse(
-            safeReadFile(fullPath, { encoding: 'utf8' }) as string
-          ) as VolatileSidecar;
+          const sidecar = loadJson<VolatileSidecar>(fullPath);
           faces.push({ mdPath: fullPath.replace(/\.volatile\.json$/, '.md'), sidecar });
         } catch {
           /* skip */
@@ -819,3 +824,5 @@ export async function handleAction(input: HandleActionInput): Promise<Record<str
   const exportAs = (params.export_as as string) ?? 'working_memory_result';
   return { ...(input.context ?? {}), [exportAs]: result };
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

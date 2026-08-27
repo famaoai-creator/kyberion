@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-contract-memory.schema.json",
   "version": "1.0.0",
   "entries": []
 }

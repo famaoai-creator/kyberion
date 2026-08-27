@@ -44,10 +44,12 @@
     {
       "id": "register_capability",
       "role": "source",
-      "op": "system:shell",
+      "op": "core:run_registry_manager",
       "produces": { "channel": "registry_result", "type": "ShellResult" },
       "params": {
-        "cmd": "KYBERION_PERSONA=sovereign node dist/scripts/registry_manager.js --adapter active/shared/tmp/{{service_name}}-gateway-adapter.json --tier {{tier}} --type gateway"
+        "adapter": "active/shared/tmp/{{service_name}}-gateway-adapter.json",
+        "tier": "{{tier}}",
+        "type": "gateway"
       }
     },
     {

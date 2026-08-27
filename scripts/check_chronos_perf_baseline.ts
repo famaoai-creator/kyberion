@@ -7,6 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chromium, type Page } from 'playwright';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface ChronosPerfSample {
   url: string;
@@ -55,9 +56,9 @@ export async function sampleChronosPage(
   };
 }
 
-function arg(name: string, fallback: string): string {
-  const index = process.argv.indexOf(name);
-  return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+function arg(argv: string[], name: string, fallback: string): string {
+  const index = argv.indexOf(name);
+  return index >= 0 && argv[index + 1] ? argv[index + 1] : fallback;
 }
 
 function startServer(port: string): ChildProcess {
@@ -81,12 +82,12 @@ async function waitFor(url: string): Promise<void> {
   throw new Error(`Chronos did not become ready at ${url}`);
 }
 
-export async function runChronosPerfBaseline(): Promise<ChronosPerfReport> {
-  const port = arg('--port', '3318');
-  const baseUrl = arg('--url', `http://127.0.0.1:${port}`);
-  const minFps = Number(arg('--min-fps', '55'));
-  const maxHeap = Number(arg('--max-heap-mib', '120'));
-  const ownedServer = process.argv.indexOf('--no-start') < 0;
+export async function runChronosPerfBaseline(argv: string[] = []): Promise<ChronosPerfReport> {
+  const port = arg(argv, '--port', '3318');
+  const baseUrl = arg(argv, '--url', `http://127.0.0.1:${port}`);
+  const minFps = Number(arg(argv, '--min-fps', '55'));
+  const maxHeap = Number(arg(argv, '--max-heap-mib', '120'));
+  const ownedServer = argv.indexOf('--no-start') < 0;
   const server = ownedServer ? startServer(port) : undefined;
   try {
     await waitFor(baseUrl);
@@ -119,14 +120,19 @@ export async function runChronosPerfBaseline(): Promise<ChronosPerfReport> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  runChronosPerfBaseline()
-    .then((report) => {
-      console.log(JSON.stringify(report, null, 2));
-      if (!report.passed) process.exitCode = 1;
-    })
-    .catch((error) => {
-      console.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
-    });
-}
+export const runCheckChronosPerf = defineScript({
+  name: 'check:chronos-perf',
+  flags: [],
+  async run(context) {
+    const report = await runChronosPerfBaseline(context.argv);
+    context.print(report);
+    if (!report.passed) throw new Error('Chronos performance thresholds were not met');
+    return report;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_chronos_perf_baseline.ts') ||
+  isDirectScript(import.meta.url, 'check_chronos_perf_baseline.js')
+)
+  void runCheckChronosPerf();

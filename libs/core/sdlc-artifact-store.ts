@@ -11,7 +11,7 @@
 
 import * as path from 'node:path';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   DecomposedTaskPlan,
   ExtractedDesignSpec,
@@ -62,7 +62,7 @@ function bumpVersion(previous?: string): string {
 function readArtifact<T>(missionId: string, filename: string): T | null {
   const file = artifactPath(missionId, filename);
   if (!file || !safeExistsSync(file)) return null;
-  return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(file);
 }
 
 function writeArtifact(missionId: string, filename: string, data: unknown): string {
@@ -181,11 +181,11 @@ export function evaluateArchitectureReadyGate(missionId: string): GateResult {
   const reasons: string[] = [];
   if (!spec) return { passed: false, reasons: ['no design-spec.json present'] };
   if (spec.components.length === 0) reasons.push('components array is empty');
-  const unmapped = spec.components.filter((c) => !c.requirements_refs || c.requirements_refs.length === 0);
+  const unmapped = spec.components.filter(
+    (c) => !c.requirements_refs || c.requirements_refs.length === 0
+  );
   if (unmapped.length > 0) {
-    reasons.push(
-      `components missing requirements_refs: ${unmapped.map((c) => c.id).join(', ')}`,
-    );
+    reasons.push(`components missing requirements_refs: ${unmapped.map((c) => c.id).join(', ')}`);
   }
   const blocking = spec.open_decisions.filter((d) => d.blocking === true);
   if (blocking.length > 0) {
@@ -200,16 +200,14 @@ export function evaluateArchitectureReadyGate(missionId: string): GateResult {
  */
 export function evaluateQaReadyGate(
   missionId: string,
-  mustHaveRequirementIds: string[] = [],
+  mustHaveRequirementIds: string[] = []
 ): GateResult {
   const plan = readTestPlan(missionId);
   const reasons: string[] = [];
   if (!plan) return { passed: false, reasons: ['no test-plan.json present'] };
   if (plan.cases.length === 0) reasons.push('test plan cases array is empty');
   if (mustHaveRequirementIds.length > 0) {
-    const covered = new Set(
-      plan.cases.flatMap((c) => c.covers_requirements ?? []),
-    );
+    const covered = new Set(plan.cases.flatMap((c) => c.covers_requirements ?? []));
     const missing = mustHaveRequirementIds.filter((id) => !covered.has(id));
     if (missing.length > 0) {
       reasons.push(`must-have requirements without coverage: ${missing.join(', ')}`);
@@ -236,11 +234,11 @@ export function evaluateTaskPlanReadyGate(missionId: string): GateResult {
     }
   }
   const mustsWithoutCriteria = plan.tasks.filter(
-    (t) => t.priority === 'must' && (!t.test_criteria || t.test_criteria.length === 0),
+    (t) => t.priority === 'must' && (!t.test_criteria || t.test_criteria.length === 0)
   );
   if (mustsWithoutCriteria.length > 0) {
     reasons.push(
-      `must-priority tasks without test_criteria: ${mustsWithoutCriteria.map((t) => t.task_id).join(', ')}`,
+      `must-priority tasks without test_criteria: ${mustsWithoutCriteria.map((t) => t.task_id).join(', ')}`
     );
   }
   if (hasCycle(plan)) reasons.push('task dependency graph contains a cycle');

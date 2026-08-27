@@ -1,8 +1,16 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { readJson } from './foundation/json.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  loadJson,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import type { ProcedureCatalog, ProcedureEntry, ProcedureRiskClass } from './procedure-types.js';
 import {
   computeDesktopRecordingHash,
@@ -150,7 +158,7 @@ export function promoteDesktopProcedure(options: {
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
   let raw: unknown;
   try {
-    raw = JSON.parse(safeReadFile(recordingAbs, { encoding: 'utf8' }) as string);
+    raw = loadJson<unknown>(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`
@@ -178,9 +186,7 @@ export function promoteDesktopProcedure(options: {
   if (!intentCandidate) throw new Error('intent_ref is outside the allowlisted recording stores');
   let intent: ReturnType<typeof validateDesktopIntentDraft>;
   try {
-    intent = validateDesktopIntentDraft(
-      JSON.parse(safeReadFile(intentCandidate, { encoding: 'utf8' }) as string)
-    );
+    intent = validateDesktopIntentDraft(loadJson<unknown>(intentCandidate));
   } catch (error) {
     throw new Error(
       `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`
@@ -233,9 +239,7 @@ export function promoteDesktopProcedure(options: {
     assertNoPendingDesktopPromotion(options.procedureId, { lockHeld: true });
     let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
     try {
-      catalog = JSON.parse(
-        safeReadFile(catalogPath, { encoding: 'utf8' }) as string
-      ) as ProcedureCatalog;
+      catalog = readJson<ProcedureCatalog>(catalogPath);
     } catch (error) {
       if (safeExistsSync(catalogPath)) {
         throw new Error(

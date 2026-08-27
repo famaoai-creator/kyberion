@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -44,15 +44,13 @@ export interface ArtifactRecord {
   metadata?: Record<string, unknown>;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const ARTIFACT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/artifact-record.schema.json');
 const ARTIFACT_DIR = pathResolver.shared('runtime/artifacts');
 let artifactValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (artifactValidateFn) return artifactValidateFn;
-  artifactValidateFn = compileSchemaFromPath(ajv, ARTIFACT_SCHEMA_PATH);
+  artifactValidateFn = compileSchema(ARTIFACT_SCHEMA_PATH);
   return artifactValidateFn;
 }
 

@@ -15,7 +15,7 @@ import {
   type WorkVisibilityViewer,
 } from './work-visibility.js';
 import { findMissionPath } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
@@ -165,10 +165,10 @@ function readTenantSlug(missionId: string): string | undefined {
   const statePath = path.join(missionDir, 'mission-state.json');
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       tenant_slug?: string;
       tenant_id?: string;
-    };
+    }>(statePath);
     return state.tenant_slug || state.tenant_id || undefined;
   } catch {
     return undefined;

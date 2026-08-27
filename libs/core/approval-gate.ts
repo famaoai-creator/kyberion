@@ -21,6 +21,8 @@ import {
 import type { GovernedArtifactRole } from './artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import type { TraceContext } from './src/trace.js';
+// Existing governance cycle is tracked by check:module-boundaries baseline.
+// eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
 import { recordGovernanceAction } from './kill-switch.js';
 import { notifyOperator } from './operator-notifications.js';
 

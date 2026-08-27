@@ -13,6 +13,13 @@ import type { AudioBus } from './audio-bus.js';
 import { StubAudioBus } from './audio-bus.js';
 import { BlackHoleAudioBus } from './blackhole-audio-bus.js';
 import { PulseAudioBus } from './pulse-audio-bus.js';
+import { getRegisteredEnv } from './foundation/env.js';
+
+function kyberionEnv(name: string): string | undefined {
+  const value = getRegisteredEnv(name);
+  if (value === undefined) return undefined;
+  return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
+}
 
 export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio';
 
@@ -22,14 +29,14 @@ const explicitFactories: Record<AudioBusId, AudioBusFactory> = {
   stub: () => new StubAudioBus(),
   blackhole: () =>
     new BlackHoleAudioBus({
-      ...(process.env.KYBERION_BLACKHOLE_INPUT_UID
-        ? { input_device_uid: process.env.KYBERION_BLACKHOLE_INPUT_UID }
+      ...(kyberionEnv('KYBERION_BLACKHOLE_INPUT_UID')
+        ? { input_device_uid: kyberionEnv('KYBERION_BLACKHOLE_INPUT_UID') }
         : {}),
-      ...(process.env.KYBERION_BLACKHOLE_OUTPUT_UID
-        ? { output_device_uid: process.env.KYBERION_BLACKHOLE_OUTPUT_UID }
+      ...(kyberionEnv('KYBERION_BLACKHOLE_OUTPUT_UID')
+        ? { output_device_uid: kyberionEnv('KYBERION_BLACKHOLE_OUTPUT_UID') }
         : {}),
-      ...(process.env.KYBERION_BLACKHOLE_DEVICE_LABEL
-        ? { expected_device_label: process.env.KYBERION_BLACKHOLE_DEVICE_LABEL }
+      ...(kyberionEnv('KYBERION_BLACKHOLE_DEVICE_LABEL')
+        ? { expected_device_label: kyberionEnv('KYBERION_BLACKHOLE_DEVICE_LABEL') }
         : {}),
     }),
   pulseaudio: () => new PulseAudioBus(),
@@ -41,7 +48,7 @@ const platformFactories: Partial<Record<NodeJS.Platform, AudioBusFactory>> = {
 };
 
 export function resolveAudioBus(
-  preferred: AudioBusId | undefined = process.env.KYBERION_AUDIO_BUS as AudioBusId | undefined
+  preferred: AudioBusId | undefined = kyberionEnv('KYBERION_AUDIO_BUS') as AudioBusId | undefined
 ): AudioBus {
   if (preferred) return explicitFactories[preferred]();
   return (platformFactories[process.platform] || explicitFactories.stub)();

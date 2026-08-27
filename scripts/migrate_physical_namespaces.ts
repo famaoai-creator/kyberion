@@ -29,6 +29,8 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
@@ -290,7 +292,7 @@ function intentScopes(source: string): {
 } {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(source, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(source);
   } catch (error) {
     return {
       disposition: 'invalid',
@@ -504,7 +506,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
     }
     let record: unknown;
     try {
-      record = JSON.parse(String(safeReadFile(candidate.source, { encoding: 'utf8' })));
+      record = readJson<unknown>(candidate.source);
     } catch (error) {
       items.push({
         kind,
@@ -648,9 +650,8 @@ function parseArgs(argv: string[]): { kind: MigrationSelection; apply: boolean }
   };
 }
 
-const isDirect = process.argv[1] && /migrate_physical_namespaces\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  const options = parseArgs(process.argv.slice(2));
+function main(argv: string[]): void {
+  const options = parseArgs(argv);
   const kinds: MigrationKind[] =
     options.kind === 'all'
       ? ['schedule', 'surface', 'feedback', 'intent', 'ledger', 'promotion']
@@ -659,6 +660,18 @@ if (isDirect) {
     kinds.map((kind) => buildPlan(kind, options.apply))
   );
   console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
+}
+
+const script = defineScript({
+  name: 'migrate:physical-namespaces',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'migrate_physical_namespaces.ts') ||
+  isDirectScript(import.meta.url, 'migrate_physical_namespaces.js')
+) {
+  void script();
 }
 
 export { buildPlan, feedbackScopes, intentScopes, ledgerScopes, promotionScopes, parseArgs };

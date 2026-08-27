@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/service-bootstrap-catalog.schema.json",
   "version": "1.0.0",
   "entries": [
     {
@@ -8,11 +9,7 @@
       "binding_id": "github:default:new-project",
       "scope": "repository",
       "target": "default/new-project",
-      "allowed_actions": [
-        "read",
-        "push_branch",
-        "pull_request"
-      ],
+      "allowed_actions": ["read", "push_branch", "pull_request"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -28,12 +25,7 @@
       "binding_id": "google-workspace:default:workspace",
       "scope": "workspace",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "send_message",
-        "create_event",
-        "create_doc"
-      ],
+      "allowed_actions": ["read", "send_message", "create_event", "create_doc"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -49,12 +41,7 @@
       "binding_id": "m365:default:workspace",
       "scope": "workspace",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "send_message",
-        "create_event",
-        "create_doc"
-      ],
+      "allowed_actions": ["read", "send_message", "create_event", "create_doc"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -70,12 +57,7 @@
       "binding_id": "jira:default:project",
       "scope": "project",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "create_issue",
-        "update_issue",
-        "add_comment"
-      ],
+      "allowed_actions": ["read", "create_issue", "update_issue", "add_comment"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -91,12 +73,7 @@
       "binding_id": "linear:default:project",
       "scope": "project",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "create_issue",
-        "update_issue",
-        "add_comment"
-      ],
+      "allowed_actions": ["read", "create_issue", "update_issue", "add_comment"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -112,12 +89,7 @@
       "binding_id": "confluence:default:knowledge-base",
       "scope": "workspace",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "create_page",
-        "update_page",
-        "search"
-      ],
+      "allowed_actions": ["read", "create_page", "update_page", "search"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -133,12 +105,7 @@
       "binding_id": "notion:default:knowledge-base",
       "scope": "workspace",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "create_page",
-        "update_page",
-        "search"
-      ],
+      "allowed_actions": ["read", "create_page", "update_page", "search"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -154,10 +121,7 @@
       "binding_id": "discord:default:community",
       "scope": "community",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "post_message"
-      ],
+      "allowed_actions": ["read", "post_message"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -173,10 +137,7 @@
       "binding_id": "telegram:default:channel",
       "scope": "channel",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "post_message"
-      ],
+      "allowed_actions": ["read", "post_message"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -192,12 +153,7 @@
       "binding_id": "zendesk:default:support",
       "scope": "support",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "create_ticket",
-        "update_ticket",
-        "add_comment"
-      ],
+      "allowed_actions": ["read", "create_ticket", "update_ticket", "add_comment"],
       "utterance_patterns": [
         {
           "type": "regex",
@@ -213,19 +169,14 @@
       "binding_id": "slack:default:workspace",
       "scope": "workspace",
       "target": "default",
-      "allowed_actions": [
-        "read",
-        "post_message"
-      ],
+      "allowed_actions": ["read", "post_message"],
       "utterance_patterns": [
         {
           "type": "regex",
           "value": "\\bslack\\b"
         }
       ],
-      "default_for_surfaces": [
-        "presence"
-      ],
+      "default_for_surfaces": ["presence"],
       "summary": "Default workspace binding for the presence surface."
     }
   ]

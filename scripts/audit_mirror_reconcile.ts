@@ -28,6 +28,7 @@ import {
   type ApprovalRequestRecord,
   type AuditEntry,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
 export const AUDIT_MIRROR_EFFECT_BINDING = 'sa-01:audit-mirror-reconcile';
@@ -411,7 +412,7 @@ export function runAuditMirrorReconciliation(input: {
   return receipt;
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[] = []): void {
   const missionIndex = argv.indexOf('--mission-id');
   const missionId = missionIndex >= 0 ? argv[missionIndex + 1] : DEFAULT_AUDIT_MIRROR_MISSION;
   const apply = argv.includes('--apply');
@@ -423,7 +424,7 @@ export function main(argv = process.argv.slice(2)): void {
   if (requestApproval) {
     const result = openAuditMirrorApproval({ missionId, ...(requestedBy ? { requestedBy } : {}) });
     console.log(JSON.stringify(result, null, 2));
-    if (result.reason) process.exitCode = 1;
+    if (result.reason) throw new ScriptExitError(1, result.reason);
     return;
   }
   console.log(
@@ -431,9 +432,14 @@ export function main(argv = process.argv.slice(2)): void {
   );
 }
 
+export const runAuditMirrorReconcile = defineScript({
+  name: 'audit:mirror-reconcile',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
 if (
-  process.argv[1]?.endsWith('audit_mirror_reconcile.ts') ||
-  process.argv[1]?.endsWith('audit_mirror_reconcile.js')
-) {
-  main();
-}
+  isDirectScript(import.meta.url, 'audit_mirror_reconcile.ts') ||
+  isDirectScript(import.meta.url, 'audit_mirror_reconcile.js')
+)
+  void runAuditMirrorReconcile();

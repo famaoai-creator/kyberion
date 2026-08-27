@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface ProductionEvidenceSummaryPolicyCatalog {
   version: string;
@@ -12,15 +9,12 @@ export interface ProductionEvidenceSummaryPolicyCatalog {
   complete_message: string;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
-const CATALOG_PATH = pathResolver.knowledge('product/governance/production-evidence-summary-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/production-evidence-summary-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: ProductionEvidenceSummaryPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
+const CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/production-evidence-summary-policy.json'
+);
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/production-evidence-summary-policy.schema.json'
+);
 
 const FALLBACK_CATALOG: ProductionEvidenceSummaryPolicyCatalog = {
   version: '1.0.0',
@@ -30,40 +24,15 @@ const FALLBACK_CATALOG: ProductionEvidenceSummaryPolicyCatalog = {
   complete_message: 'all production evidence is verified',
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): ProductionEvidenceSummaryPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid production evidence summary policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as ProductionEvidenceSummaryPolicyCatalog;
-}
+const catalog = defineCatalog<ProductionEvidenceSummaryPolicyCatalog>({
+  id: 'production-evidence-summary-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_CATALOG,
+});
 
 export function loadProductionEvidenceSummaryPolicyCatalog(): ProductionEvidenceSummaryPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = FALLBACK_CATALOG;
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolveProductionEvidenceSummaryPolicy(): ProductionEvidenceSummaryPolicyCatalog {
@@ -71,6 +40,5 @@ export function resolveProductionEvidenceSummaryPolicy(): ProductionEvidenceSumm
 }
 
 export function resetProductionEvidenceSummaryPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

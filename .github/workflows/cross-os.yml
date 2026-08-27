@@ -112,11 +112,11 @@ jobs:
 
       - name: Pipeline preview (baseline)
         if: runner.os != 'Windows'
-        run: pnpm run cli:preview -- pipelines/baseline-check.json
+        run: pnpm run cli -- preview pipelines/baseline-check.json
 
       - name: Pipeline preview (meeting proxy)
         if: runner.os != 'Windows'
-        run: pnpm run cli:preview -- pipelines/meeting-proxy-workflow.json
+        run: pnpm run cli -- preview pipelines/meeting-proxy-workflow.json
 
       - name: Pipeline shell independence
         if: runner.os != 'Windows'

@@ -1,6 +1,5 @@
 import {
-  logger,
-  safeReadFile,
+  loadJson,
   safeExistsSync,
   pathResolver,
   ensureDefaultOpPreflight,
@@ -11,16 +10,6 @@ import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governan
 import {
   activateApplication,
   detectFocusedInput,
-  clickAt,
-  rightClickAt,
-  moveMouse,
-  scrollAt,
-  dragFrom,
-  activateWindowByTitle,
-  quitApplication,
-  systemNotify,
-  clipboardRead,
-  clipboardWrite,
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
@@ -813,7 +802,9 @@ async function performReconcile(input: SystemAction) {
     input.strategy_path || 'knowledge/product/governance/system-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = loadJson<{
+    strategies: Array<{ pipeline: SystemPipelineStep[]; params?: Record<string, unknown> }>;
+  }>(strategyPath);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

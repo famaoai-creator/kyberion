@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "specialist_routing": { "$ref": "#/$defs/specialistRouting" },
     "profile_routing": { "$ref": "#/$defs/profileRouting" },
@@ -114,10 +115,7 @@
         }
       },
       "required": ["match"],
-      "oneOf": [
-        { "required": ["label"] },
-        { "required": ["label_from"] }
-      ]
+      "oneOf": [{ "required": ["label"] }, { "required": ["label_from"] }]
     },
     "designRules": {
       "type": "object",

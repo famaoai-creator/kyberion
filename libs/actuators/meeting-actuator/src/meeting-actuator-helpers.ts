@@ -24,12 +24,12 @@ import {
   logger,
   safeExec,
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeExistsSync,
   pathResolver,
   auditChain,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   createActuatorTrace,
   finalizeActuatorTrace,
@@ -39,6 +39,7 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,12 +50,13 @@ import {
   extractActionItemsOp,
   generateFacilitationScriptOp,
   generateReminderMessageOp,
+  runActionItemReminderSweepOp,
   trackPendingActionItemsOp,
 } from './meeting-intelligence-ops.js';
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
 export interface MeetingAction {
-  action: 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
+  action: 'check_consent' | 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
   params: {
     platform: 'zoom' | 'teams' | 'meet' | 'auto';
     provider?: 'google_meet' | 'teams_pipeline' | 'zoom' | 'auto';
@@ -180,7 +182,7 @@ function validateGrantedConsent(
 }
 
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
-  if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
+  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = process.env.MISSION_ID;
   if (!missionId) {
     return {
@@ -200,7 +202,7 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
     };
   }
   try {
-    const consent = JSON.parse(safeReadFile(consentPath, { encoding: 'utf8' }) as string);
+    const consent = loadJson<unknown>(consentPath);
     if (!isPlainObject(consent)) {
       return {
         allowed: false,
@@ -459,6 +461,21 @@ async function executeMeetingPipeline(
               'reminder_message'
             );
           }
+          case 'run_action_item_reminder_sweep':
+            return meetingExport(
+              context,
+              params,
+              await runActionItemReminderSweepOp({
+                ...(Array.isArray(params.mission_ids)
+                  ? { mission_ids: params.mission_ids.map(String) }
+                  : {}),
+                tone: params.tone as 'friendly' | 'formal' | 'urgent' | undefined,
+                language: String(params.language || 'ja'),
+                max_items_per_mission: Number(params.max_items || 20),
+                ...(params.report_path ? { report_path: String(params.report_path) } : {}),
+              }),
+              'reminder_sweep_report'
+            );
           case 'execute_self_action_items': {
             if (!missionId) throw new Error('execute_self_action_items: mission_id is required');
             const result = await executeSelfActionItemsOp({
@@ -510,6 +527,15 @@ export async function handleAction(
 ): Promise<MeetingActionResult | Record<string, unknown>> {
   if (input.action === 'pipeline') {
     return await executeMeetingPipeline(input.steps || [], input.context || {}, input.options);
+  }
+  if (input.action === 'check_consent') {
+    const consent = checkSpeakConsent();
+    return {
+      status: consent.allowed ? 'success' : 'denied',
+      kind: 'voice_consent_check',
+      allowed: consent.allowed,
+      ...(consent.reason ? { message: consent.reason } : {}),
+    };
   }
   const providerAdapter = resolveMeetingProvider(input.params.provider, input.params.url);
   if (providerAdapter && input.params.provider === 'auto') {
@@ -610,6 +636,6 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1); // eslint-disable-line no-restricted-properties -- CLI entry guard
+    process.exitCode = 1;
   });
 }

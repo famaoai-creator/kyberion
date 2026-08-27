@@ -6,7 +6,7 @@
  *   2. Targeted schema-aware repair hint — LLM sub-agent with full schema + classified error hints
  */
 
-import { getReasoningBackend } from './reasoning-backend.js';
+import { getReasoningBackend, type ReasoningCallOptions } from './reasoning-backend.js';
 import { safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate, loadSchema } from './validate.js';
@@ -30,14 +30,32 @@ import {
 import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { truncateNormalizedText } from './foundation/text.js';
+import type { ValidationResult } from './types.js';
 
 export interface AdfRepairResult {
   repaired: boolean;
   errors?: string[];
   report?: string;
 }
+
+export interface AdfRepairStep {
+  op: string;
+  id?: string;
+  params?: unknown;
+}
+
+export interface AdfRepairFailure {
+  category: string;
+  detail?: string;
+  repairAction?: string;
+}
 export interface AdfRepairOptions {
   workItemId?: string;
+  /** Explicit step failure context for the canonical execution repair path. */
+  step?: AdfRepairStep;
+  failure?: AdfRepairFailure;
+  delegationOptions?: ReasoningCallOptions;
 }
 
 /**
@@ -77,9 +95,20 @@ export async function validateAndRepairAdf(
   }
 
   if (schemaName === 'pipeline-adf') {
+    if (options.failure) {
+      const stepLabel = options.step?.op ? ` for step ${options.step.op}` : '';
+      const details = [options.failure.detail, options.failure.repairAction].filter(Boolean);
+      return attemptSubagentRepair(
+        adfPath,
+        schemaName,
+        `Execution failure${stepLabel}: ${options.failure.category}`,
+        details,
+        options
+      );
+    }
     try {
       const pipeline = validatePipelineAdf(parsed);
-      const guardrails = validatePipelineGuardrails(pipeline as any, adfPath);
+      const guardrails = validatePipelineGuardrails(pipeline, adfPath);
       if (!guardrails.ok) {
         const errors = guardrails.findings
           .filter((finding) => finding.severity === 'error')
@@ -120,11 +149,33 @@ export async function validateAndRepairAdf(
 const ADF_REPAIR_KNOWLEDGE_HINT_LIMIT = 2;
 const ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX = 200;
 
-function truncateKnowledgeExcerpt(value: string, max: number): string {
-  const text = String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ');
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
+function validateRepairTarget(
+  value: Record<string, unknown>,
+  schemaName: string,
+  adfPath: string
+): ValidationResult {
+  if (schemaName !== 'pipeline-adf') return validate(value, schemaName);
+  try {
+    const pipeline = validatePipelineAdf(value);
+    const guardrails = validatePipelineGuardrails(pipeline, adfPath);
+    if (guardrails.ok) return { valid: true, errors: [] };
+    return {
+      valid: false,
+      errors: guardrails.findings
+        .filter((finding) => finding.severity === 'error')
+        .map((finding) => ({ field: finding.path, message: finding.message })),
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      errors: [
+        {
+          field: 'pipeline',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  }
 }
 
 /**
@@ -196,7 +247,7 @@ async function buildAdfRepairKnowledgeContext(
       'Relevant knowledge:',
       ...entries.map(
         (entry) =>
-          `- ${entry.title} (${entry.path}): ${truncateKnowledgeExcerpt(entry.excerpt, ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX)}`
+          `- ${entry.title} (${entry.path}): ${truncateNormalizedText(entry.excerpt, ADF_REPAIR_KNOWLEDGE_EXCERPT_MAX)}`
       ),
     ];
     recordKnowledgeDelivery({
@@ -256,6 +307,8 @@ async function attemptSubagentRepair(
   const instruction = `
 The ADF file at '${adfPath}' is invalid and must be repaired.
 
+${options.step ? `## Failed Step\nOperation: ${options.step.op}\nStep ID: ${options.step.id || '(none)'}\nParams: ${JSON.stringify(options.step.params ?? {})}\n` : ''}
+
 ## Errors
 ${parseError ? `JSON Parse Error: ${parseError}\n` : ''}${validationErrors.length > 0 ? validationErrors.map((e) => `- ${e}`).join('\n') : ''}
 
@@ -283,7 +336,9 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       buildAdfRepairKnowledgeContext(adfPath, schemaName, errorSummary, hints, backend.name)
     );
     const report = await gaps.measure('backend_dispatch', async () => {
-      if (!options.workItemId) return backend.delegateTask(instruction, repairContext);
+      if (!options.workItemId) {
+        return backend.delegateTask(instruction, repairContext, options.delegationOptions);
+      }
       const workItem = getWorkItem(options.workItemId);
       const scope = workItem?.context;
       const tenantId = scope?.tenant_slug?.trim();
@@ -316,7 +371,11 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     if (updatedContent === originalContent) {
       const returnedRepair = tryRepairJson(report);
       if (returnedRepair !== null) {
-        const returnedValidation = validate(returnedRepair as Record<string, unknown>, schemaName);
+        const returnedValidation = validateRepairTarget(
+          returnedRepair as Record<string, unknown>,
+          schemaName,
+          adfPath
+        );
         if (returnedValidation.valid) {
           const repairedStr = repairJsonString(report)!;
           safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
@@ -342,7 +401,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
       }
     }
 
-    const finalValidation = validate(updatedParsed, schemaName);
+    const finalValidation = validateRepairTarget(updatedParsed, schemaName, adfPath);
     if (finalValidation.valid) {
       completeDelegatedTaskTrace(trace, { resultSummary: report, gapPhases: gaps.samples() });
       return { repaired: true, report };

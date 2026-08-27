@@ -14,19 +14,9 @@
  */
 
 import * as path from 'node:path';
-import AjvModule from 'ajv';
-import {
-  compileSchemaFromPath,
-  pathResolver,
-  resolveTenant,
-  safeReadFile,
-  type TenantRegistryPathOptions,
-} from '@agent/core';
+import { pathResolver, resolveTenant, type TenantRegistryPathOptions } from '@agent/core';
+import { compileSchema, readJson } from '@agent/core/foundation';
 import type { IngestIr } from './parse-document.js';
-
-// Same CJS/ESM interop dance as tenant-registry.ts.
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 // Tracked source, resolved against the real repo root on purpose (same
 // rationale as tenant-registry's schema resolution): fixtures still validate
@@ -38,7 +28,7 @@ const TAXONOMY_PATH = pathResolver.rootResolve(
   'knowledge/product/governance/knowledge-taxonomy.json'
 );
 
-const cardValidate = compileSchemaFromPath(ajv, CARD_SCHEMA_PATH);
+const cardValidate = compileSchema(CARD_SCHEMA_PATH);
 
 interface TaxonomyDirectoryDefault {
   path_prefix: string;
@@ -56,9 +46,7 @@ let cachedTaxonomy: TaxonomyFile | null = null;
 
 function loadTaxonomy(): TaxonomyFile {
   if (cachedTaxonomy) return cachedTaxonomy;
-  cachedTaxonomy = JSON.parse(
-    safeReadFile(TAXONOMY_PATH, { encoding: 'utf8' }) as string
-  ) as TaxonomyFile;
+  cachedTaxonomy = readJson<TaxonomyFile>(TAXONOMY_PATH);
   return cachedTaxonomy;
 }
 

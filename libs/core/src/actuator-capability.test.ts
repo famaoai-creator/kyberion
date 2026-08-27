@@ -256,7 +256,7 @@ describe('actuator-capability', () => {
       addFormats(ajv);
       const validate = compileSchemaFromPath(
         ajv,
-        path.join(process.cwd(), 'schemas/actuator-manifest.schema.json')
+        path.join(process.cwd(), 'knowledge/product/schemas/actuator-manifest.schema.json')
       );
       const manifest = JSON.parse(
         safeReadFile(path.join(process.cwd(), 'libs/actuators/file-actuator/manifest.json'), {

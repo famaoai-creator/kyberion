@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/provider-capability-scan-policy.schema.json",
   "version": "1.0.0",
   "providers": [
     {

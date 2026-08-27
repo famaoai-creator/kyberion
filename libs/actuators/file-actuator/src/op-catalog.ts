@@ -6,6 +6,70 @@ import { getOpInputContract } from '@agent/core';
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
+const FILE_EXTRA_CONTRACTS: Record<
+  string,
+  { schema: Record<string, unknown>; examples: Array<Record<string, unknown>> }
+> = {
+  json_parse: {
+    schema: {
+      type: 'object',
+      properties: { export_as: { type: 'string' }, from: { type: 'string' } },
+      required: ['from'],
+      additionalProperties: false,
+    },
+    examples: [{ from: 'raw_json' }],
+  },
+  path_join: {
+    schema: {
+      type: 'object',
+      properties: { export_as: { type: 'string' }, parts: { type: 'array' } },
+      required: ['parts'],
+      additionalProperties: false,
+    },
+    examples: [{ parts: ['active', 'shared', 'tmp', 'result.json'] }],
+  },
+  regex_replace: {
+    schema: {
+      type: 'object',
+      properties: {
+        export_as: { type: 'string' },
+        from: { type: 'string' },
+        pattern: { type: 'string' },
+        template: { type: 'string' },
+      },
+      required: ['from', 'pattern', 'template'],
+      additionalProperties: false,
+    },
+    examples: [{ from: 'text', pattern: 'old', template: 'new' }],
+  },
+  if: {
+    schema: {
+      type: 'object',
+      properties: {
+        condition: { type: 'string' },
+        else: { type: 'array' },
+        then: { type: 'array' },
+      },
+      required: ['condition'],
+      additionalProperties: false,
+    },
+    examples: [{ condition: 'ready' }],
+  },
+  while: {
+    schema: {
+      type: 'object',
+      properties: {
+        condition: { type: 'string' },
+        max_iterations: { type: 'number' },
+        pipeline: { type: 'array' },
+      },
+      required: ['condition'],
+      additionalProperties: false,
+    },
+    examples: [{ condition: 'pending', max_iterations: 3, pipeline: [] }],
+  },
+};
+
 export const FILE_ACTUATOR_CAPTURE_OPS = [
   'exists',
   'list',
@@ -36,7 +100,14 @@ function withInputSchema(op: string, kind: OpSpecKind) {
   const contract = getOpInputContract('file', op);
   return contract
     ? { op, kind, input_schema: contract.schema, examples: contract.examples }
-    : { op, kind };
+    : FILE_EXTRA_CONTRACTS[op]
+      ? {
+          op,
+          kind,
+          input_schema: FILE_EXTRA_CONTRACTS[op].schema,
+          examples: FILE_EXTRA_CONTRACTS[op].examples,
+        }
+      : { op, kind };
 }
 
 const toSpec = withInputSchema;

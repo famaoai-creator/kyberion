@@ -22,7 +22,19 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
+import {
+  loadJson,
+  safeExistsSync,
+  safeReadFile,
+  safeReaddir,
+  safeStat,
+  safeExec,
+} from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+
+function kyberionEnv(name: string): string | undefined {
+  return getRegisteredEnvText(name);
+}
 import {
   hasEnvironmentCapabilityProbe,
   registerEnvironmentCapabilityProbe,
@@ -211,7 +223,7 @@ export async function probeExplicitReasoningBackend(
 async function probeReasoningBackend(): Promise<{ available: boolean; reason?: string }> {
   // An explicitly selected backend is probed specifically — a working
   // *different* backend must not mask a broken selection.
-  const explicit = process.env.KYBERION_REASONING_BACKEND?.trim();
+  const explicit = kyberionEnv('KYBERION_REASONING_BACKEND')?.trim();
   if (explicit) {
     return probeExplicitReasoningBackend(explicit, process.env);
   }
@@ -237,43 +249,46 @@ async function probeReasoningBackend(): Promise<{ available: boolean; reason?: s
     const geminiProbe = await probeGeminiApiBackendAvailability(process.env);
     if (geminiProbe.available) return { available: true };
   }
-  if (process.env.XAI_API_KEY || process.env.KYBERION_GROK_API_KEY) {
+  if (process.env.XAI_API_KEY || kyberionEnv('KYBERION_GROK_API_KEY')) {
     const grokApiProbe = await probeGrokApiBackendAvailability(process.env);
     if (grokApiProbe.available) return { available: true };
   }
-  if (process.env.OPENROUTER_API_KEY || process.env.KYBERION_OPENROUTER_KEY) {
+  if (process.env.OPENROUTER_API_KEY || kyberionEnv('KYBERION_OPENROUTER_KEY')) {
     const openrouterProbe = await probeOpenRouterBackendAvailability(process.env);
     if (openrouterProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_OLLAMA_URL) || Boolean(process.env.OLLAMA_HOST)) {
+  if (Boolean(kyberionEnv('KYBERION_OLLAMA_URL')) || Boolean(process.env.OLLAMA_HOST)) {
     const ollamaProbe = await probeOllamaBackendAvailability(process.env);
     if (ollamaProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_VLLM_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_VLLM_URL'))) {
     const vllmProbe = await probeVllmBackendAvailability(process.env);
     if (vllmProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_LMSTUDIO_URL) || Boolean(process.env.KYBERION_LM_STUDIO_URL)) {
+  if (
+    Boolean(kyberionEnv('KYBERION_LMSTUDIO_URL')) ||
+    Boolean(kyberionEnv('KYBERION_LM_STUDIO_URL'))
+  ) {
     const lmstudioProbe = await probeLmStudioBackendAvailability(process.env);
     if (lmstudioProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_LLAMACPP_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_LLAMACPP_URL'))) {
     const llamacppProbe = await probeLlamaCppBackendAvailability(process.env);
     if (llamacppProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_MLX_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_MLX_URL'))) {
     const mlxProbe = await probeMlxBackendAvailability(process.env);
     if (mlxProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_LOCALAI_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_LOCALAI_URL'))) {
     const localaiProbe = await probeLocalAiBackendAvailability(process.env);
     if (localaiProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_LOCAL_LLM_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_LOCAL_LLM_URL'))) {
     const localProbe = await probeOpenAiCompatibleBackendAvailability(process.env);
     if (localProbe.available) return { available: true };
   }
-  if (Boolean(process.env.KYBERION_NEMOTRON_URL)) {
+  if (Boolean(kyberionEnv('KYBERION_NEMOTRON_URL'))) {
     const nemotronProbe = await probeNemotronBackendAvailability(process.env);
     if (nemotronProbe.available) return { available: true };
   }
@@ -375,8 +390,8 @@ function readRootEnginesNodeRange(): string | null {
   try {
     const pkgPath = pathResolver.rootResolve('package.json');
     if (!safeExistsSync(pkgPath)) return null;
-    const pkg = JSON.parse(safeReadFile(pkgPath, { encoding: 'utf8' }) as string);
-    const range = pkg?.engines?.node;
+    const pkg = loadJson<{ engines?: { node?: unknown } }>(pkgPath);
+    const range = pkg.engines?.node;
     return typeof range === 'string' && range.trim() !== '' ? range : null;
   } catch {
     return null;

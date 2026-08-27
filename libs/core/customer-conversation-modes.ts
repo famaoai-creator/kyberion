@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
@@ -143,9 +144,7 @@ export function readDealRequirementsCapture(
   const filePath = dealRequirementsPath(tenantSlug, dealId);
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as DealRequirementsCapture;
+    return readJson<DealRequirementsCapture>(filePath);
   } catch (err) {
     logger.warn(
       `[customer-conversation-modes] unreadable requirements capture ${filePath}: ${err instanceof Error ? err.message : String(err)}`

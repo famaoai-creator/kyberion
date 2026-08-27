@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  readJsonFile,
   safeJsonParse,
   validateDirPath,
   validateFileFreshness,
@@ -30,7 +29,6 @@ describe('validators', () => {
 
   it('parses JSON strings and files with descriptive failures', () => {
     expect(safeJsonParse('{"ok":true}')).toEqual({ ok: true });
-    expect(readJsonFile(filePath)).toEqual({ ok: true });
     expect(() => safeJsonParse('{', 'payload')).toThrow('Invalid payload');
   });
 

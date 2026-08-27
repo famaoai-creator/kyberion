@@ -1,8 +1,11 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger, pathResolver, recordDaemonHeartbeat, sendOpsAlert } from '@agent/core';
 import { spawn } from 'node:child_process';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
-const DEFAULT_INTERVAL_MS = Number(process.env.KYBERION_GENERATION_SCHEDULE_INTERVAL_MS || 60_000);
+const DEFAULT_INTERVAL_MS = Number(
+  getRegisteredEnvText('KYBERION_GENERATION_SCHEDULE_INTERVAL_MS') || 60_000
+);
 const ROOT_DIR = pathResolver.rootDir();
 const SCHEDULE_TICK_ENTRY = pathResolver.rootResolve('dist/scripts/run_generation_schedule.js');
 const DAEMON_ID = 'generation-schedule-daemon';
@@ -68,5 +71,5 @@ main().catch((err) => {
     recommendation: 'Restart the generation schedule daemon unit and inspect its logs.',
     dedupe_key: `${DAEMON_ID}:fatal`,
   });
-  process.exit(1);
+  process.exitCode = 1;
 });

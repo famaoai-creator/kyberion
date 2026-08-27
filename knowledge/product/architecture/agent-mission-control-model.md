@@ -334,7 +334,7 @@ Score each axis 0 (favors CLI team) to 3 (favors agent-runtime). Judged by the *
 - **Single-process blast radius**: all subagents in a CLI team share the orchestrating CLI process. A crash, OOM, or hang in the host session takes every in-flight subagent with it — there is no per-subagent runtime isolation the way agent-runtime provides per resource.
 - **Harness-permission dependency**: CLI team governance rests on the harness's own tool-permission and approval mechanism, not a Kyberion-native kill-switch. Kyberion layers tier/approval gates on top (governed path), but cannot force-stop a CLI subagent the harness has already approved.
 
-See [CLI_SUBAGENT_TEAM_PLAN (CT-01–04)](../../../docs/developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) for the implementation and [CROSS_PROVIDER_EXECUTION_PLAN (XP-07)](../../../docs/developer/improvement-plans-2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md) for the model-diversity axis.
+See [CLI_SUBAGENT_TEAM_PLAN (CT-01–04)](../../../docs/developer/improvement-plans-archive/2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) for the implementation and [CROSS_PROVIDER_EXECUTION_PLAN (XP-07)](../../../docs/developer/improvement-plans-archive/2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md) for the model-diversity axis.
 
 ## 12. Non-Goals
 

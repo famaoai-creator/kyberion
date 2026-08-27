@@ -9,7 +9,9 @@ import {
   resetActuatorForwardingPort,
 } from '@agent/core';
 import { describeOps } from './op-catalog.js';
-import { dispatchDecisionOp } from './decision-ops.js';
+import { dispatchWisdomOperation } from './decision-ops.js';
+
+const dispatchDecisionOp = dispatchWisdomOperation;
 import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 
@@ -164,7 +166,7 @@ describe('wisdom public contract boundaries', () => {
 
   it('publishes pipeline and reconcile in the schema contract', () => {
     const schema = readJson<{ properties: { action: { enum?: string[] } } }>(
-      'schemas/wisdom-action.schema.json'
+      'knowledge/product/schemas/wisdom-action.schema.json'
     );
 
     expect(schema.properties.action.enum).toEqual(
@@ -196,7 +198,7 @@ describe('wisdom public contract boundaries', () => {
           }>;
         };
       };
-    }>('schemas/wisdom-action.schema.json');
+    }>('knowledge/product/schemas/wisdom-action.schema.json');
     const schemaOps = new Map<string, string>();
     for (const branch of schema.$defs?.pipelineStep?.oneOf || []) {
       const kind = branch.properties?.type?.const;
@@ -211,7 +213,7 @@ describe('wisdom public contract boundaries', () => {
   it('documents the ownership rationale for every published Wisdom operation', () => {
     const ownershipDoc = safeReadFile(
       pathResolver.rootResolve(
-        'docs/developer/improvement-plans-2026-07/WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md'
+        'docs/developer/improvement-plans-archive/2026-07/WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md'
       ),
       { encoding: 'utf8' }
     ) as string;

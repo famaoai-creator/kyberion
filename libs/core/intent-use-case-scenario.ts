@@ -1,5 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import type { CompileUserIntentFlowInput, IntentContract } from './intent-contract.js';
 import type {
@@ -15,17 +15,11 @@ import {
   type ExecutionFeedbackSummary,
 } from './execution-feedback.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/intent-use-case-scenario.schema.json');
 
 export type IntentUseCaseScenarioStatus = 'ready' | 'needs_clarification' | 'blocked';
 export type IntentUseCaseScenarioNextAction =
-  | 'execute'
-  | 'clarify_inputs'
-  | 'confirm_scope'
-  | 'request_approval'
-  | 'resolve_runtime';
+  'execute' | 'clarify_inputs' | 'confirm_scope' | 'request_approval' | 'resolve_runtime';
 
 export interface IntentUseCaseScenarioInput {
   input: CompileUserIntentFlowInput;
@@ -108,7 +102,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 

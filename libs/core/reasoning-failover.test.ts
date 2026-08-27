@@ -9,6 +9,15 @@ const secureIo = vi.hoisted(() => ({
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    } catch {
+      return null;
+    }
+  },
   safeUnlinkSync: (filePath: string) => {
     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   },
@@ -26,6 +35,18 @@ const secureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: secureIo.loadJson,
+    loadJsonIfPresent: secureIo.loadJsonIfPresent,
+    appendFile: secureIo.safeAppendFileSync,
+    exists: secureIo.safeExistsSync,
+    readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: secureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 
 describe('reasoning-failover marker + event log (XP-05)', () => {
   let tmpRoot: string;

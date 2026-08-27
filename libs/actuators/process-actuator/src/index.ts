@@ -6,9 +6,12 @@ import { handleAction } from './process-actuator-helpers.js';
 async function main() {
   const processActionSchema = JSON.parse(
     String(
-      safeReadFile(pathResolver.rootResolve('schemas/process-action.schema.json'), {
-        encoding: 'utf8',
-      })
+      safeReadFile(
+        pathResolver.rootResolve('knowledge/product/schemas/process-action.schema.json'),
+        {
+          encoding: 'utf8',
+        }
+      )
     )
   );
   await runActuatorCli({
@@ -18,6 +21,12 @@ async function main() {
   });
 }
 
+export const actuator = defineCatalogBackedActuator({
+  id: 'process-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+
 export { handleAction };
 
 const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
@@ -26,6 +35,8 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     console.error(`[process-actuator] ${err?.message || err}`);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

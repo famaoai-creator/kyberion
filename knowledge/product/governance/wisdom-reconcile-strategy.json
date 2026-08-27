@@ -1,10 +1,24 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "strategies": [
     {
       "id": "capabilities-guide-sync",
       "pipeline": [
-        { "type": "capture", "op": "shell", "params": { "cmd": "pnpm exec tsx scripts/sync_component_inventory.ts", "export_as": "sync_output" } },
-        { "type": "apply", "op": "log", "params": { "message": "Catalog synchronized via sync_component_inventory: {{sync_output}}" } }
+        {
+          "type": "capture",
+          "op": "shell",
+          "params": {
+            "cmd": "pnpm exec tsx scripts/sync_component_inventory.ts",
+            "export_as": "sync_output"
+          }
+        },
+        {
+          "type": "apply",
+          "op": "log",
+          "params": {
+            "message": "Catalog synchronized via sync_component_inventory: {{sync_output}}"
+          }
+        }
       ]
     }
   ]

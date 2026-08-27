@@ -1,4 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import * as crypto from 'node:crypto';
 
 import { logger } from './core.js';
@@ -15,7 +18,6 @@ import {
   type PeerMessageResponderContext,
 } from './peer-messaging.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -137,8 +139,7 @@ export interface CreatePeerConversationResponderOptions {
     | void;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 
 const SESSION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/peer-conversation-session.schema.json'
@@ -152,10 +153,6 @@ const GOVERNED_ROLE = 'infrastructure_sentinel' as const;
 
 let sessionValidateFn: ValidateFunction | null = null;
 let messageValidateFn: ValidateFunction | null = null;
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -216,10 +213,12 @@ function recordEvent(tenantId: string, peerId: string, event: Record<string, unk
   ensurePeerDir(tenantId, peerId);
   const logicalPath = eventsPath(tenantId, peerId);
   return withExecutionContext(GOVERNED_ROLE, () => {
-    safeAppendFileSync(
-      pathResolver.resolve(logicalPath),
-      `${JSON.stringify({ ts: nowIso(), tenant_id: tenantId, peer_id: peerId, ...event })}\n`
-    );
+    appendJsonLine(pathResolver.resolve(logicalPath), {
+      ts: nowIso(),
+      tenant_id: tenantId,
+      peer_id: peerId,
+      ...event,
+    });
     return pathResolver.resolve(logicalPath);
   });
 }

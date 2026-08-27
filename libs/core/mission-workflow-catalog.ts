@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 import type {
   MissionClass,
   MissionDeliveryShape,
@@ -110,8 +110,6 @@ type WorkflowCatalogFile = {
   templates: WorkflowTemplate[];
 };
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const WORKFLOW_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-workflow-catalog.schema.json'
 );
@@ -123,7 +121,7 @@ let workflowCatalogValidateFn: ValidateFunction | null = null;
 
 function ensureWorkflowCatalogValidator(): ValidateFunction {
   if (workflowCatalogValidateFn) return workflowCatalogValidateFn;
-  workflowCatalogValidateFn = compileSchemaFromPath(ajv, WORKFLOW_CATALOG_SCHEMA_PATH);
+  workflowCatalogValidateFn = compileSchema(WORKFLOW_CATALOG_SCHEMA_PATH);
   return workflowCatalogValidateFn;
 }
 
@@ -198,9 +196,7 @@ export function normalizeWorkflowPhases(phases: WorkflowPhase[]): {
 }
 
 function loadWorkflowCatalog(): WorkflowCatalogFile {
-  const parsed = JSON.parse(
-    safeReadFile(WORKFLOW_CATALOG_PATH, { encoding: 'utf8' }) as string
-  ) as WorkflowCatalogFile;
+  const parsed = readJson<WorkflowCatalogFile>(WORKFLOW_CATALOG_PATH);
   const validate = ensureWorkflowCatalogValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])

@@ -1,6 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -9,7 +10,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 export interface ProjectRecord {
   project_id: string;
@@ -52,8 +53,7 @@ export interface ProjectBootstrapWorkItem {
   outcome_id?: string;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const PROJECT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/project-record.schema.json');
 let projectValidateFn: ValidateFunction | null = null;
 

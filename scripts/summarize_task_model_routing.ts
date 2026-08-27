@@ -15,6 +15,7 @@ import {
   type TaskRoutingSample,
   type TaskRoutingSummaryRow,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export {
   buildTaskRoutingSamples,
@@ -39,17 +40,17 @@ function formatRow(row: TaskRoutingSummaryRow): string {
   ].join('  ');
 }
 
-function argValue(name: string): string | undefined {
-  return process.argv.includes(name) ? process.argv[process.argv.indexOf(name) + 1] : undefined;
+function argValue(argv: string[], name: string): string | undefined {
+  return argv.includes(name) ? argv[argv.indexOf(name) + 1] : undefined;
 }
 
-function main() {
-  const jsonOnly = process.argv.includes('--json');
-  const outputPathArg = argValue('--output');
+export function main(argv: string[] = []): void {
+  const jsonOnly = argv.includes('--json');
+  const outputPathArg = argValue(argv, '--output');
 
   const { samples, rows, output_path } = runTaskModelRoutingSummary({
-    task_events_path: argValue('--task-events'),
-    supervisor_events_path: argValue('--supervisor-events'),
+    task_events_path: argValue(argv, '--task-events'),
+    supervisor_events_path: argValue(argv, '--supervisor-events'),
     output_path: outputPathArg,
   });
   const outputPath = output_path || pathResolver.sharedTmp('task-model-routing-summary.json');
@@ -80,6 +81,14 @@ function main() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main();
-}
+export const runSummarizeTaskModelRouting = defineScript({
+  name: 'task:summarize-model-routing',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'summarize_task_model_routing.ts') ||
+  isDirectScript(import.meta.url, 'summarize_task_model_routing.js')
+)
+  void runSummarizeTaskModelRouting();

@@ -10,6 +10,7 @@ import {
   loadWorkScopePolicy,
   type WorkScopePolicy,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function collectWorkScopePolicyViolations(policy: WorkScopePolicy): string[] {
   const derivable = new Set<string>(DERIVABLE_MANDATORY_TRIGGER_IDS);
@@ -21,17 +22,25 @@ export function collectWorkScopePolicyViolations(policy: WorkScopePolicy): strin
     );
 }
 
-export function main(): void {
-  const policy = loadWorkScopePolicy();
-  const violations = collectWorkScopePolicyViolations(policy);
-  if (violations.length > 0) {
-    for (const violation of violations) console.error(`[check:work-scope-policy] ${violation}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:work-scope-policy] OK — ${policy.mandatory_triggers.length} mandatory trigger(s) are reachable`
-  );
-}
+export const runCheckWorkScopePolicy = defineScript({
+  name: 'check:work-scope-policy',
+  flags: [],
+  run(context) {
+    const policy = loadWorkScopePolicy();
+    const violations = collectWorkScopePolicyViolations(policy);
+    if (violations.length > 0) {
+      for (const violation of violations) console.error(`[check:work-scope-policy] ${violation}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print(
+      `[check:work-scope-policy] OK — ${policy.mandatory_triggers.length} mandatory trigger(s) are reachable`
+    );
+  },
+});
 
-if (process.argv[1]?.endsWith('check_work_scope_policy.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_work_scope_policy.ts') ||
+  isDirectScript(import.meta.url, 'check_work_scope_policy.js')
+)
+  void runCheckWorkScopePolicy();

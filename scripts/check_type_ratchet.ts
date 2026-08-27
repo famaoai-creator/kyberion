@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import ts from 'typescript';
 import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
@@ -14,18 +15,12 @@ const DEFAULT_SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'tests'
 // A Docker build context contains locally generated files the baseline has
 // never seen, so counts diverge for environmental reasons, not type-safety
 // regressions. Image builds skip with a loud notice; CI keeps enforcing.
-if (process.env.KYBERION_SKIP_TYPE_RATCHET === '1') {
-  console.log(
-    '[check:type-ratchet] skipped (KYBERION_SKIP_TYPE_RATCHET=1 — image/context build; CI enforces the ratchet on the git tree)'
-  );
-  process.exit(0);
-}
-
 type RatchetBucket = {
   any_keywords: number;
   as_any: number;
   ts_ignore: number;
   files: number;
+  max_lines: number;
 };
 
 type RatchetBaseline = {
@@ -52,9 +47,11 @@ function isTestFile(repoRelativePath: string): boolean {
 function isGeneratedFile(repoRelativePath: string): boolean {
   const segments = repoRelativePath.split('/');
   return (
+    /^libs\/core\/index-part-\d+\.ts$/u.test(repoRelativePath) ||
     segments.some((segment) =>
       new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
-    ) || repoRelativePath.endsWith('/next-env.d.ts')
+    ) ||
+    repoRelativePath.endsWith('/next-env.d.ts')
   );
 }
 
@@ -64,6 +61,7 @@ function emptyBucket(): RatchetBucket {
     as_any: 0,
     ts_ignore: 0,
     files: 0,
+    max_lines: 0,
   };
 }
 
@@ -72,11 +70,13 @@ function incrementBucket(target: RatchetBucket, source: RatchetBucket): void {
   target.as_any += source.as_any;
   target.ts_ignore += source.ts_ignore;
   target.files += source.files;
+  target.max_lines = Math.max(target.max_lines, source.max_lines);
 }
 
 function countFile(filePath: string, repoRelativePath: string): RatchetBucket {
   const bucket = emptyBucket();
   const text = String(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  bucket.max_lines = text.split(/\r?\n/u).length;
   const source = ts.createSourceFile(
     repoRelativePath,
     text,
@@ -133,12 +133,15 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
 function loadBaseline(baselinePath: string): RatchetBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return JSON.parse(safeReadFile(baselinePath, { encoding: 'utf8' }) as string) as RatchetBaseline;
+  return readJson<RatchetBaseline>(baselinePath);
 }
 
 function compareBuckets(current: RatchetBucket, baseline: RatchetBucket, label: string): string[] {
   const violations: string[] = [];
-  for (const key of ['any_keywords', 'as_any', 'ts_ignore', 'files'] as const) {
+  // File count is descriptive, not a type-safety regression: a real
+  // responsibility split necessarily adds modules. New-module size is
+  // enforced independently by check:max-file-lines.
+  for (const key of ['any_keywords', 'as_any', 'ts_ignore', 'max_lines'] as const) {
     if (current[key] > baseline[key]) {
       violations.push(`${label}.${key} increased from ${baseline[key]} to ${current[key]}`);
     }
@@ -191,23 +194,34 @@ export function checkTypeRatchet(
   };
 }
 
-export function main(): void {
-  const writeBaseline = process.argv.includes('--write-baseline');
-  const report = checkTypeRatchet({ writeBaseline });
-
-  if (report.violations.length > 0) {
-    console.error('[check:type-ratchet] violations detected:');
-    for (const violation of report.violations) {
-      console.error(`- ${violation}`);
+export const runCheckTypeRatchet = defineScript({
+  name: 'check:type-ratchet',
+  flags: [],
+  run(context) {
+    if (getRegisteredEnvText('KYBERION_SKIP_TYPE_RATCHET') === '1') {
+      context.print(
+        '[check:type-ratchet] skipped (KYBERION_SKIP_TYPE_RATCHET=1 — image/context build; CI enforces the ratchet on the git tree)'
+      );
+      return;
     }
-    process.exit(1);
-  }
+    const writeBaseline = context.argv.includes('--write-baseline');
+    const report = checkTypeRatchet({ writeBaseline });
 
-  console.log('[check:type-ratchet] OK');
-}
+    if (report.violations.length > 0) {
+      console.error('[check:type-ratchet] violations detected:');
+      for (const violation of report.violations) {
+        console.error(`- ${violation}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+    context.print('[check:type-ratchet] OK');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_type_ratchet.ts') ||
+  isDirectScript(import.meta.url, 'check_type_ratchet.js')
+)
+  void runCheckTypeRatchet();

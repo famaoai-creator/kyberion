@@ -1,4 +1,4 @@
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
@@ -11,7 +11,7 @@ export const preferenceAdapter = {
   get: (key: string, defaultValue: any = null) => {
     try {
       if (!safeExistsSync(PREF_PATH)) return defaultValue;
-      const prefs = JSON.parse(safeReadFile(PREF_PATH, { encoding: 'utf8' }) as string);
+      const prefs = loadJson<unknown>(PREF_PATH);
 
       const parts = key.split('.');
       let current = prefs;
@@ -27,9 +27,7 @@ export const preferenceAdapter = {
 
   set: (key: string, value: any) => {
     try {
-      const prefs = safeExistsSync(PREF_PATH)
-        ? JSON.parse(safeReadFile(PREF_PATH, { encoding: 'utf8' }) as string)
-        : {};
+      const prefs = safeExistsSync(PREF_PATH) ? loadJson<unknown>(PREF_PATH) : {};
 
       const parts = key.split('.');
       let current = prefs;

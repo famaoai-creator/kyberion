@@ -1,17 +1,11 @@
-import { logger } from './core.js';
+import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import {
-  safeReadFile,
-  safeWriteFile,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-} from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { rootDir } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
+export { registerLockIo } from './src/lock-utils.js';
 import {
   computeAuditEntryHash,
   GENESIS_HASH,
@@ -20,6 +14,7 @@ import {
   type ChainAlg,
   verifyAuditEntryHash,
 } from './chain-integrity.js';
+export { registerChainIntegrityIo } from './chain-integrity.js';
 import {
   eventScopeMatches,
   normalizeEventScope,
@@ -27,6 +22,8 @@ import {
   type EventScope,
   type EventScopeFilter,
 } from './event-scope.js';
+
+const logger = createLogger('audit-chain');
 
 /**
  * Hash-Chained Audit Trail v1.0
@@ -77,6 +74,34 @@ export interface AuditVerifyResult {
   boundaryLimited?: boolean;
 }
 
+/** Secure I/O capabilities supplied by the secure-io boundary. */
+export interface AuditChainIo {
+  read(filePath: string): string;
+  loadJson<T>(filePath: string): T;
+  exists(filePath: string): boolean;
+  mkdir(dirPath: string): void;
+  readdir(dirPath: string): string[];
+  append(filePath: string, content: string): void;
+}
+
+let auditIo: AuditChainIo | undefined;
+
+function testAuditChainIo(): AuditChainIo | undefined {
+  if (!process.env.VITEST) return undefined;
+  return (
+    globalThis as typeof globalThis & {
+      __kyberionVitestIo?: { auditIo?: AuditChainIo };
+    }
+  ).__kyberionVitestIo?.auditIo;
+}
+let auditChainInstance: AuditChainImpl | undefined;
+
+/** Install the secure persistence boundary after both modules have initialized. */
+export function registerAuditChainIo(io: AuditChainIo): void {
+  auditIo = io;
+  auditChainInstance?.initializeFromDisk();
+}
+
 class AuditChainImpl {
   private lastHash: string = GENESIS_HASH;
   private entryCount: number = 0;
@@ -84,7 +109,11 @@ class AuditChainImpl {
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
   constructor() {
+    auditIo ||= testAuditChainIo();
     this.auditDir = path.join(pathResolver.rootDir(), 'active', 'shared', 'logs', 'audit');
+  }
+
+  initializeFromDisk(): void {
     this.seedFromDisk();
   }
 
@@ -336,6 +365,7 @@ class AuditChainImpl {
    */
   verifyTenantMirrors(): { ok: boolean; findings: string[] } {
     const findings: string[] = [];
+    if (!auditIo) return { ok: false, findings: ['audit_io_not_registered'] };
     const masterEntries = this.loadAll();
     const masterByTenant = new Map<string, AuditEntry[]>();
 
@@ -349,13 +379,14 @@ class AuditChainImpl {
     }
 
     const customersDir = path.join(pathResolver.rootDir(), 'customer');
-    if (!safeExistsSync(customersDir)) return { ok: true, findings };
+    if (!auditIo.exists(customersDir)) return { ok: true, findings };
 
-    for (const slug of safeReaddir(customersDir)) {
+    for (const slug of auditIo.readdir(customersDir)) {
       const mirrorDir = path.join(customersDir, slug, 'logs', 'audit');
-      if (!safeExistsSync(mirrorDir)) continue;
+      if (!auditIo.exists(mirrorDir)) continue;
 
-      const mirrorFiles = safeReaddir(mirrorDir)
+      const mirrorFiles = auditIo
+        .readdir(mirrorDir)
         .filter((fileName) => AuditChainImpl.AUDIT_FILE_RE.test(fileName))
         .sort((left, right) => left.localeCompare(right));
 
@@ -413,6 +444,7 @@ class AuditChainImpl {
   }
 
   private seedFromDisk(): void {
+    if (!auditIo) return;
     const files = this.listAuditFiles();
     if (files.length === 0) return;
 
@@ -429,10 +461,10 @@ class AuditChainImpl {
   }
 
   private listAuditFiles(): string[] {
-    if (!safeExistsSync(this.auditDir)) return [];
+    if (!auditIo || !auditIo.exists(this.auditDir)) return [];
     let fileNames: string[];
     try {
-      fileNames = safeReaddir(this.auditDir);
+      fileNames = auditIo.readdir(this.auditDir);
     } catch (err) {
       // The directory can vanish between the exists check and the readdir
       // (janitor sweeps, tests mocking existsSync). A missing dir simply
@@ -458,9 +490,9 @@ class AuditChainImpl {
   }
 
   private readAuditFileEntries(filePath: string): AuditEntry[] {
-    if (!safeExistsSync(filePath)) return [];
+    if (!auditIo || !auditIo.exists(filePath)) return [];
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const content = auditIo.read(filePath);
       return content
         .trim()
         .split('\n')
@@ -472,11 +504,15 @@ class AuditChainImpl {
   }
 
   private appendToFile(entry: AuditEntry): void {
+    if (!auditIo) {
+      logger.error('[AUDIT_CHAIN] Secure audit I/O is not registered; refusing to persist');
+      return;
+    }
     try {
-      if (!safeExistsSync(this.auditDir)) {
-        safeMkdir(this.auditDir, { recursive: true });
+      if (!auditIo.exists(this.auditDir)) {
+        auditIo.mkdir(this.auditDir);
       }
-      safeAppendFileSync(this.getFilePath(), JSON.stringify(entry) + '\n');
+      auditIo.append(this.getFilePath(), `${JSON.stringify(entry)}\n`);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -495,15 +531,15 @@ class AuditChainImpl {
     if (entry.tenantSlug && isValidTenantSlug(entry.tenantSlug)) {
       try {
         const stanceDir = path.join(rootDir(), 'customer', entry.tenantSlug);
-        if (!safeExistsSync(stanceDir)) return;
+        if (!auditIo.exists(stanceDir)) return;
         const tenantAuditDir = path.join(stanceDir, 'logs', 'audit');
-        if (!safeExistsSync(tenantAuditDir)) {
-          safeMkdir(tenantAuditDir, { recursive: true });
+        if (!auditIo.exists(tenantAuditDir)) {
+          auditIo.mkdir(tenantAuditDir);
         }
         const date = new Date().toISOString().slice(0, 10);
-        safeAppendFileSync(
+        auditIo.append(
           path.join(tenantAuditDir, `audit-${date}.jsonl`),
-          JSON.stringify(entry) + '\n'
+          `${JSON.stringify(entry)}\n`
         );
       } catch (err: any) {
         logger.warn(`[AUDIT_CHAIN] Tenant mirror failed for ${entry.tenantSlug}: ${err.message}`);
@@ -525,7 +561,8 @@ function resolveAuditScope(
     return normalizeEventScope({
       ...(scope || {}),
       ...(tenantSlug && !scope?.tenant_slug ? { tenant_slug: tenantSlug } : {}),
-      tier: scope?.tier || (process.env.KYBERION_TIER as EventScope['tier']) || 'public',
+      tier:
+        scope?.tier || (getRegisteredEnvText('KYBERION_TIER') as EventScope['tier']) || 'public',
     });
   } catch {
     return undefined;
@@ -550,7 +587,7 @@ function scopeForAuditEntry(entry: AuditEntry): EventScope | null | undefined {
  * and dependency-free to avoid circular imports with `authority.ts`.
  */
 function resolveCurrentTenantSlug(): string | undefined {
-  const fromEnv = (process.env.KYBERION_TENANT || '').trim();
+  const fromEnv = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   // A tier name is syntactically a valid slug, so the shape check alone lets
   // `KYBERION_TENANT=public` through and taints every audit entry it stamps.
   if (fromEnv && isValidTenantSlug(fromEnv)) {
@@ -570,9 +607,9 @@ function resolveCurrentTenantSlug(): string | undefined {
     path.join(pathResolver.rootDir(), 'active/missions/public', missionId, 'mission-state.json'),
   ];
   for (const candidate of candidates) {
-    if (!safeExistsSync(candidate)) continue;
+    if (!auditIo || !auditIo.exists(candidate)) continue;
     try {
-      const state = JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string);
+      const state = auditIo.loadJson<{ tenant_slug?: string }>(candidate);
       const slug = (state.tenant_slug || '').trim();
       if (slug && isValidTenantSlug(slug)) return slug;
     } catch {
@@ -586,4 +623,5 @@ const GLOBAL_KEY = Symbol.for('@kyberion/audit-chain');
 if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new AuditChainImpl();
 }
-export const auditChain: AuditChainImpl = (globalThis as any)[GLOBAL_KEY];
+auditChainInstance = (globalThis as any)[GLOBAL_KEY];
+export const auditChain: AuditChainImpl = auditChainInstance;

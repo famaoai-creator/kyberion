@@ -9,6 +9,72 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
+const ARTIFACT_PROPERTIES = {
+  artifacts: {
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        kind: { type: 'string' },
+        path: { type: 'string' },
+        description: { type: 'string' },
+      },
+      required: ['id', 'kind', 'path'],
+      additionalProperties: false,
+    },
+  },
+  artifactsByRole: {
+    type: 'object',
+    properties: {
+      primary: { type: 'array', items: { type: 'string' } },
+      specification: { type: 'array', items: { type: 'string' } },
+      evidence: { type: 'array', items: { type: 'string' } },
+    },
+    additionalProperties: false,
+  },
+  conversationSummary: { type: 'string' },
+  logicalDir: { type: 'string' },
+  logicalPath: { type: 'string' },
+  mainArtifactId: { type: 'string' },
+  packId: { type: 'string' },
+  recommendedNextAction: { type: 'string' },
+  requestText: { type: 'string' },
+  role: { type: 'string' },
+  summary: { type: 'string' },
+  value: {},
+};
+
+const ARTIFACT_SCHEMA = {
+  type: 'object',
+  properties: ARTIFACT_PROPERTIES,
+  additionalProperties: false,
+} as const;
+
+const ARTIFACT_EXAMPLES = {
+  write_json: [{ logicalPath: 'active/shared/tmp/result.json', value: { ok: true } }],
+  append_event: [{ logicalPath: 'active/shared/tmp/events.jsonl', value: { event: 'completed' } }],
+  read_json: [{ logicalPath: 'active/shared/tmp/result.json' }],
+  list: [{ logicalDir: 'active/shared/tmp' }],
+  ensure_dir: [{ logicalDir: 'active/shared/tmp/results' }],
+  write_delivery_pack: [
+    {
+      logicalDir: 'active/shared/tmp/delivery',
+      packId: 'pack-20260826',
+      summary: 'Delivery summary',
+    },
+  ],
+};
+
+const REQUIRED_FIELDS: Record<string, string[]> = {
+  write_json: ['logicalPath'],
+  append_event: ['logicalPath'],
+  read_json: ['logicalPath'],
+  list: ['logicalDir'],
+  ensure_dir: ['logicalDir'],
+  write_delivery_pack: ['logicalDir'],
+};
+
 export const ARTIFACT_ACTUATOR_CAPTURE_OPS = ['read_json', 'list'] as const;
 
 export const ARTIFACT_ACTUATOR_TRANSFORM_OPS = [] as const;
@@ -21,7 +87,12 @@ export const ARTIFACT_ACTUATOR_APPLY_OPS = [
 ] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
-  return { op, kind };
+  return {
+    op,
+    kind,
+    input_schema: { ...ARTIFACT_SCHEMA, required: REQUIRED_FIELDS[op] },
+    examples: ARTIFACT_EXAMPLES[op as keyof typeof ARTIFACT_EXAMPLES],
+  };
 }
 
 export function describeOps() {

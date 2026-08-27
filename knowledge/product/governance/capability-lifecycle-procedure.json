@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/capability-lifecycle-procedure.schema.json",
   "version": "1.0.0",
   "procedure_id": "capability_lifecycle",
   "scope": ["provider", "gateway", "platform"],

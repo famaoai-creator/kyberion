@@ -9,6 +9,9 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ManifestEntry {
   path: string;
@@ -23,6 +26,48 @@ interface IndexEntry {
   author: string;
   dir: string;
   tier: string;
+}
+
+interface FrontmatterExclusionManifest {
+  manifest_version: number;
+  excluded_paths: string[];
+}
+
+const FRONTMATTER_EXCLUSIONS_PATH = pathResolver.knowledge(
+  'product/governance/frontmatter-exclusions.json'
+);
+
+function matchesExclusion(relativePath: string, pattern: string): boolean {
+  const expression = new RegExp(
+    `^${pattern
+      .split('**')
+      .map((part) =>
+        part
+          .split('*')
+          .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('[^/]*')
+      )
+      .join('.*')}$`
+  );
+  return expression.test(relativePath);
+}
+
+export function validateFrontmatterExclusions(files: readonly string[]): string[] {
+  const manifest = readJson<FrontmatterExclusionManifest>(FRONTMATTER_EXCLUSIONS_PATH);
+  const failures: string[] = [];
+  if (manifest.manifest_version !== 1 || !Array.isArray(manifest.excluded_paths)) {
+    return ['frontmatter exclusion manifest has an unsupported shape'];
+  }
+  for (const pattern of manifest.excluded_paths) {
+    // These roots are intentionally omitted by `walk` for tier isolation and
+    // runtime volatility, so their exclusion is validated by the walker
+    // policy rather than by a visible index entry.
+    if (pattern === 'personal/**' || pattern.startsWith('product/evolution/')) continue;
+    if (!files.some((file) => matchesExclusion(file, pattern))) {
+      failures.push(`frontmatter exclusion does not match any knowledge path: ${pattern}`);
+    }
+  }
+  return failures;
 }
 
 function getTier(relPath: string): string {
@@ -121,13 +166,12 @@ export function generateIndex(checkOnly = false): boolean {
   // Index generation is a governance tool that must see every tier and write
   // the tier-root index files, so run it elevated (same pattern as scripts/clean.ts).
   return withExecutionContext('mission_controller', () => {
-    const previousSudo = process.env.KYBERION_SUDO;
-    process.env.KYBERION_SUDO = 'true';
+    const previousSudo = getRegisteredEnvText('KYBERION_SUDO');
+    setRegisteredEnv('KYBERION_SUDO', 'true');
     try {
       return generateIndexInner(checkOnly);
     } finally {
-      if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
-      else process.env.KYBERION_SUDO = previousSudo;
+      setRegisteredEnv('KYBERION_SUDO', previousSudo);
     }
   });
 }
@@ -135,6 +179,11 @@ export function generateIndex(checkOnly = false): boolean {
 function generateIndexInner(checkOnly: boolean): boolean {
   const kbRoot = pathResolver.knowledge('');
   const allFiles = walk(kbRoot, kbRoot);
+  const exclusionFailures = validateFrontmatterExclusions(allFiles);
+  if (exclusionFailures.length > 0) {
+    for (const failure of exclusionFailures) console.error(`[generate_knowledge_index] ${failure}`);
+    return false;
+  }
 
   const manifestEntries: ManifestEntry[] = [];
   const indexEntries: IndexEntry[] = [];
@@ -145,7 +194,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   const VOLATILE_KNOWLEDGE_PATHS = new Set(['product/governance/HINTS.md']);
 
   for (const file of allFiles) {
-    if (file === '_index.md' || file === '_manifest.json') continue;
+    if (file === '_index.md' || file === '_integrity-manifest.json') continue;
     const fullPath = path.join(kbRoot, file);
     const stat = trySafeStat(fullPath);
     if (!stat) continue;
@@ -193,7 +242,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   // For checkOnly mode, we don't compare the Last Updated string, so we generate a normalized version
   let md = `# Ecosystem Knowledge Base Index\n\n`;
   md += `*SSoT Index Version: 2.0.0 | Generated snapshot*\n\n`;
-  md += `> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [\`active/INDEX.volatile.md\`](../active/INDEX.volatile.md) (non-SSoT, refreshed by \`pnpm pipeline --input pipelines/volatile-index.json\`). Schema: \`schemas/volatile-knowledge.schema.json\`.\n\n`;
+  md += `> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [\`active/INDEX.volatile.md\`](../active/INDEX.volatile.md) (non-SSoT, refreshed by \`pnpm pipeline --input pipelines/volatile-index.json\`). Schema: \`knowledge/product/schemas/volatile-knowledge.schema.json\`.\n\n`;
 
   for (const dir of dirs) {
     md += `## 📁 ${dir}\n`;
@@ -206,7 +255,7 @@ function generateIndexInner(checkOnly: boolean): boolean {
   const indexContent = md.trim() + '\n';
 
   if (checkOnly) {
-    const existingManifest = safeReadFile(path.join(kbRoot, '_manifest.json'), {
+    const existingManifest = safeReadFile(path.join(kbRoot, '_integrity-manifest.json'), {
       encoding: 'utf8',
     }) as string;
     const existingIndex = safeReadFile(path.join(kbRoot, '_index.md'), {
@@ -239,24 +288,26 @@ function generateIndexInner(checkOnly: boolean): boolean {
     return true;
   }
 
-  safeWriteFile(path.join(kbRoot, '_manifest.json'), manifestContent);
+  safeWriteFile(path.join(kbRoot, '_integrity-manifest.json'), manifestContent);
   safeWriteFile(path.join(kbRoot, '_index.md'), indexContent);
   return true;
 }
 
-const isDirectExecution =
-  process.argv[1] != null &&
-  (process.argv[1].endsWith('generate_knowledge_index.ts') ||
-    process.argv[1].endsWith('generate_knowledge_index.js'));
-if (isDirectExecution) {
-  const checkOnly = process.argv.includes('--check');
-  const success = generateIndex(checkOnly);
-  if (!success && checkOnly) {
-    process.exit(1);
-  }
-  if (!checkOnly) {
-    console.log('[generate_knowledge_index] Index and manifest updated successfully.');
-  } else {
-    console.log('[generate_knowledge_index] Index and manifest are up-to-date.');
-  }
-}
+export const runGenerateKnowledgeIndex = defineScript({
+  name: 'generate:knowledge-index',
+  flags: [],
+  run: ({ argv }) => {
+    const checkOnly = argv.includes('--check');
+    const success = generateIndex(checkOnly);
+    if (!success && checkOnly) throw new ScriptExitError(1, '', true);
+    if (!checkOnly)
+      console.log('[generate_knowledge_index] Index and manifest updated successfully.');
+    else console.log('[generate_knowledge_index] Index and manifest are up-to-date.');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_knowledge_index.ts') ||
+  isDirectScript(import.meta.url, 'generate_knowledge_index.js')
+)
+  void runGenerateKnowledgeIndex();

@@ -1,9 +1,9 @@
 import {
+  loadJson,
   distillHttpResponse,
   executeLlmDecideOp,
   logger,
   secureFetch,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
@@ -15,10 +15,10 @@ import {
   resolveWriteArtifactSpec,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   buildUnknownActuatorOpError,
   executeAdfSteps,
 } from '@agent/core';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
 
@@ -26,7 +26,8 @@ import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
  * Network-Actuator v2.2.0 [A2A TRANSPORT ENABLED]
  * Pure ADF-driven engine for all network and A2A interactions.
  */
-const ALLOW_UNSAFE_SHELL = process.env.KYBERION_ALLOW_UNSAFE_SHELL === 'true';
+const ALLOW_UNSAFE_SHELL =
+  getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_SHELL', { defaultValue: false }) === true;
 const NETWORK_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/network-actuator/manifest.json'
 );
@@ -108,10 +109,8 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     initialCtx.context_path &&
     safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))
   ) {
-    const saved = JSON.parse(
-      safeReadFile(pathResolver.rootResolve(initialCtx.context_path), {
-        encoding: 'utf8',
-      }) as string
+    const saved = loadJson<Record<string, unknown>>(
+      pathResolver.rootResolve(initialCtx.context_path)
     );
     ctx = { ...ctx, ...saved };
   }

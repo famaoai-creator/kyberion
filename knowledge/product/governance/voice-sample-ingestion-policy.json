@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/voice-sample-ingestion-policy.schema.json",
   "version": "1.0.0",
   "sample_limits": {
     "min_samples": 3,

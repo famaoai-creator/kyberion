@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const DEPRECATED = new Map(
   describeOps()
@@ -57,14 +58,26 @@ function collectFindings(): Finding[] {
   return findings;
 }
 
-const findings = collectFindings();
-if (findings.length === 0) {
-  console.log('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
-} else {
-  for (const finding of findings) {
-    console.warn(
-      `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
-    );
-  }
-  if (process.argv.includes('--fail')) process.exitCode = 1;
-}
+export const runCheckDeprecatedWisdomOps = defineScript({
+  name: 'check:deprecated-wisdom-ops',
+  flags: [],
+  run(context) {
+    const findings = collectFindings();
+    if (findings.length === 0) {
+      context.print('[check:deprecated-wisdom-ops] OK (no deprecated Wisdom ops in catalogs)');
+    } else {
+      for (const finding of findings) {
+        console.warn(
+          `[check:deprecated-wisdom-ops] ${finding.file}: wisdom:${finding.op} -> ${finding.canonical} (${finding.kind})`
+        );
+      }
+      if (context.argv.includes('--fail')) process.exitCode = 1;
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_deprecated_wisdom_ops.ts') ||
+  isDirectScript(import.meta.url, 'check_deprecated_wisdom_ops.js')
+)
+  void runCheckDeprecatedWisdomOps();

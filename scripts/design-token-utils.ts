@@ -1,5 +1,5 @@
-import * as path from 'node:path';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 export interface KyberionDesignTokens {
   version: string;
@@ -66,9 +66,7 @@ const BRAND_TOKENS_PATH = pathResolver.rootResolve(
 );
 
 export function readKyberionDesignTokens(): KyberionDesignTokens {
-  return JSON.parse(
-    safeReadFile(BRAND_TOKENS_PATH, { encoding: 'utf8' }) as string
-  ) as KyberionDesignTokens;
+  return readJson<KyberionDesignTokens>(BRAND_TOKENS_PATH);
 }
 
 export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): string {

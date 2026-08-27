@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/gateway-capability-registry.schema.json",
   "version": "1.0.0",
   "capabilities": []
 }

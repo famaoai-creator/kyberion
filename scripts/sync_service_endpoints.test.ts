@@ -8,13 +8,22 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual('@agent/core') as any;
+  const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
+  };
+});
+
+vi.mock('@agent/core/foundation', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/foundation')>('@agent/core/foundation');
+  return {
+    ...actual,
+    readJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath) || '')),
   };
 });
 
@@ -65,7 +74,9 @@ describe('sync_service_endpoints', () => {
 
     expect(mocks.safeWriteFile).toHaveBeenCalledTimes(1);
     const [snapshotPath, content] = mocks.safeWriteFile.mock.calls[0];
-    expect(String(snapshotPath)).toContain('knowledge/product/orchestration/service-endpoints.json');
+    expect(String(snapshotPath)).toContain(
+      'knowledge/product/orchestration/service-endpoints.json'
+    );
     const parsed = JSON.parse(String(content));
     expect(parsed.default_pattern).toBe('https://api.{service_id}.com/v1');
     expect(Object.keys(parsed.services)).toEqual(['github', 'slack']);

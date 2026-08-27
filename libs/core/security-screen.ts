@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Inbound security-screening primitives (QM-04, successor to SA-03).
  *
@@ -18,14 +19,9 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeMoveSync,
-  safeReadFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
 
@@ -62,7 +58,7 @@ export function resetConfiguredPostureCache(): void {
 }
 
 export function resolveConfiguredPosture(): SecurityPosture {
-  const envValue = process.env.KYBERION_SECURITY_POSTURE?.trim();
+  const envValue = getRegisteredEnvText('KYBERION_SECURITY_POSTURE')?.trim();
   const fromEnv = parsePosture(envValue);
   if (fromEnv) return fromEnv;
   if (envValue) {
@@ -274,7 +270,8 @@ export interface QuarantineRecord {
 
 function quarantineDir(): string {
   return (
-    process.env.KYBERION_SECURITY_QUARANTINE_DIR?.trim() || pathResolver.shared('runtime/security')
+    getRegisteredEnvText('KYBERION_SECURITY_QUARANTINE_DIR')?.trim() ||
+    pathResolver.shared('runtime/security')
   );
 }
 
@@ -291,7 +288,7 @@ export const MAX_QUARANTINE_CONTENT_CHARS = 32_000;
 const DEFAULT_MAX_QUARANTINE_FILE_BYTES = 5 * 1024 * 1024;
 
 function maxQuarantineFileBytes(): number {
-  const fromEnv = Number(process.env.KYBERION_SECURITY_QUARANTINE_MAX_BYTES);
+  const fromEnv = Number(getRegisteredEnvText('KYBERION_SECURITY_QUARANTINE_MAX_BYTES'));
   return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : DEFAULT_MAX_QUARANTINE_FILE_BYTES;
 }
 
@@ -329,7 +326,7 @@ export function recordQuarantine(input: {
   };
   safeMkdir(quarantineDir());
   rotateQuarantineIfOversized();
-  safeAppendFileSync(quarantinePath(), `${JSON.stringify(record)}\n`);
+  appendJsonLine(quarantinePath(), record);
   try {
     auditChain.record({
       agentId: 'security-screen',

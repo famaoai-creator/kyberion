@@ -2,7 +2,7 @@
 
 *SSoT Index Version: 2.0.0 | Generated snapshot*
 
-> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `schemas/volatile-knowledge.schema.json`.
+> **Volatile / Working-Memory faces** (session, mission, project, personal, daily, weekly) are **not listed here** — they are ephemeral and not SSoT. See the generated volatile index: [`active/INDEX.volatile.md`](../active/INDEX.volatile.md) (non-SSoT, refreshed by `pnpm pipeline --input pipelines/volatile-index.json`). Schema: `knowledge/product/schemas/volatile-knowledge.schema.json`.
 
 ## 📁 General
 - [Ecosystem Architecture & Knowledge Map](./Ecosystem_Map.md) (public | Kyberion Sovereign Entity)
@@ -246,25 +246,6 @@
 - [Batch implementation of 13 outcome-simulation improvement points across architecture](./product/incidents/distill_msn-ip-implementation-20260427_2026_04_27.md) (public | Kyberion Wisdom Distiller)
 - [Closing Intent Catalog gaps via concrete artifacts per gap](./product/incidents/distill_msn-intent-catalog-gaps-20260427_2026_04_27.md) (public | Kyberion Wisdom Distiller)
 - [Coverage matrix audit closes 4 of 5 partial scenarios via single mission](./product/incidents/distill_msn-partial-closure-20260427_2026_04_27.md) (public | Kyberion Wisdom Distiller)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772254971164.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772255083345.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772255133910.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772255286281.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772255487200.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772255677139.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772423205048.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772423477997.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772423697998.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772458283567.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772458319325.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772458353245.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772458539108.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772458573822.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772471547982.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772473181891.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772474533342.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772474991822.md) (public | Ecosystem Architect)
-- [Incident Report: mock-skill](./product/incidents/incident-UNKNOWN-mock-skill-1772475045487.md) (public | Ecosystem Architect)
 - [Incident Report: quality-scorer](./product/incidents/incident-UNKNOWN-quality-scorer-1771099808128.md) (public | Ecosystem Architect)
 - [Incident Report: security-scanner](./product/incidents/incident-UNKNOWN-security-scanner-1771099820673.md) (public | Ecosystem Architect)
 - [Industry Incident Case Studies & Prevention](./product/incidents/industry-incident-case-studies.md) (public | Ecosystem Architect)

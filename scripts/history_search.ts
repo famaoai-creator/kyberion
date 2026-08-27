@@ -18,6 +18,7 @@ import {
   searchMissionHistory,
   searchHistory,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 
 export function runHistorySearch(): number {
   const argv = createStandardYargs()
@@ -78,12 +79,13 @@ export function runHistorySearch(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /history_search\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'history_search.ts') ||
+  isDirectScript(import.meta.url, 'history_search.js')
+)
   try {
-    process.exit(runHistorySearch());
+    process.exitCode = runHistorySearch();
   } catch (error) {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   }
-}

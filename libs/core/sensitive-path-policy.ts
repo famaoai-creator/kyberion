@@ -1,5 +1,6 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /**
  * OH-02: credential paths are a deny layer that runs before tier, persona,
@@ -23,7 +24,7 @@ function homeRoot(): string {
 }
 
 function projectRoot(): string {
-  return path.resolve(process.env.KYBERION_ROOT?.trim() || process.cwd());
+  return path.resolve(getRegisteredEnvText('KYBERION_ROOT')?.trim() || process.cwd());
 }
 
 function descendantRoot(root: string, child: string): string {

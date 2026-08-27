@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "required_sections": {
       "type": "array",
@@ -38,7 +39,10 @@
         "require_policy_refs_when_approval_required": { "type": "boolean" },
         "require_reason_when_approval_required": { "type": "boolean" }
       },
-      "required": ["require_policy_refs_when_approval_required", "require_reason_when_approval_required"]
+      "required": [
+        "require_policy_refs_when_approval_required",
+        "require_reason_when_approval_required"
+      ]
     },
     "routing_binding": {
       "type": "object",

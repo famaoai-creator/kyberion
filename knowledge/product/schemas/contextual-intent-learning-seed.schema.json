@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "entries"],
   "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
     "version": {
       "type": "string",
       "minLength": 1
@@ -44,11 +45,24 @@
         "subject": { "type": "string", "enum": ["operator_self", "team"] },
         "date_range": {
           "type": "string",
-          "enum": ["today", "tomorrow", "this_week", "next_week", "this_month", "next_month", "custom"]
+          "enum": [
+            "today",
+            "tomorrow",
+            "this_week",
+            "next_week",
+            "this_month",
+            "next_month",
+            "custom"
+          ]
         },
         "source_binding": {
           "type": "string",
-          "enum": ["operator_default_calendar", "google_calendar", "outlook_calendar", "browser_calendar"]
+          "enum": [
+            "operator_default_calendar",
+            "google_calendar",
+            "outlook_calendar",
+            "browser_calendar"
+          ]
         },
         "clarification_needed": { "type": "boolean" },
         "confirmed": { "type": "boolean" },

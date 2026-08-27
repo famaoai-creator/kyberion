@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 let tmpRoot: string;
 let mod: typeof import('./virtual_office.js');
@@ -11,12 +11,15 @@ let core: typeof import('@agent/core') | undefined;
 
 describe('virtual office surface', () => {
   beforeAll(async () => {
+    vi.resetModules();
     tmpRoot = path.join(os.tmpdir(), `kyb-office-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     // the @agent/core barrel eagerly compiles schemas at import time
-    const repoSchemas = fileURLToPath(new URL('../schemas', import.meta.url));
-    fs.cpSync(repoSchemas, path.join(tmpRoot, 'schemas'), { recursive: true });
+    // The canonical schema root is knowledge/product/schemas. Keep the
+    // legacy directory present for core's isolated-root bootstrap without
+    // depending on the removed, repository-level schema copy.
+    fs.mkdirSync(path.join(tmpRoot, 'schemas'), { recursive: true });
     fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'product'), { recursive: true });
     fs.cpSync(
       fileURLToPath(new URL('../knowledge/product/schemas', import.meta.url)),

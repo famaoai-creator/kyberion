@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   assertMemoryScope,
   memoryScopeAllowsRead,
@@ -35,9 +36,7 @@ function loadEntries(missionId: string): MissionWorkingMemoryEntry[] {
   const p = mwmPersistPath(missionId);
   if (!safeExistsSync(p)) return [];
   try {
-    return JSON.parse(
-      safeReadFile(p, { encoding: 'utf8' }) as string
-    ) as MissionWorkingMemoryEntry[];
+    return readJson<MissionWorkingMemoryEntry[]>(p);
   } catch {
     return [];
   }
