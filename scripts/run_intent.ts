@@ -19,6 +19,10 @@ import {
 } from '@agent/core';
 import type { IntentResolutionPacket } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+// Registers the Super-Nerve executor on the core execution port at load;
+// the resolver alone does not, and without it intents fall back to the
+// conversational path (which stalls where no reasoning backend exists).
+import '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
