@@ -9,7 +9,7 @@ const LOOPBACK_ADDRESSES = ['127.0.0.1', '::1', '::ffff:127.0.0.1'];
  */
 function isTrustProxyEnabled(): boolean {
   const raw = process.env.KYBERION_TRUST_PROXY;
-  return typeof raw === 'string' && /^(1|true|yes|on)$/i.test(raw.trim());
+  return typeof raw === 'string' && /^(1|true|yes|on)$/i.test(raw);
 }
 
 /**

@@ -40,6 +40,7 @@ function makeReq(
 
 describe('chronos middleware', () => {
   beforeEach(() => {
+    vi.stubEnv('KYBERION_TRUST_PROXY', '');
     vi.unstubAllEnvs();
   });
 
