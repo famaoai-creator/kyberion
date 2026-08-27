@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   approvalRequestLogicalPath,
+  buildBridgeEmptyReplyText,
   createSurfaceApprovalRequest,
   loadApprovalRequest,
   pathResolver,
+  resolveOperatorLocale,
   safeRmSync,
   withExecutionContext,
 } from '@agent/core';
@@ -11,6 +13,7 @@ import type { SurfaceConversationMessageInput, SurfaceConversationResult } from 
 
 const captured = vi.hoisted(() => ({
   conversationInputs: [] as { threadContext?: string; text: string }[],
+  replyText: 'ok',
 }));
 
 vi.mock('@agent/core', async (importOriginal) => {
@@ -23,7 +26,7 @@ vi.mock('@agent/core', async (importOriginal) => {
         text: input.text,
       });
       return {
-        text: 'ok',
+        text: captured.replyText,
         a2uiMessages: [],
         a2aMessages: [],
         delegationResults: [],
@@ -57,6 +60,7 @@ const historyChatId = `tg-m1-${RUN_ID}`;
 
 afterEach(() => {
   captured.conversationInputs.length = 0;
+  captured.replyText = 'ok';
   withExecutionContext('surface_runtime', () => {
     safeRmSync(
       pathResolver.resolve(
@@ -127,6 +131,31 @@ describe('telegram bridge thread context', () => {
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
     expect(captured.conversationInputs[1].threadContext).toContain('User (alice): 最初の相談');
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
+  });
+
+  it('answers a whitespace-only conversation reply with the empty-reply text', async () => {
+    // The shared channel-adapter delivery gate trims before sending, so a
+    // whitespace-only reply is silence and must take the empty-reply path.
+    process.env.KYBERION_SURFACE_ALLOWLISTS = JSON.stringify({ telegram: ['77'] });
+    captured.replyText = '   \n\t  ';
+
+    const receipt = await handleTelegramUpdate(
+      {
+        message: {
+          message_id: 9,
+          date: 1_700_000_009,
+          chat: { id: historyChatId },
+          from: { id: '77', username: 'alice' },
+          text: 'こんにちは',
+        },
+      },
+      { dryRun: true }
+    );
+
+    expect(receipt).toMatchObject({ ok: true, chatId: historyChatId });
+    expect(receipt.reply?.text).toBe(
+      buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+    );
   });
 
   it('routes a Telegram callback query through the shared approval decision API', async () => {

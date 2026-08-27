@@ -119,7 +119,10 @@ export function buildDiscordThreadContextFromEntries(
   return formatChannelThreadContext('Discord', entries);
 }
 
-async function collectDiscordThreadContext(message: Message): Promise<string | undefined> {
+async function collectDiscordThreadContext(
+  message: Message,
+  priorHistoryEntries: DiscordThreadHistoryEntry[]
+): Promise<string | undefined> {
   const historyEntries: DiscordThreadHistoryEntry[] = [];
   const channel = message.channel as any;
 
@@ -154,10 +157,10 @@ async function collectDiscordThreadContext(message: Message): Promise<string | u
     return buildDiscordThreadContextFromEntries(historyEntries);
   }
 
-  return buildDiscordThreadContextFromEntries(readDiscordThreadHistory(message.channelId));
+  return buildDiscordThreadContextFromEntries(priorHistoryEntries);
 }
 
-async function handleDiscordMessage(message: Message) {
+export async function handleDiscordMessage(message: Message) {
   if (message.author.bot) return;
 
   const access = evaluateSurfaceActorAccess('discord', message.author.id);
@@ -196,6 +199,10 @@ async function handleDiscordMessage(message: Message) {
     return;
   }
 
+  // m1: read the persisted thread history BEFORE appending this message. The
+  // API path already excludes it (`before: message.id`); the fallback path used
+  // to re-read after the append and leaked the message into its own context.
+  const priorHistoryEntries = readDiscordThreadHistory(message.channelId);
   appendDiscordThreadHistory({
     role: 'user',
     authorLabel: message.author.tag,
@@ -210,7 +217,7 @@ async function handleDiscordMessage(message: Message) {
   const channelAdapter: ChannelAdapter = {
     channel: 'discord',
     actorId: message.author.id,
-    threadContext: () => collectDiscordThreadContext(message),
+    threadContext: () => collectDiscordThreadContext(message, priorHistoryEntries),
     typing: () =>
       startBridgeTypingLoop(
         'discord-bridge',
@@ -301,8 +308,9 @@ async function handleDiscordMessage(message: Message) {
             return;
           }
 
-          if (!result.text) {
-            // UX-01: an empty agent reply must not read as silence.
+          // UX-01: an empty agent reply must not read as silence. Trim first so a
+          // whitespace-only reply matches the shared channel-adapter delivery gate.
+          if (!result.text.trim()) {
             await replyDiscordText(
               message,
               buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
