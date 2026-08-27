@@ -32,6 +32,7 @@ Kyberion turns a request into a clear plan and a verified result. You ask `今�
 - If you want to try it quickly, start with [`docs/QUICKSTART.md`](./docs/QUICKSTART.md).
 - If you want to understand what it does, read [`docs/WHY.md`](./docs/WHY.md) and [`docs/SCENARIO_CATALOG.md`](./docs/SCENARIO_CATALOG.md).
 - If you want to extend it, jump to [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) and [`CAPABILITIES_GUIDE.md`](./CAPABILITIES_GUIDE.md).
+- If a term is unfamiliar, check the [`Glossary`](./docs/GLOSSARY.md) — it has three tiers: first-win, contributor, and FDE.
 
 **Why this matters**: knowledge work is moving from "I do this manually with LLM help" to "I delegate and verify". The winning system is not the most chat-fluent model, but the engine that captures intent reliably, keeps evidence, and accumulates organizational memory. See [`docs/WHY.md`](./docs/WHY.md) for the full thesis ([日本語版](./docs/WHY.ja.md)).
 
