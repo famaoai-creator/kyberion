@@ -7,7 +7,6 @@ import {
   pathResolver,
   resolveTenant,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeExistsSync,
   safeStat,

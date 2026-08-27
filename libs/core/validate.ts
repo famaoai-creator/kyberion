@@ -8,7 +8,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const schemasDir: string = path.resolve(currentDir, '../../knowledge/product/schemas');

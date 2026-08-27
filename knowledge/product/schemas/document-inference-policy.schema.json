@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "type_rules", "profile_rules"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "type_rules": {
       "type": "array",

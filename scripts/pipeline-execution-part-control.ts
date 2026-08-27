@@ -1,123 +1,25 @@
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
-  validateAndRepairAdf,
-  recordGovernanceAction,
-  TraceContext,
-  finalizeAndPersist,
-  persistTrace,
-  classifyError,
   logger,
-  safeExec,
-  safeReadFile,
   safeExistsSync,
-  safeWriteFile,
-  safeMkdir,
   retry,
   resolveVars,
-  evaluateCondition,
   capabilityEntry,
-  findMissionPath,
-  missionEvidenceDir,
-  pathResolver,
-  installReasoningBackends,
-  getReasoningBackend,
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
   buildWorkingPrinciplesLines,
-  executeReportContract,
-  getReasoningPayloadScope,
-  delegateStructured,
-  createApprovalRequest,
   loadApprovalRequest,
-  isApprovalRequestExpired,
-  selectJudgeRoute,
-  resolveMaxRouteHops,
-  detectRouteCycle,
-  resolveFacets,
-  renderFacets,
-  resolveStepReasoningRoute,
-  runFeedbackLoop,
-  determineActuatorStepType,
   resolveActuatorOperation,
   resolveActuatorOperationTimeout,
-  getSemanticDecideDegradations,
-  appendSemanticDegradationRun,
-  recordAdhocPipelineRun,
-  PROMOTION_CANDIDATE_MIN_RUNS,
-  safeExecResult,
-  runJanitor,
-  checkActuatorCapabilities,
-  compactStepOutputContext,
-  killSwitch,
-  validateOpInput,
-  getRegisteredEnv,
-  resolveIdentityContext,
-  executeAdfSteps,
-  runAdfLifecycle,
-  skipAdfStep,
   type AdfStep,
-  type AdfStepHandlers,
-  type AdfStepHooks,
-  type AdfRunResult,
   type AdfSkippedStep,
-  type ReasoningCallOptions,
-  type ReasoningPromptVisibilityContext,
   executeProgrammaticToolCall,
-  getDefaultWorkerEventStream,
-  getDefaultLifecycleHookEngine,
-  fireLifecycleHooks,
-  withActuatorForwardingPort,
-  type ActuatorForwardRequest,
-  type ActuatorForwardingPort,
-  withReasoningPayloadScope,
-  runToolCallBatch,
-  resolveOpAccessClaims,
-  type ResourceClaim,
-  type OpInputDomain,
-  createPipelineRunJournal,
-  openPipelineRunJournal,
-  loadPipelineRunJournal,
-  newPipelineRunId,
-  hashPipelineOutput,
-  type PipelineRunJournalHandle,
-  type PipelineRunJournalState,
-  type PipelineRunSuspendedPayload,
-  deriveExecutionGraph,
-  createGraphRunArtifact,
-  recordGraphRunNode,
-  persistGraphRunArtifact,
-  type GraphRunArtifact,
-  assessPipelineDryRun,
 } from '@agent/core';
 
+import * as nodePath from 'node:path';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { z } from 'zod';
 import { tryRepairJson } from '@agent/core/json-repair';
-import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import {
-  markRouterActive,
-  markRouterInactive,
-  resetRouterSync,
-} from '@agent/core/blackhole-routing-guard';
-import * as nodePath from 'node:path';
-import {
-  derivePipelineStatus,
-  type PipelineAdfStep,
-  type PipelineStepReasoning,
-  ROLE_FROM_TYPE,
-} from '@agent/core/pipeline-contract';
-import {
-  formatPipelineFailure,
-  logNextActionForPipelineFailure,
-  type PipelineFailure,
-} from './pipeline-result-reporting.js';
-import { createStandardYargs } from '@agent/core/cli-utils';
-import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isDirectScript } from './lib/harness.js';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
-import { runStepHooks } from './refactor/step-hooks.js';
+import { type PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
   runInlineProductivityDryRunValidation,
@@ -157,41 +59,19 @@ import {
 } from './pipeline-domain-ops.js';
 
 import {
-  registeredEnv,
   resolveStepType,
   resolveExportKey,
-  runTsFallbackPipeline,
-  recordFallbackOutcome,
-  tryPermissionFallback,
-  finalizePipelineTrace,
-  normalizeStepBudget,
-  normalizeReasoningPolicy,
-  summarizeReasoningPolicy,
   buildReasoningPolicyNote,
   resolvePipelineReasoningOptions,
   resolvePipelineFacetNote,
-  runPipelineReportPhase,
   isReasoningBudgetExceeded,
-  validateFlow,
-  formatFlowValidationErrors,
-  dispatchCache,
-  moduleCache,
-  resolvePipelineHumanPresence,
-  PipelineSuspendedError,
   resolveParamsRecursive,
-  ActuatorStepFailedError,
   loadActuatorDispatch,
   normalizePipelineOp,
   validatePipelineOpInput,
   resolveLogMessage,
-  resolveActuatorManifestPath,
   assertPipelineStepCapabilityAvailable,
-  globToRegExp,
-  matchesArtifactPattern,
-  resolveFragmentPath,
   shouldUseSubagentForReasoningStep,
-  coercePositiveInt,
-  runParallelBatches,
   runInlineSystemExec,
   runInlineSystemWriteFile,
   runInlineSystemShell,
@@ -200,14 +80,134 @@ import {
   runInlineCoreTransform,
   CONTROL_ACTIONS,
 } from './pipeline-execution-part-bootstrap.js';
-import type {
-  RunStepResult,
-  NormalizedStepBudget,
-  ReasoningStepPolicy,
-  FlowValidationError,
-  DispatchFunc,
-  RunStepsOptions,
-} from './pipeline-execution-part-bootstrap.js';
+import type { ReasoningStepPolicy, RunStepsOptions } from './pipeline-execution-part-bootstrap.js';
+
+/**
+ * Private context key carrying the ancestry of resolved absolute pipeline
+ * paths currently on the `core:run_pipeline` stack.
+ *
+ * A nested pipeline runs in-process through the injected library runner, so
+ * without an ancestry a self-including pipeline (A -> A) or a cycle
+ * (A -> B -> A) would recurse until the JS stack is exhausted.  The key is
+ * engine-internal: it is stripped from the user-level child context and then
+ * re-attached explicitly by `buildNestedPipelineContext`.
+ */
+export const PIPELINE_ANCESTRY_CONTEXT_KEY = '__pipeline_ancestry';
+
+/**
+ * Maximum number of pipelines allowed on the nesting stack, the outermost
+ * pipeline included.  A constant rather than an environment knob: no
+ * registered env var governs pipeline nesting, and adding one would widen the
+ * env registry surface for a guardrail that should not be relaxed per run.
+ */
+export const MAX_PIPELINE_NESTING_DEPTH = 8;
+
+/**
+ * Context keys the engine derives for the pipeline it is currently running.
+ *
+ * These are produced by `executePipelineFile` / `main` in
+ * `pipeline-execution-part-results.ts` (their `autoContext` blocks) plus the
+ * trace keys written onto the finished result context.  A nested pipeline must
+ * derive its own values — inheriting the parent's would, for example, hand the
+ * child the parent's `__pipeline_options` and start timestamp — so they are
+ * removed from the context handed down.  `mission_id` is deliberately absent:
+ * it is user-level identity, and the child re-derives `mission_dir` /
+ * `mission_tier` / `mission_evidence_dir` from it.
+ */
+export const ENGINE_INTERNAL_CONTEXT_KEYS: ReadonlySet<string> = new Set([
+  '__pipeline_options',
+  '_knowledge_scope',
+  'repo_root',
+  'platform_name',
+  'node_options',
+  'run_utc_now',
+  'browser_session_id',
+  'mission_dir',
+  'mission_tier',
+  'mission_evidence_dir',
+  'trace_summary',
+  'trace_persisted_path',
+]);
+
+function readPipelineAncestry(ctx: Record<string, unknown>): string[] {
+  const raw = ctx[PIPELINE_ANCESTRY_CONTEXT_KEY];
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is string => typeof entry === 'string');
+}
+
+/**
+ * Strip engine-derived context from the data handed to a nested pipeline so
+ * the child computes its own engine context instead of inheriting the
+ * parent's.  Everything else — the user-level channels the parent produced —
+ * is forwarded unchanged.
+ *
+ * The engine-internal set is enumerable, so it is listed explicitly above; the
+ * `__` prefix is additionally treated as the engine's private namespace so a
+ * future internal key cannot silently start leaking into children.
+ */
+export function sanitizeNestedPipelineContext(
+  ctx: Record<string, unknown>
+): Record<string, unknown> {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(ctx)) {
+    if (ENGINE_INTERNAL_CONTEXT_KEYS.has(key)) continue;
+    if (key.startsWith('__')) continue;
+    sanitized[key] = value;
+  }
+  return sanitized;
+}
+
+/**
+ * Extend the nesting ancestry with the child pipeline about to be executed,
+ * rejecting cycles and runaway depth before the child is dispatched.
+ *
+ * Throws a `[PIPELINE_NESTING_CYCLE]` / `[PIPELINE_NESTING_DEPTH]` error whose
+ * message spells out the offending chain.
+ */
+export function resolveNestedPipelineAncestry(
+  ctx: Record<string, unknown>,
+  rootDir: string,
+  parentPath: string | undefined,
+  childPath: string
+): string[] {
+  const ancestry = readPipelineAncestry(ctx);
+  if (ancestry.length === 0 && parentPath) {
+    ancestry.push(nodePath.resolve(rootDir, parentPath));
+  }
+  const resolvedChild = nodePath.resolve(rootDir, childPath);
+  const display = (absolute: string) => nodePath.relative(rootDir, absolute) || absolute;
+  if (ancestry.includes(resolvedChild)) {
+    throw new Error(
+      `[PIPELINE_NESTING_CYCLE] core:run_pipeline would re-enter a pipeline already running: ` +
+        `${[...ancestry, resolvedChild].map(display).join(' -> ')}`
+    );
+  }
+  const nextAncestry = [...ancestry, resolvedChild];
+  if (nextAncestry.length > MAX_PIPELINE_NESTING_DEPTH) {
+    throw new Error(
+      `[PIPELINE_NESTING_DEPTH] core:run_pipeline exceeded the maximum nesting depth of ` +
+        `${MAX_PIPELINE_NESTING_DEPTH}: ${nextAncestry.map(display).join(' -> ')}`
+    );
+  }
+  return nextAncestry;
+}
+
+/**
+ * Build the context for a nested pipeline: user-level parent data, explicit
+ * `params.context` overrides, and the nesting ancestry.
+ */
+export function buildNestedPipelineContext(
+  ctx: Record<string, unknown>,
+  overrides: Record<string, unknown> | undefined,
+  ancestry: readonly string[]
+): Record<string, unknown> {
+  return {
+    ...sanitizeNestedPipelineContext(ctx),
+    ...(overrides || {}),
+    [PIPELINE_ANCESTRY_CONTEXT_KEY]: [...ancestry],
+  };
+}
+
 export function resolveEngineStepType(step: PipelineAdfStep): 'apply' | 'control' {
   const normalizedOp = normalizePipelineOp(step.op);
   const [domain, action] = normalizedOp.split(':');
@@ -506,10 +506,24 @@ export async function dispatchLeafOp(
     }
     const inputPath = String(params.input ?? params.pipeline ?? params.path ?? '').trim();
     if (!inputPath) throw new Error('core:run_pipeline requires an input path');
-    const nestedContext =
+    // Guard the in-process nesting stack before dispatching: a cycle or an
+    // unbounded chain would otherwise recurse until the JS stack is exhausted.
+    const ancestry = resolveNestedPipelineAncestry(ctx, rootDir, opts.pipelinePath, inputPath);
+    // The child receives user-level data only; engine-derived context
+    // (`__pipeline_options`, `repo_root`, `run_utc_now`, mission paths, ...)
+    // is stripped so the nested pipeline computes its own.
+    //
+    // Out of scope here: `executePipelineFile` re-fires `session_start` /
+    // `before_agent_start` lifecycle hooks for every nested run, so a hook
+    // observes one event per pipeline rather than one per outermost run.
+    // That re-firing semantics is intentionally left unchanged.
+    const nestedContext = buildNestedPipelineContext(
+      ctx,
       params.context && typeof params.context === 'object' && !Array.isArray(params.context)
-        ? { ...ctx, ...(params.context as Record<string, unknown>) }
-        : ctx;
+        ? (params.context as Record<string, unknown>)
+        : undefined,
+      ancestry
+    );
     const nested = await opts.runPipelineFile(inputPath, {
       context: nestedContext,
       quiet: opts.quiet,

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { createAjv } from './foundation/ajv.js';
 
 const ajv = createAjv();
@@ -82,7 +82,6 @@ export function serviceRecordingContentHash(recording: ServiceRecording): string
 }
 
 const INPUT_PLACEHOLDER = /\{\{input\.([a-z][a-z0-9_]{0,63})\}\}/g;
-const CHANNEL_PLACEHOLDER = /\{\{channel\.([a-zA-Z0-9_]+)\}\}/g;
 const SECRET_PLACEHOLDER = /^\{\{secret\.([a-zA-Z0-9_.-]+)\}\}$/u;
 const SENSITIVE_KEY =
   /(token|secret|password|authorization|api[_-]?key|credential|cookie|private[_-]?key|otp|one[_-]?time|passphrase)/iu;

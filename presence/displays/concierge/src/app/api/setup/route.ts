@@ -13,7 +13,6 @@ import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   saveBrowserOnboardingVoiceSample,
   secureIo,

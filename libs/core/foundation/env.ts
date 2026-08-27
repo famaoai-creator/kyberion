@@ -1,12 +1,9 @@
-import { pathResolver } from '../path-resolver.js';
-
 export interface FoundationEnvEntry {
   name: string;
   type: 'string' | 'boolean' | 'number' | 'enum' | 'path';
   enum?: string[];
 }
 
-const REGISTRY_PATH = pathResolver.rootResolve('knowledge/product/governance/env-registry.json');
 let cachedEntries: FoundationEnvEntry[] | null = null;
 let registryReader: (() => { entries?: FoundationEnvEntry[] } | null) | undefined;
 let loadingRegistry = false;

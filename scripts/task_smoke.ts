@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
   id: string;
@@ -100,8 +100,14 @@ export async function main(argv: string[] = []): Promise<void> {
   console.log(`TaskScenario smoke passed: ${scenario.id}`);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'task:smoke',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'task_smoke.ts') ||
+  isDirectScript(import.meta.url, 'task_smoke.js')
+) {
+  void script();
+}

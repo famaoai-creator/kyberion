@@ -5,7 +5,7 @@ import { listArtifactRecords } from './artifact-record.js';
 import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 

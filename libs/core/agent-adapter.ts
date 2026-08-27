@@ -1,12 +1,9 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeExecResult, safeReaddir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
-import { resolveCodexBinary } from './codex-cli-query.js';
-import { loadAgentInstructionResource } from './agent-instruction-loader.js';
-import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';

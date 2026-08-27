@@ -1,10 +1,4 @@
-import {
-  logger,
-  safeReadFile,
-  createStandardYargs,
-  pathResolver,
-  defineCatalogBackedActuator,
-} from '@agent/core';
+import { logger, defineCatalogBackedActuator } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './secret-actuator-helpers.js';

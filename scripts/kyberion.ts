@@ -50,15 +50,22 @@ export function formatCliManifestHelp(manifest = loadCliManifest()): string {
   ].join('\n');
 }
 
+/** Where operators fix a startup environment failure, named in the error itself. */
+const ENV_REGISTRY_PATH = 'knowledge/product/governance/env-registry.json';
+const ENV_STRICT_FLAG = 'KYBERION_ENV_REGISTRY_STRICT';
+
 /** Validate required registered settings before dispatching any CLI command. */
 export function assertRequiredEnvironment(report: {
   errors: readonly Readonly<{ name: string; issue: string }>[];
 }): void {
   if (report.errors.length === 0) return;
+  const details = report.errors.map((issue) => `${issue.name} (${issue.issue})`).join(', ');
   throw new Error(
-    `Required environment is not configured: ${report.errors
-      .map((issue) => `${issue.name} (${issue.issue})`)
-      .join(', ')}`
+    [
+      `Required environment is not configured: ${details}`,
+      `Register or correct each variable in ${ENV_REGISTRY_PATH} (regenerate with \`pnpm generate:env-registry\`).`,
+      `To downgrade unregistered/mistyped KYBERION_* variables back to warnings, set ${ENV_STRICT_FLAG}=0 (strict validation is on by default).`,
+    ].join('\n')
   );
 }
 
@@ -66,7 +73,7 @@ export function validateKyberionStartupEnvironment(
   env: Record<string, string | undefined> = process.env
 ): void {
   const strict =
-    getRegisteredEnvBool('KYBERION_ENV_REGISTRY_STRICT', {
+    getRegisteredEnvBool(ENV_STRICT_FLAG, {
       env,
       defaultValue: true,
     }) === true;

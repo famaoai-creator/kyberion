@@ -382,32 +382,6 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
     .sort((left, right) => left.service_name.localeCompare(right.service_name));
 }
 
-function resolveSurfaceId(serviceName: string): string | undefined {
-  const normalized = serviceName.trim();
-  if (!normalized) return undefined;
-  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return normalized;
-  try {
-    for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) =>
-      file.endsWith('.json')
-    )) {
-      const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(
-        pathResolver.knowledge(`product/governance/surfaces/${entry}`)
-      );
-      for (const surface of manifest.surfaces || []) {
-        if (!surface || surface.enabled === false) continue;
-        const surfaceId = String(surface.id || '').trim();
-        const alias = String(surface.service_id || '').trim();
-        if (surfaceId === normalized || alias === normalized) {
-          return surfaceId;
-        }
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return normalized;
-}
-
 function inferRequiresApproval(input: {
   requiresApproval?: boolean;
   requirements?: TaskSession['requirements'];

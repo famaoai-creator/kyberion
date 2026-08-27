@@ -1,124 +1,47 @@
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import {
-  validateAndRepairAdf,
   recordGovernanceAction,
   TraceContext,
   finalizeAndPersist,
   persistTrace,
-  classifyError,
   logger,
   safeExec,
-  safeReadFile,
   safeExistsSync,
   safeWriteFile,
   safeMkdir,
   retry,
   resolveVars,
-  evaluateCondition,
   capabilityEntry,
-  findMissionPath,
-  missionEvidenceDir,
   pathResolver,
-  installReasoningBackends,
   getReasoningBackend,
   getReasoningRuntimeInstructions,
   renderRuntimeInstructions,
   buildWorkingPrinciplesLines,
   executeReportContract,
   getReasoningPayloadScope,
-  delegateStructured,
-  createApprovalRequest,
-  loadApprovalRequest,
-  isApprovalRequestExpired,
-  selectJudgeRoute,
-  resolveMaxRouteHops,
-  detectRouteCycle,
   resolveFacets,
   renderFacets,
   resolveStepReasoningRoute,
-  runFeedbackLoop,
   determineActuatorStepType,
   resolveActuatorOperation,
-  resolveActuatorOperationTimeout,
-  getSemanticDecideDegradations,
-  appendSemanticDegradationRun,
-  recordAdhocPipelineRun,
-  PROMOTION_CANDIDATE_MIN_RUNS,
   safeExecResult,
   runJanitor,
   checkActuatorCapabilities,
-  compactStepOutputContext,
-  killSwitch,
   validateOpInput,
   getRegisteredEnv,
   resolveIdentityContext,
-  executeAdfSteps,
-  runAdfLifecycle,
-  skipAdfStep,
-  type AdfStep,
-  type AdfStepHandlers,
-  type AdfStepHooks,
-  type AdfRunResult,
-  type AdfSkippedStep,
   type ReasoningCallOptions,
-  type ReasoningPromptVisibilityContext,
-  executeProgrammaticToolCall,
-  getDefaultWorkerEventStream,
-  getDefaultLifecycleHookEngine,
-  fireLifecycleHooks,
-  withActuatorForwardingPort,
-  type ActuatorForwardRequest,
-  type ActuatorForwardingPort,
-  withReasoningPayloadScope,
-  runToolCallBatch,
   defineLegacyPipelineActuator,
-  resolveOpAccessClaims,
-  type ResourceClaim,
-  type OpInputDomain,
-  createPipelineRunJournal,
-  openPipelineRunJournal,
-  loadPipelineRunJournal,
-  newPipelineRunId,
-  hashPipelineOutput,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
   type PipelineRunSuspendedPayload,
-  deriveExecutionGraph,
-  createGraphRunArtifact,
-  recordGraphRunNode,
-  persistGraphRunArtifact,
-  type GraphRunArtifact,
-  assessPipelineDryRun,
 } from '@agent/core';
 
-import { runOpPreflight } from '@agent/core/op-preflight';
-import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { z } from 'zod';
-import { tryRepairJson } from '@agent/core/json-repair';
-import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import {
-  markRouterActive,
-  markRouterInactive,
-  resetRouterSync,
-} from '@agent/core/blackhole-routing-guard';
+import { markRouterActive, markRouterInactive } from '@agent/core/blackhole-routing-guard';
 import * as nodePath from 'node:path';
-import {
-  derivePipelineStatus,
-  type PipelineAdfStep,
-  type PipelineStepReasoning,
-  ROLE_FROM_TYPE,
-} from '@agent/core/pipeline-contract';
-import {
-  formatPipelineFailure,
-  logNextActionForPipelineFailure,
-  type PipelineFailure,
-} from './pipeline-result-reporting.js';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { type PipelineAdfStep, type PipelineStepReasoning } from '@agent/core/pipeline-contract';
+import { type PipelineFailure } from './pipeline-result-reporting.js';
 import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isDirectScript } from './lib/harness.js';
-import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
-import { runStepHooks } from './refactor/step-hooks.js';
+import { pathToFileURL } from 'node:url';
 import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 
 export function registeredEnv(name: string): string | undefined {
@@ -637,6 +560,29 @@ export function resolveParamsRecursive(params: any, ctx: any): any {
 // engine (handleAction returned status:'failed' rather than throwing).
 export class ActuatorStepFailedError extends Error {}
 
+/**
+ * Select the context a `reasoning:*` step reasons over, honouring a declared
+ * falsy value.
+ *
+ * Same falsy-fallback class as `runInlineCoreTransform`: params are
+ * template-resolved before dispatch, so `context: "{{loop.count}}"` reaches
+ * this point as the number 0 and the previous `params.context || ctx` swapped
+ * that valid, deliberately narrow context for the entire pipeline context
+ * object — the model then saw every channel in the run instead of the one
+ * value the author scoped it to. Only an absent (or null) `context` means
+ * "reason over the whole context".
+ */
+export function resolveReasoningContextParam(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): unknown {
+  if (Array.isArray(params.context)) {
+    return params.context.map((item) => (typeof item === 'string' ? resolveVars(item, ctx) : item));
+  }
+  if (typeof params.context === 'string') return resolveVars(params.context, ctx);
+  return params.context ?? ctx;
+}
+
 export async function loadActuatorDispatch(
   domain: string,
   resolvedOperation?: ReturnType<typeof resolveActuatorOperation>
@@ -657,11 +603,7 @@ export async function loadActuatorDispatch(
           typeof params.instruction === 'string'
             ? resolveVars(params.instruction, ctx)
             : params.instruction;
-        const resolvedContext = Array.isArray(params.context)
-          ? params.context.map((item) => (typeof item === 'string' ? resolveVars(item, ctx) : item))
-          : typeof params.context === 'string'
-            ? resolveVars(params.context, ctx)
-            : params.context || ctx;
+        const resolvedContext = resolveReasoningContextParam(params, ctx);
         const reasoningPolicy =
           (params._reasoning_policy as ReasoningStepPolicy | undefined) ?? policy;
         const routeOptions = resolvePipelineReasoningOptions(
@@ -1010,6 +952,10 @@ export async function runInlineSystemExec(
     typeof resolvedParams.cwd === 'string' && resolvedParams.cwd.trim().length > 0
       ? String(resolvedParams.cwd)
       : rootDir;
+  // `timeout_ms: 0` deliberately falls through to secure-io's default deadline
+  // rather than being forwarded. secure-io reads 0 as a 0ms deadline (an
+  // immediate kill), not as "no timeout", so honouring the falsy value here
+  // would turn every such step into an instant failure.
   const timeoutMs =
     typeof resolvedParams.timeout_ms === 'number' ? resolvedParams.timeout_ms : undefined;
   const execResult = safeExecResult(command, args, {
@@ -1082,6 +1028,8 @@ export async function runInlineSystemShell(
       typeof value === 'string' ? String(resolveVars(value, ctx)) : String(value),
     ])
   ) as Record<string, string>;
+  // As in runInlineSystemExec: a falsy `timeout_ms` is not forwarded, because
+  // secure-io treats 0 as an immediate-kill deadline rather than "unlimited".
   const timeoutMs = typeof params.timeout_ms === 'number' ? params.timeout_ms : undefined;
   const output = safeExec(shellBin, ['-c', cmd], {
     cwd: rootDir,
@@ -1112,11 +1060,42 @@ export async function runInlineSystemShell(
   return ctx;
 }
 
+export const DEFAULT_CORE_WAIT_MS = 1000;
+
+/**
+ * Select a `core:wait` duration that honours an explicitly declared 0.
+ *
+ * `dispatchLeafOp` template-resolves a step's params before this handler runs,
+ * so `duration_ms: "{{backoff_ms}}"` arrives here as a number — including the
+ * number 0, which the previous `params.duration_ms || params.ms || 1000`
+ * fallback silently replaced with the 1000ms default (the same falsy-fallback
+ * class fixed in `runInlineCoreTransform`). A zero-length wait is a legitimate
+ * request: it yields to the event loop without stalling the run.
+ *
+ * Values that are not a finite, non-negative duration are still treated as
+ * "not supplied" so the next alias — and finally the default — applies:
+ * `''` (what `resolveVars` returns for an unresolved template), `null`,
+ * booleans, and non-numeric strings all keep their pre-existing behaviour of
+ * falling through rather than degenerating into a 0ms or NaN wait.
+ */
+export function resolveWaitDurationMs(value: unknown): number | undefined {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim().length > 0
+        ? Number(value)
+        : Number.NaN;
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : undefined;
+}
+
 export async function runInlineCoreWait(
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const ms = Number(resolveVars(params.duration_ms || params.ms || 1000, ctx));
+  const ms =
+    resolveWaitDurationMs(resolveVars(params.duration_ms, ctx)) ??
+    resolveWaitDurationMs(resolveVars(params.ms, ctx)) ??
+    DEFAULT_CORE_WAIT_MS;
   await new Promise((resolve) => setTimeout(resolve, ms));
   return ctx;
 }
@@ -1142,7 +1121,12 @@ export async function runInlineCoreTransform(
   const { Buffer } = await import('node:buffer');
   const vm = await import('node:vm');
   const util = await import('node:util');
-  const input = resolveVars(params.input || ctx, ctx);
+  // A declared `input` is honoured even when it resolves to a falsy value.
+  // `dispatchLeafOp` template-resolves params before this handler runs, so a
+  // `{{loop.count}}` of 0 arrives here as the number 0; a `||` fallback would
+  // silently swap that valid input for the whole context object and turn the
+  // script's `Number(input)` into NaN. Only an absent input means "whole ctx".
+  const input = resolveVars(params.input ?? ctx, ctx);
   const script = String(params.script || 'input');
   // Wrap in IIFE so pipeline scripts can use `return` statements naturally
   const wrappedScript = `(function() { ${script} })()`;

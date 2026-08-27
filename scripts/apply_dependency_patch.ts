@@ -27,7 +27,6 @@ import {
   logger,
   pathResolver,
   safeExecResult,
-  safeExistsSync,
   safeJsonParse,
   safeMkdir,
   safeReadFile,

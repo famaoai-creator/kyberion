@@ -14,7 +14,6 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';

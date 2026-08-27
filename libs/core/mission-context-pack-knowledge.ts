@@ -13,8 +13,6 @@ import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import type { ProjectOperationalState } from './project-operational-state-registry.js';
-import type { ProjectTrackRecord } from './project-track-registry.js';
-import type { TaskSession } from './task-session.js';
 import type { WorkItem } from './work-coordination.js';
 import type {
   LoadKnowledgeHintsInput,

@@ -18,13 +18,11 @@ import {
   derivePipelineStatus,
   pathResolver,
   buildUnknownActuatorOpError,
-  validatePipelineAdf,
   registerTaskPlanCoordinator,
   evaluateTaskPlanReadyGate,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { executeTaskPlanFromOrchestrator, taskPlanCoordinator } from './task-plan-coordinator.js';
@@ -32,20 +30,10 @@ import { decomposeIntoTasks, taskPlanToNextTasks } from './task-plan-ops.js';
 import {
   loadActuatorRequestArchetypes,
   detectRequestArchetype,
-  normalizeRequestTextForArchetypeDetection,
-  EXECUTION_BRIEF_INPUT_ALIASES,
   resolveExecutionBriefInputs,
-  normalizeExecutionBriefInputName,
-  inferExecutionBriefInputBinding,
-  lookupAliasValue,
-  isMeaningfulInputValue,
-  previewExecutionBriefInputValue,
   resolveExecutionBriefReference,
   buildPipelineBundleJobs,
   renderPipelineBundleJob,
-  normalizeOutputPath,
-  repairRenderedPipelineContract,
-  validateRenderedPipelineContract,
   preflightExecutionPlanSet,
   executeExecutionPlanSet,
   collectCommandHealth,
@@ -55,11 +43,6 @@ import {
   deriveStatusNextActions,
   collectMissionStatusSnapshot,
   collectProjectStatusSnapshot,
-  resolveActuatorEntryPath,
-  applyPathOverrides,
-  renderTemplateValue,
-  renderTemplateString,
-  setByPath,
 } from './orchestrator-execution-brief-helpers.js';
 
 // Legacy core callers are still supported, but the coordinator is owned and
@@ -114,9 +97,6 @@ export type ExecutionPlanPreflightReport = {
   issues: ExecutionPlanPreflightIssue[];
 };
 
-const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
-  'product/orchestration/actuator-request-archetypes.json'
-);
 const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/orchestrator-actuator/manifest.json'
 );

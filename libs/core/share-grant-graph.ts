@@ -6,7 +6,6 @@ import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  safeAppendFileSync,
   safeChmodSync,
   safeCreateExclusiveFileSync,
   safeExistsSync,

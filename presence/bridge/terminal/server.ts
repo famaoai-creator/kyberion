@@ -19,7 +19,6 @@ import {
   safeRmSync,
   safeExistsSync,
   safeUnlinkSync,
-  safeReaddir,
 } from '@agent/core';
 import {
   buildSessionPaths,
@@ -41,7 +40,6 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 const ROOT_DIR = pathResolver.rootDir();
-const GLOBAL_STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const TERMINAL_TOKEN =
   getRegisteredEnvText('KYBERION_TERMINAL_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');

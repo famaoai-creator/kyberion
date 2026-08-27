@@ -6,13 +6,7 @@ import {
   evaluateBlueBubblesConfiguration,
   type BlueBubblesConfigurationReport,
 } from './bluebubbles-adapter.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeExec,
-  safeMkdir,
-  validateFileSize,
-} from './secure-io.js';
+import { safeExistsSync, safeExec, safeMkdir, validateFileSize } from './secure-io.js';
 
 export interface IMessageSendRequest {
   recipient: string; // Identifier (phone, email) or Chat ID

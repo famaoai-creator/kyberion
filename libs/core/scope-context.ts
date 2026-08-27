@@ -4,10 +4,8 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
-  validateScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-  type ScopeContextValidationOptions,
 } from './scope-context-validation.js';
 export {
   assertScopeContext,
@@ -51,18 +49,6 @@ function clean(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim();
   return normalized ? normalized : undefined;
-}
-
-function compatibleAlias(
-  tenantSlug: string | undefined,
-  tenantId: string | undefined
-): string | undefined {
-  if (tenantSlug && tenantId && tenantSlug !== tenantId) {
-    throw new Error(
-      `[SCOPE_CONTEXT_INVALID] tenant_slug '${tenantSlug}' conflicts with compatibility tenant_id '${tenantId}'`
-    );
-  }
-  return tenantSlug || tenantId;
 }
 
 /** Normalize aliases and remove empty optional values without widening scope. */

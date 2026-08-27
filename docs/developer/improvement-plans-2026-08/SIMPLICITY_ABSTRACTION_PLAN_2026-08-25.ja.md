@@ -245,7 +245,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 **実装**:
 
 1. 状態正本を `docs/developer/improvement-plans-2026-08/README.ja.md`(月次索引)+ 各計画の「実装状況」節に **1 本化**。`STATUS.ja.md` は 2026-07 の凍結台帳として表形式に整形、`ROADMAP.md` / `ROADMAP_COMPLETION_LEDGER.md` はアーカイブ、`CHANGELOG.md` はリリース手順に組み込むか削除。
-2. 全計画に `status:` frontmatter を付与し、`implemented|completed` を `improvement-plans-archive/` へ移動(docs/developer 240 → <100)。AGENTS.md からのリンク切れを check。
+2. 全計画に `status:` frontmatter を付与し、`implemented|completed` を `improvement-plans-archive/` へ移動(docs/developer 配下 md(improvement-plans-archive を除く): 現状 95 → 目標 <100。監査時点の全数 240 は §5 の baseline 注記を参照)。AGENTS.md からのリンク切れを check。
 3. 概念文書は `organization-work-loop.md` を入口、他 5 本を「補足」に降格。`COMPONENT_MAP.md:5-19` の 13 リンクを 1 つに。onboarding は QUICKSTART(SX-01)を正本に。
 4. Localization policy を実態に合わせて改訂(「rules 英語 / 計画・運用文書 日本語」を正式化)し、英語名で日本語本文の 4 ロードマップに `.ja` を付ける。
 5. Glossary を 3 階層(first-win 6 語 / contributor 約 30 語 / FDE 全語)に分割し README からリンク。未定義 5 語(mission context pack / handoff packet / semantic brief / knowledge card / design cascade)を追加または既存語へ統合。`work_shape` / `execution_shape` の説明衝突(MG-08 の文書側)を解消。
@@ -283,31 +283,33 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 5. 削減目標(ラチェットとして CI に固定)
 
-| 指標                                    | 現状         | 目標   | 担当     |
-| --------------------------------------- | ------------ | ------ | -------- |
-| `JSON.parse(safeReadFile(`              | 489          | 0      | SX-03    |
-| 自前 `new Ajv(`                         | 161 files    | 1      | SX-03/04 |
-| `process.env.KYBERION_*` 直読           | 460          | 0      | SX-03    |
-| 手書き catalog loader                   | ~151         | 0      | SX-04    |
-| schema 無し governance catalog          | 70           | 0      | SX-04    |
-| npm scripts                             | 319          | ≤120   | SX-05    |
-| CLI 入口                                | 5            | 1      | SX-05    |
-| doctor/preflight 実装                   | 11           | 1      | SX-05    |
-| `process.argv` 直読 script              | 197          | 0      | SX-06    |
-| `check:*` で CI 未実行                  | 32           | 0      | SX-07    |
-| PR 前に打つコマンド                     | 6            | 1      | SX-07    |
-| 自由文解釈の実装                        | 7（未達）    | 1      | SX-08    |
-| `IntentResolutionContract` 描画 surface | 部分（未達） | 12/12  | SX-08    |
-| viewer/auth 実装                        | 4（未達）    | 1      | SX-09    |
-| vocabulary lookup 実装                  | 6（未達）    | 1      | SX-09    |
-| actuator ABI                            | 4            | 1      | SX-10    |
-| op 入力 schema カバレッジ               | 13%          | 100%   | SX-10    |
-| `system:exec` スクリプト包み            | 68           | 0      | SX-11    |
-| 最大ファイル行数                        | 7,012        | ≤1,500 | SX-12    |
-| `index.ts` barrel 行数                  | 2,691        | ≤300   | SX-12    |
-| 状態「正本」文書                        | 6            | 1      | SX-13    |
-| docs/developer 配下 md                  | 240          | <100   | SX-13    |
-| README の外部 4 語カバレッジ            | 0/4          | 4/4    | SX-14    |
+| 指標                                                       | 現状         | 目標   | 担当     |
+| ---------------------------------------------------------- | ------------ | ------ | -------- |
+| `JSON.parse(safeReadFile(`                                 | 489          | 0      | SX-03    |
+| 自前 `new Ajv(`                                            | 161 files    | 1      | SX-03/04 |
+| `process.env.KYBERION_*` 直読                              | 460          | 0      | SX-03    |
+| 手書き catalog loader                                      | ~151         | 0      | SX-04    |
+| schema 無し governance catalog                             | 70           | 0      | SX-04    |
+| npm scripts                                                | 319          | ≤120   | SX-05    |
+| CLI 入口                                                   | 5            | 1      | SX-05    |
+| doctor/preflight 実装                                      | 11           | 1      | SX-05    |
+| `process.argv` 直読 script                                 | 197          | 0      | SX-06    |
+| `check:*` で CI 未実行                                     | 32           | 0      | SX-07    |
+| PR 前に打つコマンド                                        | 6            | 1      | SX-07    |
+| 自由文解釈の実装                                           | 7（未達）    | 1      | SX-08    |
+| `IntentResolutionContract` 描画 surface                    | 部分（未達） | 12/12  | SX-08    |
+| viewer/auth 実装                                           | 4（未達）    | 1      | SX-09    |
+| vocabulary lookup 実装                                     | 6（未達）    | 1      | SX-09    |
+| actuator ABI                                               | 4            | 1      | SX-10    |
+| op 入力 schema カバレッジ                                  | 13%          | 100%   | SX-10    |
+| `system:exec` スクリプト包み                               | 68           | 0      | SX-11    |
+| 最大ファイル行数                                           | 7,012        | ≤1,500 | SX-12    |
+| `index.ts` barrel 行数                                     | 2,691        | ≤300   | SX-12    |
+| 状態「正本」文書                                           | 6            | 1      | SX-13    |
+| docs/developer 配下 md(improvement-plans-archive を除く)\* | 95           | <100   | SX-13    |
+| README の外部 4 語カバレッジ                               | 0/4          | 4/4    | SX-14    |
+
+\* 監査時点(2026-08-25)の docs/developer 配下 md 全数(improvement-plans-archive 移行前の baseline)は 240 件。improvement-plans-archive を除いた active な計画ディレクトリ配下の md 数が上記の現状値。
 
 ---
 

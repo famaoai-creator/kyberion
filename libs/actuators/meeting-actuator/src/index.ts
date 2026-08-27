@@ -1,9 +1,7 @@
 import { logger } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleAction } from './meeting-actuator-helpers.js';
-import { safeReadFile, pathResolver } from '@agent/core';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {

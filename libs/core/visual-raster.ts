@@ -7,7 +7,6 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeRmSync,
   safeStat,
 } from './secure-io.js';

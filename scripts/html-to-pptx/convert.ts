@@ -15,7 +15,7 @@
  */
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { executePipelineFile } from '../run_pipeline.js';
-import { defineScript, ScriptExitError } from '../lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
 async function main(argv: string[]): Promise<void> {
   const [input, outArg] = argv;
@@ -65,8 +65,14 @@ async function main(argv: string[]): Promise<void> {
   console.error(`[html-to-pptx] wrote ${out}`);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'media:html-to-pptx',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'convert.ts') ||
+  isDirectScript(import.meta.url, 'convert.js')
+) {
+  void script();
+}

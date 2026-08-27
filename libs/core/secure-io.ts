@@ -6,7 +6,6 @@ import {
   spawnSync,
   type ChildProcessWithoutNullStreams,
 } from 'node:child_process';
-import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -166,12 +165,7 @@ export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_
  * Read a file with size validation and optional caching.
  */
 export function safeReadFile(filePath: string, options: SafeReadOptions = {}): string | Buffer {
-  const {
-    maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB,
-    encoding = 'utf8',
-    label = 'input',
-    cache = true,
-  } = options;
+  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input' } = options;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);

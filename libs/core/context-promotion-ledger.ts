@@ -1,7 +1,7 @@
 import { appendJsonLine } from './foundation/json.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { safeAppendFileSync, safeMkdir } from './secure-io.js';
+import { safeMkdir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { TierLevel } from './types.js';
 import type { ContextSecurityScope } from './context-security-scope.js';

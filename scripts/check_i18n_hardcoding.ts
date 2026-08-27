@@ -11,7 +11,6 @@
 // noisy. Hiragana/Katakana are a much more reliable "this is Japanese prose,
 // not a regex fragment" signal.
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   pathResolver,

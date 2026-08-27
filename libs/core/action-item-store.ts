@@ -20,7 +20,7 @@ import { nowIso } from './foundation/time.js';
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
+import { safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
 
 export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 

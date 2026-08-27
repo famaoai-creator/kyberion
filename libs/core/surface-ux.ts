@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { secretGuard } from './secret-guard.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { getServicePresetPolicy } from './service-preset-policy.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import {
   listSurfaceAsyncRequests,
   listSurfaceNotifications,

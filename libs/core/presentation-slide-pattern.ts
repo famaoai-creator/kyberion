@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface SlidePatternSlot {
   slot_id: string;

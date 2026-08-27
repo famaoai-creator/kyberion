@@ -1,6 +1,7 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
+import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
@@ -10,7 +11,6 @@ import {
   createStandardYargs,
   logger,
   pathResolver,
-  safeReadFile,
   describeIMessageBridgeHealth,
   downloadBlueBubblesAttachment,
   parseBlueBubblesWebhook,
@@ -207,6 +207,37 @@ function buildIncomingIMessageText(message: {
     .join('\n\n');
 }
 
+/**
+ * M3g-ii: arm the "working" note inside `typing.start`, never before the turn.
+ * runChannelTurn resolves thread context first and stops typing in `finally`,
+ * so a thread-context failure now leaves no timer behind — the note can no
+ * longer fire for a turn that already failed.
+ */
+export function buildIMessageChannelAdapter(msg: IMessageStimulus): ChannelAdapter {
+  return {
+    channel: 'imessage',
+    actorId: msg.sender,
+    threadContext: () =>
+      buildThreadContext({
+        ...msg,
+        text: stripLeadingIMessageWakeWord(msg.text),
+      }) || undefined,
+    // UX-02: iMessage has no typing API — send a one-time working note
+    // only if processing outlives 5s (quick replies stay clean).
+    typing: () => {
+      const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
+        sendIMessageText(buildIMessageReplyRequest(msg, '処理中です。少々お待ちください…'))
+      );
+      return { stop: () => processingNote.cancel() };
+    },
+    shouldSend: ({ result }) =>
+      !result.missionProposals?.length && result.approvalRequests.length === 0,
+    send: async ({ text }) => {
+      await sendIMessageText(buildIMessageReplyRequest(msg, text));
+    },
+  };
+}
+
 const processedMessageKeys = new Set<string>();
 
 async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageProcessingResult> {
@@ -302,28 +333,9 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
     return (await sendReply(proposalReply.reply)) ? 'processed' : 'failed';
   }
 
-  // UX-02: iMessage has no typing API — send a one-time working note
-  // only if processing outlives 5s (quick replies stay clean).
-  const processingNote = scheduleBridgeProcessingNote('imessage-bridge', () =>
-    sendIMessageText(buildIMessageReplyRequest(msg, '処理中です。少々お待ちください…'))
-  );
-  const channelAdapter: ChannelAdapter = {
-    channel: 'imessage',
-    actorId: msg.sender,
-    threadContext: () =>
-      buildThreadContext({
-        ...msg,
-        text: stripLeadingIMessageWakeWord(msg.text),
-      }) || undefined,
-    typing: () => ({ stop: () => processingNote.cancel() }),
-    shouldSend: ({ result }) =>
-      !result.missionProposals?.length && result.approvalRequests.length === 0,
-    send: async ({ text }) => {
-      await sendIMessageText(buildIMessageReplyRequest(msg, text));
-    },
-  };
+  const channelAdapter = buildIMessageChannelAdapter(msg);
   try {
-    const conversation = await runChannelTurn(
+    await runChannelTurn(
       channelAdapter,
       {
         text: incomingText,
@@ -346,52 +358,58 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
           threadContext,
           delegationSummaryInstruction:
             'Produce a concise iMessage reply in the user language. Do not use A2A blocks.',
-        })
+        }),
+      {
+        // UX-02: the processing note must stay armed until the proposal and
+        // approval envelopes this bridge posts itself have landed.
+        afterTurn: async (result) => {
+          // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
+          // confirmation instead of a plain reply.
+          const missionProposal = result.missionProposals?.[0];
+          if (missionProposal) {
+            const prompt = stashMissionProposalForConfirmation({
+              surface: 'imessage',
+              channel: msg.chatId,
+              thread: msg.chatId,
+              proposal: missionProposal,
+              sourceText: incomingText,
+              routingDecision: result.routingDecision,
+              fallbackSummary: result.text,
+            });
+            await sendIMessageText(buildIMessageReplyRequest(msg, prompt));
+            return;
+          }
+
+          if (result.approvalRequests.length > 0) {
+            const approvalTexts = result.approvalRequests.map((draft) => {
+              const record = createSurfaceApprovalRequest({
+                surface: 'imessage',
+                channel: msg.chatId,
+                threadTs: msg.chatId,
+                correlationId: `imsg-${msg.id}`,
+                requestedBy: IMESSAGE_SURFACE_AGENT_ID,
+                draft,
+                sourceText: incomingText,
+              });
+              return buildSurfaceApprovalText('imessage', record);
+            });
+            await sendIMessageText(buildIMessageReplyRequest(msg, approvalTexts.join('\n\n')));
+            return;
+          }
+
+          // UX-01: an empty agent reply must not read as silence. Trim first so a
+          // whitespace-only reply matches the shared channel-adapter delivery gate.
+          if (!result.text.trim()) {
+            await sendIMessageText(
+              buildIMessageReplyRequest(
+                msg,
+                buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+              )
+            );
+          }
+        },
+      }
     );
-
-    // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
-    // confirmation instead of a plain reply.
-    const missionProposal = conversation.missionProposals?.[0];
-    if (missionProposal) {
-      const prompt = stashMissionProposalForConfirmation({
-        surface: 'imessage',
-        channel: msg.chatId,
-        thread: msg.chatId,
-        proposal: missionProposal,
-        sourceText: incomingText,
-        routingDecision: conversation.routingDecision,
-        fallbackSummary: conversation.text,
-      });
-      await sendIMessageText(buildIMessageReplyRequest(msg, prompt));
-      return 'processed';
-    }
-
-    if (conversation.approvalRequests.length > 0) {
-      const approvalTexts = conversation.approvalRequests.map((draft) => {
-        const record = createSurfaceApprovalRequest({
-          surface: 'imessage',
-          channel: msg.chatId,
-          threadTs: msg.chatId,
-          correlationId: `imsg-${msg.id}`,
-          requestedBy: IMESSAGE_SURFACE_AGENT_ID,
-          draft,
-          sourceText: incomingText,
-        });
-        return buildSurfaceApprovalText('imessage', record);
-      });
-      await sendIMessageText(buildIMessageReplyRequest(msg, approvalTexts.join('\n\n')));
-      return 'processed';
-    }
-
-    if (!conversation.text) {
-      // UX-01: an empty agent reply must not read as silence.
-      await sendIMessageText(
-        buildIMessageReplyRequest(
-          msg,
-          buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
-        )
-      );
-    }
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(`❌ [iMessageBridge] Conversation failed for ${msg.sender}: ${detail}`);
@@ -561,7 +579,18 @@ async function main() {
   });
 }
 
-main().catch((error) => {
-  logger.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+// Same guard as the Telegram bridge: only a direct `node index.js` invocation
+// starts the bridge, so importing this module in a test cannot start the HTTP
+// listener or the poll loop — and a leaked VITEST env cannot silently no-op a
+// real start.
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+if (directEntry && !process.env.VITEST) {
+  main().catch((error) => {
+    logger.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+} else if (directEntry) {
+  logger.warn('[iMessageBridge] VITEST is set — suppressing the direct-entry start.');
+}

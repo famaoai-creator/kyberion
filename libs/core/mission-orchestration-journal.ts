@@ -2,7 +2,6 @@ import { appendJsonLine, readJson } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,

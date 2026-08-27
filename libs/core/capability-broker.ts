@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';

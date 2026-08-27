@@ -99,7 +99,8 @@ export function writeVideoCompositionBundle(
   adf: VideoCompositionADF,
   options?: { bundleDir?: string }
 ): VideoCompositionRenderPlan {
-  const policy = getVideoRenderRuntimePolicy();
+  // Warm the render runtime policy cache (and surface load warnings) before compiling.
+  getVideoRenderRuntimePolicy();
   const plan = compileVideoCompositionADF(adf, options);
   safeMkdir(plan.bundle_dir, { recursive: true });
   safeMkdir(path.join(plan.bundle_dir, 'compositions'), { recursive: true });
@@ -1388,35 +1389,6 @@ function sceneText(scene: CompiledVideoCompositionScene, key: string): string {
 function sceneLayoutVariant(scene: CompiledVideoCompositionScene): string {
   return sanitizeCssClass(
     String(scene.content?.layout_variant || scene.content?.layout_family || 'default')
-  );
-}
-
-function sceneThemeLayoutFamily(scene: CompiledVideoCompositionScene): string {
-  return String(
-    scene.content?.layout_family || scene.content?.layout_variant || scene.template_id || 'default'
-  );
-}
-
-function sceneThemeMotionProfile(scene: CompiledVideoCompositionScene): string {
-  return String(scene.content?.motion_profile || scene.content?.motion || 'guided-step');
-}
-
-function normalizeSceneDesignSystemVars(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object') return {};
-  return Object.entries(value as Record<string, unknown>).reduce<Record<string, string>>(
-    (acc, [key, entry]) => {
-      if (
-        /^--kb-[a-z0-9-]+$/u.test(key) &&
-        typeof entry === 'string' &&
-        entry.trim() &&
-        entry.length <= 512 &&
-        !/[<>{};\u0000\r\n]/u.test(entry)
-      ) {
-        acc[key] = entry.trim();
-      }
-      return acc;
-    },
-    {}
   );
 }
 

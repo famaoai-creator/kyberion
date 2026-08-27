@@ -1032,11 +1032,21 @@
     },
     {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
-      "category": "runtime",
-      "type": "string",
+      "category": "flag",
+      "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "1",
+      "description": "Strict startup validation of KYBERION_* variables; on by default. Set to 0/false to downgrade unregistered or mistyped variables to warnings. Register new names in env-registry.json via pnpm generate:env-registry.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_ENV_REGISTRY_STRICT_DOCS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Generator-only strictness: when enabled, the env-registry drift check also fails while any registry entry remains undocumented. Off by default; independent of KYBERION_ENV_REGISTRY_STRICT (CLI startup validation).",
+      "documented": true,
+      "default": "0"
     },
     {
       "name": "KYBERION_FIRST_WIN_LIVE",

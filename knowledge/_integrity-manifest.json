@@ -51,7 +51,7 @@
     {
       "path": "product/agents/meeting-proxy.agent.md",
       "tier": "public",
-      "size": 3380,
+      "size": 3887,
       "type": "md"
     },
     {
@@ -261,7 +261,7 @@
     {
       "path": "product/architecture/component-lifecycle-inventory.md",
       "tier": "public",
-      "size": 7464,
+      "size": 7463,
       "type": "md"
     },
     {
@@ -459,7 +459,7 @@
     {
       "path": "product/architecture/kyberion-intent-catalog.md",
       "tier": "public",
-      "size": 40121,
+      "size": 40217,
       "type": "md"
     },
     {
@@ -471,7 +471,7 @@
     {
       "path": "product/architecture/kyberion-scenario-coverage-matrix.md",
       "tier": "public",
-      "size": 13034,
+      "size": 24324,
       "type": "md"
     },
     {
@@ -519,7 +519,7 @@
     {
       "path": "product/architecture/meeting-facilitator-use-case.md",
       "tier": "public",
-      "size": 14658,
+      "size": 14744,
       "type": "md"
     },
     {
@@ -567,7 +567,7 @@
     {
       "path": "product/architecture/mission-task-classification-roadmap-5.4-mini.md",
       "tier": "public",
-      "size": 31207,
+      "size": 36355,
       "type": "md"
     },
     {
@@ -801,7 +801,7 @@
     {
       "path": "product/architecture/token-management-rfc-implementation-tasks-5.4-mini.md",
       "tier": "public",
-      "size": 16139,
+      "size": 16131,
       "type": "md"
     },
     {
@@ -1275,7 +1275,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 8107,
+      "size": 8059,
       "type": "json"
     },
     {
@@ -1383,7 +1383,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 84814,
+      "size": 85471,
       "type": "json"
     },
     {
@@ -1497,7 +1497,7 @@
     {
       "path": "product/governance/governance-catalog-contracts.json",
       "tier": "public",
-      "size": 6437,
+      "size": 5573,
       "type": "json"
     },
     {
@@ -1527,7 +1527,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7365,
+      "size": 7366,
       "type": "json"
     },
     {
@@ -1677,7 +1677,7 @@
     {
       "path": "product/governance/kyberion-development-practices.md",
       "tier": "public",
-      "size": 17077,
+      "size": 17187,
       "type": "md"
     },
     {
@@ -2043,7 +2043,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 3671,
+      "size": 3577,
       "type": "json"
     },
     {
@@ -2325,7 +2325,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 11374,
+      "size": 11452,
       "type": "md"
     },
     {
@@ -3555,7 +3555,7 @@
     {
       "path": "product/orchestration/counterfactual-simulation-protocol.md",
       "tier": "public",
-      "size": 2794,
+      "size": 2795,
       "type": "md"
     },
     {
@@ -3633,7 +3633,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19856,
+      "size": 19104,
       "type": "json"
     },
     {
@@ -3657,7 +3657,7 @@
     {
       "path": "product/orchestration/hypothesis-tree-protocol.md",
       "tier": "public",
-      "size": 2778,
+      "size": 2782,
       "type": "md"
     },
     {
@@ -3669,7 +3669,7 @@
     {
       "path": "product/orchestration/intuition-capture-protocol.md",
       "tier": "public",
-      "size": 3312,
+      "size": 3316,
       "type": "md"
     },
     {
@@ -3837,7 +3837,7 @@
     {
       "path": "product/orchestration/negotiation-protocol.md",
       "tier": "public",
-      "size": 3475,
+      "size": 4070,
       "type": "md"
     },
     {
@@ -4137,13 +4137,13 @@
     {
       "path": "product/orchestration/rehearsal-protocol.md",
       "tier": "public",
-      "size": 2755,
+      "size": 2756,
       "type": "md"
     },
     {
       "path": "product/orchestration/relationship-graph-protocol.md",
       "tier": "public",
-      "size": 2985,
+      "size": 2989,
       "type": "md"
     },
     {
@@ -4731,7 +4731,7 @@
     {
       "path": "product/orchestration/stakeholder-consensus-protocol.md",
       "tier": "public",
-      "size": 5369,
+      "size": 5777,
       "type": "md"
     },
     {
@@ -5247,7 +5247,7 @@
     {
       "path": "product/pipeline-templates/generate-video-smoke.json",
       "tier": "public",
-      "size": 1302,
+      "size": 1356,
       "type": "json"
     },
     {
@@ -5349,25 +5349,25 @@
     {
       "path": "product/pipeline-templates/kyberion-howto-narrated-demo.json",
       "tier": "public",
-      "size": 12418,
+      "size": 12600,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/kyberion-promo-60s-narrated-demo.json",
       "tier": "public",
-      "size": 9226,
+      "size": 9944,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/kyberion-promo-narrated-demo.json",
       "tier": "public",
-      "size": 13655,
+      "size": 13631,
       "type": "json"
     },
     {
       "path": "product/pipeline-templates/kyberion-vtuber-narrated-demo.json",
       "tier": "public",
-      "size": 10246,
+      "size": 12036,
       "type": "json"
     },
     {
@@ -6297,7 +6297,7 @@
     {
       "path": "product/schemas/actuator-dependency-bundles.schema.json",
       "tier": "public",
-      "size": 837,
+      "size": 874,
       "type": "json"
     },
     {
@@ -6315,7 +6315,7 @@
     {
       "path": "product/schemas/actuator-op-registry.schema.json",
       "tier": "public",
-      "size": 1277,
+      "size": 1314,
       "type": "json"
     },
     {
@@ -6645,7 +6645,7 @@
     {
       "path": "product/schemas/changelog-policy.schema.json",
       "tier": "public",
-      "size": 755,
+      "size": 792,
       "type": "json"
     },
     {
@@ -6717,7 +6717,7 @@
     {
       "path": "product/schemas/contextual-intent-clarification-policy.schema.json",
       "tier": "public",
-      "size": 2778,
+      "size": 2815,
       "type": "json"
     },
     {
@@ -6759,7 +6759,7 @@
     {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
-      "size": 2061,
+      "size": 2098,
       "type": "json"
     },
     {
@@ -6843,19 +6843,19 @@
     {
       "path": "product/schemas/document-contents-policy.schema.json",
       "tier": "public",
-      "size": 447,
+      "size": 484,
       "type": "json"
     },
     {
       "path": "product/schemas/document-inference-policy.schema.json",
       "tier": "public",
-      "size": 1283,
+      "size": 1320,
       "type": "json"
     },
     {
       "path": "product/schemas/document-outline-label-policy.schema.json",
       "tier": "public",
-      "size": 290,
+      "size": 327,
       "type": "json"
     },
     {
@@ -6891,7 +6891,7 @@
     {
       "path": "product/schemas/execution-receipt-policy.schema.json",
       "tier": "public",
-      "size": 2288,
+      "size": 2312,
       "type": "json"
     },
     {
@@ -6975,7 +6975,7 @@
     {
       "path": "product/schemas/governance-body-registry.schema.json",
       "tier": "public",
-      "size": 4268,
+      "size": 4305,
       "type": "json"
     },
     {
@@ -7029,7 +7029,7 @@
     {
       "path": "product/schemas/harness-capability-registry.schema.json",
       "tier": "public",
-      "size": 3583,
+      "size": 3643,
       "type": "json"
     },
     {
@@ -7131,7 +7131,7 @@
     {
       "path": "product/schemas/intent-execution-profile-registry.schema.json",
       "tier": "public",
-      "size": 4623,
+      "size": 4660,
       "type": "json"
     },
     {
@@ -7143,7 +7143,7 @@
     {
       "path": "product/schemas/intent-policy.schema.json",
       "tier": "public",
-      "size": 3146,
+      "size": 3104,
       "type": "json"
     },
     {
@@ -7155,7 +7155,7 @@
     {
       "path": "product/schemas/intent-resolution-policy.schema.json",
       "tier": "public",
-      "size": 4174,
+      "size": 4132,
       "type": "json"
     },
     {
@@ -7185,7 +7185,7 @@
     {
       "path": "product/schemas/japanese-contextual-intent-corpus.schema.json",
       "tier": "public",
-      "size": 2659,
+      "size": 2696,
       "type": "json"
     },
     {
@@ -7233,7 +7233,7 @@
     {
       "path": "product/schemas/legacy-media-ops.schema.json",
       "tier": "public",
-      "size": 336,
+      "size": 373,
       "type": "json"
     },
     {
@@ -7263,7 +7263,7 @@
     {
       "path": "product/schemas/max-file-lines.schema.json",
       "tier": "public",
-      "size": 700,
+      "size": 737,
       "type": "json"
     },
     {
@@ -7275,37 +7275,37 @@
     {
       "path": "product/schemas/media-drawio-boundary-policy.schema.json",
       "tier": "public",
-      "size": 1260,
+      "size": 1297,
       "type": "json"
     },
     {
       "path": "product/schemas/media-drawio-edge-policy.schema.json",
       "tier": "public",
-      "size": 1086,
+      "size": 1123,
       "type": "json"
     },
     {
       "path": "product/schemas/media-drawio-policy.schema.json",
       "tier": "public",
-      "size": 1138,
+      "size": 1175,
       "type": "json"
     },
     {
       "path": "product/schemas/media-drawio-security-group-order.schema.json",
       "tier": "public",
-      "size": 326,
+      "size": 363,
       "type": "json"
     },
     {
       "path": "product/schemas/media-drawio-sort-policy.schema.json",
       "tier": "public",
-      "size": 481,
+      "size": 518,
       "type": "json"
     },
     {
       "path": "product/schemas/media-drawio-tier-order.schema.json",
       "tier": "public",
-      "size": 357,
+      "size": 394,
       "type": "json"
     },
     {
@@ -7335,25 +7335,25 @@
     {
       "path": "product/schemas/media-semantic-map.schema.json",
       "tier": "public",
-      "size": 1324,
+      "size": 1361,
       "type": "json"
     },
     {
       "path": "product/schemas/media-signal-entry-policy.schema.json",
       "tier": "public",
-      "size": 1371,
+      "size": 1408,
       "type": "json"
     },
     {
       "path": "product/schemas/media-style-policy.schema.json",
       "tier": "public",
-      "size": 671,
+      "size": 708,
       "type": "json"
     },
     {
       "path": "product/schemas/media-theme-role-policy.schema.json",
       "tier": "public",
-      "size": 398,
+      "size": 435,
       "type": "json"
     },
     {
@@ -7377,7 +7377,7 @@
     {
       "path": "product/schemas/meeting-environment-policy.schema.json",
       "tier": "public",
-      "size": 7246,
+      "size": 7454,
       "type": "json"
     },
     {
@@ -7479,7 +7479,7 @@
     {
       "path": "product/schemas/mission-distill-markdown-policy.schema.json",
       "tier": "public",
-      "size": 1261,
+      "size": 1298,
       "type": "json"
     },
     {
@@ -7491,7 +7491,7 @@
     {
       "path": "product/schemas/mission-journal-policy.schema.json",
       "tier": "public",
-      "size": 878,
+      "size": 915,
       "type": "json"
     },
     {
@@ -7503,7 +7503,7 @@
     {
       "path": "product/schemas/mission-ledger-policy.schema.json",
       "tier": "public",
-      "size": 1028,
+      "size": 1065,
       "type": "json"
     },
     {
@@ -7575,7 +7575,7 @@
     {
       "path": "product/schemas/mission-task-classification-scenarios.schema.json",
       "tier": "public",
-      "size": 5844,
+      "size": 5881,
       "type": "json"
     },
     {
@@ -7647,7 +7647,7 @@
     {
       "path": "product/schemas/model-adaptation-policy.schema.json",
       "tier": "public",
-      "size": 5792,
+      "size": 5872,
       "type": "json"
     },
     {
@@ -7779,7 +7779,7 @@
     {
       "path": "product/schemas/onboarding-flow-policy.schema.json",
       "tier": "public",
-      "size": 1888,
+      "size": 1925,
       "type": "json"
     },
     {
@@ -7791,7 +7791,7 @@
     {
       "path": "product/schemas/onboarding-summary-policy.schema.json",
       "tier": "public",
-      "size": 1115,
+      "size": 1152,
       "type": "json"
     },
     {
@@ -7803,13 +7803,13 @@
     {
       "path": "product/schemas/operator-learning-dispatch-registry.schema.json",
       "tier": "public",
-      "size": 3323,
+      "size": 3360,
       "type": "json"
     },
     {
       "path": "product/schemas/operator-learning-scenario-pack.schema.json",
       "tier": "public",
-      "size": 2051,
+      "size": 2088,
       "type": "json"
     },
     {
@@ -8061,7 +8061,7 @@
     {
       "path": "product/schemas/pilot-strategy-policy.schema.json",
       "tier": "public",
-      "size": 1014,
+      "size": 1051,
       "type": "json"
     },
     {
@@ -8133,7 +8133,7 @@
     {
       "path": "product/schemas/presentation-preference-registry.schema.json",
       "tier": "public",
-      "size": 6870,
+      "size": 6907,
       "type": "json"
     },
     {
@@ -8169,13 +8169,13 @@
     {
       "path": "product/schemas/production-evidence-register.schema.json",
       "tier": "public",
-      "size": 11802,
+      "size": 11839,
       "type": "json"
     },
     {
       "path": "product/schemas/production-evidence-summary-policy.schema.json",
       "tier": "public",
-      "size": 605,
+      "size": 642,
       "type": "json"
     },
     {
@@ -8217,7 +8217,7 @@
     {
       "path": "product/schemas/promoted-report-template-policy.schema.json",
       "tier": "public",
-      "size": 568,
+      "size": 605,
       "type": "json"
     },
     {
@@ -8247,13 +8247,13 @@
     {
       "path": "product/schemas/provider-cli-capability-report-policy.schema.json",
       "tier": "public",
-      "size": 805,
+      "size": 842,
       "type": "json"
     },
     {
       "path": "product/schemas/provider-config.schema.json",
       "tier": "public",
-      "size": 3747,
+      "size": 3784,
       "type": "json"
     },
     {
@@ -8277,7 +8277,7 @@
     {
       "path": "product/schemas/reasoning-backend-policy.schema.json",
       "tier": "public",
-      "size": 3141,
+      "size": 3178,
       "type": "json"
     },
     {
@@ -8397,7 +8397,7 @@
     {
       "path": "product/schemas/service-authority-map.schema.json",
       "tier": "public",
-      "size": 977,
+      "size": 1014,
       "type": "json"
     },
     {
@@ -8409,13 +8409,13 @@
     {
       "path": "product/schemas/service-bootstrap-catalog.schema.json",
       "tier": "public",
-      "size": 2481,
+      "size": 2518,
       "type": "json"
     },
     {
       "path": "product/schemas/service-connection-readiness.schema.json",
       "tier": "public",
-      "size": 966,
+      "size": 1003,
       "type": "json"
     },
     {
@@ -8439,7 +8439,7 @@
     {
       "path": "product/schemas/service-onboarding-catalog.schema.json",
       "tier": "public",
-      "size": 933,
+      "size": 970,
       "type": "json"
     },
     {
@@ -8457,13 +8457,13 @@
     {
       "path": "product/schemas/service-runtime-policy.schema.json",
       "tier": "public",
-      "size": 1322,
+      "size": 1359,
       "type": "json"
     },
     {
       "path": "product/schemas/service-runtime-registry.schema.json",
       "tier": "public",
-      "size": 3016,
+      "size": 3053,
       "type": "json"
     },
     {
@@ -8481,7 +8481,7 @@
     {
       "path": "product/schemas/skill-install-package-map.schema.json",
       "tier": "public",
-      "size": 920,
+      "size": 957,
       "type": "json"
     },
     {
@@ -8523,7 +8523,7 @@
     {
       "path": "product/schemas/software-test-viewpoints.schema.json",
       "tier": "public",
-      "size": 1143,
+      "size": 1180,
       "type": "json"
     },
     {
@@ -8565,7 +8565,7 @@
     {
       "path": "product/schemas/spreadsheet-style-policy.schema.json",
       "tier": "public",
-      "size": 383,
+      "size": 420,
       "type": "json"
     },
     {
@@ -8583,7 +8583,7 @@
     {
       "path": "product/schemas/surface-coordination-role-map.schema.json",
       "tier": "public",
-      "size": 666,
+      "size": 703,
       "type": "json"
     },
     {
@@ -8607,7 +8607,7 @@
     {
       "path": "product/schemas/surface-query-overlay-catalog.schema.json",
       "tier": "public",
-      "size": 1150,
+      "size": 1187,
       "type": "json"
     },
     {
@@ -8679,7 +8679,7 @@
     {
       "path": "product/schemas/task-session-policy.schema.json",
       "tier": "public",
-      "size": 4622,
+      "size": 4370,
       "type": "json"
     },
     {
@@ -8775,19 +8775,19 @@
     {
       "path": "product/schemas/tool-actuator-routing-policy.schema.json",
       "tier": "public",
-      "size": 1616,
+      "size": 1686,
       "type": "json"
     },
     {
       "path": "product/schemas/tool-runtime-policy.schema.json",
       "tier": "public",
-      "size": 1387,
+      "size": 1424,
       "type": "json"
     },
     {
       "path": "product/schemas/tool-runtime-registry.schema.json",
       "tier": "public",
-      "size": 4369,
+      "size": 4406,
       "type": "json"
     },
     {
@@ -8799,7 +8799,7 @@
     {
       "path": "product/schemas/tracker-sheet-policy.schema.json",
       "tier": "public",
-      "size": 547,
+      "size": 584,
       "type": "json"
     },
     {
@@ -8841,7 +8841,7 @@
     {
       "path": "product/schemas/video-composition-template-registry.schema.json",
       "tier": "public",
-      "size": 1605,
+      "size": 1725,
       "type": "json"
     },
     {
@@ -8865,7 +8865,7 @@
     {
       "path": "product/schemas/video-render-runtime-policy.schema.json",
       "tier": "public",
-      "size": 2083,
+      "size": 2131,
       "type": "json"
     },
     {
@@ -8907,7 +8907,7 @@
     {
       "path": "product/schemas/voice-profile-registry.schema.json",
       "tier": "public",
-      "size": 1456,
+      "size": 1526,
       "type": "json"
     },
     {
@@ -8919,7 +8919,7 @@
     {
       "path": "product/schemas/voice-runtime-policy.schema.json",
       "tier": "public",
-      "size": 2334,
+      "size": 2394,
       "type": "json"
     },
     {
@@ -8937,7 +8937,7 @@
     {
       "path": "product/schemas/voice-sample-ingestion-policy.schema.json",
       "tier": "public",
-      "size": 1636,
+      "size": 1684,
       "type": "json"
     },
     {
@@ -8955,7 +8955,7 @@
     {
       "path": "product/schemas/voice-task-profile-catalog.schema.json",
       "tier": "public",
-      "size": 2828,
+      "size": 2865,
       "type": "json"
     },
     {
@@ -9045,7 +9045,7 @@
     {
       "path": "product/schemas/work-coordination-import-catalog.schema.json",
       "tier": "public",
-      "size": 1034,
+      "size": 1071,
       "type": "json"
     },
     {
@@ -9063,7 +9063,7 @@
     {
       "path": "product/schemas/work-policy.schema.json",
       "tier": "public",
-      "size": 5987,
+      "size": 5963,
       "type": "json"
     },
     {
@@ -9699,7 +9699,7 @@
     {
       "path": "public/design-patterns/presentation/kyberion-marketing-deck.json",
       "tier": "public",
-      "size": 5526,
+      "size": 6662,
       "type": "json"
     },
     {
@@ -10605,7 +10605,7 @@
     {
       "path": "public/procedures/media/run-generation-schedule-daemon.md",
       "tier": "public",
-      "size": 1703,
+      "size": 1709,
       "type": "md"
     },
     {
@@ -10623,7 +10623,7 @@
     {
       "path": "public/procedures/media/transcribe-audio-from-asset.md",
       "tier": "public",
-      "size": 1433,
+      "size": 1439,
       "type": "md"
     },
     {
@@ -10755,7 +10755,7 @@
     {
       "path": "public/procedures/system/developer-onboarding.md",
       "tier": "public",
-      "size": 8107,
+      "size": 8133,
       "type": "md"
     },
     {
@@ -10989,7 +10989,7 @@
     {
       "path": "public/standards/engineering/platform-engineering.md",
       "tier": "public",
-      "size": 2304,
+      "size": 2431,
       "type": "md"
     },
     {
@@ -11013,7 +11013,7 @@
     {
       "path": "public/standards/knowledge_management.md",
       "tier": "public",
-      "size": 3633,
+      "size": 4517,
       "type": "md"
     },
     {

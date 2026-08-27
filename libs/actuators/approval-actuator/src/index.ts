@@ -1,7 +1,6 @@
-import { createStandardYargs, logger, safeReadFile } from '@agent/core';
+import { logger } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver } from '@agent/core';
 import { handleApprovalAction } from './approval-actuator-helpers.js';
 import { defineCatalogBackedActuator } from '@agent/core';
 import { describeOps } from './op-catalog.js';

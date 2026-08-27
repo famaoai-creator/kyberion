@@ -164,4 +164,15 @@ describe('viewer-context', () => {
       'viewer project scope denied'
     );
   });
+  it('masks personal for a registered localadmin that omits tier_access instead of rejecting it', async () => {
+    const { resolveViewerTierAccess } = await import('./viewer-context.js');
+    expect(resolveViewerTierAccess('localadmin')).toEqual(['confidential', 'public']);
+    expect(resolveViewerTierAccess('readonly', ['public'])).toEqual(['public']);
+    expect(() => resolveViewerTierAccess('localadmin', ['personal', 'public'])).toThrow(
+      /exceeds the localadmin role policy/
+    );
+    expect(() => resolveViewerTierAccess('readonly', ['confidential', 'personal'])).toThrow(
+      /exceeds the readonly role policy/
+    );
+  });
 });

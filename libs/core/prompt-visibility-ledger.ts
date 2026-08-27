@@ -2,7 +2,7 @@ import { appendJsonLine } from './foundation/json.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { assertModuleInvariant } from './invariants.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 export const PROMPT_VISIBILITY_LEDGER_VERSION = 1 as const;
 

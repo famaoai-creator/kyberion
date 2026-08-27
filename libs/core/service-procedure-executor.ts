@@ -1,9 +1,5 @@
 import { logger } from './core.js';
-import {
-  isExternalEffectStep,
-  type ServiceRecording,
-  type ServiceRecordingStep,
-} from './service-recording.js';
+import { isExternalEffectStep, type ServiceRecording } from './service-recording.js';
 
 export type ServicePresetRunner = (serviceId: string, action: string, params: any) => Promise<any>;
 

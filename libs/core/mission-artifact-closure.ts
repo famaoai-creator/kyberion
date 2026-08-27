@@ -29,7 +29,6 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  safeAppendFileSync,
   safeExec,
   safeExistsSync,
   safeMkdir,

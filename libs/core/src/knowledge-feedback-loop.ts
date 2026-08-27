@@ -27,13 +27,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,

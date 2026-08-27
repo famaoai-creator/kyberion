@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import {
   createStandardYargs,
   agentLifecycle,
@@ -6,7 +5,6 @@ import {
   loadAgentManifests,
   getAgentManifest,
   logger,
-  pathResolver,
   auditChain,
   classifyError,
 } from '@agent/core';

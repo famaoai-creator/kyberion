@@ -29,7 +29,6 @@
     { "layer": "domain", "pattern": "libs/core/intent-resolution-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/report-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/router-contract.ts" },
-    { "layer": "domain", "pattern": "libs/core/structured-output-contracts.ts" },
     { "layer": "domain", "pattern": "libs/core/video-composition-contract.ts" },
     { "layer": "domain", "pattern": "libs/core/video-content-brief-contract.ts" },
     { "layer": "contracts", "pattern": "libs/core/*-contract.ts" },

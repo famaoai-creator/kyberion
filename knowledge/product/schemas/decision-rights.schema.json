@@ -5,6 +5,7 @@
   "type": "object",
   "required": ["version", "company_id", "tenant_slug", "source_kind", "source_path", "decisions"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string",
       "minLength": 1

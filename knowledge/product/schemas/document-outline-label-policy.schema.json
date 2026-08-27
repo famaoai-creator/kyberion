@@ -2,6 +2,7 @@
   "type": "object",
   "required": ["version", "report_summary_title", "report_section_title"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "report_summary_title": { "type": "string" },
     "report_section_title": { "type": "string" }

@@ -9,7 +9,6 @@ import {
   resolveOnboardingSummaryPolicy,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   withExecutionContext,
   withLock,

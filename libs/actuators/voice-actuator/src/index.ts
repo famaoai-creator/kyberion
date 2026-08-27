@@ -15,7 +15,6 @@ import {
   loadJson,
   pathResolver,
   recordInteraction,
-  resolveVars,
   listToolRuntimeInventory,
   recordVoiceSample,
   safeExec,
@@ -38,8 +37,6 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -50,23 +47,9 @@ import {
   waitForVoiceJob,
   type VoiceArtifactFormat,
 } from './voice-runtime-helpers.js';
-import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
 import { runActuatorCli } from '@agent/core';
+import { extractActionParams } from './voice-loopback-helpers.js';
 import {
-  booleanParam,
-  buildLoopbackRequest,
-  createDeterministicLoopbackStt,
-  createDeterministicLoopbackTts,
-  createNativeArtifactTtsSource,
-  extractActionParams,
-  isRecord,
-  numberParam,
-  numericRecord,
-  recordParam,
-  stringParam,
-} from './voice-loopback-helpers.js';
-import {
-  buildAudioRouteViewModel,
   listAudioRoutes,
   listVoices,
   probeAudioRoute,

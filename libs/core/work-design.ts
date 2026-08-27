@@ -112,41 +112,6 @@ interface WorkDesignRulesFile {
   }>;
 }
 
-interface ProcessDesignRuleInput {
-  intentId?: string;
-  taskType?: string;
-  shape?: string;
-}
-
-interface ExecutionShapeRuleInput {
-  intentId?: string;
-  taskType?: string;
-  shape?: string;
-  catalogShape?: string;
-}
-
-interface IntentLabelRuleInput {
-  intentId?: string;
-  taskType?: string;
-  queryType?: string;
-}
-
-interface ProcessChecklistRule {
-  items: string[];
-  match?: RoutingMatch;
-}
-
-interface ExecutionShapeRule {
-  match?: RoutingMatch;
-  shape: WorkflowExecutionShape;
-}
-
-interface IntentLabelRule {
-  match?: RoutingMatch;
-  label?: string;
-  label_from?: 'intentId' | 'taskType' | 'queryType';
-}
-
 interface WorkPolicyFile {
   version: string;
   specialist_routing: SpecialistRoutingPolicyFile;

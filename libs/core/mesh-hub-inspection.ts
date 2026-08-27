@@ -9,11 +9,7 @@ import {
   type MeshDeadLetterRecord,
 } from './mesh-message-broker.js';
 import { listMeshTopicSubscriptions } from './mesh-topic-registry.js';
-import {
-  type MeshDeliveryRecord,
-  type MeshTopicSubscription,
-  type MeshTargetSelector,
-} from './mesh-hub-contract.js';
+import { type MeshDeliveryRecord, type MeshTargetSelector } from './mesh-hub-contract.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { nowIso } from './foundation/time.js';
 

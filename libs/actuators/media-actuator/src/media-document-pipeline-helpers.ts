@@ -1,11 +1,9 @@
 import {
   loadJson,
-  safeReadFile,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
   pathResolver,
-  resolveVars,
   retry,
   designDefaultsFromMediaTheme,
 } from '@agent/core';
@@ -14,14 +12,11 @@ import {
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
-  type PdfDesignProtocol,
 } from '@agent/core/media-contracts';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,
   normalizeInvoiceDocumentBrief,
-  normalizeBriefForCategory,
-  resolveMediaBriefCategory,
   type MediaBriefCategory,
   type ProtocolKind,
 } from './media-document-helpers.js';

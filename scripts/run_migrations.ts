@@ -14,7 +14,7 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { readJson } from '@agent/core/foundation';
 import {
   logger,

@@ -17,8 +17,6 @@
 import * as path from 'path';
 import * as zlib from 'zlib';
 import * as crypto from 'crypto';
-import { createRequire } from 'node:module';
-import fontkit from './fontkit-shim.js';
 import {
   PdfWriter,
   hasNonAscii,
@@ -26,30 +24,13 @@ import {
   escapeLit,
   buildXmp,
   buildPageLabelsDict,
-  FONTKIT_REQUIRE,
-  FONTKIT,
-  CJK_FONT_CANDIDATES,
-  toUtf16BeHex,
-  collectCodePoints,
-  pickCjkFontSource,
-  openCjkFont,
   buildEmbeddedCjkFont,
-  buildWidthArray,
   buildEmbeddedFontDescriptor,
   buildEmbeddedDescendantFontObject,
   buildEmbeddedType0FontObject,
 } from './primitives.js';
-import type {
-  ImageInfo,
-  EmbeddedCjkFont,
-  FontKitGlyph,
-  FontKitSubset,
-  FontKitFont,
-  FontKitCollection,
-} from './primitives.js';
-import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from '../../secure-io.js';
-import { pathResolver } from '../../path-resolver.js';
-import { escapeXml } from '../../text-escaping.js';
+import type { ImageInfo } from './primitives.js';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { createLogger } from '../../logger.js';
 
 const logger = createLogger('native-pdf-engine');
@@ -57,7 +38,6 @@ import type {
   PdfDesignProtocol,
   PdfRenderOptions,
   PdfImageElement,
-  PdfPageLabel,
   PdfAnnotation,
   PdfOutlineItem,
   PdfAssociatedFile,
@@ -71,15 +51,6 @@ import type {
   PdfSignatureOptions,
   PdfDocumentPart,
 } from '../types/pdf-protocol.js';
-
-// ─── Registry ───────────────────────────────────────────────
-
-interface ObjEntry {
-  id: number;
-  offset: number;
-  inStream?: number;
-  indexInStream?: number;
-}
 
 // ─── PDF 2.0 Writer ─────────────────────────────────────────
 
@@ -1292,10 +1263,8 @@ export async function generateNativePdf(
 
   // ── P3-4: AES-256 Encryption (must go in catalog) ───
   let encryptId: number | undefined;
-  let encryptFileId = '';
   if (opts.encrypt?.ownerPassword) {
-    const { dictStr, key: _key, encryptId: eid } = buildEncryptDict(opts.encrypt);
-    encryptFileId = eid;
+    const { dictStr, key: _key } = buildEncryptDict(opts.encrypt);
     encryptId = writer.addObj(dictStr);
   }
 
@@ -1316,7 +1285,6 @@ export async function generateNativePdf(
   // P3 catalog entries
   if (ocPropertiesId !== undefined) catalogParts.push(`/OCProperties ${ocPropertiesId} 0 R`);
   if (acroFormId !== undefined || sigFieldId !== undefined) {
-    const allFields: number[] = [];
     if (acroFormId !== undefined) {
       // AcroForm fields are already in the acroFormId dict; we reference it directly
       // For sig: merge into an AcroForm dict

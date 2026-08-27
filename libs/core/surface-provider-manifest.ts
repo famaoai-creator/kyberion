@@ -1,7 +1,4 @@
-import {
-  getSurfaceProviderManifestRecord,
-  listSurfaceProviderManifestRecords,
-} from './surface-provider-policy.js';
+import { listSurfaceProviderManifestRecords } from './surface-provider-policy.js';
 
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import type { TierLevel } from './types.js';

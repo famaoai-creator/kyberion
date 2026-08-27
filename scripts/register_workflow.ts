@@ -27,7 +27,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_REL = 'knowledge/product/governance/mission-workflow-catalog.json';
 const INTENTS_REL = 'knowledge/product/governance/standard-intents.json';
@@ -434,8 +434,14 @@ function main(argv: string[]): void {
   );
 }
 
-void defineScript({
+const script = defineScript({
   name: 'workflow:register',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'register_workflow.ts') ||
+  isDirectScript(import.meta.url, 'register_workflow.js')
+) {
+  void script();
+}

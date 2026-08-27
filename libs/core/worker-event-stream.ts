@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
-import { safeAppendFileSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeMkdir, safeReadFile } from './secure-io.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 

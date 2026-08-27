@@ -10,7 +10,7 @@
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLock, withLockSync } from './src/lock-utils.js';
 
 export interface FencedWriterLease {

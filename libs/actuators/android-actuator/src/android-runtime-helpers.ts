@@ -13,7 +13,6 @@ import {
   assertValidMobileAppProfile,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   sleep,
   ensureDefaultOpPreflight,
   runOpPreflight,
@@ -875,15 +874,6 @@ function ensureParentDir(targetPath: string): void {
   if (!safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
   }
-}
-
-function resolveKey(key: string, ctx: Record<string, any>): any {
-  const parts = key.split('.');
-  let current: any = ctx;
-  for (const part of parts) {
-    current = current?.[part];
-  }
-  return current;
 }
 
 function resolveUiTreeSource(

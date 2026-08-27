@@ -109,7 +109,6 @@ export function buildWorkGraph(items: ReadonlyArray<WorkItem>, projectId = ''): 
     ...(item.assignee_peer_id ? { assignee_peer_id: item.assignee_peer_id } : {}),
     ...(item.metadata ? { metadata: { ...item.metadata } } : {}),
   }));
-  const nodeById = new Map(nodes.map((node) => [node.item_id, node]));
   const edges: WorkGraphEdge[] = [];
 
   for (const node of nodes) {

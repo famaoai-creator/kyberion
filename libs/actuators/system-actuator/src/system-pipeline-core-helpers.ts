@@ -1,29 +1,19 @@
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
 import {
-  distillTextObservation,
-  executeLlmDecideOp,
   logger,
   loadJson,
   safeReadFile,
-  safeWriteFile,
   safeMkdir,
   safeExec,
   safeExecResult,
   safeExistsSync,
   safeStat,
-  derivePipelineStatus,
-  executeAdfSteps,
   pathResolver,
   resolveVars,
-  resolveDesktopLaunchAdapter,
   evaluateCondition,
-  getPathValue,
-  resolveWriteArtifactSpec,
-  createVoiceCapabilityBridge,
   buildGovernedRetryOptions,
   resolveActiveProfileRoot,
-  classifyError,
   retry,
   createVirtualMediaDeviceControlBridge,
   createVirtualDeviceInventoryBridge,
@@ -46,10 +36,7 @@ import {
   StubVideoFrameBus,
   writeVideoFrameBusToMp4,
   pipeMp4ToVideoFrameBus,
-  assertExecutionBounds,
   withinLoopBounds,
-  DEFAULT_MAX_PIPELINE_STEPS,
-  DEFAULT_PIPELINE_TIMEOUT_MS,
   DEFAULT_MAX_LOOP_ITERATIONS,
   reconcileConfigFallbacks,
   reconcileUnclassifiedErrors,
@@ -63,40 +50,17 @@ import {
 import { getRegisteredEnv } from '@agent/core/foundation';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
 import {
   activateApplication,
   detectFocusedInput,
-  keystrokeText,
-  pasteText,
-  pressKey,
-  toggleDictation,
-  clickAt,
-  rightClickAt,
-  moveMouse,
-  scrollAt,
-  dragFrom,
   activateWindowByTitle,
   getScreenSize,
   getWindowList,
-  quitApplication,
-  systemNotify,
   clipboardRead,
-  clipboardWrite,
-  listKnownAppCapabilities,
-  listTerminalTargets,
   listChromeTabs,
-  activateChromeTabByTitle,
-  activateChromeTabByUrl,
-  closeChromeTabByTitle,
-  closeChromeTabByUrl,
-  emptyFinderTrash,
-  revealFinderPath,
-  openFinderPath,
 } from '@agent/core/os-automation';
 import type { FocusedInputState } from '@agent/core/os-automation';
-import { osAutomationBridge } from '@agent/core/os-automation-bridge';
 import { validateOpInput } from '@agent/core';
 import {
   systemDisplayHelpers,

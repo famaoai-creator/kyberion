@@ -162,14 +162,6 @@ const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
   fallback: FALLBACK_POLICY,
 });
 
-function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
-  try {
-    return policyCatalog.validate(value, label);
-  } catch (error) {
-    throw new Error(`Invalid reasoning backend policy at ${label}: ${String(error)}`);
-  }
-}
-
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
   return policyCatalog.load();
 }

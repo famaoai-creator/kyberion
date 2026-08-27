@@ -3,7 +3,6 @@ import * as crypto from 'node:crypto';
 import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
@@ -137,15 +136,6 @@ function deadLettersPath(namespace: string | undefined, tenantId: string): strin
 
 function eventsPath(namespace: string | undefined, tenantId: string): string {
   return `${meshHubObservabilityRoot(namespace)}/tenants/${tenantId}/events.jsonl`;
-}
-
-function payloadReference(payload: MeshRequest['payload']): MeshDeadLetterRecord['payload'] {
-  return {
-    classification: payload.classification,
-    artifact_ref: payload.reference.artifact_ref,
-    integrity_hash: payload.reference.integrity_hash,
-    storage_class: payload.reference.storage_class,
-  };
 }
 
 function selectorSummary(selector: MeshTargetSelector): Record<string, string> {

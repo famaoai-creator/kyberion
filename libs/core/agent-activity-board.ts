@@ -15,7 +15,7 @@ import {
   type WorkVisibilityViewer,
 } from './work-visibility.js';
 import { findMissionPath } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
