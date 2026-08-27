@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
-import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
+import { safeMkdir, safeExistsSync } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
 import { sanitizeTraceForPersistence, validateTraceReplay } from '../trace-schema.js';
 
