@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "relation_prefix"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "relation_prefix": { "type": "string", "minLength": 1 }
   },

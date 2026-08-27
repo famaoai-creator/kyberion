@@ -1,10 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
 import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
-
-const ajv = createAjv();
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'
@@ -252,12 +249,6 @@ function inferPreferenceProfileRefs(kind: GuidedCoordinationBrief['coordination_
       return ['booking-preference-profile'];
     default:
       return [];
-  }
-
-  function inferServiceBindingRefs(seed: GuidedCoordinationBriefSeed): string[] {
-    return Array.isArray(seed.serviceBindings)
-      ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
-      : [];
   }
 }
 

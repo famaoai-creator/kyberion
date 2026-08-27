@@ -9,7 +9,6 @@ import {
   safeRmSync,
   safeExec,
   secureFetch,
-  buildGovernedRetryOptions,
   pathResolver,
   normalizeBrowserPipelineOp,
   getOpInputContract,
@@ -180,37 +179,7 @@ const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const BROWSER_ACTION_TRAIL_DIR = path.join(BROWSER_RUNTIME_DIR, 'action-trails');
 const BROWSER_APPROVAL_DIR = path.join(BROWSER_RUNTIME_DIR, 'approvals');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/browser-actuator/manifest.json'
-);
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
-
-const DEFAULT_BROWSER_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
-
-function buildRetryOptions(stepParams: Record<string, any>) {
-  const explicitRetry =
-    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
-      ? { ...(stepParams.retry as Record<string, any>) }
-      : {};
-  if (stepParams?.max_retries !== undefined)
-    explicitRetry.maxRetries = Number(stepParams.max_retries);
-  if (stepParams?.retry_delay_ms !== undefined)
-    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildGovernedRetryOptions({
-    manifestPath: BROWSER_MANIFEST_PATH,
-    defaults: DEFAULT_BROWSER_RETRY,
-    override: explicitRetry,
-    fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
-    additionalShouldRetry: (error) =>
-      /selector|not visible|strict mode violation|detached/i.test(error.message),
-  });
-}
 
 function createBrowserRuntime(
   context: BrowserContext,

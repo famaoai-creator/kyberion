@@ -1,10 +1,4 @@
-import {
-  logger,
-  safeReadFile,
-  createStandardYargs,
-  pathResolver,
-  resolveServiceBinding,
-} from '@agent/core';
+import { logger } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './presence-actuator-helpers.js';

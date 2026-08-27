@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   getPersonalVoiceProfileRegistryPath,
   getVoiceProfileRegistry,

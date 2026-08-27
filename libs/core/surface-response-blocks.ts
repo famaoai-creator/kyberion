@@ -3,7 +3,6 @@ import type { A2UIMessage } from './a2ui.js';
 import type {
   MissionProposal,
   NerveRoutingProposal,
-  PlanningPacket,
   SlackApprovalRequestDraft,
   SurfaceConversationResult,
 } from './channel-surface-types.js';

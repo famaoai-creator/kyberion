@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import { loadOrganizationProfile } from './organization-profile.js';

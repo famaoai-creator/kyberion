@@ -1,13 +1,10 @@
 import {
   executeLlmDecideOp,
-  logger,
   ptyEngine,
   encodeTerminalInput,
-  safeReadFile,
   emitComputerSurfacePatch,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   resolveShellAdapter,
   runOpPreflight,

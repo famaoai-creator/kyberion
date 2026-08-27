@@ -1,6 +1,5 @@
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -76,8 +75,14 @@ async function main(argv: string[]): Promise<void> {
   console.log(output);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'google-workspace:meet',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'google_workspace_meet.ts') ||
+  isDirectScript(import.meta.url, 'google_workspace_meet.js')
+) {
+  void script();
+}

@@ -3,7 +3,7 @@ import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -361,7 +361,6 @@ export function applyTenantActivation(
   if (resolved.record.blockers.length > 0) {
     throw new Error(`[TENANT_ACTIVATION_BLOCKED] ${resolved.record.blockers.join('; ')}`);
   }
-  const rootDir = input.rootDir || pathResolver.rootDir();
   const filePath = resolved.activation_path;
   safeMkdir(path.dirname(filePath), { recursive: true });
   const record: TenantActivationRecord = {

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { createStandardYargs, logger } from '@agent/core';
+import { createStandardYargs } from '@agent/core';
 import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

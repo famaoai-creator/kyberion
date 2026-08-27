@@ -25,8 +25,6 @@ import {
   runOpPreflight,
 } from '@agent/core';
 
-const PLATFORMS_DARWIN = process.platform === 'darwin';
-
 interface EmailParams {
   backend?: string;
   to?: string;

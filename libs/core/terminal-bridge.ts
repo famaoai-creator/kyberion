@@ -4,7 +4,6 @@ import {
   safeExistsSync,
   loadJson,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';

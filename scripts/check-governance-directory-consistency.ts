@@ -7,8 +7,6 @@ import {
 } from '@agent/core';
 import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
 
-const GOVERNANCE_DIR = 'knowledge/product/governance';
-
 function readJson<T>(relativePath: string): T {
   return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
 }

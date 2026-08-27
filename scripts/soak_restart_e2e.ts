@@ -5,7 +5,6 @@ import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';

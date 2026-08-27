@@ -806,7 +806,6 @@ function colorSpread(hex: string): number {
 function isNearWhiteOrBlack(hex: string): boolean {
   const [r, g, b] = hexToRgb(hex);
   const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
   return max > 235 || max < 25;
 }
 

@@ -1,6 +1,4 @@
 import { logger } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeReadFile, pathResolver } from '@agent/core';
 import {
   handleAction,
   dispatchVideoCompositionOperation,

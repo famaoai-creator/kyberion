@@ -28,7 +28,6 @@ import type {
   DocxHeaderFooter,
   DocxBorderEdge,
   DocxShading,
-  DocxDrawing,
   DocxTheme,
 } from '../types/docx-protocol.js';
 

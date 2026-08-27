@@ -45,7 +45,6 @@ import {
   packetHistory,
   resolveActionParams,
   resolveAwaitCompletion,
-  isPlainObject,
   runtime,
   trackLifecycleDiagnostics,
   upsertJobDiagnostics,
@@ -529,11 +528,13 @@ async function verifyRenderedVideoArtifact(params: {
 }
 
 async function validateNarratedVideoArtifact(params: {
-  narration_path: string;
-  video_output_path: string;
-  video_bundle_dir: string;
-  mission_evidence_dir: string;
-  video_slug: string;
+  // Dispatched from the untyped action router; every field is coerced and
+  // existence-checked below, so the contract is enforced at runtime.
+  narration_path?: string;
+  video_output_path?: string;
+  video_bundle_dir?: string;
+  mission_evidence_dir?: string;
+  video_slug?: string;
   tolerance_sec?: number;
   export_as?: string;
 }) {

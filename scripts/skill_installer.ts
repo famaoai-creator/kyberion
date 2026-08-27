@@ -1,11 +1,8 @@
 import {
   loadCapabilityBundleRegistry,
   scanProviderCapabilities,
-  loadProviderCapabilityScanPolicy,
   safeExec,
   findSkillInstallPackageMapEntry,
-  type CapabilityBundleEntry,
-  type DiscoveredCapability,
 } from '@agent/core';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
@@ -17,15 +14,6 @@ function question(rl: readline.Interface, query: string): Promise<string> {
       resolve(answer.trim());
     });
   });
-}
-
-function checkBinary(bin: string): boolean {
-  try {
-    safeExec('command', ['-v', bin]);
-    return true;
-  } catch (_) {
-    return false;
-  }
 }
 
 function printUsage(): void {

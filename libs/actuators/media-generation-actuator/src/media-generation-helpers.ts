@@ -1,5 +1,4 @@
 import {
-  safeReadFile,
   safeWriteFile,
   safeCopyFileSync,
   safeExistsSync,
@@ -383,52 +382,6 @@ async function waitForPromptCompletion(
     await sleep(pollIntervalMs);
   }
   throw new Error(`Timed out waiting for Comfy prompt ${promptId}`);
-}
-
-function selectPrimaryArtifact(
-  action: string,
-  params: Record<string, unknown>,
-  artifacts: GeneratedArtifact[]
-): GeneratedArtifact | undefined {
-  const adfKey =
-    action === 'generate_image'
-      ? 'image_adf'
-      : action === 'generate_video'
-        ? 'video_adf'
-        : action === 'generate_music'
-          ? 'music_adf'
-          : '';
-  const adf = adfKey && isPlainObject(params[adfKey]) ? params[adfKey] : undefined;
-  const output = adf && isPlainObject(adf.output) ? adf.output : undefined;
-  const requestedFormat =
-    typeof params.format === 'string'
-      ? params.format
-      : output && typeof output.format === 'string'
-        ? output.format
-        : undefined;
-  const allowedFormats: Record<string, readonly string[]> = {
-    generate_image: ['png', 'jpg', 'jpeg', 'webp'],
-    generate_video: ['mp4', 'mov', 'webm', 'gif'],
-    generate_music: ['mp3', 'wav', 'flac'],
-  };
-  const modalityFormats = allowedFormats[action];
-  const available = artifacts.filter(
-    (artifact) =>
-      safeExistsSync(artifact.path) &&
-      (!modalityFormats ||
-        modalityFormats.some((format) => artifact.filename.toLowerCase().endsWith(`.${format}`)))
-  );
-  const byFormat = requestedFormat
-    ? available.filter((artifact) =>
-        artifact.filename.toLowerCase().endsWith(`.${requestedFormat}`)
-      )
-    : available;
-  const candidates = byFormat.length > 0 ? byFormat : available;
-  return (
-    candidates.find((artifact) => artifact.type === 'output') ||
-    candidates.find((artifact) => artifact.kind !== 'preview' && artifact.kind !== 'temp') ||
-    candidates[0]
-  );
 }
 
 async function collectGenerationResult(

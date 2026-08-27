@@ -30,7 +30,7 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
@@ -662,10 +662,16 @@ function main(argv: string[]): void {
   console.log(JSON.stringify({ mode: options.apply ? 'apply' : 'dry-run', plans }, null, 2));
 }
 
-void defineScript({
+const script = defineScript({
   name: 'migrate:physical-namespaces',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'migrate_physical_namespaces.ts') ||
+  isDirectScript(import.meta.url, 'migrate_physical_namespaces.js')
+) {
+  void script();
+}
 
 export { buildPlan, feedbackScopes, intentScopes, ledgerScopes, promotionScopes, parseArgs };

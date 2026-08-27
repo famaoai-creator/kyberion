@@ -47,11 +47,6 @@ export class NativePdfParser {
     const objStart = this.str.lastIndexOf(' 0 obj', xrefTypeIdx);
     if (objStart === -1) return false;
 
-    // Find the object number
-    let numStart = objStart - 1;
-    while (numStart > 0 && this.str[numStart - 1] >= '0' && this.str[numStart - 1] <= '9') numStart--;
-    const xrefObjId = parseInt(this.str.substring(numStart, objStart));
-
     // Extract /W array
     const headerRegion = this.str.substring(objStart, this.str.indexOf('stream', objStart));
     const wMatch = headerRegion.match(/\/W\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s*\]/);

@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "title", "target", "value_proposition_title", "market_strategy_title", "key_benefits_title", "phase_titles"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },
     "target": { "type": "string", "minLength": 1 },

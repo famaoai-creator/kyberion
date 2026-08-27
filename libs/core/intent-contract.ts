@@ -6,8 +6,6 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
 import { getReasoningBackend } from './reasoning-backend.js';
-import { safeReadFile } from './secure-io.js';
-import { isInjectionSuspected } from './untrusted-content.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
   buildOrganizationWorkLoopSummary,
@@ -32,7 +30,6 @@ import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-
 import {
   loadReasoningLevelPolicy,
   resolveReasoningLevelDecision,
-  type ReasoningLevelDecision,
 } from './reasoning-level-policy.js';
 import {
   loadModelRegistry,
@@ -40,17 +37,13 @@ import {
   resolveTaskModelHint,
   resolveRuntimeModelId,
   type ModelRegistryFile,
-  type ReasoningModelRoute,
 } from './reasoning-model-routing.js';
 import {
   buildIntentFlowCacheEligibility,
   lookupIntentFlowCache,
   storeIntentFlowCache,
 } from './intent-flow-cache.js';
-import {
-  buildIntentUseCaseScenario,
-  type IntentUseCaseScenario,
-} from './intent-use-case-scenario.js';
+import { buildIntentUseCaseScenario } from './intent-use-case-scenario.js';
 import {
   buildFallbackExecutionBrief,
   normalizeExecutionBrief,
@@ -68,10 +61,6 @@ import type { TraceContext } from './src/trace.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import {
-  formatClarificationPacket,
-  formatClarificationPacketConcise,
-} from './intent-clarification-format.js';
-import {
   deriveAgentRoutingDecision as deriveAgentRoutingDecisionWithDependencies,
   isSimpleGreetingText,
 } from './intent-routing-decision.js';
@@ -86,7 +75,6 @@ import type {
   AgentRoutingMode,
   AgentRoutingScope,
   CompileUserIntentFlowInput,
-  ClarificationFormatOptions,
   IntentCompilerProvider,
   IntentCompilerTarget,
   IntentContract,

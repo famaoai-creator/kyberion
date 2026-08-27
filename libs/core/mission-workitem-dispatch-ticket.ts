@@ -4,89 +4,21 @@
  */
 
 import * as nodePath from 'node:path';
-import { a2aBridge, type A2AMessage } from './a2a-bridge.js';
-import type { AgentExecutionPort, AgentExecutionReceipt } from './agent-execution-port.js';
-import type { AgentContextMode } from './context-boundary.js';
-import {
-  buildArtifactReviewReceipt,
-  hashArtifactForReview,
-  inferArtifactReviewKind,
-  type ArtifactReviewFinding,
-  type ArtifactReviewReceipt,
-} from './artifact-review.js';
+import { type ArtifactReviewReceipt } from './artifact-review.js';
 import { executeServicePreset } from './service-engine.js';
-import { getReasoningBackend } from './reasoning-backend.js';
-import {
-  delegateCoordinatedCliSubagentTask,
-  delegateCoordinatedAgentTask,
-  type CoordinatedAgentExecutionReceipt,
-} from './coordinated-agent-execution-port.js';
-import { readCanonicalWorkGraph } from './work-graph-projection.js';
-import { ledger } from './ledger.js';
-import { loadAgentProfileIndex } from './mission-team-index.js';
-import { logger } from './core.js';
-import * as pathResolver from './path-resolver.js';
-import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import {
-  resolveArtifactReviewerProfile,
-  type ArtifactReviewerProfile,
-} from './mission-review-gates.js';
-import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
-import { safeExistsSync, safeStat } from './secure-io.js';
-import {
-  getWorkItem,
-  listWorkItems,
-  updateWorkItem,
-  type WorkItem,
-  type WorkItemSource,
-  type WorkItemStatus,
-} from './work-coordination.js';
-import {
-  buildCognitiveRouteDecision,
-  formatCognitiveRouteDecision,
-  type CognitiveRouteDecision,
-} from './cognitive-routing.js';
-import {
-  advanceReasoningDriftWatchdog,
-  encodeReasoningDriftWatchdogState,
-  hydrateReasoningDriftWatchdogState,
-  formatReasoningDriftWatchdogDecision,
-} from './reasoning-drift-watchdog.js';
-import { extractSurfaceBlocks } from './surface-response-blocks.js';
-import {
-  renderMissionContextPack,
-  resolveMissionContextPack,
-  saveMissionContextPack,
-} from './mission-context-pack.js';
-import { resolveTaskModelHint, type TaskModelHint } from './reasoning-model-routing.js';
-import { resolveQuestionInteractionPacket } from './question-resolver.js';
+import { safeExistsSync } from './secure-io.js';
+import { type WorkItem } from './work-coordination.js';
+import { formatCognitiveRouteDecision, type CognitiveRouteDecision } from './cognitive-routing.js';
+import { type TaskModelHint } from './reasoning-model-routing.js';
 import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
-import { HarnessSubagentDispatcher } from './agent-dispatch.js';
-import { findMissionPath } from './path-resolver.js';
 import { closeTaskArtifacts } from './mission-artifact-closure.js';
-import { deriveAgentNhiId } from './agent-identity.js';
-import { issueTaskGrantBestEffort, revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
-import { buildWorkingPrinciplesLines } from './working-principles.js';
-import type { MissionState } from './mission-types.js';
-import type { ContextSecurityScope } from './context-security-scope.js';
-import { checkProviderEgress } from './provider-egress-gate.js';
-import { evaluateEgressPolicy } from './egress-policy.js';
-import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
+import { revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
 import {
-  countWords as countWordsFromDispatchIO,
   readJsonFile as readJsonFileFromDispatchIO,
   writeJsonFile as writeJsonFileFromDispatchIO,
 } from './mission-dispatch-io.js';
-import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
-import { evaluatePhaseEntryGate } from './mission-process-planning.js';
-import { recordTask } from './mission-maintenance.js';
-import type { ReasoningCallOptions } from './reasoning-backend.js';
-import {
-  resolveMissionExecutionSurface,
-  type MissionExecutionSurface,
-  type MissionExecutionSurfaceDecision,
-} from './mission-execution-surface.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -95,53 +27,14 @@ import {
  */
 
 import {
-  runWithWorkItemResponseDeadline,
   getWorkItemTaskId,
-  resolveRuntimeSecurityScope,
-  DEFAULT_WORK_ITEM_RESPONSE_TIMEOUT_MS,
-  resolveWorkItemResponseTimeoutMs,
-  WorkItemResponseTimeoutError,
-  dispatchRoot,
-  dispatchEventPath,
-  manifestPath,
   ticketRoot,
   ticketManifestPath,
   ticketReplyPath,
   missionNextTasksPath,
-  resolveWorkItemExecutionSurface,
-  resolveWorkItemArtifactReviewContext,
-  isResolvedArtifactReviewContext,
-  buildArtifactReviewPromptLines,
-  normalizeArtifactReviewFindings,
-  persistWorkItemArtifactReviewReceipt,
-  readManifest,
-  getMissionLabel,
-  getTeamRole,
-  getTaskDescription,
-  getTaskModelHint,
   isFastTierTaskModelHint,
-  buildFastTierPromptAddendum,
-  isIndependentReviewRequired,
-  extractJsonObject,
-  parseIndependentReviewerVerdict,
-  buildIndependentReviewerPrompt,
-  runIndependentReviewerReview,
-  workItemExpectsFiles,
-  delegateSubagentTask,
 } from './mission-workitem-dispatch-review.js';
-import type {
-  MissionWorkItemDispatchMode,
-  MissionWorkItemDispatchFinalStatus,
-  WorkItemExecutionOutcome,
-  MissionWorkItemDispatchOptions,
-  MissionWorkItemDispatchRecord,
-  MissionWorkItemDispatchManifest,
-  WorkItemDispatchAdapters,
-  WorkItemDispatchReviewerVerdict,
-  WorkItemReviewPlannedTask,
-  WorkItemArtifactReviewContext,
-  ResolvedWorkItemArtifactReviewContext,
-} from './mission-workitem-dispatch-review.js';
+import type { MissionWorkItemDispatchFinalStatus } from './mission-workitem-dispatch-review.js';
 
 export function extractGitHubIssueNumber(source: unknown): number | undefined {
   if (!source || typeof source !== 'object') return undefined;

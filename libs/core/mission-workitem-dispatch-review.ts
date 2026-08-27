@@ -14,17 +14,13 @@ import {
   type ArtifactReviewFinding,
   type ArtifactReviewReceipt,
 } from './artifact-review.js';
-import { executeServicePreset } from './service-engine.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import {
   delegateCoordinatedCliSubagentTask,
   delegateCoordinatedAgentTask,
   type CoordinatedAgentExecutionReceipt,
 } from './coordinated-agent-execution-port.js';
-import { readCanonicalWorkGraph } from './work-graph-projection.js';
-import { ledger } from './ledger.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
-import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
@@ -33,40 +29,17 @@ import {
 } from './mission-review-gates.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { safeExistsSync, safeStat } from './secure-io.js';
-import {
-  getWorkItem,
-  listWorkItems,
-  updateWorkItem,
-  type WorkItem,
-  type WorkItemSource,
-  type WorkItemStatus,
-} from './work-coordination.js';
-import {
-  buildCognitiveRouteDecision,
-  formatCognitiveRouteDecision,
-  type CognitiveRouteDecision,
-} from './cognitive-routing.js';
-import {
-  advanceReasoningDriftWatchdog,
-  encodeReasoningDriftWatchdogState,
-  hydrateReasoningDriftWatchdogState,
-  formatReasoningDriftWatchdogDecision,
-} from './reasoning-drift-watchdog.js';
-import { extractSurfaceBlocks } from './surface-response-blocks.js';
+import { type WorkItem, type WorkItemSource, type WorkItemStatus } from './work-coordination.js';
+import { type CognitiveRouteDecision } from './cognitive-routing.js';
 import {
   renderMissionContextPack,
   resolveMissionContextPack,
   saveMissionContextPack,
 } from './mission-context-pack.js';
 import { resolveTaskModelHint, type TaskModelHint } from './reasoning-model-routing.js';
-import { resolveQuestionInteractionPacket } from './question-resolver.js';
 import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { HarnessSubagentDispatcher } from './agent-dispatch.js';
-import { findMissionPath } from './path-resolver.js';
-import { closeTaskArtifacts } from './mission-artifact-closure.js';
-import { deriveAgentNhiId } from './agent-identity.js';
-import { issueTaskGrantBestEffort, revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
 import { buildWorkingPrinciplesLines } from './working-principles.js';
 import type { MissionState } from './mission-types.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
@@ -74,13 +47,10 @@ import { checkProviderEgress } from './provider-egress-gate.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { reasoningBackendEndpoint } from './reasoning-egress-scope.js';
 import {
-  countWords as countWordsFromDispatchIO,
   readJsonFile as readJsonFileFromDispatchIO,
   writeJsonFile as writeJsonFileFromDispatchIO,
 } from './mission-dispatch-io.js';
-import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
-import { evaluatePhaseEntryGate } from './mission-process-planning.js';
-import { recordTask } from './mission-maintenance.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
 import {
   resolveMissionExecutionSurface,
@@ -853,14 +823,6 @@ export async function runIndependentReviewerReview(input: {
   reviewerOutputRef?: string;
   reviewerProvider?: string;
 }> {
-  const missionState = {
-    mission_id: input.missionId,
-    tier: 'public' as const,
-    status: 'active',
-    assigned_persona: 'worker',
-    git: { branch: 'review', start_commit: '', latest_commit: '', checkpoints: [] },
-    history: [],
-  };
   const contextPack = await resolveMissionContextPack({
     missionId: input.missionId,
     tier: input.missionState.tier,

@@ -5,7 +5,6 @@
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';

@@ -24,7 +24,7 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import { nowIso } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const DEFAULT_MIGRATION_ROOT = 'active/shared/runtime/migrations/peer-tenant';
@@ -379,7 +379,7 @@ function parseArgs(argv: string[]): PeerTenantMigrationOptions {
   };
 }
 
-void defineScript({
+const script = defineScript({
   name: 'migrate:peer-tenant-runtime',
   flags: [],
   run: ({ argv }) => {
@@ -387,6 +387,12 @@ void defineScript({
     console.log(JSON.stringify(plan, null, 2));
     return plan;
   },
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'migrate_peer_tenant_runtime.ts') ||
+  isDirectScript(import.meta.url, 'migrate_peer_tenant_runtime.js')
+) {
+  void script();
+}
 
 export { parseArgs };

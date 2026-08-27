@@ -27,7 +27,7 @@
  */
 
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeReadFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -146,12 +146,6 @@ export async function buildArtifacts(): Promise<BuiltArtifacts> {
     VOCABULARY_KEYS_PATH
   );
   return { localeNormalizeSource, vocabularyKeysSource };
-}
-
-function readIfExists(filePath: string): string | null {
-  return safeExistsSync(filePath)
-    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    : null;
 }
 
 export const main = defineGenerator({

@@ -9,7 +9,7 @@ import {
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ActuatorCapability {
   op: string;
@@ -284,8 +284,14 @@ async function runPlayground(args: string[]) {
   rl.close();
 }
 
-void defineScript({
+const script = defineScript({
   name: 'actuator:playground',
   flags: [],
   run: ({ argv }) => runPlayground(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'actuator_playground.ts') ||
+  isDirectScript(import.meta.url, 'actuator_playground.js')
+) {
+  void script();
+}

@@ -8,7 +8,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeMoveSync,
@@ -463,25 +462,6 @@ function runRequired(
     timeoutMs: 120000,
     maxOutputMB: 50,
     env,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `${errorPrefix}: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
-    );
-  }
-}
-
-function runRequiredIn(
-  cwd: string,
-  command: string,
-  args: string[],
-  errorPrefix: string,
-  timeoutMs = 120000
-): void {
-  const result = safeExecResult(command, args, {
-    cwd,
-    timeoutMs,
-    maxOutputMB: 50,
   });
   if (result.status !== 0) {
     throw new Error(

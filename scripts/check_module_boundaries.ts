@@ -194,7 +194,6 @@ function buildGraph(files: string[], includeDynamic = false): Map<string, string
 }
 
 function collectDynamicImportEdges(files: string[]): DynamicImportEdge[] {
-  const staticGraph = buildGraph(files);
   const allGraph = buildGraph(files, true);
   const edges: DynamicImportEdge[] = [];
   for (const [source, targets] of allGraph) {

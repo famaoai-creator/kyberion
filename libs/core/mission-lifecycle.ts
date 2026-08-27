@@ -22,33 +22,11 @@ import { logger } from './core.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
 import { queueMissionMemoryPromotionCandidate } from './memory-promotion-queue.js';
 import { summarizeReviewGateVerdicts } from './mission-review-gates.js';
-import {
-  safeExec,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
-import {
-  evaluateArtifactReviews,
-  hashArtifactForReview,
-  loadArtifactReviewReceipt,
-  receiptToArtifactReviewDecision,
-} from './artifact-review.js';
 import { reconcileCompletion, reconcileCompletionStructurally } from './intent-reconciliation.js';
 import { loadState, saveState } from './mission-state.js';
-import {
-  delegateMission,
-  importMission,
-  pauseMission,
-  cancelMission,
-  repairLegacyMissionState,
-  grantMissionAccess,
-  grantMissionSudo,
-} from './mission-lifecycle-operator-actions.js';
 import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,

@@ -17,16 +17,13 @@ import {
   releaseAgentRuntimeInstanceBestEffort,
 } from './agent-identity.js';
 import * as crypto from 'node:crypto';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import * as path from 'node:path';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { spawnSync } from 'node:child_process';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { isObsoleteAgentRuntimeProvider } from './provider-config.js';
 import { loadProviderConfig } from './provider-config.js';
-import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from './event-scope.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 const PROJECT_ROOT = pathResolver.rootDir();

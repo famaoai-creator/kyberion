@@ -12,7 +12,7 @@
 
 import * as path from 'node:path';
 import { rootResolve } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir, safeWriteFile } from './secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,

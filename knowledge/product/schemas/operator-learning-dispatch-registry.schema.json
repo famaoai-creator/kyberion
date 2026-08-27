@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": ["version", "rules"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "rules": {
       "type": "array",

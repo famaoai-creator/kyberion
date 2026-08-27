@@ -50,7 +50,7 @@ import {
   trySelectors,
   waitForAnyVisibleSelector,
 } from './meeting-browser-driver-helpers.js';
-import { safeReadFile, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
 /* Playwright type stand-ins so this file compiles without playwright
@@ -349,7 +349,6 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const speakerDevice = this.opts.speaker_device;
     const cameraDevice = this.opts.camera_device;
     const stepTimeout = this.opts.step_timeout_ms ?? DEFAULT_TIMEOUT;
-    const headed = this.opts.headed ?? false;
 
     const runtime = await createPlaywrightJoinRuntime(chromium, this.opts);
     const { context } = runtime;

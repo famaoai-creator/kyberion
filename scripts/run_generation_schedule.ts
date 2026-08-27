@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import {
-  logger,
   safeExistsSync,
   pathResolver,
   registerGenerationSchedule,
