@@ -24,7 +24,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core')),
   runOpPreflight: vi.fn(async ({ params }: { params: unknown }) => ({
     decision: 'allow',
     input: params,
