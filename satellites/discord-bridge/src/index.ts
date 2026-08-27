@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core';
 import { appendJsonLine } from '@agent/core/foundation';
+import { pathToFileURL } from 'node:url';
 
 import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
 
@@ -417,9 +418,18 @@ async function main() {
   void runDiscordOutbox(() => drainDiscordOutbox(client));
 }
 
-if (!process.env.VITEST) {
+// Same guard as the Slack/Telegram bridges: only a direct `node index.js`
+// invocation starts the bridge, so importing this module in a test cannot open
+// a gateway connection — and a leaked VITEST env cannot silently no-op a real
+// start.
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
+} else if (directEntry) {
+  logger.warn('[DiscordBridge] VITEST is set — suppressing the direct-entry start.');
 }
