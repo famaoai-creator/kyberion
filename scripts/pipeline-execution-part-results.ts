@@ -168,7 +168,13 @@ export async function executePipelineFile(
     }
   }
   if (pipeline.knowledge_scope) autoContext._knowledge_scope = pipeline.knowledge_scope;
-  const mergedContext = { ...baseContext, ...autoContext, ...(options.context || {}) };
+  // Caller-supplied context overrides the pipeline's declared context, but it
+  // must never override the engine-derived keys: a nested run would otherwise
+  // inherit its parent's `__pipeline_options`, `repo_root`, `run_utc_now` and
+  // mission paths instead of computing its own.  `core:run_pipeline` already
+  // strips those on the way down (`sanitizeNestedPipelineContext`); re-applying
+  // `autoContext` last keeps the invariant for every library caller.
+  const mergedContext = { ...baseContext, ...(options.context || {}), ...autoContext };
   const trace =
     options.trace ||
     new TraceContext(`pipeline:${pipelineId}`, {
