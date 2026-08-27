@@ -34,7 +34,7 @@ import {
 } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -270,8 +270,14 @@ async function main(argv: string[]): Promise<void> {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'background-review:mission-e2e',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'background_review_mission_e2e.ts') ||
+  isDirectScript(import.meta.url, 'background_review_mission_e2e.js')
+) {
+  void script();
+}

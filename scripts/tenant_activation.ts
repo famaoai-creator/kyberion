@@ -12,7 +12,7 @@ import {
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
 } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function value(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -124,8 +124,14 @@ export function main(argv: string[] = []): void {
   console.log(JSON.stringify(result, null, 2));
 }
 
-void defineScript({
+const script = defineScript({
   name: 'tenant:activation',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'tenant_activation.ts') ||
+  isDirectScript(import.meta.url, 'tenant_activation.js')
+) {
+  void script();
+}

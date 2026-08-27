@@ -33,7 +33,7 @@ import {
 } from '@agent/core';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -594,8 +594,14 @@ async function main(args: string[] = []): Promise<void> {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'config:mission',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'config_mission.ts') ||
+  isDirectScript(import.meta.url, 'config_mission.js')
+) {
+  void script();
+}

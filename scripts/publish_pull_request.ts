@@ -8,7 +8,7 @@
 
 import { safeExec, pathResolver } from '@agent/core';
 import { checkTitle } from './check_pr_title.js';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface PublishOptions {
   title?: string;
@@ -98,8 +98,14 @@ async function main(argv: string[]): Promise<void> {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'pr:publish',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'publish_pull_request.ts') ||
+  isDirectScript(import.meta.url, 'publish_pull_request.js')
+) {
+  void script();
+}
