@@ -233,7 +233,7 @@ async function handleDiscordMessage(message: Message) {
     },
   };
   try {
-    const result = await runChannelTurn(
+    await runChannelTurn(
       channelAdapter,
       { text: message.content, channel: message.channelId, threadTs },
       ({ threadContext }) =>
@@ -250,58 +250,67 @@ async function handleDiscordMessage(message: Message) {
           threadContext,
           delegationSummaryInstruction:
             'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
-        })
-    );
+        }),
+      {
+        // UX-02: typing must stay alive until the proposal/approval
+        // envelopes this bridge posts itself have landed.
+        afterTurn: async (result) => {
+          // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
+          // confirmation instead of a plain reply.
+          const missionProposal = result.missionProposals?.[0];
+          if (missionProposal) {
+            const prompt = stashMissionProposalForConfirmation({
+              surface: 'discord',
+              channel: message.channelId,
+              thread: threadTs,
+              proposal: missionProposal,
+              sourceText: message.content,
+              routingDecision: result.routingDecision,
+              fallbackSummary: result.text,
+            });
+            await replyDiscordText(message, prompt);
+            appendDiscordThreadHistory({
+              role: 'assistant',
+              authorLabel: DISCORD_SURFACE_AGENT_ID,
+              text: prompt,
+              messageId: `reply-${message.id}`,
+              threadTs,
+              channelId: message.channelId,
+              receivedAt: new Date().toISOString(),
+            });
+            return;
+          }
 
-    // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
-    // confirmation instead of a plain reply.
-    const missionProposal = result.missionProposals?.[0];
-    if (missionProposal) {
-      const prompt = stashMissionProposalForConfirmation({
-        surface: 'discord',
-        channel: message.channelId,
-        thread: threadTs,
-        proposal: missionProposal,
-        sourceText: message.content,
-        routingDecision: result.routingDecision,
-        fallbackSummary: result.text,
-      });
-      await replyDiscordText(message, prompt);
-      appendDiscordThreadHistory({
-        role: 'assistant',
-        authorLabel: DISCORD_SURFACE_AGENT_ID,
-        text: prompt,
-        messageId: `reply-${message.id}`,
-        threadTs,
-        channelId: message.channelId,
-        receivedAt: new Date().toISOString(),
-      });
-      return;
-    }
+          if (result.approvalRequests.length > 0) {
+            for (const draft of result.approvalRequests) {
+              const record = createSurfaceApprovalRequest({
+                surface: 'discord',
+                channel: message.channelId,
+                threadTs,
+                correlationId: `discord-${message.id}`,
+                requestedBy: DISCORD_SURFACE_AGENT_ID,
+                draft,
+                sourceText: message.content,
+              });
+              await replyDiscordApproval(
+                message,
+                buildSurfaceApprovalText('discord', record),
+                record
+              );
+            }
+            return;
+          }
 
-    if (result.approvalRequests.length > 0) {
-      for (const draft of result.approvalRequests) {
-        const record = createSurfaceApprovalRequest({
-          surface: 'discord',
-          channel: message.channelId,
-          threadTs,
-          correlationId: `discord-${message.id}`,
-          requestedBy: DISCORD_SURFACE_AGENT_ID,
-          draft,
-          sourceText: message.content,
-        });
-        await replyDiscordApproval(message, buildSurfaceApprovalText('discord', record), record);
+          if (!result.text) {
+            // UX-01: an empty agent reply must not read as silence.
+            await replyDiscordText(
+              message,
+              buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+            );
+          }
+        },
       }
-      return;
-    }
-
-    if (!result.text) {
-      // UX-01: an empty agent reply must not read as silence.
-      await replyDiscordText(
-        message,
-        buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
-      );
-    }
+    );
   } catch (err: any) {
     logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
     // UX-01: surface a vocabulary-based error to the user (rate-limited per channel).

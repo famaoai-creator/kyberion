@@ -510,6 +510,10 @@ export async function handleTelegramUpdate(
     return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
   }
 
+  // m1: read the thread context BEFORE persisting this message. Appending
+  // first leaked the incoming message into its own context and evicted a real
+  // prior turn from the 6-entry window.
+  const priorThreadContext = buildTelegramThreadContext(threadTs);
   appendTelegramThreadHistory({
     role: 'user',
     authorLabel,
@@ -525,7 +529,7 @@ export async function handleTelegramUpdate(
   const channelAdapter: ChannelAdapter = {
     channel: 'telegram',
     actorId: String(message.from?.id || chatId),
-    threadContext: () => buildTelegramThreadContext(threadTs) || undefined,
+    threadContext: () => priorThreadContext || undefined,
     typing: () =>
       startBridgeTypingLoop(
         'telegram-bridge',
@@ -550,6 +554,7 @@ export async function handleTelegramUpdate(
       });
     },
   };
+  let postTurnReceipt: TelegramWebhookReceipt | undefined;
   try {
     conversation = await runChannelTurn(
       channelAdapter,
@@ -568,7 +573,84 @@ export async function handleTelegramUpdate(
           threadContext,
           delegationSummaryInstruction:
             'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
-        })
+        }),
+      {
+        // UX-02: the typing loop must outlive the proposal/approval envelopes
+        // this bridge posts itself once the turn returns.
+        afterTurn: async (result) => {
+          // SN-01 Phase 2: a mission proposal from the orchestrator becomes a
+          // pending numbered-choice confirmation, exactly like the Slack flow.
+          const missionProposal = result.missionProposals?.[0];
+          if (missionProposal) {
+            const prompt = stashMissionProposalForConfirmation({
+              surface: 'telegram',
+              channel: chatId,
+              thread: threadTs,
+              proposal: missionProposal,
+              sourceText: text,
+              routingDecision: result.routingDecision,
+              fallbackSummary: result.text,
+            });
+            const reply = await sendTelegramMessage({ chatId, text: prompt }, options);
+            appendTelegramThreadHistory({
+              role: 'assistant',
+              authorLabel: TELEGRAM_SURFACE_AGENT_ID,
+              text: prompt,
+              messageId: `reply-${message.message_id}`,
+              threadTs,
+              chatId,
+              receivedAt: new Date().toISOString(),
+            });
+            postTurnReceipt = {
+              ok: true,
+              chatId,
+              messageId: String(message.message_id),
+              threadTs,
+              reply,
+            };
+            return;
+          }
+
+          if (result.approvalRequests.length > 0) {
+            let reply: TelegramSendReceipt | undefined;
+            for (const draft of result.approvalRequests) {
+              const record = createSurfaceApprovalRequest({
+                surface: 'telegram',
+                channel: chatId,
+                threadTs,
+                correlationId: `telegram-${message.message_id}`,
+                requestedBy: TELEGRAM_SURFACE_AGENT_ID,
+                draft,
+                sourceText: text,
+              });
+              reply = await sendTelegramMessage(
+                {
+                  chatId,
+                  text: buildSurfaceApprovalText('telegram', record),
+                  replyMarkup: buildTelegramApprovalReplyMarkup(record),
+                },
+                options
+              );
+            }
+            postTurnReceipt = {
+              ok: true,
+              chatId,
+              messageId: String(message.message_id),
+              threadTs,
+              reply,
+            };
+            return;
+          }
+
+          if (!result.text) {
+            // UX-01: an empty agent reply must not read as silence.
+            deliveredReply = await sendTelegramMessage(
+              { chatId, text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }) },
+              options
+            );
+          }
+        },
+      }
     );
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -590,64 +672,7 @@ export async function handleTelegramUpdate(
     };
   }
 
-  // SN-01 Phase 2: a mission proposal from the orchestrator becomes a pending
-  // numbered-choice confirmation, exactly like the Slack flow.
-  const missionProposal = conversation.missionProposals?.[0];
-  if (missionProposal) {
-    const prompt = stashMissionProposalForConfirmation({
-      surface: 'telegram',
-      channel: chatId,
-      thread: threadTs,
-      proposal: missionProposal,
-      sourceText: text,
-      routingDecision: conversation.routingDecision,
-      fallbackSummary: conversation.text,
-    });
-    const reply = await sendTelegramMessage({ chatId, text: prompt }, options);
-    appendTelegramThreadHistory({
-      role: 'assistant',
-      authorLabel: TELEGRAM_SURFACE_AGENT_ID,
-      text: prompt,
-      messageId: `reply-${message.message_id}`,
-      threadTs,
-      chatId,
-      receivedAt: new Date().toISOString(),
-    });
-    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
-  }
-
-  if (conversation.approvalRequests.length > 0) {
-    let reply: TelegramSendReceipt | undefined;
-    for (const draft of conversation.approvalRequests) {
-      const record = createSurfaceApprovalRequest({
-        surface: 'telegram',
-        channel: chatId,
-        threadTs,
-        correlationId: `telegram-${message.message_id}`,
-        requestedBy: TELEGRAM_SURFACE_AGENT_ID,
-        draft,
-        sourceText: text,
-      });
-      reply = await sendTelegramMessage(
-        {
-          chatId,
-          text: buildSurfaceApprovalText('telegram', record),
-          replyMarkup: buildTelegramApprovalReplyMarkup(record),
-        },
-        options
-      );
-    }
-    return { ok: true, chatId, messageId: String(message.message_id), threadTs, reply };
-  }
-
-  let reply = deliveredReply;
-  if (!conversation.text) {
-    // UX-01: an empty agent reply must not read as silence.
-    reply = await sendTelegramMessage(
-      { chatId, text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }) },
-      options
-    );
-  }
+  if (postTurnReceipt) return postTurnReceipt;
 
   return {
     ok: true,
@@ -655,7 +680,7 @@ export async function handleTelegramUpdate(
     messageId: String(message.message_id),
     threadTs,
     text: conversation.text,
-    reply,
+    reply: deliveredReply,
   };
 }
 
