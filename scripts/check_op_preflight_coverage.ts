@@ -45,7 +45,7 @@ const missing: string[] = [];
 for (const relativePath of boundaries) {
   const absolutePath = pathResolver.rootResolve(relativePath);
   const source = String(safeReadFile(absolutePath, { encoding: 'utf8' }));
-  if (!source.includes('ensureDefaultOpPreflight')) {
+  if (!/\bensureDefaultOpPreflight\s*\(/u.test(source)) {
     missing.push(`${relativePath}: missing ensureDefaultOpPreflight connection`);
   }
 }

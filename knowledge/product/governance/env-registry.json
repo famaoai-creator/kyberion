@@ -1040,6 +1040,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_ENV_REGISTRY_STRICT_DOCS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Generator-only strictness: when enabled, the env-registry drift check also fails while any registry entry remains undocumented. Off by default; independent of KYBERION_ENV_REGISTRY_STRICT (CLI startup validation).",
+      "documented": true,
+      "default": "0"
+    },
+    {
       "name": "KYBERION_FIRST_WIN_LIVE",
       "category": "runtime",
       "type": "string",
