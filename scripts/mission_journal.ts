@@ -11,7 +11,7 @@ import {
 } from '@agent/core';
 import chalk from 'chalk';
 import { readJson } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -153,8 +153,14 @@ export function main(argv: string[] = []): void {
   renderJournal(tenantSlug || undefined);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'mission:journal',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'mission_journal.ts') ||
+  isDirectScript(import.meta.url, 'mission_journal.js')
+) {
+  void script();
+}
