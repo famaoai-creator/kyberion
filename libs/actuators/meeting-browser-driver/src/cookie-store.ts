@@ -12,14 +12,7 @@
  */
 
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  loadJson,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, loadJson, safeWriteFile } from '@agent/core';
 
 const COOKIE_DIR_REL = 'active/shared/state/browser-cookies';
 

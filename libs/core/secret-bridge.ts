@@ -14,7 +14,7 @@ import {
   safeMkdir,
   safeExecResult,
 } from './secure-io.js';
-import { SecretProvider, RegistryEntry, SecretResult } from './secret-types.js';
+import { SecretProvider, RegistryEntry } from './secret-types.js';
 
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
 const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');

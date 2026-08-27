@@ -1,6 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 
 export interface SurfaceProviderManifestCatalogEntry {

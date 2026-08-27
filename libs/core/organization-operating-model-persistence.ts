@@ -1,12 +1,8 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
-import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import { listProjectRecords, loadProjectRecord } from './project-registry.js';
-import { loadState } from './mission-state.js';
 import { t } from './t.js';
-import type { SupportedLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
@@ -18,7 +14,6 @@ import {
   loadJson,
   safeMkdir,
   safeReaddir,
-  safeRmSync,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -33,17 +28,13 @@ addFormats(ajv);
 import type {
   OrganizationTier,
   OrganizationWorkShape,
-  OrganizationRelationshipType,
   OrganizationOperatingModelCatalog,
-  OrganizationPurposeObjective,
   OrganizationPurposeRecord,
-  OrganizationServiceHealthSummary,
   OrganizationOperationalState,
   OrganizationDomainRecord,
   OrganizationCapabilityRecord,
   OrganizationServiceRecord,
   OrganizationServiceState,
-  OrganizationOperationType,
   OrganizationOperationRecord,
   OrganizationOperationState,
   OrganizationOperationRun,
@@ -52,15 +43,7 @@ import type {
   OrganizationIncidentRecord,
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
-  OrganizationLearningSourceType,
   OrganizationLearningCandidate,
-  QueueOrganizationLearningCandidateInput,
-  OrganizationCatalog,
-  OrganizationCatalogReconciliation,
-  OrganizationProjectLineage,
-  OrganizationLineage,
-  OrganizationReconciliationResult,
-  OrganizationManagementView,
   ResolveOrganizationWorkInput,
 } from './organization-operating-model.js';
 

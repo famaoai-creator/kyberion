@@ -2,7 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,

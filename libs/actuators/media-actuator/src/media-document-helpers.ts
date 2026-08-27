@@ -1,7 +1,6 @@
 import {
   loadJson,
   logger,
-  safeReadFile,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
@@ -9,7 +8,6 @@ import {
   resolveProposalSectionKeywords,
   resolveProposalEvidenceIndex,
   resolveSignalToneRank,
-  resolveMediaSemanticType,
   resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,

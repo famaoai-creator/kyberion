@@ -7,7 +7,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   loadStandardIntentCatalog,
   resolveIntentResolutionPacket,

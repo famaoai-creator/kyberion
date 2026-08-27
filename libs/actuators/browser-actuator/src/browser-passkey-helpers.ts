@@ -2,7 +2,7 @@
 
 import { loadJson, logger, safeExistsSync, pathResolver } from '@agent/core';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
-import { chromium, type CDPSession, type Page } from '@playwright/test';
+import { type CDPSession, type Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
 
 function getPasskeyPreset(provider?: string) {

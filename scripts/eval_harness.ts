@@ -8,7 +8,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { pathResolver, resolveFacets, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { pathResolver, resolveFacets, safeExistsSync, safeMkdir } from '@agent/core';
 import { appendJsonLine, readJson } from '@agent/core/foundation';
 import type { FacetRequest, FacetScope, ResolvedFacets } from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';

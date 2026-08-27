@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
 import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';

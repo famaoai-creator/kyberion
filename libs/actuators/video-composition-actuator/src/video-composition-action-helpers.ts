@@ -45,7 +45,6 @@ import {
   packetHistory,
   resolveActionParams,
   resolveAwaitCompletion,
-  isPlainObject,
   runtime,
   trackLifecycleDiagnostics,
   upsertJobDiagnostics,

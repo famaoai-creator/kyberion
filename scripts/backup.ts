@@ -8,7 +8,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeMoveSync,

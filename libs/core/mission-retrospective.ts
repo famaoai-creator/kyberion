@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,

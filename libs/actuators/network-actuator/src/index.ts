@@ -1,5 +1,4 @@
-import { logger, safeReadFile, pathResolver, defineCatalogBackedActuator } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger, defineCatalogBackedActuator } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleAction } from './network-pipeline-helpers.js';

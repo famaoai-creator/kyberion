@@ -8,8 +8,7 @@
 
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import * as path from 'path';
-import { loadJson, safeExec, safeExistsSync, safeReadFile } from '../secure-io.js';
+import { loadJson, safeExec, safeExistsSync } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 

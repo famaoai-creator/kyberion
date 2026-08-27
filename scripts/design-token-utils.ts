@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 

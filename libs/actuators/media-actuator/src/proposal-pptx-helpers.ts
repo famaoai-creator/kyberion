@@ -5,7 +5,6 @@ import {
   resolveProposalEvidenceIndex,
   resolveProposalSectionKeywords,
   resolveReportSectionTitle,
-  resolveReportSummaryTitle,
   buildSlidePatternDiagnostics,
   selectSlidePattern,
 } from '@agent/core';

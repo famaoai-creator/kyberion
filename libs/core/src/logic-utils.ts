@@ -1,4 +1,3 @@
-import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 
 /**

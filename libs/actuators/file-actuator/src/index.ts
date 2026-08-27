@@ -1,8 +1,6 @@
 import { logger, defineCatalogBackedActuator } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeReadFile, pathResolver } from '@agent/core';
 import { handleAction } from './file-pipeline-helpers.js';
 import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core';

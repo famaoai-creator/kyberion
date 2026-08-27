@@ -1,27 +1,8 @@
-import * as path from 'node:path';
-import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
-import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import { listProjectRecords, loadProjectRecord } from './project-registry.js';
-import { loadState } from './mission-state.js';
-import { t } from './t.js';
+import { type OrganizationProfile } from './organization-profile.js';
 import type { SupportedLocale } from './locale.js';
-import { pathResolver } from './path-resolver.js';
-import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
-import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { createAjv } from './foundation/ajv.js';
-import {
-  safeExistsSync,
-  loadJson,
-  safeMkdir,
-  safeReaddir,
-  safeRmSync,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeRmSync } from './secure-io.js';
 
 export type OrganizationTier = 'personal' | 'confidential' | 'public';
 export type OrganizationWorkShape =

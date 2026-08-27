@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
 

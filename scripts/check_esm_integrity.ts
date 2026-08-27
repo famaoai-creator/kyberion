@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
-import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { readJson, readTextFile } from '@agent/core/foundation';
 
 const ROOT = pathResolver.rootDir();

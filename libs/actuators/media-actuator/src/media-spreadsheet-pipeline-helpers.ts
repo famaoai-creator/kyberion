@@ -7,7 +7,6 @@ import {
 import {
   loadMediaSignalEntryPolicyCatalog,
   loadTrackerSheetPolicyCatalog,
-  resolveDocumentContentsLabel,
   resolveSpreadsheetStyleIndex,
   resolveMediaToneStyle,
 } from '@agent/core';

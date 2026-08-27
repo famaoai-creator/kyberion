@@ -1,20 +1,6 @@
-import {
-  appendGovernedArtifactJsonl,
-  createStandardYargs,
-  ensureGovernedArtifactDir,
-  listGovernedArtifacts,
-  logger,
-  readGovernedArtifactJson,
-  resolveGovernedArtifactPath,
-  safeReadFile,
-  writeGovernedArtifactJson,
-  classifyError,
-  type GovernedArtifactRole,
-  defineCatalogBackedActuator,
-} from '@agent/core';
+import { logger, defineCatalogBackedActuator } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver } from '@agent/core';
 import { handleArtifactAction } from './artifact-actuator-helpers.js';
 import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core';

@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unclassified-error-registry');

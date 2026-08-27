@@ -3,12 +3,9 @@ import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import {
   selectAgentForTeamRole,
-  type AuthorityRoleRecord,
-  type AgentProfileRecord,
   type MissionTeamAssignment,
   type RoleSeparationConstraints,
   type TeamProviderPreference,
-  type TeamRoleRecord,
 } from './team-role-assignment-selection.js';
 import { resolveTaskModelHint } from './reasoning-model-routing.js';
 import {

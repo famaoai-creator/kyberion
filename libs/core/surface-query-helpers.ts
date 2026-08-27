@@ -1,6 +1,5 @@
 import {
   buildScopedIndex,
-  queryKnowledgeHybrid,
   DEFAULT_SCOPE,
   type KnowledgeHintIndex,
   type KnowledgeScope,

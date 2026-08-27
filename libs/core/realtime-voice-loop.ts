@@ -31,11 +31,7 @@ import { startMicCapture, type MicCaptureOptions } from './mic-capture.js';
 import { pcmToWav } from './pcm-wav.js';
 import { playAudioFile, type PlaybackHandle } from './audio-playback.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
-import {
-  speakSegmented,
-  type SegmentedSpeechController,
-  DEFAULT_SPEECH_SEGMENT_CHARS,
-} from './segmented-voice-playback.js';
+import { speakSegmented, type SegmentedSpeechController } from './segmented-voice-playback.js';
 import {
   streamVoicePlayback,
   streamTtsAudioPlayback,

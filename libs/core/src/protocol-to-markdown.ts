@@ -6,7 +6,7 @@
 
 import type { PdfDesignProtocol, PdfPage, PdfLayoutElement } from './types/pdf-protocol.js';
 import type { DocxDesignProtocol, DocxBlockContent, DocxParagraph, DocxRun, DocxTable, DocxTableRow } from './types/docx-protocol.js';
-import type { XlsxDesignProtocol, XlsxWorksheet, XlsxRow, XlsxCell } from './types/xlsx-protocol.js';
+import type { XlsxDesignProtocol, XlsxWorksheet, XlsxCell } from './types/xlsx-protocol.js';
 import type { PptxDesignProtocol, PptxSlide, PptxElement } from './types/pptx-protocol.js';
 
 // ─── Public API ──────────────────────────────────────────────

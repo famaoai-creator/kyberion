@@ -6,14 +6,12 @@ import {
   resolveGovernedArtifactPath,
   writeGovernedArtifactJson,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ensureDefaultOpPreflight,
   runOpPreflight,
   type GovernedArtifactRole,
 } from '@agent/core';
 import { pathResolver } from '@agent/core';
-import { safeReadFile } from '@agent/core';
 
 export interface ArtifactAction {
   action:

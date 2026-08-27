@@ -5,7 +5,7 @@ const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 

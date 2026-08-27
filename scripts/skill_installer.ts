@@ -1,11 +1,8 @@
 import {
   loadCapabilityBundleRegistry,
   scanProviderCapabilities,
-  loadProviderCapabilityScanPolicy,
   safeExec,
   findSkillInstallPackageMapEntry,
-  type CapabilityBundleEntry,
-  type DiscoveredCapability,
 } from '@agent/core';
 import * as readline from 'node:readline';
 import chalk from 'chalk';

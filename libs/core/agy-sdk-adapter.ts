@@ -1,6 +1,5 @@
 /* eslint-disable no-restricted-imports -- the provider boundary owns this managed bridge process. */
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import * as path from 'node:path';
 import type { AgentAskOptions, AgentResponse } from './agent-adapter.js';
 import { buildProviderChildEnv } from './provider-permission-profiles.js';
 import * as pathResolver from './path-resolver.js';

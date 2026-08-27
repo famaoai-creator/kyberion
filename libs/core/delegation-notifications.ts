@@ -17,13 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
 export interface DelegationNotification {
   notification_id: string;

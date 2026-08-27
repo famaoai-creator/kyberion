@@ -17,7 +17,7 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface RestrictedActionRule {
   id: string;

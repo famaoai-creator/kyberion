@@ -1,6 +1,6 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 

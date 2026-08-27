@@ -3,7 +3,6 @@ import * as crypto from 'node:crypto';
 import { withExecutionContext } from './authority.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from './secure-io.js';
-import { pathResolver } from './path-resolver.js';
 import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
