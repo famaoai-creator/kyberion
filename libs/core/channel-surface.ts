@@ -1,25 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import * as path from 'node:path';
-import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExec, safeExistsSync, safeReaddir } from './secure-io.js';
 import { processUntrustedContent } from './untrusted-content.js';
-import { type GovernedArtifactRole } from './artifact-store.js';
-import {
-  deriveSlackExecutionMode,
-  deriveSlackIntentLabel,
-  runSurfaceConversation,
-  runSurfaceMessageConversation,
-  shouldForceSlackDelegation,
-  buildSlackSurfacePrompt,
-} from './surface-runtime-orchestrator.js';
-import {
-  emitChannelSurfaceEvent,
-  recordChronosDelegationSummary,
-  recordChronosSurfaceRequest,
-  recordSlackDelivery,
-  recordSlackSurfaceArtifact,
-} from './surface-artifact-store.js';
-import { extractSurfaceBlocks } from './surface-response-blocks.js';
 export {
   emitChannelSurfaceEvent,
   recordChronosDelegationSummary,
@@ -101,14 +81,7 @@ export {
   saveSlackMissionProposalState,
 } from './surface-mission-proposals.js';
 
-import type {
-  SlackSurfaceInput,
-  SlackExecutionMode,
-  SlackSurfaceArtifact,
-  ChronosSurfaceRequest,
-  // Internal aliases
-  SlackOutboxMessage,
-} from './channel-surface-types.js';
+import type { SlackSurfaceInput, SlackSurfaceArtifact } from './channel-surface-types.js';
 
 export type {
   SurfaceConversationResult,

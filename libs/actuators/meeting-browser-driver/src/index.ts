@@ -50,7 +50,7 @@ import {
   trySelectors,
   waitForAnyVisibleSelector,
 } from './meeting-browser-driver-helpers.js';
-import { safeReadFile, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 
 /* Playwright type stand-ins so this file compiles without playwright

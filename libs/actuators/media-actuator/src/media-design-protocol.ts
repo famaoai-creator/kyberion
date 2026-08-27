@@ -1,171 +1,36 @@
-import { draftDeckSectionBodies, loadJson, selectDeckTheme } from '@agent/core';
-import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import {
   logger,
-  safeReadFile,
-  safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
-  safeLstat,
-  safeStat,
-  safeExec,
-  safeExecResult,
-  derivePipelineStatus,
-  pathResolver,
-  pptxUtils,
-  xlsxUtils,
-  docxUtils,
   loadProjectRecord,
   loadServiceBindingRecord,
-  resolveRef,
-  resolveVars,
-  handleStepError,
-  buildGovernedRetryOptions,
-  classifyError,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  resolveMediaToneStyle,
-  resolveMediaDrawioBoundaryPalette,
-  resolveMediaDrawioNodeSize,
-  resolveMediaAwsIconCandidates,
-  resolveMediaSemanticType,
-  resolveProposalEvidenceIndex,
-  resolveSignalToneRank,
-  resolveBorderKeySides,
-  resolveDocumentContentsLabel,
-  resolveDocumentContentsSubtitle,
-  resolveReportSectionTitle,
-  resolveReportSummaryTitle,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-  resolveDrawioEdgeLabelStyleParts,
-  resolveDrawioEdgeRoutingStyleParts,
-  resolveDrawioBoundaryIconCandidates,
-  resolveDrawioBoundaryPaletteOverride,
-  resolveMediaDrawioTierRank,
-  resolveMediaDrawioGroupRank,
-  resolveMediaDrawioTypeRank,
-  resolveMediaDrawioSecurityGroupRelationPrefix,
-  resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-  resolveProposalSectionKeywords,
-  isLegacyMediaOp,
-  retry,
-  fitTextToBox,
-  measureTextBlock,
-  splitLinesBalanced,
-  resolvePptxSurfaceDesign,
-  detectRasterCapabilities,
-  rasterizeDocument,
-  rasterizeHtml,
-  assertVisualReviewPathScope,
-  runVisualReview,
-  runVisualReviewLoop,
-  loadVisualReviewRubric,
-  formatVisualReviewReport,
-  ensureReadableOn,
-  lockMediaBrief,
-  inferredDecisions,
-  formatBriefForConfirmation,
-  type LayoutFitResult,
 } from '@agent/core';
-import { validateThemeContrast } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
-import { getRegisteredEnvText } from '@agent/core/foundation';
-import {
-  distillPdfDesign,
-  extractPptxSlides,
-  filterPptxSlides,
-  generateNativeDocx,
-  generateNativePdf,
-  generateNativePptx,
-  generateNativeXlsx,
-  patchPptxText,
-  patchPptxParagraphs,
-  protocolToMarkdown,
-  type PdfDesignProtocol,
-} from '@agent/core/media-contracts';
-import {
-  buildPptxProtocolFromPdfDesign as buildPptxProtocolFromPdfDesignHelper,
-  buildXlsxProtocolFromPdfDesign as buildXlsxProtocolFromPdfDesignHelper,
-  DEFAULT_PDF_TO_PPTX_HINTS,
-  DEFAULT_PDF_TO_XLSX_HINTS,
-  type PdfToPptxHints,
-  type PdfToXlsxHints,
-} from './media-pdf-protocol-helpers.js';
-import {
-  handleMediaAction,
-  type MediaAction,
-  type MediaPipelineStep,
-} from './media-pipeline-helpers.js';
-import { recognizeDocumentImage } from './media-ocr.js';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
+import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
 import {
-  createMediaDocumentPipelineHelpers,
-  assertMediaProtocolLayoutReady,
-  summarizeMediaPptxLayout,
-} from './media-document-pipeline-helpers.js';
-import { registerPresentationPreferenceProfileOp } from './presentation-preference-ops.js';
-import {
-  warnLegacyMediaOp,
   buildMediaGenerationBoundary,
   resolveMediaBriefCategory,
   normalizeBriefForCategory,
-  buildCompositionTokenMap,
-  type MediaBriefCategory,
   type ProtocolKind,
-  type DocumentCompositionPresetResolver,
-  chooseDocumentSectionEvidence,
-  classifyRenderSemantic,
-  buildDocumentContentsSection,
-  insertDocumentContentsSection,
-  chooseProposalSectionEvidence,
   buildReportNarrativeOutline,
   buildSpreadsheetNarrativeOutline,
   buildDiagramNarrativeOutline,
-  buildUnifiedDocumentBrief,
-  normalizeInvoiceDocumentBrief,
-  normalizeDiagramDocumentBrief,
-  normalizeSpreadsheetDocumentBrief,
-  normalizeReportDocumentBrief,
 } from './media-document-helpers.js';
-import * as mediaPdfHelpers from './media-pdf-helpers.js';
-import {
-  buildMermaidConfig,
-  resolveGraphDefinition,
-  resolveDrawioIconMap,
-  loadFallbackDrawioTheme,
-} from './media-diagram-helpers.js';
-import {
-  resolveDiagramSource,
-  resolveDiagramTheme,
-  generateDrawioDocument,
-  extractChromeGeometryFromPptxDesign,
-  deriveLayoutTemplateFromPptxDesign,
-  matchLayoutTemplate,
-  deriveThemeFromPptxDesign,
-  normalizeFontFamily,
-} from './media-diagram-render-helpers.js';
+import { generateDrawioDocument, normalizeFontFamily } from './media-diagram-render-helpers.js';
 import { createMediaReportPipelineHelpers } from './media-report-pipeline-helpers.js';
-import { projectXlsxDesign } from './xlsx-extract-projection.js';
 import {
   createMediaSpreadsheetPipelineHelpers,
-  columnNumberToLetter,
-  inferPrimitiveCellType,
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
 import { loadJsonValue, resolveConfidentialTenantOverride } from './media-catalog-loaders.js';
 import * as path from 'node:path';
-import { findSlidesByOwner, pptxDiff, type MediaSlideText } from './media-slide-ops.js';
-import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
-import * as excelUtils from '@agent/shared-media';
-import { PDFParse } from 'pdf-parse';
-import { runActuatorCli } from '@agent/core';
-import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '@agent/core/design-fonts';
+import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
   cloneJsonValue,
   deepMergeCatalog,

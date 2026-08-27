@@ -1,16 +1,12 @@
 import * as path from 'node:path';
 import {
-  loadActuatorManifestCatalog,
   readModelRegistryDirectory,
   pathResolver,
   safeExistsSync,
   safeReaddir,
-  safeReadFile,
-  safeStat,
   assertProcessDefinitionRegistry,
 } from '@agent/core';
 import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
-import { fileURLToPath } from 'node:url';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   validateActuatorCatalogDirectoryConsistency,

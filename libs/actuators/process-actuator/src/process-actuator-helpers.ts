@@ -9,7 +9,6 @@ import {
   loadSurfaceManifest,
   loadSurfaceState,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ensureDefaultOpPreflight,
   runOpPreflight,

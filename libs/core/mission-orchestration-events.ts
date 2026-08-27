@@ -2,17 +2,14 @@ import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { safeAppendFileSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import { redactEventScopeForShared, type EventScope, type EventScopeInput } from './event-scope.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
-import {
-  resolveMissionOrchestrationScope,
-  loadMissionOrchestrationEvent,
-} from './mission-orchestration-event-loader.js';
+import { resolveMissionOrchestrationScope } from './mission-orchestration-event-loader.js';
 export {
   loadMissionOrchestrationEvent,
   resolveMissionOrchestrationScope,

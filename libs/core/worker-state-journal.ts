@@ -44,14 +44,7 @@ import { z } from 'zod';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 import {
   demoteActiveOnResume,

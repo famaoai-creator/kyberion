@@ -13,7 +13,6 @@ import {
   assertValidMobileAppProfile,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   sleep,
   ensureDefaultOpPreflight,
   runOpPreflight,

@@ -12,7 +12,6 @@ import {
   safeExistsSync,
   safeExec,
   loadJson,
-  safeReadFile,
   suggestClosestStrings,
   ensureDefaultOpPreflight,
   runOpPreflight,

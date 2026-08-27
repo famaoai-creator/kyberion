@@ -4,10 +4,8 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
-  validateScopeContext,
   type ScopeContext,
   type ScopeContextInput,
-  type ScopeContextValidationOptions,
 } from './scope-context-validation.js';
 export {
   assertScopeContext,

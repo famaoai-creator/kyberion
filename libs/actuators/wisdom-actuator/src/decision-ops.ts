@@ -1,6 +1,5 @@
 import {
   logger,
-  missionDir,
   sendOpsAlert,
   safeReadFile,
   safeWriteFile,
@@ -20,9 +19,6 @@ import {
   validateContextOutputTier,
   type GovernedContextFragment,
   type ReasoningParticipant,
-  resolveGoldenRulePriorityOrder,
-  resolveVision,
-  type GoldenRulePriority,
   curateBackgroundReviewProposals,
   generateKnowledgeCurationReport,
   runKnowledgeValidationSweep,

@@ -1,7 +1,6 @@
 import {
   createNextActionContract,
   createOutcomeContract,
-  createTaskSession,
   resolveIntentResolutionContract,
 } from '@agent/core';
 import { readGovernanceJson, type ContractCheck } from './check_contract_schemas_shared.js';

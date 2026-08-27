@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { safeAppendFile, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 

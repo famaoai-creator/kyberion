@@ -1,98 +1,20 @@
 import {
   logger,
-  safeReadFile,
-  safeWriteFile,
-  safeMkdir,
-  safeExec,
-  safeExecResult,
-  safeExistsSync,
-  derivePipelineStatus,
-  emitComputerSurfacePatch,
   pathResolver,
-  resolveVars,
-  evaluateCondition,
-  getPathValue,
-  resolveWriteArtifactSpec,
-  nativeTtsSpeak,
-  probeNativeTts,
   buildGovernedRetryOptions,
-  classifyError,
-  createVirtualMediaDeviceControlBridge,
-  createVirtualDeviceInventoryBridge,
-  createVirtualAudioOutputPlaybackBridge,
-  createVirtualAudioInputRecordingBridge,
-  createVirtualInputDeviceInventoryBridge,
-  createVirtualCameraBridge,
-  createVirtualCameraInjectionBridge,
-  createScreenCaptureBridge,
-  createScreenRecordingBridge,
-  createScreenDisplayInventoryBridge,
-  listToolRuntimeInventory,
-  listServiceRuntimeInventory,
   type ScreenDisplayInventory,
   type ScreenDisplayRecord,
-  StubVideoFrameBus,
-  writeVideoFrameBusToMp4,
-  pipeMp4ToVideoFrameBus,
 } from '@agent/core';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
-import { randomUUID } from 'node:crypto';
-import { getAllFiles } from '@agent/core/fs-utils';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnv } from '@agent/core/foundation';
 import {
   systemDisplayHelpers,
   type ResolvedScreenDisplaySelection,
 } from './system-display-helpers.js';
-import { systemFocusHelpers } from './system-focus-helpers.js';
-import {
-  SYSTEM_ACTUATOR_CAPTURE_OPS,
-  SYSTEM_ACTUATOR_APPLY_OPS,
-  SYSTEM_ACTUATOR_TRANSFORM_OPS,
-  SYSTEM_ACTUATOR_CONTROL_OPS,
-} from './op-catalog.js';
-import { executePipeline } from './system-pipeline-helpers.js';
-import {
-  handleSystemAction,
-  type SystemAction,
-  type ComputerInteractionAction,
-  type SystemPipelineStep,
-} from './system-action-helpers.js';
-import {
-  activateApplication,
-  detectFocusedInput,
-  keystrokeText,
-  pasteText,
-  pressKey,
-  toggleDictation,
-  clickAt,
-  rightClickAt,
-  moveMouse,
-  scrollAt,
-  dragFrom,
-  activateWindowByTitle,
-  getScreenSize,
-  getWindowList,
-  quitApplication,
-  systemNotify,
-  clipboardRead,
-  clipboardWrite,
-  listKnownAppCapabilities,
-  listTerminalTargets,
-  listChromeTabs,
-  activateChromeTabByTitle,
-  activateChromeTabByUrl,
-  closeChromeTabByTitle,
-  closeChromeTabByUrl,
-  emptyFinderTrash,
-  revealFinderPath,
-  openFinderPath,
-} from '@agent/core/os-automation';
-import { osAutomationBridge } from '@agent/core/os-automation-bridge';
-import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
+import { SYSTEM_ACTUATOR_CAPTURE_OPS } from './op-catalog.js';
+import { handleSystemAction } from './system-action-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as visionJudge from '@agent/shared-vision';
 import { runActuatorCli } from '@agent/core';
 import { describeOps } from './op-catalog.js';
 export { describeOps };

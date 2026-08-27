@@ -10,7 +10,6 @@ import {
 import { createAjv } from '@agent/core/foundation';
 import * as addFormatsModule from 'ajv-formats';
 import type { ValidateFunction } from 'ajv';
-import * as path from 'node:path';
 import {
   calendarBackendRegistry,
   createJxaCalendarBackend,

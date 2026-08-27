@@ -3,15 +3,7 @@ import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  loadJson,
-  safeReaddir,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, loadJson, safeReaddir, safeWriteFile } from './secure-io.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   createMemoryPromotionCandidate,

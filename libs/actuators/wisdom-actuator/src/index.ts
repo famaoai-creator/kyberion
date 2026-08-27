@@ -1,5 +1,4 @@
 import { loadJson, logger, pathResolver, defineCatalogBackedActuator } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './wisdom-pipeline-helpers.js';

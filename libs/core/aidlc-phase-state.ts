@@ -15,7 +15,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type AiDlcPhase = 'alignment' | 'execution' | 'test' | 'self_review' | 'complete';

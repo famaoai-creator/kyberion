@@ -1,10 +1,8 @@
-import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { loadActuatorManifestCatalog } from '@agent/core';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
-import { getAllFiles } from '@agent/core/fs-utils';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
 import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';

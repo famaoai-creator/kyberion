@@ -15,11 +15,7 @@ import {
 } from './secure-io.js';
 import { createLogger } from './logger.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
-import {
-  listEmailAccountProviders,
-  type EmailAccountId,
-  type EmailAccountOperation,
-} from './email-account-catalog.js';
+import { type EmailAccountId, type EmailAccountOperation } from './email-account-catalog.js';
 export { listEmailAccountProviders } from './email-account-catalog.js';
 export type {
   EmailAccountId,

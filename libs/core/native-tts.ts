@@ -21,7 +21,6 @@
  */
 
 import { spawn } from 'node:child_process';
-import * as os from 'node:os';
 
 export type Platform = 'darwin' | 'linux' | 'win32';
 

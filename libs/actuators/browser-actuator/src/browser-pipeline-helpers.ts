@@ -1,7 +1,5 @@
 import {
-  loadJson,
   logger,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
@@ -10,12 +8,9 @@ import {
   TraceContext,
   persistTrace,
   pathResolver,
-  resolveVars,
-  evaluateCondition,
   getPathValue,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   processUntrustedContent,
   decideFromObservation,
   executeLlmDecideOp,
@@ -24,7 +19,7 @@ import {
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
-import { chromium, type CDPSession, type Page } from '@playwright/test';
+import { type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
 import {
   registerPasskey,

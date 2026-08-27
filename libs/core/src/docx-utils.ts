@@ -16,9 +16,7 @@ import type {
   DocxRun,
   DocxRunContent,
   DocxRunProperties,
-  DocxColor,
   DocxBorderEdge,
-  DocxShading,
   DocxTable,
   DocxTableRow,
   DocxTableCell,
@@ -27,7 +25,6 @@ import type {
   DocxSectionProperties,
   DocxHeaderFooter,
   DocxDrawing,
-  DocxHyperlink,
   DocxAbstractNum,
   DocxNum,
 } from './types/docx-protocol.js';

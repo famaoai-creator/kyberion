@@ -10,7 +10,7 @@ import {
   listProjectRecords,
   withExecutionContext,
 } from '@agent/core';
-import { getRegisteredEnvBool, getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

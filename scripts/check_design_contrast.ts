@@ -5,7 +5,6 @@ import {
   createCompanionWebThemePack,
   createConciergeWebThemePack,
   pathResolver,
-  safeReadFile,
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core';

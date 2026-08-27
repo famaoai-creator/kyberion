@@ -15,7 +15,6 @@ import {
   probeSurfaceHealth,
   runtimeSupervisor,
   saveSurfaceState,
-  safeExistsSync,
   safeOpenAppendFile,
   spawnManagedProcess,
   inspectServiceAuth,

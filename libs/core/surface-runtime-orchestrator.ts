@@ -1,16 +1,12 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { deriveSurfaceSessionId } from './orchestrator-session.js';
 import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from './path-resolver.js';
-import { secureFetch } from './network.js';
-import { safeExec, safeWriteFile } from './secure-io.js';
+import { safeExec } from './secure-io.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
-import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
@@ -22,7 +18,6 @@ import {
 } from './agent-runtime-supervisor-client.js';
 import {
   compileUserIntentFlow,
-  formatClarificationPacket,
   formatClarificationPacketConcise,
   isSimpleGreetingText,
 } from './intent-contract.js';
@@ -32,46 +27,20 @@ import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
-  resolveFallbackLocationCoordinates,
-  resolveFallbackLocationSummary,
-} from './location-fallback.js';
-import {
   buildMissionTeamView,
   loadMissionTeamPlan,
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
-import {
-  classifyTaskSessionIntent,
-  createTaskSession,
-  getLatestCompletedTaskSession,
-  reopenTaskSession,
-  saveTaskSession,
-  updateTaskSession,
-  getActiveTaskSession,
-} from './task-session.js';
-import type { TaskSession } from './task-session.js';
+import { classifyTaskSessionIntent, getActiveTaskSession } from './task-session.js';
 import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
-import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
-import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
-import { truncateTextWithCount } from './text-truncation.js';
-import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
-import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
   deriveSurfaceIntentLabelFromProviderPolicy,
   shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
-import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { isCorrectionUtterance } from './correction-detection.js';
-import {
-  recordSchedulePreference,
-  resolveDefaultScheduleSource,
-} from './contextual-intent-memory.js';
-import { recordContextualIntentLearning } from './contextual-intent-learning.js';
+import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import {
   buildDelegationFallbackText,
   deriveSurfaceDelegationReceiver,
@@ -84,44 +53,21 @@ import {
   type SurfaceDelegationReceiver,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
-import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
+import { resolveSurfaceIntent } from './router-contract.js';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
-import {
-  recordIntentContractOutcome,
-  selectContractCandidates,
-  type ContractCandidate,
-} from './intent-contract-learning.js';
-import type { WorkScopeDecision } from './work-scope-decision.js';
-import {
-  findServiceById,
-  registerService,
-  updateServiceStats,
-  extractProviderFromUtterance,
-  resolveProviderUrl,
-} from './external-service-registry.js';
+import { selectContractCandidates } from './intent-contract-learning.js';
 import {
   attachRoutingDecision,
   buildDelegatedSurfaceConversationResult,
   buildDelegationSummaryContext,
   buildDelegationSummaryInstruction,
-  buildKnowledgeQueryReply,
-  buildTaskSessionReply,
-  deriveSurfaceQueryRole,
   emptySurfaceResult,
-  fetchWeatherSummary,
-  formatCalendarAgendaReply,
   formatExecutionReceipt,
-  getScheduleDateRange,
-  extractFollowUpRequests,
-  loadKnowledgeHintIndex,
-  readScheduleAgenda,
   resolvedSurfaceIntent,
-  runWebSearch,
   structuredSurfaceQueryText,
-  summarizeUserFacingText,
 } from './surface-runtime-helpers.js';
 
 export {
@@ -141,11 +87,7 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
-import {
-  parseExecutionFeedbackText,
-  recordExecutionFeedback,
-  type ExecutionFeedbackRecord,
-} from './execution-feedback.js';
+import { parseExecutionFeedbackText, recordExecutionFeedback } from './execution-feedback.js';
 import * as surfaceRuntimeData from './surface-runtime-conversation-data.js';
 
 export {

@@ -1,4 +1,4 @@
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 
 /**

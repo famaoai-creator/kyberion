@@ -1,7 +1,7 @@
 /** Public reasoning contracts shared by providers, failover, and orchestration callers. */
 
 import * as path from 'node:path';
-import { findMissionPath, pathResolver } from './path-resolver.js';
+import { pathResolver } from './path-resolver.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import type { DelegationHandle } from './delegated-task-observability.js';

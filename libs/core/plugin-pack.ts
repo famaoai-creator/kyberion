@@ -35,7 +35,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeAppendFileSync,
   safeReadFile,
   safeReaddir,
   safeRmSync,

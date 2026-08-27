@@ -1,46 +1,15 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
-import { deriveSurfaceSessionId } from './orchestrator-session.js';
-import { missionSteeringRouteHandler } from './surface-mission-steering.js';
+import { queryKnowledgeHybrid } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
 import { safeExec, safeWriteFile } from './secure-io.js';
-import { resolveLocale } from './locale.js';
-import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
-import type { A2AMessage } from './a2a-bridge.js';
-import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
-import { ensureAgentRuntime, getAgentRuntimeHandle } from './agent-runtime-supervisor.js';
-import {
-  createSupervisorBackedAgentHandle,
-  ensureAgentRuntimeViaDaemon,
-  toSupervisorEnsurePayload,
-} from './agent-runtime-supervisor-client.js';
-import {
-  compileUserIntentFlow,
-  formatClarificationPacket,
-  formatClarificationPacketConcise,
-  isSimpleGreetingText,
-} from './intent-contract.js';
 import { logger } from './core.js';
-import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
-import type { AgentHandle } from './agent-lifecycle.js';
-import { triggerBackgroundReviewFork } from './background-review-runner.js';
-import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
-import {
-  resolveFallbackLocationCoordinates,
-  resolveFallbackLocationSummary,
-} from './location-fallback.js';
-import {
-  buildMissionTeamView,
-  loadMissionTeamPlan,
-  resolveMissionTeamReceiver,
-} from './mission-team-plan-composer.js';
-import { buildSurfaceConversationInput } from './surface-interaction-model.js';
+import { resolveFallbackLocationSummary } from './location-fallback.js';
 import {
   classifyTaskSessionIntent,
   createTaskSession,
@@ -51,74 +20,32 @@ import {
   getActiveTaskSession,
 } from './task-session.js';
 import type { TaskSession } from './task-session.js';
-import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
+import { loadPendingIntent } from './pending-intent-store.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
 import { truncateTextWithCount } from './text-truncation.js';
 import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
-import {
-  deriveSlackExecutionModeFromProviderPolicy,
-  deriveSurfaceIntentLabelFromProviderPolicy,
-  shouldForceSurfaceDelegationFromProviderPolicy,
-} from './surface-provider-policy.js';
-import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
 import { isCorrectionUtterance } from './correction-detection.js';
-import {
-  recordSchedulePreference,
-  resolveDefaultScheduleSource,
-} from './contextual-intent-memory.js';
-import { recordContextualIntentLearning } from './contextual-intent-learning.js';
-import {
-  buildDelegationFallbackText,
-  deriveSurfaceDelegationReceiver,
-  normalizeSurfaceDelegationReceiver,
-  parseSlackSurfacePrompt,
-  resolveSurfaceConversationReceiver,
-  shouldCompileSurfaceIntent,
-  surfaceChannelFromAgentId,
-  surfaceRoutingText,
-  type SurfaceDelegationReceiver,
-  type SurfaceRuntimeRouteContext,
-} from './surface-runtime-router.js';
+import { type SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
-import {
-  resolveIntentResolutionContract,
-  type IntentResolutionContract,
-} from './intent-resolution-contract.js';
-import {
-  recordIntentContractOutcome,
-  selectContractCandidates,
-  type ContractCandidate,
-} from './intent-contract-learning.js';
+import { recordIntentContractOutcome } from './intent-contract-learning.js';
 import type { WorkScopeDecision } from './work-scope-decision.js';
 import {
-  findServiceById,
   registerService,
   updateServiceStats,
   extractProviderFromUtterance,
   resolveProviderUrl,
 } from './external-service-registry.js';
 import {
-  attachRoutingDecision,
-  buildDelegatedSurfaceConversationResult,
-  buildDelegationSummaryContext,
-  buildDelegationSummaryInstruction,
   buildKnowledgeQueryReply,
   buildTaskSessionReply,
   deriveSurfaceQueryRole,
   emptySurfaceResult,
   fetchWeatherSummary,
-  formatCalendarAgendaReply,
-  formatExecutionReceipt,
-  getScheduleDateRange,
-  extractFollowUpRequests,
   loadKnowledgeHintIndex,
   readScheduleAgenda,
-  resolvedSurfaceIntent,
   runWebSearch,
   structuredSurfaceQueryText,
   summarizeUserFacingText,
@@ -133,21 +60,11 @@ export {
 export const surfaceRuntimeContextStore = new AsyncLocalStorage<SurfaceConversationInput>();
 
 import type {
-  NerveRoutingProposal,
-  ParsedSlackSurfacePrompt,
-  SurfaceDelegationResult,
-  SlackExecutionMode,
-  SlackSurfaceInput,
   SurfaceConversationInput,
-  SurfaceConversationMessageInput,
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
-import {
-  parseExecutionFeedbackText,
-  recordExecutionFeedback,
-  type ExecutionFeedbackRecord,
-} from './execution-feedback.js';
+import { type ExecutionFeedbackRecord } from './execution-feedback.js';
 
 export interface SurfaceRuntimeRouteHandler {
   matches: (context: SurfaceRuntimeRouteContext) => boolean;

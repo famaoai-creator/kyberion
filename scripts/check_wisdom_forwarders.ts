@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';

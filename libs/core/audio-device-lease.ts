@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import {
   safeCreateExclusiveFileSync,
   safeExistsSync,
-  safeReadFile,
   safeUnlink,
   safeWriteFile,
 } from './secure-io.js';

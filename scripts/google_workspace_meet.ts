@@ -1,4 +1,3 @@
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent/core';
 import { defineScript } from './lib/harness.js';
 

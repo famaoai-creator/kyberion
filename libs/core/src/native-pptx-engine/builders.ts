@@ -1,5 +1,5 @@
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
-import type { PptxElement, PptxPos, PptxStyle } from '../types/pptx-protocol.js';
+import type { PptxElement, PptxStyle } from '../types/pptx-protocol.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);

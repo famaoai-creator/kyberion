@@ -1,15 +1,7 @@
 import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  loadJson,
-  safeReadFile,
-  safeUnlink,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, loadJson, safeUnlink, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**

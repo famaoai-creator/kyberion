@@ -11,7 +11,7 @@ import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeAppendFileSync, safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
+import { safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,

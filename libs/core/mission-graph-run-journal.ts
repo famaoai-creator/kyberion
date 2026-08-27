@@ -7,7 +7,7 @@ import { appendJsonLine } from './foundation/json.js';
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 export const MISSION_GRAPH_RUN_JOURNAL_VERSION = 1;
 

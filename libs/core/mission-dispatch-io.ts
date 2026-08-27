@@ -1,6 +1,6 @@
 import { appendJsonLine as appendFoundationJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
-import { safeAppendFileSync, safeMkdir, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { readJsonIfPresent } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 

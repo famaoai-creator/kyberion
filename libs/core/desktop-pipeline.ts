@@ -4,7 +4,7 @@ import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 

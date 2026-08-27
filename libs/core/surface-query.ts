@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';

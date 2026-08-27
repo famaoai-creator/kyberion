@@ -3,7 +3,7 @@ import { readJson } from './foundation/json.js';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
 import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { validateBrowserExtensionRecording } from './browser-extension-bridge.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 

@@ -38,7 +38,7 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 
 export type PiiSeverity = 'secret' | 'pii';

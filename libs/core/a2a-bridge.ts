@@ -16,11 +16,7 @@ import {
   type DelegationChain,
 } from './delegation-chain.js';
 import { type AgentHandle } from './agent-lifecycle.js';
-import {
-  getAgentManifest,
-  loadAgentManifests,
-  resolveAgentSelectionHints,
-} from './agent-manifest.js';
+import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
 import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { auditChain } from './audit-chain.js';

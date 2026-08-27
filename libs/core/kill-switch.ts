@@ -5,12 +5,9 @@ import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client
 import { trustEngine } from './trust-engine.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
-import {
-  recordGovernanceAction,
-  registerGovernanceActionSink,
-} from './governance-action-recorder.js';
+import { registerGovernanceActionSink } from './governance-action-recorder.js';
 
 const logger = createLogger('kill-switch');
 

@@ -11,7 +11,6 @@ import { appendJsonLine } from './foundation/json.js';
 import * as os from 'node:os';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync } from './secure-io.js';
 import { subscribeJsonl } from './jsonl-tail.js';
 import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
 

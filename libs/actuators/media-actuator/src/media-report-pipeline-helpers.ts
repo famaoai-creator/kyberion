@@ -1,9 +1,7 @@
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDocumentContentsLabel,
-  resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
-  resolveReportSummaryTitle,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
 } from '@agent/core';
 import {

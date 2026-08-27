@@ -12,7 +12,6 @@ import {
   retry,
   buildGovernedRetryOptions,
   classifyError,
-  derivePipelineStatus,
   executeAdfSteps,
   ensureDefaultOpPreflight,
   runOpPreflight,

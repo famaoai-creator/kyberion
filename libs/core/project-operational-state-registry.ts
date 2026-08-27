@@ -12,8 +12,6 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import {
-  projectOperationalMissionLinkPath,
-  projectOperationalTrackStatePath,
   saveProjectMissionLink,
   saveProjectTrackState,
 } from './project-operational-state-links.js';

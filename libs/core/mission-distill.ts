@@ -17,12 +17,7 @@ import { findMissionPath } from './path-resolver.js';
 import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
 import { readJsonFile } from './cli-input.js';
-import {
-  inspectLlmResolution,
-  resolveLlmConfig,
-  runAdaptiveStructuredLlmProfile,
-  type LlmPolicyConfig,
-} from './mission-llm.js';
+import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
 
 const WISDOM_SCHEMA = z.object({
   title: z.string(),

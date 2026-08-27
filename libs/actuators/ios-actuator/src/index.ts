@@ -1,5 +1,4 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import {

@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 const INTENT_EXECUTION_PROFILE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-execution-profile-registry.schema.json'

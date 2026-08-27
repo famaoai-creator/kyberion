@@ -8,14 +8,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
@@ -47,7 +40,6 @@ import type {
   WorkItemStatus,
   WorkBoardType,
   WorkLease,
-  WorkLeaseStatus,
 } from './work-coordination-types.js';
 export type {
   AppendCoordinationEventInput,

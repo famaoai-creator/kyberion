@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface AnalysisExecutionContractDefinition {
   contract_id: string;

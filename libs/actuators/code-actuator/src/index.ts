@@ -1,8 +1,7 @@
-import { logger, safeReadFile, pathResolver, defineCatalogBackedActuator } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger, defineCatalogBackedActuator } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
-import { buildRetryOptions, handleAction } from './code-pipeline-helpers.js';
+import { handleAction } from './code-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
 import { describeOps } from './op-catalog.js';
 

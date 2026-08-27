@@ -1,13 +1,7 @@
 import { appendJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedLogsProcess } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeStat,
-  safeMoveSync,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeStat, safeMoveSync } from './secure-io.js';
 
 export type ProcessLogLevel = 'debug' | 'info' | 'warn' | 'error';
 

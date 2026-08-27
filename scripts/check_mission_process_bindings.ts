@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
 import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

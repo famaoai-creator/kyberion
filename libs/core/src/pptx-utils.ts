@@ -1,7 +1,7 @@
 import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
-import type { PptxDesignProtocol, PptxElement, PptxLayoutRaw, PptxMasterMedia, PptxMasterRaw, PptxPos, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
+import type { PptxDesignProtocol, PptxElement, PptxLayoutRaw, PptxMasterMedia, PptxMasterRaw, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
 import { generateNativePptx } from './native-pptx-engine/engine.js';
 
 /**

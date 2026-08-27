@@ -17,14 +17,7 @@ import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-  safeAppendFileSync,
-  loadJson,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile, loadJson } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 
 export interface MissionEvidenceDocOptions<T> {

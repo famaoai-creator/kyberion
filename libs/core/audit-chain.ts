@@ -10,7 +10,6 @@ import {
   computeAuditEntryHash,
   GENESIS_HASH,
   getAuditChainKeyId,
-  registerChainIntegrityIo,
   resolveAuditChainKey,
   type ChainAlg,
   verifyAuditEntryHash,

@@ -24,7 +24,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';

@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 const CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/capability-bundle-registry.schema.json'

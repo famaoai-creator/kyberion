@@ -1,5 +1,4 @@
 import {
-  safeReadFile,
   safeWriteFile,
   safeCopyFileSync,
   safeExistsSync,

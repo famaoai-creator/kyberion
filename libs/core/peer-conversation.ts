@@ -18,7 +18,6 @@ import {
   type PeerMessageResponderContext,
 } from './peer-messaging.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
