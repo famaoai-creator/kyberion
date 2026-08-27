@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { registerFoundationIo } from '../libs/core/foundation/io.js';
+import { registerFoundationIo } from '@agent/core/foundation';
 
 /**
  * E2E-06 Task 8: customer dialogue end-to-end.
