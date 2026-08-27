@@ -4,6 +4,15 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
+/**
+ * Files that legitimately read `process.env.KYBERION_*` directly because they
+ * run on a runtime that cannot import `@agent/core` (Next.js edge middleware).
+ * Each entry must keep its truthy-value parsing in sync with
+ * `libs/core/foundation/env.ts`.
+ */
+const EDGE_RUNTIME_ENV_READ_ALLOWLIST = new Set([
+  'presence/displays/chronos-mirror-v2/src/middleware.ts',
+]);
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
 const JSONL_APPEND_RATCHET = 0;
@@ -58,7 +67,13 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
     ) {
       ajvViolations += 1;
     }
-    envReads += [...source.matchAll(/process\.env\.KYBERION_[A-Z0-9_]+/gu)].length;
+    const relativePath = path
+      .relative(pathResolver.rootResolve('.'), filePath)
+      .split(path.sep)
+      .join('/');
+    if (!EDGE_RUNTIME_ENV_READ_ALLOWLIST.has(relativePath)) {
+      envReads += [...source.matchAll(/process\.env\.KYBERION_[A-Z0-9_]+/gu)].length;
+    }
     for (const match of source.matchAll(/defineCatalog(?:<[^>]+>)?\(\{/gu)) {
       catalogDefinitions += 1;
       const suffix = source.slice(match.index ?? 0, (match.index ?? 0) + 1200);
