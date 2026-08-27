@@ -33,7 +33,9 @@ function loadRoles(): SurfaceRole[] {
 const IDENTITY_SOURCES: Record<string, string> = {
   concierge: 'presence/displays/concierge/src/app/layout.tsx',
   'presence-studio': 'presence/displays/presence-studio/static/index.html',
-  'chronos-mirror-v2': 'presence/displays/chronos-mirror-v2/src/app/page.tsx',
+  // chronos declares its identity in the page-config module page.tsx imports
+  // from (SURFACE_TAGLINE_KEY), not inline in the page component.
+  'chronos-mirror-v2': 'presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts',
   'operator-surface': 'presence/displays/operator-surface/src/app/layout.tsx',
   'computer-surface': 'presence/displays/computer-surface/static/index.html',
 };

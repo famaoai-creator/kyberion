@@ -19,7 +19,13 @@ vi.mock('@agent/core', () => ({
   findMissionPath: mocks.findMissionPath,
   listApprovalRequests: mocks.listApprovalRequests,
   computeApprovalPayloadHash: mocks.computeApprovalPayloadHash,
-  loadJson: vi.fn((filePath: string) => JSON.parse(mocks.safeReadFile(filePath))),
+}));
+
+// The assessor reads the brief through the foundation JSON facade, so the
+// stub has to sit on that module — mocking secure-io alone is not enough,
+// because foundation dispatches through its own registered IO bridge.
+vi.mock('@agent/core/foundation', () => ({
+  readJson: vi.fn((filePath: string) => JSON.parse(mocks.safeReadFile(filePath))),
 }));
 
 vi.mock('@agent/core/secure-io', () => ({
