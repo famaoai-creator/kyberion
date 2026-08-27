@@ -10,8 +10,8 @@ const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
  * Each entry must keep its truthy-value parsing in sync with
  * `libs/core/foundation/env.ts`.
  */
-const EDGE_RUNTIME_ENV_READ_ALLOWLIST = new Set([
-  'presence/displays/chronos-mirror-v2/src/middleware.ts',
+const EDGE_RUNTIME_ENV_READ_ALLOWLIST: ReadonlyMap<string, ReadonlyMap<string, number>> = new Map([
+  ['presence/displays/chronos-mirror-v2/src/middleware.ts', new Map([['KYBERION_TRUST_PROXY', 1]])],
 ]);
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
@@ -71,8 +71,14 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
       .relative(pathResolver.rootResolve('.'), filePath)
       .split(path.sep)
       .join('/');
-    if (!EDGE_RUNTIME_ENV_READ_ALLOWLIST.has(relativePath)) {
-      envReads += [...source.matchAll(/process\.env\.KYBERION_[A-Z0-9_]+/gu)].length;
+    const allowedReads = EDGE_RUNTIME_ENV_READ_ALLOWLIST.get(relativePath);
+    for (const match of source.matchAll(/process\.env\.(KYBERION_[A-Z0-9_]+)/gu)) {
+      const remaining = allowedReads?.get(match[1]) ?? 0;
+      if (remaining > 0) {
+        (allowedReads as Map<string, number>).set(match[1], remaining - 1);
+        continue;
+      }
+      envReads += 1;
     }
     for (const match of source.matchAll(/defineCatalog(?:<[^>]+>)?\(\{/gu)) {
       catalogDefinitions += 1;
