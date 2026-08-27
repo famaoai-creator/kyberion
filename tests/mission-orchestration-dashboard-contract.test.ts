@@ -61,10 +61,35 @@ describe('mission orchestration dashboard contract', () => {
 
   it('shows mission intelligence in Chronos default view', () => {
     const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
-    const component = read(
-      'presence/displays/chronos-mirror-v2/src/components/MissionIntelligence.tsx'
+    // SX: page.tsx was split into a shell, the legacy sections, and a static
+    // config module; each label/route now lives in the file that owns it.
+    const legacySections = read(
+      'presence/displays/chronos-mirror-v2/src/app/ChronosMirrorLegacySections.tsx'
     );
-    const route = read('presence/displays/chronos-mirror-v2/src/app/api/intelligence/route.ts');
+    const pageConfig = read('presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts');
+    // SX: MissionIntelligence.tsx was split into per-panel modules. The contract
+    // is that the MissionIntelligence surface as a whole still renders all of
+    // this, so assert against the whole family rather than a single file.
+    const component = [
+      'MissionIntelligence.tsx',
+      'MissionIntelligenceAgentTrafficPanel.tsx',
+      'MissionIntelligenceApprovalsPanel.tsx',
+      'MissionIntelligenceDangerousActionDialog.tsx',
+      'MissionIntelligenceMissionPanel.tsx',
+      'MissionIntelligencePrimitives.tsx',
+      'MissionIntelligenceRuntimePanel.tsx',
+      'MissionIntelligenceStatusGate.tsx',
+      'MissionIntelligenceSurfaceOverview.tsx',
+      'MissionIntelligenceTypes.ts',
+      'MissionIntelligenceViewHelpers.tsx',
+    ]
+      .map((file) => read(`presence/displays/chronos-mirror-v2/src/components/${file}`))
+      .join('\n');
+    // SX: the intelligence route's control/observation data collectors were
+    // extracted into sibling modules; the route handler is the three together.
+    const route = ['route.ts', 'intelligence-control-data.ts', 'intelligence-observation-data.ts']
+      .map((file) => read(`presence/displays/chronos-mirror-v2/src/app/api/intelligence/${file}`))
+      .join('\n');
     const streamRoute = read(
       'presence/displays/chronos-mirror-v2/src/app/api/intelligence/stream/route.ts'
     );
@@ -73,16 +98,16 @@ describe('mission orchestration dashboard contract', () => {
 
     expect(page).toContain('MissionIntelligence');
     // UX-03: the label moved into the vocabulary catalog; the page renders it via its key.
-    expect(page).toContain("uxText('chronos_jump_to_section'");
+    expect(legacySections).toContain("uxText('chronos_jump_to_section'");
     const vocabulary = read('knowledge/product/orchestration/user-facing-vocabulary.json');
     expect(vocabulary).toContain('Jump to section');
-    expect(page).toContain("uxText('chronos_qa_action_prereq_check'");
-    expect(page).toContain("uxText('chronos_qa_action_setup_report'");
-    expect(page).toContain("uxText('chronos_qa_action_schedule_tick'");
-    expect(page).toContain("uxText('chronos_qa_action_schedule_list'");
-    expect(page).toContain("uxText('chronos_sc_toolchain_label'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_prereq_check'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_setup_report'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_schedule_tick'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_schedule_list'");
+    expect(pageConfig).toContain("uxText('chronos_sc_toolchain_label'");
     expect(page).toContain('mission-control-plane');
-    expect(page).toContain('runtime-lease-doctor');
+    expect(legacySections).toContain('runtime-lease-doctor');
     expect(page).toContain('recent-surface-outbox');
     expect(component).toContain('Mission Control');
     expect(component).toContain('Company Context');

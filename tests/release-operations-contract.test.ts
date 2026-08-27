@@ -27,10 +27,16 @@ describe('Release operations contract', () => {
     expect(packageJson).toContain(
       '"release:notes": "node dist/scripts/extract_changelog_section.js"'
     );
-    expect(packageJson).toContain('"check:pr-title": "pnpm exec tsx scripts/check_pr_title.ts"');
-    expect(packageJson).toContain('"migration:run": "pnpm exec tsx scripts/run_migrations.ts"');
+    // SX-05: the TypeScript entrypoint runner was unified on the ts-loader
+    // import hook; these scripts no longer shell out through `pnpm exec tsx`.
     expect(packageJson).toContain(
-      '"migration:rollback": "pnpm exec tsx scripts/run_migrations.ts --rollback"'
+      '"check:pr-title": "node --import ./scripts/ts-loader.mjs scripts/check_pr_title.ts"'
+    );
+    expect(packageJson).toContain(
+      '"migration:run": "node --import ./scripts/ts-loader.mjs scripts/run_migrations.ts"'
+    );
+    expect(packageJson).toContain(
+      '"migration:rollback": "node --import ./scripts/ts-loader.mjs scripts/run_migrations.ts --rollback"'
     );
 
     const releaseOps = read('docs/developer/RELEASE_OPERATIONS.md');
