@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-25T16:43:31.740Z",
+  "generated_at": "2026-08-27T14:37:54.698Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -152,10 +152,10 @@
     },
     {
       "actuator_id": "meeting-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["chat", "join", "leave", "listen", "speak", "status"],
       "contract_schema": "knowledge/product/schemas/meeting-action.schema.json",
-      "contract_schema_sha256": "17fde8b3f90c397cf7bddd90c922d67aef55df965fa02aaf81a5b969ab46b1cd"
+      "contract_schema_sha256": "66647f982aff487095f0ce50e8fc339501d7d34cf983dc0c387769bbd1ca8a06"
     },
     {
       "actuator_id": "meeting-browser-driver",

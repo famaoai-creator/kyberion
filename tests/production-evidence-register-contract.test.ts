@@ -10,9 +10,7 @@ function read(relPath: string): string {
 }
 
 function markdownTableRow(markdown: string, id: string): string {
-  const row = markdown
-    .split('\n')
-    .find((line) => line.startsWith(`| ${id} |`));
+  const row = markdown.split('\n').find((line) => new RegExp(`^\\|\\s*${id}\\s*\\|`).test(line));
   if (!row) throw new Error(`Missing production evidence markdown row for ${id}`);
   return row;
 }
@@ -22,7 +20,9 @@ describe('production evidence register contract', () => {
     const register = read('docs/developer/PRODUCTION_EVIDENCE_REGISTER.ja.md');
     const runbook = read('docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md');
     const opsTemplate = read('docs/operator/templates/production-evidence-30day-ops.md');
-    const contribTemplate = read('docs/operator/templates/production-evidence-external-contribution.md');
+    const contribTemplate = read(
+      'docs/operator/templates/production-evidence-external-contribution.md'
+    );
     const fdeTemplate = read('docs/operator/templates/production-evidence-fde-deployment.md');
     const templateIndex = read('docs/operator/templates/README.md');
     const canonical = loadProductionEvidenceRegister();
@@ -35,7 +35,9 @@ describe('production evidence register contract', () => {
     expect(register).toContain('fork なし');
     expect(register).toContain('production-ready');
     expect(register).toContain('knowledge/product/governance/production-evidence-register.json');
-    expect(read('knowledge/product/schemas/production-evidence-register.schema.json')).toContain('pending_external_evidence');
+    expect(read('knowledge/product/schemas/production-evidence-register.schema.json')).toContain(
+      'pending_external_evidence'
+    );
     expect(register).toContain('../operator/PRODUCTION_EVIDENCE_COLLECTION.md');
     expect(runbook).toContain('EV-30DAY-OPS');
     expect(runbook).toContain('EV-EXT-CONTRIB');
@@ -54,7 +56,11 @@ describe('production evidence register contract', () => {
     expect(templateIndex).toContain('EV-30DAY-OPS');
     expect(templateIndex).toContain('EV-EXT-CONTRIB');
     expect(templateIndex).toContain('EV-FDE-DEPLOY');
-    expect(canonical.items.map((item) => item.id)).toEqual(['EV-30DAY-OPS', 'EV-EXT-CONTRIB', 'EV-FDE-DEPLOY']);
+    expect(canonical.items.map((item) => item.id)).toEqual([
+      'EV-30DAY-OPS',
+      'EV-EXT-CONTRIB',
+      'EV-FDE-DEPLOY',
+    ]);
     expect(canonical.items.map((item) => item.template_ref)).toEqual([
       'docs/operator/templates/production-evidence-30day-ops.md',
       'docs/operator/templates/production-evidence-external-contribution.md',
@@ -69,7 +75,11 @@ describe('production evidence register contract', () => {
       ])
     );
     expect(canonical.items.every((item) => item.ref_requirements.length > 0)).toBe(true);
-    expect(canonical.items.every((item) => item.verification_artifact.includes('PRODUCTION_EVIDENCE_COLLECTION.md'))).toBe(true);
+    expect(
+      canonical.items.every((item) =>
+        item.verification_artifact.includes('PRODUCTION_EVIDENCE_COLLECTION.md')
+      )
+    ).toBe(true);
     for (const item of canonical.items) {
       const row = markdownTableRow(register, item.id);
       expect(row).toContain(item.gate);
