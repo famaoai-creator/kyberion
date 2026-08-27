@@ -9,7 +9,6 @@ import {
   type DelegationChain,
 } from './delegation-chain.js';
 import { resolveCapabilityProfileForTeamRole } from './subagent-capability-profiles.js';
-import { ledger } from './ledger.js';
 import {
   claimWorkItem,
   importExternalWorkItem,
@@ -45,7 +44,6 @@ import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import { createGapRecorder, sanitizeGapSamples, type GapRecorder } from './gap-phase.js';
-import * as path from 'node:path';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 export { resolveMissionPlanningPacket } from './mission-orchestration-planning.js';

@@ -119,13 +119,6 @@ function deriveReasoningMode(backendName: string, synthetic = false): 'placehold
   return normalized === 'stub' || normalized.endsWith('-stub') ? 'placeholder' : 'model';
 }
 
-function generateHeuristicId(): string {
-  // Short ULID-ish id: time-ordered, url-safe.
-  const time = Date.now().toString(36).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `HEU-${time}-${rand}`;
-}
-
 // ---------------------------------------------------------------------------
 // Intuition Capture — records a 3-question heuristic entry under the
 // confidential tier. See knowledge/product/orchestration/intuition-capture-protocol.md.
@@ -318,7 +311,8 @@ export async function typedCrossCritique(input: {
   );
 
   for (const participant of input.participants) {
-    const resolvedParticipant = resolveReasoningParticipant({
+    // Keeps the guard: throws on invalid participants and denied egress.
+    resolveReasoningParticipant({
       participant,
       backend_name: backend.name,
     });

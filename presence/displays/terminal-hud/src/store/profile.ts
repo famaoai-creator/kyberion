@@ -6,7 +6,7 @@ import {
   listAgentIdentities,
   loadOrganizationProfile,
 } from '@agent/core';
-import { loadJson, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync } from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';

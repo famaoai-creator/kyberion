@@ -13,8 +13,6 @@ import chalk from 'chalk';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-const ROOT_DIR = pathResolver.rootDir();
-
 interface MissionHistoryEntry {
   ts: string;
   event: string;

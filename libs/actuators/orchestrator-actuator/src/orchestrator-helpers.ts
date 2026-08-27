@@ -97,9 +97,6 @@ export type ExecutionPlanPreflightReport = {
   issues: ExecutionPlanPreflightIssue[];
 };
 
-const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
-  'product/orchestration/actuator-request-archetypes.json'
-);
 const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/orchestrator-actuator/manifest.json'
 );

@@ -135,7 +135,7 @@ type CloudflareOsSurfaceMethodRegistryIsComplete =
       ? true
       : false
     : false;
-const cloudflareOsSurfaceMethodRegistryCheck: CloudflareOsSurfaceMethodRegistryIsComplete = true;
+true satisfies CloudflareOsSurfaceMethodRegistryIsComplete;
 
 function assertSurfaceAccess(access: CloudflareOsSurfaceAccess): void {
   if (!access || !String(access.principalId || '').trim()) {

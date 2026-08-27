@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
@@ -70,45 +69,11 @@ import type {
 } from './organization-operating-model.js';
 import type { BuildOrganizationOperationInput } from './organization-operating-model-operations.js';
 
-const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const CATALOG_PATH = pathResolver.knowledge(
-  'product/orchestration/organization-operating-model.json'
-);
-const CATALOG_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-operating-model.schema.json'
-);
-const PURPOSE_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-purpose.schema.json'
-);
 const STATE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-operational-state.schema.json'
 );
-const DOMAIN_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-domain.schema.json'
-);
-const CAPABILITY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-capability.schema.json'
-);
-const SERVICE_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-service.schema.json'
-);
-const SERVICE_STATE_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-service-state.schema.json'
-);
 const OPERATION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-operation.schema.json'
-);
-const OPERATION_STATE_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-operation-state.schema.json'
-);
-const OPERATION_RUN_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-operation-run.schema.json'
-);
-const WORK_RESOLUTION_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-work-resolution.schema.json'
-);
-const INCIDENT_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-incident.schema.json'
 );
 const CADENCE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-cadence.schema.json'
@@ -116,23 +81,15 @@ const CADENCE_SCHEMA_PATH = pathResolver.knowledge(
 const DECISION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-decision.schema.json'
 );
-const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-learning-candidate.schema.json'
-);
-const PURPOSE_FILE_NAME = 'purpose.json';
 const STATE_FILE_NAME = 'organization-state.json';
 const DOMAIN_FILE_NAME = 'domain.json';
 const CAPABILITY_FILE_NAME = 'capability.json';
 const SERVICE_FILE_NAME = 'service.json';
 const SERVICE_STATE_FILE_NAME = 'service-state.json';
-const OPERATION_FILE_NAME = 'operation.json';
-const OPERATION_STATE_FILE_NAME = 'operation-state.json';
-const OPERATION_RUN_FILE_NAME = 'run.json';
 const INCIDENT_FILE_NAME = 'incident.json';
 const CADENCE_FILE_NAME = 'cadence.json';
 const DECISION_FILE_NAME = 'decision.json';
 const LEARNING_FILE_NAME = 'candidate.json';
-const validatorCache = new Map<string, ValidateFunction>();
 
 export function buildOrganizationOperationRecord(
   input: BuildOrganizationOperationInput,
@@ -738,7 +695,6 @@ export function reconcileOrganizationState(query: {
   });
   const services = listOrganizationServiceStates(query);
   const operations = listOrganizationOperations(query);
-  const operationStates = listOrganizationOperationStates(query);
   const incidents = listOrganizationIncidents(query);
   const decisions = listOrganizationDecisions(query);
   const actions: OrganizationReconciliationResult['actions'] = [];

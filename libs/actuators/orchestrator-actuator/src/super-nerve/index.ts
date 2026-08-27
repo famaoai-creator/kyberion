@@ -52,7 +52,6 @@ export async function executeSuperPipeline(
   options: any = {},
   state: any = { stepCount: 0, startTime: Date.now() }
 ) {
-  const rootDir = pathResolver.rootDir();
   const maxSteps = options.max_steps || 1000;
   const timeoutMs = options.timeout_ms || 60000;
 

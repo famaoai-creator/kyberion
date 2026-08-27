@@ -38,12 +38,6 @@ function normalizeHex(value: string): string | null {
   return null;
 }
 
-function parseRgb(value: string): [number, number, number] | null {
-  const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
 function parseRgba(value: string): [number, number, number, number] | null {
   const normalized = String(value || '').trim();
   const hex = normalizeHex(normalized);
@@ -88,18 +82,6 @@ function opaqueRgb(value: string, base?: string): [number, number, number] {
     [number, number, number, number] | null;
   if (!baseRgba) throw new Error(`Unsupported base color value: ${base}`);
   return blendOver(rgba, baseRgba);
-}
-
-function parseColor(value: string): [number, number, number] | null {
-  const hex = normalizeHex(value);
-  if (hex) {
-    return [
-      Number.parseInt(hex.slice(0, 2), 16),
-      Number.parseInt(hex.slice(2, 4), 16),
-      Number.parseInt(hex.slice(4, 6), 16),
-    ];
-  }
-  return parseRgb(value);
 }
 
 function relativeLuminance(value: string, base?: string): number {

@@ -21,9 +21,6 @@ import type {
 const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
   'product/orchestration/actuator-request-archetypes.json'
 );
-const ORCHESTRATOR_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/orchestrator-actuator/manifest.json'
-);
 
 export function loadActuatorRequestArchetypes(): any {
   if (!safeExistsSync(ACTUATOR_ARCHETYPES_PATH)) {

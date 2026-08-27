@@ -34,7 +34,6 @@ import {
 } from './provider-health-registry.js';
 import { enforceSpendGuardForReasoning } from './spend-guard.js';
 import { metrics } from './metrics.js';
-import * as path from 'node:path';
 import { findMissionPath } from './path-resolver.js';
 import { z } from 'zod';
 import {
@@ -76,7 +75,6 @@ import {
   sleep,
   throwIfReasoningAborted,
 } from './reasoning-retry-policy.js';
-import { backendSupportsVision } from './reasoning-backend-contracts.js';
 import type {
   DivergeHypothesisInput,
   HypothesisSketch,
