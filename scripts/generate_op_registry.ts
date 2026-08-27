@@ -95,6 +95,7 @@ interface MediaManifestFile {
 
 interface DomainOpRegistry {
   capture?: string[];
+  control?: string[];
   transform?: string[];
   apply?: string[];
 }
@@ -149,6 +150,7 @@ function normalizeDomainRegistry(registry: DomainOpRegistry | undefined): Domain
     capture: uniqueSorted(registry?.capture ?? []),
     transform: uniqueSorted(registry?.transform ?? []),
     apply: uniqueSorted(registry?.apply ?? []),
+    ...(registry?.control?.length ? { control: uniqueSorted(registry.control) } : {}),
   };
 }
 
@@ -243,6 +245,7 @@ function buildOpDiscoveryReport(
         ...(domainOps.capture || []).map((op) => annotateOp(domainName, op, 'capture')),
         ...(domainOps.transform || []).map((op) => annotateOp(domainName, op, 'transform')),
         ...(domainOps.apply || []).map((op) => annotateOp(domainName, op, 'apply')),
+        ...(domainOps.control || []).map((op) => annotateOp(domainName, op, 'control')),
       ],
     });
   }
@@ -268,6 +271,7 @@ function buildGeneratedRegistry(): ActuatorOpRegistryFile {
       capture: ops.filter((item) => item.kind === 'capture').map((item) => item.op),
       transform: ops.filter((item) => item.kind === 'transform').map((item) => item.op),
       apply: ops.filter((item) => item.kind === 'apply').map((item) => item.op),
+      control: ops.filter((item) => item.kind === 'control').map((item) => item.op),
     });
   }
 
