@@ -76,6 +76,22 @@ describe('check_first_win_smoke', () => {
         steps: [
           {
             id: 'lifecycle-dry-run',
+            op: 'core:run_first_win_lifecycle',
+            params: {},
+          },
+        ],
+      })
+    ).toEqual([]);
+  });
+
+  it('rejects a shell wrapper in place of the typed lifecycle smoke op', () => {
+    expect(
+      validateFirstWinLifecyclePipeline({
+        pipeline_id: 'first-win-lifecycle-weekly',
+        schedule: { enabled: true, cron: '0 9 * * 1', timezone: 'Asia/Tokyo' },
+        steps: [
+          {
+            id: 'lifecycle-dry-run',
             op: 'system:exec',
             params: {
               args: ['dist/scripts/first_win_lifecycle_smoke.js', '--dry-run', '--json'],
@@ -83,6 +99,6 @@ describe('check_first_win_smoke', () => {
           },
         ],
       })
-    ).toEqual([]);
+    ).toEqual(expect.arrayContaining([expect.stringContaining('lifecycle-dry-run must execute')]));
   });
 });

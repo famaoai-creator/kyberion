@@ -69,7 +69,7 @@ const RULES: SmokeRule[] = [
     required: [
       'first-win-lifecycle-weekly',
       'No state is applied',
-      'first_win_lifecycle_smoke.js',
+      'core:run_first_win_lifecycle',
       'lifecycle-dry-run',
     ],
   },
@@ -167,14 +167,11 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
     );
   }
   const dryRunStep = steps.find((step) => step.id === 'lifecycle-dry-run');
-  const params = jsonRecord(dryRunStep?.params);
-  const args = Array.isArray(params.args) ? params.args : [];
-  if (
-    dryRunStep?.op !== 'system:exec' ||
-    !args.includes('dist/scripts/first_win_lifecycle_smoke.js') ||
-    !args.includes('--dry-run') ||
-    !args.includes('--json')
-  ) {
+  // The weekly lifecycle smoke runs through the typed engine op
+  // `core:run_first_win_lifecycle`, which always executes the dry-run JSON
+  // smoke (see runInlineFirstWinLifecycle). A shell wrapper around
+  // dist/scripts/first_win_lifecycle_smoke.js is no longer accepted.
+  if (dryRunStep?.op !== 'core:run_first_win_lifecycle') {
     violations.push(
       'pipelines/first-win-lifecycle-weekly.json: lifecycle-dry-run must execute the explicit dry-run JSON smoke command'
     );
