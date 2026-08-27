@@ -4,8 +4,13 @@
  */
 
 import * as path from 'node:path';
-import { logger, ui, ptyEngine, safeExistsSync, safeMkdir, safeWriteFile } from './index.js';
+import { createLogger } from './logger.js';
+import { ptyEngine } from './pty-engine.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { stripAnsi } from './ansi-utils.js';
 import { pathResolver } from './path-resolver.js';
+
+const logger = createLogger('reflex-terminal');
 
 export interface ReflexTerminalOptions {
   shell?: string;
@@ -23,14 +28,9 @@ export class ReflexTerminal {
 
   constructor(options: ReflexTerminalOptions = {}) {
     this.feedbackPath = options.feedbackPath || pathResolver.shared('last_response.json');
-    
+
     // Delegate spawning to ptyEngine
-    this.sessionId = ptyEngine.spawn(
-      options.shell,
-      [],
-      options.cwd,
-      {}
-    );
+    this.sessionId = ptyEngine.spawn(options.shell, [], options.cwd, {});
 
     if (options.onOutput) {
       // Setup polling for the legacy onOutput callback
@@ -75,19 +75,19 @@ export class ReflexTerminal {
 
   public persistResponse(text: string, skillName = 'reflex-terminal') {
     try {
-      const cleanText = ui.stripAnsi(text).trim();
+      const cleanText = stripAnsi(text).trim();
       if (!cleanText) return;
 
       const envelope = {
         skill: skillName,
         status: 'success',
         data: { message: cleanText },
-        metadata: { timestamp: new Date().toISOString(), duration_ms: 0 }
+        metadata: { timestamp: new Date().toISOString(), duration_ms: 0 },
       };
       const dir = path.dirname(this.feedbackPath);
       if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
       safeWriteFile(this.feedbackPath, JSON.stringify(envelope, null, 2));
-      logger.success(`[RT] Response persisted to ${this.feedbackPath}`);
+      logger.info(`[RT] Response persisted to ${this.feedbackPath}`);
     } catch (err: any) {
       logger.error(`[RT] Failed to persist response: ${err.message}`);
     }

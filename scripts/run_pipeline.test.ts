@@ -15,6 +15,7 @@ import {
   resetDefaultLifecycleHookEngine,
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { runInlineProductivityScore } from './pipeline-domain-ops.js';
 
 const {
   normalizePipelineOp,
@@ -78,6 +79,21 @@ describe('findStepByIdRecursive', () => {
     const found = findStepByIdRecursive(steps, 'nested-shell');
     expect(found?.params).toMatchObject({ cmd: 'echo target' });
     expect(findStepByIdRecursive(steps, 'missing-id')).toBeUndefined();
+  });
+});
+
+describe('typed pipeline domain operations', () => {
+  it('computes productivity score from resolved shell metrics without eval', () => {
+    const result = runInlineProductivityScore(
+      { op: 'core:calculate_productivity_score', role: 'transform', produces: 'score' } as any,
+      {
+        ts_file_count: '{{ts_file_count}}',
+        test_file_count: '{{test_file_count}}',
+        fixme_count: '{{fixme_count}}',
+      },
+      { ts_file_count: '3126\n', test_file_count: '1033\n', fixme_count: '0\n' }
+    );
+    expect(result.score).toBe(33);
   });
 });
 
@@ -1219,6 +1235,38 @@ describe('Typed Flow role resolution', () => {
     ]);
     expect(result.status).toBe('succeeded');
     expect(result.context.shell_data).toBe('typed-flow');
+  });
+
+  it('runs nested pipelines through the injected library runner', async () => {
+    const nestedRunner = vi.fn(async () => ({
+      status: 'succeeded',
+      results: [{ op: 'system:log', status: 'success' }],
+      context: { nested_value: 'ready' },
+    }));
+
+    const result = await runValidatedSteps(
+      [
+        {
+          id: 'nested',
+          op: 'core:run_pipeline',
+          role: 'source',
+          produces: 'nested_result',
+          params: { input: 'pipelines/vital-check.json' },
+        },
+      ],
+      {},
+      { quiet: true, runPipelineFile: nestedRunner }
+    );
+
+    expect(nestedRunner).toHaveBeenCalledWith('pipelines/vital-check.json', {
+      context: {},
+      quiet: true,
+      hasHuman: undefined,
+    });
+    expect(result.context.nested_result).toMatchObject({
+      status: 'succeeded',
+      context: { nested_value: 'ready' },
+    });
   });
 
   it('treats role:transform step output as accessible via produces channel', async () => {

@@ -6,7 +6,7 @@
 pnpm meeting:preflight --mission <MISSION_ID> --json
 pnpm voice:route:list -- --json
 pnpm voice:route:probe -- --json
-pnpm doctor:meeting
+pnpm doctor -- --runtime meeting
 ```
 
 receiptで次を確認します。

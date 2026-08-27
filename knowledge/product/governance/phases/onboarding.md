@@ -53,7 +53,7 @@ tenant は `pnpm tenant create ... --apply` で登録する。正本は
 
 ```bash
 pnpm tenant show <tenant-slug> --json
-pnpm run check:tenant-registry
+pnpm check -- --only tenant-registry
 ```
 
 未登録、`suspended`、`archived`、または reserved scope 名の tenant は次へ進めない。

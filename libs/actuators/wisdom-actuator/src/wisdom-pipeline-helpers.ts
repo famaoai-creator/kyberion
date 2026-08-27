@@ -25,7 +25,7 @@ import type { ScopeContext, TierLevel } from '@agent/core';
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as yaml from 'js-yaml';
-import { dispatchDecisionOp } from './decision-ops.js';
+import { dispatchWisdomOperation } from './decision-ops.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 import { getWisdomOperationSpec } from './op-catalog.js';
 import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
@@ -266,7 +266,7 @@ export async function executePipeline(
     },
     {
       fallback: async (_kind, op, params, currentCtx) => {
-        const decision = await dispatchDecisionOp(op, params, currentCtx, {
+        const decision = await dispatchWisdomOperation(op, params, currentCtx, {
           compatibilityMode: options.compatibility_mode,
         });
         if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);

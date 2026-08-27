@@ -72,4 +72,8 @@ export const main = defineGenerator({
   },
 });
 
-if (isDirectScript(import.meta.url, 'generate_service_harness_registry.ts')) void main();
+if (
+  isDirectScript(import.meta.url, 'generate_service_harness_registry.ts') ||
+  isDirectScript(import.meta.url, 'generate_service_harness_registry.js')
+)
+  void main();

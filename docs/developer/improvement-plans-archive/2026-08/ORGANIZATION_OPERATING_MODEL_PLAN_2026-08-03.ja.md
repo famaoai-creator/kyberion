@@ -389,4 +389,4 @@ operation / actuator 側に置く。
   人間承認境界に残した。
 - 受入検証済み: 組織モデル focused test 10件、`typecheck`、`build:repo`、`@agent/core build`、
   `check:contract-schemas`、`check:catalogs`、tier / ESM / script integrity、CLI dry-run / apply。
-- 2026-08-08: [PM / OM 実装レビュー受領記録](./reviews/PM-OM-REVIEW-20260808.ja.md) により受入レビュー完了。blocking finding はなし。
+- 2026-08-08: [PM / OM 実装レビュー受領記録](../../improvement-plans-2026-08/reviews/PM-OM-REVIEW-20260808.ja.md) により受入レビュー完了。blocking finding はなし。

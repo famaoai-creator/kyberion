@@ -22,7 +22,7 @@
     },
     {
       "role": "transform",
-      "op": "system:shell",
+      "op": "core:run_mission_start_from_issues",
       "consumes": "raw_issues",
       "produces": { "channel": "parsed_issues", "type": "ParsedIssues" },
       "params": {
@@ -40,9 +40,7 @@
       "op": "system:shell",
       "consumes": "parsed_issues",
       "produces": { "channel": "ingest_summary", "type": "IngestSummary" },
-      "params": {
-        "cmd": "for row in $(echo '{{parsed_issues}}' | jq -r '.[] | @base64'); do _jq() { echo ${row} | base64 --decode | jq -r ${1}; }; title=$(_jq '.title'); echo \"Starting mission: ${title}\"; node dist/scripts/mission_controller.js start \"${title}\" personal; done"
-      }
+      "params": { "issues": "{{parsed_issues}}" }
     },
     {
       "role": "sink",

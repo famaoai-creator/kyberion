@@ -42,15 +42,15 @@ describe('manifest-driven check runner', () => {
     ).toThrow('unknown package script');
   });
 
-  it('fails closed for unknown and empty scopes', () => {
-    expect(main(['--scope', 'typo', '--json'])).toBe(1);
-    expect(selectGates(loadGateManifest(), 'release')).toHaveLength(1);
+  it('fails closed for unknown and empty scopes', async () => {
+    await expect(main(['--scope', 'typo', '--json'])).resolves.toBe(1);
+    expect(selectGates(loadGateManifest(), 'release').length).toBeGreaterThan(1);
   });
 
-  it('fails closed for unknown options and missing option values', () => {
-    expect(main(['--unknown'])).toBe(1);
-    expect(main(['--', '--scope', 'pr', '--only', 'missing'])).toBe(1);
-    expect(main(['--scope'])).toBe(1);
-    expect(main(['--only'])).toBe(1);
+  it('fails closed for unknown options and missing option values', async () => {
+    await expect(main(['--unknown'])).resolves.toBe(1);
+    await expect(main(['--', '--scope', 'pr', '--only', 'missing'])).resolves.toBe(1);
+    await expect(main(['--scope'])).resolves.toBe(1);
+    await expect(main(['--only'])).resolves.toBe(1);
   });
 });

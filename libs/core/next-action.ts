@@ -1,4 +1,5 @@
 import type { ErrorClassification } from './error-classifier.js';
+import type { VocabularyKey } from './t.js';
 
 export type NextActionType =
   | 'run_command'
@@ -11,6 +12,7 @@ export type NextActionType =
 
 export interface NextAction {
   title: string;
+  next_action_key?: VocabularyKey;
   reason: string;
   next_action_type: NextActionType;
   suggested_command?: string;
@@ -20,6 +22,7 @@ export interface NextAction {
 
 export interface BuildNextActionInput {
   title: string;
+  next_action_key?: VocabularyKey;
   reason: string;
   next_action_type: NextActionType;
   suggested_command?: string;
@@ -68,6 +71,7 @@ export interface CompletionNextAction {
 export function buildNextAction(input: BuildNextActionInput): NextAction {
   return {
     title: input.title,
+    ...(input.next_action_key ? { next_action_key: input.next_action_key } : {}),
     reason: input.reason,
     next_action_type: input.next_action_type,
     ...(input.suggested_command ? { suggested_command: input.suggested_command } : {}),

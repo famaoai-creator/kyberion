@@ -12,6 +12,7 @@ describe('script harness', () => {
       check: true,
       quiet: false,
       positional: ['catalog.json'],
+      unknownFlags: [],
     });
   });
 
@@ -22,6 +23,7 @@ describe('script harness', () => {
       check: true,
       quiet: false,
       positional: ['--json'],
+      unknownFlags: ['--json'],
     });
   });
 

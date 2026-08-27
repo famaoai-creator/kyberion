@@ -71,6 +71,7 @@ import {
   type ActuatorForwardingPort,
   withReasoningPayloadScope,
   runToolCallBatch,
+  defineLegacyPipelineActuator,
   resolveOpAccessClaims,
   type ResourceClaim,
   type OpInputDomain,
@@ -118,28 +119,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
-
-import {
-  resolveEngineStepType,
-  prepareEngineSteps,
-  parseFragmentJson,
-  isSkip,
-  dispatchReasoningLeaf,
-  buildPipelinePromptVisibilityContext,
-  dispatchProgrammaticToolCall,
-  hasBoundApproval,
-  dispatchLeafOp,
-  findStepByIdRecursive,
-} from './pipeline-execution-part-control.js';
-import { runWithRepair, runSteps, runStepsInternal } from './pipeline-execution-part-execution.js';
-import {
-  TypedFlowValidationError,
-  runValidatedSteps,
-  executePipelineFile,
-  main,
-  isDirectRun,
-} from './pipeline-execution-part-results.js';
-import type { ExecutePipelineFileOptions } from './pipeline-execution-part-results.js';
+import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 
 export function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
@@ -609,6 +589,19 @@ export interface RunStepsOptions {
   runId?: string;
   /** Prevent an invalid flow from re-entering the repair gate indefinitely. */
   _adfRepairAttempted?: boolean;
+  /** Execute a nested validated pipeline without spawning run_pipeline. */
+  runPipelineFile?: (
+    inputPath: string,
+    options?: {
+      context?: Record<string, unknown>;
+      quiet?: boolean;
+      hasHuman?: boolean;
+    }
+  ) => Promise<{
+    status?: string;
+    results: unknown[];
+    context: Record<string, unknown>;
+  }>;
 }
 
 export function resolvePipelineHumanPresence(): boolean | undefined {
@@ -641,12 +634,7 @@ export function resolveParamsRecursive(params: any, ctx: any): any {
 }
 
 // Marks a genuine step failure inside an actuator's internal multi-step
-// engine (handleAction returned status:'failed' rather than throwing). Kept
-// distinct from a plain Error so the catch block below can always rethrow it
-// immediately — the underlying failure message can legitimately contain
-// words like "unsupported" or "not a function", which would otherwise be
-// misread as the actuator not supporting the 'pipeline' action and trigger
-// an unwanted second dispatch attempt via the legacy direct-action fallback.
+// engine (handleAction returned status:'failed' rather than throwing).
 export class ActuatorStepFailedError extends Error {}
 
 export async function loadActuatorDispatch(
@@ -802,99 +790,49 @@ export async function loadActuatorDispatch(
       }
       const mod = moduleCache[domain];
 
-      if (mod.actuator && typeof mod.actuator.dispatch === 'function') {
-        const sdkResult = await mod.actuator.dispatch(op, params, ctx);
-        if (!sdkResult.ok) {
-          throw new Error(sdkResult.error || `Actuator operation failed: ${domain}:${op}`);
-        }
-        const output = sdkResult.output;
-        result = {
-          handled: true,
-          ctx:
-            output && typeof output === 'object' && !Array.isArray(output)
-              ? (output as Record<string, unknown>)
-              : { ...ctx, last_actuator_result: output },
-        };
-      } else if (typeof mod.dispatchDecisionOp === 'function') {
-        result = await mod.dispatchDecisionOp(op, params, ctx);
-      }
+      const actuator =
+        mod.actuator && typeof mod.actuator.dispatch === 'function'
+          ? mod.actuator
+          : typeof mod.handleAction === 'function'
+            ? defineLegacyPipelineActuator({ id: domain, handleAction: mod.handleAction })
+            : undefined;
+      if (!actuator) throw new Error(`Actuator ${domain} does not expose the SDK ABI`);
 
-      if (!result.handled && typeof mod.handleAction === 'function') {
+      // Prefer a declared operation. Older actuators expose the contained
+      // compatibility adapter's `execute` operation instead.
+      const operation = Object.prototype.hasOwnProperty.call(actuator.ops, op) ? op : 'execute';
+      let legacyType = type;
+      if (!legacyType) {
         try {
-          // Resolve the sub-step kind from the op registry instead of a blind
-          // 'apply' default — a transform op routed into the apply switch
-          // throws UNKNOWN_OP inside the actuator (found by loop simulation).
-          let resolvedType = type;
-          if (!resolvedType) {
-            try {
-              resolvedType = determineActuatorStepType(domain, op);
-            } catch {
-              resolvedType = 'apply';
-            }
-          }
-          const actionResult = await mod.handleAction({
-            action: 'pipeline',
-            steps: [{ type: resolvedType, op, params }],
-            context: ctx,
-            options: ctx.__pipeline_options,
-            ...(trace ? { pipelineTrace: trace } : {}),
-          });
-          // A sub-pipeline that reports failed steps must fail this step —
-          // "did not throw" is not success (MO-07 §14 / AR-06). Use a marker
-          // Error subclass, not a plain Error: the underlying failure message
-          // can legitimately contain words like "unsupported" or "not a
-          // function" (e.g. "color.replace is not a function"), which the
-          // catch block below would otherwise misread as a signal that the
-          // actuator doesn't support the 'pipeline' action and retry via the
-          // legacy direct-action fallback instead of propagating the failure.
-          if (
-            actionResult &&
-            typeof actionResult === 'object' &&
-            (actionResult as any).status === 'failed'
-          ) {
-            const failedEntry = Array.isArray((actionResult as any).results)
-              ? (actionResult as any).results.find((entry: any) => entry.status === 'failed')
-              : undefined;
-            throw new ActuatorStepFailedError(
-              failedEntry?.error || `Actuator sub-pipeline reported failure for ${domain}:${op}`
-            );
-          }
-          result = {
-            handled: true,
-            ctx:
-              actionResult && typeof actionResult === 'object'
-                ? { ...ctx, ...(actionResult as Record<string, unknown>) }
-                : { ...ctx, [params.export_as || 'last_action_result']: actionResult },
-          };
-        } catch (err: any) {
-          // If the error is an actual execution failure (like SECURITY, File not found, etc.),
-          // throw it immediately to trigger autonomous repair.
-          // Only fallback to legacy direct action if the actuator doesn't support 'pipeline' action.
-          if (
-            err instanceof ActuatorStepFailedError ||
-            (!err.message.toLowerCase().includes('unsupported') &&
-              !err.message.toLowerCase().includes('not a function'))
-          ) {
-            throw err;
-          }
-          try {
-            const resolvedParams = resolveParamsRecursive(params, ctx);
-            const directResult = await mod.handleAction({
-              action: op,
-              params: { ...resolvedParams, context: ctx },
-            });
-            result = {
-              handled: true,
-              ctx: { ...ctx, [params.export_as || 'last_action_result']: directResult },
-            };
-          } catch (err2: any) {
-            logger.info(
-              `  [SYS_PIPELINE] Actuator fallback failed for domain: ${domain}, op: ${op}. Error: ${err2.message}`
-            );
-            throw err; // Critical: Re-throw to trigger autonomous repair
-          }
+          legacyType = determineActuatorStepType(domain, op);
+        } catch {
+          legacyType = 'apply';
         }
       }
+      const input =
+        operation === op
+          ? params
+          : {
+              op,
+              type: legacyType,
+              params,
+              options: ctx.__pipeline_options,
+              ...(trace ? { pipelineTrace: trace } : {}),
+            };
+      const sdkResult = await actuator.dispatch(operation, input, ctx);
+      if (!sdkResult.ok) {
+        throw new ActuatorStepFailedError(
+          sdkResult.error || `Actuator operation failed: ${domain}:${op}`
+        );
+      }
+      const output = sdkResult.output;
+      result = {
+        handled: true,
+        ctx:
+          output && typeof output === 'object' && !Array.isArray(output)
+            ? { ...ctx, ...(output as Record<string, unknown>) }
+            : { ...ctx, [params.export_as || 'last_actuator_result']: output },
+      };
     } catch (err) {
       throw err; // Ensure error propagates out of dispatch
     }

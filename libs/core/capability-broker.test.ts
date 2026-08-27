@@ -46,6 +46,22 @@ vi.mock('./secure-io.js', () => ({
   safeAppendFileSync: () => undefined,
 }));
 
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(p: string): T => JSON.parse(files.get(p) || '{}') as T,
+    loadJsonIfPresent: <T>(p: string): T | null => {
+      const value = files.get(p);
+      return value === undefined ? null : (JSON.parse(value) as T);
+    },
+    appendFile: () => undefined,
+    exists: (p: string) => files.has(p),
+    readFile: (p: string) => files.get(p) || '',
+    stat: () => ({ mtimeMs: 1, size: 1 }),
+    writeFile: (p: string, data: string) => files.set(p, data),
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
 function provider(
   providerId: string,
   models: string[],

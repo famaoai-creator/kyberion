@@ -1,4 +1,5 @@
-import { loadJson, pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
+import { pathResolver, resolveVocabularyEntry, safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const UX_CONTRACT_DOCS = [
@@ -40,7 +41,7 @@ export function checkUxContractDocs(): string[] {
       if (!term.test(door)) failures.push(`${relativePath}: missing plain-language term ${term}`);
     }
   }
-  const roles = loadJson<{ roles?: SurfaceRole[] }>(
+  const roles = readJson<{ roles?: SurfaceRole[] }>(
     pathResolver.knowledge('product/governance/surface-roles.json')
   );
   for (const role of roles.roles || []) {

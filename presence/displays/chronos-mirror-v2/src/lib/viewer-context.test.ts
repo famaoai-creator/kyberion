@@ -7,12 +7,20 @@ describe('viewer-context', () => {
     vi.unstubAllEnvs();
   });
 
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.doUnmock('@agent/core');
+  });
 
   it('resolves loopback compatibility access to all tenants', async () => {
     vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    vi.stubEnv('KYBERION_TRUST_PROXY', 'true');
     const { resolveViewerContext } = await import('./viewer-context.js');
-    const context = resolveViewerContext(new NextRequest('http://localhost/api/workitems'));
+    const context = resolveViewerContext(
+      new NextRequest('http://localhost/api/workitems', {
+        headers: { 'x-forwarded-for': '127.0.0.1' },
+      })
+    );
     expect(context).toMatchObject({ role: 'localadmin', tenantSlugs: 'all', source: 'loopback' });
   });
 
@@ -28,8 +36,54 @@ describe('viewer-context', () => {
     expect(response?.status).toBe(401);
   });
 
+  it('binds an unregistered API token to the server tenant', async () => {
+    vi.doMock('@agent/core', async () => ({
+      ...(await vi.importActual<typeof import('@agent/core')>('@agent/core')),
+      readChronosTokenRegistrations: () => [],
+    }));
+    vi.stubEnv('KYBERION_API_TOKEN', 'known-token');
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    const { resolveViewerContext } = await import('./viewer-context.js');
+    const context = resolveViewerContext(
+      new NextRequest('https://chronos.example/api/workitems', {
+        headers: { authorization: 'Bearer known-token', 'x-forwarded-for': '203.0.113.10' },
+      })
+    );
+    expect(context).toMatchObject({
+      role: 'readonly',
+      tenantSlugs: ['tenant-a'],
+      source: 'token',
+    });
+  });
+
+  it('rejects a remote unregistered token without a server tenant', async () => {
+    vi.doMock('@agent/core', async () => ({
+      ...(await vi.importActual<typeof import('@agent/core')>('@agent/core')),
+      readChronosTokenRegistrations: () => [],
+    }));
+    vi.stubEnv('KYBERION_API_TOKEN', 'known-token');
+    const { resolveViewerContextForRequest } = await import('./viewer-context.js');
+    const response = resolveViewerContextForRequest(
+      new NextRequest('https://chronos.example/api/workitems', {
+        headers: { authorization: 'Bearer known-token', 'x-forwarded-for': '203.0.113.10' },
+      })
+    ).response;
+    expect(response?.status).toBe(403);
+  });
+
   it('enforces tenant selection when rollout mode is enforce', async () => {
     vi.stubEnv('KYBERION_VIEWER_SCOPE', 'enforce');
+    const { viewerScopeTenantSlugs } = await import('./viewer-context.js');
+    expect(() =>
+      viewerScopeTenantSlugs(
+        { role: 'readonly', tenantSlugs: ['tenant-a'], source: 'token' },
+        'tenant-b'
+      )
+    ).toThrow(/tenant-b/);
+  });
+
+  it('keeps warn mode audit-only and never grants an unregistered tenant', async () => {
+    vi.stubEnv('KYBERION_VIEWER_SCOPE', 'warn');
     const { viewerScopeTenantSlugs } = await import('./viewer-context.js');
     expect(() =>
       viewerScopeTenantSlugs(

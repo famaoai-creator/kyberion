@@ -12,7 +12,7 @@ import {
   updateManagedProject,
 } from '@agent/core';
 import type { ProjectTrackRecord } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';
 type ProjectStatus = 'draft' | 'active' | 'paused' | 'archived';
@@ -117,7 +117,7 @@ function parseTrackStatus(value: string | undefined): ProjectTrackRecord['status
   throw new Error(`Invalid track status: ${value || '(missing)'}`);
 }
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(args: string[] = []): Promise<void> {
   const [command, ...argv] = args;
   const positional = argv[0] && !argv[0].startsWith('--') ? argv[0] : undefined;
   const json = hasFlag(argv, '--json');
@@ -326,8 +326,12 @@ async function main(args: string[] = []): Promise<void> {
   }
 }
 
-void defineScript({
-  name: 'project',
-  flags: [],
-  run: ({ argv }) => main(argv),
-})();
+if (
+  isDirectScript(import.meta.url, 'project_controller.ts') ||
+  isDirectScript(import.meta.url, 'project_controller.js')
+)
+  void defineScript({
+    name: 'project',
+    flags: [],
+    run: ({ argv }) => main(argv),
+  })();

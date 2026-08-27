@@ -3,6 +3,7 @@
   "type": "object",
   "required": ["version", "gates"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "const": 1 },
     "gates": {
       "type": "array",
@@ -16,6 +17,7 @@
           "args": { "type": "array", "items": { "type": "string" } },
           "script": { "type": "string", "minLength": 1 },
           "timeout_ms": { "type": "integer", "minimum": 1 },
+          "baseline": { "type": "string", "minLength": 1 },
           "owner": { "type": "string", "minLength": 1 },
           "rationale": { "type": "string", "minLength": 1 }
         },
@@ -23,6 +25,19 @@
           { "required": ["script"], "not": { "required": ["executable"] } },
           { "required": ["executable", "args"], "not": { "required": ["script"] } }
         ],
+        "additionalProperties": false
+      }
+    },
+    "workflow_exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["workflow", "script", "reason"],
+        "properties": {
+          "workflow": { "type": "string", "minLength": 1 },
+          "script": { "type": "string", "pattern": "^check:[A-Za-z0-9_-]+$" },
+          "reason": { "type": "string", "minLength": 1 }
+        },
         "additionalProperties": false
       }
     }

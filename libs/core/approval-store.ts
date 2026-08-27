@@ -1015,7 +1015,9 @@ function scheduleSteeringApprovalExecution(
   const task = (async () => {
     let applyResult: ApprovalApplyResult;
     try {
+      // Existing approval/steering cycle is tracked by the module-boundary baseline.
       const { executeApprovedMissionSteeringApproval } =
+        // eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
         await import('./surface-mission-steering.js');
       const outcome = await executeApprovedMissionSteeringApproval(record);
       applyResult = {

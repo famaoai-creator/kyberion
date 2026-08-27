@@ -13,11 +13,8 @@
     {
       "id": "check-ui-ux-governance",
       "role": "sink",
-      "op": "system:exec",
-      "params": {
-        "command": "node",
-        "args": ["dist/scripts/check_ui_ux_governance.js", "--json"]
-      }
+      "op": "core:run_ui_ux_governance",
+      "params": {}
     }
   ]
 }

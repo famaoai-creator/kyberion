@@ -24,7 +24,7 @@ To propagate the design tokens to the different interfaces, run the following ge
 
 ```bash
 node --import ./scripts/ts-loader.mjs scripts/generate_design_tokens.ts
-pnpm check:ui-ux
+pnpm check -- --only ui-ux
 ```
 
 This script automatically generates and updates the following files:
@@ -36,8 +36,8 @@ This script automatically generates and updates the following files:
 5. `presence/displays/chronos-mirror-v2/tailwind.config.cjs`
 6. `knowledge/public/design-patterns/media-templates/themes.json`
 
-The generated Kyberion token block and theme entries are checked by `pnpm run check:catalogs` so committed files cannot drift from the canonical brand-token JSON.
-`pnpm check:ui-ux` additionally rejects raw colors in operator-surface source, missing semantic tokens, and dashboard status-vocabulary bypasses. The same check runs in `pnpm validate`, GitHub Actions, and the scheduled `pipelines/ui-ux-governance-audit.json` pipeline.
+The generated Kyberion token block and theme entries are checked by `pnpm check -- --scope full --only catalogs` so committed files cannot drift from the canonical brand-token JSON.
+`pnpm check -- --only ui-ux` additionally rejects raw colors in operator-surface source, missing semantic tokens, and dashboard status-vocabulary bypasses. The same check runs in `pnpm validate`, GitHub Actions, and the scheduled `pipelines/ui-ux-governance-audit.json` pipeline.
 
 ## 3. Surface Application Patterns
 

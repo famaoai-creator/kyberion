@@ -9,11 +9,11 @@ import {
   safeWriteFile,
   safeReaddir,
 } from './secure-io.js';
-import {
-  loadMissionOrchestrationEvent,
-  type MissionOrchestrationEvent,
-  type MissionOrchestrationEventType,
-} from './mission-orchestration-events.js';
+import { loadMissionOrchestrationEvent } from './mission-orchestration-event-loader.js';
+import type {
+  MissionOrchestrationEvent,
+  MissionOrchestrationEventType,
+} from './mission-orchestration-event-contract.js';
 import { eventScopeMatches, type EventScope } from './event-scope.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 

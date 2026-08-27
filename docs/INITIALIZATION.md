@@ -49,6 +49,8 @@ winget install --id Microsoft.FoundryLocal --exact --source winget --accept-sour
 導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
 
 ```powershell
+pnpm install
+pnpm build
 pnpm prereq:check
 pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ```
@@ -57,7 +59,10 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
 
-# 2. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
+# 2. システムの具現化 (ビルド。dist/を使う後続コマンドの前提)
+pnpm build
+
+# 3. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
 pnpm prereq:check
 
 # 2b. (推奨) ブラウザ first-win 用の Playwright ブラウザ導入
@@ -70,9 +75,6 @@ pnpm exec playwright install chromium
 pnpm deps:check --actuator browser
 pnpm deps:check --actuator voice
 pnpm deps:check --actuator media-generation
-
-# 3. システムの具現化 (ビルド)
-pnpm build
 
 # 4. バックグラウンド surface の認証準備を確認
 pnpm surfaces:setup
@@ -143,17 +145,7 @@ pnpm tenant:activation activate \
   - `node_modules/` が生成されます。
   - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
 
-### Stage 2: 事前ツール確認 (Prerequisite Toolchain Check)
-
-- **実行コマンド**: `pnpm prereq:check`
-- **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
-- **チェック内容の補足**:
-  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
-  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。
-- **物理的変化**:
-  - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
-
-### Stage 3: システムの具現化 (System Manifestation)
+### Stage 2: システムの具現化 (System Manifestation)
 
 - **実行コマンド**: `pnpm build`
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
@@ -163,6 +155,16 @@ pnpm tenant:activation activate \
   - workspace 間の runtime contract が再構築されます。
 - **ステップ構成**: `build:packages` → `build:actuators` → `build:repo` → `build:ui`。
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
+
+### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
+
+- **実行コマンド**: `pnpm prereq:check`
+- **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
+- **チェック内容の補足**:
+  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
+  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。
+- **物理的変化**:
+  - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
 
 ### Python Runtime Resolution
 
@@ -222,11 +224,11 @@ pnpm tenant:activation activate \
 ### Media Runtime Preflight
 
 - **実行コマンド**: `pnpm service:preflight -- --service media-generation`
-- **補助コマンド**: `pnpm media:preflight`
+- **補助コマンド**: `pnpm service:preflight -- --service media-generation`
 - **目的**: `media-generation` 系の実装や MV パイプラインを開始する前に、ローカルの ComfyUI サービス runtime が試行可能かを確認します。
 - **使いどころ**:
   - `pnpm service:preflight -- --service media-generation` が通るなら、`media-generation` の runtime 側前提は少なくとも到達可能です。
-  - `pnpm media:preflight` は同じ runtime の簡易確認として使えます。
+  - `pnpm service:preflight -- --service media-generation` が auth と runtime の両方を確認する canonical 入口です。
   - 失敗した場合は `pnpm services:setup` とあわせて、ComfyUI の起動・プロビジョニング・接続先の確認を進めます。
 
 ### Stage 8: Runtime Surface Reconciliation

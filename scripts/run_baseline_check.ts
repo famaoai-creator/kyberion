@@ -1112,12 +1112,25 @@ export const runBaselineCheckCli = defineScript({
   name: 'baseline-check',
   flags: [],
   async run(context) {
-    const report = await runBaselineCheck();
-    context.print(report);
-    if (report.status === 'needs_recovery' && report.circuit_broken) {
-      throw new Error('baseline check requires recovery');
+    try {
+      const report = await runBaselineCheck();
+      context.print(report);
+      if (report.status === 'needs_recovery' && report.circuit_broken) {
+        process.exitCode = 1;
+      }
+      return report;
+    } catch (error) {
+      const fatalReport = {
+        status: 'fatal_error' as const,
+        circuit_broken: true,
+        failed_layer: null,
+        details: {},
+        error: error instanceof Error ? error.message : String(error),
+      };
+      context.print(fatalReport);
+      process.exitCode = 1;
+      return fatalReport;
     }
-    return report;
   },
 });
 

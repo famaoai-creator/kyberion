@@ -166,4 +166,8 @@ export const main = defineGenerator({
   },
 });
 
-if (isDirectScript(import.meta.url, 'generate_vocabulary_types.ts')) void main();
+if (
+  isDirectScript(import.meta.url, 'generate_vocabulary_types.ts') ||
+  isDirectScript(import.meta.url, 'generate_vocabulary_types.js')
+)
+  void main();

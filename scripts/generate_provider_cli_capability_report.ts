@@ -6,7 +6,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import type { CapabilityRegistryEntry } from '@agent/core';
 import { defineScript } from './lib/harness.js';
@@ -33,7 +33,7 @@ type AdapterRegistry = {
 };
 
 function readJson<T>(relativePath: string): T {
-  return readJsonFile(pathResolver.rootResolve(relativePath));
+  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
 }
 
 function parseArg(args: string[], name: string, fallback?: string): string {

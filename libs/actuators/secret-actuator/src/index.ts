@@ -1,8 +1,21 @@
-import { logger, safeReadFile, createStandardYargs, pathResolver } from '@agent/core';
+import {
+  logger,
+  safeReadFile,
+  createStandardYargs,
+  pathResolver,
+  defineCatalogBackedActuator,
+} from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './secret-actuator-helpers.js';
+import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core';
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'secret-actuator',
+  describeOps,
+  handleAction,
+});
 
 const main = async () => {
   await runActuatorCli({
@@ -17,7 +30,7 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

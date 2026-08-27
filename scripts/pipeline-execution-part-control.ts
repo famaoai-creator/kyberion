@@ -118,9 +118,42 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
+import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 import {
   runInlineProductivityDryRunValidation,
+  runInlineProductivityScore,
+  runInlineVoiceConsentGrant,
   runInlineProposalBriefParse,
+  runInlineVitest,
+  runInlineOnboardingApply,
+  runInlineCampaignSuite,
+  runInlineAiAudit,
+  runInlineFirstWinLifecycle,
+  runInlineDependencyVulnerabilityScan,
+  runInlineHealthDegradationWatch,
+  runInlineUiUxGovernanceAudit,
+  runInlineTenantDriftWatch,
+  runInlineAutoCheckpoint,
+  runInlineBackupCreate,
+  runInlineBackupRestoreDrill,
+  runInlineSoftwareQualityReport,
+  runInlineSoakEndurance,
+  runInlineSoakRestartE2E,
+  runInlineMarketingVideoDryRun,
+  runInlineComplianceScan,
+  runInlineMeshDelivery,
+  runInlinePromoteProcedure,
+  runInlineI18nHardcoding,
+  runInlineCatalogIntegrity,
+  runInlineTranslationCoverage,
+  runInlineDocExamplesCheck,
+  runInlineRegistryManager,
+  runInlineMissionCreate,
+  runInlineMissionStartFromIssues,
+  runInlineCaptureAvatarPhoto,
+  runInlineGenerateAvatar,
+  runInlineRegisterAvatar,
+  runInlineOAuthSetup,
 } from './pipeline-domain-ops.js';
 
 import {
@@ -175,16 +208,6 @@ import type {
   DispatchFunc,
   RunStepsOptions,
 } from './pipeline-execution-part-bootstrap.js';
-import { runWithRepair, runSteps, runStepsInternal } from './pipeline-execution-part-execution.js';
-import {
-  TypedFlowValidationError,
-  runValidatedSteps,
-  executePipelineFile,
-  main,
-  isDirectRun,
-} from './pipeline-execution-part-results.js';
-import type { ExecutePipelineFileOptions } from './pipeline-execution-part-results.js';
-
 export function resolveEngineStepType(step: PipelineAdfStep): 'apply' | 'control' {
   const normalizedOp = normalizePipelineOp(step.op);
   const [domain, action] = normalizedOp.split(':');
@@ -329,29 +352,6 @@ export async function dispatchReasoningLeaf(
   return { ...ctx, [reasoningExportKey]: rawResponse };
 }
 
-/** DH-06: bind pipeline model visibility to the mission-local durable ledger. */
-export function buildPipelinePromptVisibilityContext(
-  ctx: Record<string, unknown>
-): ReasoningPromptVisibilityContext | undefined {
-  const missionId = String(ctx.mission_id || process.env.MISSION_ID || '').trim();
-  if (!missionId) return undefined;
-  const missionPath = findMissionPath(missionId);
-  if (!missionPath) return undefined;
-  const rawKnowledgeRefs = ctx.__knowledge_refs;
-  const knowledgeRefs = Array.isArray(rawKnowledgeRefs)
-    ? rawKnowledgeRefs.filter((value): value is string => typeof value === 'string')
-    : [];
-  return {
-    missionPath,
-    missionId,
-    ...(typeof ctx.task_id === 'string' ? { taskId: ctx.task_id } : {}),
-    ...(typeof ctx.context_pack_id === 'string' ? { contextPackId: ctx.context_pack_id } : {}),
-    knowledgeRefs,
-    source: 'run_pipeline',
-    form: 'pipeline_reasoning',
-  };
-}
-
 /**
  * HA-04: route each child-script tool call back through the normal typed-op
  * dispatch. The child receives only the returned value; its intermediate
@@ -489,9 +489,41 @@ export async function dispatchLeafOp(
     );
   }
   params = preflight.input;
+  // Pipeline params may contain typed whole-value templates (for example
+  // `{{items}}` or `{{dry_run}}`). Resolve them before applying the op
+  // contract so the validator sees the value the actuator will receive.
+  params = resolveParamsRecursive(params, ctx) as Record<string, unknown>;
 
   if (domain === 'core' && (action === 'ptc' || action === 'programmatic_tool_call')) {
     return dispatchProgrammaticToolCall(params, ctx, rootDir, shellBin, opts, stepPolicy);
+  }
+
+  if (domain === 'core' && action === 'run_pipeline') {
+    if (!opts.runPipelineFile) {
+      throw new Error(
+        'core:run_pipeline requires the library pipeline runner; direct nested process spawning is not allowed'
+      );
+    }
+    const inputPath = String(params.input ?? params.pipeline ?? params.path ?? '').trim();
+    if (!inputPath) throw new Error('core:run_pipeline requires an input path');
+    const nestedContext =
+      params.context && typeof params.context === 'object' && !Array.isArray(params.context)
+        ? { ...ctx, ...(params.context as Record<string, unknown>) }
+        : ctx;
+    const nested = await opts.runPipelineFile(inputPath, {
+      context: nestedContext,
+      quiet: opts.quiet,
+      hasHuman: opts.hasHuman,
+    });
+    const exportKey = String(params.export_as || 'pipeline_result');
+    return {
+      ...ctx,
+      [exportKey]: {
+        status: nested.status || 'succeeded',
+        results: nested.results,
+        context: nested.context,
+      },
+    };
   }
 
   if (domain === 'system' && action === 'log') {
@@ -515,6 +547,79 @@ export async function dispatchLeafOp(
   if (domain === 'core' && action === 'validate_productivity_dry_run') {
     return runInlineProductivityDryRunValidation(step, params, ctx);
   }
+  if (domain === 'core' && action === 'calculate_productivity_score') {
+    return runInlineProductivityScore(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'grant_voice_consent') {
+    return runInlineVoiceConsentGrant(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_vitest') {
+    return runInlineVitest(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'apply_onboarding') {
+    return runInlineOnboardingApply(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_campaign_suite') {
+    return runInlineCampaignSuite(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_ai_audit') return runInlineAiAudit(step, params, ctx);
+  if (domain === 'core' && action === 'run_first_win_lifecycle') {
+    return runInlineFirstWinLifecycle(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_dependency_vulnerability_scan') {
+    return runInlineDependencyVulnerabilityScan(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_health_degradation_watch') {
+    return runInlineHealthDegradationWatch(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_ui_ux_governance') {
+    return runInlineUiUxGovernanceAudit(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_tenant_drift_watch') {
+    return runInlineTenantDriftWatch(step, params, ctx);
+  }
+  if (domain === 'core' && action === 'run_auto_checkpoint')
+    return runInlineAutoCheckpoint(step, params, ctx);
+  if (domain === 'core' && action === 'run_backup_create')
+    return runInlineBackupCreate(step, params, ctx);
+  if (domain === 'core' && action === 'run_backup_restore_drill')
+    return runInlineBackupRestoreDrill(step, params, ctx);
+  if (domain === 'core' && action === 'run_software_quality_report')
+    return runInlineSoftwareQualityReport(step, params, ctx);
+  if (domain === 'core' && action === 'run_soak_endurance')
+    return runInlineSoakEndurance(step, params, ctx);
+  if (domain === 'core' && action === 'run_soak_restart_e2e')
+    return runInlineSoakRestartE2E(step, params, ctx);
+  if (domain === 'core' && action === 'run_marketing_video_dry_run')
+    return runInlineMarketingVideoDryRun(step, params, ctx);
+  if (domain === 'core' && action === 'run_compliance_scan')
+    return runInlineComplianceScan(step, params, ctx);
+  if (domain === 'core' && action === 'run_mesh_delivery')
+    return runInlineMeshDelivery(step, params, ctx);
+  if (domain === 'core' && action === 'run_promote_procedure')
+    return runInlinePromoteProcedure(step, params, ctx);
+  if (domain === 'core' && action === 'run_i18n_hardcoding')
+    return runInlineI18nHardcoding(step, params, ctx);
+  if (domain === 'core' && action === 'run_catalog_integrity')
+    return runInlineCatalogIntegrity(step, params, ctx);
+  if (domain === 'core' && action === 'run_translation_coverage')
+    return runInlineTranslationCoverage(step, params, ctx);
+  if (domain === 'core' && action === 'run_doc_examples_check')
+    return runInlineDocExamplesCheck(step, params, ctx);
+  if (domain === 'core' && action === 'run_registry_manager')
+    return runInlineRegistryManager(step, params, ctx);
+  if (domain === 'core' && action === 'run_mission_create')
+    return runInlineMissionCreate(step, params, ctx);
+  if (domain === 'core' && action === 'run_mission_start_from_issues')
+    return runInlineMissionStartFromIssues(step, params, ctx);
+  if (domain === 'core' && action === 'capture_avatar_photo')
+    return runInlineCaptureAvatarPhoto(step, params, ctx);
+  if (domain === 'core' && action === 'generate_avatar')
+    return runInlineGenerateAvatar(step, params, ctx);
+  if (domain === 'core' && action === 'register_avatar')
+    return runInlineRegisterAvatar(step, params, ctx);
+  if (domain === 'core' && action === 'run_oauth_setup')
+    return runInlineOAuthSetup(step, params, ctx);
   if (domain === 'core' && action === 'transform') return runInlineCoreTransform(step, params, ctx);
   if (
     domain === 'reasoning' &&

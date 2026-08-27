@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import {
   evaluatePublicationVerification,
   escapeHtml,
-  loadJson,
   loadApprovalRequest,
   logger,
   loadMarketingRiskPolicy,
@@ -20,6 +19,7 @@ import {
   type ArtifactBinding,
   type PublicationApproval,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { isDirectScript } from './lib/harness.js';
 
@@ -52,7 +52,7 @@ export function runMarketingPublishDryRun(input: {
   preview: string;
   verification: string;
 } {
-  const approval = loadJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
+  const approval = readJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
   const sharedApprovalRequest =
     input.sharedApprovalRequest ||
     loadApprovalRequest(

@@ -19,13 +19,9 @@
     {
       "id": "lifecycle-dry-run",
       "role": "source",
-      "op": "system:exec",
-      "produces": { "channel": "lifecycle_report", "type": "CommandResult" },
-      "params": {
-        "command": "node",
-        "args": ["dist/scripts/first_win_lifecycle_smoke.js", "--dry-run", "--json"],
-        "timeout_ms": 120000
-      }
+      "op": "core:run_first_win_lifecycle",
+      "produces": { "channel": "lifecycle_report", "type": "Json" },
+      "params": {}
     },
     {
       "role": "sink",

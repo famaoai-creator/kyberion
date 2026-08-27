@@ -270,6 +270,15 @@ export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
 
 export { MissionEvidenceDoc } from './mission-evidence-doc.js';
 
+export {
+  grantVoiceConsent,
+  isVoiceConsentRecord,
+  readVoiceConsent,
+  revokeVoiceConsent,
+} from './voice-consent.js';
+
+export type { VoiceConsentRecord } from './voice-consent.js';
+
 export type { MissionEvidenceDocOptions } from './mission-evidence-doc.js';
 
 export {

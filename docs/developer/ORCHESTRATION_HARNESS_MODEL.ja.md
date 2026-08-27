@@ -2,7 +2,7 @@
 
 > **作成日**: 2026-07-03
 > **目的**: Claude Code / Fable 5 が実際に用いているマルチエージェント・オーケストレーションの考え方(タスク分解・依頼の書き方・順序・成果物評価・改善ループ・エージェント間通信・エージェントループ・ハーネス設計)を明文化し、Kyberion のミッション遂行基盤に取り込むための参照モデルとする。
-> **位置づけ**: 規約/思想の参照文書。個別の実装は [improvement-plans-2026-07](./improvement-plans-2026-07/README.ja.md) の各計画(特に MO/AA/HO/IL/HN 系)。本文書は「なぜそう進めるか」を与え、計画は「どう実装するか」を与える。
+> **位置づけ**: 規約/思想の参照文書。個別の実装は [improvement-plans-2026-07](./improvement-plans-archive/2026-07/README.ja.md) の各計画(特に MO/AA/HO/IL/HN 系)。本文書は「なぜそう進めるか」を与え、計画は「どう実装するか」を与える。
 > **前提の実測**: 本文書の「Kyberion の現状」は 2026-07-03 のソース調査に基づく(file:line は各計画に記載)。
 > **関係文書**: 本文書はマルチエージェントの**指揮法**。その前提となる**エージェント個体**の振る舞い原則(1 体がどう考え・話し・動くか)は [FABLE5_AGENT_MODEL](./FABLE5_AGENT_MODEL.ja.md)。両者は補完的。
 
@@ -186,4 +186,4 @@ Kyberion は**部品は揃っているが配線されていない**(品質機構
 4. **モデル/エフォート/予算の実効化**(HN-01/MO-05/OP-01)— 機械的=安価、判断=強力を dispatch で。
 5. **通信とハンドオフの自己完結化**(AA/HO/IL 系)— 相関貫通と聞き返し不要の引き継ぎ。
 
-→ 新規の原則ギャップは [HN-01](./improvement-plans-2026-07/HN-01_MODEL_TIER_LIGHTWEIGHT.ja.md) / [HN-02](./improvement-plans-2026-07/HN-02_SCHEMA_FORCED_DELEGATION.ja.md) / [HN-03](./improvement-plans-2026-07/HN-03_DETERMINISTIC_ORCHESTRATION.ja.md) に実装計画化した。
+→ 新規の原則ギャップは [HN-01](./improvement-plans-archive/2026-07/HN-01_MODEL_TIER_LIGHTWEIGHT.ja.md) / [HN-02](./improvement-plans-archive/2026-07/HN-02_SCHEMA_FORCED_DELEGATION.ja.md) / [HN-03](./improvement-plans-archive/2026-07/HN-03_DETERMINISTIC_ORCHESTRATION.ja.md) に実装計画化した。

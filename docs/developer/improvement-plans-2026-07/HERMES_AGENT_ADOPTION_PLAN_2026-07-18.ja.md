@@ -3,7 +3,9 @@ title: Hermes Agent 概念取り込み計画(HA-01〜09)
 kind: improvement-plan
 scope: core / knowledge / scheduler / execution-environment
 authority: planning
-status: proposed
+status: active
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
 ---
 
 # Hermes Agent 概念取り込み計画(HA-01〜09): 自律学習ループ・履歴全文検索・実行環境抽象・チャネル層硬化
@@ -145,7 +147,7 @@ Hermes の gateway は最大サブシステム(`gateway/platforms/` 35k LOC + pl
 
 **内容**: モデルが書いたスクリプトから typed op を関数として呼び、**stdout のみを文脈へ返す**実行 op を追加する(Hermes `code_execution_tool.py` 方式)。多段 op 合成の中間結果が文脈を消費しない「ゼロ文脈コスト turn」を実現する。
 
-- **[LAYERED_EXECUTION_PLAN](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md) との整合**: スクリプトは **op を呼ぶ糊に限定**し、計算・検証ロジックは従来どおり typed op 側に置く。再実行が見込まれる合成は従来どおり pipeline へ昇格(LC-02)— 本 op は「一度きりの探索的合成」の受け皿であり、`core:transform` JS-in-a-string の復活ではない。
+- **[LAYERED_EXECUTION_PLAN](../improvement-plans-archive/2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md) との整合**: スクリプトは **op を呼ぶ糊に限定**し、計算・検証ロジックは従来どおり typed op 側に置く。再実行が見込まれる合成は従来どおり pipeline へ昇格(LC-02)— 本 op は「一度きりの探索的合成」の受け皿であり、`core:transform` JS-in-a-string の復活ではない。
 - **ガバナンス**: 呼べる op = 事前定義の SANDBOX 許可集合 ∩ セッションで grant 済み op の**交差**。呼び出しは実 op レイヤ(policy gate・Trace)を必ず通す。per-run token 認証、call 数・stdout サイズ・timeout の上限。
 - **stub 生成**: grant 済み op から子側の `callOp` / `tools` stub を生成し、親の UDS(RPC) policy gate に接続。
 

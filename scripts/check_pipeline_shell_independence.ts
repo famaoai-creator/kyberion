@@ -14,7 +14,6 @@
 
 import * as path from 'node:path';
 import {
-  loadJson,
   pathResolver,
   safeExistsSync,
   safeMkdir,
@@ -22,6 +21,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ShellViolation {
@@ -189,7 +189,7 @@ export function scanPipelineShellIndependence(
   const violations: ShellViolation[] = [];
   for (const file of files) {
     if (!safeExistsSync(file)) continue;
-    const data = loadJson<unknown>(file);
+    const data = readJson<unknown>(file);
     scanValue(file, data, violations);
     scanScriptWrappers(file, data, violations);
   }
@@ -202,7 +202,7 @@ function violationKey(violation: ShellViolation): string {
 
 function loadBaseline(): ShellViolation[] {
   if (!safeExistsSync(BASELINE_PATH)) return [];
-  const parsed = loadJson<unknown>(BASELINE_PATH);
+  const parsed = readJson<unknown>(BASELINE_PATH);
   if (!parsed || typeof parsed !== 'object') return [];
   const violations = (parsed as Record<string, unknown>).violations;
   if (!Array.isArray(violations)) return [];

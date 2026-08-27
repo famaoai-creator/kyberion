@@ -35,6 +35,7 @@ import {
   writeVideoFrameBusToMp4,
   pipeMp4ToVideoFrameBus,
 } from '@agent/core';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { randomUUID } from 'node:crypto';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -93,7 +94,8 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as visionJudge from '@agent/shared-vision';
 import { runActuatorCli } from '@agent/core';
-export { describeOps } from './op-catalog.js';
+import { describeOps } from './op-catalog.js';
+export { describeOps };
 export {
   SYSTEM_ACTUATOR_CAPTURE_OPS,
   SYSTEM_ACTUATOR_APPLY_OPS,
@@ -204,8 +206,14 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
 export { handleSystemAction as handleAction };
+export const actuator = defineCatalogBackedActuator({
+  id: 'system-actuator',
+  describeOps,
+  handleAction: (input) =>
+    handleSystemAction(input as unknown as Parameters<typeof handleSystemAction>[0]),
+});

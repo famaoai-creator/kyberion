@@ -8,7 +8,7 @@ import {
   safeWriteFile,
   slugify,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArtifactMap = {
@@ -130,7 +130,7 @@ async function main() {
   const artifactMapPath = pathResolver.knowledge(
     'product/orchestration/project-operating-system-artifact-map.json'
   );
-  const artifactMap = readJsonFile<ArtifactMap>(artifactMapPath);
+  const artifactMap = readJson<ArtifactMap>(artifactMapPath);
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
 
   safeMkdir(targetDir, { recursive: true });

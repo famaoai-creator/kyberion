@@ -3,16 +3,18 @@ title: Skill Recorder 概念取り込み計画(DR-01〜09)
 kind: improvement-plan
 scope: libs/core / procedure-* / os-automation / pii-scrubber / ocr-bridge / evals
 authority: planning
-status: implemented
+status: completed
+tags: [improvement-plan, archived]
+last_updated: 2026-08-26
 ---
 
 # Skill Recorder 概念取り込み計画(DR-01〜09): 実演観測 → 意図再構成 → ネイティブ op 優先の蒸留
 
 > **作成日**: 2026-08-09
 > **起点**: [microsoft/skill-recorder](https://github.com/microsoft/skill-recorder) v0.4.2(Electron + TypeScript、~25k LOC、MIT)の全サブシステム実コード分析(2026-08-09、shallow clone にて実施)。
-> **位置づけ**: [OPENHARNESS_ADOPTION_PLAN](./OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md) と同じ「コードは取り込まず概念だけ既存契約へ昇華する」方式。
-> 本計画は**新パラダイムの提案ではない**。Kyberion は既に [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)(学習→再生、パターン A/B)を**凍結契約**として保有しており(`libs/core/procedure-types.ts`)、skill-recorder はその **desktop サブストレート**と**蒸留品質**に対する実装参照である。
-> **実装状況の正本**: [STATUS.ja.md](./STATUS.ja.md)
+> **位置づけ**: [OPENHARNESS_ADOPTION_PLAN](../../improvement-plans-2026-07/OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md) と同じ「コードは取り込まず概念だけ既存契約へ昇華する」方式。
+> 本計画は**新パラダイムの提案ではない**。Kyberion は既に [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)(学習→再生、パターン A/B)を**凍結契約**として保有しており(`libs/core/procedure-types.ts`)、skill-recorder はその **desktop サブストレート**と**蒸留品質**に対する実装参照である。
+> **実装状況の正本**: [STATUS.ja.md](../../improvement-plans-2026-07/STATUS.ja.md)
 
 ## 0. 実装状況（2026-08-09）
 
@@ -62,7 +64,7 @@ Kyberion にとっての価値は製品としてではなく、**「観測 → �
 
 ### 1.3 最大の発見 — 契約は凍結済みで、欠けているのは「観測層」と「意味層」
 
-`libs/core/procedure-types.ts:18` は `ProcedureSubstrate = 'browser' | 'desktop' | 'service' | 'media'` を凍結しており、[INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md) は desktop アダプタを詳細設計済みである。しかし実装は止まっている:
+`libs/core/procedure-types.ts:18` は `ProcedureSubstrate = 'browser' | 'desktop' | 'service' | 'media'` を凍結しており、[INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md) は desktop アダプタを詳細設計済みである。しかし実装は止まっている:
 
 1. `procedure-dispatcher.ts:141-149` は `executor: 'system'` に対し `not_implemented` を返す。そのコメントは **「desktop has no OS automation backend」と書かれているが、これは事実に反する** — `libs/core/os-automation.ts` は `clickAt` / `rightClickAt` / `keystrokeText` / `pasteText` / `pressKey` / `getWindowList` / `activateWindowByTitle` / `takeScreenshot` / `clipboardRead` を macOS・Windows 両対応でエクスポート済みである。同じ陳腐化した注記が `desktop-recording.schema.json:5` にもある。**再生側はほぼ揃っており、止まっているのは観測側**。
 2. `knowledge/product/orchestration/procedures.json` は空(`"procedures": []`)。実データは `knowledge/personal/browser-procedures.json` の 5 件のみ。
@@ -302,11 +304,11 @@ DR-07(redaction)────┘                                    └───�
 
 ## 5. 参照
 
-| 文書                                                                                                      | 関係                                                     |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)            | マスター設計(substrate 中立契約・Layer①/④・昇格機構)     |
-| [INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md)            | desktop アダプタ設計。DR-02/03 は本書 §6/§7/§8 の実装    |
-| [LOOP_CLOSURE_PLAN](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)                                                 | LC-02(昇格ツール)・LC-05(判断配置)・LC-07〜09(縮退)      |
-| [LAYERED_EXECUTION_PLAN](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)                                       | 蒸留結果を pipeline=配線 / typed op=ロジックに落とす原則 |
-| [OPENHARNESS_ADOPTION_PLAN](./OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md)                                 | 同方式の先行事例(概念のみ昇華)                           |
-| [kyberion-development-practices](../../../knowledge/product/governance/kyberion-development-practices.md) | 登録儀式・境界テスト allowlist・hermetic テスト          |
+| 文書                                                                                                         | 関係                                                     |
+| ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| [INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md)            | マスター設計(substrate 中立契約・Layer①/④・昇格機構)     |
+| [INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN](../../../INTENT_DRIVEN_DESKTOP_AUTOMATION_DESIGN.ja.md)            | desktop アダプタ設計。DR-02/03 は本書 §6/§7/§8 の実装    |
+| [LOOP_CLOSURE_PLAN](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)                                                    | LC-02(昇格ツール)・LC-05(判断配置)・LC-07〜09(縮退)      |
+| [LAYERED_EXECUTION_PLAN](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)                                          | 蒸留結果を pipeline=配線 / typed op=ロジックに落とす原則 |
+| [OPENHARNESS_ADOPTION_PLAN](../../improvement-plans-2026-07/OPENHARNESS_ADOPTION_PLAN_2026-07-18.ja.md)      | 同方式の先行事例(概念のみ昇華)                           |
+| [kyberion-development-practices](../../../../knowledge/product/governance/kyberion-development-practices.md) | 登録儀式・境界テスト allowlist・hermetic テスト          |

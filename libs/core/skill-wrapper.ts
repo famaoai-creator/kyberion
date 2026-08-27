@@ -178,12 +178,12 @@ export async function runSkillAsync<T>(
 
 export function runSkillCli<T>(skillName: string, fn: () => T): void {
   const output = runSkill(skillName, fn);
-  if (output.status === 'error') process.exit(1);
+  if (output.status === 'error') process.exitCode = 1;
 }
 
 export async function runSkillAsyncCli<T>(skillName: string, fn: () => Promise<T>): Promise<void> {
   const output = await runSkillAsync(skillName, fn);
-  if (output.status === 'error') process.exit(1);
+  if (output.status === 'error') process.exitCode = 1;
 }
 
 export const runAsyncSkill = runSkillAsync;

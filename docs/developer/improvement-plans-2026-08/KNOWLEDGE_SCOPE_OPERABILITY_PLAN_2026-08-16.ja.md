@@ -179,8 +179,8 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 ## 関連
 
 - [KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16](../improvement-plans-archive/2026-08/KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md)(前提・隔離)
-- [KM-03_PROMOTION_GOVERNANCE_LOOP](../improvement-plans-2026-07/KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md) / [KM-04_KNOWLEDGE_STORE_HYGIENE](../improvement-plans-2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)
-- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-08 curation / ingest ceremony)
+- [KM-03_PROMOTION_GOVERNANCE_LOOP](../improvement-plans-archive/2026-07/KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md) / [KM-04_KNOWLEDGE_STORE_HYGIENE](../improvement-plans-archive/2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)
+- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-08 curation / ingest ceremony)
 - [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(scope-migration / physical namespace)
 - [LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08](./LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08.ja.md)(改善ループ信号品質)
 - `scripts/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)

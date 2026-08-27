@@ -84,7 +84,12 @@ export function loadIntentExecutionProfileRegistry(): IntentExecutionProfileRegi
   const filePath = pathResolver.knowledge(
     'product/governance/intent-execution-profile-registry.json'
   );
-  const parsed = loadJson<IntentExecutionProfileRegistryFile>(filePath);
+  const source = loadJson<IntentExecutionProfileRegistryFile>(
+    filePath
+  ) as IntentExecutionProfileRegistryFile & {
+    $schema?: string;
+  };
+  const { $schema: _schema, ...parsed } = source;
   const validate = ensureValidator();
   if (!validate(parsed)) {
     throw new Error(

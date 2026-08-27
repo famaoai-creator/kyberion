@@ -17,16 +17,12 @@
     {
       "id": "health_degradation_watch",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_health_degradation_watch",
       "produces": {
         "channel": "health_degradation_report",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/health_degradation_watch.ts"],
-        "timeout_ms": 120000
-      }
+      "params": {}
     }
   ]
 }

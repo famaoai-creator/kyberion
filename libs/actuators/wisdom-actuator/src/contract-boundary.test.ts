@@ -9,7 +9,9 @@ import {
   resetActuatorForwardingPort,
 } from '@agent/core';
 import { describeOps } from './op-catalog.js';
-import { dispatchDecisionOp } from './decision-ops.js';
+import { dispatchWisdomOperation } from './decision-ops.js';
+
+const dispatchDecisionOp = dispatchWisdomOperation;
 import { handleAction, runWithOperationRetry } from './wisdom-pipeline-helpers.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 

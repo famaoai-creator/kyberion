@@ -1,5 +1,5 @@
 import { loadActuatorManifestCatalog, pathResolver, safeReaddir } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type StandardIntent = {
@@ -33,7 +33,7 @@ type IntentDomainEntry = {
 
 function readJson<T>(relativePath: string): T {
   const fullPath = pathResolver.rootResolve(relativePath);
-  return readJsonFile(fullPath);
+  return readFoundationJson<T>(fullPath);
 }
 
 function pushIfMissing<T>(

@@ -20,7 +20,7 @@ import { isDirectScript } from './lib/harness.js';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
 
-async function runOnce(options: {
+export async function runMeshDeliveryDriverOnce(options: {
   senderPeerId: string;
   sharedSecret?: string;
   batchLimit: number;
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
 
   try {
     do {
-      const report = await runOnce({
+      const report = await runMeshDeliveryDriverOnce({
         senderPeerId,
         sharedSecret,
         batchLimit: Number(argv.limit) || 10,

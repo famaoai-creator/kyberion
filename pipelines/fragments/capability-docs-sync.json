@@ -8,11 +8,8 @@
     {
       "id": "sync_docs",
       "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "node dist/scripts/check_doc_examples.js",
-        "env": { "KYBERION_PERSONA": "sovereign" }
-      }
+      "op": "core:run_doc_examples_check",
+      "params": {}
     },
     {
       "id": "log_sync",

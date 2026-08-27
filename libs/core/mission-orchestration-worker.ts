@@ -1,4 +1,5 @@
 import { a2aBridge, AgentBusyError } from './a2a-bridge.js';
+import './mission-orchestration-worker-part-core.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import {
   buildMissionTeamView,

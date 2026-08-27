@@ -2,13 +2,13 @@
 import * as path from 'node:path';
 import {
   pathResolver,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
   loadApprovalRequest,
 } from '@agent/core';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
@@ -325,7 +325,7 @@ function unique(values: string[]): string[] {
 }
 
 function readJson<T>(filePath: string): T {
-  return loadJson<T>(filePath);
+  return readFoundationJson<T>(filePath);
 }
 
 function readJsonIfExists<T>(filePath: string): T | null {

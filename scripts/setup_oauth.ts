@@ -147,16 +147,20 @@ export const runOAuthSetup = defineScript({
   name: 'oauth:setup',
   flags: [],
   run: async ({ argv }) => {
-    try {
-      await main(argv);
-    } catch (error) {
-      activeCleanup?.();
-      throw error;
-    } finally {
-      activeCleanup = undefined;
-    }
+    await runOAuthSetupForService(argv[0]);
   },
 });
+
+export async function runOAuthSetupForService(serviceId: string): Promise<void> {
+  try {
+    await main([serviceId]);
+  } catch (error) {
+    activeCleanup?.();
+    throw error;
+  } finally {
+    activeCleanup = undefined;
+  }
+}
 
 if (
   isDirectScript(import.meta.url, 'setup_oauth.ts') ||

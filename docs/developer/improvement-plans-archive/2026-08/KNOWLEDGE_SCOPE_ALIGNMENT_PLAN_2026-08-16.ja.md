@@ -191,12 +191,12 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 
 ## 関連
 
-- [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(EG-10 distill 一本化、physical namespace)
+- [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](../../improvement-plans-2026-08/ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(EG-10 distill 一本化、physical namespace)
 - [TENANT_ORGANIZATION_ONBOARDING_AUTONOMY_PLAN_2026-08-15](./TENANT_ORGANIZATION_ONBOARDING_AUTONOMY_PLAN_2026-08-15.ja.md)(ScopeContext・memory-scope)
-- [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25](../improvement-plans-2026-07/TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07、tenant 次元を持たない前提)
-- [KM-02_RETRIEVAL_QUALITY](../improvement-plans-2026-07/KM-02_RETRIEVAL_QUALITY.ja.md)(Task 4 ranker 統一残)/ [KM-04_KNOWLEDGE_STORE_HYGIENE](../improvement-plans-2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)(context_ranker 全走査の記載)
-- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-07 tenant retrieval)
-- [VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05](../improvement-plans-2026-07/VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05.ja.md)(ViewerContext)
+- [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25](../2026-07/TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07、tenant 次元を持たない前提)
+- [KM-02_RETRIEVAL_QUALITY](../2026-07/KM-02_RETRIEVAL_QUALITY.ja.md)(Task 4 ranker 統一残)/ [KM-04_KNOWLEDGE_STORE_HYGIENE](../2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)(context_ranker 全走査の記載)
+- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-07 tenant retrieval)
+- [VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05](../2026-07/VISIBILITY_SCOPE_AUTHZ_PLAN_2026-08-05.ja.md)(ViewerContext)
 
 ## 実装状況
 
@@ -205,4 +205,4 @@ reasoning backend policy・surface query providers・design cascade(org/project 
 - 2026-08-16: Wave 1 を実装済み。`currentScope()` と project/task env、scope proximity ranking、context pack の `compileScopedContextPack`、chain-aware tenant retrieval、tenant-aware provider egress、delivery scope を追加した。task/session の fragment rejection も契約へ追加し、既存 pack のバイト互換は optional field が空のとき維持する。
 - 2026-08-16: Wave 2 を実装済み。feedback delivery/usage、intent memory/learning、intent contract、promotion ledger、HINTS、compaction summary を tenant physical namespace に区画化し、tenant distill lane と scope-aware promotion/egress を追加した。旧グローバル記録は `unscoped-legacy` lane として従来 lane に残し、自動的に tenant 記録へ混ぜない。
 - 2026-08-16: Wave 3 と KS-12 cowork bridge の残項目を実装した。Chronos viewer の organization/project scope、operator-home/workitems の source-side filtering、tenant/org/project overlay、rate limiter の API/policy 接続、Cowork tenant sync lane を追加した。KS-16 は direct-read/provider declaration 検査まで拡張し、focused tests・typecheck・checker を通過した。
-- 2026-08-16: 実装後 read-only 監査で残を確認 — pack retrieval scope に org/project 未伝播(proximity 3/4 段が pack 経路で発火しない)、`scope_audit` の消費者 0、`check:knowledge-scope` の PR CI 未配線、受入 3/7/8 のテスト欠落、`unscoped-legacy` の移行/期限なし、新区画の backup/offboarding/retention 未登録、design cascade(設計判断 6)は未着手。これらは後続の [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KO-01〜19)へ引き継ぐ。
+- 2026-08-16: 実装後 read-only 監査で残を確認 — pack retrieval scope に org/project 未伝播(proximity 3/4 段が pack 経路で発火しない)、`scope_audit` の消費者 0、`check:knowledge-scope` の PR CI 未配線、受入 3/7/8 のテスト欠落、`unscoped-legacy` の移行/期限なし、新区画の backup/offboarding/retention 未登録、design cascade(設計判断 6)は未着手。これらは後続の [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](../../improvement-plans-2026-08/KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KO-01〜19)へ引き継ぐ。

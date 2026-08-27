@@ -10,10 +10,13 @@
     {
       "id": "project-management-tests",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "project_management_tests", "type": "ShellResult" },
+      "op": "core:run_vitest",
+      "produces": { "channel": "project_management_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts"
+        "files": [
+          "libs/core/project-management.test.ts",
+          "libs/core/mission-project-reassignment.test.ts"
+        ]
       }
     },
     {

@@ -213,6 +213,10 @@ export const main = defineScript({
   },
 });
 
-if (isDirectScript(import.meta.url, 'generate_changelog.ts')) void main();
+if (
+  isDirectScript(import.meta.url, 'generate_changelog.ts') ||
+  isDirectScript(import.meta.url, 'generate_changelog.js')
+)
+  void main();
 
 export { parseCommit, classify, renderSection };

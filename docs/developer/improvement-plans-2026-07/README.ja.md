@@ -1,3 +1,10 @@
+---
+title: README
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
+status: archived
+---
+
 # コードベース改善計画 2026-07(索引)
 
 > **作成日**: 2026-07-02
@@ -5,17 +12,17 @@
 > **位置づけ**: [PRODUCTIZATION_ROADMAP](../../PRODUCTIZATION_ROADMAP.md) Phase B(30日連続運用に耐える)/ Phase C'(貢献容易性)に寄与する下位計画。
 > **登録**: [docs/ROADMAP.md](../../ROADMAP.md) §1 に登録済み。
 > **履歴台帳**: [STATUS.ja.md](./STATUS.ja.md)(2026-07-05 までの計画をコード実態と突合した凍結記録)。現在の実装状況は [2026-08 の状態索引](../improvement-plans-2026-08/README.ja.md) と各計画文書を参照する。
-> **最新の横断レビュー**: [REVIEW_CODEX_2026-07-11.ja.md](./REVIEW_CODEX_2026-07-11.ja.md)(UX・拡張性・セキュリティ・運用の再監査と優先バックログ)。
-> **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](./UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
-> **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](./LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
-> **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
-> **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
-> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜05: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + Claude governed path + Codex app-server 内 logical subagent/thread + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
-> **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
-> **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
-> **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](./INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
-> **グラフオーケストレーション計画**: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)(GE-01〜09: ループエンジニアリングからグラフエンジニアリングへ。ステップ間エッジの契約化・frontier スケジューラ・条件付きエッジと式評価安全化・ノード境界チェックポイント `--resume`・ミッションワーカーの wave バリア撤廃・delegateTask ハンドル・グラフ guardrails/Mermaid プレビュー・DAG トレース・wisdom fanout 並列化。AR-01/HN-03/MO-03/MO-06 の後続、外部フレームワーク非依存)。
-> **テナントデータ活用計画**: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-01〜08: 社内ツールの非構造データを「抽出→連携→ナレッジ化→活用」の閉ループへ。テナント基準系の単一化・抽出コネクタ完備(Box 新設/Slack 読取/Drive 本文)・増分同期 watermark・正規化カード化・情報資産台帳と明示 ingest(Hybrid Sovereign Ledger 実装)・PII/tier ゲート・テナント知識の検索到達性・保持/オフボーディング/取込予算。KP-01〜07 の上流ループ)。
+> **最新の横断レビュー**: [REVIEW_CODEX_2026-07-11.ja.md](../improvement-plans-archive/2026-07/REVIEW_CODEX_2026-07-11.ja.md)(UX・拡張性・セキュリティ・運用の再監査と優先バックログ)。
+> **UI/UX 持続運営レビュー**: [UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md](../improvement-plans-archive/2026-07/UI_UX_DESIGN_SYSTEM_SUSTAINABILITY_PLAN_2026-07-13.ja.md)(DS-01/UX-05 の完了と週次 drift audit)。
+> **ループ完結計画**: [LOOP_CLOSURE_PLAN_2026-07-13.ja.md](../improvement-plans-archive/2026-07/LOOP_CLOSURE_PLAN_2026-07-13.ja.md)(LC-01〜12: 実行成功→pipeline 昇格・LLM 判断配置・stub 縮退遮断・却下理由→修正再実行の4ループ)。
+> **実行レイヤリング計画**: [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](../improvement-plans-archive/2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05: pipeline=配線 / typed ops=ロジック / デザインシステム=単一カスケードの3層分離。PPTX デザイン乖離の根治と script ラッパー pipeline の解消)。
+> **タスク知識配給計画**: [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07: 配給経路の単一化・タスクプロファイル駆動の知識スライス・knowledge_feedback 帰還ループ・有効性主導キュレーション。MO-04/KM 系の後続ループ)。
+> **CLI サブエージェント・チーム計画**: [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜05: 単一 LLM プロバイダ CLI 内で完結するチーム構成・連携。役割→サブエージェント定義の生成儀式 + `HarnessSubagentDispatcher` + Claude governed path + Codex app-server 内 logical subagent/thread + ファイル契約 E2E + 実行面の使い分け基準。agent-runtime の代替実行面)。
+> **クロスプロバイダ実行計画**: [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07: 複数 LLM プロバイダ CLI(claude/codex/agy 等)の同一マシン併走規約。能力プローブ registry・権限射影と env 最小化・tier×egress ゲート・同一ディレクトリ併走契約・縮退表面化と provenance・並行予算・モデル分散 best-of-N。CT の兄弟計画)。
+> **surface 会話オーケストレータ計画**: [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05: surface(Slack/terminal/web 等)が CLI と同格の対話オーケストレータ(ミッション所有・操縦)になる。lifecycle facade の libs 昇格・OrchestratorSession・owner 権限配線・会話操縦 + IL-04 完了検証・責務別モデル階梯(前面 fast/standard、判断 deep)。SN-01 の後続)。
+> **国際化・多言語対応計画**: [INTERNATIONALIZATION_PLAN_2026-07-26.ja.md](../improvement-plans-archive/2026-07/INTERNATIONALIZATION_PLAN_2026-07-26.ja.md)(I18N-01〜08: 「翻訳を足す」ではなく「第3言語をデータ追加だけで足せる状態」への構造転換。ロケール解決5系統の単一正本化・語彙カタログのメッセージ基盤化(namespace/ICU サブセット/型安全 `t()`)・ハードコード ratchet・表面別移行・書式国際化・LLM 出力言語の契約化・疑似ロケールによる実証。UX-03 の後続)。
+> **グラフオーケストレーション計画**: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)(GE-01〜09: ループエンジニアリングからグラフエンジニアリングへ。ステップ間エッジの契約化・frontier スケジューラ・条件付きエッジと式評価安全化・ノード境界チェックポイント `--resume`・ミッションワーカーの wave バリア撤廃・delegateTask ハンドル・グラフ guardrails/Mermaid プレビュー・DAG トレース・wisdom fanout 並列化。AR-01/HN-03/MO-03/MO-06 の後続、外部フレームワーク非依存)。
+> **テナントデータ活用計画**: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-01〜08: 社内ツールの非構造データを「抽出→連携→ナレッジ化→活用」の閉ループへ。テナント基準系の単一化・抽出コネクタ完備(Box 新設/Slack 読取/Drive 本文)・増分同期 watermark・正規化カード化・情報資産台帳と明示 ingest(Hybrid Sovereign Ledger 実装)・PII/tier ゲート・テナント知識の検索到達性・保持/オフボーディング/取込予算。KP-01〜07 の上流ループ)。
 
 ## 1. 目的
 
@@ -45,23 +52,23 @@
 
 ## 3. 改善ポイント一覧
 
-| ID                                                        | タイトル                                                                   | 優先度 | 規模 | 依存                    |
-| --------------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----------------------- |
-| [IP-01](./IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md)      | ESLint ガバナンスの実効化(secure-io 不変条件の lint 復活)                  | **P0** | S    | なし                    |
-| [IP-02](./IP-02_NATIVE_ENGINE_SECURE_IO.ja.md)            | native-\*-engine 等の secure-io 不変条件違反の解消                         | **P0** | M    | IP-01                   |
-| [IP-03](./IP-03_CI_TEST_GATES.ja.md)                      | CI テスト実行範囲の拡大と品質ゲート強化                                    | **P0** | M    | なし                    |
-| [IP-04](./IP-04_DEAD_REFERENCE_CLEANUP.ja.md)             | 死んだ参照の一掃と参照整合性チェックの自動化                               | P1     | S    | なし                    |
-| [IP-05](./IP-05_ACTUATOR_CLI_RUNNER.ja.md)                | アクチュエータ CLI エントリポイントの共通化と入力検証                      | P1     | M    | なし                    |
-| [IP-06](./IP-06_WORKSPACE_CONSISTENCY.ja.md)              | ワークスペース整合性の回復(package.json 欠落・命名不統一)                  | P1     | S    | なし                    |
-| [IP-07](./IP-07_CRITICAL_PATH_TESTS.ja.md)                | クリティカルパスへのテスト追加(ADF修復・推論バックエンド等)                | **P0** | M    | なし                    |
-| [IP-08](./IP-08_ERROR_HANDLING_DISCIPLINE.ja.md)          | エラーハンドリング規律(握りつぶし catch・浮遊 Promise・process.exit)       | P1     | M    | IP-05推奨               |
-| [IP-09](./IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md)       | 重複ユーティリティの統合(slugify×14・retry×11 ほか)                        | P2     | S    | なし                    |
-| [IP-10](./IP-10_GOD_FILE_DECOMPOSITION.ja.md)             | 巨大ファイルの分割(4,500〜5,300行級 5ファイル)                             | P2     | L    | IP-07                   |
-| [IP-11](./IP-11_TYPE_SAFETY_RATCHET.ja.md)                | 型安全性ラチェット(strict 化・any 削減 約2,900箇所)                        | P2     | L    | IP-03                   |
-| [IP-12](./IP-12_EXECUTION_MODE_UNIFICATION.ja.md)         | スクリプト実行モードの統一と baseline-check 高速化                         | P2     | M    | なし                    |
-| [IP-13](./IP-13_MODEL_ID_CENTRALIZATION.ja.md)            | モデルIDの一元管理と陳腐化解消                                             | P1     | S    | なし                    |
-| [RG-01](./RG-01_UNIFIED_REASONING_MODEL_GOVERNANCE.ja.md) | 統一推論・モデルガバナンス基盤(runtime/model/profile/role/fallback の統合) | P1     | L    | IP-13,MO-05,OP-01,SA-04 |
-| [IP-14](./IP-14_REPO_HYGIENE.ja.md)                       | リポジトリ衛生(ハードコードパス・死んだ共有ライブラリ・陳腐化ドキュメント) | P2     | S    | なし                    |
+| ID                                                                                           | タイトル                                                                   | 優先度 | 規模 | 依存                    |
+| -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----------------------- |
+| [IP-01](../improvement-plans-archive/2026-07/IP-01_ESLINT_GOVERNANCE_ENFORCEMENT.ja.md)      | ESLint ガバナンスの実効化(secure-io 不変条件の lint 復活)                  | **P0** | S    | なし                    |
+| [IP-02](../improvement-plans-archive/2026-07/IP-02_NATIVE_ENGINE_SECURE_IO.ja.md)            | native-\*-engine 等の secure-io 不変条件違反の解消                         | **P0** | M    | IP-01                   |
+| [IP-03](../improvement-plans-archive/2026-07/IP-03_CI_TEST_GATES.ja.md)                      | CI テスト実行範囲の拡大と品質ゲート強化                                    | **P0** | M    | なし                    |
+| [IP-04](../improvement-plans-archive/2026-07/IP-04_DEAD_REFERENCE_CLEANUP.ja.md)             | 死んだ参照の一掃と参照整合性チェックの自動化                               | P1     | S    | なし                    |
+| [IP-05](../improvement-plans-archive/2026-07/IP-05_ACTUATOR_CLI_RUNNER.ja.md)                | アクチュエータ CLI エントリポイントの共通化と入力検証                      | P1     | M    | なし                    |
+| [IP-06](../improvement-plans-archive/2026-07/IP-06_WORKSPACE_CONSISTENCY.ja.md)              | ワークスペース整合性の回復(package.json 欠落・命名不統一)                  | P1     | S    | なし                    |
+| [IP-07](../improvement-plans-archive/2026-07/IP-07_CRITICAL_PATH_TESTS.ja.md)                | クリティカルパスへのテスト追加(ADF修復・推論バックエンド等)                | **P0** | M    | なし                    |
+| [IP-08](../improvement-plans-archive/2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md)          | エラーハンドリング規律(握りつぶし catch・浮遊 Promise・process.exit)       | P1     | M    | IP-05推奨               |
+| [IP-09](../improvement-plans-archive/2026-07/IP-09_SHARED_UTILITY_CONSOLIDATION.ja.md)       | 重複ユーティリティの統合(slugify×14・retry×11 ほか)                        | P2     | S    | なし                    |
+| [IP-10](../improvement-plans-archive/2026-07/IP-10_GOD_FILE_DECOMPOSITION.ja.md)             | 巨大ファイルの分割(4,500〜5,300行級 5ファイル)                             | P2     | L    | IP-07                   |
+| [IP-11](../improvement-plans-archive/2026-07/IP-11_TYPE_SAFETY_RATCHET.ja.md)                | 型安全性ラチェット(strict 化・any 削減 約2,900箇所)                        | P2     | L    | IP-03                   |
+| [IP-12](../improvement-plans-archive/2026-07/IP-12_EXECUTION_MODE_UNIFICATION.ja.md)         | スクリプト実行モードの統一と baseline-check 高速化                         | P2     | M    | なし                    |
+| [IP-13](../improvement-plans-archive/2026-07/IP-13_MODEL_ID_CENTRALIZATION.ja.md)            | モデルIDの一元管理と陳腐化解消                                             | P1     | S    | なし                    |
+| [RG-01](../improvement-plans-archive/2026-07/RG-01_UNIFIED_REASONING_MODEL_GOVERNANCE.ja.md) | 統一推論・モデルガバナンス基盤(runtime/model/profile/role/fallback の統合) | P1     | L    | IP-13,MO-05,OP-01,SA-04 |
+| [IP-14](../improvement-plans-archive/2026-07/IP-14_REPO_HYGIENE.ja.md)                       | リポジトリ衛生(ハードコードパス・死んだ共有ライブラリ・陳腐化ドキュメント) | P2     | S    | なし                    |
 
 規模: S = 半日〜1日 / M = 2〜5日 / L = 1〜3週(フェーズ分割前提)
 
@@ -69,171 +76,171 @@
 
 DoR・AC・DoDを正準契約として定義し、要求/リスク/変更影響からの試験観点抽出、項目設計、安全な試験実行、欠陥・再試験、品質報告、人間によるリリース責任までを一つの証跡チェーンにする。IP-03/07 の「Kyberion 自身のテスト基盤」とは別に、Kyberion が任意のソフトウェア開発を QA 業務として遂行する能力を扱う。
 
-| ID                                                | タイトル                                                                 | 優先度 | 規模 | 依存        |
-| ------------------------------------------------- | ------------------------------------------------------------------------ | ------ | ---- | ----------- |
-| [QA-01](./QA-01_SOFTWARE_QUALITY_LIFECYCLE.ja.md) | DoR・AC・DoDから観点抽出・試験実行・欠陥管理・品質報告までの標準QAフロー | **P0** | L    | MO-02,IL-01 |
+| ID                                                                                   | タイトル                                                                 | 優先度 | 規模 | 依存        |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------ | ---- | ----------- |
+| [QA-01](../improvement-plans-archive/2026-07/QA-01_SOFTWARE_QUALITY_LIFECYCLE.ja.md) | DoR・AC・DoDから観点抽出・試験実行・欠陥管理・品質報告までの標準QAフロー | **P0** | L    | MO-02,IL-01 |
 
 ### UX 改善(ユーザー接点)
 
 UI・CLI・会話ブリッジ・音声のユーザー接点調査(2026-07-02 追加)に基づく改善計画。既存の [PRODUCT_UX_EVALUATION_2026-05-29](../PRODUCT_UX_EVALUATION_2026-05-29.ja.md) の提言(UX-0 first-run 安定化 / UX-1 surface health / UX-2 ユースケース別オンボーディング)とは**重複しない**よう、同評価が扱っていない領域に限定している。
 
-| ID                                                       | タイトル                                                               | 優先度 | 規模 | 依存  |
-| -------------------------------------------------------- | ---------------------------------------------------------------------- | ------ | ---- | ----- |
-| [UX-01](./UX-01_ERROR_PRESENTATION.ja.md)                | エラー提示の統一(生エラー露出と「無言の失敗」の解消)                   | **P0** | M    | なし  |
-| [UX-02](./UX-02_PROGRESS_VISIBILITY.ja.md)               | 長時間処理の進捗可視化(パイプライン・ミッション・ブリッジ・チャット)   | P1     | M    | なし  |
-| [UX-03](./UX-03_LANGUAGE_CONSISTENCY.ja.md)              | 言語一貫性(日本語既定オペレータへの英語ハードコード解消)               | P1     | M〜L | なし  |
-| [UX-04](./UX-04_APPROVAL_CONFIRMATION_UNIFICATION.ja.md) | 承認・確認フローの統一(魔法の言葉廃止・破壊的操作の確認)               | P1     | M    | なし  |
-| [UX-05](./UX-05_UX_CONTRACT_ENFORCEMENT.ja.md)           | UX 契約の code 化(語彙一元化・バリデータ実効化)                        | P2     | M    | UX-03 |
-| [UX-06](./UX-06_ONBOARDING_DASHBOARD_INTEGRITY.ja.md)    | オンボーディング/ダッシュボード整合(半構成バグ・customer オーバーレイ) | P1     | S〜M | なし  |
+| ID                                                                                          | タイトル                                                               | 優先度 | 規模 | 依存  |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------ | ---- | ----- |
+| [UX-01](../improvement-plans-archive/2026-07/UX-01_ERROR_PRESENTATION.ja.md)                | エラー提示の統一(生エラー露出と「無言の失敗」の解消)                   | **P0** | M    | なし  |
+| [UX-02](../improvement-plans-archive/2026-07/UX-02_PROGRESS_VISIBILITY.ja.md)               | 長時間処理の進捗可視化(パイプライン・ミッション・ブリッジ・チャット)   | P1     | M    | なし  |
+| [UX-03](../improvement-plans-archive/2026-07/UX-03_LANGUAGE_CONSISTENCY.ja.md)              | 言語一貫性(日本語既定オペレータへの英語ハードコード解消)               | P1     | M〜L | なし  |
+| [UX-04](../improvement-plans-archive/2026-07/UX-04_APPROVAL_CONFIRMATION_UNIFICATION.ja.md) | 承認・確認フローの統一(魔法の言葉廃止・破壊的操作の確認)               | P1     | M    | なし  |
+| [UX-05](../improvement-plans-archive/2026-07/UX-05_UX_CONTRACT_ENFORCEMENT.ja.md)           | UX 契約の code 化(語彙一元化・バリデータ実効化)                        | P2     | M    | UX-03 |
+| [UX-06](../improvement-plans-archive/2026-07/UX-06_ONBOARDING_DASHBOARD_INTEGRITY.ja.md)    | オンボーディング/ダッシュボード整合(半構成バグ・customer オーバーレイ) | P1     | S〜M | なし  |
 
 ### Actuator 能力(何ができるか)
 
 アクチュエータの機能的能力(カタログ整合・需要ギャップ・外部連携深度)の調査(2026-07-02 追加)に基づく。コード品質(IP-05/06)とは別軸。
 
-| ID                                               | タイトル                                                     | 優先度 | 規模 | 依存  |
-| ------------------------------------------------ | ------------------------------------------------------------ | ------ | ---- | ----- |
-| [AC-01](./AC-01_CAPABILITY_TRUTHFULNESS.ja.md)   | 能力の正直さ(プローブ全数化・カタログ/実装整合)              | **P0** | M    | なし  |
-| [AC-02](./AC-02_UNHANDLED_INTENT_LOOP.ja.md)     | 未処理意図の解消と需要取り込みループ稼働                     | P1     | S〜M | なし  |
-| [AC-03](./AC-03_DEPLOY_CICD_CAPABILITY.ja.md)    | デプロイ/CI-CD 実行能力の実体化                              | P1     | M    | AC-01 |
-| [AC-04](./AC-04_CALENDAR_EMAIL_ROBUSTNESS.ja.md) | カレンダー/メール堅牢化とプラットフォーム依存緩和            | P1     | M    | AC-01 |
-| [AC-05](./AC-05_JP_SAAS_AUTH_MATURITY.ja.md)     | 外部サービス認証の成熟化と日本 SaaS 接続(kintone パイロット) | P2     | M    | なし  |
-| [AC-06](./AC-06_STUB_CAPABILITY_TRIAGE.ja.md)    | スタブ能力の整理と能力境界の明文化                           | P2     | S    | AC-01 |
+| ID                                                                                  | タイトル                                                     | 優先度 | 規模 | 依存  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------ | ------ | ---- | ----- |
+| [AC-01](../improvement-plans-archive/2026-07/AC-01_CAPABILITY_TRUTHFULNESS.ja.md)   | 能力の正直さ(プローブ全数化・カタログ/実装整合)              | **P0** | M    | なし  |
+| [AC-02](../improvement-plans-archive/2026-07/AC-02_UNHANDLED_INTENT_LOOP.ja.md)     | 未処理意図の解消と需要取り込みループ稼働                     | P1     | S〜M | なし  |
+| [AC-03](../improvement-plans-archive/2026-07/AC-03_DEPLOY_CICD_CAPABILITY.ja.md)    | デプロイ/CI-CD 実行能力の実体化                              | P1     | M    | AC-01 |
+| [AC-04](../improvement-plans-archive/2026-07/AC-04_CALENDAR_EMAIL_ROBUSTNESS.ja.md) | カレンダー/メール堅牢化とプラットフォーム依存緩和            | P1     | M    | AC-01 |
+| [AC-05](../improvement-plans-archive/2026-07/AC-05_JP_SAAS_AUTH_MATURITY.ja.md)     | 外部サービス認証の成熟化と日本 SaaS 接続(kintone パイロット) | P2     | M    | なし  |
+| [AC-06](../improvement-plans-archive/2026-07/AC-06_STUB_CAPABILITY_TRIAGE.ja.md)    | スタブ能力の整理と能力境界の明文化                           | P2     | S    | AC-01 |
 
 ### ナレッジ / メモリ管理
 
 ナレッジシステム・メモリ管理の調査(2026-07-02 追加)に基づく。[VOLATILE_KNOWLEDGE_PLAN](../../VOLATILE_KNOWLEDGE_PLAN.ja.md) の再設計ではなく、その**起動・品質・統治の完成**が主眼。
 
-| ID                                                | タイトル                                                      | 優先度 | 規模 | 依存  |
-| ------------------------------------------------- | ------------------------------------------------------------- | ------ | ---- | ----- |
-| [KM-01](./KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md) | 揮発メモリ層の起動(cron 配線・GC 稼働・lifecycle 接続)        | **P0** | S    | なし  |
-| [KM-02](./KM-02_RETRIEVAL_QUALITY.ja.md)          | 検索品質(本文チャンク索引・偽セマンティックの解消)            | P1     | M    | KM-04 |
-| [KM-03](./KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md)  | 記憶昇格ガバナンスの閉ループ(distill 正規化・dedup・矛盾防衛) | P1     | M    | KM-01 |
-| [KM-04](./KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)    | ナレッジストア衛生(テスト汚染1,387ファイル除去・索引自動生成) | P1     | S    | なし  |
+| ID                                                                                   | タイトル                                                      | 優先度 | 規模 | 依存  |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------ | ---- | ----- |
+| [KM-01](../improvement-plans-archive/2026-07/KM-01_VOLATILE_MEMORY_ACTIVATION.ja.md) | 揮発メモリ層の起動(cron 配線・GC 稼働・lifecycle 接続)        | **P0** | S    | なし  |
+| [KM-02](../improvement-plans-archive/2026-07/KM-02_RETRIEVAL_QUALITY.ja.md)          | 検索品質(本文チャンク索引・偽セマンティックの解消)            | P1     | M    | KM-04 |
+| [KM-03](../improvement-plans-archive/2026-07/KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md)  | 記憶昇格ガバナンスの閉ループ(distill 正規化・dedup・矛盾防衛) | P1     | M    | KM-01 |
+| [KM-04](../improvement-plans-archive/2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)    | ナレッジストア衛生(テスト汚染1,387ファイル除去・索引自動生成) | P1     | S    | なし  |
 
 ### ミッション・オーケストレーション(SDLC/AI-DLC 型の遂行プロセス)
 
 ミッションタイプ・実行プロセス・ゲーティング・タスク分配の調査(2026-07-02 追加)に基づく。**Claude Code / Fable 5 ハーネスのオーケストレーション原則**(計画承認ゲート、成果物を動かして検証、敵対的レビュー、アイテム独立パイプラインの並列分配、自己完結タスク契約とコンテキスト予算、タスク単位のモデル/エフォート選択、ジャーナルからの決定論的レジューム)を Kyberion のミッション制御モデルに翻訳したもの。各計画冒頭に対応原則を明記している。
 
-| ID                                                   | タイトル                                                                               | 優先度 | 規模 | 依存              |
-| ---------------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
-| [MO-01](./MO-01_MISSION_TYPE_EFFECTIVENESS.ja.md)    | ミッションタイプの実効化(分類→プロセステンプレート駆動)                                | **P0** | M    | なし              |
-| [MO-02](./MO-02_PHASE_GATES_VERIFICATION.ja.md)      | フェーズゲート実効化(計画ゲート・受入ゲート・敵対的レビュー・circuit breaker)          | **P0** | M〜L | MO-01             |
-| [MO-03](./MO-03_TASK_DAG_PARALLEL_DISPATCH.ja.md)    | タスク契約と DAG 並列分配(直列 for ループ脱却・リース統合)                             | P1     | M〜L | MO-01             |
-| [MO-04](./MO-04_WORKER_CONTEXT_ECONOMY.ja.md)        | ワーカーコンテキスト経済(context pack 配線・構造化結果契約)                            | P1     | S〜M | なし              |
-| [MO-05](./MO-05_MODEL_EFFORT_ROUTING.ja.md)          | タスク単位モデル/エフォート・ルーティング(shadow→段階的 enforce)                       | P1     | M    | MO-03             |
-| [MO-06](./MO-06_DURABLE_RESUME.ja.md)                | 調整の永続化と決定論的レジューム(バス JSONL 化・イベント journal)                      | P1     | S〜M | なし              |
-| [MO-07](./MO-07_QUALITY_MAXIMIZING_DELEGATION.ja.md) | 品質最大化タスク移譲(休眠品質機構の起動・best-of-N・judge・敵対レビュー・draft-refine) | P1     | L    | MO-02,MO-04,MO-05 |
-| [MO-08](./MO-08_ARTIFACT_REVIEW_CLOSURE.ja.md)       | 成果物品質レビューと Mission 終了処理の分離(hash-bound review・reconcile・finish)      | **P0** | M    | MO-02,MO-05       |
+| ID                                                                                      | タイトル                                                                               | 優先度 | 規模 | 依存              |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [MO-01](../improvement-plans-archive/2026-07/MO-01_MISSION_TYPE_EFFECTIVENESS.ja.md)    | ミッションタイプの実効化(分類→プロセステンプレート駆動)                                | **P0** | M    | なし              |
+| [MO-02](../improvement-plans-archive/2026-07/MO-02_PHASE_GATES_VERIFICATION.ja.md)      | フェーズゲート実効化(計画ゲート・受入ゲート・敵対的レビュー・circuit breaker)          | **P0** | M〜L | MO-01             |
+| [MO-03](../improvement-plans-archive/2026-07/MO-03_TASK_DAG_PARALLEL_DISPATCH.ja.md)    | タスク契約と DAG 並列分配(直列 for ループ脱却・リース統合)                             | P1     | M〜L | MO-01             |
+| [MO-04](../improvement-plans-archive/2026-07/MO-04_WORKER_CONTEXT_ECONOMY.ja.md)        | ワーカーコンテキスト経済(context pack 配線・構造化結果契約)                            | P1     | S〜M | なし              |
+| [MO-05](../improvement-plans-archive/2026-07/MO-05_MODEL_EFFORT_ROUTING.ja.md)          | タスク単位モデル/エフォート・ルーティング(shadow→段階的 enforce)                       | P1     | M    | MO-03             |
+| [MO-06](../improvement-plans-archive/2026-07/MO-06_DURABLE_RESUME.ja.md)                | 調整の永続化と決定論的レジューム(バス JSONL 化・イベント journal)                      | P1     | S〜M | なし              |
+| [MO-07](../improvement-plans-archive/2026-07/MO-07_QUALITY_MAXIMIZING_DELEGATION.ja.md) | 品質最大化タスク移譲(休眠品質機構の起動・best-of-N・judge・敵対レビュー・draft-refine) | P1     | L    | MO-02,MO-04,MO-05 |
+| [MO-08](../improvement-plans-archive/2026-07/MO-08_ARTIFACT_REVIEW_CLOSURE.ja.md)       | 成果物品質レビューと Mission 終了処理の分離(hash-bound review・reconcile・finish)      | **P0** | M    | MO-02,MO-05       |
 
 ### デザインシステム(Web / PPTX・文書 / 動画)
 
 視覚成果物のデザイン定義の調査(2026-07-02 追加)に基づく。既存の [VIDEO_DESIGN_SYSTEM_INTEGRATION_PLAN](../VIDEO_DESIGN_SYSTEM_INTEGRATION_PLAN.ja.md)(VDS-01〜08 の配管はほぼ完了)と重複せず、未了の VDS-07 は DS-02 が引き取る。
 
-| ID                                                  | タイトル                                                                   | 優先度 | 規模 | 依存         |
-| --------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ------------ |
-| [DS-01](./DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**         | P1     | M    | なし         |
-| [DS-02](./DS-02_TENANT_BRANDING_EVERYWHERE.ja.md)   | テナントブランディングの全面適用(PPTX 限定→Web/動画、VDS-07 実装)          | P1     | M    | DS-01        |
-| [DS-03](./DS-03_DOCUMENT_THEME_JP_TYPOGRAPHY.ja.md) | 文書エンジンのテーマ駆動化と日本語タイポグラフィ(PDF フォント埋め込み)     | P1     | M    | DS-01        |
-| [DS-04](./DS-04_VIDEO_SCENE_TOKENIZATION.ja.md)     | 動画シーンテンプレートのトークン化                                         | P2     | S〜M | DS-01        |
-| [DS-05](./DS-05_A11Y_BASELINE.ja.md)                | アクセシビリティ基盤(reduced-motion・light/dark・コントラストゲート・ARIA) | P2     | M    | DS-01        |
-| [DS-06](./DS-06_CHRONOS_LIGHT_THEME.ja.md)          | Chronos light テーマの実効化(コンポーネント層トークン化・DOM コントラスト) | P2     | L    | DS-01, DS-05 |
+| ID                                                                                     | タイトル                                                                   | 優先度 | 規模 | 依存         |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ------------ |
+| [DS-01](../improvement-plans-archive/2026-07/DS-01_CANONICAL_DESIGN_TOKENS.ja.md)      | 正準デザイントークンと Web 4 面の統一(KDS 三重管理解消) **(完了)**         | P1     | M    | なし         |
+| [DS-02](../improvement-plans-archive/2026-07/DS-02_TENANT_BRANDING_EVERYWHERE.ja.md)   | テナントブランディングの全面適用(PPTX 限定→Web/動画、VDS-07 実装)          | P1     | M    | DS-01        |
+| [DS-03](../improvement-plans-archive/2026-07/DS-03_DOCUMENT_THEME_JP_TYPOGRAPHY.ja.md) | 文書エンジンのテーマ駆動化と日本語タイポグラフィ(PDF フォント埋め込み)     | P1     | M    | DS-01        |
+| [DS-04](../improvement-plans-archive/2026-07/DS-04_VIDEO_SCENE_TOKENIZATION.ja.md)     | 動画シーンテンプレートのトークン化                                         | P2     | S〜M | DS-01        |
+| [DS-05](../improvement-plans-archive/2026-07/DS-05_A11Y_BASELINE.ja.md)                | アクセシビリティ基盤(reduced-motion・light/dark・コントラストゲート・ARIA) | P2     | M    | DS-01        |
+| [DS-06](../improvement-plans-archive/2026-07/DS-06_CHRONOS_LIGHT_THEME.ja.md)          | Chronos light テーマの実効化(コンポーネント層トークン化・DOM コントラスト) | P2     | L    | DS-01, DS-05 |
 
 ### エージェント間通信(A2A / メッセージハブ / agent runtime)
 
 エージェント間通信基盤の調査(2026-07-02 追加)に基づく。通信は2プレーン構成: ホスト内 A2A/ACP ランタイム面(a2aBridge → supervisor daemon → provider CLI)と、クロスホスト Mesh Hub 面(HTTP+HMAC・JSONL 配送台帳)。MO-03(並列分配)・MO-06(ミッション内バス永続化)とは重複しない。
 
-| ID                                                   | タイトル                                                                   | 優先度 | 規模 | 依存  |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----- |
-| [AA-01](./AA-01_RUNTIME_RESILIENCE.ja.md)            | Agent runtime 耐障害化(クラッシュ検知・ask タイムアウト・デーモン堅牢化)   | **P0** | M    | なし  |
-| [AA-02](./AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md)      | Mesh Hub 配送ドライバ(実装済み at-least-once 状態機械の起動)               | **P0** | M    | なし  |
-| [AA-03](./AA-03_A2A_IDENTITY_TRUST.ja.md)            | A2A アイデンティティと信頼の実効化(鍵永続化・署名 enforce・trust 尺度統一) | P1     | M    | なし  |
-| [AA-04](./AA-04_CONVERSATION_BACKPRESSURE.ja.md)     | 会話モデルとバックプレッシャ(会話ストア・セッション復元・inflight 上限)    | P1     | M    | AA-01 |
-| [AA-05](./AA-05_A2A_UNIFICATION_OBSERVABILITY.ja.md) | A2A 二重実装の整理とメッセージフロー統一観測                               | P2     | S〜M | AA-02 |
+| ID                                                                                      | タイトル                                                                   | 優先度 | 規模 | 依存  |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------ | ---- | ----- |
+| [AA-01](../improvement-plans-archive/2026-07/AA-01_RUNTIME_RESILIENCE.ja.md)            | Agent runtime 耐障害化(クラッシュ検知・ask タイムアウト・デーモン堅牢化)   | **P0** | M    | なし  |
+| [AA-02](../improvement-plans-archive/2026-07/AA-02_MESH_HUB_DELIVERY_DRIVER.ja.md)      | Mesh Hub 配送ドライバ(実装済み at-least-once 状態機械の起動)               | **P0** | M    | なし  |
+| [AA-03](../improvement-plans-archive/2026-07/AA-03_A2A_IDENTITY_TRUST.ja.md)            | A2A アイデンティティと信頼の実効化(鍵永続化・署名 enforce・trust 尺度統一) | P1     | M    | なし  |
+| [AA-04](../improvement-plans-archive/2026-07/AA-04_CONVERSATION_BACKPRESSURE.ja.md)     | 会話モデルとバックプレッシャ(会話ストア・セッション復元・inflight 上限)    | P1     | M    | AA-01 |
+| [AA-05](../improvement-plans-archive/2026-07/AA-05_A2A_UNIFICATION_OBSERVABILITY.ja.md) | A2A 二重実装の整理とメッセージフロー統一観測                               | P2     | S〜M | AA-02 |
 
 ### セキュリティ・監査・統制
 
 セキュリティ多層防御と監査/統制の完全性の調査(2026-07-02 追加)に基づく。IP-01/02/08・AC-05・AA-03 が扱わない残余領域。**構想評価レポートで「宣言と執行の乖離」として指摘した中核**(統制が効いていない)への実装。
 
-| ID                                             | タイトル                                                            | 優先度 | 規模 | 依存        |
-| ---------------------------------------------- | ------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [SA-01](./SA-01_AUDIT_CHAIN_INTEGRITY.ja.md)   | 監査チェーンの真正性(鍵付き・継続保証・定期検証)                    | **P0** | M    | なし        |
-| [SA-02](./SA-02_ADF_SHELL_GUARDRAILS.ja.md)    | ADF/シェル実行ガードレール(危険op走査・無条件Bash廃止・fail-closed) | **P0** | M〜L | なし        |
-| [SA-03](./SA-03_UNTRUSTED_INPUT_DEFENSE.ja.md) | 非信頼入力・プロンプトインジェクション防御                          | P1     | M    | SA-02       |
-| [SA-04](./SA-04_EGRESS_CONTROL.ja.md)          | データ持ち出し(egress)制御(allowlist全適用・tier照合)               | P1     | M    | なし        |
-| [SA-05](./SA-05_ENFORCEMENT_ACTIVATION.ja.md)  | 統制機構の実効化(kill-switch 配線・ポリシー/承認の fail-closed 化)  | **P0** | M    | SA-02,SA-04 |
+| ID                                                                                | タイトル                                                            | 優先度 | 規模 | 依存        |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [SA-01](../improvement-plans-archive/2026-07/SA-01_AUDIT_CHAIN_INTEGRITY.ja.md)   | 監査チェーンの真正性(鍵付き・継続保証・定期検証)                    | **P0** | M    | なし        |
+| [SA-02](../improvement-plans-archive/2026-07/SA-02_ADF_SHELL_GUARDRAILS.ja.md)    | ADF/シェル実行ガードレール(危険op走査・無条件Bash廃止・fail-closed) | **P0** | M〜L | なし        |
+| [SA-03](../improvement-plans-archive/2026-07/SA-03_UNTRUSTED_INPUT_DEFENSE.ja.md) | 非信頼入力・プロンプトインジェクション防御                          | P1     | M    | SA-02       |
+| [SA-04](../improvement-plans-archive/2026-07/SA-04_EGRESS_CONTROL.ja.md)          | データ持ち出し(egress)制御(allowlist全適用・tier照合)               | P1     | M    | なし        |
+| [SA-05](../improvement-plans-archive/2026-07/SA-05_ENFORCEMENT_ACTIVATION.ja.md)  | 統制機構の実効化(kill-switch 配線・ポリシー/承認の fail-closed 化)  | **P0** | M    | SA-02,SA-04 |
 
 ### 運用・可観測性・配布
 
 コスト会計・可観測性・配布/インストール・バックアップ/復旧・設定の調査(2026-07-02 追加)に基づく。統一 Trace(D3)・IP-03・AA-05・IP-12・KM-01 が扱わない残余領域。
 
-| ID                                                   | タイトル                                                        | 優先度 | 規模 | 依存  |
-| ---------------------------------------------------- | --------------------------------------------------------------- | ------ | ---- | ----- |
-| [OP-01](./OP-01_COST_ACCOUNTING.ja.md)               | LLM コスト会計と予算上限(直接SDK経路の計測・spend cap)          | **P0** | M    | IP-13 |
-| [OP-02](./OP-02_BACKUP_RECOVERY.ja.md)               | バックアップと災害復旧(全状態のスナップショット・復元ツール)    | **P0** | M    | なし  |
-| [OP-03](./OP-03_INSTALL_DISTRIBUTION.ja.md)          | インストールと配布(死んだ init 修復・bin・動く Docker イメージ) | P1     | M    | IP-04 |
-| [OP-04](./OP-04_HEALTH_DEGRADATION_MONITORING.ja.md) | 長期運用の健全性・劣化監視(予兆検知・health エンドポイント)     | P1     | M    | AA-01 |
-| [OP-05](./OP-05_CONFIG_SURFACE.ja.md)                | 設定サーフェスの一元化(181 env のレジストリ・起動時検証)        | P2     | S〜M | なし  |
+| ID                                                                                      | タイトル                                                        | 優先度 | 規模 | 依存  |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------ | ---- | ----- |
+| [OP-01](../improvement-plans-archive/2026-07/OP-01_COST_ACCOUNTING.ja.md)               | LLM コスト会計と予算上限(直接SDK経路の計測・spend cap)          | **P0** | M    | IP-13 |
+| [OP-02](../improvement-plans-archive/2026-07/OP-02_BACKUP_RECOVERY.ja.md)               | バックアップと災害復旧(全状態のスナップショット・復元ツール)    | **P0** | M    | なし  |
+| [OP-03](../improvement-plans-archive/2026-07/OP-03_INSTALL_DISTRIBUTION.ja.md)          | インストールと配布(死んだ init 修復・bin・動く Docker イメージ) | P1     | M    | IP-04 |
+| [OP-04](../improvement-plans-archive/2026-07/OP-04_HEALTH_DEGRADATION_MONITORING.ja.md) | 長期運用の健全性・劣化監視(予兆検知・health エンドポイント)     | P1     | M    | AA-01 |
+| [OP-05](../improvement-plans-archive/2026-07/OP-05_CONFIG_SURFACE.ja.md)                | 設定サーフェスの一元化(181 env のレジストリ・起動時検証)        | P2     | S〜M | なし  |
 
 ### インテントライフサイクル(受信→ゴール→完了の縦串)
 
 ユーザーインテントから完了までの縦のフローの縫い目の調査(2026-07-02 追加)に基づく。MO 系(ミッション内部機構)・UX 系(明確化/進捗の体裁)・AC-02(未処理意図)とは層が別で、「元の intent の goal を縦に貫き完了時に突き合わせる」接続に焦点。
 
-| ID                                                          | タイトル                                                               | 優先度 | 規模 | 依存        |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [IL-01](./IL-01_GOAL_THREADING.ja.md)                       | ゴールの貫通(受信時 goal を実行まで運ぶ・汎用 outcome contract 廃止)   | **P0** | M    | なし        |
-| [IL-02](./IL-02_CORRELATION_THREAD.ja.md)                   | intent→goal→result 相関スレッド(単一相関IDの貫通・trace 閲覧)          | P1     | M    | IL-01       |
-| [IL-03](./IL-03_DRIFT_DETECTION.ja.md)                      | ドリフト検出の是正(起点比較・全経路 baseline・実行中ゲート)            | P1     | M    | IL-01,IL-02 |
-| [IL-04](./IL-04_COMPLETION_INTENT_RECONCILIATION.ja.md)     | 完了とインテントの突合(close-the-loop・完了ゲート・全shape)            | **P0** | M    | IL-01       |
-| [IL-05](./IL-05_SHAPE_UNIFICATION_CORRECTION_REENTRY.ja.md) | shape 決定の一元化と修正の再突入(pending 永続化・completed 再オープン) | P2     | M    | IL-01,IL-02 |
+| ID                                                                                             | タイトル                                                               | 優先度 | 規模 | 依存        |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [IL-01](../improvement-plans-archive/2026-07/IL-01_GOAL_THREADING.ja.md)                       | ゴールの貫通(受信時 goal を実行まで運ぶ・汎用 outcome contract 廃止)   | **P0** | M    | なし        |
+| [IL-02](../improvement-plans-archive/2026-07/IL-02_CORRELATION_THREAD.ja.md)                   | intent→goal→result 相関スレッド(単一相関IDの貫通・trace 閲覧)          | P1     | M    | IL-01       |
+| [IL-03](../improvement-plans-archive/2026-07/IL-03_DRIFT_DETECTION.ja.md)                      | ドリフト検出の是正(起点比較・全経路 baseline・実行中ゲート)            | P1     | M    | IL-01,IL-02 |
+| [IL-04](../improvement-plans-archive/2026-07/IL-04_COMPLETION_INTENT_RECONCILIATION.ja.md)     | 完了とインテントの突合(close-the-loop・完了ゲート・全shape)            | **P0** | M    | IL-01       |
+| [IL-05](../improvement-plans-archive/2026-07/IL-05_SHAPE_UNIFICATION_CORRECTION_REENTRY.ja.md) | shape 決定の一元化と修正の再突入(pending 永続化・completed 再オープン) | P2     | M    | IL-01,IL-02 |
 
 ### 初回オンボーディング(すんなり使い始められるか)
 
 初回オンボード体験の実地調査(2026-07-02)に基づく。UX-06(オンボードバグ)・OP-03(配布)・UX-03(言語)が扱わない新規ギャップ。**最重大の発見: 新規ユーザーは推論バックエンド未設定でもオンボードが「成功」し、スタブ脳のまま実作業へ誘導される。**
 
-| ID                                                    | タイトル                                                                     | 優先度 | 規模 | 依存                              |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------- | ------ | ---- | --------------------------------- |
-| [ONB-01](./ONB-01_REASONING_BACKEND_ONBOARDING.ja.md) | 実働バックエンドのオンボード統合(スタブ脳で成功する問題の解消)               | **P0** | M    | なし                              |
-| [ONB-02](./ONB-02_CANONICAL_COLDSTART.ja.md)          | コールドスタートの単一正本化(5矛盾手順・Node統一・Playwright・統合preflight) | **P0** | M    | なし                              |
-| [ONB-03](./ONB-03_ONBOARDING_FRICTION_RECOVERY.ja.md) | オンボード摩擦削減(express・reset・resume修復・Path B・vital overlay)        | P1     | S〜M | UX-06                             |
-| [ONB-04](./ONB-04_AI_COMPANY_STARTUP_UX.ja.md)        | AI会社起業オンボーディング(human責任者・AI workforce・承認/予算・first-work) | **P0** | M    | ONB-01,ONB-02,ONB-03,CO-06,E2E-04 |
+| ID                                                                                       | タイトル                                                                     | 優先度 | 規模 | 依存                              |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------ | ---- | --------------------------------- |
+| [ONB-01](../improvement-plans-archive/2026-07/ONB-01_REASONING_BACKEND_ONBOARDING.ja.md) | 実働バックエンドのオンボード統合(スタブ脳で成功する問題の解消)               | **P0** | M    | なし                              |
+| [ONB-02](../improvement-plans-archive/2026-07/ONB-02_CANONICAL_COLDSTART.ja.md)          | コールドスタートの単一正本化(5矛盾手順・Node統一・Playwright・統合preflight) | **P0** | M    | なし                              |
+| [ONB-03](../improvement-plans-archive/2026-07/ONB-03_ONBOARDING_FRICTION_RECOVERY.ja.md) | オンボード摩擦削減(express・reset・resume修復・Path B・vital overlay)        | P1     | S〜M | UX-06                             |
+| [ONB-04](../improvement-plans-archive/2026-07/ONB-04_AI_COMPANY_STARTUP_UX.ja.md)        | AI会社起業オンボーディング(human責任者・AI workforce・承認/予算・first-work) | **P0** | M    | ONB-01,ONB-02,ONB-03,CO-06,E2E-04 |
 
 ### Surface UI capability(何が操作できると嬉しいか)
 
 surface が提供する UI の機能的アフォーダンスの調査(2026-07-03)に基づく。視覚デザイン(DS 系)・体験の体裁(UX 系)とは別軸で、「毎日開く価値のある操作」を実装する。A2UI 仕様の `kb-intervention-panel` 等は描画されるが未配線(inert)。
 
-| ID                                                    | タイトル                                                                  | 優先度 | 規模 | 依存              |
-| ----------------------------------------------------- | ------------------------------------------------------------------------- | ------ | ---- | ----------------- |
-| [SU-01](./SU-01_OPERATOR_HOME_INTENT_TO_PLAN.ja.md)   | オペレータホームとゴール表明→プラン承認(二値確認の廃止・プラン編集)       | P1     | L    | IL-01,IL-04,MO-01 |
-| [SU-02](./SU-02_LIVE_MISSION_INTERVENTION.ja.md)      | ライブミッション監視と実行中介入(pause/cancel/回答・kb-panel 配線)        | P1     | M    | MO-02,AA-04       |
-| [SU-03](./SU-03_DELIVERABLE_INBOX_REVIEW.ja.md)       | 成果物インボックスとレビュー・反復(accept/reject/request-changes・版管理) | P1     | M    | IL-04,MO-07       |
-| [SU-04](./SU-04_MISSION_HISTORY_COST_APPROVALS.ja.md) | ミッション履歴検索・コスト可視化・承認キュー・テナントバナー              | P2     | M    | OP-01,IL-02       |
+| ID                                                                                       | タイトル                                                                  | 優先度 | 規模 | 依存              |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [SU-01](../improvement-plans-archive/2026-07/SU-01_OPERATOR_HOME_INTENT_TO_PLAN.ja.md)   | オペレータホームとゴール表明→プラン承認(二値確認の廃止・プラン編集)       | P1     | L    | IL-01,IL-04,MO-01 |
+| [SU-02](../improvement-plans-archive/2026-07/SU-02_LIVE_MISSION_INTERVENTION.ja.md)      | ライブミッション監視と実行中介入(pause/cancel/回答・kb-panel 配線)        | P1     | M    | MO-02,AA-04       |
+| [SU-03](../improvement-plans-archive/2026-07/SU-03_DELIVERABLE_INBOX_REVIEW.ja.md)       | 成果物インボックスとレビュー・反復(accept/reject/request-changes・版管理) | P1     | M    | IL-04,MO-07       |
+| [SU-04](../improvement-plans-archive/2026-07/SU-04_MISSION_HISTORY_COST_APPROVALS.ja.md) | ミッション履歴検索・コスト可視化・承認キュー・テナントバナー              | P2     | M    | OP-01,IL-02       |
 
 ### E2E(オペレータ接点の最小統合)
 
 `E2E-04` は SU-01 / SU-03 の最小形を引き取る統合計画。入口(話しかける場所)は分散のまま、ホームと受け取り口を1つにまとめる。
 
-| ID                                          | タイトル                                                        | 優先度 | 規模 | 依存        |
-| ------------------------------------------- | --------------------------------------------------------------- | ------ | ---- | ----------- |
-| [E2E-04](./E2E-04_OPERATOR_INTERFACE.ja.md) | オペレータ・インターフェース統合(ホーム/inbox/計画承認の最小形) | **P0** | M〜L | UX-01,IL-01 |
+| ID                                                                             | タイトル                                                        | 優先度 | 規模 | 依存        |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------- | ------ | ---- | ----------- |
+| [E2E-04](../improvement-plans-archive/2026-07/E2E-04_OPERATOR_INTERFACE.ja.md) | オペレータ・インターフェース統合(ホーム/inbox/計画承認の最小形) | **P0** | M〜L | UX-01,IL-01 |
 
 ### Handoff(SDLC/AI-DLC の引き継ぎ)
 
 作業が別 holder に渡る瞬間の文脈保持の調査(2026-07-03)に基づく。MO-04(コンテキスト)・IL-01(goal 貫通)を補完。AI-DLC は完全人手コピペで未実装、Cowork 連携が最も成熟した自己完結パケットを持つ。
 
-| ID                                                       | タイトル                                                                                            | 優先度 | 規模 | 依存              |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
-| [HO-01](./HO-01_HANDOFF_PACKETS.ja.md)                   | 自己完結ハンドオフパケット(work-item/mission handoff・契約に rationale/受入条件・承認 framing 配線) | P1     | M    | MO-04,IL-01       |
-| [HO-02](./HO-02_AIDLC_PHASE_HANDOFF_OBSERVABILITY.ja.md) | AI-DLC フェーズハンドオフの自動化と統合ハンドオフ履歴                                               | P2     | M〜L | MO-01,MO-02,HO-01 |
+| ID                                                                                          | タイトル                                                                                            | 優先度 | 規模 | 依存              |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [HO-01](../improvement-plans-archive/2026-07/HO-01_HANDOFF_PACKETS.ja.md)                   | 自己完結ハンドオフパケット(work-item/mission handoff・契約に rationale/受入条件・承認 framing 配線) | P1     | M    | MO-04,IL-01       |
+| [HO-02](../improvement-plans-archive/2026-07/HO-02_AIDLC_PHASE_HANDOFF_OBSERVABILITY.ja.md) | AI-DLC フェーズハンドオフの自動化と統合ハンドオフ履歴                                               | P2     | M〜L | MO-01,MO-02,HO-01 |
 
 ### ハーネス(Fable 5 のオーケストレーション取り込み)
 
 「軽量モデルでも高品質な成果を出すオーケストレーションの型」を Kyberion に取り込む。思想は参照文書 [ORCHESTRATION_HARNESS_MODEL](../ORCHESTRATION_HARNESS_MODEL.ja.md)(タスク分解・ブリフ・順序・成果物評価・改善ループ・通信・エージェントループの原則体系 + Kyberion 現状マッピング)にまとめ、既存の原則ギャップを以下に計画化。
 
-| ID                                                 | タイトル                                                                                | 優先度 | 規模 | 依存        |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [HN-01](./HN-01_MODEL_TIER_LIGHTWEIGHT.ja.md)      | モデル階層の実効化と軽量モデル活用の規律(tier/effort・軽量ほど厳格)                     | P1     | M    | MO-05,IP-13 |
-| [HN-02](./HN-02_SCHEMA_FORCED_DELEGATION.ja.md)    | schema-forced 委譲(検証済みオブジェクト返却・retry-on-mismatch・出力契約検証)           | P1     | M    | なし        |
-| [HN-03](./HN-03_DETERMINISTIC_ORCHESTRATION.ja.md) | 決定論オーケストレーション強化(並列map・loop-until・workflow-as-code・無音打ち切り解消) | P1     | L    | MO-03       |
+| ID                                                                                    | タイトル                                                                                | 優先度 | 規模 | 依存        |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [HN-01](../improvement-plans-archive/2026-07/HN-01_MODEL_TIER_LIGHTWEIGHT.ja.md)      | モデル階層の実効化と軽量モデル活用の規律(tier/effort・軽量ほど厳格)                     | P1     | M    | MO-05,IP-13 |
+| [HN-02](../improvement-plans-archive/2026-07/HN-02_SCHEMA_FORCED_DELEGATION.ja.md)    | schema-forced 委譲(検証済みオブジェクト返却・retry-on-mismatch・出力契約検証)           | P1     | M    | なし        |
+| [HN-03](../improvement-plans-archive/2026-07/HN-03_DETERMINISTIC_ORCHESTRATION.ja.md) | 決定論オーケストレーション強化(並列map・loop-until・workflow-as-code・無音打ち切り解消) | P1     | L    | MO-03       |
 
 ### OpenHarness 概念取り込み(コンテキスト経済・ガバナンス硬化・実行前判定)
 
@@ -285,7 +292,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### メディア生成プロセス(HyperFrames / Anthropic skills の作成プロセス移植)
 
-[heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) の skills 群・design ガイドと [anthropics/skills](https://github.com/anthropics/skills)(pptx/frontend-design/canvas-design 等)の実プロセス分析(2026-07-20)に基づく。正本は [MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md](./MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md)(MP-01〜06 は同文書内)。動画・PPTX のデザイン品質を「ブリーフロック→トークン先行→ビート/ページ設計→lint→レンダリング視覚批評→限定修正」の段階ゲート型プロセスへ転換する。LE(スタイルカスケード統一)の後続として、レイアウト知能(テキスト計測)と視覚検証ループを補う。
+[heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) の skills 群・design ガイドと [anthropics/skills](https://github.com/anthropics/skills)(pptx/frontend-design/canvas-design 等)の実プロセス分析(2026-07-20)に基づく。正本は [MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md](../improvement-plans-archive/2026-07/MEDIA_CREATION_PROCESS_PLAN_2026-07-20.ja.md)(MP-01〜06 は同文書内)。動画・PPTX のデザイン品質を「ブリーフロック→トークン先行→ビート/ページ設計→lint→レンダリング視覚批評→限定修正」の段階ゲート型プロセスへ転換する。LE(スタイルカスケード統一)の後続として、レイアウト知能(テキスト計測)と視覚検証ループを補う。
 
 | ID    | タイトル                                                                     | 優先度 | 規模 | 依存        |
 | ----- | ---------------------------------------------------------------------------- | ------ | ---- | ----------- |
@@ -315,7 +322,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### Skill Recorder 概念取り込み(実演観測・意図再構成・ネイティブ op 優先の蒸留)
 
-[microsoft/skill-recorder](https://github.com/microsoft/skill-recorder) v0.4.2 の実コード分析(2026-08-09)に基づく。正本は [SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md](./SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md)(DR-01〜09 は同文書内)。同じく概念昇華方式。**新パラダイムではなく、既に凍結済みの学習→再生契約(`libs/core/procedure-types.ts`、[INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md))の desktop サブストレートと蒸留品質に対する実装参照。** 診断で判明した構造的事実: (a) `procedure-dispatcher.ts` と `desktop-recording.schema.json` の「OS automation backend が無い」という注記は**事実に反する**(`os-automation.ts` に実行プリミティブが揃っている)ため、止まっているのは再生側ではなく**観測側**; (b) 既存 desktop 設計 §6 の「`osAutomationBridge` をフックして録画」は**人間の実演では発火しない**(パターン A の前提と矛盾)ため独立ポーリング観測へ補正が必要; (c) `DistillCandidateRecord.target_kind` に実行可能成果物の選択肢が無く、成功ミッションは散文しか残せない。
+[microsoft/skill-recorder](https://github.com/microsoft/skill-recorder) v0.4.2 の実コード分析(2026-08-09)に基づく。正本は [SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md](../improvement-plans-archive/2026-07/SKILL_RECORDER_ADOPTION_PLAN_2026-08-09.ja.md)(DR-01〜09 は同文書内)。同じく概念昇華方式。**新パラダイムではなく、既に凍結済みの学習→再生契約(`libs/core/procedure-types.ts`、[INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN](../../INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md))の desktop サブストレートと蒸留品質に対する実装参照。** 診断で判明した構造的事実: (a) `procedure-dispatcher.ts` と `desktop-recording.schema.json` の「OS automation backend が無い」という注記は**事実に反する**(`os-automation.ts` に実行プリミティブが揃っている)ため、止まっているのは再生側ではなく**観測側**; (b) 既存 desktop 設計 §6 の「`osAutomationBridge` をフックして録画」は**人間の実演では発火しない**(パターン A の前提と矛盾)ため独立ポーリング観測へ補正が必要; (c) `DistillCandidateRecord.target_kind` に実行可能成果物の選択肢が無く、成功ミッションは散文しか残せない。
 
 | ID    | タイトル                                          | 優先度 | 規模 | 依存               |
 | ----- | ------------------------------------------------- | ------ | ---- | ------------------ |
@@ -331,7 +338,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### タスク知識配給(配置・配給・帰還の閉ループ)
 
-ミッションのタスク実行時に担当エージェントへ渡すナレッジを「必要十分で生産性が高い」状態にする計画(2026-07-25、origin/main `00485737` で実コード突合)。正本は [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](./TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07 は同文書内)。MO-04(context pack)・KM-01〜04(検索品質・昇格ガバナンス・ストア衛生)の後続ループ。**診断で判明した構造的問題: 配給3経路の装備不均一(goal-driven 経路は context pack 非添付、`delegateTask` は素文字列)、一律 top-3 で規模・役割に較正されない選定、trace `knowledgeRefs` 全空 = 帰還信号ゼロによる「量の管理」のみのメンテナンス。**
+ミッションのタスク実行時に担当エージェントへ渡すナレッジを「必要十分で生産性が高い」状態にする計画(2026-07-25、origin/main `00485737` で実コード突合)。正本は [TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md)(KP-01〜07 は同文書内)。MO-04(context pack)・KM-01〜04(検索品質・昇格ガバナンス・ストア衛生)の後続ループ。**診断で判明した構造的問題: 配給3経路の装備不均一(goal-driven 経路は context pack 非添付、`delegateTask` は素文字列)、一律 top-3 で規模・役割に較正されない選定、trace `knowledgeRefs` 全空 = 帰還信号ゼロによる「量の管理」のみのメンテナンス。**
 
 | ID    | タイトル                                              | 優先度 | 規模 | 依存                   |
 | ----- | ----------------------------------------------------- | ------ | ---- | ---------------------- |
@@ -345,7 +352,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### CLI サブエージェント・チーム(単一プロバイダ CLI 内のチーム構成・連携)
 
-単一 LLM プロバイダの CLI(Claude Code / Codex app-server 等)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](./CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜06 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への provider adapter 追加)として実現する。Claude は governed Agent SDK path、Codex は既存 app-server 内の logical subagent/thread を使い、タスクごとの新規 CLI spawn は行わない。agent-runtime(A2A)の置き換えではなく代替実行面。CT-06では、mission WorkItemごとにCLI subagent / agent-runtime / hybridを選択し、実装・独立レビューの双方へ同じ契約を適用する。
+単一 LLM プロバイダの CLI(Claude Code / Codex app-server 等)内で完結するチームモードの構築計画(2026-07-25、実コード突合)。正本は [CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)(CT-01〜06 は同文書内)。Kyberion のチームは既に CLI 非依存の契約の束(team-roles・KD-05 能力ティア・タスク契約・context pack・共有ミッション作業域)なので、新規の連携機構ではなく**既存契約を CLI ハーネスのサブエージェント機構へ射影する薄いアダプタ**(役割定義の生成儀式 + `AgentDispatcher` seam への provider adapter 追加)として実現する。Claude は governed Agent SDK path、Codex は既存 app-server 内の logical subagent/thread を使い、タスクごとの新規 CLI spawn は行わない。agent-runtime(A2A)の置き換えではなく代替実行面。CT-06では、mission WorkItemごとにCLI subagent / agent-runtime / hybridを選択し、実装・独立レビューの双方へ同じ契約を適用する。
 
 | ID    | タイトル                                                  | 優先度 | 規模 | 依存                       |
 | ----- | --------------------------------------------------------- | ------ | ---- | -------------------------- |
@@ -358,7 +365,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### クロスプロバイダ実行(複数 LLM プロバイダ CLI の併走規約)
 
-単一マシンに複数の LLM プロバイダ CLI(claude / codex / agy / gemini / copilot)が同居する現実(provider-discovery 5/5 検出、failover chain 構成済み)に対し、「検出して切り替える」以上の併走規約を定める計画(2026-07-25、実コード突合)。正本は [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](./CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07 は同文書内)。ハード制約5点(ディレクトリ契約・指示の単一正本射影・env allowlist・tier×egress ゲート・プロバイダ中立出力契約)を**プロバイダ中立の宣言 + adapter 射影**として実装する。CT(単一 CLI チーム)の兄弟計画。
+単一マシンに複数の LLM プロバイダ CLI(claude / codex / agy / gemini / copilot)が同居する現実(provider-discovery 5/5 検出、failover chain 構成済み)に対し、「検出して切り替える」以上の併走規約を定める計画(2026-07-25、実コード突合)。正本は [CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md)(XP-01〜07 は同文書内)。ハード制約5点(ディレクトリ契約・指示の単一正本射影・env allowlist・tier×egress ゲート・プロバイダ中立出力契約)を**プロバイダ中立の宣言 + adapter 射影**として実装する。CT(単一 CLI チーム)の兄弟計画。
 
 | ID    | タイトル                                                 | 優先度 | 規模 | 依存                   |
 | ----- | -------------------------------------------------------- | ------ | ---- | ---------------------- |
@@ -372,7 +379,7 @@ surface が提供する UI の機能的アフォーダンスの調査(2026-07-03
 
 ### surface 会話オーケストレータ(surface が CLI と同格のオーケストレータになる)
 
-LLM プロバイダ CLI 経由では CLI セッションが会話オーケストレータ(ミッション所有・操縦)を担うのに対し、surface 経由では会話の前面(`runSurfaceConversation` の共通ループ)とミッション発行(SN-01)までしか中立化されていない(2026-07-25、実コード突合)。正本は [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](./SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05 は同文書内)。既にプログラマティックに存在する lifecycle 動詞(`missionSystem`)の governed facade 昇格 + 会話スレッド↔ミッション所有の永続バインディング(`OrchestratorSession`)+ owner 権限配線 + 会話操縦ルートの4増分で、**発行者から所有者への昇格**を実現する。CLI オーケストレータの置き換えではなく対称化。加えて責務別モデル階梯(会話の前面 = fast/standard、オーケストレータ判断 = deep)を既存 `model_tier` 語彙の宣言として配線し、対称化がコスト増にならないようにする。
+LLM プロバイダ CLI 経由では CLI セッションが会話オーケストレータ(ミッション所有・操縦)を担うのに対し、surface 経由では会話の前面(`runSurfaceConversation` の共通ループ)とミッション発行(SN-01)までしか中立化されていない(2026-07-25、実コード突合)。正本は [SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md](../improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md)(SO-01〜05 は同文書内)。既にプログラマティックに存在する lifecycle 動詞(`missionSystem`)の governed facade 昇格 + 会話スレッド↔ミッション所有の永続バインディング(`OrchestratorSession`)+ owner 権限配線 + 会話操縦ルートの4増分で、**発行者から所有者への昇格**を実現する。CLI オーケストレータの置き換えではなく対称化。加えて責務別モデル階梯(会話の前面 = fast/standard、オーケストレータ判断 = deep)を既存 `model_tier` 語彙の宣言として配線し、対称化がコスト増にならないようにする。
 
 | ID    | タイトル                                                       | 優先度 | 規模 | 依存                      |
 | ----- | -------------------------------------------------------------- | ------ | ---- | ------------------------- |
@@ -386,21 +393,21 @@ LLM プロバイダ CLI 経由では CLI セッションが会話オーケスト
 
 各アクチュエータのリファクタリング・使いやすさの調査(2026-07-03、実コード検証済み)に基づく。AC 系(能力)・IP-05(CLI runner)・IP-10(巨大ファイル)とは**別軸**(op 設計・ADFスキーマ・エンジン一貫性)。**検証で判明した構造的問題: 3つの非互換パイプラインエンジン、op 真実源の4系統ドリフト、未知 op の silent no-op(`file-pipeline-helpers.ts:178/237/249`)、op 命名の乱れ、per-op 入力契約の欠如。**
 
-| ID                                                  | タイトル                                                                          | 優先度 | 規模 | 依存              |
-| --------------------------------------------------- | --------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
-| [AR-01](./AR-01_UNIFY_ADF_ENGINE.ja.md)             | ADF 実行エンジンの統合(3非互換エンジン→1、意味論一致)                             | **P0** | L    | なし              |
-| [AR-02](./AR-02_OP_REGISTRY_SINGLE_SOURCE.ja.md)    | op レジストリの単一真実源化(dispatch から生成・4系統ドリフト解消)                 | **P0** | M    | なし              |
-| [AR-03](./AR-03_PER_OP_INPUT_CONTRACTS.ja.md)       | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                             | P1     | M〜L | AR-02             |
-| [AR-04](./AR-04_SHARED_OP_VOCABULARY.ja.md)         | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)                   | P1     | M    | AR-01,AR-02       |
-| [AR-05](./AR-05_ACTUATOR_COHERENCE_SPLIT.ja.md)     | 不整合アクチュエータの分割(観察/変更・ドメイン境界、IP-10 と統合)                 | P2     | L    | AR-01,AR-02       |
-| [AR-06](./AR-06_NO_SILENT_NOOP.ja.md)               | silent no-op の撲滅(未知 op を成功でなくエラーに)                                 | P1     | S    | AR-02推奨         |
-| [AR-08](./AR-08_PIPELINE_CATALOG_AUDIT.ja.md)       | pipeline カタログ全数監査(77件・実行検証55件・ADF修復エンジンのfalse-success修正) | P1     | M    | AR-01,AR-02       |
-| [AR-09](./AR-09_ACTUATOR_COMMONIZATION.ja.md)       | actuator 共通能力の正本化(recovery/process/voice/job/HTTP)                        | P1     | L    | AR-02,AR-03       |
-| [AR-10](./AR-10_MACOS_AUTOMATION_INTEGRATION.ja.md) | macOS automation capability の共通 facade と system probe                         | P1     | M    | AR-02,AR-03,AR-09 |
+| ID                                                                                     | タイトル                                                                          | 優先度 | 規模 | 依存              |
+| -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [AR-01](../improvement-plans-archive/2026-07/AR-01_UNIFY_ADF_ENGINE.ja.md)             | ADF 実行エンジンの統合(3非互換エンジン→1、意味論一致)                             | **P0** | L    | なし              |
+| [AR-02](../improvement-plans-archive/2026-07/AR-02_OP_REGISTRY_SINGLE_SOURCE.ja.md)    | op レジストリの単一真実源化(dispatch から生成・4系統ドリフト解消)                 | **P0** | M    | なし              |
+| [AR-03](../improvement-plans-archive/2026-07/AR-03_PER_OP_INPUT_CONTRACTS.ja.md)       | per-op 入力契約(`params:any` → 検証付き契約・必須/例)                             | P1     | M〜L | AR-02             |
+| [AR-04](../improvement-plans-archive/2026-07/AR-04_SHARED_OP_VOCABULARY.ja.md)         | 共有 op 語彙(io/capture/net/transform/core・命名エイリアス整理)                   | P1     | M    | AR-01,AR-02       |
+| [AR-05](../improvement-plans-archive/2026-07/AR-05_ACTUATOR_COHERENCE_SPLIT.ja.md)     | 不整合アクチュエータの分割(観察/変更・ドメイン境界、IP-10 と統合)                 | P2     | L    | AR-01,AR-02       |
+| [AR-06](../improvement-plans-archive/2026-07/AR-06_NO_SILENT_NOOP.ja.md)               | silent no-op の撲滅(未知 op を成功でなくエラーに)                                 | P1     | S    | AR-02推奨         |
+| [AR-08](../improvement-plans-archive/2026-07/AR-08_PIPELINE_CATALOG_AUDIT.ja.md)       | pipeline カタログ全数監査(77件・実行検証55件・ADF修復エンジンのfalse-success修正) | P1     | M    | AR-01,AR-02       |
+| [AR-09](../improvement-plans-archive/2026-07/AR-09_ACTUATOR_COMMONIZATION.ja.md)       | actuator 共通能力の正本化(recovery/process/voice/job/HTTP)                        | P1     | L    | AR-02,AR-03       |
+| [AR-10](../improvement-plans-archive/2026-07/AR-10_MACOS_AUTOMATION_INTEGRATION.ja.md) | macOS automation capability の共通 facade と system probe                         | P1     | M    | AR-02,AR-03,AR-09 |
 
 ### 実行レイヤリング(pipeline / typed ops / デザインシステムの3層分離)
 
-PPTX デザイン乖離の調査(2026-07-15)に基づく。正本は [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](./LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05 は同文書内)。AR-02/AR-08/DS-01/HN-03/E2E-02 の完了済み成果を接続する。
+PPTX デザイン乖離の調査(2026-07-15)に基づく。正本は [LAYERED_EXECUTION_PLAN_2026-07-15.ja.md](../improvement-plans-archive/2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)(LE-01〜05 は同文書内)。AR-02/AR-08/DS-01/HN-03/E2E-02 の完了済み成果を接続する。
 
 | ID    | タイトル                                                             | 優先度 | 規模 | 依存         |
 | ----- | -------------------------------------------------------------------- | ------ | ---- | ------------ |
@@ -414,69 +421,69 @@ PPTX デザイン乖離の調査(2026-07-15)に基づく。正本は [LAYERED_EX
 
 30日連続の無人運用・自己保守に必要な機構の調査(2026-07-03)に基づく。判断の考え方は参照文書 [AUTONOMOUS_MAINTENANCE_JUDGMENT](../AUTONOMOUS_MAINTENANCE_JUDGMENT.ja.md)(自動/承認の4軸・脆弱性パッチのルーブリック・運用ループ・エスカレーション基準)にまとめ、それを回す機構を以下に計画化。既存の OP/AA/SA/KM 系を束ねる。**調査結論: 現状では30日無人運用は任せられない**(スケジューラにジョブゼロ・デーモン無監督・依存/CVEパッチ機構皆無・アラート経路不在)。
 
-| ID                                                   | タイトル                                                                                          | 優先度 | 規模 | 依存              |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
-| [AO-01](./AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md)   | 自律保守ループと定期メンテの実配線(scheduler実ジョブ・missed-run/lock・判断駆動の振り分け)        | P1     | M    | KM-01,OP-04,AO-03 |
-| [AO-02](./AO-02_DEPENDENCY_VULN_PATCH.ja.md)         | 依存・脆弱性・パッチ管理(CVE追跡・ルーブリック駆動のパッチ適用フロー)                             | **P0** | M    | IP-03,AO-01,AO-03 |
-| [AO-03](./AO-03_DAEMON_SUPERVISION_ESCALATION.ja.md) | デーモン監督と人間エスカレーション(watchdog・launchd完備・実アラートsink・自己修復の承認ゲート化) | **P0** | M    | なし              |
-| [AO-04](./AO-04_SOAK_ENDURANCE_VALIDATION.ja.md)     | 長時間運用の耐久検証(soak・リーク検出・再起動e2e・30日エビデンス)                                 | P1     | M    | AO-01,AO-02,AO-03 |
+| ID                                                                                      | タイトル                                                                                          | 優先度 | 規模 | 依存              |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------ | ---- | ----------------- |
+| [AO-01](../improvement-plans-archive/2026-07/AO-01_AUTONOMOUS_MAINTENANCE_LOOP.ja.md)   | 自律保守ループと定期メンテの実配線(scheduler実ジョブ・missed-run/lock・判断駆動の振り分け)        | P1     | M    | KM-01,OP-04,AO-03 |
+| [AO-02](../improvement-plans-archive/2026-07/AO-02_DEPENDENCY_VULN_PATCH.ja.md)         | 依存・脆弱性・パッチ管理(CVE追跡・ルーブリック駆動のパッチ適用フロー)                             | **P0** | M    | IP-03,AO-01,AO-03 |
+| [AO-03](../improvement-plans-archive/2026-07/AO-03_DAEMON_SUPERVISION_ESCALATION.ja.md) | デーモン監督と人間エスカレーション(watchdog・launchd完備・実アラートsink・自己修復の承認ゲート化) | **P0** | M    | なし              |
+| [AO-04](../improvement-plans-archive/2026-07/AO-04_SOAK_ENDURANCE_VALIDATION.ja.md)     | 長時間運用の耐久検証(soak・リーク検出・再起動e2e・30日エビデンス)                                 | P1     | M    | AO-01,AO-02,AO-03 |
 
 ### E2E 縦一気通貫(中核ユースケースの実流)
 
 「部品はあるのに流れない」を、継ぎ目の配線と前提の事前検出で解消する実流計画(2026-07-05 追加)。
 
-| ID                                           | タイトル                                                                                                      | 優先度 | 規模 | 依存                                                      |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ | ---- | --------------------------------------------------------- |
-| [E2E-01](./E2E-01_MEETING_TO_VALUE.ja.md)    | 会議→価値提供の縦一気通貫(声学習→本人ボイス会議→議事録→アクションアイテム→タスク→顧客提供。Task 1-7 実装済み) | **P0** | M    | なし(AC-01/UX-01/OP-02 の成果を利用)                      |
-| [E2E-02](./E2E-02_CREATIVE_SUITE.ja.md)      | クリエイティブ統合(動画・パワポ・音楽・MV・Web を1つのデザインシステムで)                                     | **P0** | M〜L | DS-01。DS-02/DS-04 未了分を引き取る                       |
-| [E2E-03](./E2E-03_AGENT_COLLABORATION.ja.md) | エージェント協調(上流成果の可視化・review往復・best-of-N・PR協調)                                             | **P0** | M〜L | MO-03/MO-04/HO-01/IL-01 を利用。MO-02 と棲み分け          |
-| [E2E-04](./E2E-04_OPERATOR_INTERFACE.ja.md)  | オペレータ・インターフェース統合(入口・ホーム・通知・inbox・plan-preview・CLI 経路統一)                       | **P0** | M〜L | UX-01/IL-01/E2E-01〜03 の成果を利用。SU-01/SU-03 の最小形 |
-| [E2E-05](./E2E-05_APP_LIFECYCLE.ja.md)       | アプリ開発ライフサイクル(iOS/Android の AI-DLC/SDLC 全工程自動化: build/scaffold/デバイステスト/配布)         | **P0** | L    | E2E-03/MO-02 と接続。AC-01/AC-03/IP-05 を利用             |
-| [E2E-06](./E2E-06_CUSTOMER_DIALOGUE.ja.md)   | 顧客対話ドリブン(顧客チャネル・接地ガードレール・deal 状態機械・見積/契約・要件吸収→SDLC)                     | **P0** | L    | E2E-01/04/05 と接続。SA-03/SA-04 の防御思想に従う         |
+| ID                                                                              | タイトル                                                                                                      | 優先度 | 規模 | 依存                                                      |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ | ---- | --------------------------------------------------------- |
+| [E2E-01](../improvement-plans-archive/2026-07/E2E-01_MEETING_TO_VALUE.ja.md)    | 会議→価値提供の縦一気通貫(声学習→本人ボイス会議→議事録→アクションアイテム→タスク→顧客提供。Task 1-7 実装済み) | **P0** | M    | なし(AC-01/UX-01/OP-02 の成果を利用)                      |
+| [E2E-02](../improvement-plans-archive/2026-07/E2E-02_CREATIVE_SUITE.ja.md)      | クリエイティブ統合(動画・パワポ・音楽・MV・Web を1つのデザインシステムで)                                     | **P0** | M〜L | DS-01。DS-02/DS-04 未了分を引き取る                       |
+| [E2E-03](../improvement-plans-archive/2026-07/E2E-03_AGENT_COLLABORATION.ja.md) | エージェント協調(上流成果の可視化・review往復・best-of-N・PR協調)                                             | **P0** | M〜L | MO-03/MO-04/HO-01/IL-01 を利用。MO-02 と棲み分け          |
+| [E2E-04](../improvement-plans-archive/2026-07/E2E-04_OPERATOR_INTERFACE.ja.md)  | オペレータ・インターフェース統合(入口・ホーム・通知・inbox・plan-preview・CLI 経路統一)                       | **P0** | M〜L | UX-01/IL-01/E2E-01〜03 の成果を利用。SU-01/SU-03 の最小形 |
+| [E2E-05](../improvement-plans-archive/2026-07/E2E-05_APP_LIFECYCLE.ja.md)       | アプリ開発ライフサイクル(iOS/Android の AI-DLC/SDLC 全工程自動化: build/scaffold/デバイステスト/配布)         | **P0** | L    | E2E-03/MO-02 と接続。AC-01/AC-03/IP-05 を利用             |
+| [E2E-06](../improvement-plans-archive/2026-07/E2E-06_CUSTOMER_DIALOGUE.ja.md)   | 顧客対話ドリブン(顧客チャネル・接地ガードレール・deal 状態機械・見積/契約・要件吸収→SDLC)                     | **P0** | L    | E2E-01/04/05 と接続。SA-03/SA-04 の防御思想に従う         |
 
 ### Company OS(会社を経営する OS 層)
 
 「1人 + AI で AIスタートアップを回す」ための会社経営レイヤーの調査(2026-07-03)に基づく。コンセプトは参照文書 [COMPANY_OS_CONCEPT](../COMPANY_OS_CONCEPT.ja.md)(可能かの診断・組織/業務の表現方法)。既存プリミティブ(vision/role/agent/tenant/mission/pipeline)で業務は表現・実行できるが、会社を束ねる集約層・財務/KPI/意思決定のデータ化が未完。それを埋める。
 
-| ID                                              | タイトル                                                                               | 優先度 | 規模 | 依存                                    |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | ---- | --------------------------------------- |
-| [CO-01](./CO-01_COMPANY_ENTITY.ja.md)           | 会社の集約エンティティと理念の runtime 配線(散在5ファイルの統合・per-tenant vision)    | P1     | M    | なし                                    |
-| [CO-02](./CO-02_ORG_CHART_ROLES.ja.md)          | 組織図のデータ化とカスタムロール作成フロー(CFO/営業を作れる・固定でなく mission 派生)  | P2     | M    | CO-01,SA-05                             |
-| [CO-03](./CO-03_FINANCIAL_KPI_MODEL.ja.md)      | 財務・KPI・OKR モデリング(P&L/予算/予測・OKR・経営判断への接続)                        | P1     | M〜L | CO-01,OP-01                             |
-| [CO-04](./CO-04_DECISION_RIGHTS.ja.md)          | 意思決定権限マトリクス(decision rights as data・承認ゲート統合・黄金律タイブレーク)    | P2     | M    | CO-01,CO-02,SA-05                       |
-| [CO-05](./CO-05_BUSINESS_PROCESS_LIBRARY.ja.md) | 事業プロセステンプレートの拡充(採用/財務決算/調達/取締役会/資金調達)                   | P2     | M    | MO-01,CO-02,CO-03                       |
-| [CO-06](./CO-06_SOLOPRENEUR_AI_WORKFORCE.ja.md) | ソロプレナーAI workforce(人とAIの共通労働契約・人間への最終帰責・委任lease・CEO操作面) | **P0** | L    | CO-01,CO-04,MO-03,OP-01,SU-01〜04,SA-05 |
+| ID                                                                                 | タイトル                                                                               | 優先度 | 規模 | 依存                                    |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------ | ---- | --------------------------------------- |
+| [CO-01](../improvement-plans-archive/2026-07/CO-01_COMPANY_ENTITY.ja.md)           | 会社の集約エンティティと理念の runtime 配線(散在5ファイルの統合・per-tenant vision)    | P1     | M    | なし                                    |
+| [CO-02](../improvement-plans-archive/2026-07/CO-02_ORG_CHART_ROLES.ja.md)          | 組織図のデータ化とカスタムロール作成フロー(CFO/営業を作れる・固定でなく mission 派生)  | P2     | M    | CO-01,SA-05                             |
+| [CO-03](../improvement-plans-archive/2026-07/CO-03_FINANCIAL_KPI_MODEL.ja.md)      | 財務・KPI・OKR モデリング(P&L/予算/予測・OKR・経営判断への接続)                        | P1     | M〜L | CO-01,OP-01                             |
+| [CO-04](../improvement-plans-archive/2026-07/CO-04_DECISION_RIGHTS.ja.md)          | 意思決定権限マトリクス(decision rights as data・承認ゲート統合・黄金律タイブレーク)    | P2     | M    | CO-01,CO-02,SA-05                       |
+| [CO-05](../improvement-plans-archive/2026-07/CO-05_BUSINESS_PROCESS_LIBRARY.ja.md) | 事業プロセステンプレートの拡充(採用/財務決算/調達/取締役会/資金調達)                   | P2     | M    | MO-01,CO-02,CO-03                       |
+| [CO-06](../improvement-plans-archive/2026-07/CO-06_SOLOPRENEUR_AI_WORKFORCE.ja.md) | ソロプレナーAI workforce(人とAIの共通労働契約・人間への最終帰責・委任lease・CEO操作面) | **P0** | L    | CO-01,CO-04,MO-03,OP-01,SU-01〜04,SA-05 |
 
 ### グラフオーケストレーション(ループ → グラフ)
 
-グラフエンジニアリング動向(ADK Go 2.0・LangGraph durable execution)の取り込み調査(2026-07-28 追加)に基づく。グラフの「データ」(タスク DAG・Kahn ソート・並列原語)は既にあるが「実行機」(エッジ契約・frontier スケジューラ・checkpoint/resume)がない、というねじれの解消。正本: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)。
+グラフエンジニアリング動向(ADK Go 2.0・LangGraph durable execution)の取り込み調査(2026-07-28 追加)に基づく。グラフの「データ」(タスク DAG・Kahn ソート・並列原語)は既にあるが「実行機」(エッジ契約・frontier スケジューラ・checkpoint/resume)がない、というねじれの解消。正本: [GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md)。
 
-| ID                                                   | タイトル                                                                        | 優先度 | 規模 | 依存        |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [GE-01](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ステップ間エッジの契約化(depends_on + データフローエッジ・preflight 検証)       | P1     | M    | なし        |
-| [GE-02](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | frontier スケジューラ(逐次 for 置換・fan-in マージポリシー・ResourceClaim 統合) | P1     | L    | GE-01       |
-| [GE-03](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | 条件付きエッジと安全な式評価(when・core:switch・黙殺 false 根治)                | P1     | M    | GE-01       |
-| [GE-04](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ノード境界チェックポイントと --resume(EventSourcingKernel 派生 run journal)     | P1     | L    | GE-01,GE-02 |
-| [GE-05](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ミッションワーカーの wave バリア撤廃(frontier 駆動・ループ上限ポリシー化)       | P1     | L    | GE-02,GE-06 |
-| [GE-06](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | delegateTask ハンドル API(delegation_id・join・cancel)                          | P1     | M    | なし        |
-| [GE-07](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | グラフ guardrails とプレビュー(トラバース穴・グラフ lint・Mermaid)              | P2     | S〜M | GE-01       |
-| [GE-08](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | DAG 形トレースと run-graph アーティファクト                                     | P2     | M    | GE-02       |
-| [GE-09](./GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | wisdom fanout の並列化(dogfood・before/after 実測)                              | P2     | S〜M | GE-02       |
+| ID                                                                                      | タイトル                                                                        | 優先度 | 規模 | 依存        |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [GE-01](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ステップ間エッジの契約化(depends_on + データフローエッジ・preflight 検証)       | P1     | M    | なし        |
+| [GE-02](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | frontier スケジューラ(逐次 for 置換・fan-in マージポリシー・ResourceClaim 統合) | P1     | L    | GE-01       |
+| [GE-03](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | 条件付きエッジと安全な式評価(when・core:switch・黙殺 false 根治)                | P1     | M    | GE-01       |
+| [GE-04](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ノード境界チェックポイントと --resume(EventSourcingKernel 派生 run journal)     | P1     | L    | GE-01,GE-02 |
+| [GE-05](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | ミッションワーカーの wave バリア撤廃(frontier 駆動・ループ上限ポリシー化)       | P1     | L    | GE-02,GE-06 |
+| [GE-06](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | delegateTask ハンドル API(delegation_id・join・cancel)                          | P1     | M    | なし        |
+| [GE-07](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | グラフ guardrails とプレビュー(トラバース穴・グラフ lint・Mermaid)              | P2     | S〜M | GE-01       |
+| [GE-08](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | DAG 形トレースと run-graph アーティファクト                                     | P2     | M    | GE-02       |
+| [GE-09](../improvement-plans-archive/2026-07/GRAPH_ORCHESTRATION_PLAN_2026-07-28.ja.md) | wisdom fanout の並列化(dogfood・before/after 実測)                              | P2     | S〜M | GE-02       |
 
 ### テナントデータ活用(抽出→連携→ナレッジ化→活用)
 
-オペレータ要望「テナントごとに社内ツールのデータを抽出・連携・ナレッジ化・活用したい」(2026-07-28)に基づく。KP-01〜07 が閉じた「knowledge/ にある知識を配る」ループの上流 — 「knowledge/ の外にある社内データを統制付きで入れる」取込ループと、テナント知識への検索到達性を成立させる。[analysis-multi-tenant-governance-20260304](../../../knowledge/product/architecture/analysis-multi-tenant-governance-20260304.md) の結論(Hybrid Sovereign Ledger)の実装計画を含む。正本: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)。
+オペレータ要望「テナントごとに社内ツールのデータを抽出・連携・ナレッジ化・活用したい」(2026-07-28)に基づく。KP-01〜07 が閉じた「knowledge/ にある知識を配る」ループの上流 — 「knowledge/ の外にある社内データを統制付きで入れる」取込ループと、テナント知識への検索到達性を成立させる。[analysis-multi-tenant-governance-20260304](../../../knowledge/product/architecture/analysis-multi-tenant-governance-20260304.md) の結論(Hybrid Sovereign Ledger)の実装計画を含む。正本: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)。
 
-| ID                                                      | タイトル                                                                        | 優先度 | 規模 | 依存        |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
-| [DA-01](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント基準系の単一化(4系統併存の slug 突合・TenantProfile 正本化)             | **P0** | S〜M | なし        |
-| [DA-02](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 抽出コネクタの完備(Box 新設・Slack 読取・Drive 本文・メール添付)                | **P0** | M    | DA-01,AC-05 |
-| [DA-03](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 増分同期エンジン(watermark ストア・knowledge-sync no-op 解消・cron 取込)        | P1     | M    | DA-02       |
-| [DA-04](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 正規化・カード化パイプライン(docx/pdf/xlsx/html/Slack → knowledge card)         | **P0** | M    | DA-02       |
-| [DA-05](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 情報資産台帳と明示 ingest(Hybrid Sovereign Ledger・lineage・supersede)          | **P0** | M〜L | DA-01,DA-04 |
-| [DA-06](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | PII・秘匿ガード(pii_patterns 実効化・tier 分類提案・steward 承認必須)           | **P0** | M    | DA-04,DA-05 |
-| [DA-07](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント知識の検索到達性(context pack corpus 統合・slice tenant 次元・隔離強制) | P1     | M〜L | DA-01       |
-| [DA-08](./TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 運用ガバナンス(保持カタログ登録・オフボーディング purge・取込クォータ)          | P2     | S〜M | DA-03,DA-05 |
+| ID                                                                                         | タイトル                                                                        | 優先度 | 規模 | 依存        |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- | ------ | ---- | ----------- |
+| [DA-01](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント基準系の単一化(4系統併存の slug 突合・TenantProfile 正本化)             | **P0** | S〜M | なし        |
+| [DA-02](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 抽出コネクタの完備(Box 新設・Slack 読取・Drive 本文・メール添付)                | **P0** | M    | DA-01,AC-05 |
+| [DA-03](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 増分同期エンジン(watermark ストア・knowledge-sync no-op 解消・cron 取込)        | P1     | M    | DA-02       |
+| [DA-04](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 正規化・カード化パイプライン(docx/pdf/xlsx/html/Slack → knowledge card)         | **P0** | M    | DA-02       |
+| [DA-05](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 情報資産台帳と明示 ingest(Hybrid Sovereign Ledger・lineage・supersede)          | **P0** | M〜L | DA-01,DA-04 |
+| [DA-06](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | PII・秘匿ガード(pii_patterns 実効化・tier 分類提案・steward 承認必須)           | **P0** | M    | DA-04,DA-05 |
+| [DA-07](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | テナント知識の検索到達性(context pack corpus 統合・slice tenant 次元・隔離強制) | P1     | M〜L | DA-01       |
+| [DA-08](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) | 運用ガバナンス(保持カタログ登録・オフボーディング purge・取込クォータ)          | P2     | S〜M | DA-03,DA-05 |
 
 ## 4. 優先度の根拠(要約)
 

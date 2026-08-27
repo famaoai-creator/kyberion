@@ -18,10 +18,10 @@ import * as path from 'node:path';
 import {
   expandProcessTemplateTasks,
   normalizeWorkflowPhases,
-  loadJson,
   pathResolver,
   safeExistsSync,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
@@ -32,7 +32,7 @@ type CatalogTemplate = {
 };
 
 function main(): number {
-  const catalog = loadJson<{
+  const catalog = readJson<{
     templates: CatalogTemplate[];
   }>(CATALOG_PATH);
   const violations: string[] = [];

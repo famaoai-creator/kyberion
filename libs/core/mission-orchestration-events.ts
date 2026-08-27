@@ -1,64 +1,31 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { findMissionPath, pathResolver, rootDir } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-  loadJson,
-} from './secure-io.js';
+import { pathResolver, rootDir } from './path-resolver.js';
+import { safeAppendFileSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
-import {
-  normalizeEventScope,
-  redactEventScopeForShared,
-  resolveEventScopeAgainstAuthority,
-  type EventScope,
-  type EventScopeInput,
-} from './event-scope.js';
+import { redactEventScopeForShared, type EventScope, type EventScopeInput } from './event-scope.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
-
-export type MissionOrchestrationEventType =
-  | 'mission_issue_requested'
-  | 'mission_team_prewarm_requested'
-  | 'mission_kickoff_requested'
-  | 'mission_followup_requested'
-  | 'mission_reconciliation_requested'
-  | 'mission_distillation_requested'
-  | 'mission_completion_requested'
-  | 'mission_control_requested'
-  | 'surface_control_requested';
-
-const MISSION_ORCHESTRATION_EVENT_TYPES: readonly MissionOrchestrationEventType[] = [
-  'mission_issue_requested',
-  'mission_team_prewarm_requested',
-  'mission_kickoff_requested',
-  'mission_followup_requested',
-  'mission_reconciliation_requested',
-  'mission_distillation_requested',
-  'mission_completion_requested',
-  'mission_control_requested',
-  'surface_control_requested',
-];
-
-export interface MissionOrchestrationEvent<TPayload = Record<string, unknown>> {
-  event_id: string;
-  event_type: MissionOrchestrationEventType;
-  mission_id: string;
-  requested_by: string;
-  created_at: string;
-  correlation_id?: string;
-  causation_id?: string;
-  scope?: EventScope;
-  /** Repo-relative mission-local payload; never contains raw payload in shared queue files. */
-  payload_ref?: string;
-  payload: TPayload;
-}
+import {
+  resolveMissionOrchestrationScope,
+  loadMissionOrchestrationEvent,
+} from './mission-orchestration-event-loader.js';
+export {
+  loadMissionOrchestrationEvent,
+  resolveMissionOrchestrationScope,
+} from './mission-orchestration-event-loader.js';
+export {
+  MISSION_ORCHESTRATION_EVENT_TYPES,
+  type MissionOrchestrationEvent,
+  type MissionOrchestrationEventType,
+} from './mission-orchestration-event-contract.js';
+import type {
+  MissionOrchestrationEvent,
+  MissionOrchestrationEventType,
+} from './mission-orchestration-event-contract.js';
 
 const EVENTS_DIR = pathResolver.shared('coordination/orchestration/events');
 const OBS_DIR = pathResolver.shared('observability/mission-control');
@@ -110,24 +77,6 @@ function missionPayloadPath(
       ? pathResolver.tenantMissionDir(missionId, scopeTenantSlug, tier)
       : pathResolver.missionDir(missionId, tier));
   return path.join(missionPath, PAYLOAD_SUBDIR, `${eventId}.json`);
-}
-
-function isSafePayloadReference(
-  reference: unknown,
-  missionId: string,
-  eventId: string
-): reference is string {
-  if (typeof reference !== 'string' || path.isAbsolute(reference)) return false;
-  const normalized = reference.replaceAll('\\', '/');
-  if (normalized.includes('../') || normalized.startsWith('../')) return false;
-  const allowedRoot =
-    normalized.startsWith('active/missions/') ||
-    normalized.startsWith('knowledge/personal/missions/');
-  return (
-    allowedRoot &&
-    normalized.includes(`/${missionId.toUpperCase()}/`) &&
-    normalized.endsWith(`/coordination/orchestration/payloads/${eventId}.json`)
-  );
 }
 
 export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unknown>>(input: {
@@ -195,95 +144,6 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
     scope: event.scope,
   });
   return event;
-}
-
-function resolveMissionOrchestrationScope(
-  missionId: string,
-  supplied?: EventScopeInput
-): EventScope {
-  const locatedMissionPath =
-    findMissionPath(missionId) ||
-    (supplied?.tenant_slug && supplied.tier
-      ? (() => {
-          const candidate = pathResolver.tenantMissionDir(
-            missionId,
-            supplied.tenant_slug,
-            supplied.tier!
-          );
-          return safeExistsSync(candidate) ? candidate : undefined;
-        })()
-      : undefined);
-  const statePath = locatedMissionPath ? `${locatedMissionPath}/mission-state.json` : undefined;
-  try {
-    const state = statePath ? readJson<Record<string, unknown>>(statePath) : {};
-    const authority = normalizeEventScope({
-      mission_id: missionId,
-      tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
-      ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-      ...(typeof state.organization_id === 'string'
-        ? { organization_id: state.organization_id }
-        : {}),
-      ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
-    });
-    return resolveEventScopeAgainstAuthority(authority, supplied, {
-      mission_id: missionId,
-      scope_kind: 'mission',
-    });
-  } catch {
-    const authority = normalizeEventScope({ mission_id: missionId, tier: 'public' });
-    return resolveEventScopeAgainstAuthority(authority, supplied, {
-      mission_id: missionId,
-      scope_kind: 'mission',
-    });
-  }
-}
-
-export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
-  eventPath: string
-): MissionOrchestrationEvent<TPayload> {
-  const parsed = loadJson<Partial<MissionOrchestrationEvent<TPayload>>>(eventPath);
-  if (
-    typeof parsed.event_id !== 'string' ||
-    typeof parsed.event_type !== 'string' ||
-    !MISSION_ORCHESTRATION_EVENT_TYPES.includes(
-      parsed.event_type as MissionOrchestrationEventType
-    ) ||
-    typeof parsed.mission_id !== 'string' ||
-    typeof parsed.requested_by !== 'string' ||
-    typeof parsed.payload !== 'object' ||
-    parsed.payload === null
-  ) {
-    throw new Error('[MISSION_ORCHESTRATION_EVENT_INVALID] required fields are missing');
-  }
-  if (parsed.payload_ref !== undefined) {
-    if (!isSafePayloadReference(parsed.payload_ref, parsed.mission_id, parsed.event_id)) {
-      throw new Error(
-        '[MISSION_ORCHESTRATION_EVENT_INVALID] payload_ref is outside the mission payload store'
-      );
-    }
-    const payloadEnvelope = JSON.parse(
-      String(
-        safeReadFile(pathResolver.rootResolve(parsed.payload_ref), { encoding: 'utf8' }) || '{}'
-      )
-    ) as { event_id?: unknown; mission_id?: unknown; payload?: unknown };
-    if (
-      payloadEnvelope.event_id !== parsed.event_id ||
-      payloadEnvelope.mission_id !== parsed.mission_id.toUpperCase() ||
-      !payloadEnvelope.payload ||
-      typeof payloadEnvelope.payload !== 'object' ||
-      Array.isArray(payloadEnvelope.payload)
-    ) {
-      throw new Error(
-        '[MISSION_ORCHESTRATION_EVENT_INVALID] mission payload reference envelope is invalid'
-      );
-    }
-    parsed.payload = payloadEnvelope.payload as TPayload;
-  }
-  return {
-    ...parsed,
-    mission_id: parsed.mission_id.toUpperCase(),
-    scope: resolveMissionOrchestrationScope(parsed.mission_id, parsed.scope),
-  } as MissionOrchestrationEvent<TPayload>;
 }
 
 export function startMissionOrchestrationWorker<TPayload = Record<string, unknown>>(

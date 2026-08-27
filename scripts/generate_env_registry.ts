@@ -279,4 +279,8 @@ export const main = defineGenerator({
   },
 });
 
-if (isDirectScript(import.meta.url, 'generate_env_registry.ts')) void main();
+if (
+  isDirectScript(import.meta.url, 'generate_env_registry.ts') ||
+  isDirectScript(import.meta.url, 'generate_env_registry.js')
+)
+  void main();

@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": ["version", "defaults", "scope_classes"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "defaults": {
       "type": "object",

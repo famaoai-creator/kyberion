@@ -21,7 +21,6 @@ import * as path from 'node:path';
 import { isDirectScript } from './lib/harness.js';
 import {
   createStandardYargs,
-  loadJson,
   customerResolver,
   listApprovalRequests,
   listCustomerChannelBindings,
@@ -48,7 +47,7 @@ import {
   isValidTenantSlug,
   readCanonicalWorkGraph,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson as readFoundationJson } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -162,7 +161,7 @@ interface OfficeSnapshot {
 function readJson<T>(filePath: string): T | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    return loadJson<T>(filePath);
+    return readFoundationJson<T>(filePath);
   } catch {
     return null;
   }

@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { getFoundationIo } from './foundation/io.js';
 
 export interface ServiceAuthorityMapEntry {
   id: string;
@@ -37,7 +37,7 @@ function loadMapFile(
   mapPath: string,
   catalog: typeof publicMapCatalog
 ): ServiceAuthorityMap | null {
-  if (!safeExistsSync(mapPath)) return null;
+  if (!getFoundationIo().exists(mapPath)) return null;
   return catalog.load();
 }
 

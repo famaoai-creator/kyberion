@@ -27,7 +27,7 @@ import { safeExistsSync, safeMkdir, safeWriteFile, pathResolver } from '@agent/c
 import * as path from 'node:path';
 import { z } from 'zod';
 import { delegateWorkItemWithReasoningBackend, getWorkItem } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 function writeJSON(rel: string, data: unknown): string {
   const abs = pathResolver.rootResolve(rel);
@@ -35,10 +35,6 @@ function writeJSON(rel: string, data: unknown): string {
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, JSON.stringify(data, null, 2));
   return abs;
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function deriveReasoningMode(backendName: string, synthetic = false): 'placeholder' | 'model' {

@@ -5,19 +5,12 @@ import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
 import { collectDoctorReport } from './run_doctor.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-export type SetupCountEntry = [label: string, value: number];
-
-export function formatSetupSummaryLine(entries: SetupCountEntry[]): string {
-  const parts = entries
-    .filter(([, value]) => Number.isFinite(value))
-    .map(([label, value]) => `${value} ${label}`);
-  return `Setup summary: ${parts.join(', ')}`;
-}
-
-export function formatSetupHintLine(message: string): string {
-  return `  ↳ ${message}`;
-}
+import { formatSetupSummaryLine } from './setup-report-format.js';
+export {
+  formatSetupHintLine,
+  formatSetupSummaryLine,
+  type SetupCountEntry,
+} from './setup-report-format.js';
 
 type SetupPersona = 'operator' | 'first-time-user';
 

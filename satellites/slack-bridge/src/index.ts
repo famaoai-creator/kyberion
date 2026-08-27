@@ -18,13 +18,8 @@ import {
   type ChannelAdapter,
   recordSlackDelivery,
   recordSlackKnowledgeReaction,
-  listSlackOutboxMessages,
-  clearSlackOutboxMessage,
   createSurfaceOutboxDrainGuard,
-  isSurfaceOutboxDue,
-  recordSurfaceDeliverySuccess,
-  settleSurfaceOutboxFailure,
-  assertSurfaceOutboxDeliveryAuthorized,
+  drainSurfaceOutbox,
   deriveSlackDelegationReceiver,
   isEnvironmentInitialized,
   getSlackMissionProposalState,
@@ -277,11 +272,9 @@ function formatSlackMissionIssuedReply(
 }
 
 async function processSlackOutbox(client: any) {
-  const messages = listSlackOutboxMessages({ includeTenantNamespaces: true });
-  for (const message of messages) {
-    if (!isSurfaceOutboxDue(message)) continue;
-    try {
-      assertSurfaceOutboxDeliveryAuthorized(message);
+  return drainSurfaceOutbox(
+    'slack',
+    async (message) => {
       const response = await postSlackText(client, {
         channel: message.channel,
         thread_ts: message.thread_ts || undefined,
@@ -294,15 +287,9 @@ async function processSlackOutbox(client: any) {
         response.ts,
         message.source
       );
-      recordSurfaceDeliverySuccess('slack', message.channel, message.scope);
-      clearSlackOutboxMessage(message.message_id, message.scope);
-    } catch (err: any) {
-      const decision = settleSurfaceOutboxFailure('slack', message, err);
-      logger.error(
-        `❌ [SlackBridge] Outbox delivery failed for ${message.message_id}: ${err.message} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
-      );
-    }
-  }
+    },
+    { includeTenantNamespaces: true }
+  );
 }
 
 const runSlackOutbox = createSurfaceOutboxDrainGuard('slack');
@@ -613,6 +600,7 @@ async function start() {
       };
 
       const forcedReceiver = deriveSlackDelegationReceiver(message.text);
+      const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
       await reflectSlackPresence({
         status: 'thinking',
         expression: 'thinking',
@@ -625,7 +613,22 @@ async function start() {
         threadContext: () =>
           collectSlackThreadContext(client, message.channel, threadTs, message.ts),
         typing: () => ({ stop: clearTypingReaction }),
-        send: async () => undefined,
+        shouldSend: ({ result }) =>
+          !result.missionProposals?.length && result.approvalRequests.length === 0,
+        send: async ({ text }) => {
+          const response = await postSlackText(client, {
+            channel: message.channel,
+            thread_ts: threadTs,
+            text,
+          });
+          recordSlackDelivery(
+            artifact.correlationId,
+            message.channel,
+            threadTs,
+            response.ts,
+            route
+          );
+        },
       };
       const conversation = await runChannelTurn(
         channelAdapter,
@@ -651,8 +654,6 @@ async function start() {
             },
           })
       );
-      const route = forcedReceiver === 'nerve-agent' ? 'nerve' : 'surface';
-
       if (conversation.approvalRequests.length > 0) {
         await reflectSlackPresence({
           status: 'thinking',
@@ -745,12 +746,6 @@ async function start() {
           approvalCount: conversation.approvalRequests.length,
           missionProposalCount: conversation.missionProposals?.length || 0,
         });
-        const response = await postSlackText(client, {
-          channel: message.channel,
-          thread_ts: threadTs,
-          text: conversation.text,
-        });
-        recordSlackDelivery(artifact.correlationId, message.channel, threadTs, response.ts, route);
         return;
       }
 

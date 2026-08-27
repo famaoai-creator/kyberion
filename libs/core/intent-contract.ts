@@ -67,6 +67,53 @@ import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import type { TraceContext } from './src/trace.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
+import {
+  formatClarificationPacket,
+  formatClarificationPacketConcise,
+} from './intent-clarification-format.js';
+import {
+  deriveAgentRoutingDecision as deriveAgentRoutingDecisionWithDependencies,
+  isSimpleGreetingText,
+} from './intent-routing-decision.js';
+import { deriveIntentDeliveryDecision as deriveIntentDeliveryDecisionFromModule } from './intent-delivery-decision.js';
+import { emitIntentCompilationCompletedEvent } from './intent-compilation-events.js';
+import { resolveCorrelationId, resolveTenantId } from './intent-input-context.js';
+export { isSimpleGreetingText } from './intent-routing-decision.js';
+import type {
+  AgentRoutingAutonomy,
+  AgentRoutingDecision,
+  AgentRoutingFanout,
+  AgentRoutingMode,
+  AgentRoutingScope,
+  CompileUserIntentFlowInput,
+  ClarificationFormatOptions,
+  IntentCompilerProvider,
+  IntentCompilerTarget,
+  IntentContract,
+  IntentDeliveryDecision,
+  IntentDeliveryMode,
+  UserIntentFlow,
+} from './intent-contract-types.js';
+
+export type {
+  AgentRoutingAutonomy,
+  AgentRoutingDecision,
+  AgentRoutingFanout,
+  AgentRoutingMode,
+  AgentRoutingScope,
+  CompileUserIntentFlowInput,
+  ClarificationFormatOptions,
+  IntentCompilerProvider,
+  IntentCompilerTarget,
+  IntentContract,
+  IntentDeliveryDecision,
+  IntentDeliveryMode,
+  UserIntentFlow,
+} from './intent-contract-types.js';
+export {
+  formatClarificationPacket,
+  formatClarificationPacketConcise,
+} from './intent-clarification-format.js';
 
 const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract.schema.json'
@@ -80,96 +127,6 @@ const INTENT_POLICY_SCHEMA_PATH = pathResolver.knowledge(
 const INTENT_POLICY_PATH = pathResolver.knowledge('product/governance/intent-policy.json');
 const WORK_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-policy.schema.json');
 const WORK_POLICY_PATH = pathResolver.knowledge('product/governance/work-policy.json');
-
-export type IntentCompilerProvider = 'codex' | 'claude' | 'gemini';
-export type IntentDeliveryMode = 'one_shot' | 'managed_program';
-
-export interface IntentContract {
-  kind: 'intent-contract';
-  source_text: string;
-  intent_id: string;
-  correlation_id?: string;
-  capability_bundle_id?: string;
-  execution_profile_id?: string;
-  goal: {
-    summary: string;
-    success_condition: string;
-  };
-  resolution: {
-    execution_shape: WorkflowExecutionShape;
-    task_type?: string;
-  };
-  required_inputs: string[];
-  outcome_ids: string[];
-  approval: {
-    requires_approval: boolean;
-  };
-  delivery_mode: IntentDeliveryMode;
-  clarification_needed: boolean;
-  confidence: number;
-  why: string;
-}
-
-export interface IntentDeliveryDecision {
-  mode: IntentDeliveryMode;
-  shouldBootstrapProject: boolean;
-  shouldStartMission: boolean;
-  shouldDeliverDirectOutcome: boolean;
-  askHumanToConfirm: boolean;
-  rationale: string;
-}
-
-export type AgentRoutingMode = 'prompt' | 'subagent' | 'coordination';
-export type AgentRoutingScope =
-  'single_artifact' | 'multi_artifact' | 'stateful_flow' | 'boundary_crossing';
-export type AgentRoutingAutonomy = 'low' | 'medium' | 'high';
-export type AgentRoutingFanout = 'none' | 'parallel' | 'review' | 'cross_critique';
-
-export interface AgentRoutingDecision {
-  kind: 'agent-routing-decision';
-  source_text: string;
-  intent_id: string;
-  mode: AgentRoutingMode;
-  scope: AgentRoutingScope;
-  autonomy: AgentRoutingAutonomy;
-  boundary_crossing: boolean;
-  fanout: AgentRoutingFanout;
-  owner: string;
-  delegates?: string[];
-  artifact_count: number;
-  stop_condition: string;
-  rationale: string;
-}
-
-export interface UserIntentFlow {
-  executionBrief: ActuatorExecutionBrief;
-  intentContract: IntentContract;
-  workLoop: OrganizationWorkLoopSummary;
-  useCaseScenario?: IntentUseCaseScenario;
-  correlationId?: string;
-  routingDecision?: AgentRoutingDecision;
-  reasoningDecision: ReasoningLevelDecision;
-  shadowModelRoute: ReasoningModelRoute;
-  clarificationPacket?: OperatorInteractionPacket;
-  source: 'llm' | 'fallback';
-}
-
-export interface CompileUserIntentFlowInput {
-  text: string;
-  correlationId?: string;
-  channel?: string;
-  locale?: string;
-  projectId?: string;
-  projectName?: string;
-  trackId?: string;
-  trackName?: string;
-  tier?: 'personal' | 'confidential' | 'public';
-  tenantId?: string;
-  tenantSlug?: string;
-  serviceBindings?: string[];
-  runtimeContext?: Record<string, unknown>;
-  resolutionPacket?: IntentResolutionPacket;
-}
 
 interface ValidationResult<T> {
   valid: boolean;
@@ -255,12 +212,6 @@ type CompilationFallbackReason =
   | 'work_loop_invalid'
   | 'backend_error'
   | 'none';
-
-export interface IntentCompilerTarget {
-  provider: IntentCompilerProvider;
-  model?: string;
-  modelProvider?: string;
-}
 
 interface IntentCompilerTargetResolutionOptions extends Pick<
   LlmCompileOptions,
@@ -719,40 +670,11 @@ function toExecutionBriefSeed(
   };
 }
 
-function resolveTenantId(input: CompileUserIntentFlowInput): string | undefined {
-  const runtime = input.runtimeContext || {};
-  const candidates = [
-    input.tenantId,
-    input.tenantSlug,
-    typeof runtime.tenant_id === 'string' ? runtime.tenant_id : undefined,
-    typeof runtime.tenantId === 'string' ? runtime.tenantId : undefined,
-    typeof runtime.tenant_slug === 'string' ? runtime.tenant_slug : undefined,
-    typeof runtime.tenantSlug === 'string' ? runtime.tenantSlug : undefined,
-    getRegisteredEnvText('KYBERION_TENANT'),
-    getRegisteredEnvText('KYBERION_CUSTOMER'),
-  ];
-  return candidates
-    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    ?.trim();
-}
-
 function resolveIntentPacketForInput(input: CompileUserIntentFlowInput): IntentResolutionPacket {
   return resolveIntentResolutionPacket(input.text, {
     tier: input.tier,
     tenantId: resolveTenantId(input),
   });
-}
-
-function resolveCorrelationId(input: CompileUserIntentFlowInput): string | undefined {
-  const runtime = input.runtimeContext || {};
-  const candidates = [
-    input.correlationId,
-    typeof runtime.correlation_id === 'string' ? runtime.correlation_id : undefined,
-    typeof runtime.correlationId === 'string' ? runtime.correlationId : undefined,
-  ];
-  return candidates
-    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
-    ?.trim();
 }
 
 function buildFallbackIntentContract(
@@ -1331,147 +1253,8 @@ function attachCorrelationId(
   };
 }
 
-export function formatClarificationPacket(packet: OperatorInteractionPacket): string {
-  const briefSummary =
-    typeof (packet as any).execution_brief_summary === 'string' &&
-    (packet as any).execution_brief_summary.trim().length > 0
-      ? (packet as any).execution_brief_summary
-      : undefined;
-  const lines: string[] = [];
-  if (isInjectionSuspected()) {
-    lines.push(
-      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)',
-      ''
-    );
-  }
-  lines.push(packet.headline, packet.summary);
-  if (briefSummary) {
-    lines.push('', `Brief: ${briefSummary}`);
-  }
-  lines.push('', 'Required inputs:');
-  for (const question of packet.questions || []) {
-    lines.push(`- ${question.id}: ${question.question}`);
-  }
-  return lines.join('\n');
-}
-
-export interface ClarificationFormatOptions {
-  /** When true, show only the first blocking question instead of the full list. Default: false */
-  concise?: boolean;
-  /**
-   * Output locale. 'ja' produces Japanese-phrased output; anything else
-   * (including locales this formatter has no dedicated phrasing for, e.g.
-   * the I18N-07 pseudo-locale `qps-ploc`) falls through to the English
-   * branch below. Typed as `string`, not the narrower `SupportedLocale`,
-   * because this widened from a hardcoded `'en' | 'ja'` literal union that
-   * broke `tsc` the moment `SupportedLocale` grew a third member — the
-   * comparison logic below was always string-shaped, only the declared
-   * type was too narrow. Default: 'en'
-   */
-  locale?: string;
-}
-
-/**
- * Concise clarification formatter — surfaces the single next required input
- * rather than the full question list.  Use for CLI and surface contexts where
- * brevity is more important than completeness.
- */
-export function formatClarificationPacketConcise(
-  packet: OperatorInteractionPacket,
-  options: ClarificationFormatOptions = {}
-): string {
-  const locale = options.locale ?? 'en';
-  const questions = packet.questions ?? [];
-  const first = questions[0];
-  const remaining = questions.length - 1;
-
-  let warning = '';
-  if (isInjectionSuspected()) {
-    warning =
-      '⚠️ 外部コンテンツにインジェクションの疑い (Injection suspected in external content)\n';
-  }
-
-  if (!first) {
-    return (
-      warning +
-      (locale === 'ja'
-        ? '不足している情報はありません。実行を進められます。'
-        : 'No missing inputs. Ready to proceed.')
-    );
-  }
-
-  if (locale === 'ja') {
-    const moreHint = remaining > 0 ? `（他 ${remaining} 件）` : '';
-    const lines = [`次に必要な情報${moreHint}: \`${first.id}\``, first.question];
-    if (first.reason) lines.push(`理由: ${first.reason}`);
-    if (first.default_assumption) lines.push(`デフォルト: ${first.default_assumption}`);
-    return warning + lines.join('\n');
-  }
-
-  const moreHint = remaining > 0 ? ` (+ ${remaining} more)` : '';
-  const lines = [`Next required${moreHint}: \`${first.id}\``, first.question];
-  if (first.reason) lines.push(`Reason: ${first.reason}`);
-  if (first.default_assumption) lines.push(`Default: ${first.default_assumption}`);
-  return warning + lines.join('\n');
-}
-
 export function deriveIntentDeliveryDecision(contract: IntentContract): IntentDeliveryDecision {
-  const durableShape =
-    contract.resolution.execution_shape === 'project_bootstrap' ||
-    contract.resolution.execution_shape === 'mission';
-  const managedProgram = contract.delivery_mode === 'managed_program';
-  const askHumanToConfirm =
-    managedProgram &&
-    contract.resolution.execution_shape === 'task_session' &&
-    !contract.clarification_needed;
-
-  const decisionRules: Array<{
-    when: () => boolean;
-    rationale: string;
-    decision: Omit<IntentDeliveryDecision, 'mode' | 'rationale'>;
-  }> = [
-    {
-      when: () => askHumanToConfirm,
-      rationale:
-        'The request implies durable program management, but the current execution shape still needs a human confirmation before bootstrap.',
-      decision: {
-        shouldBootstrapProject: true,
-        shouldStartMission: true,
-        shouldDeliverDirectOutcome: false,
-        askHumanToConfirm: true,
-      },
-    },
-    {
-      when: () => managedProgram,
-      rationale:
-        'The request appears to require durable governance across revisions, work items, or staged outcomes.',
-      decision: {
-        shouldBootstrapProject: contract.resolution.execution_shape === 'project_bootstrap',
-        shouldStartMission: true,
-        shouldDeliverDirectOutcome: false,
-        askHumanToConfirm: false,
-      },
-    },
-    {
-      when: () => true,
-      rationale:
-        'The request appears satisfiable as a single direct outcome without durable project scaffolding.',
-      decision: {
-        shouldBootstrapProject: false,
-        shouldStartMission: false,
-        shouldDeliverDirectOutcome: !durableShape,
-        askHumanToConfirm: false,
-      },
-    },
-  ];
-
-  const matchedRule = decisionRules.find((rule) => rule.when())!;
-
-  return {
-    mode: contract.delivery_mode,
-    ...matchedRule.decision,
-    rationale: matchedRule.rationale,
-  };
+  return deriveIntentDeliveryDecisionFromModule(contract);
 }
 
 export function deriveAgentRoutingDecision(
@@ -1479,153 +1262,9 @@ export function deriveAgentRoutingDecision(
   workLoop: OrganizationWorkLoopSummary,
   sourceText = contract.source_text
 ): AgentRoutingDecision {
-  const policyDecision = resolvePolicyRoutingDecision(contract, workLoop);
-  if (policyDecision) return policyDecision;
-
-  const intent = findStandardIntentById(contract.intent_id);
-  const managedProgram = contract.delivery_mode === 'managed_program';
-  const durableShape =
-    contract.resolution.execution_shape === 'project_bootstrap' ||
-    contract.resolution.execution_shape === 'mission';
-  const boundaryCrossing =
-    managedProgram ||
-    durableShape ||
-    workLoop.runtime_design.coordination.bus === 'mission_coordination_bus' ||
-    workLoop.runtime_design.memory.store === 'mission_working_memory';
-  const browserSession = intent?.execution_shape === 'browser_session';
-  const lowRiskSimpleIntent =
-    intent?.risk_profile === 'low' &&
-    contract.outcome_ids.length <= 1 &&
-    contract.required_inputs.length <= 1;
-  const reviewHeavy =
-    workLoop.review_design.review_mode !== 'lean' ||
-    contract.required_inputs.length >= 2 ||
-    contract.outcome_ids.length > 1 ||
-    (intent?.plan_outline?.length || 0) >= 3 ||
-    intent?.risk_profile === 'review_required';
-
-  const mode: AgentRoutingMode = boundaryCrossing
-    ? 'coordination'
-    : browserSession && lowRiskSimpleIntent
-      ? 'prompt'
-      : reviewHeavy
-        ? 'subagent'
-        : 'prompt';
-
-  const scope: AgentRoutingScope = boundaryCrossing
-    ? 'boundary_crossing'
-    : mode === 'coordination'
-      ? 'stateful_flow'
-      : contract.outcome_ids.length > 1
-        ? 'multi_artifact'
-        : 'single_artifact';
-
-  const autonomy: AgentRoutingAutonomy =
-    mode === 'prompt' ? 'low' : mode === 'subagent' ? (reviewHeavy ? 'high' : 'medium') : 'high';
-
-  const fanout: AgentRoutingFanout =
-    mode === 'coordination'
-      ? 'parallel'
-      : contract.outcome_ids.length > 1
-        ? 'parallel'
-        : browserSession && lowRiskSimpleIntent
-          ? 'none'
-          : workLoop.review_design.review_mode === 'strict'
-            ? 'cross_critique'
-            : reviewHeavy
-              ? 'review'
-              : 'none';
-
-  const owner =
-    workLoop.teaming.specialist_id ||
-    intent?.specialist_id ||
-    workLoop.teaming.conversation_agent ||
-    'intent-owner';
-  const delegates = [
-    workLoop.teaming.conversation_agent,
-    managedProgram ? 'mission-controller' : undefined,
-  ].filter((value): value is string => Boolean(value) && value !== owner);
-
-  const artifactCount = Math.max(contract.outcome_ids.length, mode === 'coordination' ? 1 : 1);
-
-  const stopCondition =
-    mode === 'coordination'
-      ? 'The governed orchestration has a durable owner, state transition, and completion checkpoint.'
-      : mode === 'subagent'
-        ? 'The child worker has produced a bounded result and the owner has accepted it.'
-        : 'The response is ready as a single governed reply or artifact.';
-
-  const rationale =
-    mode === 'coordination'
-      ? 'The request crosses a durable governance boundary and should be managed as coordinated work.'
-      : mode === 'subagent'
-        ? 'The request is bounded but review-heavy enough to benefit from a child worker.'
-        : 'The request can finish as a single prompt without autonomous decomposition.';
-
-  return {
-    kind: 'agent-routing-decision',
-    source_text: sourceText,
-    intent_id: contract.intent_id,
-    mode,
-    scope,
-    autonomy,
-    boundary_crossing: boundaryCrossing,
-    fanout,
-    owner,
-    delegates: delegates.length > 0 ? delegates : undefined,
-    artifact_count: artifactCount,
-    stop_condition: stopCondition,
-    rationale,
-  };
-}
-
-const SIMPLE_GREETING_REGEX =
-  /^(こんにちは|おはよう|こんばんは|ありがとう|さようなら|バイバイ|お疲れ様|おつかれ|hello|hi|thanks|thank you|bye)[！!！？?]?$/i;
-
-export function isSimpleGreetingText(text: string): boolean {
-  return SIMPLE_GREETING_REGEX.test(text.trim());
-}
-
-function emitIntentCompilationCompletedEvent(
-  trace: Pick<TraceContext, 'addEvent'> | undefined,
-  input: {
-    reasoningDecision: ReasoningLevelDecision;
-    shadowModelRoute: ReasoningModelRoute;
-    source: 'llm' | 'fallback';
-    cacheStatus: 'disabled' | 'miss' | 'hit' | 'invalid' | 'write';
-    selectedIntentId?: string;
-    selectedConfidence?: number;
-    compilerProvider: string;
-    compilerModel: string;
-    fallbackReason: CompilationFallbackReason;
-    reasoningPolicyVersion: string;
-    selectedResolutionShape?: string;
-    contractExecutionShape?: string;
-    /** SO-05 / OP-01: model tier declared by the caller for this compile pass. */
-    declaredModelTier?: 'fast' | 'standard' | 'deep';
-  }
-): void {
-  const shapeDisagreement =
-    Boolean(input.selectedResolutionShape) &&
-    Boolean(input.contractExecutionShape) &&
-    input.selectedResolutionShape !== input.contractExecutionShape;
-  trace?.addEvent('intent_compilation.completed', {
-    reasoning_level: input.reasoningDecision.level,
-    reasoning_rule_id: input.reasoningDecision.rule_id,
-    source: input.source,
-    selected_intent_id: input.selectedIntentId || '',
-    selected_confidence: input.selectedConfidence ?? 0,
-    compiler_provider: input.compilerProvider,
-    compiler_model: input.compilerModel,
-    recommended_model_id: input.shadowModelRoute.recommended_model_id || '',
-    model_route_status: input.shadowModelRoute.model_route_status,
-    cache_status: input.cacheStatus,
-    fallback_reason: input.fallbackReason,
-    reasoning_policy_version: input.reasoningPolicyVersion,
-    shape_disagreement: shapeDisagreement,
-    selected_resolution_shape: input.selectedResolutionShape || '',
-    contract_execution_shape: input.contractExecutionShape || '',
-    declared_model_tier: input.declaredModelTier || '',
+  return deriveAgentRoutingDecisionWithDependencies(contract, workLoop, sourceText, {
+    resolvePolicyRoutingDecision,
+    findStandardIntentById,
   });
 }
 
