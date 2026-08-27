@@ -58,8 +58,16 @@ function registrations(): ChronosTokenRegistration[] | null {
   }
 }
 
-function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
-  return defaultSurfaceViewerTierAccess(role);
+type ConciergeTier = ConciergeViewerContext['tierAccess'][number];
+
+/** Concierge roles currently expose public/confidential; personal remains masked. */
+function maskPersonalTier(tiers: readonly ConciergeTier[]): ConciergeViewerContext['tierAccess'] {
+  return tiers.filter((tier) => tier !== 'personal');
+}
+
+/** Concierge roles currently expose public/confidential; personal remains masked. */
+export function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
+  return maskPersonalTier(defaultSurfaceViewerTierAccess(role));
 }
 
 function serverTenant(): string {
@@ -73,12 +81,23 @@ function serverTenant(): string {
   }
 }
 
-function resolveTierAccess(
+/**
+ * A registration can narrow a role, but never widen it — and never reach `personal`:
+ * an explicit request for it is denied, and the role default is masked down.
+ */
+export function resolveTierAccess(
   role: ChronosAccessRole,
-  requested?: readonly ConciergeViewerContext['tierAccess'][number][]
+  requested?: readonly ConciergeTier[]
 ): ConciergeViewerContext['tierAccess'] {
   try {
-    return resolveSurfaceViewerTierAccess(role, requested);
+    if (requested?.includes('personal')) {
+      throw new Error(`viewer tier scope exceeds the ${role} role policy.`);
+    }
+    const resolved = maskPersonalTier(resolveSurfaceViewerTierAccess(role, requested));
+    if (!resolved.length) {
+      throw new Error(`viewer tier scope exceeds the ${role} role policy.`);
+    }
+    return resolved;
   } catch (error) {
     throw new ConciergeViewerError(
       403,
@@ -189,7 +208,7 @@ export function conciergeHeadlessScope(viewer: ConciergeViewerContext): Headless
     tenant_slugs: viewer.tenantSlugs,
     organization_ids: viewer.organizationIds,
     project_ids: viewer.projectIds,
-    tier_access: viewer.tierAccess,
+    tier_access: maskPersonalTier(viewer.tierAccess),
   };
 }
 
@@ -201,7 +220,7 @@ export function toSurfaceAuthorizationContext(
     tenantSlugs: viewer.tenantSlugs,
     organizationIds: viewer.organizationIds,
     projectIds: viewer.projectIds,
-    tierAccess: viewer.tierAccess,
+    tierAccess: maskPersonalTier(viewer.tierAccess),
     principalId: viewer.principalId,
     source: viewer.source,
   };
