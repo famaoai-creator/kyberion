@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as nodePath from 'node:path';
 
 import {
-  artifactOwnershipRegistryPath,
   appendArtifactOwnershipRecord,
   createArtifactOwnershipRecord,
+  type ArtifactOwnershipQuery,
+  type ArtifactOwnershipRecord,
 } from './artifact-registry.js';
 import { HarnessSubagentDispatcher } from './agent-dispatch.js';
 import {
@@ -42,20 +43,99 @@ import {
   releaseWorkItem,
 } from './work-coordination.js';
 
+// Artifact ownership lives in ONE process-global JSONL file
+// (`active/shared/runtime/artifacts/registry.jsonl`). CI runs this directory
+// with file parallelism (`vitest run libs/core/ --coverage`, maxWorkers=4),
+// and two sibling suites rewrite that same file from their own hooks:
+// artifact-registry.test.ts deletes it in `beforeEach`, mission-context-pack.test.ts
+// restores/removes it in `afterEach`. When either fires between the seeding
+// below and the dispatch that reads it, `listArtifactOwnershipRecords()` sees a
+// missing file, returns [], and the prompt loses its `Reusable artifact hints:`
+// section — the CI-only flake this suite hit (reproducible locally by deleting
+// that file in a loop during a run). Ownership records therefore stay in this
+// process: no shared file to lose, and this suite stops clobbering the file the
+// other two suites back up.
+const artifactRegistryStore = vi.hoisted(() => ({ records: [] as ArtifactOwnershipRecord[] }));
+
+vi.mock('./artifact-registry.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./artifact-registry.js')>('./artifact-registry.js');
+
+  const matchesQuery = (
+    record: ArtifactOwnershipRecord,
+    query: ArtifactOwnershipQuery
+  ): boolean => {
+    if (query.tenantSlug && record.tenant_slug !== query.tenantSlug) return false;
+    if (query.organizationId && record.organization_id !== query.organizationId) return false;
+    if (query.projectId && record.project_id !== query.projectId) return false;
+    if (query.missionId && record.mission_id !== query.missionId) return false;
+    if (query.taskSessionId && record.task_session_id !== query.taskSessionId) return false;
+    if (query.kind && record.kind !== query.kind) return false;
+    const storageClasses = query.storageClass
+      ? Array.isArray(query.storageClass)
+        ? query.storageClass
+        : [query.storageClass]
+      : [];
+    if (storageClasses.length > 0 && !storageClasses.includes(record.storage_class)) return false;
+    if (query.includeTmp === false && record.storage_class === 'tmp') return false;
+    return true;
+  };
+
+  const listByQuery = (query: ArtifactOwnershipQuery = {}): ArtifactOwnershipRecord[] =>
+    artifactRegistryStore.records
+      .filter((record) => matchesQuery(record, query))
+      .sort((a, b) => {
+        const createdAtCompare = String(b.created_at || '').localeCompare(
+          String(a.created_at || '')
+        );
+        if (createdAtCompare !== 0) return createdAtCompare;
+        return String(b.artifact_id || '').localeCompare(String(a.artifact_id || ''));
+      });
+
+  return {
+    ...actual,
+    appendArtifactOwnershipRecord(
+      record: ArtifactOwnershipRecord,
+      options: { for_delivery?: boolean } = {}
+    ): string {
+      if (!record.project_id && !record.mission_id && !record.task_session_id) {
+        throw new Error(
+          'Artifact ownership record requires at least one owner: project_id, mission_id, or task_session_id.'
+        );
+      }
+      if (options.for_delivery && record.storage_class === 'tmp') {
+        throw new Error('tmp storage_class cannot be registered as a delivery artifact.');
+      }
+      const validation = actual.validateArtifactOwnershipRecord(record);
+      if (!validation.valid) {
+        throw new Error(`Invalid artifact ownership record: ${validation.errors.join('; ')}`);
+      }
+      artifactRegistryStore.records.push(record);
+      return actual.artifactOwnershipRegistryPath();
+    },
+    listArtifactOwnershipRecords: (): ArtifactOwnershipRecord[] => [
+      ...artifactRegistryStore.records,
+    ],
+    listArtifactOwnershipRecordsByQuery: listByQuery,
+    listArtifactOwnershipRecordsForProject: (
+      projectId: string,
+      query: Omit<ArtifactOwnershipQuery, 'projectId'> = {}
+    ): ArtifactOwnershipRecord[] => listByQuery({ ...query, projectId }),
+    listArtifactOwnershipRecordsForMission: (
+      missionId: string,
+      query: Omit<ArtifactOwnershipQuery, 'missionId'> = {}
+    ): ArtifactOwnershipRecord[] => listByQuery({ ...query, missionId }),
+    findReusableArtifactOwnershipRecord: (
+      query: ArtifactOwnershipQuery
+    ): ArtifactOwnershipRecord | null =>
+      listByQuery({ ...query, includeTmp: query.includeTmp ?? false })[0] ?? null,
+  };
+});
+
 const missionId = `MSN-WORKITEM-DISPATCH-${process.pid}`;
 const workCoordinationNamespace = `mission-workitem-dispatch-test-${process.pid}`;
 const missionPath = pathResolver.missionDir(missionId, 'public');
 const projectWorkspace = pathResolver.rootResolve(`active/projects/public/shared/${missionId}`);
-const artifactRegistryPath = artifactOwnershipRegistryPath();
-let originalArtifactRegistryRaw: string | null = null;
-
-beforeEach(() => {
-  if (safeExistsSync(artifactRegistryPath) && originalArtifactRegistryRaw === null) {
-    originalArtifactRegistryRaw = safeReadFile(artifactRegistryPath, {
-      encoding: 'utf8',
-    }) as string;
-  }
-});
 
 function makeMissionState(): MissionState {
   return {
@@ -149,6 +229,7 @@ function makeTaskResultText(input: {
 beforeEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
   process.env.KYBERION_PERSONA = 'worker';
+  artifactRegistryStore.records.length = 0;
   setWorkCoordinationNamespace(workCoordinationNamespace);
   clearWorkCoordinationStore();
   if (!safeExistsSync(missionPath)) safeMkdir(missionPath, { recursive: true });
@@ -159,11 +240,7 @@ afterEach(() => {
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(projectWorkspace, { recursive: true, force: true });
   setWorkCoordinationNamespace(null);
-  if (originalArtifactRegistryRaw !== null) {
-    safeWriteFile(artifactRegistryPath, originalArtifactRegistryRaw);
-    return;
-  }
-  if (safeExistsSync(artifactRegistryPath)) safeRmSync(artifactRegistryPath);
+  artifactRegistryStore.records.length = 0;
 });
 
 describe('mission work item dispatch', () => {
