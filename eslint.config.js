@@ -119,8 +119,9 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      // The ratchet is enabled for the maintained boundary files below. The
-      // legacy barrel/facade set is tracked separately until it is decomposed.
+      // Default off; the widened ratchet below turns it on for libs/,
+      // scripts/, satellites/ and presence/ (see that block for the three
+      // named, counted carve-outs).
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       // IP-11 Task 3: @ts-ignore silently suppresses real type errors with no
@@ -144,18 +145,20 @@ export default [
     },
   },
   {
+    // SX phase-2: the no-unused-vars ratchet now covers the whole maintained
+    // source surface, not the 10-file allowlist it started as. Dead locals,
+    // helpers, types and missed imports are removed at the source; `_` is
+    // reserved for bindings a signature or destructuring position forces to
+    // exist. `args`/`caughtErrors` stay off so interface-conforming handler
+    // params and `catch (err)` are not churned.
     files: [
-      'libs/core/foundation/io.ts',
-      'libs/core/foundation/json.ts',
-      'libs/core/foundation/governed-catalog.ts',
-      'libs/core/actuator-sdk.ts',
-      'libs/core/provider-config.ts',
-      'scripts/check_config_fallbacks.ts',
-      'scripts/check_documentation_links.ts',
-      'scripts/check_max_file_lines.ts',
-      'scripts/check_pipeline_op_schema_coverage.ts',
-      'scripts/check_script_integrity.ts',
+      'libs/**/*.ts',
+      'scripts/**/*.ts',
+      'satellites/**/*.ts',
+      'presence/**/*.ts',
+      'presence/**/*.tsx',
     ],
+    ignores: ['**/*.test.ts', '**/*.spec.ts', '**/*.generated.ts', '**/dist/**'],
     rules: {
       '@typescript-eslint/no-unused-vars': [
         'error',
@@ -166,6 +169,29 @@ export default [
           varsIgnorePattern: '^_',
         },
       ],
+    },
+  },
+  {
+    // Deferred, not waived. Measured 2026-08-27 against the widened rule above;
+    // these three surfaces hold 846 of the 1013 repo-wide findings and are
+    // dominated by one mechanical pattern each, so they are carved out by name
+    // (never by a blanket `off`) and shrink as each is decomposed:
+    //   presence/displays/chronos-mirror-v2  673 — a ~150-key view-model
+    //     destructure in ChronosMirrorLegacySections.tsx plus the mission
+    //     intelligence panels re-destructuring the same model.
+    //   presence/displays/presence-studio     89 — runtime-data/server split
+    //     left both halves holding the full symbol set.
+    //   satellites/voice-hub/server.ts        84 — single unsplit server module.
+    // Every other file under libs/, scripts/, satellites/ and presence/ is
+    // clean and enforced. Remove an entry here once its file(s) reach zero;
+    // do not add one without a count and a decomposition reason.
+    files: [
+      'presence/displays/chronos-mirror-v2/**/*.{ts,tsx}',
+      'presence/displays/presence-studio/**/*.ts',
+      'satellites/voice-hub/server.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
     },
   },
   {

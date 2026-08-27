@@ -100,7 +100,7 @@ const errorClassifierCatalog = defineCatalog<ErrorClassifierRulesFile>({
 });
 
 let _cachedRules: ClassifierRule[] | null = null;
-let _cachedPolicyPatterns: typeof POLICY_VIOLATION_PATTERNS | null = null;
+let _cachedPolicyPatterns: PolicyViolationPattern[] | null = null;
 
 function loadClassifierRules(): ClassifierRule[] {
   if (_cachedRules) return _cachedRules;
@@ -116,7 +116,7 @@ function loadClassifierRules(): ClassifierRule[] {
   return _cachedRules;
 }
 
-function loadPolicyViolationPatterns(): typeof POLICY_VIOLATION_PATTERNS {
+function loadPolicyViolationPatterns(): PolicyViolationPattern[] {
   if (_cachedPolicyPatterns) return _cachedPolicyPatterns;
   const data = errorClassifierCatalog.load();
   _cachedPolicyPatterns = data.policy_violation_patterns.map((entry) => ({
@@ -162,9 +162,6 @@ type PolicyViolationPattern = {
   requiredAuthority?: string;
   repairSteps: string[];
 };
-
-// Alias for loadPolicyViolationPatterns return type (resolved at runtime from JSON)
-const POLICY_VIOLATION_PATTERNS: PolicyViolationPattern[] = [];
 
 const USER_FACING_ERROR_BODY_KEYS: Record<ErrorCategory, string> = {
   auth: 'error_auth_body',

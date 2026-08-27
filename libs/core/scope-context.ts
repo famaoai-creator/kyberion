@@ -51,18 +51,6 @@ function clean(value: unknown): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function compatibleAlias(
-  tenantSlug: string | undefined,
-  tenantId: string | undefined
-): string | undefined {
-  if (tenantSlug && tenantId && tenantSlug !== tenantId) {
-    throw new Error(
-      `[SCOPE_CONTEXT_INVALID] tenant_slug '${tenantSlug}' conflicts with compatibility tenant_id '${tenantId}'`
-    );
-  }
-  return tenantSlug || tenantId;
-}
-
 /** Normalize aliases and remove empty optional values without widening scope. */
 
 /** Resolve runtime hints without ever treating customer stance as tenant scope. */

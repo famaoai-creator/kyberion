@@ -11,7 +11,6 @@ import {
   createStandardYargs,
   logger,
   pathResolver,
-  safeReadFile,
   describeIMessageBridgeHealth,
   downloadBlueBubblesAttachment,
   parseBlueBubblesWebhook,

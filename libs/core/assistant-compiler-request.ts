@@ -33,9 +33,6 @@ const INTENT_CONTRACT_SCHEMA_PATH = pathResolver.knowledge(
 const WORK_LOOP_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-work-loop.schema.json'
 );
-const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/actuator-execution-brief.schema.json'
-);
 
 export interface AssistantCompilerRequest {
   kind: 'assistant-compiler-request';
@@ -107,7 +104,6 @@ let requestValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;
 let intentContractValidateFn: ValidateFunction | null = null;
 let workLoopValidateFn: ValidateFunction | null = null;
-let executionBriefValidateFn: ValidateFunction | null = null;
 
 function ensureRequestValidator(): ValidateFunction {
   if (requestValidateFn) return requestValidateFn;
@@ -131,12 +127,6 @@ function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
   workLoopValidateFn = compileSchema(WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
-}
-
-function ensureExecutionBriefValidator(): ValidateFunction {
-  if (executionBriefValidateFn) return executionBriefValidateFn;
-  executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
-  return executionBriefValidateFn;
 }
 
 function createRequestId() {
@@ -189,10 +179,6 @@ function validateIntentContract(value: unknown): value is IntentContract {
 
 function validateWorkLoop(value: unknown): value is OrganizationWorkLoopSummary {
   return Boolean(ensureWorkLoopValidator()(value));
-}
-
-function validateExecutionBrief(value: unknown): value is ActuatorExecutionBrief {
-  return Boolean(ensureExecutionBriefValidator()(value));
 }
 
 function toExecutionBriefSeed(

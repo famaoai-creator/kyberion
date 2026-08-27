@@ -166,7 +166,6 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
     const headers = columns.map((column: any) => String(column.label || column.key || 'Column'));
     const widths = columns.map((column: any) => Number(column.width || layout.default_column_width || 18));
     const lastColumnLetter = String.fromCharCode(64 + Math.max(headers.length, 1));
-    const summaryRowIndex = summaryCards.length > 0 ? 3 : 0;
     const headerRowIndex = summaryCards.length > 0 ? 4 : 3;
     const dataStartIndex = headerRowIndex + 1;
     const rowToneKey = typeof brief.payload.row_tone_key === 'string' ? brief.payload.row_tone_key : '';
@@ -359,7 +358,6 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
     const successTextColor = String(toneCatalog.success?.text_color || '#166534');
     const warningTextColor = String(toneCatalog.warning?.text_color || '#92400E');
     const dangerTextColor = String(toneCatalog.danger?.text_color || '#991B1B');
-    const summaryLastColumnLetter = String.fromCharCode(64 + Math.max(summaryCards.length, 1));
     const overviewRows: any[] = [
       {
         index: 1,

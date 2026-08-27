@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import {
-  logger,
   pathResolver,
   resolveGoldenRulePriorityOrder,
   resolveVision,
@@ -74,13 +73,7 @@ export function captureIntuition(input: CaptureIntuitionInput): {
 
 // NOTE: LLM/voice-dependent ops now delegate to reasoning-backend / voice-bridge.
 // The backends are responsible for their own provenance signalling (engine_id,
-// _synthetic, warn logs when unregistered). The warnStub helper is preserved
-// for call sites that still need to mark bespoke stub paths.
-function warnStub(op: string, note?: string): void {
-  logger.warn(
-    `[DECISION_OPS:STUB] ${op} executed in stub mode${note ? ` — ${note}` : ''}. Replace with LLM/voice integration before production use.`
-  );
-}
+// _synthetic, warn logs when unregistered).
 
 // ---------------------------------------------------------------------------
 // Pure-logic ops

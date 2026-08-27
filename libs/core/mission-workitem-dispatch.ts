@@ -8,12 +8,7 @@ import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
-import {
-  getWorkItem,
-  updateWorkItem,
-  type WorkItem,
-  type WorkItemStatus,
-} from './work-coordination.js';
+import { getWorkItem, updateWorkItem, type WorkItemStatus } from './work-coordination.js';
 import { formatCognitiveRouteDecision } from './cognitive-routing.js';
 import { type TaskModelHint } from './reasoning-model-routing.js';
 import { findMissionPath } from './path-resolver.js';

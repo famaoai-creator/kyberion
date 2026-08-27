@@ -175,14 +175,6 @@ function stripLocaleArg(args: string[]): string[] {
   return nextArgs;
 }
 
-function getCalendarProvider(
-  options: Record<string, string | boolean>
-): 'google-workspace' | 'm365' {
-  const provider =
-    typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
-  return provider === 'm365' ? 'm365' : 'google-workspace';
-}
-
 export function stripNpmSeparatorArg(args: string[]): string[] {
   return args.filter((arg) => arg !== '--');
 }

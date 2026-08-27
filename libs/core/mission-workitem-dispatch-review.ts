@@ -823,14 +823,6 @@ export async function runIndependentReviewerReview(input: {
   reviewerOutputRef?: string;
   reviewerProvider?: string;
 }> {
-  const missionState = {
-    mission_id: input.missionId,
-    tier: 'public' as const,
-    status: 'active',
-    assigned_persona: 'worker',
-    git: { branch: 'review', start_commit: '', latest_commit: '', checkpoints: [] },
-    history: [],
-  };
   const contextPack = await resolveMissionContextPack({
     missionId: input.missionId,
     tier: input.missionState.tier,

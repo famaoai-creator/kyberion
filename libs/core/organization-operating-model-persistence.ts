@@ -103,12 +103,6 @@ const CAPABILITY_FILE_NAME = 'capability.json';
 const SERVICE_FILE_NAME = 'service.json';
 const SERVICE_STATE_FILE_NAME = 'service-state.json';
 const OPERATION_FILE_NAME = 'operation.json';
-const OPERATION_STATE_FILE_NAME = 'operation-state.json';
-const OPERATION_RUN_FILE_NAME = 'run.json';
-const INCIDENT_FILE_NAME = 'incident.json';
-const CADENCE_FILE_NAME = 'cadence.json';
-const DECISION_FILE_NAME = 'decision.json';
-const LEARNING_FILE_NAME = 'candidate.json';
 const validatorCache = new Map<string, ValidateFunction>();
 
 export function validatorFor(schemaPath: string): ValidateFunction {

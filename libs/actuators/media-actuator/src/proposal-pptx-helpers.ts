@@ -268,13 +268,6 @@ function buildCanonicalProposalSlides(deps: ProposalPptxDependencies, rootDir: s
   const { preset } = deps.resolveDocumentCompositionPreset(rootDir, brief);
   const sections = Array.isArray(preset.sections) ? preset.sections : [];
   const evidence = buildCanonicalProposalEvidence(brief);
-  const storyChapters = normalizeProposalList(
-    brief.story?.chapters || brief.payload?.story?.chapters,
-    sections
-      .filter((section: any) => !['cover', 'contents'].includes(String(section.section_id || '')))
-      .map((section: any) => String(section.title || section.section_id || '').trim())
-      .filter(Boolean),
-  );
   const audience = normalizeAudienceList(
     brief.audience || brief.payload?.audience,
     ['Executive Sponsor'],

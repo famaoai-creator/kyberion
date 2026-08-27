@@ -39,7 +39,6 @@
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03.
  */
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
@@ -85,7 +84,6 @@ function policyPath(): string {
 
 function ensureValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
-  const ajv = createAjv();
   cachedValidator = compileSchema(SCHEMA_PATH);
   return cachedValidator;
 }

@@ -57,7 +57,6 @@ export interface VirtualDeviceInventoryOptions {
 const DEFAULT_SYSTEM_PROFILER = 'system_profiler';
 const DEFAULT_FFMPEG = 'ffmpeg';
 const DEFAULT_PACTL = 'pactl';
-const DEFAULT_IMAGESNAP = 'imagesnap';
 const DEFAULT_POWERSHELL = 'powershell.exe';
 
 function emptyInventory(): VirtualDeviceInventory {

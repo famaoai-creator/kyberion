@@ -60,25 +60,6 @@ function hexToPdfRgb(
   return [r / 255, g / 255, b / 255];
 }
 
-function formatJpy(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(Math.round(value));
-}
-
-function applyRounding(value: number, mode: string): number {
-  switch (mode) {
-    case 'floor':
-      return Math.floor(value);
-    case 'ceil':
-      return Math.ceil(value);
-    default:
-      return Math.round(value);
-  }
-}
-
 export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) {
   function buildReportDocxProtocol(rootDir: string, brief: any): any {
     const outline = buildReportNarrativeOutline(

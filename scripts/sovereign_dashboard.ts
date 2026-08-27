@@ -32,7 +32,6 @@ import { defineScript, isDirectScript } from './lib/harness.js';
  * Pure ANSI-based TUI for real-time ecosystem observability.
  */
 
-const ROOT_DIR = pathResolver.rootDir();
 const PACKAGE_JSON_PATH = pathResolver.rootResolve('package.json');
 
 type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';

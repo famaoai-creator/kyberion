@@ -113,61 +113,6 @@ function resolveColor(xml: string | undefined, palette: { [key: string]: string 
   return undefined;
 }
 
-function resolveRelPath(zip: AdmZip, relsFile: string, rId: string): string | undefined {
-  const entry = zip.getEntry(relsFile);
-  if (!entry) return undefined;
-  const xml = entry.getData().toString('utf8');
-  const match = xml.match(new RegExp(`Id="${rId}"[^>]*Target=".*?media/([^"]*)"`));
-  return match ? match[1] : undefined;
-}
-
-function findInheritedBackground(zip: AdmZip, slideName: string, palette: { [key: string]: string }): { image?: string, color?: string } {
-  const findInXml = (xml: string, relsFile: string): { image?: string, color?: string } => {
-    const bgMatch = xml.match(/<p:bg>([\s\S]*?)<\/p:bg>/);
-    if (bgMatch) {
-      const bgXml = bgMatch[1];
-      const blip = bgXml.match(/<a:blip r:embed="([^"]*)"/);
-      if (blip) return { image: resolveRelPath(zip, relsFile, blip[1]) };
-      const color = resolveColor(bgXml, palette);
-      if (color) return { color };
-    }
-    return {};
-  };
-
-  const slideEntry = zip.getEntry(`ppt/slides/${slideName}`);
-  if (!slideEntry) return {};
-  const slideXml = slideEntry.getData().toString('utf8');
-  const slideRes = findInXml(slideXml, `ppt/slides/_rels/${slideName}.rels`);
-  if (slideRes.image || slideRes.color) return slideRes;
-
-  const slideRelsEntry = zip.getEntry(`ppt/slides/_rels/${slideName}.rels`);
-  if (!slideRelsEntry) return {};
-  const slideRels = slideRelsEntry.getData().toString('utf8');
-  const layoutMatch = slideRels.match(/slideLayouts\/(slideLayout\d+\.xml)/);
-  if (layoutMatch) {
-    const layoutName = layoutMatch[1];
-    const layoutXml = zip.getEntry(`ppt/slideLayouts/${layoutName}`)?.getData().toString('utf8');
-    if (layoutXml) {
-      const layoutRes = findInXml(layoutXml, `ppt/slideLayouts/_rels/${layoutName}.rels`);
-      if (layoutRes.image || layoutRes.color) return layoutRes;
-    }
-
-    const layoutRels = zip.getEntry(`ppt/slideLayouts/_rels/${layoutName}.rels`)?.getData().toString('utf8');
-    if (layoutRels) {
-      const masterMatch = layoutRels.match(/slideMasters\/(slideMaster\d+\.xml)/);
-      if (masterMatch) {
-        const masterName = masterMatch[1];
-        const masterXml = zip.getEntry(`ppt/slideMasters/${masterName}`)?.getData().toString('utf8');
-        if (masterXml) {
-          const masterRes = findInXml(masterXml, `ppt/slideMasters/_rels/${masterName}.rels`);
-          if (masterRes.image || masterRes.color) return masterRes;
-        }
-      }
-    }
-  }
-  return {};
-}
-
 function extractTopLevelShapes(xml: string): string[] {
   const results: string[] = [];
   const tags = ['p:sp', 'p:cxnSp', 'p:pic', 'p:graphicFrame', 'p:grpSp'];

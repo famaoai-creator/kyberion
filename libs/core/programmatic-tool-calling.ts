@@ -76,13 +76,6 @@ interface RpcRequest {
   params: Record<string, unknown>;
 }
 
-interface RpcResponse {
-  id: string;
-  ok: boolean;
-  result?: unknown;
-  error?: string;
-}
-
 interface RunnerEnvelope {
   socket_path: string;
   token: string;

@@ -8,8 +8,6 @@ interface SmokeRule {
   required: string[];
 }
 
-const ROOT = pathResolver.rootDir();
-
 const RULES: SmokeRule[] = [
   {
     file: 'README.md',

@@ -77,17 +77,6 @@ function extractColor(xml: string): XlsxColor | undefined {
 
 // ─── Theme Extraction ────────────────────────────────────────
 
-function extractTheme(zip: JSZip): XlsxTheme {
-  const theme: XlsxTheme = { colors: {} };
-  const themeFile = zip.file('xl/theme/theme1.xml');
-  if (!themeFile) return theme;
-
-  const xml = (themeFile as any)._data;
-  // We need to use async, but store for later
-  theme.rawXml = '(deferred)';
-  return theme;
-}
-
 async function extractThemeAsync(zip: JSZip): Promise<XlsxTheme> {
   const theme: XlsxTheme = { colors: {} };
   const themeFile = zip.file('xl/theme/theme1.xml');

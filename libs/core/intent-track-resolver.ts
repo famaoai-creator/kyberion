@@ -1,6 +1,5 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
 import { readJson as readFoundationJson } from './foundation/json.js';
 import { safeExistsSync } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
@@ -89,7 +88,6 @@ interface IntentRoutingMap {
   track_intent_policy_map?: Record<string, TrackIntentPolicyMapping>;
 }
 
-const ajv = createAjv();
 let overrideValidator: ValidateFunction | null = null;
 
 function readJson(filePath: string): JsonObject {

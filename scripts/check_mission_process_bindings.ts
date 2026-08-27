@@ -5,7 +5,6 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 type JsonRecord = Record<string, any>;
 
-const ROOT = pathResolver.rootDir();
 const rel = (value: string) => pathResolver.rootResolve(value);
 
 function readJson(path: string): JsonRecord {

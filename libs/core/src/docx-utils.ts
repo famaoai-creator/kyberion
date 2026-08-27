@@ -31,13 +31,6 @@ import type {
 
 // ─── XML Helpers ────────────────────────────────────────────
 
-function getAttr(xml: string, attr: string): string | undefined {
-  // Match both w:attr="val" and attr="val"
-  const re = new RegExp(`(?:w:|r:|wp:|a:|pic:)?${attr}="([^"]*)"`, 'i');
-  const m = xml.match(re);
-  return m ? m[1] : undefined;
-}
-
 function getAttrExact(xml: string, prefix: string, attr: string): string | undefined {
   const re = new RegExp(`${prefix}:${attr}="([^"]*)"`, 'i');
   const m = xml.match(re);
@@ -50,19 +43,6 @@ function getSimpleAttr(xml: string, attr: string): string | undefined {
   return m ? m[1] : undefined;
 }
 
-function getTagContent(xml: string, tag: string): string | undefined {
-  // Handle both w:tag and tag (with optional namespace)
-  const patterns = [
-    new RegExp(`<(?:w:|r:)?${tag}[^>]*>([\\s\\S]*?)<\\/(?:w:|r:)?${tag}>`, 'i'),
-    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i'),
-  ];
-  for (const re of patterns) {
-    const m = xml.match(re);
-    if (m) return m[1];
-  }
-  return undefined;
-}
-
 function getTagFull(xml: string, tag: string): string | undefined {
   const patterns = [
     new RegExp(`<(?:w:)?${tag}(?:\\s[^>]*)?\\/?>(?:[\\s\\S]*?<\\/(?:w:)?${tag}>)?`, 'i'),
@@ -73,17 +53,6 @@ function getTagFull(xml: string, tag: string): string | undefined {
     if (m) return m[0];
   }
   return undefined;
-}
-
-function getAllTags(xml: string, tag: string): string[] {
-  const results: string[] = [];
-  // Match both self-closing and paired tags
-  const re = new RegExp(`<(?:w:|r:|wp:|a:|pic:)?${tag}(?:\\s[^>]*)?\\/?>(?:[\\s\\S]*?<\\/(?:w:|r:|wp:|a:|pic:)?${tag}>)?`, 'gi');
-  let m;
-  while ((m = re.exec(xml)) !== null) {
-    results.push(m[0]);
-  }
-  return results;
 }
 
 function getAllTagsNS(xml: string, ns: string, tag: string): string[] {

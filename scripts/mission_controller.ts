@@ -84,7 +84,6 @@ import {
 } from './refactor/mission-memory-commands.js';
 import {
   assertCanGrantMissionAuthority,
-  readFocusedMissionId as _readFocusedMissionId,
   writeFocusedMissionId as _writeFocusedMissionId,
   loadState,
   saveState,
@@ -129,10 +128,6 @@ const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
 
 // ─── Focus helpers (thin wrappers binding MISSION_FOCUS_PATH) ────────────────
-function readFocusedMissionId(): string | null {
-  return _readFocusedMissionId(MISSION_FOCUS_PATH);
-}
-
 function writeFocusedMissionId(missionId: string): void {
   _writeFocusedMissionId(MISSION_FOCUS_PATH, missionId);
 }
@@ -251,16 +246,6 @@ async function createMission(
       { ...options, organizationId }
     )
   );
-}
-
-function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return { raw };
-  }
 }
 
 function formatRoutingDecisionSummary(

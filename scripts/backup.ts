@@ -470,25 +470,6 @@ function runRequired(
   }
 }
 
-function runRequiredIn(
-  cwd: string,
-  command: string,
-  args: string[],
-  errorPrefix: string,
-  timeoutMs = 120000
-): void {
-  const result = safeExecResult(command, args, {
-    cwd,
-    timeoutMs,
-    maxOutputMB: 50,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `${errorPrefix}: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
-    );
-  }
-}
-
 function installCleanCheckoutDependencies(target: string): void {
   const strict = safeExecResult('pnpm', ['install', '--frozen-lockfile', '--offline'], {
     cwd: target,

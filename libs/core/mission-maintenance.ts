@@ -158,7 +158,7 @@ async function recordCheckpointForMission(
   let traceStatus: 'ok' | 'error' = 'ok';
   try {
     await withLock(`mission-${activeMissionId}`, async () => {
-      const stageSpan = traceCtx.startSpan('git.stage');
+      traceCtx.startSpan('git.stage');
       try {
         safeExec('git', ['add', '.'], { cwd: missionPath });
         traceCtx.endSpan('ok');
@@ -168,7 +168,7 @@ async function recordCheckpointForMission(
       }
 
       let commitCreated = true;
-      const commitSpan = traceCtx.startSpan('git.commit');
+      traceCtx.startSpan('git.commit');
       try {
         safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], {
           cwd: missionPath,
@@ -184,7 +184,7 @@ async function recordCheckpointForMission(
       }
 
       const hash = getGitHash(missionPath);
-      const saveSpan = traceCtx.startSpan('state.save');
+      traceCtx.startSpan('state.save');
       const currentState = loadState(activeMissionId)!;
       currentState.git.latest_commit = hash;
       currentState.git.checkpoints.push({
@@ -205,7 +205,7 @@ async function recordCheckpointForMission(
       );
     });
 
-    const ledgerSpan = traceCtx.startSpan('project_ledger.sync');
+    traceCtx.startSpan('project_ledger.sync');
     try {
       await syncProjectLedgerIfLinked(activeMissionId);
       traceCtx.endSpan('ok');
@@ -215,7 +215,7 @@ async function recordCheckpointForMission(
       throw err;
     }
 
-    const intentSpan = traceCtx.startSpan('intent_delta.emit');
+    traceCtx.startSpan('intent_delta.emit');
     try {
       await emitMissionLifecycleIntentSnapshot({
         missionId: activeMissionId,

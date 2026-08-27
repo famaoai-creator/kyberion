@@ -361,7 +361,6 @@ export function applyTenantActivation(
   if (resolved.record.blockers.length > 0) {
     throw new Error(`[TENANT_ACTIVATION_BLOCKED] ${resolved.record.blockers.join('; ')}`);
   }
-  const rootDir = input.rootDir || pathResolver.rootDir();
   const filePath = resolved.activation_path;
   safeMkdir(path.dirname(filePath), { recursive: true });
   const record: TenantActivationRecord = {

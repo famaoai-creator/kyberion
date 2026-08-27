@@ -262,7 +262,6 @@ function loadProviderCatalog(): ServiceProvider[] {
 function fillUrlTemplate(template: string, topic: string, location: string): string {
   const query = [topic, location].filter(Boolean).join(' ');
   const encodedTopic = encodeURIComponent(topic);
-  const encodedLocation = encodeURIComponent(location);
   const encodedQuery = encodeURIComponent(query);
   // location fallback: use topic as location for services like wttr.in
   const effectiveLocation = location || topic;

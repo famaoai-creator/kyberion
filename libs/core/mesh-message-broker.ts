@@ -138,15 +138,6 @@ function eventsPath(namespace: string | undefined, tenantId: string): string {
   return `${meshHubObservabilityRoot(namespace)}/tenants/${tenantId}/events.jsonl`;
 }
 
-function payloadReference(payload: MeshRequest['payload']): MeshDeadLetterRecord['payload'] {
-  return {
-    classification: payload.classification,
-    artifact_ref: payload.reference.artifact_ref,
-    integrity_hash: payload.reference.integrity_hash,
-    storage_class: payload.reference.storage_class,
-  };
-}
-
 function selectorSummary(selector: MeshTargetSelector): Record<string, string> {
   switch (selector.kind) {
     case 'peer':
