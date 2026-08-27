@@ -1259,7 +1259,11 @@ describe('Typed Flow role resolution', () => {
     );
 
     expect(nestedRunner).toHaveBeenCalledWith('pipelines/vital-check.json', {
-      context: {},
+      // The child inherits user-level data only; the nesting ancestry is the
+      // one engine key attached on purpose (see pipeline-run-pipeline-nesting).
+      context: {
+        __pipeline_ancestry: [path.resolve(pathResolver.rootDir(), 'pipelines/vital-check.json')],
+      },
       quiet: true,
       hasHuman: undefined,
     });
