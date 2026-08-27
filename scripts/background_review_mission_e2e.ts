@@ -26,7 +26,6 @@ import {
   listSurfaceOutboxMessages,
   pathResolver,
   recordBackgroundReviewActivity,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
   withExecutionContext,

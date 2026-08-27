@@ -5,14 +5,7 @@ import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  loadJson,
-  safeAppendFile,
-  safeMkdir,
-  safeReadFile,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { loadJson, safeMkdir, safeReadFile, safeStat, safeWriteFile } from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
 import { createAjv } from './foundation/ajv.js';

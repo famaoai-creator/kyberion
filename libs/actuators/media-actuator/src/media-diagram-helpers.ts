@@ -1,5 +1,5 @@
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
-import { loadJson, safeExistsSync, safeReadFile } from '@agent/core';
+import { loadJson, safeExistsSync } from '@agent/core';
 import * as path from 'node:path';
 
 export function buildMermaidConfig(theme: any, backgroundColor?: string): Record<string, any> {

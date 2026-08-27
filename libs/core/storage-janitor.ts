@@ -10,7 +10,6 @@ import {
   safeUnlinkSync,
   safeExistsSync,
   safeWriteFile,
-  safeAppendFileSync,
   safeMkdir,
   safeMoveSync,
   safeRmSync,

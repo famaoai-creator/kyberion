@@ -1,29 +1,14 @@
 import {
   logger,
-  safeReadFile,
-  safeWriteFile,
-  safeMkdir,
-  safeExec,
-  safeExistsSync,
-  safeReaddir,
-  safeRmSync,
-  derivePipelineStatus,
   emitComputerSurfacePatch,
-  TraceContext,
-  persistTrace,
   pathResolver,
-  resolveVars,
-  evaluateCondition,
-  getPathValue,
   buildGovernedRetryOptions,
-  classifyError,
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
   ensureDefaultOpPreflight,
   runOpPreflight,
   defineCatalogBackedActuator,
 } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,
@@ -32,7 +17,7 @@ import {
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium, Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
+import { Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
 import { runActuatorCli } from '@agent/core';
 import { describeOps } from './op-catalog.js';
 

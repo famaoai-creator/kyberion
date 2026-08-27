@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeFsyncFile, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeFsyncFile, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 import type {
   ShareGrantLiveSessionEvictionRequest,

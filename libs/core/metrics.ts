@@ -1,11 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
-import {
-  loadJson,
-  safeReadFile,
-  safeAppendFileSync,
-  safeMkdir,
-  safeExistsSync,
-} from './secure-io.js';
+import { loadJson, safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';

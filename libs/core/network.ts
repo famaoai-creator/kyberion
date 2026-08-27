@@ -2,7 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
+import { loadJson, safeExistsSync, validateUrl } from './secure-io.js';
 import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,

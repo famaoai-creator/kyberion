@@ -7,7 +7,6 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReaddir,

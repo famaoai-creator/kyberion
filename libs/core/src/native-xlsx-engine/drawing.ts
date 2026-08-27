@@ -1,7 +1,7 @@
 /**
  * Drawing XML generator for XLSX packages
  */
-import type { XlsxDrawing, XlsxDrawingElement, XlsxDrawingAnchor } from '../types/xlsx-protocol.js';
+import type { XlsxDrawing, XlsxDrawingElement } from '../types/xlsx-protocol.js';
 import { escapeXml as escXml } from '../../text-escaping.js';
 
 function anchorPosXml(

@@ -14,7 +14,7 @@
  *
  * スキーマは README.md 参照。
  */
-import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';

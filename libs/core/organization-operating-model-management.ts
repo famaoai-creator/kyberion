@@ -1,27 +1,13 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
-import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
+import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
 import { loadState } from './mission-state.js';
-import { t } from './t.js';
-import type { SupportedLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import { auditChain } from './audit-chain.js';
-import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { createAjv } from './foundation/ajv.js';
-import {
-  safeExistsSync,
-  loadJson,
-  safeMkdir,
-  safeReaddir,
-  safeRmSync,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 
 type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
 const addFormats =
@@ -35,112 +21,52 @@ import {
   validationErrors,
   assertOrganizationId,
   assertTenantSlug,
-  recordTenant,
   assertRecordIdentity,
-  statePath,
-  purposePath,
-  recordPath,
   recordQueryTiers,
   recordQueryTenant,
   readJsonRecord,
-  saveValidated,
   loadOrganizationOperatingModelCatalog,
-  validateOrganizationPurpose,
   validateOrganizationOperationalState,
   validateOrganizationDomain,
   validateOrganizationCapability,
   validateOrganizationService,
   validateOrganizationServiceState,
   validateOrganizationOperation,
-  validateOrganizationOperationState,
-  validateOrganizationOperationRun,
-  validateOrganizationWorkResolution,
   validateOrganizationIncident,
   validateOrganizationCadence,
   validateOrganizationDecision,
   validateOrganizationLearningCandidate,
-  classifyOrganizationWork,
-  resolveOrganizationWork,
-  organizationPurposePath,
   organizationOperationalStatePath,
-  saveOrganizationPurpose,
   loadOrganizationPurpose,
   saveOrganizationOperationalState,
-  transitionOrganizationLifecycle,
   loadOrganizationOperationalState,
-  saveOrganizationDomain,
-  saveOrganizationCapability,
-  saveOrganizationService,
-  saveOrganizationServiceState,
-  loadOrganizationDomain,
-  loadOrganizationCapability,
-  loadOrganizationService,
-  loadOrganizationServiceState,
-  operationDirectory,
-  organizationRecordFiles,
   listOrganizationRecordFiles,
 } from './organization-operating-model-persistence.js';
-import type {
-  OrganizationRecordKind,
-  OrganizationLifecycleVerb,
-  OrganizationRetireKind,
-} from './organization-operating-model-persistence.js';
 import {
-  saveOrganizationOperation,
-  saveOrganizationOperationState,
-  saveOrganizationOperationRun,
-  loadOrganizationOperation,
-  loadOrganizationOperationState,
   listOrganizationOperations,
   listOrganizationOperationStates,
   listOrganizationOperationRuns,
-  saveOrganizationIncident,
-  loadOrganizationIncident,
-  saveOrganizationCadence,
   loadOrganizationCadence,
-  saveOrganizationDecision,
-  saveOrganizationLearningCandidate,
-  buildOrganizationLearningCandidate,
-  enqueueOrganizationLearningCandidate,
-  buildOrganizationScaffold,
-  buildOrganizationPurposeRecord,
-  buildOrganizationObjectiveAddition,
-  buildOrganizationDomainRecord,
-  buildOrganizationServiceAddition,
-  buildOrganizationServiceState,
 } from './organization-operating-model-operations.js';
 import type {
   OrganizationTier,
-  OrganizationWorkShape,
   OrganizationRelationshipType,
-  OrganizationOperatingModelCatalog,
-  OrganizationPurposeObjective,
-  OrganizationPurposeRecord,
-  OrganizationServiceHealthSummary,
   OrganizationOperationalState,
   OrganizationDomainRecord,
   OrganizationCapabilityRecord,
   OrganizationServiceRecord,
   OrganizationServiceState,
-  OrganizationOperationType,
   OrganizationOperationRecord,
-  OrganizationOperationState,
-  OrganizationOperationRun,
-  OrganizationManagementUnit,
-  OrganizationWorkResolution,
   OrganizationIncidentRecord,
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
-  OrganizationLearningSourceType,
   OrganizationLearningCandidate,
-  QueueOrganizationLearningCandidateInput,
   OrganizationCatalog,
   OrganizationCatalogReconciliation,
   OrganizationProjectLineage,
   OrganizationLineage,
   OrganizationReconciliationResult,
   OrganizationManagementView,
-  ResolveOrganizationWorkInput,
 } from './organization-operating-model.js';
 import type { BuildOrganizationOperationInput } from './organization-operating-model-operations.js';
 

@@ -3,12 +3,11 @@ import JSZip from 'jszip';
 import { safeReadFile } from '../secure-io.js';
 import {
   XlsxDesignProtocol, XlsxWorksheet, XlsxRow, XlsxCell, XlsxColumn,
-  XlsxMergeCell, XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge,
-  XlsxColor, XlsxNumberFormat, XlsxCellStyle, XlsxAlignment,
-  XlsxNamedStyle, XlsxTextRun, XlsxTheme, XlsxDefinedName,
-  XlsxSheetView, XlsxPageSetup, XlsxDrawing, XlsxDrawingElement,
-  XlsxDrawingAnchor, XlsxConditionalFormat, XlsxDataValidation,
-  XlsxAutoFilter, XlsxTable, XlsxTableColumn
+  XlsxFont, XlsxFill, XlsxBorder, XlsxBorderEdge,
+  XlsxColor, XlsxCellStyle, XlsxAlignment,
+  XlsxTextRun, XlsxTheme, XlsxDefinedName,
+  XlsxDrawing, XlsxDrawingElement,
+  XlsxDrawingAnchor, XlsxTable, XlsxTableColumn
 } from './types/xlsx-protocol.js';
 
 /**

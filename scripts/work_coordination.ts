@@ -33,7 +33,6 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core';
-import { safeReadFile } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 

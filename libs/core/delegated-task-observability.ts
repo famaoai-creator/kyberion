@@ -8,7 +8,6 @@ import { enqueueDelegationNotification } from './delegation-notifications.js';
 import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,

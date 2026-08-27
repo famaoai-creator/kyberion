@@ -26,7 +26,6 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  safeStat,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
   safeChmodSync,

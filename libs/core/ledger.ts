@@ -1,5 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
-import { safeReadFile, safeAppendFileSync, safeMkdir, safeExistsSync } from './secure-io.js';
+import { safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';

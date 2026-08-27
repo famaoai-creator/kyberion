@@ -5,7 +5,7 @@ import { pcmToWav } from './pcm-wav.js';
 import type { TraceContext } from './src/trace.js';
 import type { AudioBus } from './audio-bus.js';
 import type { StreamingSpeechToTextBridge } from './streaming-stt-bridge.js';
-import type { AudioChunk, AudioFormat, TranscriptChunk } from './meeting-session-types.js';
+import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import { chunkDurationMs, pcmSignalMetrics } from './audio-route.js';
 import { compareAudioText } from './audio-text-similarity.js';
 

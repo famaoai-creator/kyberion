@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 import {
-  logger,
   pathResolver,
   resolveOperatorDisplayName,
   resolveLocale as resolveUnifiedLocale,
   safeExistsSync,
   safeExec,
-  safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeReaddir,
   safeStat,
@@ -18,22 +15,6 @@ import {
 import { t as coreT } from '@agent/core/t';
 import type { SupportedLocale, VocabularyKey } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import {
-  executeEmailDelivery,
-  generateEmailReplyDraft,
-  organizeEmailInbox,
-  listEmailAccountProviders,
-  readEmailDraftArtifact,
-  readGwsAuthStatus,
-  resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
-import {
-  createCalendarEvent,
-  listCalendarAgenda,
-  listCalendars,
-  queryCalendarFreeBusy,
-  readM365AuthStatus,
-} from '@agent/core/calendar-workflow';
 import {
   assertValidMobileAppProfileIndex,
   assertValidWebAppProfileIndex,
@@ -50,7 +31,6 @@ import {
   handleEmailWorkflowCommand,
   handleOffboardCommand,
   handleTaskCommand,
-  parseOffboardArgs,
 } from './cli-workflow-handlers.js';
 export { parseOffboardArgs } from './cli-workflow-handlers.js';
 import { printBranchBanner, printHeader, printHelp } from './cli-presentation.js';

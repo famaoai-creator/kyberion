@@ -54,7 +54,7 @@ import {
   type NotificationChannelTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { collectDoctorReport, runDoctor } from './run_doctor.js';
+import { runDoctor } from './run_doctor.js';
 import {
   handleDealsIngestAudio,
   handleDealsSubcommand,

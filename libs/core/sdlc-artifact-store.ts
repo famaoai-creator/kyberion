@@ -11,7 +11,7 @@
 
 import * as path from 'node:path';
 import { missionEvidenceDir } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   DecomposedTaskPlan,
   ExtractedDesignSpec,

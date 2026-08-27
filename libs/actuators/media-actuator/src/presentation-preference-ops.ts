@@ -3,7 +3,6 @@ import {
   pathResolver,
   registerPresentationPreferenceProfile,
   safeExistsSync,
-  safeReadFile,
   type PresentationPreferenceProfile,
 } from '@agent/core';
 

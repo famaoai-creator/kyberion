@@ -27,7 +27,6 @@ import {
   loadArtifactReviewReceipt,
   receiptToArtifactReviewDecision,
 } from './artifact-review.js';
-import type { CompletionReconciliation } from './next-action.js';
 import { loadState } from './mission-state.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 /** KO-19: weekly tenant-scope reconciliation and steward-facing report. */
-import * as path from 'node:path';
 import {
   listTenantProfileSlugs,
   pathResolver,

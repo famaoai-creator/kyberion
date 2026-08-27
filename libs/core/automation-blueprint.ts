@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { loadJson, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
+import { loadJson, safeLstat, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';

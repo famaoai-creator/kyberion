@@ -12,7 +12,7 @@ import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { missionDir } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
 

@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
@@ -25,12 +25,8 @@ import {
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
 import { slugify } from './foundation/text.js';
-import {
-  compileScopedContextPack,
-  type ContextFragmentRejection,
-  type ContextSecurityScope,
-} from './context-security-scope.js';
-import { resolveFacets, type FacetRequest, type ResolvedFacets } from './facet-registry.js';
+import { compileScopedContextPack, type ContextSecurityScope } from './context-security-scope.js';
+import { resolveFacets, type ResolvedFacets } from './facet-registry.js';
 import {
   loadSkillResourceDescriptor,
   renderSkillResourceIndex,
@@ -51,15 +47,10 @@ import type {
   MissionContextPackFacets,
   MissionContextPackKnowledgeHint,
   MissionContextPackMissionSummary,
-  MissionContextPackPruningSummary,
-  MissionContextPackProjectSummary,
   MissionContextPackRecipient,
   MissionContextPackScope,
   MissionContextPackSource,
   MissionContextPackTaskGuidance,
-  MissionContextPackTaskSessionSummary,
-  MissionContextPackTrackSummary,
-  MissionContextPackWorkItemSummary,
   MissionContextRecipientKind,
   MissionStateSummary,
   MissionTier,

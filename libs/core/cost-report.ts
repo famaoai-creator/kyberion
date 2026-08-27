@@ -1,10 +1,5 @@
 import { metrics, type ResourceUsageStatus } from './metrics.js';
-import {
-  eventScopeMatches,
-  parseEventScopeFromRecord,
-  type EventScope,
-  type EventScopeFilter,
-} from './event-scope.js';
+import { eventScopeMatches, type EventScope, type EventScopeFilter } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 

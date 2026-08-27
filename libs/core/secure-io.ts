@@ -6,7 +6,6 @@ import {
   spawnSync,
   type ChildProcessWithoutNullStreams,
 } from 'node:child_process';
-import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import {

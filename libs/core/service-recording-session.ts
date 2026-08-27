@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import {
   describeServiceHarness,
   planServiceOperation,
-  redactServiceInputs,
   type ServiceOperationContract,
 } from './service-harness.js';
 import {

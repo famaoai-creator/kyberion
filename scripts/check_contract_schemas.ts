@@ -3,10 +3,6 @@ import {
   compileSchemaFromPath,
   buildPromotedMemoryRecord,
   createDistillCandidateRecord,
-  resolveIntentResolutionContract,
-  createNextActionContract,
-  createOutcomeContract,
-  createTaskSession,
   safeExistsSync,
   safeReaddir,
 } from '@agent/core';
@@ -16,9 +12,7 @@ import {
   readAgentProfilePayloads,
   readAuthorityRolePayloads,
   readGovernanceJson,
-  readSpecialistPayloads,
   readSurfaceManifestPayloads,
-  readSurfaceProviderCatalogPayloads,
   readTeamRolePayloads,
   readVoiceProfilePayloads,
   ContractCheck,
@@ -28,7 +22,6 @@ import { createPolicyAndManifestChecks } from './check_contract_schemas_policy_c
 import { createContractSchemaChecksPart1 } from './check_contract_schemas_checks_1.js';
 import { createContractSchemaChecksPart2 } from './check_contract_schemas_checks_2.js';
 import { createContractSchemaChecksPart3 } from './check_contract_schemas_checks_3.js';
-import { createServiceChecks } from './check_contract_schemas_service_checks.js';
 import { createAjv, createAjv2020 } from '@agent/core/foundation';
 
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
