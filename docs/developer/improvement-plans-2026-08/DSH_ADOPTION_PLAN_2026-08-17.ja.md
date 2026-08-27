@@ -14,7 +14,7 @@ tags:
     adoption-plan,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # DeepSeek Harness 分析・採択計画(DH-01〜16)
@@ -315,17 +315,17 @@ seam 選択・prompt section・guard・hook のいずれも「登録順で決ま
 
 ## 10. 検証コマンド(実装時)
 
-- DH-01: `pnpm vitest run libs/core/op-preflight.test.ts libs/core/op-preflight-defaults.test.ts` + `pnpm run check:op-preflight-coverage`
+- DH-01: `pnpm vitest run libs/core/op-preflight.test.ts libs/core/op-preflight-defaults.test.ts` + `pnpm check -- --scope full --only op-preflight-coverage`
 - DH-02: `pnpm vitest run libs/core/seam.test.ts` + 各 seam の移行テスト、`grep -c "export function reset" libs/core/*.ts` の減少をラチェット
-- DH-03/07: `pnpm bindings --dump --json`、`pnpm run generate:capability-seams && pnpm run check:capability-seams`
-- DH-06: `pnpm run check:module-invariants`
+- DH-03/07: `pnpm bindings --dump --json`、`pnpm run generate:capability-seams && pnpm check -- --scope full --only capability-seams`
+- DH-06: `pnpm check -- --scope full --only module-invariants`
 - DH-08: `pnpm plugin:install` → deactivate → 全貢献消失の boundary test
 
 ## 11. 関連
 
 - [PI_ADOPTION_PLAN_2026-08-16](./PI_ADOPTION_PLAN_2026-08-16.ja.md)(PI-08 preflight repair ↔ DH-01、PI-09 provenance/narrow-only ↔ DH-08、PI-10/13 ↔ DH-04、PI-15/16 ↔ DH-10/12)
-- [TAKT_ADOPTION_PLAN_2026-08-16](./TAKT_ADOPTION_PLAN_2026-08-16.ja.md)(TK-04 facet ↔ DH-09、TK-03 ↔ DH-10)
-- [QM_ADOPTION_PLAN_2026-08-01](./QM_ADOPTION_PLAN_2026-08-01.ja.md)(QM-06 backend 能力宣言 ↔ DH-04、QM-07 skill pack ↔ DH-08)
+- [TAKT_ADOPTION_PLAN_2026-08-16](../improvement-plans-archive/2026-08/TAKT_ADOPTION_PLAN_2026-08-16.ja.md)(TK-04 facet ↔ DH-09、TK-03 ↔ DH-10)
+- [QM_ADOPTION_PLAN_2026-08-01](../improvement-plans-archive/2026-08/QM_ADOPTION_PLAN_2026-08-01.ja.md)(QM-06 backend 能力宣言 ↔ DH-04、QM-07 skill pack ↔ DH-08)
 - [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KO-06 `pnpm scope` ↔ DH-03)
 - `knowledge/product/governance/adapter-first-extension-policy.md`(4 層規則、DH-02 の土台)
 - `knowledge/product/governance/kyberion-development-practices.md`(登録儀式、DH-07 の流儀)

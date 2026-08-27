@@ -1,15 +1,10 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type {
   MissionTeamGovernance,
   MissionTeamOrganizationProfileSummary,
@@ -348,11 +343,11 @@ export function loadMissionStaffingAssignments(
 ): MissionStaffingAssignments | null {
   const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
-  const parsed = JSON.parse(
-    safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }) as string
-  ) as Omit<MissionStaffingAssignments, 'assignments'> & {
-    assignments?: Array<Partial<MissionStaffingAssignment>>;
-  };
+  const parsed = readJson<
+    Omit<MissionStaffingAssignments, 'assignments'> & {
+      assignments?: Array<Partial<MissionStaffingAssignment>>;
+    }
+  >(paths.staffingAssignmentsPath);
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];
@@ -439,10 +434,7 @@ function resolveMissionLedgerScope(
   const statePath = path.join(missionPath, 'mission-state.json');
   if (safeExistsSync(statePath)) {
     try {
-      state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-        string,
-        unknown
-      >;
+      state = readJson<Record<string, unknown>>(statePath);
     } catch {
       state = {};
     }
@@ -499,6 +491,6 @@ export function appendMissionExecutionLedgerEntry(
     mission_id: missionId,
     ...entryPayload,
   };
-  safeAppendFileSync(paths.executionLedgerPath, `${JSON.stringify(entry)}\n`);
+  appendJsonLine(paths.executionLedgerPath, entry);
   return paths.executionLedgerPath;
 }

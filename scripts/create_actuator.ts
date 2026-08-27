@@ -11,7 +11,7 @@
  *     manifest.json
  *     package.json
  *     src/index.ts
- *     schemas/<name>-action.schema.json
+ *     knowledge/product/schemas/<name>-action.schema.json
  *     examples/README.md
  *
  * Pattern from Paper2Any's `dfa create` scaffolding CLI (Apache 2.0).
@@ -19,15 +19,8 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  classifyError,
-  createStandardYargs,
-  formatClassification,
-  logger,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
+import { createStandardYargs, logger, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -69,7 +62,7 @@ function buildManifest(fullName: string, description: string, name: string): str
       actuator_id: fullName,
       version: '1.0.0',
       description,
-      contract_schema: `schemas/${name}-action.schema.json`,
+      contract_schema: `knowledge/product/schemas/${name}-action.schema.json`,
       resilience_tier: 'adaptive_retry',
       recovery_policy: {
         fallback_strategy: 'sequential_alternatives',
@@ -79,7 +72,7 @@ function buildManifest(fullName: string, description: string, name: string): str
       capabilities: [
         {
           op: 'execute',
-          schema_ref: `schemas/${name}-action.schema.json`,
+          schema_ref: `knowledge/product/schemas/${name}-action.schema.json`,
           platforms: ['darwin', 'linux', 'win32'],
         },
       ],
@@ -113,54 +106,23 @@ function buildPackage(description: string, name: string, fullName: string): stri
   );
 }
 
-function buildIndexTs(fullName: string, pascalName: string): string {
-  return `import { ensureDefaultOpPreflight, logger, classifyError, runOpPreflight } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
+  return `import { defineActuator, logger, runActuatorCli } from '@agent/core';
 
-// ── Op dispatch ─────────────────────────────────────────────────────────────
+const executeInputSchema = {
+  type: 'object',
+  description: 'Replace this scaffold contract with the actuator-specific input schema.',
+  additionalProperties: true,
+} as const;
 
-export async function dispatch${pascalName}Op(
-  op: string,
-  params: Record<string, unknown>,
-  ctx: Record<string, unknown>,
-): Promise<{ handled: boolean; ctx: Record<string, unknown> }> {
-  try {
-    ensureDefaultOpPreflight();
-    const approvalGranted = params._approval_granted === true || ctx._approval_granted === true;
-    const preflight = await runOpPreflight({
-      op: '${fullName}:' + op,
-      params,
-      context: ctx,
-      source: 'actuator',
-      requiresApproval: params._approval_required === true || ctx._approval_required === true,
-      approvalGranted,
-    });
-    if (preflight.decision !== 'allow') {
-      throw new Error(
-        '[OP_PREFLIGHT_' + preflight.decision.toUpperCase() + '] ' +
-          (preflight.reason || 'Operation was not admitted.')
-      );
-    }
-    const admittedParams = preflight.input;
-    switch (op) {
-      case 'execute':
-        return { handled: true, ctx: await opExecute(admittedParams, ctx) };
-
-      default:
-        logger.warn(\`[${fullName}] Unknown op: \${op}\`);
-        return { handled: false, ctx };
-    }
-  } catch (err: any) {
-    const classification = classifyError(err);
-    logger.error(\`[${fullName}] \${op} failed (\${classification.category}): \${err.message}\`);
-    throw err;
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Actuator input must be an object.');
   }
+  return value as Record<string, unknown>;
 }
 
-// Re-export under the generic name expected by run_pipeline.ts
-export const dispatchDecisionOp = dispatch${pascalName}Op;
-
-// ── Op implementations ──────────────────────────────────────────────────────
+// ── Op implementation ───────────────────────────────────────────────────────
 
 async function opExecute(
   params: Record<string, unknown>,
@@ -180,17 +142,27 @@ async function opExecute(
   };
 }
 
-// ── CLI entry point ─────────────────────────────────────────────────────────
+export const actuator = defineActuator({
+  id: '${fullName}',
+  ops: {
+    execute: {
+      kind: 'apply',
+      input_schema: executeInputSchema,
+      validateInput: asRecord,
+      handler: opExecute,
+    },
+  },
+});
 
-if (process.argv[1]?.endsWith('index.js') || process.argv[1]?.endsWith('index.ts')) {
-  const argv = await createStandardYargs()
-    .option('op', { type: 'string', demandOption: true, describe: 'Operation to run' })
-    .option('params', { type: 'string', default: '{}', describe: 'JSON params' })
-    .parseAsync();
+export async function main(): Promise<void> {
+  await runActuatorCli({ name: '${fullName}', actuator });
+}
 
-  const params = JSON.parse(argv.params as string);
-  const result = await dispatch${pascalName}Op(argv.op as string, params, {});
-  console.log(JSON.stringify(result.ctx, null, 2));
+if (import.meta.main) {
+  main().catch((err: unknown) => {
+    logger.error(err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+  });
 }
 `;
 }
@@ -277,7 +249,7 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
     path.join(outDir, 'package.json'),
     `${buildPackage(description, name, fullName)}\n`
   );
-  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName));
+  safeWriteFile(path.join(outDir, 'src', 'index.ts'), buildIndexTs(fullName, pascalName, name));
   safeWriteFile(
     path.join(outDir, 'schemas', `${name}-action.schema.json`),
     `${buildSchema(pascalName)}\n`
@@ -293,7 +265,7 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
       'manifest.json',
       'package.json',
       'src/index.ts',
-      `schemas/${name}-action.schema.json`,
+      `knowledge/product/schemas/${name}-action.schema.json`,
       'examples/README.md',
     ],
     name: fullName,
@@ -301,8 +273,8 @@ export function createActuatorScaffold(input: ActuatorScaffoldInput): ActuatorSc
   };
 }
 
-function parseCliArgs(): ActuatorScaffoldInput {
-  const argv = createStandardYargs()
+function parseCliArgs(args: string[]): ActuatorScaffoldInput {
+  const argv = createStandardYargs(['node', 'create_actuator', ...args])
     .option('name', { type: 'string', describe: 'Actuator name' })
     .option('desc', { type: 'string', describe: 'Human-readable description' })
     .parseSync();
@@ -319,31 +291,31 @@ function parseCliArgs(): ActuatorScaffoldInput {
   };
 }
 
-async function main(): Promise<void> {
-  try {
-    const scaffold = createActuatorScaffold(parseCliArgs());
-    logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
-    console.log('  Files created:');
-    for (const file of scaffold.files) {
-      console.log(`    ${file}`);
-    }
-    console.log('\nNext steps:');
-    console.log('  1. Implement the actuator-specific op logic in src/index.ts');
-    console.log('  2. Replace the schema stub with the real contract');
-    console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
-    console.log('  4. Run: pnpm build');
-    console.log(
-      '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
-    );
-  } catch (err: any) {
-    logger.error(formatClassification(classifyError(err)));
-    process.exit(1);
+async function main(args: string[]): Promise<void> {
+  const scaffold = createActuatorScaffold(parseCliArgs(args));
+  logger.success(`✓ Scaffolded ${scaffold.name} at ${path.relative(ROOT, scaffold.outDir)}/`);
+  console.log('  Files created:');
+  for (const file of scaffold.files) {
+    console.log(`    ${file}`);
   }
+  console.log('\nNext steps:');
+  console.log('  1. Implement the actuator-specific op logic in src/index.ts');
+  console.log('  2. Replace the schema stub with the real contract');
+  console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
+  console.log('  4. Run: pnpm build');
+  console.log(
+    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
+  );
 }
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
-  await main();
+const script = defineScript({
+  name: 'create:actuator',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'create_actuator.ts') ||
+  isDirectScript(import.meta.url, 'create_actuator.js')
+) {
+  void script();
 }

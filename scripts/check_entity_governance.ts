@@ -10,7 +10,9 @@ import {
   listProjectRecords,
   withExecutionContext,
 } from '@agent/core';
+import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface EntityGovernanceReport {
   status: 'ok' | 'drift';
@@ -132,7 +134,7 @@ export function collectEntityGovernanceReport(
   const violations: string[] = [];
   const warnings: string[] = [];
   const policyPath = path.join(rootDir, 'knowledge/product/governance/security-policy.json');
-  const schemaPath = path.join(rootDir, 'schemas/work-item.schema.json');
+  const schemaPath = path.join(rootDir, 'knowledge/product/schemas/governed-work-item.schema.json');
   const catalogPath = path.join(
     rootDir,
     'knowledge/product/governance/storage-retention-catalog.json'
@@ -140,12 +142,12 @@ export function collectEntityGovernanceReport(
   let policy: any = null;
   let catalog: any = null;
   try {
-    policy = JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' })));
+    policy = readJson<unknown>(policyPath);
   } catch (error) {
     violations.push(`security policy unreadable: ${String(error)}`);
   }
   try {
-    catalog = JSON.parse(String(safeReadFile(catalogPath, { encoding: 'utf8' })));
+    catalog = readJson<unknown>(catalogPath);
   } catch (error) {
     violations.push(`retention catalog unreadable: ${String(error)}`);
   }
@@ -279,21 +281,25 @@ export function collectEntityGovernanceReport(
   };
 }
 
-export function main(): void {
-  const report = withExecutionContext(
-    'sovereign',
-    () => collectEntityGovernanceReport(),
-    'sovereign'
-  );
-  console.log(JSON.stringify(report, null, 2));
-  const strictWarnings =
-    process.argv.includes('--strict-warnings') ||
-    process.env.KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS === 'true';
-  if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
-}
+export const runCheckEntityGovernance = defineScript({
+  name: 'check:entity-governance',
+  flags: [],
+  run(context) {
+    const report = withExecutionContext(
+      'sovereign',
+      () => collectEntityGovernanceReport(),
+      'sovereign'
+    );
+    context.print(report);
+    const strictWarnings =
+      context.argv.includes('--strict-warnings') ||
+      getRegisteredEnvBool('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === true;
+    if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
+  },
+});
 
 if (
-  process.argv[1]?.endsWith('check_entity_governance.ts') ||
-  process.argv[1]?.endsWith('check_entity_governance.js')
+  isDirectScript(import.meta.url, 'check_entity_governance.ts') ||
+  isDirectScript(import.meta.url, 'check_entity_governance.js')
 )
-  main();
+  void runCheckEntityGovernance();

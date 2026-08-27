@@ -1,4 +1,6 @@
 import * as crypto from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -83,10 +85,6 @@ export interface MeshTopicResolutionOptions {
   policyVersion?: string;
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function normalizeIso(value?: string | Date): string {
   const input = value ?? new Date();
   const date = input instanceof Date ? input : new Date(input);
@@ -105,13 +103,14 @@ function normalizeNamespace(namespace?: string): string {
 }
 
 function meshHubRuntimeRoot(namespace?: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_RUNTIME_ROOT || DEFAULT_RUNTIME_ROOT;
+  const baseRoot = getRegisteredEnvText('KYBERION_MESH_HUB_RUNTIME_ROOT') || DEFAULT_RUNTIME_ROOT;
   const suffix = normalizeNamespace(namespace);
   return suffix ? `${baseRoot}/${suffix}` : baseRoot;
 }
 
 function meshHubObservabilityRoot(namespace?: string): string {
-  const baseRoot = process.env.KYBERION_MESH_HUB_OBSERVABILITY_ROOT || DEFAULT_OBSERVABILITY_ROOT;
+  const baseRoot =
+    getRegisteredEnvText('KYBERION_MESH_HUB_OBSERVABILITY_ROOT') || DEFAULT_OBSERVABILITY_ROOT;
   const suffix = normalizeNamespace(namespace);
   return suffix ? `${baseRoot}/${suffix}` : baseRoot;
 }

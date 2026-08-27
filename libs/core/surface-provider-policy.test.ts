@@ -14,6 +14,7 @@ import {
 } from './surface-provider-policy.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -210,13 +211,15 @@ describe('surface-provider-policy', () => {
       ajv,
       path.resolve(root, 'knowledge/product/schemas/surface-provider-manifests.schema.json')
     );
-    const manifests = JSON.parse(
-      safeReadFile(
-        path.resolve(root, 'knowledge/product/governance/surface-provider-manifests.json'),
-        {
-          encoding: 'utf8',
-        }
-      ) as string
+    const manifests = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(
+          path.resolve(root, 'knowledge/product/governance/surface-provider-manifests.json'),
+          {
+            encoding: 'utf8',
+          }
+        ) as string
+      )
     );
 
     expect(validate(manifests)).toBe(true);

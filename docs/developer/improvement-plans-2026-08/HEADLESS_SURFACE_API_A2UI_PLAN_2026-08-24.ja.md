@@ -3,6 +3,7 @@ title: Headless Surface API と A2UI adapter の段階導入計画
 category: Improvement Plan
 tags: [chronos, headless-api, a2ui, surface, api, viewer-scope]
 last_updated: 2026-08-24
+status: active
 ---
 
 # Headless Surface API と A2UI adapter

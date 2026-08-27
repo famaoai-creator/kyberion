@@ -7,6 +7,7 @@
  */
 import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 // Do not traverse tenant/personal knowledge tiers: the checker is a public
 // repository-governance lint and those paths are intentionally role-scoped.
@@ -15,7 +16,7 @@ export const MISSION_GATE_SCAN_ROOTS = ['docs', 'knowledge/product', 'knowledge/
 /** Historical analysis, policy-source, and domain-specific documents may quote these terms. */
 export const MISSION_GATE_DOCUMENT_EXCLUSIONS = new Set([
   'docs/developer/improvement-plans-2026-07/STATUS.ja.md',
-  'docs/developer/improvement-plans-2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md',
+  'docs/developer/improvement-plans-archive/2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md',
   'knowledge/product/architecture/mission-task-classification-roadmap-5.4-mini.md',
   'knowledge/product/architecture/agent-communication-layer-model.md',
   'knowledge/product/incidents/distill_msn-jgb-retrofit-20260422_2026_04_22.md',
@@ -83,16 +84,24 @@ function loadMissionGateDocuments(): Record<string, string> {
   );
 }
 
-export function main(): void {
-  const violations = collectMissionGateDocViolations(loadMissionGateDocuments());
-  if (violations.length > 0) {
-    for (const violation of violations) console.error(`[check:mission-gate-docs] ${violation}`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
-  );
-}
+export const runCheckMissionGateDocs = defineScript({
+  name: 'check:mission-gate-docs',
+  flags: [],
+  run(context) {
+    const violations = collectMissionGateDocViolations(loadMissionGateDocuments());
+    if (violations.length > 0) {
+      for (const violation of violations) console.error(`[check:mission-gate-docs] ${violation}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print(
+      `[check:mission-gate-docs] OK — ${Object.keys(loadMissionGateDocuments()).length} documents checked`
+    );
+  },
+});
 
-if (process.argv[1]?.endsWith('check_mission_gate_docs.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_mission_gate_docs.ts') ||
+  isDirectScript(import.meta.url, 'check_mission_gate_docs.js')
+)
+  void runCheckMissionGateDocs();

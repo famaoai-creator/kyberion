@@ -12,6 +12,7 @@ import {
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -24,52 +25,52 @@ function usage(): never {
   );
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  if (
-    !['request', 'apply', 'apply-skill', 'apply-memory'].includes(argv[0]) ||
-    !flag(argv, '--candidate')
-  )
-    usage();
-  if (argv[0] === 'request') {
-    const request = createBackgroundReviewApprovalRequest({
+export const main = defineScript({
+  name: 'background-review',
+  flags: [],
+  async run(context) {
+    const argv = context.positional;
+    if (
+      !['request', 'apply', 'apply-skill', 'apply-memory'].includes(argv[0]) ||
+      !flag(argv, '--candidate')
+    )
+      usage();
+    if (argv[0] === 'request') {
+      const request = createBackgroundReviewApprovalRequest({
+        candidateId: flag(argv, '--candidate'),
+        expectedSha256: flag(argv, '--expected-sha256'),
+        requestedBy: flag(argv, '--requested-by') || undefined,
+        missionId: flag(argv, '--mission-id') || undefined,
+      });
+      context.print({
+        ok: true,
+        approval_request_id: request.id,
+        storage_channel: request.storageChannel,
+        candidate_id: flag(argv, '--candidate'),
+        next: `pnpm cli -- approve ${request.id} ${request.storageChannel}`,
+      });
+      return;
+    }
+    if (!flag(argv, '--approved-by') || !flag(argv, '--approval-ref')) usage();
+    const apply =
+      argv[0] === 'apply-skill'
+        ? applyBackgroundReviewSkillPatch
+        : argv[0] === 'apply-memory'
+          ? applyBackgroundReviewMemoryConsolidationPatch
+          : applyBackgroundReviewPipelinePatch;
+    const result = apply({
       candidateId: flag(argv, '--candidate'),
       expectedSha256: flag(argv, '--expected-sha256'),
-      requestedBy: flag(argv, '--requested-by') || undefined,
-      missionId: flag(argv, '--mission-id') || undefined,
+      approvedBy: flag(argv, '--approved-by'),
+      approvalRef: flag(argv, '--approval-ref'),
     });
-    process.stdout.write(
-      `${JSON.stringify(
-        {
-          ok: true,
-          approval_request_id: request.id,
-          storage_channel: request.storageChannel,
-          candidate_id: flag(argv, '--candidate'),
-          next: `pnpm cli -- approve ${request.id} ${request.storageChannel}`,
-        },
-        null,
-        2
-      )}\n`
-    );
-    return;
-  }
-  if (!flag(argv, '--approved-by') || !flag(argv, '--approval-ref')) usage();
-  const apply =
-    argv[0] === 'apply-skill'
-      ? applyBackgroundReviewSkillPatch
-      : argv[0] === 'apply-memory'
-        ? applyBackgroundReviewMemoryConsolidationPatch
-        : applyBackgroundReviewPipelinePatch;
-  const result = apply({
-    candidateId: flag(argv, '--candidate'),
-    expectedSha256: flag(argv, '--expected-sha256'),
-    approvedBy: flag(argv, '--approved-by'),
-    approvalRef: flag(argv, '--approval-ref'),
-  });
-  process.stdout.write(`${JSON.stringify({ ok: true, ...result }, null, 2)}\n`);
-}
-
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+    context.print({ ok: true, ...result });
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'background_review.ts') ||
+  isDirectScript(import.meta.url, 'background_review.js')
+) {
+  void main();
+}

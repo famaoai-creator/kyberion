@@ -5,12 +5,7 @@
 import { pathResolver } from '@agent/core';
 import { safeMkdir } from '../../../secure-io.js';
 import { generateNativePptx } from '../engine.js';
-import type {
-  PptxDesignProtocol,
-  PptxElement,
-  PptxSlide,
-  PptxTextRun,
-} from '../../types/pptx-protocol.js';
+import type { PptxDesignProtocol, PptxElement, PptxSlide } from '../../types/pptx-protocol.js';
 
 // ─── Color Palette ──────────────────────────────────────────
 const C = {

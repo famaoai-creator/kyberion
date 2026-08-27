@@ -53,7 +53,7 @@ function legacyEnvironmentKeys(surface: string): string[] {
 }
 
 function resolveAllowlist(surface: string): ParsedAllowlist | null {
-  const common = process.env.KYBERION_SURFACE_ALLOWLISTS?.trim();
+  const common = getRegisteredEnvText('KYBERION_SURFACE_ALLOWLISTS')?.trim();
   if (common) return parseCommonAllowlist(common, surface);
 
   for (const key of legacyEnvironmentKeys(surface)) {
@@ -125,3 +125,4 @@ export function describeSurfaceAllowlistConfiguration(surface: string): {
   const decision = evaluateSurfaceActorAccess(surface, '', { defaultAllow: true });
   return { configured: decision.configured, source: decision.source };
 }
+import { getRegisteredEnvText } from './foundation/env.js';

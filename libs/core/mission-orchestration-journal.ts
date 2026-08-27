@@ -1,18 +1,18 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
   safeReaddir,
 } from './secure-io.js';
-import {
-  loadMissionOrchestrationEvent,
-  type MissionOrchestrationEvent,
-  type MissionOrchestrationEventType,
-} from './mission-orchestration-events.js';
+import { loadMissionOrchestrationEvent } from './mission-orchestration-event-loader.js';
+import type {
+  MissionOrchestrationEvent,
+  MissionOrchestrationEventType,
+} from './mission-orchestration-event-contract.js';
 import { eventScopeMatches, type EventScope } from './event-scope.js';
 import { withFencedWriterLeaseSync, writerLeaseResourceId } from './writer-lease.js';
 
@@ -180,7 +180,7 @@ export function readProvisionedEntry<TContent>(
 ): PersistedProvisionedEntry<TContent> {
   let persisted: unknown;
   try {
-    persisted = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''));
+    persisted = readJson<unknown>(filePath);
   } catch {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
   }
@@ -211,7 +211,7 @@ export function appendProvisionedEntryRecord(input: {
     leasePath,
     fn: () => {
       ensureJournalDir(input.missionId, input.scope);
-      safeAppendFileSync(recordPath, `${JSON.stringify(record)}\n`);
+      appendJsonLine(recordPath, record);
       return record;
     },
   });
@@ -271,7 +271,7 @@ export function writeProvisionedJson<TContent>(input: {
   safeWriteFile(input.filePath, `${JSON.stringify(input.provisioned.content, null, 2)}\n`);
   let content: unknown;
   try {
-    content = JSON.parse(String(safeReadFile(input.filePath, { encoding: 'utf8' }) || ''));
+    content = readJson<unknown>(input.filePath);
   } catch {
     throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
   }
@@ -469,10 +469,7 @@ export function appendMissionOrchestrationJournalEntry(input: {
     ownerId: `process:${process.pid}`,
     leasePath,
     fn: () => {
-      safeAppendFileSync(
-        `${journalMissionPath}/coordination/orchestration-journal.jsonl`,
-        `${JSON.stringify(entry)}\n`
-      );
+      appendJsonLine(`${journalMissionPath}/coordination/orchestration-journal.jsonl`, entry);
       return entry;
     },
   });

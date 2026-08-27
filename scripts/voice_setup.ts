@@ -10,6 +10,8 @@ import {
   safeExistsSync,
   safeMkdir,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const VOICE_TOOL_IDS = [
   'mlx_audio',
@@ -20,7 +22,8 @@ const VOICE_TOOL_IDS = [
   'ten_vad',
   'silero_vad',
 ] as const;
-const MANAGED_PYTHON_VERSION = process.env.KYBERION_MANAGED_PYTHON_VERSION?.trim() || '3.11';
+const MANAGED_PYTHON_VERSION =
+  getRegisteredEnvText('KYBERION_MANAGED_PYTHON_VERSION')?.trim() || '3.11';
 
 type VoiceToolId = (typeof VOICE_TOOL_IDS)[number];
 
@@ -271,10 +274,12 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /voice_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'voice_setup.ts') ||
+  isDirectScript(import.meta.url, 'voice_setup.js')
+) {
   main().catch((error: any) => {
     console.error(error?.message ?? String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

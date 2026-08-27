@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "sample_limits": {
       "type": "object",
@@ -19,7 +20,13 @@
           "items": { "type": "string", "minLength": 2 }
         }
       },
-      "required": ["min_samples", "max_samples", "min_sample_bytes", "max_sample_bytes", "allowed_extensions"]
+      "required": [
+        "min_samples",
+        "max_samples",
+        "min_sample_bytes",
+        "max_sample_bytes",
+        "allowed_extensions"
+      ]
     },
     "profile_rules": {
       "type": "object",

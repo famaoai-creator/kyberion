@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-workflow-catalog.schema.json",
   "version": "1.3.0",
   "defaults": {
     "workflow_id": "single-track-default"

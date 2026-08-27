@@ -2,7 +2,7 @@
   "actuator_id": "vision-actuator",
   "version": "1.4.0",
   "description": "Perception-oriented compatibility facade; generation and screen capture live in media-generation-actuator",
-  "contract_schema": "schemas/vision-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/vision-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "media_generation_fallback",

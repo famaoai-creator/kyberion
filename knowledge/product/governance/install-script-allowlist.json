@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "schema_version": 1,
   "description": "Every pnpm allowBuilds entry must have an explicit, reviewable reason.",
   "packages": {

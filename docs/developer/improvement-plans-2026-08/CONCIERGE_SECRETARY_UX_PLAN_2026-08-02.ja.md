@@ -1,3 +1,10 @@
+---
+title: CONCIERGE SECRETARY UX PLAN 2026 08 02
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # Concierge 秘書室 全面改善計画(CS-00〜CS-05)
 
 > **作成日**: 2026-08-02
@@ -31,16 +38,16 @@
 
 ## 1. 現状の問題(調査結果 2026-08-02)
 
-| #   | 問題                                                                                                                                                                                                                                                                              | 根拠                                                                             |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| P1  | **二重実装**: Next.js 版(port 3050、登録済み、承認/受領ダッシュボードのみ)と旧 Express 版(port 3033、未登録、アバター+音声チャット)が同居し、**会話・音声機能が登録サーフェスから到達不能**                                                                                       | `presence/displays/concierge/src/app/**` vs `server.ts` + `static/index.html`    |
-| P2  | **crash-loop**: manifest が `next start` のみ実行し `next build` が走らないため、2026-07-26 以降起動失敗を繰り返している                                                                                                                                                          | `active/shared/logs/surfaces/concierge.log`(`Could not find a production build`) |
-| P3  | **/setup が読み取り専用**: 「変更は各コマンドで」とシェルコマンドを印字するだけ。秘書ではなく掲示板                                                                                                                                                                               | `src/app/setup/page.tsx:65`、`api/setup/route.ts`(GET のみ)                      |
-| P4  | **業務網羅性の欠如**: セットアップ・プロバイダ設定・通知設定・ナレッジ取込・プラグイン承認等、ユーザ業務のほぼ全てが CLI か JSON 手編集。GUI 書き込み経路は承認・成果物受領のみ                                                                                                   | ユーザ業務インベントリ(§2)                                                       |
-| P5  | **UI 品質**: 30 秒 `setInterval` ポーリング、修正依頼が `window.prompt`、素の CSS、状態管理なし、ストリーミングなし                                                                                                                                                               | `src/app/page.tsx:93-97,139`                                                     |
-| P6  | **i18n ゼロ + 方式乖離**: main は日本語ハードコード。pr653 worktree にパッケージローカル `messages.json` 方式の未コミット実装があるが、全体計画([INTERNATIONALIZATION_PLAN](../improvement-plans-2026-07/INTERNATIONALIZATION_PLAN_2026-07-26.ja.md))の共通語彙カタログ方式と乖離 | `.worktrees/pr653` 差分(+941/−147、未コミット)                                   |
-| P7  | **未コミット資産の消失リスク**: pr653 worktree に /setup 書き込み化(テナント CRUD・アバター/音声サンプル登録・サービス接続カタログ)+応答状況パネルの実装が working-tree のみで存在                                                                                                | 同上                                                                             |
-| P8  | **設計文書の陳腐化**: CONCIERGE_AND_DASHBOARD_DESIGN.ja.md が port 3033 / `/health` 前提のまま                                                                                                                                                                                    | 同文書 :49,:110,:128-129                                                         |
+| #   | 問題                                                                                                                                                                                                                                                                                      | 根拠                                                                             |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| P1  | **二重実装**: Next.js 版(port 3050、登録済み、承認/受領ダッシュボードのみ)と旧 Express 版(port 3033、未登録、アバター+音声チャット)が同居し、**会話・音声機能が登録サーフェスから到達不能**                                                                                               | `presence/displays/concierge/src/app/**` vs `server.ts` + `static/index.html`    |
+| P2  | **crash-loop**: manifest が `next start` のみ実行し `next build` が走らないため、2026-07-26 以降起動失敗を繰り返している                                                                                                                                                                  | `active/shared/logs/surfaces/concierge.log`(`Could not find a production build`) |
+| P3  | **/setup が読み取り専用**: 「変更は各コマンドで」とシェルコマンドを印字するだけ。秘書ではなく掲示板                                                                                                                                                                                       | `src/app/setup/page.tsx:65`、`api/setup/route.ts`(GET のみ)                      |
+| P4  | **業務網羅性の欠如**: セットアップ・プロバイダ設定・通知設定・ナレッジ取込・プラグイン承認等、ユーザ業務のほぼ全てが CLI か JSON 手編集。GUI 書き込み経路は承認・成果物受領のみ                                                                                                           | ユーザ業務インベントリ(§2)                                                       |
+| P5  | **UI 品質**: 30 秒 `setInterval` ポーリング、修正依頼が `window.prompt`、素の CSS、状態管理なし、ストリーミングなし                                                                                                                                                                       | `src/app/page.tsx:93-97,139`                                                     |
+| P6  | **i18n ゼロ + 方式乖離**: main は日本語ハードコード。pr653 worktree にパッケージローカル `messages.json` 方式の未コミット実装があるが、全体計画([INTERNATIONALIZATION_PLAN](../improvement-plans-archive/2026-07/INTERNATIONALIZATION_PLAN_2026-07-26.ja.md))の共通語彙カタログ方式と乖離 | `.worktrees/pr653` 差分(+941/−147、未コミット)                                   |
+| P7  | **未コミット資産の消失リスク**: pr653 worktree に /setup 書き込み化(テナント CRUD・アバター/音声サンプル登録・サービス接続カタログ)+応答状況パネルの実装が working-tree のみで存在                                                                                                        | 同上                                                                             |
+| P8  | **設計文書の陳腐化**: CONCIERGE_AND_DASHBOARD_DESIGN.ja.md が port 3033 / `/health` 前提のまま                                                                                                                                                                                            | 同文書 :49,:110,:128-129                                                         |
 
 ---
 
@@ -65,7 +72,7 @@
 | **日常業務**                             |                                                  |        |                                                                                                                         |
 | 依頼(会話での仕事の依頼)                 | `pnpm kyberion ask` / 旧 3033 チャット           | **A**  | `runSurfaceMessageConversation` / voice-hub `/api/ingest-text`                                                          |
 | 承認・差戻し                             | 既存(3050 で可)                                  | A      | 既存ルート(維持)                                                                                                        |
-| 成果物の受領・修正依頼・プレビュー       | 既存(ただし `window.prompt`、プレビューなし)     | A      | [SU-03](../improvement-plans-2026-07/SU-03_DELIVERABLE_INBOX_REVIEW.ja.md) 残件のインラインプレビュー                   |
+| 成果物の受領・修正依頼・プレビュー       | 既存(ただし `window.prompt`、プレビューなし)     | A      | [SU-03](../improvement-plans-archive/2026-07/SU-03_DELIVERABLE_INBOX_REVIEW.ja.md) 残件のインラインプレビュー           |
 | 依頼状況・例外の確認                     | 既存                                             | 状況   | `buildCeoSurfaceSummary`                                                                                                |
 | 停滞ミッションの判断(開始/中止)          | `mission-controller hygiene` → 手動判断          | **A**  | hygiene 分類結果を「伺い」カードとして提示。**判断は必ず人間のボタン/発話**                                             |
 | 会議参加・議事録                         | `meeting:participate` / `minutes:record`         | C      | meeting preflight+mission 起票を会話から                                                                                |
@@ -111,7 +118,7 @@
 
 - **Tier 0(ブラウザ完結・依存ゼロ)**: 旧 `static/index.html:174-252` の `SpeechRecognition` + `speechSynthesis` 実装(約 50 行)を React 化して移植。マイクボタン→文字起こし→`/api/message`→応答読み上げ。
 - **Tier 1(voice-hub 統合)**: voice-hub(:3032)稼働時は `/api/listen-once`(ネイティブ STT: mlx_whisper / Parakeet / Apple Speech)+サーバ側 TTS に自動昇格。`/api/stt/backends`・`/api/input-devices` を設定画面のデバイス/バックエンド選択に、`/api/speech/state`・`/api/stop-speaking` を発話中インジケータ+停止ボタンに接続。
-- **Tier 2(リアルタイム対話)**: 本計画のスコープ外。[REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-2026-07/REALTIME_VOICE_CONVERSATION_PLAN.ja.md) に委譲し、`/api/message` の契約を再利用できる形だけ担保。
+- **Tier 2(リアルタイム対話)**: 本計画のスコープ外。[REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-archive/2026-07/REALTIME_VOICE_CONVERSATION_PLAN_2026-07-20.ja.md) に委譲し、`/api/message` の契約を再利用できる形だけ担保。
 - アバター: 旧 2.5D SVG アバター(5 状態)は**任意表示**として移植(設定でオン/オフ)。3D 化は既存設計文書 §4 に委譲し本計画では扱わない。
 
 **受け入れ条件**: `test:ui-voice-browser-smoke` 系のスモークが Concierge に対して通る/Tier 0↔1 の切替がユーザ操作なしに機能する/`prefers-reduced-motion` と字幕(発話テキスト常時表示)でアクセシビリティを担保。
@@ -129,12 +136,12 @@
 5. **ガバナンス設定の config-mission 化**(GUI から直接 JSON を書かず、プリセット選択→config-mission 起票→承認、の governed 経路のみ提供)。
 6. **会議・メール・カレンダーの会話起票**(方式 C)。
 
-**受け入れ条件**: 各業務ごとに「CLI を使わず Concierge のみで完了できる」ことを E2E で実証/[CO-06](../improvement-plans-2026-07/CO-06_SOLOPRENEUR_AI_WORKFORCE.ja.md) の要件どおり CLI(`pnpm kyberion`)・Concierge・Chronos で件数が一致(action-queue projection の共有)。
+**受け入れ条件**: 各業務ごとに「CLI を使わず Concierge のみで完了できる」ことを E2E で実証/[CO-06](../improvement-plans-archive/2026-07/CO-06_SOLOPRENEUR_AI_WORKFORCE.ja.md) の要件どおり CLI(`pnpm kyberion`)・Concierge・Chronos で件数が一致(action-queue projection の共有)。
 
 ### CS-04: UI/UX 刷新(P2)
 
 1. **情報設計**: 「今日の伺い(承認・受領・例外・停滞判断を 1 本のキューに統合)」を最上部に、会話を常設(右または下部ドック)、業務カタログはコマンドパレット(⌘K)+ナビで到達。4 ペイン並列は廃止し「秘書が優先順に差し出す」導線へ。
-2. **デザインシステム**: `createConciergeWebThemePack`(warm ivory/brass)を維持しつつ、コンポーネント層(ボタン/カード/フォーム/トースト)を整備。コントラストは `check_design_contrast.ts` ゲートを通す([DS-06](../improvement-plans-2026-07/DS-06_CHRONOS_LIGHT_THEME.ja.md) の再発防止)。
+2. **デザインシステム**: `createConciergeWebThemePack`(warm ivory/brass)を維持しつつ、コンポーネント層(ボタン/カード/フォーム/トースト)を整備。コントラストは `check_design_contrast.ts` ゲートを通す([DS-06](../improvement-plans-archive/2026-07/DS-06_CHRONOS_LIGHT_THEME.ja.md) の再発防止)。
 3. **i18n 方式の確定**(P6): 全体計画の共通語彙カタログ(`@agent/core`)方式に合流。pr653 のパッケージローカル `messages.json` は移行措置とし、I18N-04 の PARTIAL を解消。
 4. **アクセシビリティ**: キーボード操作・スクリーンリーダ・字幕・`prefers-reduced-motion`。音声機能があるからこそ非音声代替を全機能に用意。
 
@@ -172,4 +179,4 @@
 - 2026-08-02: **CS-03 完了(優先度 5・6 含む)** — プラグイン承認 1 画面化(`/setup` プラグイン pane: `decideApprovalRequest` + `refreshManagedPluginActivation` で 3 手順 CLI ceremony を 1 画面に;approve 後も activatable にならない場合は正直に報告)。ガバナンス設定の config-mission 化(preset 選択→`config_mission.js create` のみ;GUI に apply 経路なし=契約テストで固定)。会話クイック起票チップ(会議/メール/予定 — ルーティングは orchestrator に委譲)。
 - 2026-08-02: **CS-04 完了** — (1)「今日の伺い」統合キュー(承認→停滞判断→学び→成果物→例外の優先順;カードヘルパーをキューとペインで共有し乖離不能)。(2) ⌘K コマンドパレット(dialog/focus-trap/矢印キー;判断は実行しない=契約テストで固定)。(3) i18n 合流: messages.json 全 373 キーを共通語彙カタログ `concierge` ドメインへ移行(qps-ploc 自動生成、`check:catalogs`/`check:pseudo-locale`/`check:vocabulary-types`/`check:i18n` 緑)、messages.json 削除。(4) `:focus-visible`・コントラストゲート通過。
 - 2026-08-02: **CS-05 完了** — 旧 Express 版(`server.ts`+`static/`、port 3033)削除(二重実装 P1 クローズ)、i18n baseline 再生成(948→945)、surface 健全性契約テスト追加(manifest healthPath↔ルート実在・`build:ui` 包含・旧実装不在を固定)。契約テスト 22 件。
-- **残課題(スコープ外送り)**: 稼働 voice-hub デーモン+マイク実機でのライブ音声 E2E(この環境ではデーモン停止のため未実施;`pipelines/ui-voice-browser-smoke.json` 系は presence-studio 対象で concierge 非依存)。Tier 2 リアルタイム対話は [REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-2026-07/REALTIME_VOICE_CONVERSATION_PLAN.ja.md) に委譲。
+- **残課題(スコープ外送り)**: 稼働 voice-hub デーモン+マイク実機でのライブ音声 E2E(この環境ではデーモン停止のため未実施;`pipelines/ui-voice-browser-smoke.json` 系は presence-studio 対象で concierge 非依存)。Tier 2 リアルタイム対話は [REALTIME_VOICE_CONVERSATION_PLAN](../improvement-plans-archive/2026-07/REALTIME_VOICE_CONVERSATION_PLAN_2026-07-20.ja.md) に委譲。

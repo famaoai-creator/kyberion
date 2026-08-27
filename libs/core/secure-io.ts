@@ -6,15 +6,23 @@ import {
   spawnSync,
   type ChildProcessWithoutNullStreams,
 } from 'node:child_process';
-import { pipeline } from 'node:stream/promises';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
+import {
+  getRegisteredEnvBool,
+  getRegisteredEnvText,
+  registerEnvironmentRegistryReader,
+} from './foundation/env.js';
 import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
+import { registerFoundationIo } from './foundation/io.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
-import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './kill-switch.js';
-import { logger } from './core.js';
+import * as auditChainModule from './audit-chain.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('secure-io');
+const auditChain = auditChainModule.auditChain;
 
 /**
  * Secure I/O utilities for Kyberion Ecosystem (TypeScript Edition)
@@ -38,9 +46,14 @@ const SAFE_EXEC_ENV_ALLOWLIST = [
   'PWD',
   'SHLVL',
   'NODE_ENV',
+  'CI',
+  'PNPM_CONFIG_CONFIRM_MODULES_PURGE',
+  'NPM_CONFIG_CONFIRM_MODULES_PURGE',
   'NODE_OPTIONS',
   'COREPACK_HOME',
   'PNPM_HOME',
+  'PI_ALLOW_LOCKFILE_CHANGE',
+  'PI_LOCKFILE_REVIEW_EVIDENCE',
   'NPM_CONFIG_USERCONFIG',
   'NVM_DIR',
   'NVM_BIN',
@@ -152,12 +165,7 @@ export function validateFileSize(filePath: string, maxSizeMB = DEFAULT_MAX_FILE_
  * Read a file with size validation and optional caching.
  */
 export function safeReadFile(filePath: string, options: SafeReadOptions = {}): string | Buffer {
-  const {
-    maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB,
-    encoding = 'utf8',
-    label = 'input',
-    cache = true,
-  } = options;
+  const { maxSizeMB = DEFAULT_MAX_FILE_SIZE_MB, encoding = 'utf8', label = 'input' } = options;
 
   if (!filePath) {
     throw new Error(`Missing required ${label} file path`);
@@ -184,19 +192,34 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
 /**
  * Read and parse a JSON file safely.
  */
-export function loadJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+/**
+ * Secure implementation supplied to the foundation I/O bridge.
+ *
+ * The public JSON reader lives in `foundation/json.ts`; keeping this
+ * implementation private prevents secure-io from becoming a second reader
+ * API while preserving the permission checks used by the bridge itself.
+ */
+function secureLoadJson<T>(filePath: string): T {
+  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+  return JSON.parse(raw) as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */
-export function loadJsonIfPresent<T>(filePath: string): T | null {
+function secureLoadJsonIfPresent<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return loadJson<T>(filePath);
+    return secureLoadJson<T>(filePath);
   } catch {
     return null;
   }
 }
+
+// Compatibility exports remain available to callers that still import the
+// secure-io module directly. Foundation JSON bootstraps this module, so the
+// direction stays one-way: secure-io owns the governed implementation and
+// foundation/json delegates to its registered bridge.
+export const loadJson = secureLoadJson;
+export const loadJsonIfPresent = secureLoadJsonIfPresent;
 
 let _policyCheckInProgress = false;
 
@@ -223,24 +246,24 @@ export function safeWriteFile(
     _policyCheckInProgress = true;
     try {
       const policyDecision = policyEngine.evaluate({
-        agentId: process.env.KYBERION_PERSONA || 'unknown',
+        agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
         operation: 'file_write',
         target_tier: detectTier(resolved),
         // Root operator processes are sovereign-tier by default; subagent
         // spawns can downgrade via KYBERION_AGENT_TIER so sovereign-shield
         // (personal-tier isolation) has real firing context.
-        agent_tier: process.env.KYBERION_AGENT_TIER || 'sovereign',
+        agent_tier: getRegisteredEnvText('KYBERION_AGENT_TIER') || 'sovereign',
         message: `Write to ${resolved}`,
       });
       if (!policyDecision.allowed) {
         recordGovernanceAction(
-          process.env.KYBERION_PERSONA || 'unknown',
+          getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
           'file_write',
           `${resolved}:denied`,
           true
         );
         auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'unknown',
+          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
           action: 'policy_violation',
           operation: 'file_write',
           result: 'failed',
@@ -557,23 +580,23 @@ export function safeExistsSync(filePath: string): boolean {
 // command scanning is shell-command-policy's job (SA-02), and duplicating
 // it here would double-regulate and false-positive on argument content.
 function assertExecPolicy(command: string): void {
-  const ringRaw = process.env.KYBERION_AGENT_RING;
+  const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
-    agentId: process.env.KYBERION_PERSONA || 'unknown',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
     operation: 'execute_command',
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
   if (!decision.allowed) {
     recordGovernanceAction(
-      process.env.KYBERION_PERSONA || 'unknown',
+      getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       'execute_command',
       `${command}:denied`,
       true
     );
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'unknown',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
       action: 'policy_violation',
       operation: 'execute_command',
       result: 'failed',
@@ -636,6 +659,93 @@ export function safeExecResult(
       error: err,
     };
   }
+}
+
+/**
+ * Execute a command asynchronously through the same governed boundary as
+ * safeExecResult. This is used by independent validation gates so the runner
+ * can overlap work without allowing feature code to bypass secure-io.
+ */
+export function safeExecResultAsync(
+  command: string,
+  args: string[] = [],
+  options: any = {}
+): Promise<{
+  stdout: string;
+  stderr: string;
+  status: number | null;
+  error?: Error;
+}> {
+  const {
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    cwd = process.cwd(),
+    env = {},
+    maxOutputMB = 10,
+  } = options;
+  assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
+  assertExecPolicy(command);
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd,
+      env: buildSafeExecEnv(env),
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    const maxBytes = maxOutputMB * 1024 * 1024;
+    let outputBytes = 0;
+    let settled = false;
+    let timedOut = false;
+    const finish = (result: {
+      stdout: string;
+      stderr: string;
+      status: number | null;
+      error?: Error;
+    }): void => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      child.kill('SIGTERM');
+    }, timeoutMs);
+    const append = (target: Buffer[], chunk: Buffer): void => {
+      outputBytes += chunk.byteLength;
+      if (outputBytes > maxBytes) {
+        child.kill('SIGTERM');
+        return;
+      }
+      target.push(chunk);
+    };
+    child.stdout.on('data', (chunk: Buffer) => append(stdout, chunk));
+    child.stderr.on('data', (chunk: Buffer) => append(stderr, chunk));
+    child.on('error', (error) => {
+      clearTimeout(timeout);
+      finish({
+        stdout: Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
+        status: 1,
+        error,
+      });
+    });
+    child.on('close', (status) => {
+      clearTimeout(timeout);
+      const outputError = outputBytes > maxBytes;
+      const error = timedOut
+        ? new Error(`command timed out after ${timeoutMs}ms`)
+        : outputError
+          ? new Error(`command output exceeded ${maxOutputMB}MB`)
+          : undefined;
+      finish({
+        stdout: Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
+        status: error ? 1 : status,
+        ...(error ? { error } : {}),
+      });
+    });
+  });
 }
 
 /**
@@ -708,7 +818,8 @@ export function validateUrl(url: string, options?: { allowLocalNetwork?: boolean
     const blockedHostnames = ['localhost', '127.0.0.1', '0.0.0.0', '::', '::1'];
 
     const allowLocal =
-      options?.allowLocalNetwork === true || process.env.KYBERION_ALLOW_LOCAL_NETWORK === 'true';
+      options?.allowLocalNetwork === true ||
+      getRegisteredEnvBool('KYBERION_ALLOW_LOCAL_NETWORK') === true;
 
     if (blockedHostnames.includes(normalizedHostname)) {
       if (allowLocal) return url;
@@ -835,4 +946,58 @@ export function safeReadlink(filePath: string): string {
   return fs.readlinkSync(resolved);
 }
 
+registerEnvironmentRegistryReader(() =>
+  secureLoadJsonIfPresent<{
+    entries?: Array<{
+      name: string;
+      type: 'string' | 'boolean' | 'number' | 'enum' | 'path';
+      enum?: string[];
+    }>;
+  }>(pathResolver.rootResolve('knowledge/product/governance/env-registry.json'))
+);
+registerFoundationIo({
+  loadJson: secureLoadJson,
+  loadJsonIfPresent: secureLoadJsonIfPresent,
+  appendFile: (filePath, content) => safeAppendFileSync(filePath, content),
+  exists: safeExistsSync,
+  readFile: (filePath) => safeReadFile(filePath, { encoding: 'utf8' }) as string,
+  stat: safeStat,
+  writeFile: (filePath, content) => safeWriteFile(filePath, content),
+});
+
+// Test and plugin adapters may expose a deliberately reduced audit-chain
+// surface. Optional chaining does not protect a Vitest namespace proxy from
+// a missing named export, so resolve optional registrations behind a guarded
+// lookup and keep secure-io initialization fail-closed but non-fragile.
+function registerOptionalAuditIo(name: string, io: unknown): void {
+  try {
+    const register = (auditChainModule as unknown as Record<string, unknown>)[name];
+    if (typeof register === 'function') (register as (value: unknown) => void)(io);
+  } catch {
+    // A reduced adapter simply has no corresponding integration seam.
+  }
+}
+
+registerOptionalAuditIo('registerAuditChainIo', {
+  read: (filePath) => safeReadFile(filePath, { encoding: 'utf8' }) as string,
+  loadJson: secureLoadJson,
+  exists: safeExistsSync,
+  mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
+  readdir: safeReaddir,
+  append: (filePath, content) => safeAppendFileSync(filePath, content),
+});
+registerOptionalAuditIo('registerChainIntegrityIo', {
+  exists: safeExistsSync,
+  read: (filePath) => safeReadFile(filePath, { encoding: 'utf8' }) as string,
+  mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
+  createExclusive: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),
+  chmod: safeChmodSync,
+});
+registerOptionalAuditIo('registerLockIo', {
+  exists: safeExistsSync,
+  mkdir: (dirPath) => safeMkdir(dirPath, { recursive: true }),
+  createExclusive: (filePath, content) => safeCreateExclusiveFileSync(filePath, content),
+  unlink: safeUnlinkSync,
+  loadJson: secureLoadJson,
+});
 secureIoInitialized = true;

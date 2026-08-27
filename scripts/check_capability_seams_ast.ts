@@ -3,13 +3,14 @@
  *
  * The generated seam graph intentionally has its own hand-maintained role
  * map. This checker does not import that map: it scans production TypeScript
- * declarations directly and verifies that every defineSeam declaration is
+ * declarations directly and verifies that every createSeam declaration is
  * catalog-backed and represented in the generated graph.
  */
 import * as path from 'node:path';
 import * as ts from 'typescript';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SOURCE_ROOT = pathResolver.rootResolve('libs/core');
 const GRAPH_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');
@@ -20,6 +21,8 @@ interface SeamDeclaration {
   line: number;
   catalogBacked: boolean;
 }
+
+const SEAM_CONSTRUCTORS = new Set(['createSeam', 'defineSeam']);
 
 function collectSourceFiles(directory: string): string[] {
   const files: string[] = [];
@@ -68,7 +71,7 @@ function scanDeclarations(): SeamDeclaration[] {
       if (
         ts.isCallExpression(node) &&
         ts.isIdentifier(node.expression) &&
-        node.expression.text === 'defineSeam'
+        SEAM_CONSTRUCTORS.has(node.expression.text)
       ) {
         const argument = node.arguments[0];
         if (!argument || !ts.isObjectLiteralExpression(argument)) return;
@@ -105,7 +108,7 @@ function check(): string[] {
     }
   }
 
-  if (declarations.length === 0) findings.push('no production defineSeam declaration was found');
+  if (declarations.length === 0) findings.push('no production createSeam declaration was found');
   for (const declaration of declarations) {
     const previous = byKey.get(declaration.key);
     if (previous) {
@@ -116,7 +119,7 @@ function check(): string[] {
     byKey.set(declaration.key, declaration);
     if (!declaration.catalogBacked) {
       findings.push(
-        `${declaration.key}: defineSeam declaration is not registered in a catalog (${declaration.file}:${declaration.line})`
+        `${declaration.key}: createSeam declaration is not registered in a catalog (${declaration.file}:${declaration.line})`
       );
     }
     if (!documentedKeys.has(declaration.key)) {
@@ -132,11 +135,20 @@ function check(): string[] {
   return findings;
 }
 
-const findings = check();
-if (findings.length > 0) {
-  console.error('[check:capability-seams-ast] FAILED');
-  for (const finding of findings) console.error(`- ${finding}`);
-  process.exitCode = 1;
-} else {
-  console.log(`[check:capability-seams-ast] OK (${scanDeclarations().length} declarations)`);
-}
+export const runCheckCapabilitySeamsAst = defineScript({
+  name: 'check:capability-seams-ast',
+  flags: [],
+  run(context): void {
+    const findings = check();
+    if (findings.length > 0) {
+      throw new Error(findings.join('; '));
+    }
+    context.print(`[check:capability-seams-ast] OK (${scanDeclarations().length} declarations)`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_capability_seams_ast.ts') ||
+  isDirectScript(import.meta.url, 'check_capability_seams_ast.js')
+)
+  void runCheckCapabilitySeamsAst();

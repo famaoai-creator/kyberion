@@ -2,10 +2,11 @@
 title: adf-replay-extension 統合レビュー 2026-08-10
 kind: review-report
 scope: tools/adf-replay-extension, scripts/browser_bridge_host.ts, libs/core/browser-extension-bridge.ts
-status: verified-with-evidence
+status: active
 owner: ecosystem_architect
 reviewed_at: 2026-08-10
 tags: [browser-bridge, chrome-extension, intent-loop, self-repair, pii, i18n]
+last_updated: 2026-07-31
 ---
 
 # adf-replay-extension 統合レビュー

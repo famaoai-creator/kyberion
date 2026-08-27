@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/tool-runtime-registry.schema.json",
   "version": "1.0.0",
   "default_tool_id": "mflux",
   "tools": [

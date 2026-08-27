@@ -117,6 +117,13 @@ describe('intent-resolution-contract', () => {
       expect(contract.outcome_kind, fixture.utterance).toBe(fixture.outcomeKind);
       expect(contract.missing_inputs, fixture.utterance).toEqual(fixture.missingInputs || []);
       expect(contract.authority_level, fixture.utterance).toBe(fixture.authority);
+      expect(contract.next_action.kind, fixture.utterance).toBe(
+        fixture.authority === 'approval_required'
+          ? 'request_approval'
+          : fixture.authority === 'human_clarification_required'
+            ? 'provide_input'
+            : 'continue'
+      );
     }
   });
 
@@ -126,11 +133,15 @@ describe('intent-resolution-contract', () => {
     expect(contract.missing_inputs.length).toBeGreaterThan(0);
     expect(contract.authority_level).toBe('human_clarification_required');
     expect(contract.resolution_shape).toBe('direct_answer');
+    expect(contract.next_action.kind).toBe('provide_input');
   });
 
   it('emits contracts that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'schemas/intent-resolution.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/intent-resolution.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const contract = resolveIntentResolutionContract('今週の進捗レポートを作って');
     const valid = validate(contract);

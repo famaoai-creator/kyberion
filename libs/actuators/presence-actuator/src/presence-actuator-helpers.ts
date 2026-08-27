@@ -2,16 +2,15 @@ import {
   logger,
   recordInteraction,
   resolveServiceBinding,
-  safeReadFile,
   validatePresenceTimeline,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   secureFetch,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
@@ -168,7 +167,7 @@ export async function handleAction(input: PresenceAction) {
 
     case 'dispatch_timeline': {
       const timeline = validatePresenceTimeline(params.payload.timeline);
-      const bridgeUrl = process.env.KYBERION_A2UI_BRIDGE_URL || 'http://127.0.0.1:3031';
+      const bridgeUrl = getRegisteredEnvText('KYBERION_A2UI_BRIDGE_URL') || 'http://127.0.0.1:3031';
       const body = await retry(
         async () =>
           secureFetch({

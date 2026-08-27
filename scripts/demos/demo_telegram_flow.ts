@@ -1,7 +1,10 @@
 import { logger, runSurfaceMessageConversation } from '@agent/core';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 
 async function simulate() {
-  process.env.KYBERION_PERSONA ||= 'ecosystem_architect';
+  if (!getRegisteredEnvText('KYBERION_PERSONA')) {
+    setRegisteredEnv('KYBERION_PERSONA', 'ecosystem_architect');
+  }
   process.env.MISSION_ROLE ||= 'mission_controller';
 
   logger.info('🚀 Starting Telegram Flow Simulation...');
@@ -18,7 +21,8 @@ async function simulate() {
       actorId: '987654321',
       senderAgentId: 'kyberion:telegram-bridge',
       agentId: 'telegram-surface-agent',
-      delegationSummaryInstruction: 'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
+      delegationSummaryInstruction:
+        'Produce a concise Telegram reply. Use markdown if useful. Do not use A2A blocks.',
     } as any);
 
     logger.success('✅ Conversation logic completed.');

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   inspectServiceAuth,
   loadServiceEndpointsCatalog,
@@ -122,7 +123,7 @@ async function probeService(serviceId: string): Promise<ServicePreflightReport> 
       : `runtime probe failed: ${resolution.reason}`;
   }
 
-  const ready = authReady && (directProbeReady !== false) && runtimeReady;
+  const ready = authReady && directProbeReady !== false && runtimeReady;
   const status: ServicePreflightStatus = ready
     ? 'ready'
     : authReady || directProbeReady === true || runtimeReady
@@ -168,8 +169,8 @@ export async function runServicePreflight(options: {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'service_preflight', ...args])
     .option('service', { type: 'string', describe: 'Service id to preflight' })
     .option('all', { type: 'boolean', default: false })
     .option('json', { type: 'boolean', default: false })
@@ -183,7 +184,9 @@ async function main(): Promise<void> {
   if (!argv.json) {
     for (const item of report.reports) {
       console.log(`[service-preflight] ${item.serviceId}: ${item.status}`);
-      console.log(`  auth=${item.authReady ? 'yes' : 'no'} direct=${item.directProbeReady === null ? 'n/a' : item.directProbeReady ? 'yes' : 'no'} runtime=${item.runtimeReady ? 'yes' : 'no'}`);
+      console.log(
+        `  auth=${item.authReady ? 'yes' : 'no'} direct=${item.directProbeReady === null ? 'n/a' : item.directProbeReady ? 'yes' : 'no'} runtime=${item.runtimeReady ? 'yes' : 'no'}`
+      );
       console.log(`  reason=${item.reason}`);
     }
     console.log('');
@@ -191,13 +194,18 @@ async function main(): Promise<void> {
     logger.info(JSON.stringify({ status: 'ok', report }, null, 2));
   }
 
-  process.exit(report.ready ? 0 : 1);
+  return report.ready ? 0 : 1;
 }
 
-const isDirect = process.argv[1] && /service_preflight\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'service_preflight.ts') ||
+  isDirectScript(import.meta.url, 'service_preflight.js')
+)
+  void defineScript({
+    name: 'service:preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`service:preflight failed with exit code ${status}`);
+    },
+  })();

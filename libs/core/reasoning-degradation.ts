@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeUnlink, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeUnlink, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -49,7 +49,7 @@ export function readReasoningDegraded(): ReasoningDegradedMarker | null {
   try {
     const markerPath = reasoningDegradedMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    const parsed = JSON.parse(safeReadFile(markerPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<Partial<ReasoningDegradedMarker>>(markerPath);
     if (parsed && typeof parsed.mode === 'string' && typeof parsed.reason === 'string') {
       return parsed as ReasoningDegradedMarker;
     }

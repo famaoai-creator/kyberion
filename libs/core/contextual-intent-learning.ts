@@ -1,17 +1,19 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
+import { createAjv } from './foundation/ajv.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-learning.schema.json'
@@ -19,7 +21,7 @@ const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
 
 function learningStorePath(scope?: ScopeContext): string {
   const base =
-    process.env.KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH')?.trim() ||
     pathResolver.knowledge('personal/contextual-intent-learning.json');
   if (!scope?.tenant_slug) return base;
   return `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
@@ -65,9 +67,7 @@ function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
   const filePath = learningStorePath(scope);
   if (!safeExistsSync(filePath)) return defaultStore();
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ContextualIntentLearningStore;
+    const parsed = readJson<ContextualIntentLearningStore>(filePath);
     const validate = ensureContextualIntentLearningValidator();
     if (!validate(parsed)) return defaultStore();
     return parsed;

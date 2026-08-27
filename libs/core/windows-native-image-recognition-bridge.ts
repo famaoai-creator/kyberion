@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExecResult } from './secure-io.js';
 
 export interface WindowsNativeImageRecognitionAvailability {
@@ -9,7 +10,7 @@ export interface WindowsNativeImageRecognitionAvailability {
 }
 
 function helperPath(): string | undefined {
-  const value = process.env.KYBERION_WINDOWS_IMAGE_GENERATOR?.trim();
+  const value = getRegisteredEnvText('KYBERION_WINDOWS_IMAGE_GENERATOR')?.trim();
   return value || undefined;
 }
 

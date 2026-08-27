@@ -1,4 +1,6 @@
-export function isExpressOnboarding(argv: readonly string[] = process.argv): boolean {
+import { currentProcessArgv } from './lib/harness.js';
+
+export function isExpressOnboarding(argv: readonly string[] = currentProcessArgv()): boolean {
   return argv.includes('--express');
 }
 

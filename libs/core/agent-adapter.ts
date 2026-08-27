@@ -1,56 +1,29 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeExecResult, safeReaddir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
-import { resolveCodexBinary } from './codex-cli-query.js';
-import { loadAgentInstructionResource } from './agent-instruction-loader.js';
-import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
+import { getRegisteredEnvText, safeChildEnv } from './foundation/env.js';
+import {
+  CodexAppServerAdapter,
+  CodexExecutionEnhancer,
+  extractUsageSummary,
+  type CodexAppServerAdapterOptions,
+  type CodexExecutionEnhancerOptions,
+  type CodexNativeSubagentInfo,
+} from './agent-codex-app-server-adapter.js';
 
-const ENV_WHITELIST = [
-  'PATH',
-  'HOME',
-  'USER',
-  'SHELL',
-  'LANG',
-  'TERM',
-  'NODE_ENV',
-  'NVM_DIR',
-  'NVM_BIN',
-  'GOOGLE_API_KEY',
-  'GEMINI_API_KEY',
-  'ANTHROPIC_API_KEY',
-  'OPENAI_API_KEY',
-  'XAI_API_KEY',
-  'KYBERION_GROK_API_KEY',
-  'MISSION_ID',
-  'MISSION_ROLE',
-  'KYBERION_PERSONA',
-  'CODEX_HOME',
-  // SSL/Proxy
-  'NODE_EXTRA_CA_CERTS',
-  'SSL_CERT_FILE',
-  'SSL_CERT_DIR',
-  'HTTP_PROXY',
-  'HTTPS_PROXY',
-  'NO_PROXY',
-  'http_proxy',
-  'https_proxy',
-  'no_proxy',
-];
-function safeEnv(): NodeJS.ProcessEnv {
-  // Locally a relaxed map; cast at the boundary so callers see ProcessEnv
-  // (Next 15 augmentation requires NODE_ENV; we treat that as opaque here).
-  const env: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
-  for (const k of ENV_WHITELIST) {
-    if (process.env[k]) env[k] = process.env[k] as string;
-  }
-  return env as unknown as NodeJS.ProcessEnv;
-}
+export {
+  CodexAppServerAdapter,
+  CodexExecutionEnhancer,
+  type CodexAppServerAdapterOptions,
+  type CodexExecutionEnhancerOptions,
+  type CodexNativeSubagentInfo,
+};
 
 const PROJECT_ROOT = pathResolver.rootDir();
 
@@ -205,7 +178,7 @@ function summarizePromptForLog(prompt: string, maxChars = 200): string {
 async function waitForBootSignal(
   child: ChildProcess,
   label: string,
-  timeoutMs = Number(process.env.KYBERION_AGENT_BOOT_READY_TIMEOUT_MS || 5000)
+  timeoutMs = Number(getRegisteredEnvText('KYBERION_AGENT_BOOT_READY_TIMEOUT_MS') || 5000)
 ): Promise<void> {
   await new Promise<void>((resolve) => {
     let settled = false;
@@ -367,7 +340,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
       spawnOptions: {
         cwd: PROJECT_ROOT,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: safeEnv(),
+        env: safeChildEnv() as NodeJS.ProcessEnv,
       },
       metadata: {
         bootCommand: this.bootCommand,
@@ -914,68 +887,7 @@ ${prompt}`;
   }
 }
 
-export interface CodexExecutionEnhancerOptions {
-  maxContractChars?: number;
-}
-
-/**
- * Codex-specific Add-on: injects repository execution contract context.
- * Codex tends to perform better on coding tasks when concrete repo rules are explicit.
- */
-export class CodexExecutionEnhancer implements AgentEnhancer {
-  public name = 'CodexExecutionEnhancer';
-  private cachedContext: string | null = null;
-
-  constructor(private options: CodexExecutionEnhancerOptions = {}) {}
-
-  public async onBeforeAsk(
-    prompt: string,
-    options?: AgentAskOptions
-  ): Promise<{ prompt: string; options?: AgentAskOptions }> {
-    const context = this.loadExecutionContext();
-    if (!context) return { prompt, options };
-
-    const enhancedPrompt = `
-<codex_execution_context>
-${context}
-</codex_execution_context>
-
-User Request:
-${prompt}`;
-    return { prompt: enhancedPrompt, options };
-  }
-
-  private loadExecutionContext(): string {
-    if (this.cachedContext !== null) return this.cachedContext;
-    const maxChars = this.options.maxContractChars || 4000;
-    const agents = loadAgentInstructionResource(PROJECT_ROOT);
-    if (!agents) {
-      this.cachedContext = '';
-      return this.cachedContext;
-    }
-    try {
-      const header = [
-        'Repository execution contract (excerpt):',
-        '- Follow AGENTS.md repository rules.',
-        '- Prefer non-destructive deterministic operations.',
-        '- Preserve existing unrelated changes.',
-      ].join('\n');
-      const excerpt = agents.content.slice(0, maxChars).trim();
-      this.cachedContext = `${header}\n\n${excerpt}`;
-      return this.cachedContext;
-    } catch (error: any) {
-      logger.warn(
-        `[CodexEnhancer] Failed to load AGENTS.md context: ${error?.message || String(error)}`
-      );
-      this.cachedContext = '';
-      return this.cachedContext;
-    }
-  }
-}
-
-/**
- * Non-ACP implementation for Codex using stable CLI 'exec' mode.
- */
+export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok';
 export class CodexAdapter implements AgentAdapter {
   protected enhancers: AgentEnhancer[] = [];
 
@@ -999,7 +911,7 @@ export class CodexAdapter implements AgentAdapter {
     try {
       // Pass the text as a single argument to npx/codex exec
       const res = await runCliProcess('npx', ['codex', 'exec', '--json', enhanced.prompt], {
-        env: safeEnv(),
+        env: safeChildEnv() as NodeJS.ProcessEnv,
         cwd: PROJECT_ROOT,
         timeoutMs: 300000,
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -1075,8 +987,8 @@ export class AgyAdapter implements AgentAdapter {
     try {
       const bin =
         this.options.bin ||
-        process.env.KYBERION_ANTIGRAVITY_CLI_BIN ||
-        process.env.KYBERION_AGY_CLI_BIN ||
+        getRegisteredEnvText('KYBERION_ANTIGRAVITY_CLI_BIN') ||
+        getRegisteredEnvText('KYBERION_AGY_CLI_BIN') ||
         'agy';
 
       const args: string[] = [];
@@ -1105,7 +1017,8 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       // 3. Sandboxed Execution
-      const useSandbox = options?.sandbox === true || process.env.KYBERION_AGY_SANDBOX === '1';
+      const useSandbox =
+        options?.sandbox === true || getRegisteredEnvText('KYBERION_AGY_SANDBOX') === '1';
       if (useSandbox) {
         args.push('--sandbox');
       }
@@ -1119,7 +1032,7 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       const res = await runCliProcess(bin, args, {
-        env: safeEnv(),
+        env: safeChildEnv() as NodeJS.ProcessEnv,
         cwd: this.options.cwd || PROJECT_ROOT,
         timeoutMs: this.options.timeoutMs || 300000,
         stdio: isInteractive ? 'inherit' : ['ignore', 'pipe', 'pipe'],
@@ -1182,679 +1095,6 @@ export class AgyAdapter implements AgentAdapter {
       return { mode: 'soft', sessionId: this.activeSessionId };
     }
     return { mode: 'stateless', sessionId: null };
-  }
-}
-
-export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok';
-
-export interface CodexAppServerAdapterOptions {
-  model?: string;
-  modelProvider?: string;
-  cwd?: string;
-  systemPrompt?: string;
-  approvalPolicy?: any;
-  timeoutMs?: number;
-  approvalMode?: 'strict' | 'relaxed';
-  sandboxMode?: 'workspace-write' | 'read-only' | 'danger-full-access';
-  networkAccess?: boolean;
-  writableRoots?: string[];
-}
-
-export interface CodexNativeSubagentInfo {
-  provider: 'codex';
-  model?: string;
-  parentThreadId: string;
-  threadId: string;
-  turnId?: string;
-  forked: boolean;
-  mode: 'thread-fork' | 'parent-turn';
-  effort: 'low' | 'medium' | 'high' | 'ultra';
-}
-
-/**
- * Codex App Server Adapter (JSON-RPC over stdio).
- */
-export class CodexAppServerAdapter implements AgentAdapter {
-  private options: CodexAppServerAdapterOptions;
-  private child: ChildProcess | null = null;
-  private runtimeResourceId: string | null = null;
-  private buffer = '';
-  private nextId = 1;
-  private pendingRequests: Map<
-    number,
-    {
-      resolve: (value: any) => void;
-      reject: (err: Error) => void;
-      timeout?: ReturnType<typeof setTimeout>;
-    }
-  > = new Map();
-  private threadId: string | null = null;
-  private currentTurnId: string | null = null;
-  private pendingTurn: {
-    turnId: string;
-    threadId: string;
-    resolve: (res: AgentResponse) => void;
-    reject: (err: Error) => void;
-    timeout: ReturnType<typeof setTimeout>;
-    abortCleanup?: () => void;
-  } | null = null;
-  private accumulatedText = '';
-  private sawAgentDelta = false;
-  private logBuffer: { ts: number; type: string; content: string }[] = [];
-  private earlyTurnResults: Map<string, { text: string; stopReason: string }> = new Map();
-  private projectRoot: string = PROJECT_ROOT;
-  private usageSummary: Record<string, unknown> | null = null;
-  private nativeMultiAgentMode: unknown = null;
-  private activeThreadId: string | null = null;
-  private lastNativeSubagentInfo: CodexNativeSubagentInfo | null = null;
-  private activeApprovalMode: 'strict' | 'relaxed' | undefined;
-  private enhancers: AgentEnhancer[] = [];
-  private codexBinary: string | null = null;
-  private codexVersion = 'unknown';
-
-  constructor(options?: CodexAppServerAdapterOptions) {
-    this.options = options || {};
-    this.addEnhancer(new CodexExecutionEnhancer());
-  }
-
-  public addEnhancer(enhancer: AgentEnhancer): void {
-    registerEnhancer(this.enhancers, enhancer);
-  }
-
-  public getLog(limit = 50): { ts: number; type: string; content: string }[] {
-    return this.logBuffer.slice(-limit);
-  }
-
-  private getSandboxMode(): 'workspace-write' | 'read-only' | 'danger-full-access' {
-    return this.options.sandboxMode || 'workspace-write';
-  }
-
-  private buildSandboxPolicy():
-    | { type: 'dangerFullAccess' }
-    | { type: 'readOnly'; networkAccess: boolean }
-    | {
-        type: 'workspaceWrite';
-        writableRoots?: string[];
-        networkAccess: boolean;
-        excludeTmpdirEnvVar: boolean;
-        excludeSlashTmp: boolean;
-      } {
-    return toCodexSandboxPolicy(
-      resolveSandboxPolicy({
-        provider: 'codex',
-        mode: this.getSandboxMode(),
-        networkAccess: this.options.networkAccess ?? true,
-        writableRoots: this.options.writableRoots,
-      })
-    ) as ReturnType<CodexAppServerAdapter['buildSandboxPolicy']>;
-  }
-
-  public async boot(): Promise<void> {
-    const cwd = this.options.cwd || PROJECT_ROOT;
-    logger.info(`[UAA] Codex App Server booting (cwd: ${cwd})`);
-
-    this.runtimeResourceId = `codex-app-server:${cwd}`;
-    this.codexBinary = resolveCodexBinary(process.env);
-    const versionResult = safeExecResult(this.codexBinary, ['--version'], {
-      env: safeEnv(),
-      cwd,
-      timeoutMs: 5000,
-    });
-    this.codexVersion =
-      (versionResult.stdout || versionResult.stderr).trim().split(/\r?\n/u)[0] || 'unknown';
-    const managed = spawnManagedProcess({
-      resourceId: this.runtimeResourceId,
-      kind: 'agent',
-      ownerId: cwd,
-      ownerType: 'agent-adapter',
-      command: this.codexBinary,
-      args: ['app-server', '--listen', 'stdio://'],
-      shutdownPolicy: 'manual',
-      spawnOptions: {
-        cwd,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: safeEnv(),
-      },
-      metadata: { cwd },
-    });
-    this.child = managed.child;
-
-    this.child.stdout?.on('data', (chunk) => this.handleStdout(chunk));
-    this.child.stderr?.on('data', (chunk) => {
-      const msg = chunk.toString().trim();
-      if (msg) {
-        const kind = /codex_models_manager|base_instructions/i.test(msg)
-          ? 'UAA_CODEX_MODEL_CACHE_WARN'
-          : 'UAA_CODEX_ERR';
-        logger.warn(`[${kind}] ${msg}`);
-      }
-      if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
-    });
-    this.child.on('exit', (code, signal) => {
-      const err = new Error(
-        `Codex app-server exited (code=${code ?? 'null'}, signal=${signal ?? 'null'})`
-      );
-      for (const pending of this.pendingRequests.values()) {
-        if (pending.timeout) clearTimeout(pending.timeout);
-        pending.reject(err);
-      }
-      this.pendingRequests.clear();
-      if (this.pendingTurn) {
-        clearTimeout(this.pendingTurn.timeout);
-        this.pendingTurn.abortCleanup?.();
-        this.pendingTurn.reject(err);
-        this.pendingTurn = null;
-      }
-    });
-
-    const bootTimeoutMs = this.options.timeoutMs ?? 20000;
-    await this.sendRequest(
-      'initialize',
-      {
-        clientInfo: { name: 'Kyberion', version: '1.0.0' },
-        capabilities: { experimentalApi: false, optOutNotificationMethods: [] },
-      },
-      bootTimeoutMs
-    );
-
-    const approvalMode = this.options.approvalMode || 'strict';
-    const sandboxMode = this.getSandboxMode();
-
-    const threadRes: any = await this.sendRequest(
-      'thread/start',
-      {
-        model: this.options.model ?? undefined,
-        modelProvider: this.options.modelProvider ?? undefined,
-        cwd,
-        approvalPolicy:
-          this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
-        sandbox: sandboxMode,
-        developerInstructions: this.options.systemPrompt ?? undefined,
-        experimentalRawEvents: false,
-        persistExtendedHistory: false,
-      },
-      bootTimeoutMs
-    );
-
-    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
-    if (!this.threadId) {
-      throw new Error(
-        `Codex app-server thread/start missing thread id: ${JSON.stringify(threadRes)}`
-      );
-    }
-    this.activeThreadId = this.threadId;
-    this.nativeMultiAgentMode =
-      threadRes?.multiAgentMode ?? threadRes?.thread?.multiAgentMode ?? null;
-    logger.info(`[UAA] Codex App Server ready. Thread: ${this.threadId}`);
-  }
-
-  public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
-    if (!this.threadId) throw new Error('Codex app-server not booted.');
-    return this.askOnThread(prompt, options, this.threadId);
-  }
-
-  /**
-   * Use a child thread in the same app-server process when the parent has a
-   * completed rollout. The first delegated turn has no parent rollout yet,
-   * so it uses the selected native effort and seeds the parent thread.
-   */
-  public async askNativeSubagent(
-    prompt: string,
-    options?: AgentAskOptions
-  ): Promise<AgentResponse> {
-    if (!this.threadId) throw new Error('Codex app-server not booted.');
-    const parentThreadId = this.threadId;
-    const effort = options?.effort ?? 'medium';
-    let targetThreadId = parentThreadId;
-    let forked = false;
-
-    try {
-      const forkResponse: any = await this.sendRequest(
-        'thread/fork',
-        { threadId: parentThreadId },
-        this.options.timeoutMs ?? 20000
-      );
-      targetThreadId = forkResponse?.thread?.id || forkResponse?.threadId || forkResponse?.id;
-      if (!targetThreadId) throw new Error('Codex app-server thread/fork missing thread id.');
-      forked = true;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (!/no rollout found|rollout.*not found/i.test(message)) {
-        throw new Error(`[SUBAGENT_UNAVAILABLE] Codex thread/fork failed: ${message}`);
-      }
-    }
-
-    const response = await this.askOnThread(
-      prompt,
-      { ...options, effort, subagent: true },
-      targetThreadId
-    );
-    const info: CodexNativeSubagentInfo = {
-      provider: 'codex',
-      ...(this.options.model ? { model: this.options.model } : {}),
-      parentThreadId,
-      threadId: targetThreadId,
-      ...(this.currentTurnId ? { turnId: this.currentTurnId } : {}),
-      forked,
-      mode: forked ? 'thread-fork' : 'parent-turn',
-      effort,
-    };
-    this.lastNativeSubagentInfo = info;
-    return { ...response, metadata: { ...(response.metadata || {}), nativeSubagent: info } };
-  }
-
-  private async askOnThread(
-    prompt: string,
-    options: AgentAskOptions | undefined,
-    targetThreadId: string
-  ): Promise<AgentResponse> {
-    if (this.pendingTurn) throw new Error('Codex app-server is already processing a turn.');
-    if (options?.signal?.aborted) throw new Error('Codex app-server turn cancelled before start.');
-    this.activeThreadId = targetThreadId;
-    this.activeApprovalMode = options?.approvalMode ?? this.options.approvalMode;
-
-    const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
-    const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
-
-    this.accumulatedText = '';
-    this.sawAgentDelta = false;
-    this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: enhanced.prompt });
-
-    const turnRes: any = await this.sendRequest(
-      'turn/start',
-      {
-        threadId: targetThreadId,
-        input: [{ type: 'text', text: enhanced.prompt, text_elements: [] }],
-        model: this.options.model ?? undefined,
-        cwd: this.options.cwd ?? undefined,
-        sandboxPolicy: this.buildSandboxPolicy(),
-        // Codex 0.146.0 deprecates multiAgentMode and enables proactive native
-        // delegation through the selected effort. Keep this provider-specific
-        // projection here so callers only request `subagent: true`.
-        ...(options?.subagent ? { effort: options.effort ?? 'medium' } : {}),
-        ...enhanced.options,
-      },
-      this.options.timeoutMs ?? 20000
-    );
-
-    const turnId = turnRes?.turn?.id || turnRes?.turnId;
-    if (turnId) this.currentTurnId = turnId;
-
-    if (!turnId) {
-      throw new Error(`Codex app-server turn/start missing turn id: ${JSON.stringify(turnRes)}`);
-    }
-
-    const early = this.earlyTurnResults.get(turnId);
-    if (early) {
-      this.earlyTurnResults.delete(turnId);
-      return applyEnhancersAfterAsk(this.enhancers, {
-        text: early.text,
-        stopReason: early.stopReason,
-        trace,
-      });
-    }
-
-    const timeoutMs = this.options.timeoutMs ?? 300000;
-    const raw = await new Promise<AgentResponse>((resolve, reject) => {
-      let settled = false;
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      const cleanup = (): void => {
-        if (settled) return;
-        settled = true;
-        if (timeout) clearTimeout(timeout);
-        options?.signal?.removeEventListener('abort', onAbort);
-      };
-      const settleReject = (error: Error): void => {
-        cleanup();
-        reject(error);
-      };
-      const onAbort = (): void => {
-        if (this.pendingTurn?.turnId !== turnId) return;
-        this.pendingTurn = null;
-        cleanup();
-        void this.interruptTurn(targetThreadId, turnId);
-        reject(new Error('Codex app-server turn cancelled.'));
-      };
-      timeout = setTimeout(() => {
-        if (this.pendingTurn?.turnId !== turnId) return;
-        this.pendingTurn = null;
-        cleanup();
-        void this.interruptTurn(targetThreadId, turnId);
-        settleReject(new Error('Codex app-server turn timed out.'));
-      }, timeoutMs);
-      this.pendingTurn = {
-        turnId,
-        threadId: targetThreadId,
-        resolve,
-        reject,
-        timeout,
-        abortCleanup: cleanup,
-      };
-      if (options?.signal) options.signal.addEventListener('abort', onAbort, { once: true });
-    });
-    return applyEnhancersAfterAsk(this.enhancers, raw);
-  }
-
-  public async shutdown(): Promise<void> {
-    if (this.child) {
-      if (this.runtimeResourceId) stopManagedProcess(this.runtimeResourceId, this.child);
-      this.child = null;
-    }
-    this.runtimeResourceId = null;
-    this.activeApprovalMode = undefined;
-    this.activeThreadId = null;
-    this.lastNativeSubagentInfo = null;
-  }
-
-  public getRuntimeInfo(): Record<string, unknown> {
-    return {
-      pid: this.child?.pid,
-      codexBinary: this.codexBinary,
-      codexVersion: this.codexVersion,
-      threadId: this.threadId,
-      activeThreadId: this.activeThreadId,
-      usage: this.usageSummary,
-      nativeMultiAgentMode: this.nativeMultiAgentMode,
-      lastNativeSubagent: this.lastNativeSubagentInfo,
-      supportsNativeSubagents: this.nativeMultiAgentMode !== null,
-      supportsSoftRefresh: true,
-    };
-  }
-
-  public async refreshContext(): Promise<{ mode: 'soft'; threadId?: string | null }> {
-    if (!this.child) throw new Error('Codex app-server not booted.');
-    const cwd = this.options.cwd || PROJECT_ROOT;
-    const approvalMode = this.options.approvalMode || 'strict';
-    const sandboxMode = this.getSandboxMode();
-    const threadRes: any = await this.sendRequest(
-      'thread/start',
-      {
-        model: this.options.model ?? undefined,
-        modelProvider: this.options.modelProvider ?? undefined,
-        cwd,
-        approvalPolicy:
-          this.options.approvalPolicy ?? (approvalMode === 'relaxed' ? 'never' : 'on-request'),
-        sandbox: sandboxMode,
-        developerInstructions: this.options.systemPrompt ?? undefined,
-        experimentalRawEvents: false,
-        persistExtendedHistory: false,
-      },
-      this.options.timeoutMs ?? 20000
-    );
-    this.threadId = threadRes?.thread?.id || threadRes?.threadId || null;
-    this.activeThreadId = this.threadId;
-    return { mode: 'soft', threadId: this.threadId };
-  }
-
-  private handleStdout(chunk: Buffer): void {
-    if (this.runtimeResourceId) touchManagedProcess(this.runtimeResourceId);
-    this.buffer += chunk.toString();
-    let newlineIdx = this.buffer.indexOf('\n');
-    while (newlineIdx >= 0) {
-      const line = this.buffer.slice(0, newlineIdx).trim();
-      this.buffer = this.buffer.slice(newlineIdx + 1);
-      if (line.length > 0) {
-        try {
-          const msg = JSON.parse(line);
-          this.handleMessage(msg);
-        } catch (e: any) {
-          logger.warn(`[UAA_CODEX_PARSE] Failed to parse JSON: ${e.message}`);
-        }
-      }
-      newlineIdx = this.buffer.indexOf('\n');
-    }
-  }
-
-  private handleMessage(msg: any): void {
-    if (!msg || typeof msg !== 'object') return;
-
-    const hasId = Object.prototype.hasOwnProperty.call(msg, 'id');
-    const hasMethod = Object.prototype.hasOwnProperty.call(msg, 'method');
-    const hasResult = Object.prototype.hasOwnProperty.call(msg, 'result');
-    const hasError = Object.prototype.hasOwnProperty.call(msg, 'error');
-
-    if (hasId && (hasResult || hasError)) {
-      const pending = this.pendingRequests.get(msg.id);
-      if (pending) {
-        this.pendingRequests.delete(msg.id);
-        if (pending.timeout) clearTimeout(pending.timeout);
-        if (hasError) {
-          const errMsg = msg.error?.message || 'Codex app-server error';
-          pending.reject(new Error(errMsg));
-        } else {
-          pending.resolve(msg.result);
-        }
-      }
-      return;
-    }
-
-    if (hasMethod && hasId) {
-      void this.handleServerRequest(msg);
-      return;
-    }
-
-    if (hasMethod) {
-      this.handleNotification(msg);
-    }
-  }
-
-  private handleNotification(msg: any): void {
-    const method = msg.method;
-    const params = msg.params || {};
-
-    if (method === 'item/agentMessage/delta') {
-      const activeThreadId = this.activeThreadId || this.threadId;
-      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
-      if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
-      if (typeof params.delta === 'string') {
-        this.sawAgentDelta = true;
-        this.accumulatedText += params.delta;
-      }
-      return;
-    }
-
-    if (method === 'rawResponseItem/completed') {
-      const activeThreadId = this.activeThreadId || this.threadId;
-      if (activeThreadId && params.threadId && params.threadId !== activeThreadId) return;
-      if (this.currentTurnId && params.turnId && params.turnId !== this.currentTurnId) return;
-      if (
-        !this.sawAgentDelta &&
-        params.item?.type === 'message' &&
-        params.item?.role === 'assistant'
-      ) {
-        const content = Array.isArray(params.item?.content) ? params.item.content : [];
-        const text = content
-          .filter((c: any) => c?.type === 'output_text' && typeof c.text === 'string')
-          .map((c: any) => c.text)
-          .join('');
-        if (text) this.accumulatedText += text;
-      }
-      const usage = extractUsageSummary(params);
-      if (usage) this.usageSummary = usage;
-      return;
-    }
-
-    if (method === 'turn/started') {
-      const turnId = params.turn?.id;
-      if (turnId) this.currentTurnId = turnId;
-      return;
-    }
-
-    if (method === 'turn/completed') {
-      const turnId = params.turn?.id;
-      if (!turnId) return;
-
-      const status = params.turn?.status || 'completed';
-      const stopReason =
-        status === 'failed' ? 'error' : status === 'interrupted' ? 'interrupted' : 'completed';
-      const finalText = this.accumulatedText;
-      this.logBuffer.push({ ts: Date.now(), type: 'agent', content: finalText.slice(0, 500) });
-      if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
-      const result = { text: finalText, stopReason };
-      const usage = extractUsageSummary(params);
-      if (usage) this.usageSummary = usage;
-
-      if (this.pendingTurn && this.pendingTurn.turnId === turnId) {
-        const pending = this.pendingTurn;
-        clearTimeout(pending.timeout);
-        pending.abortCleanup?.();
-        this.pendingTurn = null;
-        pending.resolve(result);
-      } else {
-        this.earlyTurnResults.set(turnId, result);
-      }
-      return;
-    }
-
-    if (method === 'error') {
-      logger.error(`[UAA_CODEX_ERR] ${JSON.stringify(params)}`);
-    }
-  }
-
-  private async handleServerRequest(msg: any): Promise<void> {
-    const { id, method, params } = msg;
-    const relaxed = (this.activeApprovalMode ?? this.options.approvalMode) === 'relaxed';
-
-    switch (method) {
-      case 'item/commandExecution/requestApproval': {
-        const allow = relaxed || this.isReadOnlyCommand(params);
-        this.sendResponse(id, { decision: allow ? 'accept' : 'decline' });
-        return;
-      }
-      case 'item/fileChange/requestApproval': {
-        this.sendResponse(id, { decision: relaxed ? 'accept' : 'decline' });
-        return;
-      }
-      case 'item/permissions/requestApproval': {
-        this.sendResponse(id, {
-          permissions: relaxed ? params?.permissions || {} : {},
-          scope: relaxed ? 'session' : 'turn',
-        });
-        return;
-      }
-      case 'item/tool/requestUserInput': {
-        this.sendResponse(id, { answers: {} });
-        return;
-      }
-      case 'item/tool/call': {
-        this.sendResponse(id, {
-          success: false,
-          contentItems: [
-            { type: 'inputText', text: 'Dynamic tool calls are not supported by Kyberion.' },
-          ],
-        });
-        return;
-      }
-      case 'mcpServer/elicitation/request': {
-        this.sendResponse(id, { action: 'decline' });
-        return;
-      }
-      case 'applyPatchApproval': {
-        this.sendResponse(id, { decision: relaxed ? 'approved' : 'denied' });
-        return;
-      }
-      case 'execCommandApproval': {
-        const allow = relaxed || this.isReadOnlyParsedCommand(params);
-        this.sendResponse(id, { decision: allow ? 'approved' : 'denied' });
-        return;
-      }
-      case 'account/chatgptAuthTokens/refresh': {
-        this.sendError(id, -32000, 'ChatGPT auth token refresh not supported');
-        return;
-      }
-      default: {
-        this.sendError(id, -32601, `Unsupported request: ${method}`);
-      }
-    }
-  }
-
-  private sendRequest<T>(method: string, params: any, timeoutMs?: number): Promise<T> {
-    if (!this.child?.stdin?.writable) throw new Error('Codex app-server stdin not writable.');
-    const id = this.nextId++;
-    const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });
-    this.child.stdin.write(`${payload}\n`);
-    return new Promise<T>((resolve, reject) => {
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      if (timeoutMs && timeoutMs > 0) {
-        timeout = setTimeout(() => {
-          this.pendingRequests.delete(id);
-          reject(new Error(`Codex app-server request timed out (${method}).`));
-        }, timeoutMs);
-      }
-      this.pendingRequests.set(id, { resolve, reject, timeout });
-    });
-  }
-
-  private sendResponse(id: number | string, result: any): void {
-    if (!this.child?.stdin?.writable) return;
-    const payload = JSON.stringify({ jsonrpc: '2.0', id, result });
-    this.child.stdin.write(`${payload}\n`);
-  }
-
-  private sendError(id: number | string, code: number, message: string, data?: any): void {
-    if (!this.child?.stdin?.writable) return;
-    const payload = JSON.stringify({ jsonrpc: '2.0', id, error: { code, message, data } });
-    this.child.stdin.write(`${payload}\n`);
-  }
-
-  private async interruptTurn(threadId: string, turnId: string): Promise<void> {
-    if (!this.child?.stdin?.writable) return;
-    try {
-      await this.sendRequest(
-        'turn/interrupt',
-        { threadId, turnId },
-        this.options.timeoutMs ?? 20000
-      );
-    } catch (err) {
-      logger.warn(
-        `[UAA_CODEX_INTERRUPT] failed to interrupt turn ${turnId}: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-  }
-
-  private isReadOnlyCommand(params: any): boolean {
-    const actions = Array.isArray(params?.commandActions) ? params.commandActions : [];
-    if (actions.length === 0) return false;
-    if (!this.isCwdAllowed(params?.cwd)) return false;
-    return actions.every((action: any) => {
-      const type = action?.type;
-      if (type === 'read' || type === 'listFiles' || type === 'search') {
-        return this.isPathAllowed(action?.path, params?.cwd);
-      }
-      return false;
-    });
-  }
-
-  private isReadOnlyParsedCommand(params: any): boolean {
-    const parsed = Array.isArray(params?.parsedCmd) ? params.parsedCmd : [];
-    if (parsed.length === 0) return false;
-    if (!this.isCwdAllowed(params?.cwd)) return false;
-    return parsed.every((cmd: any) => {
-      const type = cmd?.type;
-      if (type === 'read') return this.isPathAllowed(cmd?.path, params?.cwd);
-      if (type === 'list_files' || type === 'search')
-        return this.isPathAllowed(cmd?.path, params?.cwd);
-      return false;
-    });
-  }
-
-  private isCwdAllowed(cwd?: string | null): boolean {
-    if (!cwd) return true;
-    return this.isWithinRoot(cwd);
-  }
-
-  private isPathAllowed(targetPath?: string | null, cwd?: string | null): boolean {
-    if (!targetPath) return true;
-    const base = cwd || this.options.cwd || this.projectRoot;
-    const resolved = path.isAbsolute(targetPath) ? targetPath : path.resolve(base, targetPath);
-    return this.isWithinRoot(resolved);
-  }
-
-  private isWithinRoot(targetPath: string): boolean {
-    const root = path.resolve(this.projectRoot);
-    const resolved = path.resolve(targetPath);
-    if (resolved === root) return true;
-    return resolved.startsWith(root + path.sep);
   }
 }
 
@@ -1947,7 +1187,7 @@ export class ClaudeAdapter implements AgentAdapter {
       }
 
       const result = await runCliProcess('claude', args, {
-        env: safeEnv(),
+        env: safeChildEnv() as NodeJS.ProcessEnv,
         cwd: this.options.cwd || PROJECT_ROOT,
         timeoutMs: 300000, // 5 min for complex tasks
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -2040,13 +1280,13 @@ export class AgentFactory {
 type AgentAdapterFactory = () => AgentAdapter;
 
 function createCodexAdapterFromEnv(): AgentAdapter {
-  const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+  const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
   if (mode === 'exec' || mode === 'legacy') return new CodexAdapter();
   return new CodexAppServerAdapter({
-    model: process.env.KYBERION_CODEX_MODEL,
-    modelProvider: process.env.KYBERION_CODEX_MODEL_PROVIDER,
+    model: getRegisteredEnvText('KYBERION_CODEX_MODEL'),
+    modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
     approvalMode:
-      (process.env.KYBERION_CODEX_APPROVAL || 'strict').toLowerCase() === 'relaxed'
+      (getRegisteredEnvText('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() === 'relaxed'
         ? 'relaxed'
         : 'strict',
   });
@@ -2059,19 +1299,3 @@ const AGENT_ADAPTER_FACTORIES: Record<BuiltinAgentProvider, AgentAdapterFactory>
   agy: () => new AgyAdapter(),
   grok: () => new GrokAdapter(),
 };
-
-function extractUsageSummary(payload: unknown): Record<string, unknown> | null {
-  const queue: unknown[] = [payload];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || typeof current !== 'object') continue;
-    const usage = (current as any).usage;
-    if (usage && typeof usage === 'object') {
-      return usage as Record<string, unknown>;
-    }
-    for (const value of Object.values(current as Record<string, unknown>)) {
-      if (value && typeof value === 'object') queue.push(value);
-    }
-  }
-  return null;
-}

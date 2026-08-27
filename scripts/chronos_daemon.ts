@@ -25,6 +25,8 @@ import {
   createTriggerRunner,
   withExecutionContextAsync,
   withTriggerLeaderLease,
+  validateChronosDeliveryTarget,
+  type ChronosDeliveryTarget,
 } from '@agent/core';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
@@ -169,7 +171,9 @@ async function tickAsLeader(): Promise<void> {
                 runId: deliveryId,
                 status: result.status,
                 context: result.context,
-                target: scheduled.deliver_to,
+                target: validateChronosDeliveryTarget(
+                  scheduled.deliver_to as ChronosDeliveryTarget
+                ),
               });
               logger.info(`[CHRONOS] ✓ ${scheduled.id}: direct delivery queued (${messageId})`);
             } catch (deliveryError: any) {
@@ -282,5 +286,5 @@ main().catch((err) => {
     recommendation: 'Restart chronos and inspect active/shared/logs/traces for the last failure.',
     dedupe_key: 'chronos-daemon:fatal',
   });
-  process.exit(1);
+  process.exitCode = 1;
 });

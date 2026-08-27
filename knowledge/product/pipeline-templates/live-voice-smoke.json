@@ -16,18 +16,18 @@
     },
     {
       "id": "check_live_voice_runtime",
-      "role": "sink",
-      "op": "system:shell",
-      "params": {
-        "cmd": "test -f dist/libs/actuators/voice-actuator/src/index.js && test -f dist/libs/actuators/meeting-actuator/src/index.js && command -v say >/dev/null && echo '[live-voice-smoke] runtime ready'"
-      }
+      "role": "source",
+      "op": "voice:health",
+      "produces": { "channel": "runtime_result", "type": "VoiceHealthResult" },
+      "params": {}
     },
     {
       "id": "summarize_live_voice_route",
       "role": "sink",
       "op": "system:log",
+      "consumes": "runtime_result",
       "params": {
-        "message": "[live-voice-smoke] live-voice intent mapped to voice-actuator + meeting-actuator smoke path"
+        "message": "[live-voice-smoke] governed voice runtime ready: {{runtime_result}}; meeting preflight remains in the included gate"
       }
     }
   ]

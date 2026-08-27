@@ -18,29 +18,12 @@
     {
       "id": "create_encrypted_backup",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_backup_create",
       "produces": {
         "channel": "backup_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": [
-          "--import",
-          "./scripts/ts-loader.mjs",
-          "scripts/backup.ts",
-          "create",
-          "--scope",
-          "all",
-          "--encrypt",
-          "--prune",
-          "--retain-daily",
-          "7",
-          "--retain-weekly",
-          "4"
-        ],
-        "timeout_ms": 120000
-      }
+      "params": {}
     },
     {
       "role": "sink",

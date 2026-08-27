@@ -1,4 +1,3 @@
-import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import * as path from 'node:path';
 import {
@@ -11,7 +10,8 @@ import {
   safeReaddir,
   safeStat,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { createAjv } from '@agent/core/foundation';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
@@ -20,9 +20,9 @@ import {
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
 } from './design-token-utils.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 addFormats(ajv);
 
@@ -30,6 +30,11 @@ type CatalogCheck = {
   id: string;
   schemaPath: string;
   dataPath: string;
+};
+
+type GovernanceCatalogContracts = {
+  version: number;
+  catalogs: Record<string, string[]>;
 };
 
 const CHECKS: CatalogCheck[] = [
@@ -88,11 +93,16 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/product/schemas/organization-catalog.schema.json',
     dataPath: 'knowledge/product/orchestration/organization-catalog.json',
   },
+  {
+    id: 'cli-commands',
+    schemaPath: 'knowledge/product/schemas/cli-commands.schema.json',
+    dataPath: 'knowledge/product/governance/cli-commands.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
   const fullPath = pathResolver.rootResolve(relativePath);
-  return readJsonFile(fullPath);
+  return readFoundationJson<T>(fullPath);
 }
 
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
@@ -149,7 +159,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryServiceIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      const payload = readFoundationJson<typeof typed>(filePath) as {
         default_pattern?: string;
         services?: Record<string, unknown>;
       };
@@ -252,7 +262,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+      const payload = readFoundationJson<typeof typed>(filePath) as {
         version?: string;
         specialists?: Record<string, unknown>;
       };
@@ -623,9 +633,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const raw = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    ) as ThemeCatalogShape;
+    const raw = readFoundationJson<ThemeCatalogShape>(filePath);
     violations.push(
       ...collectThemeCatalogViolations({
         label: path.relative(pathResolver.rootDir(), filePath),
@@ -641,12 +649,8 @@ function validateDesignTokenCatalog(violations: string[]) {
   // E2E-02: the flat catalog and the decomposed directory copy are a generated
   // pair; their theme maps must stay identical so neither drifts silently.
   try {
-    const flat = JSON.parse(String(safeReadFile(themeFiles[0], { encoding: 'utf8' }) || '')) as {
-      themes?: Record<string, unknown>;
-    };
-    const nested = JSON.parse(String(safeReadFile(themeFiles[1], { encoding: 'utf8' }) || '')) as {
-      themes?: Record<string, unknown>;
-    };
+    const flat = readFoundationJson<{ themes?: Record<string, unknown> }>(themeFiles[0]);
+    const nested = readFoundationJson<{ themes?: Record<string, unknown> }>(themeFiles[1]);
     if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
       violations.push(
         'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
@@ -686,19 +690,101 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
   }
 }
 
-function main() {
+/**
+ * Every governance-root JSON file is a governed catalog or an explicitly
+ * documented compatibility artifact. Keeping this check directory-driven
+ * prevents new policy JSON from silently bypassing schema validation.
+ */
+function validateGovernanceCatalogMetadata(violations: string[]) {
+  const relativeRoot = 'knowledge/product/governance';
+  const root = pathResolver.rootResolve(relativeRoot);
+  const contractsPath = pathResolver.rootResolve(
+    'knowledge/product/governance/governance-catalog-contracts.json'
+  );
+  const contracts = readFoundationJson<GovernanceCatalogContracts>(contractsPath);
+  const genericSchemaRef = '../schemas/governance-catalog.schema.json';
+  const genericCatalogs = new Set<string>();
+  for (const fileName of safeReaddir(root)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()) {
+    const relativePath = `${relativeRoot}/${fileName}`;
+    const filePath = pathResolver.rootResolve(relativePath);
+    let payload: Record<string, unknown>;
+    try {
+      payload = readFoundationJson<Record<string, unknown>>(filePath);
+    } catch (error) {
+      violations.push(
+        `governance-catalog: ${relativePath} is not valid JSON (${error instanceof Error ? error.message : String(error)})`
+      );
+      continue;
+    }
+
+    const schemaRef = payload.$schema;
+    if (typeof schemaRef !== 'string' || schemaRef.trim() === '') {
+      if (payload.documentation_only !== true) {
+        violations.push(
+          `governance-catalog: ${relativePath} must declare $schema or documentation_only=true`
+        );
+      }
+      continue;
+    }
+
+    if (/^https?:\/\//u.test(schemaRef)) continue;
+    if (schemaRef === genericSchemaRef) {
+      genericCatalogs.add(fileName);
+      const requiredKeys = contracts.catalogs[fileName];
+      if (!requiredKeys) {
+        violations.push(
+          `governance-catalog: ${relativePath} uses the envelope schema without a domain contract`
+        );
+        continue;
+      }
+      for (const key of requiredKeys) {
+        if (!(key in payload)) {
+          violations.push(
+            `governance-catalog: ${relativePath} is missing contracted top-level key ${key}`
+          );
+        }
+      }
+      continue;
+    }
+    const schemaPath = pathResolver.rootResolve(path.join(relativeRoot, schemaRef));
+    if (!safeExistsSync(schemaPath)) {
+      violations.push(`governance-catalog: ${relativePath} references missing schema ${schemaRef}`);
+    }
+  }
+  for (const fileName of Object.keys(contracts.catalogs)) {
+    if (!genericCatalogs.has(fileName)) {
+      violations.push(
+        `governance-catalog: contract entry ${fileName} is not backed by the envelope schema`
+      );
+    }
+  }
+}
+
+export const runCheckCatalogIntegrity = defineScript({
+  name: 'check:catalogs',
+  flags: [],
+  run(context) {
+    const result = runCatalogIntegrityCheck();
+    context.print(result);
+  },
+});
+
+export function runCatalogIntegrityCheck(): { status: 'passed'; warnings: string[] } {
   const violations: string[] = [];
   const warnings: string[] = [];
   for (const check of CHECKS) {
     validateCatalog(check, violations, warnings);
   }
+  validateGovernanceCatalogMetadata(violations);
   validateDesignTokenCatalog(violations);
   validateCapabilitiesGuideDrift(violations);
 
   const indexUpToDate = generateIndex(true);
   if (!indexUpToDate) {
     violations.push(
-      'knowledge: _index.md or _manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+      'knowledge: _index.md or _integrity-manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
     );
   }
 
@@ -714,16 +800,16 @@ function main() {
     for (const violation of violations.sort()) {
       console.error(`- ${violation}`);
     }
-    process.exitCode = 1;
-    return;
+    throw new Error(`${violations.length} catalog integrity violation(s)`);
   }
 
-  console.log('[check:catalogs] OK');
+  return { status: 'passed', warnings };
 }
 
 // Guarded so importing the pure collectors above does not run the whole
 // repository check as a side effect.
-const isDirectRun =
-  process.argv[1]?.endsWith('check_catalog_integrity.ts') ||
-  process.argv[1]?.endsWith('check_catalog_integrity.js');
-if (isDirectRun) main();
+if (
+  isDirectScript(import.meta.url, 'check_catalog_integrity.ts') ||
+  isDirectScript(import.meta.url, 'check_catalog_integrity.js')
+)
+  void runCheckCatalogIntegrity();

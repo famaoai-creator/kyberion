@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
@@ -14,13 +14,10 @@ import { notifyOperator } from './operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { logger } from './core.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/question-resolution-policy.schema.json'
@@ -187,14 +184,12 @@ let policyValidateFn: ValidateFunction | null = null;
 
 function ensurePolicyValidator(): ValidateFunction {
   if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
+  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
   return policyValidateFn;
 }
 
 function loadPolicyFile(): QuestionResolutionPolicyFile {
-  const parsed = JSON.parse(
-    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as QuestionResolutionPolicyFile;
+  const parsed = readJson<QuestionResolutionPolicyFile>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])
@@ -354,25 +349,15 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
 }
 
 function getMeetingProfileFallback(): any {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  ) as any;
+  return readJson<any>(
+    pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json')
+  );
 }
 
 function getNarratedVideoProfileFallback(): any {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  ) as any;
+  return readJson<any>(
+    pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json')
+  );
 }
 
 export function resolveQuestionResolution(input: ResolveQuestionInput): QuestionResolutionResult {

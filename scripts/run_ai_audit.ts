@@ -18,7 +18,7 @@
  */
 
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
@@ -37,6 +37,7 @@ import {
   safeWriteFile,
   TraceContext,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export const AI_AUDIT_CASES_SCHEMA = z.object({
   cases: z
@@ -298,7 +299,7 @@ async function mapWithConcurrency<T, R>(
  * stub-env runs (and hermetic tests) never touch provider discovery.
  */
 export function detectBackendMode(): { mode: string | null; nonStub: boolean } {
-  if (process.env.KYBERION_REASONING_BACKEND === 'stub') {
+  if (getRegisteredEnvText('KYBERION_REASONING_BACKEND') === 'stub') {
     return { mode: 'stub', nonStub: false };
   }
   const nonStub = installReasoningBackends();
@@ -479,7 +480,8 @@ async function main(): Promise<void> {
 }
 
 const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'run_ai_audit.ts') ||
+  isDirectScript(import.meta.url, 'run_ai_audit.js');
 if (isDirectRun) {
   main().catch((error) => {
     console.error(`[ai-audit] fatal: ${error?.message ?? error}`);

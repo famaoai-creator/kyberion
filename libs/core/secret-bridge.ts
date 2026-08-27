@@ -3,16 +3,18 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeChmodSync,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
+  loadJson,
   safeWriteFile,
   safeMkdir,
   safeExecResult,
 } from './secure-io.js';
-import { SecretProvider, RegistryEntry, SecretResult } from './secret-types.js';
+import { SecretProvider, RegistryEntry } from './secret-types.js';
 
 const KEYCHAIN_REGISTRY_PATH = pathResolver.vault('secrets/keychain-registry.json');
 const FILE_SECRETS_PATH = pathResolver.vault('secrets/file-secrets.json');
@@ -25,9 +27,7 @@ interface KeychainRegistry {
 function loadRegistry(): KeychainRegistry {
   if (!safeExistsSync(KEYCHAIN_REGISTRY_PATH)) return { entries: [] };
   try {
-    return JSON.parse(
-      safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' }) as string
-    ) as KeychainRegistry;
+    return readJson<KeychainRegistry>(KEYCHAIN_REGISTRY_PATH);
   } catch {
     return { entries: [] };
   }
@@ -242,7 +242,7 @@ export class FileSecretProvider implements SecretProvider {
     if (!safeExistsSync(this.secretsPath)) return {};
     this.assertNotSymlink(this.secretsPath, 'secret file');
     try {
-      return JSON.parse(safeReadFile(this.secretsPath, { encoding: 'utf8' }) as string);
+      return loadJson<Record<string, Record<string, string>>>(this.secretsPath);
     } catch {
       return {};
     }
@@ -344,7 +344,7 @@ export class SecretPolicyRouter {
     for (const id of chain) {
       const provider = this.providers.get(id);
       if (provider && (await provider.isAvailable())) {
-        if (id === 'file_secrets' && !process.env.KYBERION_ALLOW_FILE_SECRETS) {
+        if (id === 'file_secrets' && !getRegisteredEnvText('KYBERION_ALLOW_FILE_SECRETS')) {
           // Warn-phase (REVIEW_CODEX_2026-07-11 / AC-05): plaintext-JSON file
           // secrets engage silently when the keychain is unavailable. TODO:
           // after the warn observation period and AC-05 Task 2 (encryption

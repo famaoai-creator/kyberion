@@ -1,8 +1,8 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnclassifiedError } from './unclassified-error-registry.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type ErrorCategory =
   | 'auth' // missing / invalid credentials
@@ -81,58 +81,52 @@ function buildTestFn(entry: RuleFileEntry): (m: string, code?: string | number) 
     (codes.size > 0 && code !== undefined && codes.has(String(code)));
 }
 
+const DEFAULT_ERROR_CLASSIFIER_RULES: ErrorClassifierRulesFile = {
+  rules: [],
+  policy_violation_patterns: [],
+};
+
+const errorClassifierCatalog = defineCatalog<ErrorClassifierRulesFile>({
+  id: 'error-classifier-rules',
+  path: () => pathResolver.knowledge('product/governance/error-classifier-rules.json'),
+  schema: 'knowledge/product/schemas/error-classifier-rules.schema.json',
+  fallback: DEFAULT_ERROR_CLASSIFIER_RULES,
+  onFallback: (error, defaults) =>
+    recordConfigFallback({
+      knowledgePath: 'product/governance/error-classifier-rules.json',
+      error,
+      defaults,
+    }),
+});
+
 let _cachedRules: ClassifierRule[] | null = null;
-let _cachedPolicyPatterns: typeof POLICY_VIOLATION_PATTERNS | null = null;
+let _cachedPolicyPatterns: PolicyViolationPattern[] | null = null;
 
 function loadClassifierRules(): ClassifierRule[] {
   if (_cachedRules) return _cachedRules;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ErrorClassifierRulesFile;
-    _cachedRules = data.rules.map((entry) => ({
-      id: entry.id,
-      category: entry.category,
-      label: entry.label,
-      remediation: entry.remediation,
-      test: buildTestFn(entry),
-      repairAction: entry.repairAction,
-    }));
-  } catch (err) {
-    recordConfigFallback({
-      knowledgePath: 'product/governance/error-classifier-rules.json',
-      error: err,
-      defaults: { rules: [], policy_violation_patterns: [] },
-    });
-    _cachedRules = [];
-  }
+  const data = errorClassifierCatalog.load();
+  _cachedRules = data.rules.map((entry) => ({
+    id: entry.id,
+    category: entry.category,
+    label: entry.label,
+    remediation: entry.remediation,
+    test: buildTestFn(entry),
+    repairAction: entry.repairAction,
+  }));
   return _cachedRules;
 }
 
-function loadPolicyViolationPatterns(): typeof POLICY_VIOLATION_PATTERNS {
+function loadPolicyViolationPatterns(): PolicyViolationPattern[] {
   if (_cachedPolicyPatterns) return _cachedPolicyPatterns;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/error-classifier-rules.json');
-    const data = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ErrorClassifierRulesFile;
-    _cachedPolicyPatterns = data.policy_violation_patterns.map((entry) => ({
-      pattern: new RegExp(entry.pattern, 'i'),
-      violationType: entry.violation_type,
-      explanation: entry.explanation,
-      requiredRole: entry.required_role,
-      requiredAuthority: entry.required_authority,
-      repairSteps: entry.repair_steps,
-    }));
-  } catch (err) {
-    recordConfigFallback({
-      knowledgePath: 'product/governance/error-classifier-rules.json',
-      error: err,
-      defaults: { rules: [], policy_violation_patterns: [] },
-    });
-    _cachedPolicyPatterns = [];
-  }
+  const data = errorClassifierCatalog.load();
+  _cachedPolicyPatterns = data.policy_violation_patterns.map((entry) => ({
+    pattern: new RegExp(entry.pattern, 'i'),
+    violationType: entry.violation_type,
+    explanation: entry.explanation,
+    requiredRole: entry.required_role,
+    requiredAuthority: entry.required_authority,
+    repairSteps: entry.repair_steps,
+  }));
   return _cachedPolicyPatterns;
 }
 
@@ -168,9 +162,6 @@ type PolicyViolationPattern = {
   requiredAuthority?: string;
   repairSteps: string[];
 };
-
-// Alias for loadPolicyViolationPatterns return type (resolved at runtime from JSON)
-const POLICY_VIOLATION_PATTERNS: PolicyViolationPattern[] = [];
 
 const USER_FACING_ERROR_BODY_KEYS: Record<ErrorCategory, string> = {
   auth: 'error_auth_body',

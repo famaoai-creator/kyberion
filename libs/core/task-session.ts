@@ -1,10 +1,12 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
+import { createAjv } from './foundation/ajv.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -37,7 +39,7 @@ import {
   resolveProviderUrl,
 } from './external-service-registry.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 export type TaskSessionSurface = string; // Replaces 'presence' | 'slack' | 'terminal' | 'chronos' | 'web' | 'imessage' | 'discord'
 
@@ -155,8 +157,7 @@ interface ValidationResult<T> {
   value?: T;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-session.schema.json');
 const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/task-session-policy.schema.json'
@@ -211,9 +212,7 @@ function ensureTaskSessionPolicyValidator(): ValidateFunction {
 }
 
 function loadTaskSessionPolicy(): TaskSessionPolicyFile {
-  const value = JSON.parse(
-    safeReadFile(TASK_SESSION_POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as TaskSessionPolicyFile;
+  const value = loadJson<TaskSessionPolicyFile>(TASK_SESSION_POLICY_PATH);
   const validate = ensureTaskSessionPolicyValidator();
   if (!validate(value)) {
     throw new Error(`Invalid task-session-policy: ${errorsFrom(validate).join('; ')}`);
@@ -309,9 +308,7 @@ function isRunningPid(pid: unknown): pid is number {
 function loadRunningServiceIds(): string[] {
   if (!safeExistsSync(SERVICE_PID_FILE)) return [];
   try {
-    const parsed = JSON.parse(
-      safeReadFile(SERVICE_PID_FILE, { encoding: 'utf8' }) as string
-    ) as Record<string, unknown>;
+    const parsed = loadJson<Record<string, unknown>>(SERVICE_PID_FILE);
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)
@@ -333,9 +330,9 @@ type SurfaceStartableChoice = {
 function loadSurfaceStateRunningIds(): Set<string> {
   if (!safeExistsSync(SURFACE_STATE_PATH)) return new Set();
   try {
-    const parsed = JSON.parse(safeReadFile(SURFACE_STATE_PATH, { encoding: 'utf8' }) as string) as {
+    const parsed = loadJson<{
       surfaces?: Record<string, { pid?: unknown }>;
-    };
+    }>(SURFACE_STATE_PATH);
     return new Set(
       Object.entries(parsed.surfaces || {})
         .filter(([, record]) => isRunningPid(record?.pid))
@@ -354,11 +351,9 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
     .sort()
     .flatMap((entry) => {
       try {
-        const manifest = JSON.parse(
-          safeReadFile(pathResolver.knowledge(`product/governance/surfaces/${entry}`), {
-            encoding: 'utf8',
-          }) as string
-        ) as { surfaces?: Array<Record<string, unknown>> };
+        const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(
+          pathResolver.knowledge(`product/governance/surfaces/${entry}`)
+        );
         return (manifest.surfaces || [])
           .filter((surface) => surface && surface.enabled !== false)
           .map((surface) => {
@@ -385,34 +380,6 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
       }
     })
     .sort((left, right) => left.service_name.localeCompare(right.service_name));
-}
-
-function resolveSurfaceId(serviceName: string): string | undefined {
-  const normalized = serviceName.trim();
-  if (!normalized) return undefined;
-  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return normalized;
-  try {
-    for (const entry of safeReaddir(SURFACE_MANIFEST_DIR).filter((file) =>
-      file.endsWith('.json')
-    )) {
-      const manifest = JSON.parse(
-        safeReadFile(pathResolver.knowledge(`product/governance/surfaces/${entry}`), {
-          encoding: 'utf8',
-        }) as string
-      ) as { surfaces?: Array<Record<string, unknown>> };
-      for (const surface of manifest.surfaces || []) {
-        if (!surface || surface.enabled === false) continue;
-        const surfaceId = String(surface.id || '').trim();
-        const alias = String(surface.service_id || '').trim();
-        if (surfaceId === normalized || alias === normalized) {
-          return surfaceId;
-        }
-      }
-    }
-  } catch {
-    // fall through
-  }
-  return normalized;
 }
 
 function inferRequiresApproval(input: {
@@ -685,7 +652,7 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
 export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
 
-const taskIntentBuilderSeam = defineSeam<TaskSessionIntentBuilder>({
+const taskIntentBuilderSeam = createSeam<TaskSessionIntentBuilder>({
   key: 'task-intent-builder',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

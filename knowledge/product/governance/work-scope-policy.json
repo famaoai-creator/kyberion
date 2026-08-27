@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/work-scope-policy.schema.json",
   "version": "1.0.0",
   "defaults": {
     "accumulation_trigger_threshold": 2
@@ -26,10 +27,7 @@
     {
       "id": "catalog-floor",
       "when": {
-        "minimum_catalog_shapes": [
-          "mission",
-          "project_bootstrap"
-        ]
+        "minimum_catalog_shapes": ["mission", "project_bootstrap"]
       },
       "promotion_required": true,
       "result_shape": "mission",

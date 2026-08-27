@@ -1,8 +1,8 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
-import { getToolRuntimeRecord } from './tool-runtime-registry.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
@@ -18,10 +18,7 @@ export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
 export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local';
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type MediaBackendProbeKind =
-  | 'service_runtime'
-  | 'tool_runtime'
-  | 'native_bridge'
-  | 'registry';
+  'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
 
 export interface MediaBackendRecord {
   backend_id: string;
@@ -90,7 +87,7 @@ export function resetMediaBackendAvailabilityCache(): void {
 }
 
 function defaultMediaBackendProbeTtlMs(): number {
-  const configured = Number(process.env.KYBERION_MEDIA_BACKEND_PROBE_TTL_MS || 30_000);
+  const configured = Number(getRegisteredEnvText('KYBERION_MEDIA_BACKEND_PROBE_TTL_MS') || 30_000);
   return Number.isFinite(configured) ? Math.min(300_000, Math.max(1_000, configured)) : 30_000;
 }
 
@@ -206,7 +203,9 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: MediaBackendRegistry | null = null;
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_MEDIA_BACKEND_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  );
 }
 
 function loadRegistryFromPath(registryPath: string): MediaBackendRegistry {

@@ -18,7 +18,6 @@
 
 import {
   listApprovalRequests,
-  loadApprovalRequest,
   decideApprovalRequest,
   type ApprovalRequestRecord,
 } from './approval-store.js';

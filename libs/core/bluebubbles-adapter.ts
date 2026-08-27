@@ -555,7 +555,7 @@ export async function downloadBlueBubblesAttachment(
   };
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+function toRecordOrNull(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
@@ -563,12 +563,12 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 /** Normalize a BlueBubbles new-message webhook into the existing iMessage stimulus contract. */
 export function parseBlueBubblesWebhook(payload: unknown): IMessageStimulus | null {
-  const root = asRecord(payload);
+  const root = toRecordOrNull(payload);
   if (root?.type !== 'new-message') return null;
-  const data = asRecord(root.data);
+  const data = toRecordOrNull(root.data);
   if (!data || data.isFromMe === true) return null;
   const chats = Array.isArray(data.chats) ? data.chats : [];
-  const chat = asRecord(chats[0]);
+  const chat = toRecordOrNull(chats[0]);
   const chatGuid = String(chat?.guid || chat?.chatGuid || '').trim();
   if (!chatGuid) return null;
   const id = String(data.guid || data.id || data.dateCreated || '').trim();

@@ -56,7 +56,8 @@ last_updated: 2026-04-17
 
 - 前提: [hypothesis-tree-protocol.md](knowledge/product/orchestration/hypothesis-tree-protocol.md)
 - 実行枠: [execution-boundary-profiles.json](knowledge/product/governance/execution-boundary-profiles.json)
-- パイプライン: [pipelines/counterfactual-branch.json](pipelines/counterfactual-branch.json)
+- パイプライン: [pipelines/counterfactual-branch.json](../pipeline-templates/counterfactual-branch.json)
 
 ---
+
 _Created: 2026-04-17 | Ecosystem Architect_

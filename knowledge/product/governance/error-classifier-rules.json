@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/error-classifier-rules.schema.json",
   "version": "1.0.0",
   "description": "Error classification rules for classifyError(). Rules are evaluated in order; first match wins. Add new entries here rather than editing error-classifier.ts. Pattern strings are applied as case-insensitive RegExp. Code strings are matched as exact equality against the Node.js error code.",
   "rules": [

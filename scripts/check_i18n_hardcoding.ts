@@ -11,7 +11,6 @@
 // noisy. Hiragana/Katakana are a much more reliable "this is Japanese prose,
 // not a regex fragment" signal.
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   pathResolver,
@@ -22,8 +21,10 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve(
@@ -72,6 +73,7 @@ export type I18nHardcodingReport = {
 
 type I18nBaseline = {
   version: 1;
+  $schema?: string;
   generated_at: string;
   scan_roots: string[];
   files: Record<string, number>;
@@ -210,7 +212,7 @@ function scanTree(scanRoots: string[]): {
 
 function loadBaseline(baselinePath: string): I18nBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return JSON.parse(safeReadFile(baselinePath, { encoding: 'utf8' }) as string) as I18nBaseline;
+  return readJson<I18nBaseline>(baselinePath);
 }
 
 function writeBaselineFile(
@@ -222,7 +224,15 @@ function writeBaselineFile(
     safeMkdir(path.dirname(baselinePath), { recursive: true });
     safeWriteFile(
       baselinePath,
-      JSON.stringify({ ...baseline, scan_roots: relativeScanRootsForNote }, null, 2)
+      JSON.stringify(
+        {
+          $schema: baseline.$schema || '../schemas/governance-catalog.schema.json',
+          ...baseline,
+          scan_roots: relativeScanRootsForNote,
+        },
+        null,
+        2
+      )
     );
   });
 }
@@ -353,24 +363,28 @@ function printHumanReport(report: I18nHardcodingReport): void {
   }
 }
 
-export function main(): void {
-  const updateBaseline = process.argv.includes('--update-baseline');
-  const asJson = process.argv.includes('--json');
-  const report = checkI18nHardcoding({ updateBaseline });
+export const runCheckI18nHardcoding = defineScript({
+  name: 'check:i18n',
+  flags: ['json'],
+  run(context) {
+    const updateBaseline = context.argv.includes('--update-baseline');
+    const asJson = context.json;
+    const report = checkI18nHardcoding({ updateBaseline });
 
-  if (asJson) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    printHumanReport(report);
-  }
+    if (asJson) {
+      context.print(report);
+    } else {
+      printHumanReport(report);
+    }
 
-  if (report.status === 'fail') {
-    process.exitCode = 1;
-  }
-}
+    if (report.status === 'fail') {
+      process.exitCode = 1;
+    }
+  },
+});
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_i18n_hardcoding.ts') ||
+  isDirectScript(import.meta.url, 'check_i18n_hardcoding.js')
+)
+  void runCheckI18nHardcoding();

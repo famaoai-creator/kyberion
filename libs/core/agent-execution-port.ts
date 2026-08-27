@@ -11,7 +11,7 @@ import {
   type ContextSecurityScope,
 } from './context-security-scope.js';
 import type { EventScopeInput } from './event-scope.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface AgentTaskEnvelope {
   task_id: string;
@@ -136,7 +136,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
   }
 }
 
-const agentExecutionPortSeam = defineSeam<AgentExecutionPort>({
+const agentExecutionPortSeam = createSeam<AgentExecutionPort>({
   key: 'agent-execution-port',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

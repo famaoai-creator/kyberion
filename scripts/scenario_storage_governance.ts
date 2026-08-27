@@ -185,7 +185,6 @@ procLog.debug('config loaded', { backend: 'gemini-cli', ttl_ms: 300_000 });
 procLog.warn('rate limit approaching', { remaining: 5, limit: 100 });
 procLog.error('connection reset', { host: 'api.example.com', attempt: 3 });
 
-const logPath = path.join(path.dirname(sharedLogsProcess()), 'scenario-daemon.log');
 if (safeExistsSync(sharedLogsProcess('scenario-daemon.log'))) {
   const raw = safeReadFile(sharedLogsProcess('scenario-daemon.log'), {
     encoding: 'utf8',

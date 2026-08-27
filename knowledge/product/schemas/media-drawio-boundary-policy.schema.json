@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "palette_overrides", "icon_rules"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "palette_overrides": {
       "type": "array",

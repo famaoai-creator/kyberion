@@ -6,6 +6,7 @@ import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
   pathResolver,
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -200,12 +201,8 @@ app.get('/api/identity', (req, res) => {
       const idPath = path.join(personalDir, 'my-identity.json');
       const agentPath = path.join(personalDir, 'agent-identity.json');
       const visionPath = path.join(personalDir, 'my-vision.md');
-      const sovereign = safeExistsSync(idPath)
-        ? JSON.parse(safeReadFile(idPath, { encoding: 'utf8' }) as string)
-        : null;
-      const agent = safeExistsSync(agentPath)
-        ? JSON.parse(safeReadFile(agentPath, { encoding: 'utf8' }) as string)
-        : null;
+      const sovereign = safeExistsSync(idPath) ? loadJson<unknown>(idPath) : null;
+      const agent = safeExistsSync(agentPath) ? loadJson<unknown>(agentPath) : null;
       const visionRaw = safeExistsSync(visionPath)
         ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
         : null;

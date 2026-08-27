@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "egress-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "enum": ["warn", "enforce"] },
+    "manual_allowed_domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "blocked_domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "tenant_allowed_domains": {
+      "type": "object",
+      "additionalProperties": { "type": "array", "items": { "type": "string" } }
+    },
+    "link_allowed_domains": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+    "_meta_tenant": { "type": "string" }
+  },
+  "required": []
+}

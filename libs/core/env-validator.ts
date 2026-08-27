@@ -10,7 +10,9 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnv as getFoundationRegisteredEnv } from './foundation/env.js';
 
 export interface EnvRegistryValidationEntry {
   name: string;
@@ -40,13 +42,18 @@ export interface RegisteredEnvReadOptions<T = string> {
   strict?: boolean;
 }
 
+export interface EnvValidationOptions {
+  /** Promote unknown variables and type mismatches from warnings to errors. */
+  strict?: boolean;
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
 const BOOLEAN_VALUE_RE = /^(1|0|true|false|yes|no|on|off)$/i;
 
 export function loadEnvRegistryEntries(): EnvRegistryValidationEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
   try {
-    const parsed = JSON.parse(String(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) || '{}'));
+    const parsed = readJson<{ entries?: unknown }>(REGISTRY_PATH);
     return Array.isArray(parsed.entries) ? (parsed.entries as EnvRegistryValidationEntry[]) : [];
   } catch {
     return [];
@@ -55,7 +62,8 @@ export function loadEnvRegistryEntries(): EnvRegistryValidationEntry[] {
 
 export function validateEnvAgainstRegistry(
   entries: EnvRegistryValidationEntry[],
-  env: Record<string, string | undefined>
+  env: Record<string, string | undefined>,
+  options: EnvValidationOptions = {}
 ): EnvValidationReport {
   const report: EnvValidationReport = {
     errors: [],
@@ -65,10 +73,17 @@ export function validateEnvAgainstRegistry(
     checked: 0,
   };
   const registered = new Set(entries.map((entry) => entry.name));
+  const addIssue = (issue: EnvValidationIssue, strictIssue = false): void => {
+    if (options.strict && strictIssue) report.errors.push(issue);
+    else report.warnings.push(issue);
+  };
 
   for (const key of Object.keys(env)) {
     if (key.startsWith('KYBERION_') && !registered.has(key)) {
       report.unknown.push(key);
+      if (options.strict) {
+        report.errors.push({ name: key, issue: 'variable is not registered' });
+      }
     }
   }
   report.unknown.sort((a, b) => a.localeCompare(b));
@@ -84,17 +99,23 @@ export function validateEnvAgainstRegistry(
     }
     report.checked += 1;
     if (entry.type === 'boolean' && !BOOLEAN_VALUE_RE.test(value)) {
-      report.warnings.push({
-        name: entry.name,
-        issue: 'expected a boolean value (1/0/true/false/yes/no/on/off)',
-      });
+      addIssue(
+        {
+          name: entry.name,
+          issue: 'expected a boolean value (1/0/true/false/yes/no/on/off)',
+        },
+        true
+      );
     } else if (entry.type === 'number' && Number.isNaN(Number(value))) {
-      report.warnings.push({ name: entry.name, issue: 'expected a numeric value' });
+      addIssue({ name: entry.name, issue: 'expected a numeric value' }, true);
     } else if (entry.type === 'enum' && entry.enum?.length && !entry.enum.includes(value)) {
-      report.warnings.push({
-        name: entry.name,
-        issue: `expected one of: ${entry.enum.join(', ')}`,
-      });
+      addIssue(
+        {
+          name: entry.name,
+          issue: `expected one of: ${entry.enum.join(', ')}`,
+        },
+        true
+      );
     }
   }
 
@@ -104,9 +125,10 @@ export function validateEnvAgainstRegistry(
 }
 
 export function validateEnv(
-  env: Record<string, string | undefined> = process.env
+  env: Record<string, string | undefined> = process.env,
+  options: EnvValidationOptions = {}
 ): EnvValidationReport {
-  return validateEnvAgainstRegistry(loadEnvRegistryEntries(), env);
+  return validateEnvAgainstRegistry(loadEnvRegistryEntries(), env, options);
 }
 
 /**
@@ -121,36 +143,7 @@ export function getRegisteredEnv<T = string>(
   name: string,
   options: RegisteredEnvReadOptions<T> = {}
 ): string | number | boolean | T | undefined {
-  const env = options.env ?? process.env;
-  const raw = env[name];
-  if (raw === undefined || raw === '') return options.defaultValue;
-
-  const entry = loadEnvRegistryEntries().find((candidate) => candidate.name === name);
-  if (!entry) return raw;
-
-  const invalid = (): string | number | boolean | T | undefined => {
-    if (options.strict) {
-      throw new Error(`Invalid value for registered environment variable ${name}`);
-    }
-    return options.defaultValue;
-  };
-
-  switch (entry.type) {
-    case 'boolean':
-      if (/^(1|true|yes|on)$/i.test(raw)) return true;
-      if (/^(0|false|no|off)$/i.test(raw)) return false;
-      return invalid();
-    case 'number': {
-      const parsed = Number(raw);
-      return Number.isFinite(parsed) ? parsed : invalid();
-    }
-    case 'enum':
-      return entry.enum?.includes(raw) ? raw : invalid();
-    case 'path':
-    case 'string':
-    default:
-      return raw;
-  }
+  return getFoundationRegisteredEnv(name, options) as string | number | boolean | T | undefined;
 }
 
 export function formatEnvValidationReport(report: EnvValidationReport): string[] {

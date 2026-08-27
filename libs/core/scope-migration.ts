@@ -31,7 +31,7 @@ const COMPARABLE_SCOPE_KEYS = [
   'nhi_id',
 ] as const;
 
-function asRecord(value: unknown): JsonRecord | undefined {
+function toRecordOrUndefined(value: unknown): JsonRecord | undefined {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as JsonRecord)
     : undefined;
@@ -42,14 +42,14 @@ function sameScope(left: EventScope, right: EventScope): boolean {
 }
 
 function missionIdFrom(record: JsonRecord): string | undefined {
-  const payload = asRecord(record.payload);
+  const payload = toRecordOrUndefined(record.payload);
   const value = record.mission_id ?? payload?.mission_id;
   if (typeof value !== 'string' || !value.trim()) return undefined;
   return value.trim().toUpperCase();
 }
 
 function stringHint(record: JsonRecord, key: string, alias: string): string | undefined {
-  const payload = asRecord(record.payload);
+  const payload = toRecordOrUndefined(record.payload);
   const value = record[key] ?? record[alias] ?? payload?.[key] ?? payload?.[alias];
   if (typeof value !== 'string' || !value.trim()) return undefined;
   return value.trim();
@@ -98,7 +98,7 @@ export function resolveScopeForRecord(
   record: JsonRecord,
   options: ScopeMigrationOptions = {}
 ): ScopeMigrationResult {
-  const payload = asRecord(record.payload);
+  const payload = toRecordOrUndefined(record.payload);
   const recordScopeResult = parseNestedScope(record);
   const payloadScopeResult = payload ? parseNestedScope(payload) : undefined;
   if (recordScopeResult.invalid || payloadScopeResult?.invalid) {

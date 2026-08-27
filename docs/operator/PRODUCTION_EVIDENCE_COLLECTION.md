@@ -20,7 +20,7 @@ For repo-local paths, the reviewer should verify the file or directory is presen
 
 ```bash
 pnpm run validate
-pnpm run check:production-evidence-status
+pnpm check -- --scope full --only production-evidence-status
 pnpm run check:production-evidence-complete
 ```
 
@@ -90,6 +90,6 @@ After evidence review:
 
 1. Update `knowledge/product/governance/production-evidence-register.json`.
 2. Mirror the status in `docs/developer/PRODUCTION_EVIDENCE_REGISTER.ja.md`.
-3. Run `pnpm run check:production-evidence-status`.
+3. Run `pnpm check -- --scope full --only production-evidence-status`.
 4. Run `pnpm run check:production-evidence-complete` only when all items are expected to be verified.
 5. Update `docs/developer/PRODUCTION_RELEASE_GATE_AUDIT.ja.md` if the release decision changes.

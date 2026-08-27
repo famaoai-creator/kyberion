@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-signal-entry-policy.schema.json",
   "version": "1.0.0",
   "sheet_title": "Signals and Risks",
   "columns": ["Task", "Owner", "Status"],

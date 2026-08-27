@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface MissionLedgerPolicyCatalog {
   version: string;
@@ -18,15 +15,8 @@ export interface MissionLedgerPolicyCatalog {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-ledger-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-ledger-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MissionLedgerPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_CATALOG: MissionLedgerPolicyCatalog = {
   version: '1.0.0',
@@ -42,40 +32,15 @@ const FALLBACK_CATALOG: MissionLedgerPolicyCatalog = {
   },
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MissionLedgerPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid mission ledger policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as MissionLedgerPolicyCatalog;
-}
+const catalog = defineCatalog<MissionLedgerPolicyCatalog>({
+  id: 'mission-ledger-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_CATALOG,
+});
 
 export function loadMissionLedgerPolicyCatalog(): MissionLedgerPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = FALLBACK_CATALOG;
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolveMissionLedgerPolicy(): MissionLedgerPolicyCatalog {
@@ -83,6 +48,5 @@ export function resolveMissionLedgerPolicy(): MissionLedgerPolicyCatalog {
 }
 
 export function resetMissionLedgerPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

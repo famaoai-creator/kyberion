@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import {
+  getRegisteredEnv,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskTrigger =
   | { type: 'schedule'; cron: string; timezone?: string }
@@ -41,7 +48,9 @@ type TaskScenario = {
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
 function resolveScenarioDir(): string {
-  const override = process.env.KYBERION_TASK_SCENARIO_DIR?.trim();
+  const override = (
+    getRegisteredEnv<string>('KYBERION_TASK_SCENARIO_DIR') as string | undefined
+  )?.trim();
   return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
 }
 
@@ -57,7 +66,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return readJson<TaskScenario>(filePath);
 }
 
 function resolveProfilePath(scenario: TaskScenario): string {
@@ -118,9 +127,10 @@ export function printTaskScenarios(scenarios: TaskScenario[]): void {
     console.error(
       `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
     );
-    console.error('Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.');
-    process.exitCode = 1;
-    return;
+    console.error(
+      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
+    );
+    throw new Error('No repeatable TaskScenario definitions were found');
   }
 
   console.log('Available repeatable tasks:\n');
@@ -130,7 +140,7 @@ export function printTaskScenarios(scenarios: TaskScenario[]): void {
   }
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const args = [...argv];
   const json = args.includes('--json');
   if (json) {
@@ -140,13 +150,28 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   const scenarios = listTaskScenarios();
+  if (scenarios.length === 0) {
+    // `task:list` is also the readiness probe used before `task:init`; an
+    // empty catalog is an actionable state, not an uncaught CLI exception.
+    console.error(
+      `No TaskScenario files found under ${path.relative(pathResolver.rootDir(), resolveScenarioDir()) || resolveScenarioDir()}.`
+    );
+    console.error(
+      'Add at least one JSON file to knowledge/product/task-scenarios/*.json and run pnpm task:list again.'
+    );
+    return;
+  }
   printTaskScenarios(scenarios);
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runTaskList = defineScript({
+  name: 'task:list',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'task_list.ts') ||
+  isDirectScript(import.meta.url, 'task_list.js')
+)
+  void runTaskList();

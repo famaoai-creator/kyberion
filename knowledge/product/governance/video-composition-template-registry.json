@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/video-composition-template-registry.schema.json",
   "version": "1.0.0",
   "default_template_id": "basic-title-card",
   "templates": [

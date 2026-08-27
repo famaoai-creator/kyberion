@@ -4,11 +4,12 @@ import {
   resetEmbeddingBackend,
 } from './embedding-backend.js';
 import { MlxEmbeddingBackend, isMlxAvailable } from './mlx-embedding-backend.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { GeminiEmbeddingBackend, isGeminiEmbeddingAvailable } from './gemini-embedding-backend.js';
 import { logger } from './core.js';
 
 export function installEmbeddingBackendIfAvailable(): boolean {
-  if (process.env.KYBERION_DISABLE_EMBEDDINGS === '1') {
+  if (getRegisteredEnvText('KYBERION_DISABLE_EMBEDDINGS') === '1') {
     resetEmbeddingBackend();
     logger.info('[embedding-bootstrap] Embeddings disabled by environment flag');
     return false;

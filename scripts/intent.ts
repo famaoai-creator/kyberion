@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   auditChain,
   customerResolver,
@@ -570,7 +570,7 @@ function printJson(report: IntentTraceReportData): void {
   console.log(JSON.stringify(sanitized, null, 2));
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const parsed = await createStandardYargs(['node', 'intent', ...argv])
     .command(
       'trace <correlationId>',
@@ -599,15 +599,19 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   const command = String(parsed._[0] || '');
   if (command !== 'trace') {
     console.error('Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]');
-    process.exit(1);
-    return;
+    throw new ScriptExitError(
+      1,
+      'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]'
+    );
   }
 
   const correlationId = String(parsed.correlationId || parsed._[1] || '').trim();
   if (!correlationId) {
     console.error('Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]');
-    process.exit(1);
-    return;
+    throw new ScriptExitError(
+      1,
+      'Usage: pnpm intent trace <correlation_id> [--json] [--limit <n>]'
+    );
   }
 
   const report = collectIntentTraceReport(correlationId);
@@ -620,10 +624,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err: any) => {
-    console.error(`[intent] ${err?.message || err}`);
-    process.exit(1);
-  });
-}
+  isDirectScript(import.meta.url, 'intent.ts') || isDirectScript(import.meta.url, 'intent.js');
+export const runIntentTrace = defineScript({
+  name: 'intent:trace',
+  flags: [],
+  run: async ({ argv }) => main(argv),
+});
+
+if (isDirect) void runIntentTrace();

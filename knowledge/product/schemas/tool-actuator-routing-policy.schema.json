@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "defaults", "tool_routes"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string",
       "minLength": 1
@@ -30,7 +31,12 @@
           "tool_name": { "type": "string", "minLength": 1 },
           "execution_mode": {
             "type": "string",
-            "enum": ["deterministic_pipeline", "llm_reasoning", "mission_command", "actuator_direct"]
+            "enum": [
+              "deterministic_pipeline",
+              "llm_reasoning",
+              "mission_command",
+              "actuator_direct"
+            ]
           },
           "intent_ids": {
             "type": "array",

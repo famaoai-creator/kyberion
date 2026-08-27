@@ -28,7 +28,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   derivePluginTrustLabel,
   isPathContainedIn,
@@ -115,12 +115,12 @@ export function isSkillAllowed(
   const policyPath = pathResolver.knowledge('product/governance/restricted-skills.json');
   if (!safeExistsSync(policyPath)) return { allowed: true };
   try {
-    const parsed = JSON.parse(safeReadFile(policyPath, { encoding: 'utf8' }) as string) as {
+    const parsed = loadJson<{
       restrictions?: RestrictedSkillRecord[];
       tenant_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
       organization_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
       project_overrides?: Record<string, { restrictions?: RestrictedSkillRecord[] }>;
-    };
+    }>(policyPath);
     const records = [
       ...(parsed.restrictions || []),
       ...(scope?.tenant_slug

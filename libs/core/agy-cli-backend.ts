@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import {
   buildProviderChildEnv,
   resolveProviderPermissionArgs,
@@ -197,7 +198,7 @@ export class AgyCliBackend implements ReasoningBackend {
     this.workspaceDir = options.workspaceDir ?? pathResolver.rootDir();
     this.agent = options.agent;
     this.includeWorkspaceAgents = options.includeWorkspaceAgents ?? true;
-    this.sandbox = options.sandbox ?? process.env.KYBERION_AGY_SANDBOX !== '0';
+    this.sandbox = options.sandbox ?? getRegisteredEnvText('KYBERION_AGY_SANDBOX') !== '0';
     this.logFile =
       options.logFile ??
       path.join(

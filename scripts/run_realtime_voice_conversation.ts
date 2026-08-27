@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import * as path from 'node:path';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { pathToFileURL } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import {
   buildSafeExecEnv,
   checkMeetingParticipationConsent,
@@ -44,6 +44,7 @@ import {
   type StreamingTextToSpeechBridge,
   type VadTurnState,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 type DeliveryMode = 'none' | 'artifact' | 'artifact_and_playback';
 type PersonalVoiceMode = 'allow_fallback' | 'require_personal_voice';
@@ -451,7 +452,8 @@ export async function runRealtimeVoiceConversationLoop(
       : null;
 
   let streamingTts: StreamingTextToSpeechBridge | undefined;
-  const streamPlaybackCommand = process.env.KYBERION_TTS_PLAY_COMMAND?.split(',')
+  const streamPlaybackCommand = getRegisteredEnvText('KYBERION_TTS_PLAY_COMMAND')
+    ?.split(',')
     .map((part) => part.trim())
     .filter(Boolean);
   if (playbackEnabled) {
@@ -702,8 +704,8 @@ export async function main(): Promise<void> {
   // The general bootstrap probes Apple Speech asynchronously. Await it here so
   // the realtime CLI can use macOS-native STT before falling back to MLX.
   if (
-    !process.env.KYBERION_STT_COMMAND?.trim() &&
-    !process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+    !getRegisteredEnvText('KYBERION_STT_COMMAND')?.trim() &&
+    !getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
   ) {
     await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
   }
@@ -816,9 +818,12 @@ export async function main(): Promise<void> {
   await runOneShotConversation(options);
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+if (
+  isDirectScript(import.meta.url, 'run_realtime_voice_conversation.ts') ||
+  isDirectScript(import.meta.url, 'run_realtime_voice_conversation.js')
+) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

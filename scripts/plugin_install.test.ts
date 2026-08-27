@@ -51,10 +51,14 @@ function captureStdout(): { text: () => string; restore: () => void } {
   };
 }
 
+function runWithProcessArgs(): number {
+  return runPluginInstall(process.argv.slice(2));
+}
+
 describe('plugin_install CLI', () => {
   it('requires --source and --id', () => {
     process.argv = ['node', 'plugin_install.ts'];
-    const exitCode = runPluginInstall();
+    const exitCode = runWithProcessArgs();
     expect(exitCode).toBe(1);
   });
 
@@ -74,7 +78,7 @@ describe('plugin_install CLI', () => {
     ];
 
     const capture = captureStdout();
-    const exitCode = runPluginInstall();
+    const exitCode = runWithProcessArgs();
     capture.restore();
 
     expect(exitCode).toBe(0);
@@ -106,7 +110,7 @@ describe('plugin_install CLI', () => {
     ];
 
     const capture = captureStdout();
-    const exitCode = runPluginInstall();
+    const exitCode = runWithProcessArgs();
     capture.restore();
 
     expect(exitCode).toBe(0);
@@ -137,7 +141,7 @@ describe('plugin_install CLI', () => {
     ];
 
     const capture = captureStdout();
-    const exitCode = runPluginInstall();
+    const exitCode = runWithProcessArgs();
     capture.restore();
 
     expect(exitCode).toBe(1);

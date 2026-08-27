@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
@@ -9,11 +8,12 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createCustomer } from './customer_create.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function copyTree(srcDir: string, dstDir: string): void {
   safeMkdir(dstDir, { recursive: true });
@@ -26,7 +26,9 @@ function copyTree(srcDir: string, dstDir: string): void {
       continue;
     }
     if (stat.isSymbolicLink()) {
-      throw new Error(`Refusing to copy symlink from personal tree: ${path.relative(pathResolver.rootDir(), src)}`);
+      throw new Error(
+        `Refusing to copy symlink from personal tree: ${path.relative(pathResolver.rootDir(), src)}`
+      );
     }
     safeCopyFileSync(src, dst);
   }
@@ -38,7 +40,7 @@ export function migratePersonalCustomer(slug: string): string {
   const customerRoot = created.root;
 
   const customerJsonPath = path.join(customerRoot, 'customer.json');
-  const customerJson = JSON.parse(safeReadFile(customerJsonPath, { encoding: 'utf8' }) as string) as Record<string, unknown>;
+  const customerJson = readJson<Record<string, unknown>>(customerJsonPath);
   safeWriteFile(
     customerJsonPath,
     JSON.stringify(
@@ -48,8 +50,8 @@ export function migratePersonalCustomer(slug: string): string {
         display_name: customerJson.display_name || slug,
       },
       null,
-      2,
-    ) + '\n',
+      2
+    ) + '\n'
   );
 
   const mappings: Array<[string, string]> = [
@@ -74,23 +76,35 @@ export function migratePersonalCustomer(slug: string): string {
   return customerRoot;
 }
 
-function main(): void {
-  const slug = process.argv[2];
+function main(argv: string[]): void {
+  const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    console.error('Usage: customer_migrate_from_personal <slug>');
-    process.exit(slug ? 0 : 2);
+    const usage = 'Usage: customer_migrate_from_personal <slug>';
+    if (slug) {
+      console.error(usage);
+      throw new ScriptExitError(0);
+    }
+    throw new ScriptExitError(2, usage);
   }
 
   try {
     const customerRoot = migratePersonalCustomer(slug);
-    console.log(`Migrated personal setup to ${path.relative(pathResolver.rootDir(), customerRoot)}`);
+    console.log(
+      `Migrated personal setup to ${path.relative(pathResolver.rootDir(), customerRoot)}`
+    );
   } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
+    throw new Error(formatClassification(classifyError(err)));
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'customer_migrate_from_personal.ts') ||
+  isDirectScript(import.meta.url, 'customer_migrate_from_personal.js')
+)
+  void defineScript({
+    name: 'customer:migrate-from-personal',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

@@ -2,7 +2,7 @@
   "actuator_id": "modeling-actuator",
   "version": "1.0.0",
   "description": "Architectural Analysis and ADF Transformation Engine",
-  "contract_schema": "schemas/modeling-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/modeling-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "modeling_io_retry",
@@ -16,7 +16,11 @@
     "retryable_categories": ["resource_unavailable", "timeout"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/modeling-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] },
+    {
+      "op": "pipeline",
+      "schema_ref": "knowledge/product/schemas/modeling-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    },
     { "op": "reconcile", "platforms": ["darwin", "linux", "win32"] }
   ]
 }

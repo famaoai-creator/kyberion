@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 
 export interface ServiceBootstrapCatalogEntry {
@@ -23,46 +20,32 @@ interface ServiceBootstrapCatalog {
   entries: ServiceBootstrapCatalogEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
-const PUBLIC_CATALOG_PATH = pathResolver.knowledge('product/governance/service-bootstrap-catalog.json');
-const PERSONAL_CATALOG_PATH = pathResolver.knowledge('personal/governance/service-bootstrap-catalog.json');
+const PUBLIC_CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/service-bootstrap-catalog.json'
+);
+const PERSONAL_CATALOG_PATH = pathResolver.knowledge(
+  'personal/governance/service-bootstrap-catalog.json'
+);
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-bootstrap-catalog.schema.json');
 
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: ServiceBootstrapCatalog | null = null;
-let cachedCatalogKey: string | null = null;
+const publicCatalog = defineCatalog<ServiceBootstrapCatalog>({
+  id: 'service-bootstrap-catalog.public',
+  path: PUBLIC_CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: { version: '1.0.0', entries: [] },
+});
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
+const personalCatalog = defineCatalog<ServiceBootstrapCatalog>({
+  id: 'service-bootstrap-catalog.personal',
+  path: PERSONAL_CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: { version: '1.0.0', entries: [] },
+});
 
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): ServiceBootstrapCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid service bootstrap catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as ServiceBootstrapCatalog;
-}
-
-function loadCatalogFile(catalogPath: string): ServiceBootstrapCatalog | null {
-  if (!safeExistsSync(catalogPath)) return null;
-  return validateCatalog(
-    JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string),
-    catalogPath
-  );
-}
-
-function mergeCatalogs(base: ServiceBootstrapCatalog, overlay: ServiceBootstrapCatalog): ServiceBootstrapCatalog {
+function mergeCatalogs(
+  base: ServiceBootstrapCatalog,
+  overlay: ServiceBootstrapCatalog
+): ServiceBootstrapCatalog {
   const byId = new Map<string, ServiceBootstrapCatalogEntry>();
   for (const entry of base.entries) byId.set(entry.id, entry);
   for (const entry of overlay.entries) byId.set(entry.id, entry);
@@ -73,23 +56,21 @@ function mergeCatalogs(base: ServiceBootstrapCatalog, overlay: ServiceBootstrapC
 }
 
 export function loadServiceBootstrapCatalog(): ServiceBootstrapCatalog {
-  const cacheKey = `${PUBLIC_CATALOG_PATH}::${PERSONAL_CATALOG_PATH}`;
-  if (cachedCatalog && cachedCatalogKey === cacheKey) return cachedCatalog;
-
-  const base = loadCatalogFile(PUBLIC_CATALOG_PATH) ?? { version: '1.0.0', entries: [] };
-  const personal = loadCatalogFile(PERSONAL_CATALOG_PATH) ?? { version: base.version, entries: [] };
-  const merged = mergeCatalogs(base, personal);
-
-  cachedCatalog = merged;
-  cachedCatalogKey = cacheKey;
-  return merged;
+  const base = publicCatalog.load();
+  const personal = personalCatalog.load();
+  return mergeCatalogs(base, {
+    ...personal,
+    version: personal.version || base.version,
+  });
 }
 
 export function listServiceBootstrapCatalogEntries(): ServiceBootstrapCatalogEntry[] {
   return loadServiceBootstrapCatalog().entries;
 }
 
-export function findServiceBootstrapEntriesByUtterance(utterance: string): ServiceBootstrapCatalogEntry[] {
+export function findServiceBootstrapEntriesByUtterance(
+  utterance: string
+): ServiceBootstrapCatalogEntry[] {
   const normalized = utterance.trim();
   if (!normalized) return [];
   return listServiceBootstrapCatalogEntries().filter((entry) =>
@@ -97,10 +78,14 @@ export function findServiceBootstrapEntriesByUtterance(utterance: string): Servi
   );
 }
 
-export function getServiceBootstrapCatalogEntryByServiceId(serviceId: string): ServiceBootstrapCatalogEntry | null {
+export function getServiceBootstrapCatalogEntryByServiceId(
+  serviceId: string
+): ServiceBootstrapCatalogEntry | null {
   const normalized = serviceId.trim();
   if (!normalized) return null;
-  return listServiceBootstrapCatalogEntries().find((entry) => entry.service_id === normalized) || null;
+  return (
+    listServiceBootstrapCatalogEntries().find((entry) => entry.service_id === normalized) || null
+  );
 }
 
 export function getDefaultServiceIdForSurface(surface: string): string | null {
@@ -113,6 +98,6 @@ export function getDefaultServiceIdForSurface(surface: string): string | null {
 }
 
 export function resetServiceBootstrapCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogKey = null;
+  publicCatalog.reset();
+  personalCatalog.reset();
 }

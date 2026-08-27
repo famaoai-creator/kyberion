@@ -36,27 +36,27 @@ This roadmap is intentionally shaped so that GPT-5.4 mini can execute it without
 
 ### 1.2 Roadmap at a glance
 
-| Phase | Goal | GPT-5.4 mini output shape | Exit signal |
-|---|---|---|---|
-| Phase A | Align contracts and types | tests, enums, shared execution-shape helpers | One closed vocabulary across TypeScript, schemas, and catalog rules |
-| Phase B | Make escalation deterministic | pure policy resolver, advisory work-design, orchestration boundary wiring | Small tasks stay lightweight; qualifying work is promoted consistently |
-| Phase C | Cover the full ontology | workflow/team/review catalog coverage, scenario regression fixtures | Every class and execution shape resolves to a valid governed route |
-| Phase D | Decide class-count and operator UX | ADR, UX copy, reference-drift checks | The model can explain work boundaries without taxonomy jargon |
+| Phase   | Goal                               | GPT-5.4 mini output shape                                                 | Exit signal                                                            |
+| ------- | ---------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Phase A | Align contracts and types          | tests, enums, shared execution-shape helpers                              | One closed vocabulary across TypeScript, schemas, and catalog rules    |
+| Phase B | Make escalation deterministic      | pure policy resolver, advisory work-design, orchestration boundary wiring | Small tasks stay lightweight; qualifying work is promoted consistently |
+| Phase C | Cover the full ontology            | workflow/team/review catalog coverage, scenario regression fixtures       | Every class and execution shape resolves to a valid governed route     |
+| Phase D | Decide class-count and operator UX | ADR, UX copy, reference-drift checks                                      | The model can explain work boundaries without taxonomy jargon          |
 
 ## 2. Current-State Review
 
 The architecture already contains the main concepts, but they are not aligned end to end.
 
-| Layer | Current state | Gap |
-|---|---|---|
-| Canonical classes | The intent catalog and JSON Schemas define nine mission classes | `MissionClass` in TypeScript defines only six |
-| Execution shape | The ontology distinguishes `direct_reply`, `task_session`, `mission`, `project_bootstrap`, `browser_session`, `pipeline`, and `actuator_action` | Core workflow APIs generally accept only four shapes |
-| Classification policy | Rules already emit `decision_support`, `customer_engagement`, and `platform_onboarding` | Runtime typing and default template mapping do not cover them explicitly |
-| Team selection | Nine team templates exist | Several mission classes collapse to `development`, obscuring intent |
-| Workflow selection | Class-specific templates exist for decision support, customer engagement, and platform onboarding | No single contract proves that every class and execution shape resolves to a valid workflow |
-| Review gates | Class-specific gates exist for decision support, customer engagement, platform onboarding, and release work | Coverage is not enforced for every canonical class |
-| Task vs mission | The ontology assigns a static execution shape per intent | Request scope, stakeholder count, approvals, repetition, and artifact count do not deterministically promote a task to a mission |
-| Knowledge lifecycle | The ontology category exists | There is no dedicated mission class; work falls into `research_and_absorption` or `decision_support` |
+| Layer                 | Current state                                                                                                                                   | Gap                                                                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Canonical classes     | The intent catalog and JSON Schemas define nine mission classes                                                                                 | `MissionClass` in TypeScript defines only six                                                                                    |
+| Execution shape       | The ontology distinguishes `direct_reply`, `task_session`, `mission`, `project_bootstrap`, `browser_session`, `pipeline`, and `actuator_action` | Core workflow APIs generally accept only four shapes                                                                             |
+| Classification policy | Rules already emit `decision_support`, `customer_engagement`, and `platform_onboarding`                                                         | Runtime typing and default template mapping do not cover them explicitly                                                         |
+| Team selection        | Nine team templates exist                                                                                                                       | Several mission classes collapse to `development`, obscuring intent                                                              |
+| Workflow selection    | Class-specific templates exist for decision support, customer engagement, and platform onboarding                                               | No single contract proves that every class and execution shape resolves to a valid workflow                                      |
+| Review gates          | Class-specific gates exist for decision support, customer engagement, platform onboarding, and release work                                     | Coverage is not enforced for every canonical class                                                                               |
+| Task vs mission       | The ontology assigns a static execution shape per intent                                                                                        | Request scope, stakeholder count, approvals, repetition, and artifact count do not deterministically promote a task to a mission |
+| Knowledge lifecycle   | The ontology category exists                                                                                                                    | There is no dedicated mission class; work falls into `research_and_absorption` or `decision_support`                             |
 
 This is primarily a contract-alignment problem, not a request to add more top-level classes immediately.
 
@@ -66,14 +66,14 @@ Classification must be two-dimensional. `execution_shape` answers how much gover
 
 ### 3.1 Execution boundary
 
-| Result | Use when | Required state | Example |
-|---|---|---|---|
-| `direct_reply` | No external mutation, no durable continuation, and no approval record is needed | Response only; optional trace | Read today's agenda; explain a concept |
-| `actuator_action` / `browser_session` | One bounded tool interaction can complete the request | Execution receipt and applicable consent | Capture one screenshot; inspect one page |
-| `task_session` | Bounded multi-step work needs resumable local state, but not mission-wide governance | Task session, receipt, focused verification | Draft a review; prepare schedule options |
-| `pipeline` | The same governed sequence should be replayed or produces multiple coordinated artifacts | Validated ADF, evidence bundle | Import a PPTX theme; contract review pipeline |
-| `mission` | Governance, coordination, durable ownership, or auditability is load-bearing | Mission record, owner, workflow, gates, evidence | Customer requirements engagement; production release |
-| `project_bootstrap` | The request creates a durable project context containing multiple missions | Project record and initial mission plan | Start a governed customer implementation |
+| Result                                | Use when                                                                                 | Required state                                   | Example                                              |
+| ------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| `direct_reply`                        | No external mutation, no durable continuation, and no approval record is needed          | Response only; optional trace                    | Read today's agenda; explain a concept               |
+| `actuator_action` / `browser_session` | One bounded tool interaction can complete the request                                    | Execution receipt and applicable consent         | Capture one screenshot; inspect one page             |
+| `task_session`                        | Bounded multi-step work needs resumable local state, but not mission-wide governance     | Task session, receipt, focused verification      | Draft a review; prepare schedule options             |
+| `pipeline`                            | The same governed sequence should be replayed or produces multiple coordinated artifacts | Validated ADF, evidence bundle                   | Import a PPTX theme; contract review pipeline        |
+| `mission`                             | Governance, coordination, durable ownership, or auditability is load-bearing             | Mission record, owner, workflow, gates, evidence | Customer requirements engagement; production release |
+| `project_bootstrap`                   | The request creates a durable project context containing multiple missions               | Project record and initial mission plan          | Start a governed customer implementation             |
 
 ### 3.2 Mission promotion rule
 
@@ -92,17 +92,17 @@ direct_reply -> actuator_action/browser_session -> task_session -> pipeline -> m
 
 ### 3.3 Canonical class matrix
 
-| Mission class | Typical bounded task | Promote to mission when | Default team direction | Review emphasis |
-|---|---|---|---|---|
-| `code_change` | One localized implementation and focused test | Cross-package change, release impact, or multiple competing designs | `development` | Contract and QA |
-| `product_delivery` | Product brief or one delivery artifact | End-to-end shipment or several delivery tracks | `product_development` | Architecture, QA, artifact bundle |
-| `operations_and_release` | Read-only status check or bounded operation | Production mutation, release, long-running operation, or handoff | `operations` | Release and security readiness |
-| `customer_engagement` | Prepare options or a follow-up draft | Multiple parties, external commitment, requirements capture, or signoff | `surface_concierge` | Requirements completeness and customer signoff |
-| `decision_support` | Explain options or review plain text | Stakeholder alignment, dissent resolution, negotiation, or consequential decision | explicit decision-support template or governed fallback | Alignment, dissent, rehearsal |
-| `content_and_media` | Produce one bounded asset | Theme extraction, multi-format generation, brand fidelity, or reusable media pipeline | explicit content/media template or governed fallback | Artifact fidelity and rights |
-| `platform_onboarding` | Inspect readiness or prepare setup steps | Secrets, organization policy, integration registration, or cross-system activation | `operations` initially; dedicated template only if evidence warrants | Architecture and security readiness |
-| `environment_and_recovery` | Diagnose one local failure | Recovery changes state, resumes durable work, or coordinates several services | `incident` | Recovery evidence and safety |
-| `research_and_absorption` | Answer a bounded repository question | Cross-source synthesis, durable knowledge promotion, or multi-view research | `system_query` or `development` by delivery shape | Source quality and tier hygiene |
+| Mission class              | Typical bounded task                          | Promote to mission when                                                               | Default team direction                                               | Review emphasis                                |
+| -------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------- |
+| `code_change`              | One localized implementation and focused test | Cross-package change, release impact, or multiple competing designs                   | `development`                                                        | Contract and QA                                |
+| `product_delivery`         | Product brief or one delivery artifact        | End-to-end shipment or several delivery tracks                                        | `product_development`                                                | Architecture, QA, artifact bundle              |
+| `operations_and_release`   | Read-only status check or bounded operation   | Production mutation, release, long-running operation, or handoff                      | `operations`                                                         | Release and security readiness                 |
+| `customer_engagement`      | Prepare options or a follow-up draft          | Multiple parties, external commitment, requirements capture, or signoff               | `surface_concierge`                                                  | Requirements completeness and customer signoff |
+| `decision_support`         | Explain options or review plain text          | Stakeholder alignment, dissent resolution, negotiation, or consequential decision     | explicit decision-support template or governed fallback              | Alignment, dissent, rehearsal                  |
+| `content_and_media`        | Produce one bounded asset                     | Theme extraction, multi-format generation, brand fidelity, or reusable media pipeline | explicit content/media template or governed fallback                 | Artifact fidelity and rights                   |
+| `platform_onboarding`      | Inspect readiness or prepare setup steps      | Secrets, organization policy, integration registration, or cross-system activation    | `operations` initially; dedicated template only if evidence warrants | Architecture and security readiness            |
+| `environment_and_recovery` | Diagnose one local failure                    | Recovery changes state, resumes durable work, or coordinates several services         | `incident`                                                           | Recovery evidence and safety                   |
+| `research_and_absorption`  | Answer a bounded repository question          | Cross-source synthesis, durable knowledge promotion, or multi-view research           | `system_query` or `development` by delivery shape                    | Source quality and tier hygiene                |
 
 ## 4. Global Constraints for GPT-5.4 mini
 
@@ -280,7 +280,7 @@ The resolver must be pure when policy data is injected. Policy loading and schem
 ```bash
 pnpm exec vitest run libs/core/work-scope-decision.test.ts
 pnpm run check:contract-schemas
-pnpm run check:governance-rules
+pnpm check -- --only governance-rules
 pnpm build
 ```
 
@@ -373,9 +373,9 @@ pnpm build
 
 ```bash
 pnpm exec vitest run libs/core/mission-classification-contract.test.ts libs/core/mission-workflow-catalog.test.ts libs/core/mission-review-gates.test.ts
-pnpm run check:intent-domain-coverage
-pnpm run check:catalogs
-pnpm run check:governance-rules
+pnpm check -- --only intent-domain-coverage
+pnpm check -- --only catalogs
+pnpm check -- --only governance-rules
 pnpm build
 ```
 
@@ -416,7 +416,7 @@ Each scenario must declare expected intent, execution shape, mission class, risk
 
 ```bash
 pnpm exec vitest run libs/core/mission-task-classification-scenarios.test.ts libs/core/contextual-intent-corpus.test.ts
-pnpm run check:intent-domain-coverage
+pnpm check -- --only intent-domain-coverage
 pnpm build
 ```
 
@@ -452,8 +452,8 @@ pnpm build
 **Verification:**
 
 ```bash
-pnpm run check:doc-examples
-pnpm run check:reference-drift
+pnpm check -- --scope full --only doc-examples
+pnpm check -- --only reference-drift
 ```
 
 **Completion condition:** The ADR records evidence, alternatives, and a clear keep-nine or add-one decision.
@@ -481,7 +481,7 @@ pnpm run check:reference-drift
 
 ```bash
 pnpm exec vitest run libs/core/surface-ux-contract.test.ts
-pnpm run check:doc-examples
+pnpm check -- --scope full --only doc-examples
 pnpm build
 ```
 
@@ -506,15 +506,15 @@ Then run the representative scenarios through the real operator entry point in d
 
 ## 10. Recommended Pull Request Sequence
 
-| PR | Tasks | Behavior change | Rollback scope |
-|---|---|---|---|
-| PR 1 | 1-2 | Type/contract alignment only | Mission classification core |
-| PR 2 | 3 | Shared execution-shape vocabulary | Core type normalization |
-| PR 3 | 4 | New pure advisory policy | New policy and resolver |
-| PR 4 | 5 | Advisory output only | Work-design integration |
-| PR 5 | 6 | Task-to-mission routing enforcement | Orchestrator boundary |
-| PR 6 | 7-8 | Coverage and regression scenarios | Governance catalogs/tests |
-| PR 7 | 9-10 | ADR and operator UX | Documentation/UX contract |
+| PR   | Tasks | Behavior change                     | Rollback scope              |
+| ---- | ----- | ----------------------------------- | --------------------------- |
+| PR 1 | 1-2   | Type/contract alignment only        | Mission classification core |
+| PR 2 | 3     | Shared execution-shape vocabulary   | Core type normalization     |
+| PR 3 | 4     | New pure advisory policy            | New policy and resolver     |
+| PR 4 | 5     | Advisory output only                | Work-design integration     |
+| PR 5 | 6     | Task-to-mission routing enforcement | Orchestrator boundary       |
+| PR 6 | 7-8   | Coverage and regression scenarios   | Governance catalogs/tests   |
+| PR 7 | 9-10  | ADR and operator UX                 | Documentation/UX contract   |
 
 Do not merge PR 5 until PR 4 has been observed against the scenario set and promotion rates have been reviewed. PR 5 is the first change that can materially alter runtime routing.
 
@@ -536,20 +536,20 @@ This section turns the classification model into a build order that GPT-5.4 mini
 
 ### 12.1 Class-to-implementation matrix
 
-| Class | Typical user request | Current implementation gap | Smallest useful change | Verification artifact |
-|---|---|---|---|---|
-| `direct_reply` | Read agenda, answer a question, explain a concept | User-facing text still sometimes exposes internal taxonomy | Add plain-language explanation and keep the route read-only | Surface copy test + corpus check |
-| `task_session` | Draft options, prep a review, organize a bounded task | Advisory scope decision is not always surfaced | Compute and expose `work_scope_decision` without changing execution | Work-design test + route test |
-| `pipeline` | Import a PPTX theme, review a contract, run a repeatable extraction | Pipeline intent and mission intent can be conflated | Keep replayable flows explicit and prevent silent mission promotion | Pipeline scenario regression |
-| `mission` | Coordinate stakeholders, customer discovery, release work | Promotion triggers are not always explainable | Persist mandatory and accumulation triggers in evidence | Orchestrator promotion test |
-| `project_bootstrap` | Start a new product or long-lived initiative | Project-level initiation is under-documented | Separate project creation from mission execution and describe the handoff | Bootstrapping contract test |
-| `customer_engagement` | Schedule coordination, requirements elicitation | External commitment rules need clearer operator text | Add reviewer/tenant/stakeholder phrasing to the UX contract | Customer-engagement scenario pack |
-| `decision_support` | Decision memo, approval text, plain review | Decision alignment and dissent handling are hidden in the flow | Make alignment, dissent, and role context explicit in the review path | Decision-support scenario pack |
-| `content_and_media` | PPTX theme import, web theme extraction, design build | Theme fidelity and media-type differences are not visible enough | Separate theme extraction, theme registration, and downstream reuse | Theme-pack schema and regression tests |
-| `operations_and_release` | Diagnose a local runtime issue, inspect readiness | Read-only diagnosis and actual mutation are too close in UX | Keep diagnosis distinct from state-changing operations | Operations scenario regression |
-| `platform_onboarding` | Configure an org integration, first-run setup | Setup flows need stronger prerequisites and safe fallback | Route missing prerequisites into setup rather than execution | Onboarding scenario pack |
-| `environment_and_recovery` | Recover a suspended mission, resume work | Recovery and normal task flow can blur | Preserve recovery evidence, checkpoint state, and resume semantics | Recovery flow regression |
-| `research_and_absorption` | Query knowledge, promote reusable knowledge | Knowledge query and durable knowledge promotion are mixed | Separate read-only query, distillation, and promotion to durable knowledge | Knowledge scenario regression |
+| Class                      | Typical user request                                                | Current implementation gap                                       | Smallest useful change                                                     | Verification artifact                  |
+| -------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
+| `direct_reply`             | Read agenda, answer a question, explain a concept                   | User-facing text still sometimes exposes internal taxonomy       | Add plain-language explanation and keep the route read-only                | Surface copy test + corpus check       |
+| `task_session`             | Draft options, prep a review, organize a bounded task               | Advisory scope decision is not always surfaced                   | Compute and expose `work_scope_decision` without changing execution        | Work-design test + route test          |
+| `pipeline`                 | Import a PPTX theme, review a contract, run a repeatable extraction | Pipeline intent and mission intent can be conflated              | Keep replayable flows explicit and prevent silent mission promotion        | Pipeline scenario regression           |
+| `mission`                  | Coordinate stakeholders, customer discovery, release work           | Promotion triggers are not always explainable                    | Persist mandatory and accumulation triggers in evidence                    | Orchestrator promotion test            |
+| `project_bootstrap`        | Start a new product or long-lived initiative                        | Project-level initiation is under-documented                     | Separate project creation from mission execution and describe the handoff  | Bootstrapping contract test            |
+| `customer_engagement`      | Schedule coordination, requirements elicitation                     | External commitment rules need clearer operator text             | Add reviewer/tenant/stakeholder phrasing to the UX contract                | Customer-engagement scenario pack      |
+| `decision_support`         | Decision memo, approval text, plain review                          | Decision alignment and dissent handling are hidden in the flow   | Make alignment, dissent, and role context explicit in the review path      | Decision-support scenario pack         |
+| `content_and_media`        | PPTX theme import, web theme extraction, design build               | Theme fidelity and media-type differences are not visible enough | Separate theme extraction, theme registration, and downstream reuse        | Theme-pack schema and regression tests |
+| `operations_and_release`   | Diagnose a local runtime issue, inspect readiness                   | Read-only diagnosis and actual mutation are too close in UX      | Keep diagnosis distinct from state-changing operations                     | Operations scenario regression         |
+| `platform_onboarding`      | Configure an org integration, first-run setup                       | Setup flows need stronger prerequisites and safe fallback        | Route missing prerequisites into setup rather than execution               | Onboarding scenario pack               |
+| `environment_and_recovery` | Recover a suspended mission, resume work                            | Recovery and normal task flow can blur                           | Preserve recovery evidence, checkpoint state, and resume semantics         | Recovery flow regression               |
+| `research_and_absorption`  | Query knowledge, promote reusable knowledge                         | Knowledge query and durable knowledge promotion are mixed        | Separate read-only query, distillation, and promotion to durable knowledge | Knowledge scenario regression          |
 
 ### 12.2 Recommended build order for GPT-5.4 mini
 

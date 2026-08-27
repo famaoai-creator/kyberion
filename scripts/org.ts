@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   loadApprovalRequest,
 } from '@agent/core';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
 type Persona =
   'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst' | 'unknown';
@@ -325,7 +325,7 @@ function unique(values: string[]): string[] {
 }
 
 function readJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return readFoundationJson<T>(filePath);
 }
 
 function readJsonIfExists<T>(filePath: string): T | null {
@@ -999,7 +999,7 @@ function printResult(result: Record<string, unknown>): void {
   console.log(JSON.stringify(result, null, 2));
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv = currentProcessArgv().slice(2)): Promise<void> {
   const command = parseArgs(argv);
   if (command.kind === 'help') {
     console.log(helpText());
@@ -1049,11 +1049,11 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   printResult(result);
 }
 
-const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runOrg = defineScript({
+  name: 'organization:org',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (isDirectScript(import.meta.url, 'org.ts') || isDirectScript(import.meta.url, 'org.js'))
+  void runOrg();

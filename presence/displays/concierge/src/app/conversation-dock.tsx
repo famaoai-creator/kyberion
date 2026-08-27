@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useConciergeI18n } from '../lib/use-concierge-i18n';
 import { useVoice } from '../lib/use-voice';
+import { buildIntentResolutionView } from '../lib/intent-resolution-view';
 import type { ConciergeMessageKey } from '../lib/i18n';
 import type {
   ConversationMessageResponse,
@@ -10,6 +11,7 @@ import type {
   ConversationPromotion,
   ConversationShape,
 } from '../lib/conversation-types';
+import type { IntentResolutionContract } from '@agent/core';
 
 type DockMessage = {
   id: string;
@@ -18,7 +20,17 @@ type DockMessage = {
   shape?: ConversationShape;
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
+  intentResolution?: IntentResolutionContract;
   error?: boolean;
+};
+
+const AUTHORITY_LABEL_KEYS: Record<
+  IntentResolutionContract['authority_level'],
+  ConciergeMessageKey
+> = {
+  autonomous: 'dock.intent_resolution.authority_autonomous',
+  approval_required: 'dock.intent_resolution.authority_approval',
+  human_clarification_required: 'dock.intent_resolution.authority_clarification',
 };
 
 // Only the four contract shapes carry a card label; a plain reply stays a
@@ -99,6 +111,7 @@ export function ConversationDock() {
             shape: payload.shape || 'reply',
             promoted: payload.promoted,
             nextActions: payload.nextActions,
+            intentResolution: payload.intentResolution,
             error: payload.mode === 'unavailable',
           },
         ]);
@@ -166,6 +179,7 @@ export function ConversationDock() {
                 role: 'secretary' as const,
                 text: reply,
                 shape: 'reply' as const,
+                intentResolution: result.intentResolution,
               },
             ]
           : []),
@@ -244,6 +258,9 @@ export function ConversationDock() {
           // confirm button for approval-queue items would suggest chat text
           // can stand in for the guarded approval flow.
           const actions = message.nextActions ?? [];
+          const intentView = message.intentResolution
+            ? buildIntentResolutionView(message.intentResolution)
+            : null;
           return (
             <div
               key={message.id}
@@ -263,6 +280,50 @@ export function ConversationDock() {
                     { label: message.promoted.label }
                   )}
                 </p>
+              ) : null}
+              {intentView ? (
+                <section
+                  className="dock-intent-resolution"
+                  aria-label={t('dock.intent_resolution.title')}
+                  data-testid="intent-resolution-card"
+                >
+                  <div className="dock-intent-heading">
+                    <strong>{t('dock.intent_resolution.title')}</strong>
+                    <span className="dock-intent-authority">
+                      {t(AUTHORITY_LABEL_KEYS[intentView.authority])}
+                    </span>
+                  </div>
+                  <dl>
+                    <div>
+                      <dt>{t('dock.intent_resolution.understood')}</dt>
+                      <dd>{intentView.understood}</dd>
+                    </div>
+                    <div>
+                      <dt>{t('dock.intent_resolution.missing')}</dt>
+                      <dd>
+                        {intentView.missingInputs.length > 0
+                          ? intentView.missingInputs.join(', ')
+                          : t('dock.intent_resolution.none')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t('dock.intent_resolution.next')}</dt>
+                      <dd>
+                        {intentView.nextAction.label}
+                        <small>{intentView.nextAction.consequence}</small>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{t('dock.intent_resolution.outcome')}</dt>
+                      <dd>{intentView.outcome}</dd>
+                    </div>
+                  </dl>
+                  {intentView.authority === 'approval_required' ? (
+                    <p className="dock-intent-waiting" role="status">
+                      {t('dock.intent_resolution.waiting_approval')}
+                    </p>
+                  ) : null}
+                </section>
               ) : null}
               {actionable && actions.length > 0 ? (
                 <div className="button-row">

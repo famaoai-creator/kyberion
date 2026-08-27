@@ -14,14 +14,15 @@ import {
   safeExistsSync,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 const app = express();
 const server = createServer(app);
 
-const HOST = process.env.KYBERION_OAUTH_CALLBACK_HOST || '127.0.0.1';
-const PORT = Number(process.env.KYBERION_OAUTH_CALLBACK_PORT || 8787);
-const CALLBACK_PATH = process.env.KYBERION_OAUTH_CALLBACK_PATH || '/oauth/callback';
+const HOST = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_HOST') || '127.0.0.1';
+const PORT = Number(getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PORT') || 8787);
+const CALLBACK_PATH = getRegisteredEnvText('KYBERION_OAUTH_CALLBACK_PATH') || '/oauth/callback';
 const RUNTIME_DIR = pathResolver.shared('runtime/oauth');
 const LATEST_RESULT_PATH = path.join(RUNTIME_DIR, 'latest-callback.json');
 

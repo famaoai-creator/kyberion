@@ -1,3 +1,4 @@
+import { appendJsonLine } from '../foundation/json.js';
 /**
  * Kyberion Trace Model
  * OpenTelemetry-inspired tracing with artifact and knowledge references.
@@ -5,9 +6,10 @@
 
 import { createHash, randomUUID } from 'crypto';
 import * as path from 'node:path';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
-import { safeMkdir, safeAppendFileSync, safeExistsSync } from '../secure-io.js';
+import { safeMkdir, safeExistsSync } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
 import { sanitizeTraceForPersistence, validateTraceReplay } from '../trace-schema.js';
 
@@ -87,8 +89,8 @@ export class TraceContext {
       knowledgeRefs: [],
       children: [],
     };
-    const customer = process.env.KYBERION_CUSTOMER?.trim() || undefined;
-    const tenant = process.env.KYBERION_TENANT?.trim() || undefined;
+    const customer = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined;
+    const tenant = getRegisteredEnvText('KYBERION_TENANT')?.trim() || undefined;
     this.trace = {
       traceId: randomUUID(),
       rootSpan,
@@ -259,7 +261,7 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
   const file = path.join(dir, `traces-${day}.jsonl`);
   const safeTrace = sanitizeTraceForPersistence(trace);
   const record = { ...safeTrace, _persistedAt: new Date().toISOString() };
-  safeAppendFileSync(file, JSON.stringify(record) + '\n');
+  appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
   void exportTraceOtlp(safeTrace).catch(() => undefined);

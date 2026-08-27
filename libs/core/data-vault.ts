@@ -10,6 +10,7 @@ import {
   safeReaddir,
 } from './secure-io.js';
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 
 export type DataVaultTier = 'personal' | 'confidential' | 'public';
 
@@ -52,19 +53,17 @@ function vaultDir(): string {
 }
 
 function entryFileName(sourceType: string, key: string, projectId: string): string {
-  return crypto
-    .createHash('sha256')
-    .update(`${sourceType}::${projectId}::${key}`)
-    .digest('hex')
-    .slice(0, 32) + '.json';
+  return (
+    crypto
+      .createHash('sha256')
+      .update(`${sourceType}::${projectId}::${key}`)
+      .digest('hex')
+      .slice(0, 32) + '.json'
+  );
 }
 
 function entryFilePath(sourceType: string, key: string, projectId: string): string {
   return nodePath.join(vaultDir(), entryFileName(sourceType, key, projectId));
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function sha256Hex(data: unknown): string {
@@ -96,7 +95,7 @@ export async function fetchWithVaultCache<T>(
   sourceType: string,
   key: string,
   loader: () => Promise<T> | T,
-  options: FetchWithVaultCacheOptions = {},
+  options: FetchWithVaultCacheOptions = {}
 ): Promise<FetchWithVaultCacheResult<T>> {
   const projectId = options.projectId ?? '_global';
   const filePath = entryFilePath(sourceType, key, projectId);
@@ -124,7 +123,11 @@ export async function fetchWithVaultCache<T>(
   return { data, fromCache: false, entry };
 }
 
-export function getVaultEntry(sourceType: string, key: string, projectId: string): VaultEntry | null {
+export function getVaultEntry(
+  sourceType: string,
+  key: string,
+  projectId: string
+): VaultEntry | null {
   const filePath = entryFilePath(sourceType, key, projectId);
   const entry = readEntryFile(filePath);
   if (!entry) return null;

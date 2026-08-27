@@ -12,6 +12,7 @@ import {
   saveProjectTrackRecord,
   writeIntentGoalHandoff,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
 import type { MissionRelationships } from './mission-types.js';
@@ -563,7 +564,7 @@ export async function runMissionControllerAction(
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'CREATE');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'mission_controller',
           action: 'mission.routing_decision_recorded',
           operation: `create:${arg1}`,
           result: 'completed',
@@ -623,7 +624,7 @@ export async function runMissionControllerAction(
       await syncRoutingDecisionSummary(context, arg1!, routingDecision, 'START');
       if (Object.keys(routingDecision).length > 0) {
         auditChain.record({
-          agentId: process.env.KYBERION_PERSONA || 'mission_controller',
+          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'mission_controller',
           action: 'mission.routing_decision_recorded',
           operation: `start:${arg1}`,
           result: 'completed',

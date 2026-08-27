@@ -1,4 +1,5 @@
 import { safeExecResult } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface WindowsNativeImageGenerationAvailability {
   available: boolean;
@@ -24,7 +25,7 @@ export interface WindowsNativeImageGenerationRequest {
  */
 export function probeWindowsNativeImageGeneration(): WindowsNativeImageGenerationAvailability {
   if (process.platform !== 'win32') return { available: false, reason: 'requires Windows' };
-  const helper = process.env.KYBERION_WINDOWS_IMAGE_GENERATOR?.trim();
+  const helper = getRegisteredEnvText('KYBERION_WINDOWS_IMAGE_GENERATOR')?.trim();
   if (!helper) {
     return {
       available: false,

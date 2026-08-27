@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/standard-intents.schema.json",
   "version": "2.0.0",
   "ux_contract": "Intent -> Plan -> State -> Result",
   "notes": [

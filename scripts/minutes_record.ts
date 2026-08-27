@@ -24,6 +24,7 @@ import {
   startInRoomMinutesSession,
 } from '@agent/core';
 import { t as catalogT } from '@agent/core/t';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function getFlag(argv: string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -32,21 +33,20 @@ function getFlag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-async function main(): Promise<number> {
+async function main(argv: string[] = []): Promise<void> {
   process.env.MISSION_ROLE = process.env.MISSION_ROLE || 'mission_controller';
-  const argv = process.argv.slice(2);
   const missionId = getFlag(argv, '--mission');
   if (!missionId) {
     logger.error(
       'Usage: pnpm minutes:record --mission <MISSION_ID> [--device ":0"] [--title "..."] [--language ja]'
     );
-    return 1;
+    throw new ScriptExitError(1, '', true);
   }
 
   const probe = probeMicCapture();
   if (!probe.available) {
     logger.error(`❌ ${catalogT('minutes_record:mic_capture_failed', { reason: probe.reason })}`);
-    return 1;
+    throw new ScriptExitError(1, '', true);
   }
   // Register every on-device STT backend, not just the shell one. Each
   // installer no-ops when a higher-priority backend is already configured, so
@@ -106,10 +106,10 @@ async function main(): Promise<number> {
           minutes,
         })}`
       );
-      process.exit(0);
+      process.exitCode = 0;
     } catch (error) {
       logger.error(error instanceof Error ? error.message : String(error));
-      process.exit(1);
+      process.exitCode = 1;
     }
   };
   process.on('SIGINT', () => void finish());
@@ -117,10 +117,16 @@ async function main(): Promise<number> {
 
   await session.done;
   await finish();
-  return 0;
 }
 
-main().catch((error) => {
-  logger.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+export const runMinutesRecord = defineScript({
+  name: 'minutes:record',
+  flags: [],
+  run: async ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'minutes_record.ts') ||
+  isDirectScript(import.meta.url, 'minutes_record.js')
+)
+  void runMinutesRecord();

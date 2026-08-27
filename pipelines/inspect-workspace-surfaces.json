@@ -17,10 +17,10 @@
     {
       "id": "check-surfaces",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "surface_status", "type": "ShellResult" },
+      "op": "process:list-surfaces",
+      "produces": { "channel": "surface_status", "type": "SurfaceStatus" },
       "params": {
-        "cmd": "node dist/scripts/surface_runtime.js --action status"
+        "export_as": "surface_status"
       }
     },
     {
@@ -31,10 +31,7 @@
       "produces": { "channel": "surface_report", "type": "AnalysisResult" },
       "params": {
         "instruction": "Summarize the connected monitors and the health of active Kyberion UI surfaces. Identify the 'Main' surface for human interaction.",
-        "context": [
-          "{{display_info}}",
-          "{{surface_status}}"
-        ]
+        "context": ["{{display_info}}", "{{surface_status}}"]
       }
     },
     {

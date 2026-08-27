@@ -442,6 +442,11 @@ vi.mock('node:crypto', async (importOriginal) => {
   };
 });
 
+vi.mock('@agent/core/foundation', () => ({
+  compileSchema: mocks.compileSchemaFromPath,
+  getRegisteredEnvText: (name: string) => process.env[name],
+}));
+
 describe('voice actuator', () => {
   const originalPlatform = process.platform;
 
@@ -834,7 +839,7 @@ describe('voice actuator', () => {
         action: 'record_verify_repair_voice_sample',
         training_path: expect.stringContaining('verify-repair-1/sample-01.wav'),
         verification: expect.objectContaining({ status: 'passed', dry_run: true }),
-      }),
+      })
     );
   });
 

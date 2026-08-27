@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "providers"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string"
     },

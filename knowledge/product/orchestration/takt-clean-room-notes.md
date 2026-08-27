@@ -9,7 +9,7 @@ last_updated: 2026-08-16
 
 # takt Clean-Room Notes
 
-Source repository reviewed: `nrslib/takt` (v0.59.1). This note records implementation ideas in original Kyberion wording only; no source or prose is copied. Adoption plan: `docs/developer/improvement-plans-2026-08/TAKT_ADOPTION_PLAN_2026-08-16.ja.md` (TK-01〜12).
+Source repository reviewed: `nrslib/takt` (v0.59.1). This note records implementation ideas in original Kyberion wording only; no source or prose is copied. Adoption plan: `docs/developer/improvement-plans-archive/2026-08/TAKT_ADOPTION_PLAN_2026-08-16.ja.md` (TK-01〜12).
 
 ## High-value concepts to reuse
 

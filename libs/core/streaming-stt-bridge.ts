@@ -12,9 +12,10 @@
  * file) or vendor SDK (Deepgram WS, Google STT streaming — left as
  * stub bindings).
  */
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import type { AudioChunk, TranscriptChunk } from './meeting-session-types.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface StreamingSpeechToTextBridge {
   readonly bridge_id: string;
@@ -59,7 +60,7 @@ export class StubStreamingSpeechToTextBridge implements StreamingSpeechToTextBri
  * Registry — lets the coordinator pick a backend by id at runtime.
  * ------------------------------------------------------------------ */
 
-const streamingSttSeam = defineSeam<() => StreamingSpeechToTextBridge>({
+const streamingSttSeam = createSeam<() => StreamingSpeechToTextBridge>({
   key: 'streaming-stt-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
@@ -87,7 +88,7 @@ export function resetStreamingSttBridges(): void {
 }
 
 export function getStreamingSttBridge(
-  id: string = process.env.KYBERION_STREAMING_STT_BRIDGE ?? 'stub'
+  id: string = getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') ?? 'stub'
 ): StreamingSpeechToTextBridge {
   if (id === 'stub') return new StubStreamingSpeechToTextBridge();
   const factory = streamingSttSeam.getOptional(id);

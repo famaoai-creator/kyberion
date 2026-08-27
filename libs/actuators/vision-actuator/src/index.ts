@@ -4,14 +4,12 @@ import {
   executeServicePreset,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ocrImage as coreOcrImage,
   describeImage as coreDescribeImage,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core';
@@ -50,6 +48,12 @@ function buildRetryOptions(override?: Record<string, any>) {
     fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
   });
 }
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'vision-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
 
 async function inspectImage(params: any) {
   const logicalPath = String(params.path || '');
@@ -167,6 +171,8 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

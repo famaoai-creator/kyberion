@@ -9,7 +9,7 @@ const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 function readJson(relativePath: string): unknown {
   return JSON.parse(
-    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string,
+    safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }) as string
   ) as unknown;
 }
 
@@ -21,10 +21,14 @@ describe('email triage workflow contract', () => {
   it('keeps the TaskScenario aligned with the workflow template contract', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schemaPath = pathResolver.rootResolve('schemas/task-scenario.schema.json');
+    const schemaPath = pathResolver.rootResolve(
+      'knowledge/product/schemas/task-scenario.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const scenario = readJson('knowledge/product/task-scenarios/daily-email-triage.json');
-    const template = readJson('knowledge/product/pipeline-templates/email-triage-workflow.json') as {
+    const template = readJson(
+      'knowledge/product/pipeline-templates/email-triage-workflow.json'
+    ) as {
       context?: { triage_output_path?: string; reply_drafts_path?: string };
       steps?: Array<{ id: string; params?: Record<string, unknown> }>;
     };
@@ -49,10 +53,10 @@ describe('email triage workflow contract', () => {
       reply_drafts_path: 'active/shared/tmp/reply-drafts.json',
     });
     expect(readText('knowledge/product/pipeline-templates/email-triage-workflow.json')).toContain(
-      'active/shared/tmp/email-triage.md',
+      'active/shared/tmp/email-triage.md'
     );
     expect(readText('knowledge/product/pipeline-templates/email-triage-workflow.json')).toContain(
-      'reply-drafts.json',
+      'reply-drafts.json'
     );
   });
 });

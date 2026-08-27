@@ -14,7 +14,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
@@ -44,8 +44,8 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
 
     const candidate =
       options.pythonBin ??
-      process.env.KYBERION_PYTHON_BIN ??
-      process.env.KYBERION_PYTHON ??
+      getRegisteredEnvText('KYBERION_PYTHON_BIN') ??
+      getRegisteredEnvText('KYBERION_PYTHON') ??
       resolveManagedToolPythonBin('mlx_audio') ??
       resolveManagedToolPythonBin('mlx_whisper') ??
       rootResolve('.venv/bin/python3');

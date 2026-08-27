@@ -1,12 +1,6 @@
 import * as path from 'node:path';
-import {
-  loadJson,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 
 type AuthorityRoleRecord = {
@@ -24,7 +18,7 @@ const DIRECTORY = pathResolver.knowledge('product/governance/authority-roles');
 const SNAPSHOT = pathResolver.knowledge('product/governance/authority-role-index.json');
 
 function loadSnapshotRoles(): Record<string, AuthorityRoleRecord> {
-  const snapshot = loadJson<{ authority_roles?: Record<string, AuthorityRoleRecord> }>(SNAPSHOT);
+  const snapshot = readJson<{ authority_roles?: Record<string, AuthorityRoleRecord> }>(SNAPSHOT);
   return snapshot.authority_roles || {};
 }
 
@@ -43,7 +37,7 @@ function loadDirectoryRoles(): Record<string, AuthorityRoleRecord> | null {
   const roles: Record<string, AuthorityRoleRecord> = {};
   for (const file of files) {
     const filePath = path.join(DIRECTORY, file);
-    const payload = loadJson<AuthorityRoleFile>(filePath);
+    const payload = readJson<AuthorityRoleFile>(filePath);
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Authority role file ${file} must declare a role id`);

@@ -1,5 +1,6 @@
 import express from 'express';
-import { installProcessGuards } from '@agent/core';
+import { extractSurfaceBearerToken, installProcessGuards } from '@agent/core';
+import { appendJsonLine, getRegisteredEnvText } from '@agent/core/foundation';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'node:path';
@@ -12,13 +13,12 @@ import {
   pathResolver,
   runtimeSupervisor,
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeMkdir,
   safeRmSync,
   safeExistsSync,
   safeUnlinkSync,
-  safeReaddir,
-  safeAppendFileSync,
 } from '@agent/core';
 import {
   buildSessionPaths,
@@ -40,16 +40,17 @@ const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
 const ROOT_DIR = pathResolver.rootDir();
-const GLOBAL_STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
-const TERMINAL_TOKEN = process.env.KYBERION_TERMINAL_TOKEN || process.env.KYBERION_API_TOKEN;
-const ALLOW_REMOTE = process.env.KYBERION_TERMINAL_ALLOW_REMOTE === 'true';
+const TERMINAL_TOKEN =
+  getRegisteredEnvText('KYBERION_TERMINAL_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');
+const ALLOW_REMOTE = getRegisteredEnvText('KYBERION_TERMINAL_ALLOW_REMOTE') === 'true';
 const DISCONNECT_TIMEOUT_MS = Number(
-  process.env.KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS || 5 * 60 * 1000
+  getRegisteredEnvText('KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS') || 5 * 60 * 1000
 );
-const RESTORE_RUNTIME_ON_BOOT = process.env.KYBERION_TERMINAL_RESTORE_RUNTIME === 'true';
+const RESTORE_RUNTIME_ON_BOOT =
+  getRegisteredEnvText('KYBERION_TERMINAL_RESTORE_RUNTIME') === 'true';
 const SESSION_RETENTION_MS = Number(
-  process.env.KYBERION_TERMINAL_SESSION_RETENTION_MS || 7 * 24 * 60 * 60 * 1000
+  getRegisteredEnvText('KYBERION_TERMINAL_SESSION_RETENTION_MS') || 7 * 24 * 60 * 60 * 1000
 );
 
 interface Session {
@@ -86,9 +87,8 @@ function isLoopback(ip: string): boolean {
 
 function extractToken(req: any): string | null {
   const authHeader = req.headers['authorization'];
-  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7);
-  }
+  const bearer = extractSurfaceBearerToken(authHeader);
+  if (bearer) return bearer;
   try {
     const url = new URL(req.url || '/', 'http://localhost');
     return url.searchParams.get('token');
@@ -258,7 +258,7 @@ function emitGlobalStimulus(text: string, session: Session) {
       control: { status: 'processed', feedback: 'silent', evidence: [] },
     };
     const stimuliFile = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-    safeAppendFileSync(stimuliFile, JSON.stringify(stimulus) + '\n');
+    appendJsonLine(stimuliFile, stimulus);
   } catch (err) {
     logger.warn(`[server] suppressed error in emitGlobalStimulus: ${err}`);
   }
@@ -306,7 +306,10 @@ async function setupSessionWatcher(session: Session) {
         try {
           const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
           if (safeExistsSync(registryPath)) {
-            const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+            const registry = loadJson<{
+              default_profile: string;
+              profiles: Record<string, { cmd: string; args: string[] }>;
+            }>(registryPath);
             const profileKey =
               requestedBrain === 'default' ? registry.default_profile : requestedBrain;
             const profile =
@@ -605,7 +608,7 @@ app.post('/sessions', (req, res) => {
 });
 
 const PORT = Number(process.env.TERMINAL_PORT || 4000);
-const HOST = process.env.KYBERION_TERMINAL_HOST || '127.0.0.1';
+const HOST = getRegisteredEnvText('KYBERION_TERMINAL_HOST') || '127.0.0.1';
 server.listen(PORT, HOST, () => {
   logger.info(`🌌 Terminal Hub v6.2 standardized on port ${PORT}`);
 

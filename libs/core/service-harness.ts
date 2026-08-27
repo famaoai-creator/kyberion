@@ -92,7 +92,7 @@ const SENSITIVE_KEY =
   /(token|secret|password|authorization|api[_-]?key|credential|cookie|private[_-]?key)/iu;
 const RECEIPT_DIR = pathResolver.shared('runtime/service-receipts');
 
-function asRecord(value: unknown): Record<string, unknown> {
+function recordOrEmpty(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
@@ -136,7 +136,7 @@ function normalizeAlternative(
   value: unknown,
   fallback: Record<string, unknown>
 ): ServiceOperationAlternativeSummary {
-  const alternative = asRecord(value);
+  const alternative = recordOrEmpty(value);
   const type = String(alternative.type || fallback.type || 'api');
   const summary: ServiceOperationAlternativeSummary = { type };
   const method = alternative.method || fallback.method;
@@ -151,7 +151,7 @@ function normalizeAlternative(
 }
 
 function normalizeVerification(value: unknown): ServiceVerificationSpec {
-  const candidate = asRecord(value);
+  const candidate = recordOrEmpty(value);
   const kind = candidate.kind;
   if (
     kind === 'result_present' ||
@@ -171,7 +171,7 @@ function normalizeVerification(value: unknown): ServiceVerificationSpec {
 }
 
 function normalizeOperation(action: string, raw: unknown): ServiceOperationContract {
-  const operation = asRecord(raw);
+  const operation = recordOrEmpty(raw);
   const rawAlternatives =
     Array.isArray(operation.alternatives) && operation.alternatives.length > 0
       ? operation.alternatives
@@ -180,7 +180,7 @@ function normalizeOperation(action: string, raw: unknown): ServiceOperationContr
     normalizeAlternative(alternative, operation)
   );
   const risk = inferRisk(operation, alternatives);
-  const parameters = asRecord(operation.parameters) as Record<string, Record<string, unknown>>;
+  const parameters = recordOrEmpty(operation.parameters) as Record<string, Record<string, unknown>>;
   return {
     action,
     ...(typeof operation.description === 'string' ? { description: operation.description } : {}),
@@ -202,7 +202,7 @@ function loadHarnessPreset(serviceId: string): {
   endpoint: Record<string, unknown>;
 } {
   const endpoints = loadServiceEndpointsCatalog();
-  const endpoint = asRecord(endpoints.services?.[serviceId]);
+  const endpoint = recordOrEmpty(endpoints.services?.[serviceId]);
   const preset = getServicePresetRecord(
     serviceId,
     typeof endpoint.preset_path === 'string' ? endpoint.preset_path : undefined
@@ -267,7 +267,7 @@ function redactError(error: string): string {
 }
 
 export function redactServiceInputs(value: unknown): Record<string, unknown> {
-  return asRecord(redactValue(value));
+  return recordOrEmpty(redactValue(value));
 }
 
 function validateParameterValue(

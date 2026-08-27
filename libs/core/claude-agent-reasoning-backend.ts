@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { runClaudeAgentQuery, runClaudeAgentTask } from './claude-agent-query.js';
 import {
   GOVERNED_AGENT_ALLOWED_TOOLS,
@@ -322,7 +323,7 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
   constructor(options: ClaudeAgentReasoningBackendOptions = {}) {
     this.model = options.model ?? 'opus';
     this.nativeSubagentEnabled =
-      options.nativeSubagent ?? process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1';
+      options.nativeSubagent ?? getRegisteredEnvText('KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1';
     this.nativeSubagentAdopter = {
       id: 'claude-agent-sdk',
       dispatch: (instruction, context, callOptions) =>
@@ -605,7 +606,7 @@ export class ClaudeAgentReasoningBackend implements ReasoningBackend {
     // Direction B: governed agentic path (tools + Kyberion MCP + tier/approval gate),
     // opt-in via KYBERION_CLAUDE_AGENT_TOOLS=1. Default stays the pure single-turn
     // answer below — no behavior change unless explicitly enabled.
-    if (process.env.KYBERION_CLAUDE_AGENT_TOOLS === '1') {
+    if (getRegisteredEnvText('KYBERION_CLAUDE_AGENT_TOOLS') === '1') {
       const result = await runClaudeAgentTask({
         systemPrompt: buildGovernedAgentSystemPrompt({
           base: 'You are a focused Kyberion sub-agent. Complete the task and return a concise report.',

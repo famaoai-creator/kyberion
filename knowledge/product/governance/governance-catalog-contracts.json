@@ -1,0 +1,174 @@
+{
+  "$schema": "../schemas/governance-catalog-contracts.schema.json",
+  "version": 1,
+  "description": "Required top-level keys for governance catalogs that share the envelope schema.",
+  "catalogs": {
+    "active-services.json": ["_note"],
+    "active-surfaces.json": ["surfaces", "version"],
+    "adf-execution-policy.json": ["limits", "network", "version"],
+    "analysis-config.json": ["algorithms", "auto_update", "description", "name", "version"],
+    "analysis-execution-contracts.json": ["contracts", "version"],
+    "autonomous-ops-policy.json": ["actions", "axis_weights", "decision_thresholds", "version"],
+    "dynamic-policies.json": ["policies", "version"],
+    "ecosystem-blueprint.json": ["infrastructure", "name", "version"],
+    "env-registry.json": ["description", "entries", "version"],
+    "execution-boundary-profiles.json": ["profiles", "version"],
+    "health-thresholds.json": [
+      "description",
+      "red_demoted_providers",
+      "red_regressions",
+      "regression_multiplier",
+      "restart_red_count",
+      "restart_warning_count",
+      "rss_growth_red_ratio",
+      "rss_growth_warning_ratio",
+      "trend_window_ms",
+      "version"
+    ],
+    "i18n-baseline.json": ["files", "generated_at", "scan_roots", "version"],
+    "ingest-quota-policy.json": [
+      "description",
+      "max_bytes_per_day",
+      "max_files_per_day",
+      "tenant_overrides",
+      "version",
+      "warn_ratio"
+    ],
+    "ingestion-rules.json": ["action", "pipelines"],
+    "install-script-allowlist.json": ["description", "packages", "schema_version"],
+    "integrity-policy.json": ["checks", "name", "version"],
+    "intent-coverage-matrix.json": [
+      "coverage_levels",
+      "cross_cutting_gaps",
+      "generated_manually",
+      "intents",
+      "next_priorities",
+      "notes",
+      "version"
+    ],
+    "intent-outcome-patterns.json": ["notes", "patterns", "version"],
+    "judgment-rules.json": [
+      "alignment_mirror",
+      "counterfactual",
+      "dissent_quorum",
+      "intuition_capture",
+      "name",
+      "personas",
+      "version"
+    ],
+    "knowledge-feedback-policy.json": ["defaults", "description", "tenant_overrides", "version"],
+    "knowledge-scope-check.json": [
+      "confidential_scope_allowlist",
+      "description",
+      "legacy_quarantine_ttl_days",
+      "max_direct_tenant_env_reads",
+      "scoped_runtime_writer_files",
+      "version"
+    ],
+    "knowledge-sync-rules.json": [
+      "guide",
+      "indexing",
+      "jobs",
+      "jobs_note",
+      "name",
+      "security",
+      "sync",
+      "version"
+    ],
+    "knowledge-weights.json": ["defaults", "description", "tenant_overrides", "version"],
+    "maintenance-schedule.json": ["default_tasks", "policy_path", "schedule", "scope"],
+    "marketing-risk-policy.json": ["allowed_channels", "cta_domain_allowlist", "levels", "version"],
+    "media-backend-registry.json": ["backends", "default_backend_ids", "version"],
+    "mesh-hub-policy.json": [
+      "data_tier",
+      "placement",
+      "recipient_acceptance",
+      "routing",
+      "tenant_scope",
+      "topic_delivery",
+      "version"
+    ],
+    "mission-management-config.json": [
+      "directories",
+      "mep_version",
+      "mission_control_model",
+      "rehydrate_map",
+      "version"
+    ],
+    "model-cost-registry.fallback.json": [
+      "aliases",
+      "currency",
+      "default",
+      "models",
+      "note",
+      "unit",
+      "version"
+    ],
+    "model-cost-registry.json": [
+      "aliases",
+      "currency",
+      "default",
+      "models",
+      "note",
+      "unit",
+      "version"
+    ],
+    "module-layer-boundaries.json": ["default_layer", "layers", "patterns", "version"],
+    "monitoring-rules.json": ["benchmarking", "name", "pulse", "quarantine", "slo", "version"],
+    "orchestration-config.json": [
+      "defaults",
+      "jobs",
+      "name",
+      "pipelines",
+      "plugins",
+      "scaffolding",
+      "version"
+    ],
+    "package-governance.json": ["ignore_deps", "normalization"],
+    "protocol-service-registry.json": ["description", "entries", "version"],
+    "qa-rules.json": ["rules", "version", "visual_monitoring"],
+    "reasoning-provider-registry.json": ["providers", "version"],
+    "reporting-config.json": ["action", "reports"],
+    "restricted-capabilities.json": ["last_updated", "restrictions", "version"],
+    "restricted-skills.json": [
+      "last_updated",
+      "organization_overrides",
+      "project_overrides",
+      "restrictions",
+      "tenant_overrides",
+      "version"
+    ],
+    "role-authority-map.json": [
+      "context_roles",
+      "description",
+      "mission_roles",
+      "system_roles",
+      "version"
+    ],
+    "role-write-access.json": ["default_allow", "roles", "version"],
+    "runtime-design-profiles.json": ["profiles", "version"],
+    "sdlc-gate-catalog.json": [
+      "concept",
+      "deprecated",
+      "gates",
+      "note",
+      "superseded_by",
+      "version"
+    ],
+    "shared-tmp-allowlist.json": ["$comment", "entries", "plan", "version"],
+    "standard-policy.json": ["name", "rules", "version"],
+    "surface-roles.json": ["description", "roles", "version"],
+    "tenant-registry-exceptions.json": ["_meta", "exceptions"],
+    "tier-hygiene-policy.json": [
+      "allowlist_patterns",
+      "denied_patterns",
+      "denied_substrings",
+      "description",
+      "scan_paths",
+      "skip_paths",
+      "version"
+    ],
+    "track-creation-policy.json": ["description", "lifecycle_models", "track_types", "version"],
+    "wisdom-reconcile-strategy.json": ["strategies"]
+  }
+}

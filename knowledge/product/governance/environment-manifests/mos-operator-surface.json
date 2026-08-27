@@ -29,7 +29,7 @@
       "probe": {
         "kind": "command",
         "command": "pnpm",
-        "args": ["-s", "run", "check:mos-no-write-api"]
+        "args": ["-s", "run", "check", "--", "--scope", "full", "--only", "mos-no-write-api"]
       },
       "install": {
         "operator_confirmed": true,

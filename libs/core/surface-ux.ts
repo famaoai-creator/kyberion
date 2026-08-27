@@ -2,7 +2,7 @@ import { pathResolver } from './path-resolver.js';
 import { secretGuard } from './secret-guard.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { getServicePresetPolicy } from './service-preset-policy.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import {
   listSurfaceAsyncRequests,
   listSurfaceNotifications,
@@ -10,6 +10,7 @@ import {
 import { listSurfaceProviderManifests } from './surface-provider-manifest.js';
 import { buildNextAction } from './next-action.js';
 import type { SupportedLocale } from './locale-normalize.js';
+import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 
 export interface SurfaceDirectoryRow {
   id: string;
@@ -73,7 +74,7 @@ export interface SurfaceDoctorSummary {
 function readJsonSafe<T>(absPath: string): T | null {
   try {
     if (!safeExistsSync(absPath)) return null;
-    return JSON.parse(safeReadFile(absPath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(absPath);
   } catch {
     return null;
   }
@@ -566,8 +567,8 @@ export function buildSurfaceLauncherNextActions(params: {
   return actions.slice(0, 4);
 }
 
-function listKnownSurfaceChannels(): string[] {
-  const channels = new Set<string>(['presence']);
+function listKnownSurfaceChannels(): SurfaceAsyncChannel[] {
+  const channels = new Set<SurfaceAsyncChannel>(['presence']);
   for (const manifest of listSurfaceProviderManifests()) {
     if (manifest.id) channels.add(manifest.id);
   }

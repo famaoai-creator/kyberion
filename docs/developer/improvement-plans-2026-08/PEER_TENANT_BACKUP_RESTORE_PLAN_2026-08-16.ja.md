@@ -2,7 +2,7 @@
 title: Kyberion peer / Mesh Hub tenant 境界と backup / restore 統合計画
 tags: [tenant, peer, mesh-hub, message, backup, restore, quarantine]
 last_updated: 2026-08-16
-status: in_progress
+status: active
 ---
 
 # Kyberion peer / Mesh Hub tenant 境界と backup / restore 統合計画

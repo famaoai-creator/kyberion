@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schemas/metadata-sync-contract.schema.json",
+  "$schema": "../schemas/metadata-sync-contract.schema.json",
   "sync_rules": [
     {
       "source": "libs/actuators/*/src/index.ts",

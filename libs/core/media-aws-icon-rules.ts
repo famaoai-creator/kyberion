@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface MediaAwsIconRuleEntry {
   match_type: 'starts_with' | 'contains';
@@ -16,15 +13,8 @@ interface MediaAwsIconRuleCatalog {
   rules: MediaAwsIconRuleEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-aws-icon-rules.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-aws-icon-rules.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MediaAwsIconRuleCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_RULES: MediaAwsIconRuleEntry[] = [
   {
@@ -153,40 +143,19 @@ const FALLBACK_EXACT_RESOURCES: Record<string, string[]> = {
   ],
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MediaAwsIconRuleCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid media aws icon rule catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as MediaAwsIconRuleCatalog;
-}
+const catalog = defineCatalog<MediaAwsIconRuleCatalog>({
+  id: 'media-aws-icon-rules',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: () => ({
+    version: '1.0.0',
+    exact_resources: FALLBACK_EXACT_RESOURCES,
+    rules: FALLBACK_RULES,
+  }),
+});
 
 export function loadMediaAwsIconRuleCatalog(): MediaAwsIconRuleCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = { version: '1.0.0', exact_resources: FALLBACK_EXACT_RESOURCES, rules: FALLBACK_RULES };
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolveMediaAwsIconCandidates(resourceType: string): string[] {
@@ -196,13 +165,13 @@ export function resolveMediaAwsIconCandidates(resourceType: string): string[] {
   const exact = catalog.exact_resources[normalized];
   if (Array.isArray(exact) && exact.length > 0) return exact;
   for (const rule of catalog.rules) {
-    if (rule.match_type === 'starts_with' && normalized.startsWith(rule.match_value)) return rule.icons;
+    if (rule.match_type === 'starts_with' && normalized.startsWith(rule.match_value))
+      return rule.icons;
     if (rule.match_type === 'contains' && normalized.includes(rule.match_value)) return rule.icons;
   }
   return [];
 }
 
 export function resetMediaAwsIconRuleCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

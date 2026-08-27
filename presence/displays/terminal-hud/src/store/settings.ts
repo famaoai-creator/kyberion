@@ -1,5 +1,6 @@
 import { getInstalledReasoningMode, resolveActiveProfileRoot, pathResolver } from '@agent/core';
 import { activeCustomer } from '@agent/core/customer-resolver';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
 
@@ -11,7 +12,7 @@ export interface SettingsData {
 }
 
 export function loadSettings(): SettingsData {
-  let reasoningMode = process.env.KYBERION_REASONING_BACKEND ?? '';
+  let reasoningMode = getRegisteredEnvText('KYBERION_REASONING_BACKEND') ?? '';
   try {
     reasoningMode = getInstalledReasoningMode() ?? reasoningMode;
   } catch {

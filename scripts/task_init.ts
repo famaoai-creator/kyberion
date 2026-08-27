@@ -1,18 +1,37 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeLstat, safeMkdir, safeReadFile, safeReaddir, safeWriteFile } from '@agent/core';
+import {
+  getRegisteredEnv,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
   id: string;
   title: string;
   description: string;
-  trigger: { type: 'schedule' | 'event' | 'manual'; cron?: string; timezone?: string; event_name?: string; source?: string; prompt?: string };
+  trigger: {
+    type: 'schedule' | 'event' | 'manual';
+    cron?: string;
+    timezone?: string;
+    event_name?: string;
+    source?: string;
+    prompt?: string;
+  };
   input: { sources: string[]; required_params: string[]; optional_params?: string[] };
   first_run: { reasoning_required: boolean; questions: string[]; profile_output: string };
   repeat_run: { pipeline_template: string; params_from_profile: boolean; profile_input?: string };
   result: { artifacts: string[]; summary_format: 'markdown' | 'json' | 'text' };
-  approval_boundary: { required_for: string[]; default_action: 'draft-only' | 'notify-only' | 'requires-human-approval' };
+  approval_boundary: {
+    required_for: string[];
+    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
+  };
 };
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
@@ -55,12 +74,16 @@ function parseArgs(argv: string[]): TaskInitArgs {
 }
 
 function printUsage(): void {
-  console.log('Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]');
+  console.log(
+    'Usage: pnpm task:init <scenario-id> [--answers-json <json>] [--answers-file <path>]'
+  );
   console.log('  pnpm task:init <scenario-id> --print-template');
 }
 
 function resolveScenarioDir(): string {
-  const override = process.env.KYBERION_TASK_SCENARIO_DIR?.trim();
+  const override = (
+    getRegisteredEnv<string>('KYBERION_TASK_SCENARIO_DIR') as string | undefined
+  )?.trim();
   return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
 }
 
@@ -75,16 +98,18 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return readJson<TaskScenario>(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
-  return loadScenarioFiles().map(loadScenario).find((scenario) => scenario.id === scenarioId);
+  return loadScenarioFiles()
+    .map(loadScenario)
+    .find((scenario) => scenario.id === scenarioId);
 }
 
 function loadAnswers(args: TaskInitArgs): Record<string, unknown> {
   if (args.answersFile) {
-    return JSON.parse(safeReadFile(pathResolver.rootResolve(args.answersFile), { encoding: 'utf8' }) as string) as Record<string, unknown>;
+    return readJson<Record<string, unknown>>(pathResolver.rootResolve(args.answersFile));
   }
   if (args.answersJson) {
     return JSON.parse(args.answersJson) as Record<string, unknown>;
@@ -127,7 +152,7 @@ function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) 
   };
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const args = parseArgs(argv);
   if (args.help) {
     printUsage();
@@ -160,10 +185,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(`Next: pnpm task:run ${scenario.id}`);
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runTaskInit = defineScript({
+  name: 'task:init',
+  flags: [],
+  run: (context) => main(context.argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'task_init.ts') ||
+  isDirectScript(import.meta.url, 'task_init.js')
+)
+  void runTaskInit();

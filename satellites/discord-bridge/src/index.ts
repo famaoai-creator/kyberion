@@ -1,5 +1,7 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
+import { pathToFileURL } from 'node:url';
 
 import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
 
@@ -11,21 +13,18 @@ import {
   logger,
   startBridgeTypingLoop,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   runSurfaceMessageConversation,
+  runChannelTurn,
+  formatChannelThreadContext,
+  type ChannelAdapter,
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
   postBridgeError,
-  listSurfaceOutboxMessages,
-  clearSurfaceOutboxMessage,
   createSurfaceOutboxDrainGuard,
-  isSurfaceOutboxDue,
-  recordSurfaceDeliverySuccess,
-  settleSurfaceOutboxFailure,
-  assertSurfaceOutboxDeliveryAuthorized,
+  drainSurfaceOutbox,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
   evaluateSurfaceActorAccess,
@@ -109,7 +108,7 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
   try {
     const resolved = resolveDiscordThreadHistoryPath(entry.threadTs);
     safeMkdir(path.dirname(resolved), { recursive: true });
-    safeAppendFileSync(resolved, `${JSON.stringify(entry)}\n`);
+    appendJsonLine(resolved, entry);
   } catch (error: any) {
     logger.warn(`⚠️ [DiscordBridge] Failed to persist thread history: ${error?.message || error}`);
   }
@@ -118,21 +117,13 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
 export function buildDiscordThreadContextFromEntries(
   entries: DiscordThreadHistoryEntry[]
 ): string | undefined {
-  const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
-
-  if (!recent.length) return undefined;
-
-  return [
-    'Recent Discord thread context:',
-    ...recent.map((entry) =>
-      entry.role === 'assistant'
-        ? `Assistant: ${entry.text}`
-        : `User (${entry.authorLabel}): ${entry.text}`
-    ),
-  ].join('\n');
+  return formatChannelThreadContext('Discord', entries);
 }
 
-async function collectDiscordThreadContext(message: Message): Promise<string | undefined> {
+async function collectDiscordThreadContext(
+  message: Message,
+  priorHistoryEntries: DiscordThreadHistoryEntry[]
+): Promise<string | undefined> {
   const historyEntries: DiscordThreadHistoryEntry[] = [];
   const channel = message.channel as any;
 
@@ -167,10 +158,10 @@ async function collectDiscordThreadContext(message: Message): Promise<string | u
     return buildDiscordThreadContextFromEntries(historyEntries);
   }
 
-  return buildDiscordThreadContextFromEntries(readDiscordThreadHistory(message.channelId));
+  return buildDiscordThreadContextFromEntries(priorHistoryEntries);
 }
 
-async function handleDiscordMessage(message: Message) {
+export async function handleDiscordMessage(message: Message) {
   if (message.author.bot) return;
 
   const access = evaluateSurfaceActorAccess('discord', message.author.id);
@@ -209,7 +200,10 @@ async function handleDiscordMessage(message: Message) {
     return;
   }
 
-  const threadContext = await collectDiscordThreadContext(message);
+  // m1: read the persisted thread history BEFORE appending this message. The
+  // API path already excludes it (`before: message.id`); the fallback path used
+  // to re-read after the append and leaked the message into its own context.
+  const priorHistoryEntries = readDiscordThreadHistory(message.channelId);
   appendDiscordThreadHistory({
     role: 'user',
     authorLabel: message.author.tag,
@@ -221,90 +215,111 @@ async function handleDiscordMessage(message: Message) {
   });
 
   // UX-02: keep the channel's typing indicator alive while we think.
-  const typing = startBridgeTypingLoop(
-    'discord-bridge',
-    () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
-    8000
-  );
-  try {
-    const result = await runSurfaceMessageConversation({
-      surface: 'discord',
-      text: message.content,
-      channel: message.channelId,
-      threadTs,
-      correlationId: `discord-${message.id}`,
-      receivedAt: message.createdAt.toISOString(),
-      actorId: message.author.id,
-      senderAgentId: 'kyberion:discord-bridge',
-      agentId: DISCORD_SURFACE_AGENT_ID,
-      threadContext: threadContext || undefined,
-      delegationSummaryInstruction:
-        'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
-    } as any);
-
-    // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
-    // confirmation instead of a plain reply.
-    const missionProposal = result.missionProposals?.[0];
-    if (missionProposal) {
-      const prompt = stashMissionProposalForConfirmation({
-        surface: 'discord',
-        channel: message.channelId,
-        thread: threadTs,
-        proposal: missionProposal,
-        sourceText: message.content,
-        routingDecision: result.routingDecision,
-        fallbackSummary: result.text,
-      });
-      await replyDiscordText(message, prompt);
+  const channelAdapter: ChannelAdapter = {
+    channel: 'discord',
+    actorId: message.author.id,
+    threadContext: () => collectDiscordThreadContext(message, priorHistoryEntries),
+    typing: () =>
+      startBridgeTypingLoop(
+        'discord-bridge',
+        () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
+        8000
+      ),
+    shouldSend: ({ result }) =>
+      !result.missionProposals?.length && result.approvalRequests.length === 0,
+    send: async ({ text }) => {
+      await replyDiscordText(message, text);
       appendDiscordThreadHistory({
         role: 'assistant',
         authorLabel: DISCORD_SURFACE_AGENT_ID,
-        text: prompt,
+        text,
         messageId: `reply-${message.id}`,
         threadTs,
         channelId: message.channelId,
         receivedAt: new Date().toISOString(),
       });
-      return;
-    }
-
-    if (result.approvalRequests.length > 0) {
-      for (const draft of result.approvalRequests) {
-        const record = createSurfaceApprovalRequest({
+    },
+  };
+  try {
+    await runChannelTurn(
+      channelAdapter,
+      { text: message.content, channel: message.channelId, threadTs },
+      ({ threadContext }) =>
+        runSurfaceMessageConversation({
           surface: 'discord',
+          text: message.content,
           channel: message.channelId,
           threadTs,
           correlationId: `discord-${message.id}`,
-          requestedBy: DISCORD_SURFACE_AGENT_ID,
-          draft,
-          sourceText: message.content,
-        });
-        await replyDiscordApproval(message, buildSurfaceApprovalText('discord', record), record);
-      }
-      return;
-    }
+          receivedAt: message.createdAt.toISOString(),
+          actorId: message.author.id,
+          senderAgentId: 'kyberion:discord-bridge',
+          agentId: DISCORD_SURFACE_AGENT_ID,
+          threadContext,
+          delegationSummaryInstruction:
+            'Produce a concise Discord reply. Use markdown if appropriate. Do not use A2A blocks.',
+        }),
+      {
+        // UX-02: typing must stay alive until the proposal/approval
+        // envelopes this bridge posts itself have landed.
+        afterTurn: async (result) => {
+          // SN-01 Phase 2: a mission proposal becomes a pending numbered-choice
+          // confirmation instead of a plain reply.
+          const missionProposal = result.missionProposals?.[0];
+          if (missionProposal) {
+            const prompt = stashMissionProposalForConfirmation({
+              surface: 'discord',
+              channel: message.channelId,
+              thread: threadTs,
+              proposal: missionProposal,
+              sourceText: message.content,
+              routingDecision: result.routingDecision,
+              fallbackSummary: result.text,
+            });
+            await replyDiscordText(message, prompt);
+            appendDiscordThreadHistory({
+              role: 'assistant',
+              authorLabel: DISCORD_SURFACE_AGENT_ID,
+              text: prompt,
+              messageId: `reply-${message.id}`,
+              threadTs,
+              channelId: message.channelId,
+              receivedAt: new Date().toISOString(),
+            });
+            return;
+          }
 
-    if (result.text) {
-      logger.info(`📤 [DiscordBridge] Replying to ${message.author.tag}`);
-      // Discord rejects messages over 2,000 chars — long replies used to
-      // throw here and vanish into the catch below (UX-01).
-      await replyDiscordText(message, result.text);
-      appendDiscordThreadHistory({
-        role: 'assistant',
-        authorLabel: DISCORD_SURFACE_AGENT_ID,
-        text: result.text,
-        messageId: `reply-${message.id}`,
-        threadTs,
-        channelId: message.channelId,
-        receivedAt: new Date().toISOString(),
-      });
-    } else {
-      // UX-01: an empty agent reply must not read as silence.
-      await replyDiscordText(
-        message,
-        buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
-      );
-    }
+          if (result.approvalRequests.length > 0) {
+            for (const draft of result.approvalRequests) {
+              const record = createSurfaceApprovalRequest({
+                surface: 'discord',
+                channel: message.channelId,
+                threadTs,
+                correlationId: `discord-${message.id}`,
+                requestedBy: DISCORD_SURFACE_AGENT_ID,
+                draft,
+                sourceText: message.content,
+              });
+              await replyDiscordApproval(
+                message,
+                buildSurfaceApprovalText('discord', record),
+                record
+              );
+            }
+            return;
+          }
+
+          // UX-01: an empty agent reply must not read as silence. Trim first so a
+          // whitespace-only reply matches the shared channel-adapter delivery gate.
+          if (!result.text.trim()) {
+            await replyDiscordText(
+              message,
+              buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() })
+            );
+          }
+        },
+      }
+    );
   } catch (err: any) {
     logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
     // UX-01: surface a vocabulary-based error to the user (rate-limited per channel).
@@ -315,8 +330,6 @@ async function handleDiscordMessage(message: Message) {
       locale: resolveOperatorLocale(),
       post: (errorText) => replyDiscordText(message, errorText),
     });
-  } finally {
-    typing.stop();
   }
 }
 
@@ -344,24 +357,17 @@ export async function handleDiscordInteraction(interaction: any): Promise<void> 
 }
 
 async function drainDiscordOutbox(client: Client): Promise<void> {
-  for (const message of listSurfaceOutboxMessages('discord', { includeTenantNamespaces: true })) {
-    if (!isSurfaceOutboxDue(message)) continue;
-    try {
-      assertSurfaceOutboxDeliveryAuthorized(message);
+  await drainSurfaceOutbox(
+    'discord',
+    async (message) => {
       const channel = await (client as any).channels.fetch(message.channel);
       if (!channel || typeof channel.send !== 'function') {
         throw Object.assign(new Error('channel_not_found'), { status: 404 });
       }
       await channel.send(message.text);
-      recordSurfaceDeliverySuccess('discord', message.channel, message.scope);
-      clearSurfaceOutboxMessage('discord', message.message_id, message.scope);
-    } catch (error) {
-      const decision = settleSurfaceOutboxFailure('discord', message, error);
-      logger.error(
-        `❌ [DiscordBridge] Outbox delivery failed for ${message.message_id}: ${error instanceof Error ? error.message : String(error)} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
-      );
-    }
-  }
+    },
+    { includeTenantNamespaces: true }
+  );
 }
 
 const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');
@@ -412,9 +418,18 @@ async function main() {
   void runDiscordOutbox(() => drainDiscordOutbox(client));
 }
 
-if (!process.env.VITEST) {
+// Same guard as the Slack/Telegram bridges: only a direct `node index.js`
+// invocation starts the bridge, so importing this module in a test cannot open
+// a gateway connection — and a leaked VITEST env cannot silently no-op a real
+// start.
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
+} else if (directEntry) {
+  logger.warn('[DiscordBridge] VITEST is set — suppressing the direct-entry start.');
 }

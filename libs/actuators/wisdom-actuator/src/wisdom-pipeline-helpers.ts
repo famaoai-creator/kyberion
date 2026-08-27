@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -11,7 +12,6 @@ import {
   retry,
   buildGovernedRetryOptions,
   classifyError,
-  derivePipelineStatus,
   executeAdfSteps,
   ensureDefaultOpPreflight,
   runOpPreflight,
@@ -24,7 +24,7 @@ import type { ScopeContext, TierLevel } from '@agent/core';
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as yaml from 'js-yaml';
-import { dispatchDecisionOp } from './decision-ops.js';
+import { dispatchWisdomOperation } from './decision-ops.js';
 import { createWisdomDispatcher } from './wisdom-dispatcher.js';
 import { getWisdomOperationSpec } from './op-catalog.js';
 import { forwardWisdomBoundaryOperation } from './compatibility/cross-actuator-forwarders.js';
@@ -265,7 +265,7 @@ export async function executePipeline(
     },
     {
       fallback: async (_kind, op, params, currentCtx) => {
-        const decision = await dispatchDecisionOp(op, params, currentCtx, {
+        const decision = await dispatchWisdomOperation(op, params, currentCtx, {
           compatibilityMode: options.compatibility_mode,
         });
         if (!decision.handled) throw new Error(`[UNKNOWN_OP] Unknown wisdom operation: ${op}`);
@@ -276,12 +276,7 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(pathResolver.rootResolve(contextPath))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(pathResolver.rootResolve(contextPath), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(pathResolver.rootResolve(contextPath)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -792,9 +787,7 @@ async function opApply(
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const targetTier = normalizeKnowledgeTier(params.tier);
-        const rawPackage: unknown = JSON.parse(
-          safeReadFile(pkgPath, { encoding: 'utf8' }) as string
-        );
+        const rawPackage: unknown = loadJson<unknown>(pkgPath);
         if (
           rawPackage &&
           typeof rawPackage === 'object' &&
@@ -862,7 +855,7 @@ export async function performReconcile(input: WisdomAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = (await retry(
-    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    async () => loadJson<unknown>(strategyPath),
     buildRetryOptions()
   )) as {
     strategies: Array<{

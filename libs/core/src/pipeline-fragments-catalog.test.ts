@@ -53,7 +53,7 @@ const FRAGMENTS: Array<{
   },
   {
     file: 'pipelines/fragments/software-qa-lifecycle.json',
-    requiredOps: ['system:exec', 'system:log'],
+    requiredOps: ['core:run_software_quality_report', 'system:log'],
   },
 ];
 

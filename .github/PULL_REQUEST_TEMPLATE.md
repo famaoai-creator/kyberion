@@ -74,7 +74,7 @@ N/A.
 
 <!-- Contract tests compare directories against committed snapshots; changing one side without the other breaks tests/ for everyone. -->
 
-- [ ] `pnpm generate:knowledge-index && pnpm check:catalogs` is green (index/manifest regenerated)
+- [ ] `pnpm generate:knowledge-index && pnpm check -- --only catalogs` is green (index/manifest regenerated)
 - [ ] Actuator manifests changed → `pnpm sync:component-inventory` run (CAPABILITIES_GUIDE / global_actuator_index)
 - [ ] `agent-profiles/` changed → `agent-profile-index.json` regenerated to match
 - [ ] `surfaces/*.json` changed → `active-surfaces.json` snapshot matches (aggregate of per-surface files)

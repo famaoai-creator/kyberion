@@ -5,9 +5,9 @@ import {
 } from './surface-query.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { recordUnhandledIntent } from './unhandled-intent-registry.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface SurfaceIntentResolution {
   intentId?: string;
@@ -37,29 +37,27 @@ interface IntentRoutingMap {
   direct_intent_commands: Record<string, { command: string; args: string[] }>;
 }
 
-let _cachedRoutingMap: IntentRoutingMap | null = null;
+const DEFAULT_INTENT_ROUTING_MAP: IntentRoutingMap = {
+  pipeline_intent_map: {},
+  mission_intent_action_map: {},
+  direct_intent_commands: {},
+};
 
-function loadIntentRoutingMap(): IntentRoutingMap {
-  if (_cachedRoutingMap) return _cachedRoutingMap;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/intent-routing-map.json');
-    _cachedRoutingMap = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as IntentRoutingMap;
-  } catch (err) {
-    const defaults = {
-      pipeline_intent_map: {},
-      mission_intent_action_map: {},
-      direct_intent_commands: {},
-    };
+const intentRoutingCatalog = defineCatalog<IntentRoutingMap>({
+  id: 'intent-routing-map',
+  path: () => pathResolver.knowledge('product/governance/intent-routing-map.json'),
+  schema: 'knowledge/product/schemas/intent-routing-map.schema.json',
+  fallback: DEFAULT_INTENT_ROUTING_MAP,
+  onFallback: (error, defaults) =>
     recordConfigFallback({
       knowledgePath: 'product/governance/intent-routing-map.json',
-      error: err,
+      error,
       defaults,
-    });
-    _cachedRoutingMap = defaults;
-  }
-  return _cachedRoutingMap;
+    }),
+});
+
+function loadIntentRoutingMap(): IntentRoutingMap {
+  return intentRoutingCatalog.load();
 }
 
 function routeFamilyForIntent(

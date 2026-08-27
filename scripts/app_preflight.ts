@@ -6,6 +6,7 @@
  */
 import { safeExecResult, secretGuard } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type AppPreflightStatus = 'pass' | 'fail' | 'warn';
 
@@ -185,8 +186,8 @@ function printReport(report: AppPreflightReport): void {
   console.log(`[app-preflight] ready: ${report.ready}`);
 }
 
-export async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'app_preflight', ...args])
     .option('platform', { type: 'string', default: 'all', choices: ['ios', 'android', 'all'] })
     .option('full', { type: 'boolean', default: false, description: 'include distribution checks' })
     .option('json', { type: 'boolean', default: false })
@@ -199,13 +200,18 @@ export async function main(): Promise<void> {
 
   if (argv.json) console.log(JSON.stringify(report, null, 2));
   else printReport(report);
-  process.exit(report.ready ? 0 : 1);
+  return report.ready ? 0 : 1;
 }
 
-const isDirect = process.argv[1] && /app_preflight\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'app_preflight.ts') ||
+  isDirectScript(import.meta.url, 'app_preflight.js')
+)
+  void defineScript({
+    name: 'app:preflight',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`app:preflight failed with exit code ${status}`);
+    },
+  })();

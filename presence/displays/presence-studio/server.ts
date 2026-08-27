@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
@@ -26,6 +27,7 @@ import {
   presenceStudioHeadlessScope,
   narrowPresenceStudioTenant,
   validateLocalServiceUrl,
+  requirePresenceStudioLocalAdmin,
 } from './security.js';
 import {
   authorizePresenceOperation,
@@ -70,9 +72,9 @@ import {
   listSurfaceNotificationsAcrossChannels,
   listSurfaceAgentCatalog,
   logger,
+  loadJson,
   pathResolver,
   resolveWorkDesign,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeExec,
@@ -105,1109 +107,29 @@ import {
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
+import * as presenceStudioData from './presence-studio-runtime-data.js';
 
-// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
-installProcessGuards('presence-studio');
-
-type Client = express.Response;
-
-function safeErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-interface SurfaceSnapshot {
-  catalogId?: string;
-  title?: string;
-  components: Array<{ id: string; type: string; props?: Record<string, unknown> }>;
-  data: Record<string, unknown>;
-}
-
-let surfaceLauncherCache: {
-  fetchedAt: number;
-  payload: Record<string, unknown>;
-} | null = null;
-
-async function loadSurfaceLauncherPayload(): Promise<Record<string, unknown>> {
-  const now = Date.now();
-  if (surfaceLauncherCache && now - surfaceLauncherCache.fetchedAt < 15_000) {
-    return surfaceLauncherCache.payload;
-  }
-
-  const rows = getSurfaceDirectory();
-  const summary = getSurfaceDirectorySummary();
-  const doctor = await collectDoctorReport({ runtime: 'meeting' });
-  const payload = {
-    ok: true,
-    summary,
-    rows,
-    scenarios: getSurfaceScenarioGuide(),
-    recommendations: buildSurfaceLauncherRecommendations({
-      rows,
-      doctorSummaries: doctor.summaries,
-    }),
-    nextActions: buildSurfaceLauncherNextActions({
-      summary,
-      rows,
-      doctorSummaries: doctor.summaries,
-    }),
-    doctor,
-  };
-  surfaceLauncherCache = { fetchedAt: now, payload };
-  return payload;
-}
-
-function inferProjectIdForApprovalRecord(record: any): string | undefined {
-  const projects = listProjectRecords();
-  const missionId = record?.requestedByContext?.missionId;
-  const serviceId = record?.target?.serviceId;
-  if (missionId) {
-    const byMission = projects.find((project) =>
-      (project.active_missions || []).includes(missionId)
-    );
-    if (byMission) return byMission.project_id;
-  }
-  if (serviceId) {
-    const byService = projects.find((project) =>
-      (project.service_bindings || []).some((bindingId) => bindingId.includes(serviceId))
-    );
-    if (byService) return byService.project_id;
-  }
-  return undefined;
-}
-
-function buildApprovalInboxItem(record: any) {
-  const projectId = inferProjectIdForApprovalRecord(record);
-  const learned = projectId
-    ? listDistillCandidateRecords()
-        .filter((candidate) => candidate.project_id === projectId && candidate.promoted_ref)
-        .slice(0, 2)
-        .map((candidate) => candidate.title)
-    : [];
-  const requestedEffects = Array.isArray(record?.justification?.requestedEffects)
-    ? record.justification.requestedEffects.filter(Boolean)
-    : [];
-  const expectedOutcome = requestedEffects.length
-    ? requestedEffects.join(' / ')
-    : record?.target?.serviceId
-      ? `Proceed with ${record.target.serviceId}`
-      : 'Proceed with the requested work';
-  return {
-    ...record,
-    expected_outcome: expectedOutcome,
-    learned_titles: learned,
-    project_id: projectId,
-    work_loop: record?.work_loop,
-  };
-}
-
-function buildOutcomeInboxItem(item: any) {
-  const relatedCandidates = listDistillCandidateRecords()
-    .filter((candidate) => (candidate.artifact_ids || []).includes(item.artifact_id))
-    .slice(0, 3);
-  return {
-    ...item,
-    downloadable:
-      typeof item.path === 'string' &&
-      isAllowedArtifactDownloadPath(item.path) &&
-      safeExistsSync(item.path),
-    distill_titles: relatedCandidates.map((candidate) => candidate.title),
-    promoted_refs: relatedCandidates.map((candidate) => candidate.promoted_ref).filter(Boolean),
-    work_loop: item?.work_loop,
-  };
-}
-
-interface PresenceStudioState {
-  surfaces: Record<string, SurfaceSnapshot>;
-  recentStimuli: Array<Record<string, unknown>>;
-  lastUpdatedAt: string | null;
-}
-
-interface BrowserRuntimeSessionSummary {
-  session_id: string;
-  active_tab_id?: string;
-  tabs?: Array<{
-    tab_id: string;
-    url?: string;
-    title?: string;
-    active?: boolean;
-  }>;
-  updated_at?: string;
-  lease_status?: string;
-  retained?: boolean;
-}
-
-interface BrowserSnapshotSummary {
-  session_id: string;
-  tab_id?: string;
-  url?: string;
-  title?: string;
-  element_count?: number;
-}
-
-interface PresenceLocationContext {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-  timestamp: string;
-  source: 'browser_geolocation';
-}
-
-interface TaskSessionArtifactShape {
-  output_path?: string;
-}
-
-interface ArtifactRecordShape {
-  artifact_id: string;
-  kind: string;
-  path?: string;
-}
-
-interface StandardIntentCatalog {
-  intents?: Array<{
-    id?: string;
-    category?: string;
-    description?: string;
-    surface_examples?: string[];
-    plan_outline?: string[];
-    outcome_ids?: string[];
-    specialist_id?: string;
-    resolution?: Record<string, unknown>;
-  }>;
-}
-
-interface VoiceMinutesArtifact {
-  title: string;
-  summary: string;
-  decisions: string[];
-  action_items: string[];
-  open_questions: string[];
-  minutes_markdown: string;
-}
-
-interface EmailTriageArtifact {
-  exists: boolean;
-  path: string;
-  updated_at: string | null;
-  content: string;
-}
-
-function validationErrorMessage(error: z.ZodError): string {
-  return error.issues[0]?.message || 'Invalid request body';
-}
-
-function toBoolean(value: unknown): boolean {
-  return value === true || value === 'true';
-}
-
-function presenceStudioAuditLine(
-  req: Pick<express.Request, 'method' | 'path' | 'url' | 'socket'>,
-  action: string,
-  fields: Record<string, string | number | boolean | null | undefined>
-): string {
-  const parts = [
-    `[presence-studio][${action}]`,
-    `method=${String(req.method || 'UNKNOWN').toUpperCase()}`,
-    `path=${String(req.path || req.url || '')}`,
-    `client=${getPresenceStudioClientAddress(req)}`,
-  ];
-  for (const [key, value] of Object.entries(fields)) {
-    if (value === undefined) continue;
-    parts.push(`${key}=${String(value)}`);
-  }
-  return parts.join(' ');
-}
-
-const app = express();
-const server = createServer(app);
-const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/presence-studio/static');
-const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
-const PORT = Number(process.env.PRESENCE_STUDIO_PORT || 3031);
-const HOST = process.env.PRESENCE_STUDIO_HOST || '127.0.0.1';
-const VOICE_HUB_URL = validateLocalServiceUrl(
-  process.env.VOICE_HUB_URL || 'http://127.0.0.1:3032',
-  'VOICE_HUB_URL'
-);
-const sseClients = new Set<Client>();
-const activeTimelineTimers = new Map<string, NodeJS.Timeout[]>();
-const SPEECH_STATE_POLL_MS = Number(process.env.PRESENCE_STUDIO_SPEECH_STATE_POLL_MS || 400);
-let latestSpeechSseState = 'idle';
-let speechStatePollInFlight = false;
-
-process.env.MISSION_ROLE ||= 'surface_runtime';
-const cloudflareOsSurface = new CloudflareOsSurface();
-
-const state: PresenceStudioState = {
-  surfaces: {},
-  recentStimuli: [],
-  lastUpdatedAt: null,
-};
-let latestLocationContext: PresenceLocationContext | null = null;
-
-function findTaskSession(sessionId: string) {
-  return listTaskSessions('presence').find((item) => item.session_id === sessionId) || null;
-}
-
-function isAllowedTaskArtifactPath(filePath: string): boolean {
-  const resolved = path.resolve(filePath);
-  const allowedRoot = path.resolve(pathResolver.sharedTmp('surface-task-sessions'));
-  return resolved.startsWith(`${allowedRoot}${path.sep}`) || resolved === allowedRoot;
-}
-
-function isAllowedArtifactDownloadPath(filePath: string): boolean {
-  const resolved = path.resolve(filePath);
-  const allowedRoots = [
-    path.resolve(pathResolver.sharedTmp()),
-    path.resolve(pathResolver.active('missions/public')),
-    path.resolve(pathResolver.active('missions/confidential')),
-  ];
-  return allowedRoots.some(
-    (root) => resolved === root || resolved.startsWith(`${root}${path.sep}`)
-  );
-}
-
-function isAllowedRuntimeRefPath(logicalPath: string): boolean {
-  const normalized = String(logicalPath || '').replace(/^\/+/, '');
-  if (!/^active\/projects\/.+\.(md|json)$/i.test(normalized)) {
-    return false;
-  }
-  const resolved = path.resolve(pathResolver.resolve(normalized));
-  const allowedRoot = path.resolve(pathResolver.active('projects'));
-  return resolved === allowedRoot || resolved.startsWith(`${allowedRoot}${path.sep}`);
-}
-
-function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
-  const normalized = String(logicalPath || '').replace(/^\/+/, '');
-  if (
-    !/^knowledge\/(public|confidential|personal)\/common\/.+\/generated\/[^/]+\.(md|json)$/i.test(
-      normalized
-    )
-  ) {
-    return false;
-  }
-  const resolved = path.resolve(pathResolver.resolve(normalized));
-  const allowedRoots = [
-    path.resolve(pathResolver.knowledge('public/common')),
-    path.resolve(pathResolver.knowledge('confidential/common')),
-    path.resolve(pathResolver.knowledge('personal/common')),
-  ];
-  return allowedRoots.some(
-    (root) => resolved === root || resolved.startsWith(`${root}${path.sep}`)
-  );
-}
-
-function ensureStimuliDir(): void {
-  const dir = path.dirname(STIMULI_PATH);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-}
-
-function toLineItems(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item).trim()).filter(Boolean);
-  }
-  if (typeof value === 'string') {
-    return value
-      .split(/\n+/)
-      .map((item) => item.replace(/^[\s*-]+/, '').trim())
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function buildFallbackMinutesMarkdown(input: {
-  title: string;
-  summary: string;
-  decisions: string[];
-  actionItems: string[];
-  openQuestions: string[];
-  sourceText: string;
-}): string {
-  const topSummary =
-    input.summary.trim() ||
-    input.sourceText
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .slice(0, 2)
-      .join(' ');
-  const sourcePreview = input.sourceText
-    .split(/\n+/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 6)
-    .join('\n');
-  return [
-    `# ${input.title}`,
-    '',
-    '## Summary',
-    topSummary || 'No summary available.',
-    '',
-    '## Decisions',
-    ...(input.decisions.length ? input.decisions.map((item) => `- ${item}`) : ['- None captured.']),
-    '',
-    '## Action Items',
-    ...(input.actionItems.length
-      ? input.actionItems.map((item) => `- ${item}`)
-      : ['- None captured.']),
-    '',
-    '## Open Questions',
-    ...(input.openQuestions.length
-      ? input.openQuestions.map((item) => `- ${item}`)
-      : ['- None captured.']),
-    '',
-    '## Source Notes',
-    sourcePreview || input.sourceText,
-    '',
-  ].join('\n');
-}
-
-function resolveVoiceMinutesDir(missionId?: string): string {
-  if (missionId) {
-    const missionDir = pathResolver.missionEvidenceDir(missionId);
-    if (missionDir) return missionDir;
-  }
-  return pathResolver.shared('runtime/presence-studio/voice-notes');
-}
-
-function readEmailTriageArtifact(): EmailTriageArtifact {
-  const path = resolveEmailTriagePath();
-  if (!safeExistsSync(path)) {
-    return {
-      exists: false,
-      path,
-      updated_at: null,
-      content: '',
-    };
-  }
-  const content = String(safeReadFile(path, { encoding: 'utf8' }) || '');
-  return {
-    exists: true,
-    path,
-    updated_at: new Date().toISOString(),
-    content,
-  };
-}
-
-function rememberStimulus(stimulus: Record<string, unknown>): void {
-  state.recentStimuli.push(stimulus);
-  state.recentStimuli = state.recentStimuli.slice(-20);
-  state.lastUpdatedAt = new Date().toISOString();
-}
-
-const A2UI_SURFACE_ID = /^[a-z0-9][a-z0-9:_-]{0,80}$/u;
-const A2UI_COMPONENT_TYPE = /^[a-z0-9][a-z0-9:._-]{0,80}$/u;
-
-function validateA2UIMessage(value: unknown): A2UIMessage {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('A2UI message must be an object.');
-  }
-  const message = value as Record<string, unknown>;
-  const operations = [
-    'createSurface',
-    'updateComponents',
-    'updateDataModel',
-    'deleteSurface',
-  ].filter((key) => message[key] !== undefined);
-  if (operations.length !== 1) throw new Error('A2UI message must contain exactly one operation.');
-
-  const operation = message[operations[0]];
-  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) {
-    throw new Error(`A2UI ${operations[0]} payload must be an object.`);
-  }
-  const payload = operation as Record<string, unknown>;
-  const surfaceId = payload.surfaceId;
-  if (typeof surfaceId !== 'string' || !A2UI_SURFACE_ID.test(surfaceId)) {
-    throw new Error('A2UI surfaceId is invalid.');
-  }
-  if (operations[0] === 'createSurface') {
-    if (typeof payload.catalogId !== 'string' || !A2UI_SURFACE_ID.test(payload.catalogId)) {
-      throw new Error('A2UI catalogId is invalid.');
-    }
-    if (payload.title !== undefined && typeof payload.title !== 'string') {
-      throw new Error('A2UI title must be a string.');
-    }
-  }
-  if (operations[0] === 'updateComponents') {
-    if (!Array.isArray(payload.components)) throw new Error('A2UI components must be an array.');
-    for (const component of payload.components) {
-      if (!component || typeof component !== 'object' || Array.isArray(component)) {
-        throw new Error('A2UI component must be an object.');
-      }
-      const item = component as Record<string, unknown>;
-      if (typeof item.id !== 'string' || !A2UI_SURFACE_ID.test(item.id)) {
-        throw new Error('A2UI component id is invalid.');
-      }
-      if (typeof item.type !== 'string' || !A2UI_COMPONENT_TYPE.test(item.type)) {
-        throw new Error('A2UI component type is invalid.');
-      }
-      if (!item.props || typeof item.props !== 'object' || Array.isArray(item.props)) {
-        throw new Error('A2UI component props must be an object.');
-      }
-    }
-  }
-  if (operations[0] === 'updateDataModel') {
-    if (!payload.data || typeof payload.data !== 'object' || Array.isArray(payload.data)) {
-      throw new Error('A2UI data model must be an object.');
-    }
-  }
-  return value as A2UIMessage;
-}
-
-function applyA2UIMessage(message: A2UIMessage): void {
-  if (message.createSurface) {
-    const current = state.surfaces[message.createSurface.surfaceId] || { components: [], data: {} };
-    state.surfaces[message.createSurface.surfaceId] = {
-      ...current,
-      catalogId: message.createSurface.catalogId,
-      title: message.createSurface.title || current.title,
-      components: current.components || [],
-      data: current.data || {},
-    };
-  }
-
-  if (message.updateComponents) {
-    const current = state.surfaces[message.updateComponents.surfaceId] || {
-      components: [],
-      data: {},
-    };
-    state.surfaces[message.updateComponents.surfaceId] = {
-      ...current,
-      components: message.updateComponents.components || [],
-    };
-  }
-
-  if (message.updateDataModel) {
-    const current = state.surfaces[message.updateDataModel.surfaceId] || {
-      components: [],
-      data: {},
-    };
-    state.surfaces[message.updateDataModel.surfaceId] = {
-      ...current,
-      data: {
-        ...(current.data || {}),
-        ...(message.updateDataModel.data || {}),
-      },
-    };
-  }
-
-  if (message.deleteSurface) {
-    delete state.surfaces[message.deleteSurface.surfaceId];
-  }
-
-  state.lastUpdatedAt = new Date().toISOString();
-}
-
-function getSurfaceData(surfaceId: string): Record<string, unknown> {
-  return state.surfaces[surfaceId]?.data || {};
-}
-
-function rebuildPresenceSurface(surfaceId: string): void {
-  const data = getSurfaceData(surfaceId);
-  const avatarProfile = getPresenceAvatarProfile(
-    typeof data.agentId === 'string' ? data.agentId : undefined
-  );
-  const messages = buildPresenceSurfaceFrame({
-    surfaceId,
-    agentId: typeof data.agentId === 'string' ? data.agentId : avatarProfile.agentId,
-    title: typeof data.title === 'string' ? data.title : 'Presence Studio',
-    status: typeof data.status === 'string' ? data.status : 'ready',
-    expression: typeof data.expression === 'string' ? data.expression : 'neutral',
-    subtitle: typeof data.subtitle === 'string' ? data.subtitle : '',
-    avatarAssetPath:
-      typeof data.avatarAssetPath === 'string'
-        ? data.avatarAssetPath
-        : avatarProfile.defaultAvatarAssetPath,
-    expressionAvatarMap:
-      data.expressionAvatarMap && typeof data.expressionAvatarMap === 'object'
-        ? (data.expressionAvatarMap as Record<string, string>)
-        : avatarProfile.expressionAvatarMap,
-    transcript: Array.isArray(data.transcript)
-      ? (data.transcript as Array<{ speaker: string; text: string }>)
-      : [],
-  });
-  for (const message of messages) applyA2UIMessage(message);
-}
-
-function updatePresenceSurface(surfaceId: string, patch: Record<string, unknown>): void {
-  const current = getSurfaceData(surfaceId);
-  state.surfaces[surfaceId] = {
-    ...(state.surfaces[surfaceId] || { components: [], data: {} }),
-    data: {
-      ...current,
-      ...patch,
-    },
-  };
-  rebuildPresenceSurface(surfaceId);
-}
-
-function clearTimeline(surfaceId: string): void {
-  const timers = activeTimelineTimers.get(surfaceId) || [];
-  for (const timer of timers) clearTimeout(timer);
-  activeTimelineTimers.delete(surfaceId);
-}
-
-function applyTimelineEvent(
-  surfaceId: string,
-  timeline: PresenceTimelineAdf,
-  event: PresenceTimelineAdf['events'][number]
-): void {
-  const current = getSurfaceData(surfaceId);
-  switch (event.op) {
-    case 'set_agent': {
-      const agentId = String(event.params?.agentId || 'presence-surface-agent');
-      const profile = getPresenceAvatarProfile(agentId);
-      updatePresenceSurface(surfaceId, {
-        agentId,
-        displayName: profile.displayName,
-        avatarAssetPath: profile.defaultAvatarAssetPath,
-        expressionAvatarMap: profile.expressionAvatarMap,
-      });
-      break;
-    }
-    case 'set_status':
-      updatePresenceSurface(surfaceId, {
-        status: String(event.params?.value || event.params?.status || 'ready'),
-      });
-      break;
-    case 'set_expression':
-      updatePresenceSurface(surfaceId, {
-        expression: String(event.params?.value || event.params?.expression || 'neutral'),
-      });
-      break;
-    case 'set_subtitle':
-      updatePresenceSurface(surfaceId, {
-        subtitle: String(event.params?.text || event.params?.value || ''),
-      });
-      break;
-    case 'clear_subtitle':
-      updatePresenceSurface(surfaceId, { subtitle: '' });
-      break;
-    case 'append_transcript': {
-      const transcript = Array.isArray(current.transcript)
-        ? [...(current.transcript as Array<{ speaker: string; text: string }>)]
-        : [];
-      transcript.push({
-        speaker: String(event.params?.speaker || 'AI'),
-        text: String(event.params?.text || ''),
-      });
-      updatePresenceSurface(surfaceId, { transcript });
-      break;
-    }
-    case 'clear_transcript':
-      updatePresenceSurface(surfaceId, { transcript: [] });
-      break;
-    default:
-      logger.warn(`[presence-studio] unsupported timeline op ${(event as any).op}`);
-  }
-  state.lastUpdatedAt = new Date().toISOString();
-  emitState();
-}
-
-function playTimeline(timeline: PresenceTimelineAdf): {
-  accepted: boolean;
-  surfaceId: string;
-  scheduled: number;
-} {
-  const surfaceId = timeline.surface_id || 'presence-studio';
-  if (timeline.interrupt_policy === 'ignore' && activeTimelineTimers.has(surfaceId)) {
-    return { accepted: false, surfaceId, scheduled: 0 };
-  }
-  clearTimeline(surfaceId);
-  if (timeline.title) {
-    updatePresenceSurface(surfaceId, { title: timeline.title });
-  }
-  const timers = timeline.events.map((event) =>
-    setTimeout(() => {
-      applyTimelineEvent(surfaceId, timeline, event);
-    }, event.at_ms)
-  );
-  activeTimelineTimers.set(surfaceId, timers);
-  return { accepted: true, surfaceId, scheduled: timeline.events.length };
-}
-
-function broadcast(event: string, payload: unknown): void {
-  const chunk = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-  for (const client of sseClients) {
-    client.write(chunk);
-  }
-}
-
-function emitState(): void {
-  broadcast('state', state);
-}
-
-async function pollVoiceHubSpeechStateForSse(): Promise<void> {
-  if (speechStatePollInFlight) return;
-  speechStatePollInFlight = true;
-  try {
-    const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
-    if (!response.ok) return;
-    const payload = (await response.json()) as { speech?: { status?: string } };
-    const nextState = String(payload?.speech?.status || 'idle');
-    if (nextState === latestSpeechSseState) return;
-    latestSpeechSseState = nextState;
-    broadcast('speech_state', {
-      ok: true,
-      speech: payload?.speech || { status: nextState },
-    });
-  } catch {
-    // Best effort only.
-  } finally {
-    speechStatePollInFlight = false;
-  }
-}
-
-function listBrowserRuntimeSessions(): BrowserRuntimeSessionSummary[] {
-  const dir = pathResolver.shared('runtime/browser/sessions');
-  return safeExistsSync(dir)
-    ? safeReaddir(dir)
-        .filter((entry) => entry.endsWith('.json'))
-        .map(
-          (entry) =>
-            JSON.parse(
-              safeReadFile(path.join(dir, entry), { encoding: 'utf8' }) as string
-            ) as BrowserRuntimeSessionSummary
-        )
-        .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
-    : [];
-}
-
-function loadBrowserSnapshotSummary(sessionId: string): BrowserSnapshotSummary | null {
-  const filePath = pathResolver.shared(`runtime/browser/snapshots/${sessionId}.json`);
-  if (!safeExistsSync(filePath)) return null;
-  return JSON.parse(
-    safeReadFile(filePath, { encoding: 'utf8' }) as string
-  ) as BrowserSnapshotSummary;
-}
-
-function pickPresenceBrowserRuntimeSession(
-  items: BrowserRuntimeSessionSummary[]
-): BrowserRuntimeSessionSummary | null {
-  const now = Date.now();
-  const scored = items
-    .map((item) => {
-      const tabs = item.tabs || [];
-      const preferredTab =
-        tabs.find((tab) => tab.active && tab.url && tab.url !== 'about:blank') ||
-        tabs.find(
-          (tab) => tab.tab_id === item.active_tab_id && tab.url && tab.url !== 'about:blank'
-        ) ||
-        tabs.find((tab) => tab.url && tab.url !== 'about:blank');
-      const snapshot = loadBrowserSnapshotSummary(item.session_id);
-      const snapshotLooksUseful = Boolean(
-        snapshot &&
-        snapshot.url &&
-        snapshot.url !== 'about:blank' &&
-        Number(snapshot.element_count || 0) > 0
-      );
-      const hasReconnectPath = Boolean((item as any).cdp_url);
-      const leaseExpiresAt =
-        typeof (item as any).lease_expires_at === 'string'
-          ? Date.parse((item as any).lease_expires_at)
-          : Number.NaN;
-      const leaseIsFresh = !Number.isFinite(leaseExpiresAt) || leaseExpiresAt >= now;
-      const likelySyntheticSession =
-        /^browser-(admin|cdp|cdp-reconnect|lease|pause|passkey|passkey-flow|profile|test|video|video-lease)$/.test(
-          item.session_id
-        );
-      let score = 0;
-      if (preferredTab) score += 4;
-      if (snapshotLooksUseful) score += 3;
-      if (hasReconnectPath && leaseIsFresh) score += 2;
-      if (item.lease_status === 'active' && leaseIsFresh) score += 1;
-      if (item.retained !== false && leaseIsFresh) score += 1;
-      if (!leaseIsFresh) score -= 3;
-      if (likelySyntheticSession && !snapshotLooksUseful) score -= 2;
-      return { item, score };
-    })
-    .filter(({ score }) => score > 0)
-    .sort(
-      (a, b) =>
-        b.score - a.score ||
-        String(b.item.updated_at || '').localeCompare(String(a.item.updated_at || ''))
-    );
-
-  return scored[0]?.item || null;
-}
-
-function ensurePresenceBrowserConversationSession(): ReturnType<
-  typeof getActiveBrowserConversationSession
-> {
-  const existing = getActiveBrowserConversationSession('presence');
-  const browserSession = pickPresenceBrowserRuntimeSession(listBrowserRuntimeSessions());
-  if (
-    existing &&
-    (!browserSession || existing.target?.browser_session_id === browserSession.session_id)
-  ) {
-    return existing;
-  }
-  if (!browserSession) return null;
-
-  try {
-    const activeTab =
-      (browserSession.tabs || []).find(
-        (tab) => tab.active && tab.url && tab.url !== 'about:blank'
-      ) ||
-      browserSession.tabs?.find(
-        (tab) => tab.tab_id === browserSession.active_tab_id && tab.url && tab.url !== 'about:blank'
-      ) ||
-      browserSession.tabs?.find((tab) => tab.url && tab.url !== 'about:blank') ||
-      browserSession.tabs?.[0];
-    const session = createBrowserConversationSession({
-      sessionId: `BCS-presence-${browserSession.session_id}`,
-      surface: 'presence',
-      goal: {
-        summary: activeTab?.title || browserSession.session_id,
-        success_condition: 'Complete the requested browser step safely.',
-      },
-      target: {
-        app: 'browser',
-        window_title: activeTab?.title,
-        url: activeTab?.url,
-        tab_id: activeTab?.tab_id || browserSession.active_tab_id,
-        browser_session_id: browserSession.session_id,
-      },
-    });
-    saveBrowserConversationSession(session);
-    return session;
-  } catch (error: any) {
-    logger.warn(
-      `[presence-studio] failed to auto-bootstrap browser conversation session for ${browserSession.session_id}: ${error?.message || String(error)}`
-    );
-    return null;
-  }
-}
-
-function bootstrapState(): void {
-  const messages = buildPresenceSurfaceFrame({
-    agentId: 'presence-surface-agent',
-    title: 'Presence Studio',
-    status: 'ready',
-    expression: 'neutral',
-    subtitle: 'Surface ready. Send A2UI or voice stimuli.',
-    transcript: [],
-  });
-  for (const message of messages) applyA2UIMessage(message);
-}
-
-bootstrapState();
-ensureStimuliDir();
-
-app.use((_req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  next();
-});
-
-app.post(
-  '/api/onboarding/voice-sample',
-  requirePresenceStudioRateLimit(),
-  requirePresenceStudioAccess(),
-  express.raw({
-    type: ['audio/webm', 'audio/wav', 'audio/x-wav', 'audio/ogg', 'audio/mp4'],
-    limit: '12mb',
-  }),
-  (req, res) => {
-    try {
-      const profileId = String(req.query.profile_id || '').trim();
-      const data = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-      const result = saveBrowserOnboardingVoiceSample({
-        profileId,
-        contentType: String(req.headers['content-type'] || ''),
-        data,
-      });
-      logger.info(
-        presenceStudioAuditLine(req, 'onboarding/voice-sample.complete', {
-          profile_id: profileId,
-          bytes: result.bytes,
-          status: 201,
-        })
-      );
-      res.status(201).json({ ok: true, ...result });
-    } catch (error: any) {
-      logger.warn(
-        presenceStudioAuditLine(req, 'onboarding/voice-sample.reject', {
-          status: 400,
-          error: error?.message || String(error),
-        })
-      );
-      res.status(400).json({ ok: false, error: error?.message || String(error) });
-    }
-  }
-);
-
-app.use(express.json({ limit: '1mb' }));
-app.use(express.static(staticDir));
-app.use(['/api', '/a2ui'], requirePresenceStudioRateLimit(), requirePresenceStudioAccess());
-
-app.get('/api/headless/manifest', (req, res) => {
-  try {
-    const viewer = resolvePresenceStudioViewerContext(req);
-    res.json({
-      ok: true,
-      manifest: presenceManifestForViewer(viewer),
-      viewer: {
-        scope: presenceStudioHeadlessScope(viewer),
-        available_operations: presenceAvailableOperations(viewer),
-      },
-    });
-  } catch (error) {
-    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
-  }
-});
-
-app.get('/api/headless/overview', (req, res) => {
-  try {
-    const viewer = resolvePresenceStudioViewerContext(req);
-    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
-    authorizePresenceOperation(viewer, 'presence.overview.read', {
-      tenantSlug: requestedTenant,
-    });
-    const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
-    const scopedViewer = { ...viewer, tenantSlugs: scoped };
-    res.json(
-      presenceEnvelope('overview', readPresenceHeadlessOverview(scopedViewer), scopedViewer)
-    );
-  } catch (error) {
-    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
-  }
-});
-
-app.get('/api/headless/a2ui/overview', (req, res) => {
-  try {
-    const viewer = resolvePresenceStudioViewerContext(req);
-    const requestedTenant = typeof req.query.tenant === 'string' ? req.query.tenant : undefined;
-    authorizePresenceOperation(viewer, 'presence.overview.a2ui', {
-      tenantSlug: requestedTenant,
-    });
-    const scoped = narrowPresenceStudioTenant(viewer, requestedTenant);
-    const scopedViewer = { ...viewer, tenantSlugs: scoped };
-    const overview = readPresenceHeadlessOverview(scopedViewer);
-    res.json(
-      presenceEnvelope(
-        'overview',
-        { source_resource: 'overview', a2ui: buildPresenceOverviewA2UI(overview) },
-        scopedViewer
-      )
-    );
-  } catch (error) {
-    const status = error instanceof PresenceStudioViewerError ? error.status : 500;
-    res.status(status).json({ ok: false, error: safeErrorMessage(error) });
-  }
-});
-
-app.get('/onboarding', (_req, res) => {
-  res.sendFile(path.join(staticDir, 'onboarding.html'));
-});
-
-// Browsers always probe /favicon.ico — return 204 to silence noisy console 404.
-app.get('/favicon.ico', (_req, res) => {
-  res.status(204).end();
-});
-
-// --- In-room minutes recording (マイク録音 → 自動議事録) -------------------
-let inRoomMinutesSession: Awaited<ReturnType<typeof startInRoomMinutesSession>> | null = null;
-let inRoomMinutesMissionId: string | null = null;
-
-app.post('/api/minutes/session/start', async (req, res) => {
-  try {
-    if (inRoomMinutesSession) {
-      res.status(409).json({ ok: false, error: `既に録音中です (${inRoomMinutesMissionId})` });
-      return;
-    }
-    const missionId = String(req.body?.missionId || '').trim();
-    if (!missionId) {
-      res.status(400).json({ ok: false, error: 'missionId が必要です' });
-      return;
-    }
-    const probe = probeMicCapture();
-    if (!probe.available) {
-      res.status(503).json({ ok: false, error: probe.reason || 'マイクが利用できません' });
-      return;
-    }
-    const consent = checkMeetingParticipationConsent({
-      mission_id: missionId,
-      purpose: 'recording',
-    });
-    if (!consent.allowed) {
-      res.status(412).json({
-        ok: false,
-        error: consent.reason || 'recording consent is required',
-        nextAction: `pnpm meeting:consent grant --mission ${missionId} --operator <handle>`,
-      });
-      return;
-    }
-    installShellSpeechToTextBridgeIfAvailable();
-    try {
-      const targetDir = pathResolver.missionDir(missionId);
-      const evidenceDir = path.join(targetDir, 'evidence');
-      safeMkdir(evidenceDir, { recursive: true });
-      const consentPath = path.join(evidenceDir, 'voice-consent.json');
-      safeWriteFile(
-        consentPath,
-        JSON.stringify(
-          {
-            consent: 'granted',
-            mission_id: missionId,
-            operator_handle: 'presence-studio-user',
-            granted_at: new Date().toISOString(),
-          },
-          null,
-          2
-        ),
-        { encoding: 'utf8' }
-      );
-    } catch (err) {
-      logger.warn(`[presence-studio] failed to write voice consent: ${err}`);
-    }
-    inRoomMinutesSession = await startInRoomMinutesSession({
-      missionId,
-      meetingTitle: typeof req.body?.title === 'string' ? req.body.title : undefined,
-      language: typeof req.body?.language === 'string' ? req.body.language : 'ja',
-      mic: { device: typeof req.body?.device === 'string' ? req.body.device : undefined },
-      onTranscriptChunk: (chunk) => {
-        broadcast('minutes-transcript', chunk);
-      },
-    });
-    inRoomMinutesMissionId = missionId.toUpperCase();
-    broadcast('minutes-session', { status: 'recording', missionId: inRoomMinutesMissionId });
-    res.json({
-      ok: true,
-      missionId: inRoomMinutesMissionId,
-      transcriptPath: inRoomMinutesSession.transcriptPath,
-      backend: probe.backend,
-    });
-  } catch (err: any) {
-    inRoomMinutesSession = null;
-    inRoomMinutesMissionId = null;
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
-  }
-});
-
-app.post('/api/minutes/session/stop', async (_req, res) => {
-  try {
-    if (!inRoomMinutesSession) {
-      res.status(409).json({ ok: false, error: '録音中のセッションがありません' });
-      return;
-    }
-    const session = inRoomMinutesSession;
-    inRoomMinutesSession = null;
-    const missionId = inRoomMinutesMissionId;
-    inRoomMinutesMissionId = null;
-    const result = await session.stop();
-    broadcast('minutes-session', {
-      status: 'completed',
-      missionId,
-      minutesPath: result.minutesPath,
-      transcriptPath: result.transcriptPath,
-      segments: result.segments,
-    });
-    res.json({ ok: true, ...result });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message || String(err) });
-  }
-});
-
-app.get('/api/minutes/session', (_req, res) => {
-  res.json({
-    ok: true,
-    recording: Boolean(inRoomMinutesSession),
-    missionId: inRoomMinutesMissionId,
-  });
-});
-
-// DS-01: canonical design tokens for this face — the companion theme pack
-// rendered as --kb-* CSS vars. Loaded after the static design-tokens.css so
-// the canonical values win while the static file remains the fallback.
-app.get('/api/design-tokens.css', (_req, res) => {
-  // The shared derivation is now theme-aware (light themes get a faint ink
-  // tint instead of the dark-console panel), so the local --kb-panel-bg
-  // override this used to carry is no longer needed.
-  const cssVars = webThemePackToCssVars(createCompanionWebThemePack());
-  const body = `:root {\n${Object.entries(cssVars)
-    .map(([name, value]) => `  ${name}: ${value};`)
-    .join('\n')}\n}\n`;
-  res.setHeader('Content-Type', 'text/css; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
-  res.send(body);
-});
-
-const PRESENCE_STUDIO_VOCABULARY_KEYS = [
-  'presence_studio:record_mission_placeholder',
-  'presence_studio:record_start',
-  'presence_studio:record_stop',
-  'presence_studio:live_transcript',
-  'presence_studio:record_hint',
-  'presence_studio:record_panel_label',
-  'presence_studio:notes_panel_label',
-  'presence_studio:notes_placeholder',
-  'presence_studio:meeting_title_placeholder',
-  'presence_studio:create_minutes',
-  'presence_studio:copy_notes',
-  'presence_studio:restore_draft',
-  'presence_studio:clear_notes',
-  'presence_studio:notes_hint',
-  'presence_studio:email_triage_label',
-  'presence_studio:email_triage_empty',
-  'presence_studio:refresh_triage',
-  'presence_studio:copy_draft',
-  'presence_studio:email_triage_hint',
-  'presence_studio:email_reply_label',
-  'presence_studio:email_auth_checking',
-  'presence_studio:account_auto',
-  'presence_studio:recipient_placeholder',
-  'presence_studio:subject_placeholder',
-  'presence_studio:tone_clear',
-  'presence_studio:tone_warm',
-  'presence_studio:tone_firm',
-  'presence_studio:reply_message_id_placeholder',
-  'presence_studio:mode_new',
-  'presence_studio:mode_reply',
-  'presence_studio:mode_reply_all',
-  'presence_studio:email_draft_empty',
-  'presence_studio:create_reply_draft',
-  'presence_studio:create_account_draft',
-  'presence_studio:send_approved_email',
-  'presence_studio:refresh_auth',
-  'presence_studio:reload_draft',
-  'presence_studio:copy_reply',
-  'presence_studio:email_draft_hint',
-  'presence_studio:approval_label',
-  'presence_studio:outcomes_label',
-  'presence_studio:requested_work_label',
-  'presence_studio:browser_label',
-  'presence_studio:prepare_browser',
-  'presence_studio:browser_task_hint',
-  'presence_studio:recording_started',
-  'presence_studio:recording_stopping',
-  'presence_studio:minutes_created',
-  'presence_studio:recording_short',
-] as const satisfies readonly VocabularyKey[];
-
-app.get('/api/ui-vocabulary', (req, res) => {
+presenceStudioData.app.get('/api/ui-vocabulary', (req, res) => {
   const locale = normalizeLocale(req.query.locale) ?? 'en';
   const texts = Object.fromEntries(
-    PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [key, catalogT(key, undefined, locale)])
+    presenceStudioData.PRESENCE_STUDIO_VOCABULARY_KEYS.map((key) => [
+      key,
+      catalogT(key, undefined, locale),
+    ])
   );
   res.setHeader('Cache-Control', 'no-store');
   res.json({ ok: true, locale, texts });
 });
 
-app.get('/api/identity', (_req, res) => {
+presenceStudioData.app.get('/api/identity', (_req, res) => {
   try {
     const personalDir = pathResolver.knowledge('personal');
     const idPath = path.join(personalDir, 'my-identity.json');
     const agentPath = path.join(personalDir, 'agent-identity.json');
     const visionPath = path.join(personalDir, 'my-vision.md');
     const result = withExecutionContext('ecosystem_architect', () => {
-      const sovereign = safeExistsSync(idPath)
-        ? JSON.parse(safeReadFile(idPath, { encoding: 'utf8' }) as string)
-        : null;
-      const agent = safeExistsSync(agentPath)
-        ? JSON.parse(safeReadFile(agentPath, { encoding: 'utf8' }) as string)
-        : null;
+      const sovereign = safeExistsSync(idPath) ? loadJson<unknown>(idPath) : null;
+      const agent = safeExistsSync(agentPath) ? loadJson<unknown>(agentPath) : null;
       const visionRaw = safeExistsSync(visionPath)
         ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
         : null;
@@ -1225,7 +147,7 @@ app.get('/api/identity', (_req, res) => {
   }
 });
 
-app.get('/api/onboarding/browser-state', (_req, res) => {
+presenceStudioData.app.get('/api/onboarding/browser-state', (_req, res) => {
   try {
     const mic = probeMicCapture();
     res.json({ ...getBrowserOnboardingState(), readiness: { microphone: mic } });
@@ -1235,7 +157,7 @@ app.get('/api/onboarding/browser-state', (_req, res) => {
   }
 });
 
-app.post('/api/onboarding/preview', (req, res) => {
+presenceStudioData.app.post('/api/onboarding/preview', (req, res) => {
   try {
     res.json(previewBrowserOnboarding(req.body));
   } catch (error: any) {
@@ -1243,11 +165,11 @@ app.post('/api/onboarding/preview', (req, res) => {
   }
 });
 
-app.post('/api/onboarding/apply', async (req, res) => {
+presenceStudioData.app.post('/api/onboarding/apply', async (req, res) => {
   try {
     const result = await applyBrowserOnboarding(req.body);
     logger.info(
-      presenceStudioAuditLine(req, 'onboarding/apply.complete', {
+      presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.complete', {
         artifacts: result.artifacts.length,
         status: 200,
       })
@@ -1255,7 +177,7 @@ app.post('/api/onboarding/apply', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     logger.warn(
-      presenceStudioAuditLine(req, 'onboarding/apply.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'onboarding/apply.reject', {
         status: 400,
         error: error?.message || String(error),
       })
@@ -1264,35 +186,35 @@ app.post('/api/onboarding/apply', async (req, res) => {
   }
 });
 
-app.get('/health', (_req, res) => {
+presenceStudioData.app.get('/health', (_req, res) => {
   res.json({
     ok: true,
-    surfaces: Object.keys(state.surfaces).length,
-    recentStimuli: state.recentStimuli.length,
+    surfaces: Object.keys(presenceStudioData.state.surfaces).length,
+    recentStimuli: presenceStudioData.state.recentStimuli.length,
     timestamp: new Date().toISOString(),
   });
 });
 
-app.get('/api/state', (_req, res) => {
-  res.json(summarizePresenceStudioState(state));
+presenceStudioData.app.get('/api/state', (_req, res) => {
+  res.json(summarizePresenceStudioState(presenceStudioData.state));
 });
 
-app.get('/api/email-triage', (_req, res) => {
-  res.json(readEmailTriageArtifact());
+presenceStudioData.app.get('/api/email-triage', (_req, res) => {
+  res.json(presenceStudioData.readEmailTriageArtifact());
 });
 
-app.get('/api/email-draft', (_req, res) => {
+presenceStudioData.app.get('/api/email-draft', (_req, res) => {
   res.json(readSharedEmailDraftArtifact());
 });
 
-app.get('/api/email-auth-status', (_req, res) => {
+presenceStudioData.app.get('/api/email-auth-status', (_req, res) => {
   res.json({ accounts: listEmailAccountProviders() });
 });
 
-app.get('/api/surface-agents', (_req, res) => {
+presenceStudioData.app.get('/api/surface-agents', (_req, res) => {
   const currentAgentId =
-    typeof state.surfaces['presence-studio']?.data?.agentId === 'string'
-      ? (state.surfaces['presence-studio']?.data?.agentId as string)
+    typeof presenceStudioData.state.surfaces['presence-studio']?.data?.agentId === 'string'
+      ? (presenceStudioData.state.surfaces['presence-studio']?.data?.agentId as string)
       : 'presence-surface-agent';
   const currentRuntime = listAgentRuntimeSnapshots().find(
     (entry) => entry.agent.agentId === currentAgentId
@@ -1332,12 +254,10 @@ app.get('/api/surface-agents', (_req, res) => {
   });
 });
 
-app.get('/api/standard-intents', (_req, res) => {
+presenceStudioData.app.get('/api/standard-intents', (_req, res) => {
   try {
     const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as StandardIntentCatalog;
+    const parsed = readJson<presenceStudioData.StandardIntentCatalog>(filePath);
     const items = Array.isArray(parsed?.intents)
       ? parsed.intents
           .filter((intent) => intent?.category === 'surface')
@@ -1373,14 +293,14 @@ app.get('/api/standard-intents', (_req, res) => {
   }
 });
 
-app.get('/api/projects', (_req, res) => {
+presenceStudioData.app.get('/api/projects', (_req, res) => {
   res.json({
     ok: true,
     items: listProjectRecords(),
   });
 });
 
-app.get('/api/project-management', (_req, res) => {
+presenceStudioData.app.get('/api/project-management', (_req, res) => {
   try {
     res.json({
       ok: true,
@@ -1404,7 +324,7 @@ app.get('/api/project-management', (_req, res) => {
   }
 });
 
-app.get('/api/project-tracks', (_req, res) => {
+presenceStudioData.app.get('/api/project-tracks', (_req, res) => {
   const tracks = listProjectTrackRecords();
   const gateReadiness = buildTrackGateReadinessSummaries({
     tracks,
@@ -1420,57 +340,57 @@ app.get('/api/project-tracks', (_req, res) => {
   });
 });
 
-app.get('/api/service-bindings', (_req, res) => {
+presenceStudioData.app.get('/api/service-bindings', (_req, res) => {
   res.json({
     ok: true,
     items: listServiceBindingRecords(),
   });
 });
 
-app.get('/api/mission-seeds', (_req, res) => {
+presenceStudioData.app.get('/api/mission-seeds', (_req, res) => {
   res.json({
     ok: true,
     items: listMissionSeedRecords(),
   });
 });
 
-app.get('/api/distill-candidates', (_req, res) => {
+presenceStudioData.app.get('/api/distill-candidates', (_req, res) => {
   res.json({
     ok: true,
     items: listDistillCandidateRecords(),
   });
 });
 
-app.get('/api/async-requests', (_req, res) => {
+presenceStudioData.app.get('/api/async-requests', (_req, res) => {
   res.json({
     ok: true,
     items: listSurfaceAsyncRequestsAcrossChannels().slice(0, 20),
   });
 });
 
-app.get('/api/notifications', (_req, res) => {
+presenceStudioData.app.get('/api/notifications', (_req, res) => {
   res.json({
     ok: true,
     items: listSurfaceNotificationsAcrossChannels().slice(0, 20),
   });
 });
 
-app.get('/api/surface-launcher', async (_req, res) => {
+presenceStudioData.app.get('/api/surface-launcher', async (_req, res) => {
   try {
-    res.json(await loadSurfaceLauncherPayload());
+    res.json(await presenceStudioData.loadSurfaceLauncherPayload());
   } catch (error: any) {
     res.status(500).json({ ok: false, error: error?.message || String(error) });
   }
 });
 
-app.get('/api/os/control-plane', (req, res) => {
+presenceStudioData.app.get('/api/os/control-plane', (req, res) => {
   try {
     const access = resolvePresenceStudioViewerContext(req);
     const rawMissionId = req.query.mission_id;
     if (Array.isArray(rawMissionId)) {
       return res.status(400).json({ ok: false, error: 'mission_id must be a single value' });
     }
-    const snapshot = cloudflareOsSurface.snapshot(
+    const snapshot = presenceStudioData.cloudflareOsSurface.snapshot(
       typeof rawMissionId === 'string' ? rawMissionId : undefined,
       access
     );
@@ -1485,7 +405,7 @@ app.get('/api/os/control-plane', (req, res) => {
           ? error.message
           : 'Unable to load the OS control-plane projection.';
     logger.warn(
-      presenceStudioAuditLine(req, 'os/control-plane.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'os/control-plane.reject', {
         status,
         error: message,
       })
@@ -1494,7 +414,7 @@ app.get('/api/os/control-plane', (req, res) => {
   }
 });
 
-app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
+presenceStudioData.app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   const actionId = String(req.params.actionId || '').trim();
   const decision = req.body?.decision;
   if (!actionId || (decision !== 'approved' && decision !== 'rejected')) {
@@ -1505,9 +425,14 @@ app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   }
   try {
     const access = resolvePresenceStudioViewerContext(req);
-    const item = cloudflareOsSurface.decideHeldAction(actionId, decision, access);
+    requirePresenceStudioLocalAdmin(access);
+    const item = presenceStudioData.cloudflareOsSurface.decideHeldAction(
+      actionId,
+      decision,
+      access
+    );
     logger.info(
-      presenceStudioAuditLine(req, 'os/held-action.decision', {
+      presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.decision', {
         action_id: actionId,
         decision,
         status: 200,
@@ -1523,7 +448,7 @@ app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
           ? error.message
           : 'Unable to record the held-action decision.';
     logger.warn(
-      presenceStudioAuditLine(req, 'os/held-action.decision.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.decision.reject', {
         action_id: actionId,
         status,
         error: message,
@@ -1533,15 +458,16 @@ app.post('/api/os/held-actions/:actionId/decision', (req, res) => {
   }
 });
 
-app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
+presenceStudioData.app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
   const actionId = String(req.params.actionId || '').trim();
   if (!actionId) return res.status(400).json({ ok: false, error: 'actionId is required' });
   try {
     const access = resolvePresenceStudioViewerContext(req);
-    const item = await cloudflareOsSurface.applyHeldAction(actionId, access);
+    requirePresenceStudioLocalAdmin(access);
+    const item = await presenceStudioData.cloudflareOsSurface.applyHeldAction(actionId, access);
     if (item.status === 'failed') {
       logger.warn(
-        presenceStudioAuditLine(req, 'os/held-action.apply.failed', {
+        presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.apply.failed', {
           action_id: actionId,
           status: 502,
         })
@@ -1553,7 +479,7 @@ app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
       });
     }
     logger.info(
-      presenceStudioAuditLine(req, 'os/held-action.apply', {
+      presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.apply', {
         action_id: actionId,
         status: 200,
       })
@@ -1568,7 +494,7 @@ app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
           ? error.message
           : 'Unable to apply the held action.';
     logger.warn(
-      presenceStudioAuditLine(req, 'os/held-action.apply.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'os/held-action.apply.reject', {
         action_id: actionId,
         status,
         error: message,
@@ -1578,19 +504,21 @@ app.post('/api/os/held-actions/:actionId/apply', async (req, res) => {
   }
 });
 
-app.get('/api/approvals', (_req, res) => {
+presenceStudioData.app.get('/api/approvals', (_req, res) => {
   res.json({
     ok: true,
-    items: listApprovalRequests({ status: 'pending' }).slice(0, 10).map(buildApprovalInboxItem),
+    items: listApprovalRequests({ status: 'pending' })
+      .slice(0, 10)
+      .map(presenceStudioData.buildApprovalInboxItem),
   });
 });
 
-app.post('/api/approvals/:requestId/decision', (req, res) => {
+presenceStudioData.app.post('/api/approvals/:requestId/decision', (req, res) => {
   const requestId = String(req.params.requestId || '').trim();
   const decision = String(req.body?.decision || '').trim();
   if (!requestId) {
     logger.warn(
-      presenceStudioAuditLine(req, 'approvals/decision.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.reject', {
         status: 400,
         error: 'requestId is required',
       })
@@ -1599,7 +527,7 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
   }
   if (decision !== 'approved' && decision !== 'rejected') {
     logger.warn(
-      presenceStudioAuditLine(req, 'approvals/decision.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.reject', {
         request_id: requestId,
         status: 400,
         error: 'decision must be approved or rejected',
@@ -1611,7 +539,7 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
   const record = listApprovalRequests({ status: 'pending' }).find((item) => item.id === requestId);
   if (!record) {
     logger.warn(
-      presenceStudioAuditLine(req, 'approvals/decision.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.reject', {
         request_id: requestId,
         status: 404,
         error: 'approval request not found',
@@ -1622,7 +550,7 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
 
   try {
     logger.info(
-      presenceStudioAuditLine(req, 'approvals/decision.accept', {
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.accept', {
         request_id: requestId,
         decision,
         channel: record.channel || 'unknown',
@@ -1644,7 +572,7 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
       note: 'Decision captured from Presence Studio approval inbox.',
     });
     logger.info(
-      presenceStudioAuditLine(req, 'approvals/decision.complete', {
+      presenceStudioData.presenceStudioAuditLine(req, 'approvals/decision.complete', {
         request_id: requestId,
         decision,
         status: 200,
@@ -1656,17 +584,20 @@ app.post('/api/approvals/:requestId/decision', (req, res) => {
   }
 });
 
-app.get('/api/outcomes', (_req, res) => {
-  const items = listArtifactRecords().slice(-10).reverse().map(buildOutcomeInboxItem);
+presenceStudioData.app.get('/api/outcomes', (_req, res) => {
+  const items = listArtifactRecords()
+    .slice(-10)
+    .reverse()
+    .map(presenceStudioData.buildOutcomeInboxItem);
   res.json({ ok: true, items });
 });
 
-app.get('/api/knowledge-ref', (req, res) => {
+presenceStudioData.app.get('/api/knowledge-ref', (req, res) => {
   const logicalPath = String(req.query.path || '').trim();
   if (!logicalPath) {
     return res.status(400).json({ ok: false, error: 'path is required' });
   }
-  if (!isAllowedKnowledgeRefPath(logicalPath)) {
+  if (!presenceStudioData.isAllowedKnowledgeRefPath(logicalPath)) {
     return res
       .status(403)
       .json({ ok: false, error: `knowledge ref is not accessible: ${logicalPath}` });
@@ -1683,12 +614,12 @@ app.get('/api/knowledge-ref', (req, res) => {
   return res.send(safeReadFile(resolved, { encoding: 'utf8' }));
 });
 
-app.get('/api/runtime-ref', (req, res) => {
+presenceStudioData.app.get('/api/runtime-ref', (req, res) => {
   const logicalPath = String(req.query.path || '').trim();
   if (!logicalPath) {
     return res.status(400).json({ ok: false, error: 'path is required' });
   }
-  if (!isAllowedRuntimeRefPath(logicalPath)) {
+  if (!presenceStudioData.isAllowedRuntimeRefPath(logicalPath)) {
     return res
       .status(403)
       .json({ ok: false, error: `runtime ref is not accessible: ${logicalPath}` });
@@ -1701,10 +632,10 @@ app.get('/api/runtime-ref', (req, res) => {
   return res.send(safeReadFile(resolved, { encoding: 'utf8' }));
 });
 
-app.get('/api/artifacts/:artifactId', (req, res) => {
+presenceStudioData.app.get('/api/artifacts/:artifactId', (req, res) => {
   const artifactId = String(req.params.artifactId || '').trim();
   const artifact = listArtifactRecords().find((item) => item.artifact_id === artifactId) as
-    ArtifactRecordShape | undefined;
+    presenceStudioData.ArtifactRecordShape | undefined;
   if (!artifact) {
     return res.status(404).json({ ok: false, error: `artifact not found: ${artifactId}` });
   }
@@ -1712,7 +643,7 @@ app.get('/api/artifacts/:artifactId', (req, res) => {
   if (
     !artifactPath ||
     !safeExistsSync(artifactPath) ||
-    !isAllowedArtifactDownloadPath(artifactPath)
+    !presenceStudioData.isAllowedArtifactDownloadPath(artifactPath)
   ) {
     return res
       .status(403)
@@ -1721,8 +652,8 @@ app.get('/api/artifacts/:artifactId', (req, res) => {
   return res.download(artifactPath, path.basename(artifactPath));
 });
 
-app.get('/api/browser-conversation-sessions', (_req, res) => {
-  const active = ensurePresenceBrowserConversationSession();
+presenceStudioData.app.get('/api/browser-conversation-sessions', (_req, res) => {
+  const active = presenceStudioData.ensurePresenceBrowserConversationSession();
   res.json({
     ok: true,
     active,
@@ -1730,12 +661,12 @@ app.get('/api/browser-conversation-sessions', (_req, res) => {
   });
 });
 
-app.get('/api/browser-sessions', (_req, res) => {
-  const items = listBrowserRuntimeSessions();
+presenceStudioData.app.get('/api/browser-sessions', (_req, res) => {
+  const items = presenceStudioData.listBrowserRuntimeSessions();
   res.json({ ok: true, items });
 });
 
-app.get('/api/task-sessions', (_req, res) => {
+presenceStudioData.app.get('/api/task-sessions', (_req, res) => {
   res.json({
     ok: true,
     active: getActiveTaskSession('presence'),
@@ -1743,29 +674,29 @@ app.get('/api/task-sessions', (_req, res) => {
   });
 });
 
-app.get('/api/task-sessions/:sessionId', (req, res) => {
+presenceStudioData.app.get('/api/task-sessions/:sessionId', (req, res) => {
   const sessionId = String(req.params.sessionId || '').trim();
-  const session = findTaskSession(sessionId);
+  const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
   }
   return res.json({ ok: true, item: session });
 });
 
-app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
+presenceStudioData.app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
   const sessionId = String(req.params.sessionId || '').trim();
-  const session = findTaskSession(sessionId);
+  const session = presenceStudioData.findTaskSession(sessionId);
   if (!session) {
     return res.status(404).json({ ok: false, error: `task session not found: ${sessionId}` });
   }
-  const artifact = (session.artifact || {}) as TaskSessionArtifactShape;
+  const artifact = (session.artifact || {}) as presenceStudioData.TaskSessionArtifactShape;
   const outputPath = typeof artifact.output_path === 'string' ? artifact.output_path : '';
   if (!outputPath) {
     return res
       .status(404)
       .json({ ok: false, error: `artifact not found for task session: ${sessionId}` });
   }
-  if (!isAllowedTaskArtifactPath(outputPath) || !safeExistsSync(outputPath)) {
+  if (!presenceStudioData.isAllowedTaskArtifactPath(outputPath) || !safeExistsSync(outputPath)) {
     return res
       .status(403)
       .json({ ok: false, error: `artifact path is not accessible: ${sessionId}` });
@@ -1773,20 +704,22 @@ app.get('/api/task-sessions/:sessionId/artifact', (req, res) => {
   return res.download(outputPath, path.basename(outputPath));
 });
 
-app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
+presenceStudioData.app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
   const parsed = presenceStudioBrowserBootstrapSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'browser-bootstrap.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
   const browserSessionId = parsed.data.browser_session_id;
   logger.info(
-    presenceStudioAuditLine(req, 'browser-bootstrap.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.accept', {
       browser_session_id: browserSessionId,
       goal_summary_len: parsed.data.goal_summary?.length || 0,
       success_condition_len: parsed.data.success_condition?.length || 0,
@@ -1794,12 +727,12 @@ app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
   );
 
   try {
-    const browserSession = listBrowserRuntimeSessions().find(
-      (item) => item.session_id === browserSessionId
-    );
+    const browserSession = presenceStudioData
+      .listBrowserRuntimeSessions()
+      .find((item) => item.session_id === browserSessionId);
     if (!browserSession) {
       logger.warn(
-        presenceStudioAuditLine(req, 'browser-bootstrap.reject', {
+        presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.reject', {
           browser_session_id: browserSessionId,
           status: 404,
           error: 'browser session not found',
@@ -1841,7 +774,7 @@ app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
     });
     saveBrowserConversationSession(session);
     logger.info(
-      presenceStudioAuditLine(req, 'browser-bootstrap.complete', {
+      presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.complete', {
         browser_session_id: browserSessionId,
         session_id: session.session_id,
         status: 200,
@@ -1850,7 +783,7 @@ app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
     return res.json({ ok: true, session });
   } catch (error: any) {
     logger.warn(
-      presenceStudioAuditLine(req, 'browser-bootstrap.fail', {
+      presenceStudioData.presenceStudioAuditLine(req, 'browser-bootstrap.fail', {
         browser_session_id: browserSessionId,
         status: 500,
         error: error?.message || String(error),
@@ -1860,49 +793,52 @@ app.post('/api/browser-conversation-sessions/bootstrap', (req, res) => {
   }
 });
 
-app.get('/api/stream', (req, res) => {
+presenceStudioData.app.get('/api/stream', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
-  sseClients.add(res);
-  res.write(`event: state\ndata: ${JSON.stringify(state)}\n\n`);
+  presenceStudioData.sseClients.add(res);
+  res.write(`event: state\ndata: ${JSON.stringify(presenceStudioData.state)}\n\n`);
   res.write(
-    `event: speech_state\ndata: ${JSON.stringify({ ok: true, speech: { status: latestSpeechSseState } })}\n\n`
+    `event: speech_state\ndata: ${JSON.stringify({ ok: true, speech: { status: presenceStudioData.latestSpeechSseState } })}\n\n`
   );
   req.on('close', () => {
-    sseClients.delete(res);
+    presenceStudioData.sseClients.delete(res);
   });
 });
 
-app.post('/a2ui/dispatch', (req, res) => {
+presenceStudioData.app.post('/a2ui/dispatch', (req, res) => {
   const body = req.body;
   const messages = Array.isArray(body) ? body : [body];
   logger.info(
-    presenceStudioAuditLine(req, 'a2ui/dispatch.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'a2ui/dispatch.accept', {
       messages: messages.length,
       body_kind: Array.isArray(body) ? 'array' : typeof body,
     })
   );
   try {
     for (const message of messages) {
-      applyA2UIMessage(validateA2UIMessage(message));
+      presenceStudioData.applyA2UIMessage(presenceStudioData.validateA2UIMessage(message));
     }
   } catch (error) {
     logger.warn(
-      presenceStudioAuditLine(req, 'a2ui/dispatch.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'a2ui/dispatch.reject', {
         messages: messages.length,
         status: 400,
-        error: safeErrorMessage(error),
+        error: presenceStudioData.safeErrorMessage(error),
       })
     );
     return res
       .status(400)
-      .json({ ok: false, error: safeErrorMessage(error) || 'Invalid A2UI message.' });
+      .json({
+        ok: false,
+        error: presenceStudioData.safeErrorMessage(error) || 'Invalid A2UI message.',
+      });
   }
-  emitState();
+  presenceStudioData.emitState();
   logger.info(
-    presenceStudioAuditLine(req, 'a2ui/dispatch.complete', {
+    presenceStudioData.presenceStudioAuditLine(req, 'a2ui/dispatch.complete', {
       messages: messages.length,
       status: 200,
     })
@@ -1910,21 +846,23 @@ app.post('/a2ui/dispatch', (req, res) => {
   res.json({ ok: true, applied: messages.length });
 });
 
-app.post('/api/voice/stimuli', (req, res) => {
+presenceStudioData.app.post('/api/voice/stimuli', (req, res) => {
   const parsed = presenceStudioVoiceStimulusSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/stimuli.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/stimuli.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
 
   const requestId = parsed.data.request_id || randomUUID();
   logger.info(
-    presenceStudioAuditLine(req, 'voice/stimuli.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/stimuli.accept', {
       request_id: requestId,
       text_len: parsed.data.text.length,
       intent: parsed.data.intent || 'conversation',
@@ -1938,11 +876,11 @@ app.post('/api/voice/stimuli', (req, res) => {
     parsed.data.source_id || 'presence-studio',
     requestId
   );
-  safeAppendFileSync(STIMULI_PATH, `${JSON.stringify(stimulus)}\n`, 'utf8');
-  rememberStimulus(stimulus as unknown as Record<string, unknown>);
-  emitState();
+  appendJsonLine(presenceStudioData.STIMULI_PATH, stimulus);
+  presenceStudioData.rememberStimulus(stimulus as unknown as Record<string, unknown>);
+  presenceStudioData.emitState();
   logger.info(
-    presenceStudioAuditLine(req, 'voice/stimuli.complete', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/stimuli.complete', {
       request_id: requestId,
       status: 201,
     })
@@ -1950,21 +888,23 @@ app.post('/api/voice/stimuli', (req, res) => {
   return res.status(201).json({ ok: true, request_id: requestId, stimulus });
 });
 
-app.post('/api/voice/ingest', async (req, res) => {
+presenceStudioData.app.post('/api/voice/ingest', async (req, res) => {
   const parsed = presenceStudioVoiceIngestSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/ingest.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/ingest.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
 
   const requestId = parsed.data.request_id || randomUUID();
   logger.info(
-    presenceStudioAuditLine(req, 'voice/ingest.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/ingest.accept', {
       request_id: requestId,
       text_len: parsed.data.text.length,
       intent: parsed.data.intent || 'conversation',
@@ -1972,7 +912,7 @@ app.post('/api/voice/ingest', async (req, res) => {
     })
   );
 
-  const response = await fetch(`${VOICE_HUB_URL}/api/ingest-text`, {
+  const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/ingest-text`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -1984,14 +924,17 @@ app.post('/api/voice/ingest', async (req, res) => {
       reflect_to_surface:
         parsed.data.reflect_to_surface === undefined
           ? true
-          : toBoolean(parsed.data.reflect_to_surface),
-      auto_reply: parsed.data.auto_reply === undefined ? true : toBoolean(parsed.data.auto_reply),
+          : presenceStudioData.toBoolean(parsed.data.reflect_to_surface),
+      auto_reply:
+        parsed.data.auto_reply === undefined
+          ? true
+          : presenceStudioData.toBoolean(parsed.data.auto_reply),
     }),
   });
 
   const payload = await response.text();
   logger.info(
-    presenceStudioAuditLine(req, 'voice/ingest.complete', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/ingest.complete', {
       request_id: requestId,
       status: response.status,
     })
@@ -1999,16 +942,18 @@ app.post('/api/voice/ingest', async (req, res) => {
   res.status(response.status).type('application/json').send(payload);
 });
 
-app.post('/api/voice/minutes', async (req, res) => {
+presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
   const parsed = presenceStudioVoiceMinutesSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/minutes.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/minutes.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
 
   const sourceText = parsed.data.text;
@@ -2016,9 +961,9 @@ app.post('/api/voice/minutes', async (req, res) => {
   const missionId = parsed.data.mission_id || undefined;
   const title = parsed.data.title || 'Voice Notes Minutes';
   const language = parsed.data.language || 'ja';
-  const attendees = toLineItems(parsed.data.attendees);
+  const attendees = presenceStudioData.toLineItems(parsed.data.attendees);
   logger.info(
-    presenceStudioAuditLine(req, 'voice/minutes.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/minutes.accept', {
       request_id: requestId,
       mission_id: missionId || 'none',
       text_len: sourceText.length,
@@ -2026,7 +971,7 @@ app.post('/api/voice/minutes', async (req, res) => {
       language,
     })
   );
-  const outputDir = resolveVoiceMinutesDir(missionId);
+  const outputDir = presenceStudioData.resolveVoiceMinutesDir(missionId);
   safeMkdir(outputDir, { recursive: true });
 
   const sourcePath = path.join(outputDir, `voice-notes-${requestId}.txt`);
@@ -2045,7 +990,7 @@ app.post('/api/voice/minutes', async (req, res) => {
   ].join('\n');
 
   let backendName = 'unknown';
-  let artifact: VoiceMinutesArtifact | null = null;
+  let artifact: presenceStudioData.VoiceMinutesArtifact | null = null;
   try {
     const raw = await backend.delegateTask(prompt, `voice-minutes:${requestId}`);
     backendName = (backend as any)?.name || backendName;
@@ -2055,9 +1000,9 @@ app.post('/api/voice/minutes', async (req, res) => {
         title:
           typeof parsed.title === 'string' && parsed.title.trim() ? parsed.title.trim() : title,
         summary: typeof parsed.summary === 'string' ? parsed.summary.trim() : '',
-        decisions: toLineItems(parsed.decisions),
-        action_items: toLineItems(parsed.action_items),
-        open_questions: toLineItems(parsed.open_questions),
+        decisions: presenceStudioData.toLineItems(parsed.decisions),
+        action_items: presenceStudioData.toLineItems(parsed.action_items),
+        open_questions: presenceStudioData.toLineItems(parsed.open_questions),
         minutes_markdown:
           typeof parsed.minutes_markdown === 'string' ? parsed.minutes_markdown.trim() : '',
       };
@@ -2083,7 +1028,7 @@ app.post('/api/voice/minutes', async (req, res) => {
   };
   const markdown =
     minutes.minutes_markdown.trim() ||
-    buildFallbackMinutesMarkdown({
+    presenceStudioData.buildFallbackMinutesMarkdown({
       title: minutes.title,
       summary: minutes.summary,
       decisions: minutes.decisions,
@@ -2117,7 +1062,7 @@ app.post('/api/voice/minutes', async (req, res) => {
     { encoding: 'utf8' }
   );
   logger.info(
-    presenceStudioAuditLine(req, 'voice/minutes.complete', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/minutes.complete', {
       request_id: requestId,
       mission_id: missionId || 'none',
       status: 201,
@@ -2137,16 +1082,18 @@ app.post('/api/voice/minutes', async (req, res) => {
   });
 });
 
-app.post('/api/email-draft', async (req, res) => {
+presenceStudioData.app.post('/api/email-draft', async (req, res) => {
   const parsed = presenceStudioEmailDraftSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'email-draft.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-draft.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
 
   const requestId = parsed.data.request_id || randomUUID();
@@ -2154,10 +1101,10 @@ app.post('/api/email-draft', async (req, res) => {
   const subjectInput = parsed.data.subject || '';
   const tone = parsed.data.tone || 'clear and concise';
   const triageInput = parsed.data.triage_text || '';
-  const triageText = triageInput || readEmailTriageArtifact().content.trim();
+  const triageText = triageInput || presenceStudioData.readEmailTriageArtifact().content.trim();
   if (!triageText) {
     logger.warn(
-      presenceStudioAuditLine(req, 'email-draft.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-draft.reject', {
         request_id: requestId,
         status: 400,
         error: 'triage_text is required when no email triage file exists',
@@ -2168,7 +1115,7 @@ app.post('/api/email-draft', async (req, res) => {
       .json({ error: 'triage_text is required when no email triage file exists' });
   }
   logger.info(
-    presenceStudioAuditLine(req, 'email-draft.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'email-draft.accept', {
       request_id: requestId,
       to_present: recipient ? 'yes' : 'no',
       subject_len: subjectInput.length,
@@ -2202,7 +1149,7 @@ app.post('/api/email-draft', async (req, res) => {
       `[presence-studio] email draft generation failed: ${error?.message || String(error)}`
     );
     logger.warn(
-      presenceStudioAuditLine(req, 'email-draft.fail', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-draft.fail', {
         request_id: requestId,
         status: 500,
         error: error?.message || String(error),
@@ -2212,28 +1159,30 @@ app.post('/api/email-draft', async (req, res) => {
   }
 });
 
-app.post('/api/email-deliver', async (req, res) => {
+presenceStudioData.app.post('/api/email-deliver', async (req, res) => {
   const parsed = presenceStudioEmailDeliverSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'email-deliver.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-deliver.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
-  const approved = toBoolean(parsed.data.approved);
+  const approved = presenceStudioData.toBoolean(parsed.data.approved);
   const body_markdown = parsed.data.body_markdown;
   const reply_mode = parsed.data.reply_mode || 'new';
-  const draft_mode = toBoolean(parsed.data.draft_mode);
+  const draft_mode = presenceStudioData.toBoolean(parsed.data.draft_mode);
   const subject = parsed.data.subject || '';
   const to = parsed.data.to || '';
   const message_id = parsed.data.message_id || '';
   const account = parsed.data.account || 'auto';
   if (!draft_mode && !approved) {
     logger.warn(
-      presenceStudioAuditLine(req, 'email-deliver.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-deliver.reject', {
         status: 400,
         error: 'approval is required before sending an email',
         draft_mode,
@@ -2242,7 +1191,7 @@ app.post('/api/email-deliver', async (req, res) => {
     return res.status(400).json({ error: 'approval is required before sending an email' });
   }
   logger.info(
-    presenceStudioAuditLine(req, 'email-deliver.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'email-deliver.accept', {
       status: 202,
       draft_mode,
       reply_mode,
@@ -2274,7 +1223,7 @@ app.post('/api/email-deliver', async (req, res) => {
   } catch (error: any) {
     logger.warn(`[presence-studio] email delivery failed: ${error?.message || String(error)}`);
     logger.warn(
-      presenceStudioAuditLine(req, 'email-deliver.fail', {
+      presenceStudioData.presenceStudioAuditLine(req, 'email-deliver.fail', {
         status: 500,
         error: error?.message || String(error),
       })
@@ -2283,7 +1232,7 @@ app.post('/api/email-deliver', async (req, res) => {
   }
 });
 
-app.post('/api/voice/native-listen', async (req, res) => {
+presenceStudioData.app.post('/api/voice/native-listen', async (req, res) => {
   const parsed = presenceStudioVoiceNativeListenSchema.safeParse({
     ...req.body,
     timeout_seconds: Number.isFinite(req.body?.timeout_seconds)
@@ -2292,16 +1241,18 @@ app.post('/api/voice/native-listen', async (req, res) => {
   });
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/native-listen.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
   const requestId = parsed.data.request_id || randomUUID();
   logger.info(
-    presenceStudioAuditLine(req, 'voice/native-listen.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.accept', {
       request_id: requestId,
       locale: parsed.data.locale || 'ja-JP',
       backend: parsed.data.backend || 'default',
@@ -2310,7 +1261,7 @@ app.post('/api/voice/native-listen', async (req, res) => {
   );
 
   try {
-    const response = await fetch(`${VOICE_HUB_URL}/api/listen-once`, {
+    const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/listen-once`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2324,15 +1275,18 @@ app.post('/api/voice/native-listen', async (req, res) => {
         reflect_to_surface:
           parsed.data.reflect_to_surface === undefined
             ? true
-            : toBoolean(parsed.data.reflect_to_surface),
-        auto_reply: parsed.data.auto_reply === undefined ? true : toBoolean(parsed.data.auto_reply),
+            : presenceStudioData.toBoolean(parsed.data.reflect_to_surface),
+        auto_reply:
+          parsed.data.auto_reply === undefined
+            ? true
+            : presenceStudioData.toBoolean(parsed.data.auto_reply),
       }),
     });
 
     const contentType = response.headers.get('content-type') || '';
     const payload = await response.text();
     logger.info(
-      presenceStudioAuditLine(req, 'voice/native-listen.complete', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.complete', {
         request_id: requestId,
         status: response.status,
       })
@@ -2346,7 +1300,7 @@ app.post('/api/voice/native-listen', async (req, res) => {
     res.status(response.status).type('application/json').send(payload);
   } catch (error: any) {
     logger.error(
-      presenceStudioAuditLine(req, 'voice/native-listen.error', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/native-listen.error', {
         request_id: requestId,
         error: error?.message || String(error),
       })
@@ -2358,7 +1312,7 @@ app.post('/api/voice/native-listen', async (req, res) => {
   }
 });
 
-app.get('/api/voice/selection', (_req, res) => {
+presenceStudioData.app.get('/api/voice/selection', (_req, res) => {
   try {
     const snapshot = getVoiceSelectionSnapshot();
     // Keep the profile storage location internal; the UI only needs the selectable
@@ -2370,22 +1324,24 @@ app.get('/api/voice/selection', (_req, res) => {
   }
 });
 
-app.post('/api/voice/selection', (req, res) => {
+presenceStudioData.app.post('/api/voice/selection', (req, res) => {
   const parsed = presenceStudioVoiceSelectionSchema.safeParse(req.body);
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/selection.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/selection.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
   try {
     const snapshot = saveVoiceSelectionPreferences(parsed.data);
     const { storage_path: _storagePath, ...publicSnapshot } = snapshot;
     logger.info(
-      presenceStudioAuditLine(req, 'voice/selection.complete', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/selection.complete', {
         status: 200,
         tts_engine_id: publicSnapshot.preferences.tts_engine_id,
         stt_backend: publicSnapshot.preferences.stt_backend,
@@ -2395,7 +1351,7 @@ app.post('/api/voice/selection', (req, res) => {
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(
-      presenceStudioAuditLine(req, 'voice/selection.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'voice/selection.reject', {
         status: 400,
         error: message,
       })
@@ -2404,9 +1360,9 @@ app.post('/api/voice/selection', (req, res) => {
   }
 });
 
-app.get('/api/voice/input-devices', async (req, res) => {
+presenceStudioData.app.get('/api/voice/input-devices', async (req, res) => {
   try {
-    const response = await fetch(`${VOICE_HUB_URL}/api/input-devices`);
+    const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/input-devices`);
     const contentType = response.headers.get('content-type') || '';
     const payload = await response.text();
     if (!contentType.includes('application/json')) {
@@ -2423,9 +1379,9 @@ app.get('/api/voice/input-devices', async (req, res) => {
   }
 });
 
-app.get('/api/voice/stt-backends', async (req, res) => {
+presenceStudioData.app.get('/api/voice/stt-backends', async (req, res) => {
   try {
-    const response = await fetch(`${VOICE_HUB_URL}/api/stt/backends`);
+    const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/stt/backends`);
     const contentType = response.headers.get('content-type') || '';
     const payload = await response.text();
     if (!contentType.includes('application/json')) {
@@ -2442,9 +1398,9 @@ app.get('/api/voice/stt-backends', async (req, res) => {
   }
 });
 
-app.get('/api/voice/speech-state', async (req, res) => {
+presenceStudioData.app.get('/api/voice/speech-state', async (req, res) => {
   try {
-    const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
+    const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/speech/state`);
     const contentType = response.headers.get('content-type') || '';
     const payload = await response.text();
     if (!contentType.includes('application/json')) {
@@ -2461,11 +1417,11 @@ app.get('/api/voice/speech-state', async (req, res) => {
   }
 });
 
-app.get('/api/context/location', (_req, res) => {
-  res.json({ ok: true, location: latestLocationContext });
+presenceStudioData.app.get('/api/context/location', (_req, res) => {
+  res.json({ ok: true, location: presenceStudioData.latestLocationContext });
 });
 
-app.post('/api/context/location', (req, res) => {
+presenceStudioData.app.post('/api/context/location', (req, res) => {
   const parsed = presenceStudioLocationSchema.safeParse({
     latitude: Number(req.body?.latitude),
     longitude: Number(req.body?.longitude),
@@ -2474,33 +1430,35 @@ app.post('/api/context/location', (req, res) => {
   });
   if (!parsed.success) {
     logger.warn(
-      presenceStudioAuditLine(req, 'context/location.reject', {
+      presenceStudioData.presenceStudioAuditLine(req, 'context/location.reject', {
         status: 400,
-        error: validationErrorMessage(parsed.error),
+        error: presenceStudioData.validationErrorMessage(parsed.error),
       })
     );
-    return res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
   }
-  latestLocationContext = {
+  presenceStudioData.setLatestLocationContext({
     latitude: parsed.data.latitude,
     longitude: parsed.data.longitude,
     accuracy: parsed.data.accuracy,
     timestamp: parsed.data.timestamp || new Date().toISOString(),
     source: 'browser_geolocation',
-  };
+  });
   logger.info(
-    presenceStudioAuditLine(req, 'context/location.accept', {
+    presenceStudioData.presenceStudioAuditLine(req, 'context/location.accept', {
       status: 200,
       latitude: parsed.data.latitude,
       longitude: parsed.data.longitude,
       accuracy: parsed.data.accuracy ?? 'none',
     })
   );
-  return res.json({ ok: true, location: latestLocationContext });
+  return res.json({ ok: true, location: presenceStudioData.latestLocationContext });
 });
 
-app.post('/api/voice/stop-speaking', async (req, res) => {
-  const response = await fetch(`${VOICE_HUB_URL}/api/stop-speaking`, {
+presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
+  const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/stop-speaking`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -2511,7 +1469,7 @@ app.post('/api/voice/stop-speaking', async (req, res) => {
   res.status(response.status).type('application/json').send(payload);
 });
 
-app.post('/api/demo/frame', (req, res) => {
+presenceStudioData.app.post('/api/demo/frame', (req, res) => {
   const messages = buildPresenceSurfaceFrame({
     surfaceId: typeof req.body?.surfaceId === 'string' ? req.body.surfaceId : 'presence-studio',
     agentId: typeof req.body?.agentId === 'string' ? req.body.agentId : 'presence-surface-agent',
@@ -2523,20 +1481,20 @@ app.post('/api/demo/frame', (req, res) => {
       ? req.body.transcript
       : [{ speaker: 'AI', text: 'Hello from Kyberion.' }],
   });
-  for (const message of messages) applyA2UIMessage(message);
-  emitState();
+  for (const message of messages) presenceStudioData.applyA2UIMessage(message);
+  presenceStudioData.emitState();
   res.json({ ok: true, messages });
 });
 
-app.post('/api/timeline/dispatch', (req, res) => {
+presenceStudioData.app.post('/api/timeline/dispatch', (req, res) => {
   const timeline = validatePresenceTimeline(req.body);
-  const result = playTimeline(timeline);
+  const result = presenceStudioData.playTimeline(timeline);
   return res.status(result.accepted ? 202 : 409).json({ ok: result.accepted, ...result });
 });
 
-app.get('/api/stimuli/tail', (_req, res) => {
-  if (!safeExistsSync(STIMULI_PATH)) return res.json({ items: [] });
-  const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+presenceStudioData.app.get('/api/stimuli/tail', (_req, res) => {
+  if (!safeExistsSync(presenceStudioData.STIMULI_PATH)) return res.json({ items: [] });
+  const content = safeReadFile(presenceStudioData.STIMULI_PATH, { encoding: 'utf8' }) as string;
   const items = content
     .split('\n')
     .filter((line) => line.trim().length > 0)
@@ -2551,13 +1509,15 @@ app.get('/api/stimuli/tail', (_req, res) => {
   res.json({ items });
 });
 
-server.listen(PORT, HOST, () => {
-  logger.info(`[presence-studio] listening on http://${HOST}:${PORT}`);
+presenceStudioData.server.listen(presenceStudioData.PORT, presenceStudioData.HOST, () => {
+  logger.info(
+    `[presence-studio] listening on http://${presenceStudioData.HOST}:${presenceStudioData.PORT}`
+  );
   setTimeout(() => {
-    ensurePresenceBrowserConversationSession();
+    presenceStudioData.ensurePresenceBrowserConversationSession();
   }, 0);
 });
 
 setInterval(() => {
-  void pollVoiceHubSpeechStateForSse();
-}, SPEECH_STATE_POLL_MS);
+  void presenceStudioData.pollVoiceHubSpeechStateForSse();
+}, presenceStudioData.SPEECH_STATE_POLL_MS);

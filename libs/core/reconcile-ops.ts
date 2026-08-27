@@ -24,7 +24,7 @@ import {
   type UnclassifiedErrorEntry,
 } from './unclassified-error-registry.js';
 import { listUnhandledIntents, type UnhandledIntentEntry } from './unhandled-intent-registry.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 
 // ─── config fallbacks ───────────────────────────────────────
 

@@ -9,6 +9,7 @@ vi.mock('../path-resolver.js', () => ({
   pathResolver: {
     shared: (sub = '') => (sub ? `/tmp/test-shared/${sub}` : '/tmp/test-shared'),
     rootDir: () => '/tmp/test-root',
+    rootResolve: (sub = '') => (sub ? `/tmp/test-root/${sub}` : '/tmp/test-root'),
     knowledge: (sub = '') => (sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base'),
   },
 }));

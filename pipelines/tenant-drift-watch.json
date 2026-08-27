@@ -17,22 +17,12 @@
     {
       "id": "watch_tenant_drift",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_tenant_drift_watch",
       "produces": {
         "channel": "tenant_drift_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": [
-          "--import",
-          "./scripts/ts-loader.mjs",
-          "scripts/watch_tenant_drift.ts",
-          "--quiet",
-          "--alert"
-        ],
-        "timeout_ms": 120000
-      }
+      "params": {}
     }
   ]
 }

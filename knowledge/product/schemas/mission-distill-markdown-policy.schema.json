@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "title_suffix", "section_titles", "prompt_titles"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "title_suffix": { "type": "string", "minLength": 1 },
     "section_titles": {

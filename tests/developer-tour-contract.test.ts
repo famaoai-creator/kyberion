@@ -36,7 +36,7 @@ describe('Developer tour contract', () => {
     const readme = read('docs/developer/README.md');
     expect(ext).toContain('release:notes');
     expect(ext).toContain('migration:run');
-    expect(ext).toContain('doctor:meeting');
+    expect(ext).toContain('doctor --runtime meeting');
     expect(ext).toContain('test:meeting-dry-run');
     expect(ext).toContain('libs/actuators/meeting-browser-driver/');
     expect(ext).toContain('meeting-actuator');
@@ -44,7 +44,9 @@ describe('Developer tour contract', () => {
     expect(ext).toContain('PLUGIN_AUTHORING.md');
     expect(ext).toContain('Resolution order: customer overlay → legacy personal fallback.');
     expect(ext).toContain('Editing `knowledge/personal/` when `KYBERION_CUSTOMER` is unset');
-    expect(ext).toContain('Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset');
+    expect(ext).toContain(
+      'Editing `knowledge/personal/connections/` when `KYBERION_CUSTOMER` is unset'
+    );
     expect(ext).toContain('Stable (v1+)');
     expect(ext).toContain('Internal');
     expect(readme).toContain('PLUGIN_AUTHORING.md');

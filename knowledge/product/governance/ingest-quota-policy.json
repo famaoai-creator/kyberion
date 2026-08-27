@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "DA-08 ingest quota policy (libs/core/ingest-quota.ts). Per-tenant daily ingest budget with staged warn→block enforcement inside ingest:commit: crossing warn_ratio × limit logs and proceeds (audited), exceeding a limit refuses the commit. Same override pattern as spend-policy.json: tenant_overrides keyed by tenant slug, each entry may override max_files_per_day / max_bytes_per_day / warn_ratio. Generous starting caps — observe the measured distribution before tightening.",
   "max_files_per_day": 200,

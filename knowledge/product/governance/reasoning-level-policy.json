@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/reasoning-level-policy.schema.json",
   "version": "1.0.0",
   "thresholds": {
     "low_confidence": 0.65,

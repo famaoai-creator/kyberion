@@ -1,4 +1,5 @@
 import { logger, processMissionTeamPrewarmRequest, killSwitch } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function parseRequestPath(argv: string[]): string {
   const index = argv.findIndex((arg) => arg === '--request');
@@ -8,14 +9,23 @@ function parseRequestPath(argv: string[]): string {
   return argv[index + 1];
 }
 
-async function main() {
+async function main(argv: string[]) {
   killSwitch.startMonitor();
-  const requestPath = parseRequestPath(process.argv.slice(2));
+  const requestPath = parseRequestPath(argv);
   const result = await processMissionTeamPrewarmRequest(requestPath);
   logger.info(`[AGENT_RUNTIME_SUPERVISOR] Completed ${result.request_id} for ${result.mission_id}`);
 }
 
-main().catch((error) => {
-  logger.error(`[AGENT_RUNTIME_SUPERVISOR] ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
+export const runAgentRuntimeSupervisor = defineScript({
+  name: 'agent-runtime-supervisor',
+  flags: [],
+  run(context) {
+    return main(context.argv);
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'run_agent_runtime_supervisor.ts') ||
+  isDirectScript(import.meta.url, 'run_agent_runtime_supervisor.js')
+)
+  void runAgentRuntimeSupervisor();

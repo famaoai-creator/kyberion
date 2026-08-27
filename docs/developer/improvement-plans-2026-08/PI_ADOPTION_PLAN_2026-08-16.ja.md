@@ -15,7 +15,7 @@ tags:
     adoption-plan,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # pi 分析・採択計画(PI-01〜19)
@@ -269,7 +269,7 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 - 2026-08-17: PI-04 の第一段として `worker-context-compaction.ts` に provider usage を既知 prefix のアンカーとして保持し、未計測 tail のみを `/4` で推定する hybrid token details (`strategy`, `usageTokens`, `estimatedTrailingTokens`)を追加。`compact.before/after` と result/working-memory metadata に推定方法と内訳を記録し、従来の共通 `estimateTokens()` は互換性のため維持した。更新型要約・retained tail の自己完結化・compaction reason は未完了。
 - 2026-08-17: PI-04 の第二段として `knowledge/product/prompts/worker-context-update-summary.md` を正本にした更新型要約入力(前要約・累積 `readFiles/modifiedFiles`・新 transcript・理由)を追加し、summary callback の context と summary artifact に渡すようにした。summary entry/result に `retained_tail` を保持し、carryover/working-memory に累積ファイル情報を残す。`manual|threshold|overflow` reason を event/result に記録し、mission worker の prompt-too-long 再構築は `overflow` を明示する。5 回連続 golden と overflow retry の実運用統合テストは未完了。
 - 2026-08-17: PI-04 の第三段として `WorkerContextCompactor` の連続 summary path を5回反復する golden 回帰テストを追加した。各 cycle の更新型 prompt が前 cycle の governing decision を保持し、summary message と `retained_tail` が毎回 self-contained recovery に利用できることを検証した。mission worker の実 provider overflow retry との統合測定は未完了。
-- 2026-08-17: PI-06 の第一段として `libs/core/trace-schema.ts` に mission/task/step/tool/compaction/judge/hook/gate の span 定義、親制約、型/cardinality/sensitive/values 属性、redaction と low-cardinality metric 投影を追加し、`persistTrace`/OTLP 投影を persistence-safe copy 経由にした。`generate:trace-docs`/`check:trace-docs` で `docs/developer/TRACE_SCHEMA.md` を schema から生成・突合する。ExactTelemetryAttributes の compile-time enforcement と replay validator への全面接続は未完了。
+- 2026-08-17: PI-06 の第一段として `libs/core/trace-schema.ts` に mission/task/step/tool/compaction/judge/hook/gate の span 定義、親制約、型/cardinality/sensitive/values 属性、redaction と low-cardinality metric 投影を追加し、`persistTrace`/OTLP 投影を persistence-safe copy 経由にした。`pnpm run generate:trace-docs -- --check` で `docs/developer/TRACE_SCHEMA.md` を schema から生成・突合する。ExactTelemetryAttributes の compile-time enforcement と replay validator への全面接続は未完了。
 - 2026-08-17: PI-06 の第二段として `validateTraceAttributes` を fail-closed 化し、schema 未定義の余剰属性と `values` 外の値を runtime validator が拒否するようにした。compile-time の `ExactTelemetryAttributes` と trace tree 全体への replay validator 接続は未完了。
 - 2026-08-17: PI-06 の第三段として span 定義から導出する `ExactTelemetryAttributes<kind, phase>` 型と、既知 span の属性/event・親子構造・status を検査する `validateTraceReplay` を追加した。未知の拡張 span は既定では構造検査のみ、`strictUnknownSpans` で閉じた語彙にもできる。既存の広い extension span を壊さないため、永続 trace 読み込み全体への strict validator 接続と Exact 型の全 call-site 適用は未完了。
 - 2026-08-17: PI-06 の第四段として `persistTrace` の JSONL 書込み境界で `validateTraceReplay` を実行し、malformed trace を保存前に fail-closed で拒否する replay/write fixture を追加した。既存 extension span は互換性のため structural validation のままで、trace feed 全消費者の strict validation と Exact 型の全 call-site 適用は未完了。
@@ -333,16 +333,16 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 - PI-02: `pnpm run check:wire-error-boundary`(新設)+ MCP/Chronos route tests
 - PI-03: `pnpm vitest run libs/core/skill-plugin-loader.test.ts libs/core/approval-gate.test.ts`
 - PI-04: `pnpm vitest run libs/core/worker-context-compaction.test.ts`(5 連続圧縮 golden・overflow 1 回)
-- PI-06: `pnpm run generate:trace-docs && pnpm run check:reference-drift`
-- PI-12: `pnpm run check:pinned-deps check:install-script-allowlist release:local`
+- PI-06: `pnpm run generate:trace-docs && pnpm check -- --scope full --only reference-drift`
+- PI-12: `pnpm check -- --scope pr` (pinned dependency, install-script allowlist, and lockfile gates are manifest entries)
 - PI-13: `pnpm vitest run libs/core/testing/reasoning-backend-conformance.test.ts`(stub)/ `PROVIDER_LIVE=1`(live)
 
 ## 8. 関連
 
-- [TAKT_ADOPTION_PLAN_2026-08-16](./TAKT_ADOPTION_PLAN_2026-08-16.ja.md)(TK-03 await_decision ↔ PI-14、TK-04 facet ↔ PI-09、TK-10 OTel ↔ PI-06、TK-11 ↔ PI-18)
-- [QM_ADOPTION_PLAN_2026-08-01](./QM_ADOPTION_PLAN_2026-08-01.ja.md)(QM-06 backend 能力宣言 ↔ PI-10/13、QM-07 skill pack ↔ PI-09)
+- [TAKT_ADOPTION_PLAN_2026-08-16](../improvement-plans-archive/2026-08/TAKT_ADOPTION_PLAN_2026-08-16.ja.md)(TK-03 await_decision ↔ PI-14、TK-04 facet ↔ PI-09、TK-10 OTel ↔ PI-06、TK-11 ↔ PI-18)
+- [QM_ADOPTION_PLAN_2026-08-01](../improvement-plans-archive/2026-08/QM_ADOPTION_PLAN_2026-08-01.ja.md)(QM-06 backend 能力宣言 ↔ PI-10/13、QM-07 skill pack ↔ PI-09)
 - [CLOUDFLARE_OS_ADOPTION_PLAN_2026-08-09](./CLOUDFLARE_OS_ADOPTION_PLAN_2026-08-09.ja.md)(OS-05 provenance/egress ↔ PI-09)
-- [KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md) / [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KS-13/14 ↔ PI-02/03、KO の scope 表示 ↔ PI-08 systemPromptOptions)
-- [EVENT_HANDLING_UNIFICATION_PLAN_2026-08-10](./EVENT_HANDLING_UNIFICATION_PLAN_2026-08-10.ja.md)(`acquireLock` ↔ PI-16)
+- [KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16](../improvement-plans-archive/2026-08/KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md) / [KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_OPERABILITY_PLAN_2026-08-16.ja.md)(KS-13/14 ↔ PI-02/03、KO の scope 表示 ↔ PI-08 systemPromptOptions)
+- [EVENT_HANDLING_UNIFICATION_PLAN_2026-08-10](../improvement-plans-archive/2026-08/EVENT_HANDLING_UNIFICATION_PLAN_2026-08-10.ja.md)(`acquireLock` ↔ PI-16)
 - [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(migration mission ↔ PI-05)
 - `knowledge/product/governance/multi-provider-coexecution-contract.md`(↔ PI-19)

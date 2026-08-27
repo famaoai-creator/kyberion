@@ -1,9 +1,10 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import {
   firstJsonObject,
@@ -160,8 +161,9 @@ function getSignalPath(): string {
  * Checks if the injection suspected status is active in the current session/mission context.
  */
 export function isInjectionSuspected(scope?: string): boolean {
-  if (process.env.KYBERION_INJECTION_SUSPECTED === 'true') {
-    const envScope = process.env.KYBERION_INJECTION_SCOPE || 'global';
+  const injectionSuspected = getRegisteredEnvText('KYBERION_INJECTION_SUSPECTED');
+  if (injectionSuspected === '1' || injectionSuspected === 'true') {
+    const envScope = getRegisteredEnvText('KYBERION_INJECTION_SCOPE') || 'global';
     if (!scope || envScope === 'global' || envScope === scope) {
       return true;
     }
@@ -212,17 +214,17 @@ export function isInjectionSuspected(scope?: string): boolean {
  */
 export function setInjectionSuspected(suspected: boolean = true, scope: string = 'global'): void {
   if (suspected) {
-    process.env.KYBERION_INJECTION_SUSPECTED = 'true';
-    process.env.KYBERION_INJECTION_SCOPE = scope;
+    setRegisteredEnv('KYBERION_INJECTION_SUSPECTED', 'true');
+    setRegisteredEnv('KYBERION_INJECTION_SCOPE', scope);
   } else {
-    delete process.env.KYBERION_INJECTION_SUSPECTED;
-    delete process.env.KYBERION_INJECTION_SCOPE;
+    setRegisteredEnv('KYBERION_INJECTION_SUSPECTED', undefined);
+    setRegisteredEnv('KYBERION_INJECTION_SCOPE', undefined);
   }
   const signalPath = getSignalPath();
   try {
     let currentSignal: any = { scopes: [] };
     if (safeExistsSync(signalPath)) {
-      currentSignal = JSON.parse(safeReadFile(signalPath, { encoding: 'utf8' }) as string);
+      currentSignal = loadJson<typeof currentSignal>(signalPath);
       if (!Array.isArray(currentSignal.scopes)) currentSignal.scopes = [];
     }
 

@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -33,9 +33,9 @@ export interface ResolvedCustomerBinding {
 function readBindingsFile(filePath: string): CustomerChannelBinding[] {
   try {
     if (!safeExistsSync(filePath)) return [];
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    const parsed = loadJson<{
       bindings?: CustomerChannelBinding[];
-    };
+    }>(filePath);
     return Array.isArray(parsed?.bindings) ? parsed.bindings : [];
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

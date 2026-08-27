@@ -7,7 +7,6 @@ import {
   pathResolver,
   resolveTenant,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeExistsSync,
   safeStat,
@@ -16,6 +15,8 @@ import {
   type OpsAlertInput,
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type HealthRow = {
   tenant_slug: string;
@@ -73,9 +74,9 @@ export function evaluateLegacyQuarantine(
 function legacyQuarantineTtlDays(): number {
   const policyPath = pathResolver.knowledge('product/governance/knowledge-scope-check.json');
   try {
-    const parsed = JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' }))) as {
+    const parsed = readJson<{
       legacy_quarantine_ttl_days?: unknown;
-    };
+    }>(policyPath);
     return typeof parsed.legacy_quarantine_ttl_days === 'number' &&
       parsed.legacy_quarantine_ttl_days >= 0
       ? parsed.legacy_quarantine_ttl_days
@@ -86,7 +87,7 @@ function legacyQuarantineTtlDays(): number {
 }
 
 function healthHistoryPath(): string {
-  const override = process.env.KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH')?.trim();
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('runtime/feedback-loop/knowledge-scope-health.json');
@@ -115,9 +116,9 @@ function readPriorLegacyCount(): number | undefined {
   const filePath = healthHistoryPath();
   if (!safeExistsSync(filePath)) return undefined;
   try {
-    const value = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as {
+    const value = readJson<{
       legacy_unscoped_file_count?: unknown;
-    };
+    }>(filePath);
     return typeof value.legacy_unscoped_file_count === 'number'
       ? value.legacy_unscoped_file_count
       : undefined;
@@ -255,24 +256,34 @@ function buildHealthAlert(report: KnowledgeScopeHealthReport): OpsAlertInput {
   };
 }
 
-const isDirect =
-  process.argv[1] != null && /watch_knowledge_scope_health\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  const report = scanKnowledgeScopeHealth({ persistHistory: process.argv.includes('--alert') });
-  if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-  else
-    console.log(
-      `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
-    );
-  if (process.argv.includes('--alert') && report.alerts.length > 0) {
-    const receipt = sendOpsAlert(buildHealthAlert(report));
-    if (!process.argv.includes('--quiet')) {
-      console.warn(
-        `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
+export const runKnowledgeScopeHealth = defineScript({
+  name: 'knowledge:scope-health',
+  flags: [],
+  run: ({ argv }) => {
+    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
+    if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
+    else
+      console.log(
+        `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
       );
+    if (argv.includes('--alert') && report.alerts.length > 0) {
+      const receipt = sendOpsAlert(buildHealthAlert(report));
+      if (!argv.includes('--quiet')) {
+        console.warn(
+          `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
+        );
+      }
     }
-  }
-  if (process.argv.includes('--fail') && report.status !== 'healthy') process.exitCode = 1;
-}
+    if (argv.includes('--fail') && report.status !== 'healthy') {
+      throw new ScriptExitError(1, '', true);
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'watch_knowledge_scope_health.ts') ||
+  isDirectScript(import.meta.url, 'watch_knowledge_scope_health.js')
+)
+  void runKnowledgeScopeHealth();
 
 export { buildHealthAlert };

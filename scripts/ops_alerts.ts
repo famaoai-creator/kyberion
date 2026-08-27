@@ -27,6 +27,7 @@ import {
   OPS_ALERT_WEBHOOK_ENV,
   type OpsAlertLogSummary,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function formatOpsAlertSummary(summary: OpsAlertLogSummary): string[] {
   const lines: string[] = [];
@@ -65,8 +66,8 @@ export function formatOpsAlertSummary(summary: OpsAlertLogSummary): string[] {
   return lines;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'ops_alerts', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('redeliver', {
       type: 'boolean',
@@ -151,10 +152,13 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /ops_alerts\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+if (
+  isDirectScript(import.meta.url, 'ops_alerts.ts') ||
+  isDirectScript(import.meta.url, 'ops_alerts.js')
+) {
+  void defineScript({
+    name: 'ops:alerts',
+    flags: [],
+    run: (context) => main(context.argv),
+  })();
 }

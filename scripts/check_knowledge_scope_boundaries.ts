@@ -2,6 +2,7 @@
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
   max_direct_tenant_env_reads: number;
@@ -108,7 +109,7 @@ export function scanKnowledgeScopeBoundaries(
   );
   if (directReads > config.max_direct_tenant_env_reads) {
     findings.push(
-      `process.env.KYBERION_TENANT direct reads increased beyond baseline: ${directReads} > ${config.max_direct_tenant_env_reads}`
+      `process.env.${'KYBERION_TENANT'} direct reads increased beyond baseline: ${directReads} > ${config.max_direct_tenant_env_reads}`
     );
   }
   return findings;
@@ -162,14 +163,23 @@ export function scan(): string[] {
   ];
 }
 
-const isDirect =
-  process.argv[1] != null && /check_knowledge_scope_boundaries\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  const findings = scan();
-  if (findings.length > 0) {
-    console.error('[check_knowledge_scope_boundaries] FAILED');
-    for (const finding of findings) console.error(`- ${finding}`);
-    process.exit(1);
-  }
-  console.log('[check_knowledge_scope_boundaries] OK');
-}
+export const runCheckKnowledgeScopeBoundaries = defineScript({
+  name: 'check:knowledge-scope-boundaries',
+  flags: [],
+  run(context) {
+    const findings = scan();
+    if (findings.length > 0) {
+      console.error('[check_knowledge_scope_boundaries] FAILED');
+      for (const finding of findings) console.error(`- ${finding}`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print('[check_knowledge_scope_boundaries] OK');
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_knowledge_scope_boundaries.ts') ||
+  isDirectScript(import.meta.url, 'check_knowledge_scope_boundaries.js')
+)
+  void runCheckKnowledgeScopeBoundaries();

@@ -9,6 +9,7 @@ import {
   type AudioChunk,
   type StreamingSpeechToTextBridge,
 } from '@agent/core';
+import { isRecord } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { resolvePythonBin } from './voice-runtime-helpers.js';
 
@@ -162,8 +163,4 @@ function assertLoopbackFormat(chunk: AudioChunk): void {
   ) {
     throw new Error('voice STT backend requires 16kHz mono pcm_s16le');
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

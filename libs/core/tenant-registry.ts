@@ -1,11 +1,11 @@
 import * as path from 'node:path';
-import AjvModule from 'ajv';
 import { customerDirForSlug } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
+  loadJson,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -13,24 +13,24 @@ import {
 } from './secure-io.js';
 
 const TENANT_GROUP_ID_RE = /^[a-z][a-z0-9-]{1,30}$/;
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve('schemas/tenant-group.schema.json');
-let tenantGroupValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
+const TENANT_GROUP_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/tenant-group.schema.json'
+);
+let tenantGroupValidate: ReturnType<typeof compileSchema> | undefined;
 // Resolved at module load against the real repo root on purpose: the schema is
 // tracked source, not fixture data — hermetic tests that pass a fixture
 // rootDir still validate against the canonical schema.
 const TENANT_PROFILE_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/tenant-profile.schema.json'
 );
-let tenantProfileValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
+let tenantProfileValidate: ReturnType<typeof compileSchema> | undefined;
 
 function getTenantGroupValidator() {
-  return (tenantGroupValidate ??= compileSchemaFromPath(ajv, TENANT_GROUP_SCHEMA_PATH));
+  return (tenantGroupValidate ??= compileSchema(TENANT_GROUP_SCHEMA_PATH));
 }
 
 function getTenantProfileValidator() {
-  return (tenantProfileValidate ??= compileSchemaFromPath(ajv, TENANT_PROFILE_SCHEMA_PATH));
+  return (tenantProfileValidate ??= compileSchema(TENANT_PROFILE_SCHEMA_PATH));
 }
 
 /** Declared ingest source system for a tenant (DA-01). */
@@ -291,7 +291,7 @@ export function tenantGroupPath(groupId: string): string {
 export function ensureDefaultTenantProfile(): TenantProfile {
   const file = tenantProfilePath('default');
   if (safeExistsSync(file)) {
-    return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as TenantProfile;
+    return loadJson<TenantProfile>(file);
   }
 
   const now = new Date().toISOString();

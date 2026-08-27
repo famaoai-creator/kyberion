@@ -11,11 +11,13 @@ import {
   skipAdfStep,
   safeExistsSync,
   safeExec,
-  safeReadFile,
+  loadJson,
   suggestClosestStrings,
   ensureDefaultOpPreflight,
   runOpPreflight,
+  registerSuperNerveExecutor,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -50,7 +52,6 @@ export async function executeSuperPipeline(
   options: any = {},
   state: any = { stepCount: 0, startTime: Date.now() }
 ) {
-  const rootDir = pathResolver.rootDir();
   const maxSteps = options.max_steps || 1000;
   const timeoutMs = options.timeout_ms || 60000;
 
@@ -134,6 +135,8 @@ export async function executeSuperPipeline(
   throw new Error(`[SUPER_NERVE] Exhausted repair attempts`);
 }
 
+registerSuperNerveExecutor(executeSuperPipeline as any);
+
 function normalizeStep(step: SuperPipelineStep) {
   const [domain, action] = step.op.split(':');
   if (domain === 'core') {
@@ -206,7 +209,7 @@ async function handleCoreAction(
     case 'include': {
       const ref = String(resolveVars(params.path ?? params.fragment ?? '', ctx));
       const macroPath = pathResolver.rootResolve(ref);
-      const macroDef = JSON.parse(safeReadFile(macroPath, { encoding: 'utf8' }) as string);
+      const macroDef = loadJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
       const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
       if (nested.status === 'failed') {
         throw new Error(
@@ -302,7 +305,7 @@ async function dispatchToActuator(domain: string, action: string, params: any, c
   // handler directly; the handler returns { status, results, context }.
   // SA-05 Task 1: actuator dispatch feeds kill-switch anomaly tracking.
   recordGovernanceAction(
-    process.env.KYBERION_PERSONA || 'unknown',
+    getRegisteredEnvText('KYBERION_PERSONA') || 'unknown',
     'actuator_dispatch',
     `${domain}:${action}`,
     false

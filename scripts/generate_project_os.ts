@@ -8,7 +8,8 @@ import {
   safeWriteFile,
   slugify,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArtifactMap = {
   lifecycle: Array<{
@@ -129,7 +130,7 @@ async function main() {
   const artifactMapPath = pathResolver.knowledge(
     'product/orchestration/project-operating-system-artifact-map.json'
   );
-  const artifactMap = readJsonFile<ArtifactMap>(artifactMapPath);
+  const artifactMap = readJson<ArtifactMap>(artifactMapPath);
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
 
   safeMkdir(targetDir, { recursive: true });
@@ -158,7 +159,16 @@ async function main() {
   process.stdout.write(`${path.relative(pathResolver.rootDir(), targetDir)}\n`);
 }
 
-main().catch((err) => {
-  process.stderr.write(`${err.message}\n`);
-  process.exit(1);
+export const runGenerateProjectOs = defineScript({
+  name: 'generate:project-os',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'generate_project_os.ts') ||
+  isDirectScript(import.meta.url, 'generate_project_os.js')
+)
+  void runGenerateProjectOs();

@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
@@ -113,10 +114,7 @@ export function emitMissionTaskEvent(input: MissionTaskEventInput): void {
   const globalDir = resolveSharedObservabilityDir(nodePath.dirname(globalEventPath));
   if (globalDir) {
     safeMkdir(globalDir);
-    safeAppendFileSync(
-      `${globalDir}/task-events.jsonl`,
-      `${JSON.stringify(redactMissionTaskEventForShared(event))}\n`
-    );
+    appendJsonLine(`${globalDir}/task-events.jsonl`, redactMissionTaskEventForShared(event));
   }
   appendMissionExecutionLedgerEntry({
     mission_id: input.mission_id,

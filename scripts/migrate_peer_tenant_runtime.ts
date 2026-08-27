@@ -23,6 +23,8 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { nowIso } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const DEFAULT_MIGRATION_ROOT = 'active/shared/runtime/migrations/peer-tenant';
@@ -87,10 +89,6 @@ const DEFAULT_ROOTS: PeerTenantMigrationRoot[] = [
   { kind: 'mesh-hub-runtime', root: 'active/shared/runtime/mesh-hub' },
   { kind: 'mesh-hub-observability', root: 'active/shared/observability/mesh-hub' },
 ];
-
-function nowIso(): string {
-  return new Date().toISOString();
-}
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -381,15 +379,20 @@ function parseArgs(argv: string[]): PeerTenantMigrationOptions {
   };
 }
 
-const isDirect = process.argv[1] && /migrate_peer_tenant_runtime\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  try {
-    const plan = runPeerTenantMigration(parseArgs(process.argv.slice(2)));
+const script = defineScript({
+  name: 'migrate:peer-tenant-runtime',
+  flags: [],
+  run: ({ argv }) => {
+    const plan = runPeerTenantMigration(parseArgs(argv));
     console.log(JSON.stringify(plan, null, 2));
-  } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
+    return plan;
+  },
+});
+if (
+  isDirectScript(import.meta.url, 'migrate_peer_tenant_runtime.ts') ||
+  isDirectScript(import.meta.url, 'migrate_peer_tenant_runtime.js')
+) {
+  void script();
 }
 
 export { parseArgs };

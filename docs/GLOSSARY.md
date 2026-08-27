@@ -2,6 +2,53 @@
 
 This glossary translates Kyberion's ecosystem language into practical terms for contributors and operators.
 
+## How to use this glossary
+
+- **First-win vocabulary**: the six terms needed to understand the basic intent-to-result loop.
+- **Contributor vocabulary**: the canonical terms most contributors encounter while changing the repository.
+- **FDE full glossary**: the complete reference below, including governance, tenancy, runtime, and delivery terms.
+
+### First-win vocabulary
+
+Intent, Plan, Result, Mission, Task Session, and Artifact are the six terms to learn first.
+
+### Contributor vocabulary
+
+| Term                 | Canonical definition                                                  |
+| -------------------- | --------------------------------------------------------------------- |
+| Intent               | The human request expressed in natural language.                      |
+| Resolution           | The structured interpretation of an intent.                           |
+| Plan                 | A human-readable execution summary.                                   |
+| Result               | The user-facing outcome of execution.                                 |
+| Mission              | A bounded unit of work with lifecycle state and evidence.             |
+| Task Session         | A lighter-weight durable execution contract.                          |
+| Artifact             | The concrete output of work.                                          |
+| Work Shape           | The operating mode of a work item.                                    |
+| Execution Shape      | The selected execution rung for an intent.                            |
+| WorkItem             | The canonical unit of executable work.                                |
+| WorkItem Context     | The typed identity chain on a work item.                              |
+| Mission Context Pack | The bounded context delivered to a mission task.                      |
+| Handoff Packet       | The explicit transfer record between workers or phases.               |
+| Knowledge Slice      | A task-profile-driven knowledge placement rule.                       |
+| Knowledge Card       | A concise, frontmatter-backed knowledge artifact.                     |
+| Semantic Brief       | A content brief that leaves presentation choices to the design layer. |
+| Design Cascade       | The ordered resolution of creative design defaults.                   |
+| Actuator             | A concrete execution component.                                       |
+| Procedure            | Distilled operational knowledge or a reusable method.                 |
+| Pipeline             | A declarative, governed execution graph.                              |
+| ADF                  | A human-readable structured execution contract.                       |
+| Tenant               | An isolation boundary identified by a tenant slug.                    |
+| Viewer Context       | The server-resolved principal and allowed tenant scope.               |
+| Approval Contract    | The human-approval boundary for consequential actions.                |
+| Gateway              | The generic delivery contract shared by surfaces.                     |
+| Trace                | The root observability record for an execution.                       |
+| Span                 | A timed operation within a trace.                                     |
+| Event                | A point-in-time occurrence within a span.                             |
+| Lease                | A durable authority grant with an expiry.                             |
+| Mission Controller   | The governed mission lifecycle entry point.                           |
+
+### FDE full glossary
+
 ## Core concepts
 
 ### Sovereign
@@ -60,6 +107,10 @@ A human-facing interaction contract that carries clarification prompts, status s
 
 A bounded unit of work with lifecycle state, evidence, and history. Mission operations are managed through `scripts/mission_controller.ts`.
 
+### Mission Context Pack
+
+The bounded, role-scoped context assembled for a mission task: governed instructions, typed scope, relevant knowledge, and task-specific evidence. It is an input pack, not a replacement for the mission record.
+
 ### Task Session
 
 A lighter-weight durable execution contract used for conversational work such as document generation, service inspection, capture flows, and interactive browser assistance.
@@ -88,9 +139,17 @@ The top-level framing of Kyberion as a system where leadership provides intent a
 
 A durable authority grant over a mission, task, bridge, or resource. Leases define who currently holds control and when that control expires.
 
+### Handoff Packet
+
+The explicit transfer record used when responsibility moves between workers or phases. It carries the current state, evidence, open risks, and the next owner's acceptance boundary.
+
 ### Task Contract
 
 A structured unit of delegated work inside a mission. Task contracts define objective, write scope, expected outputs, and acceptance criteria.
+
+### Semantic Brief
+
+A content and intent brief for a visual or other designed artifact. It states meaning, audience, and constraints while leaving presentation choices to the governed design layer.
 
 ### Existing Work Reconciliation
 
@@ -102,11 +161,11 @@ The mission lifecycle controller referenced in the charter. It handles mission s
 
 ### OrchestratorSession
 
-A durable, journaled binding between a conversation thread (`surface`/`channel`/`thread`) and the mission it owns (SO-02, `libs/core/orchestrator-session.ts`). At most one active session exists per mission at a time, enforced across processes by claiming a `mission-ownership:<MISSION_ID>` work-item lease alongside the journal entry (SO-03) — not just an in-process check. Creating a session is the explicit ceremony that promotes a conversation thread from "issued this mission" to "owns and may steer this mission"; releasing it (handoff / finish / explicit) ends that authority. See [SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md) and the [multi-provider co-execution contract](../knowledge/product/governance/multi-provider-coexecution-contract.md#surface-orchestrator-sessions).
+A durable, journaled binding between a conversation thread (`surface`/`channel`/`thread`) and the mission it owns (SO-02, `libs/core/orchestrator-session.ts`). At most one active session exists per mission at a time, enforced across processes by claiming a `mission-ownership:<MISSION_ID>` work-item lease alongside the journal entry (SO-03) — not just an in-process check. Creating a session is the explicit ceremony that promotes a conversation thread from "issued this mission" to "owns and may steer this mission"; releasing it (handoff / finish / explicit) ends that authority. See [SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md) and the [multi-provider co-execution contract](../knowledge/product/governance/multi-provider-coexecution-contract.md#surface-orchestrator-sessions).
 
 ### Surface Orchestrator
 
-A conversation thread (Slack / Telegram / Discord / iMessage / terminal / web) that has been promoted, via an active OrchestratorSession, to mission-owner authority equal to a CLI orchestrator process — able to steer mission lifecycle verbs (checkpoint, gate approval, pause/resume, finish) through the same governed SO-01 facade the CLI uses. This authority is never projected into worker/provider delegations spawned from that process (KD-05 capability tiers, XP-02 env minimization) — see [SO-03 in SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md).
+A conversation thread (Slack / Telegram / Discord / iMessage / terminal / web) that has been promoted, via an active OrchestratorSession, to mission-owner authority equal to a CLI orchestrator process — able to steer mission lifecycle verbs (checkpoint, gate approval, pause/resume, finish) through the same governed SO-01 facade the CLI uses. This authority is never projected into worker/provider delegations spawned from that process (KD-05 capability tiers, XP-02 env minimization) — see [SO-03 in SURFACE_ORCHESTRATOR_PLAN](./developer/improvement-plans-archive/2026-07/SURFACE_ORCHESTRATOR_PLAN_2026-07-25.ja.md).
 
 ### NHI (Non-Human Identity)
 
@@ -212,7 +271,7 @@ The operational front door for agent runtimes. It owns runtime ensure, ask, refr
 
 ### CLI Subagent Team Mode
 
-An execution surface where a team of subagents runs entirely inside one CLI harness session (Claude Code Agent tool / Agent SDK `agents`) instead of the agent-runtime A2A bridge — a thin adapter over the same CLI-independent contracts used everywhere else (team roles, KD-05 capability profiles, task contracts, context packs), not a second connection mechanism. Hub-and-spoke: the main CLI session stays mission owner, subagents never message each other directly. Best suited to short-lived, read-mostly, in-session work; see [Execution surface selection](../knowledge/product/architecture/agent-mission-control-model.md#11-execution-surface-selection) for the deterministic routing rubric against agent-runtime, and [CLI_SUBAGENT_TEAM_PLAN](developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) (CT-01–04) for the implementation plan.
+An execution surface where a team of subagents runs entirely inside one CLI harness session (Claude Code Agent tool / Agent SDK `agents`) instead of the agent-runtime A2A bridge — a thin adapter over the same CLI-independent contracts used everywhere else (team roles, KD-05 capability profiles, task contracts, context packs), not a second connection mechanism. Hub-and-spoke: the main CLI session stays mission owner, subagents never message each other directly. Best suited to short-lived, read-mostly, in-session work; see [Execution surface selection](../knowledge/product/architecture/agent-mission-control-model.md#11-execution-surface-selection) for the deterministic routing rubric against agent-runtime, and [CLI_SUBAGENT_TEAM_PLAN](./developer/improvement-plans-archive/2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md) (CT-01–04) for the implementation plan.
 
 ### Service Runtime
 
@@ -312,7 +371,7 @@ The bounded local control-plane access level mapped to `chronos_localadmin`. It 
 
 ### ViewerContext / Viewer Scope
 
-The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
+The request-scoped principal resolved server-side by a surface adapter: a viewer role (`readonly` | `localadmin`), operation permissions, and allowed tenant, organization, project, and tier sets (`tenant_slugs`, `organization_ids`, `project_ids`, `tier_access`). Headless operations declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; query parameters may only narrow the viewer's allowed set, never widen it. This is the internal authorization boundary for OSS/self-hosted/FDE surfaces, not hosted SaaS user management. Chronos keeps `KYBERION_VIEWER_SCOPE=off|warn|enforce` as a migration/telemetry setting, but every mode denies an unregistered tenant; `warn` records the attempted expansion before denying it. Operations guide: `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`.
 
 ### Channel
 
@@ -351,6 +410,8 @@ The `work_shape` field classifying a work item's operating mode: `solution_proje
 ### Execution Shape
 
 The `execution_shape` field in the intent-coverage matrix describing the selected execution rung: `direct_reply`, `actuator_action`/`browser_session`, `task_session`, `pipeline`, `mission`, or `project_bootstrap`. It selects how an intent runs; `work_shape` describes the operating mode of a `WorkItem`, so the two fields are not interchangeable.
+
+These are orthogonal axes: changing the operating mode does not by itself choose the execution rung, and choosing a rung does not redefine the operating mode.
 
 ### WorkItem
 
@@ -401,6 +462,14 @@ Zero-LLM full-text search over conversation, mission, and trace history on SQLit
 ### Knowledge Slice
 
 A task-profile-driven placement rule declared in `knowledge/product/governance/knowledge-slices.json` (schema: `knowledge/product/schemas/knowledge-slices.schema.json`), matched on `team_role` x `phase` x `mission_type` (any field omitted or `'*'` matches anything). Resolved by `resolveKnowledgeSlice()` (`libs/core/knowledge-slices.ts`) and consumed by `loadKnowledgeHintsIfPossible()` (`libs/core/mission-context-pack.ts`) to decide, per dispatched task, which documents are always delivered (`pinned`, budget-reserved first), which subtrees to prioritize when searching (`search_roots`, most-specific-slice-wins), and which paths are never delivered (`exclude`, unioned across all matching slices). No matching slice, or a missing/invalid manifest, fails open to the pre-KP-03 behavior (flat top-N search, no pinning/filtering). See KP-03_SCHEMA_DESIGN_NOTE.ja.md for full precedence and merge rules.
+
+### Knowledge Card
+
+A concise, frontmatter-backed knowledge artifact placed in the appropriate governed knowledge tier so later mission context retrieval can find and reuse it.
+
+### Design Cascade
+
+The ordered resolution of creative design defaults from explicit mission choices through theme, pattern, and engine defaults. It keeps semantic content separate from per-element style literals.
 
 ### Trace / Span / Event
 

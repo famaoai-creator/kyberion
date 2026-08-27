@@ -1,4 +1,4 @@
-import { safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
@@ -28,18 +28,27 @@ export interface ResolvedVocabularyEntry {
 }
 
 const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
+const VOCABULARY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/user-facing-vocabulary.schema.json'
+);
+
+const catalog = defineCatalog<VocabularyCatalogFile>({
+  id: 'user-facing-vocabulary',
+  path: VOCABULARY_PATH,
+  schema: VOCABULARY_SCHEMA_PATH,
+});
 
 let cachedCatalog: VocabularyCatalogFile | null | undefined;
 let cachedBareIndex: Map<string, ResolvedVocabularyEntry[]> | undefined;
 
 export function loadVocabularyCatalog(): VocabularyCatalogFile | null {
-  if (cachedCatalog !== undefined) return cachedCatalog;
   try {
-    cachedCatalog = JSON.parse(
-      String(safeReadFile(VOCABULARY_PATH, { label: 'user-facing vocabulary' }))
-    ) as VocabularyCatalogFile;
+    const loaded = catalog.load();
+    if (cachedCatalog !== loaded) cachedBareIndex = undefined;
+    cachedCatalog = loaded;
   } catch {
     cachedCatalog = null;
+    cachedBareIndex = undefined;
   }
   return cachedCatalog;
 }
@@ -108,4 +117,5 @@ export function resolveVocabularyEntry(key: string): ResolvedVocabularyEntry | n
 export function _resetVocabularyCatalogCacheForTests(): void {
   cachedCatalog = undefined;
   cachedBareIndex = undefined;
+  catalog.reset();
 }

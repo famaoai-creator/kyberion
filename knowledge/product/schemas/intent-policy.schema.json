@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "delivery": {
       "type": "object",
@@ -57,10 +58,7 @@
         "text_patterns": {
           "type": "array",
           "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "$ref": "#/$defs/textRule" }
-            ]
+            "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }]
           }
         },
         "min_required_inputs": {

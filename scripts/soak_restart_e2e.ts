@@ -3,13 +3,14 @@ import {
   logger,
   spawnManagedProcess,
   pathResolver,
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { appendJsonLine } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface RestartE2EReport {
   timestamp: string;
@@ -60,7 +61,7 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
   const journalPath = path.join(root, 'mission-journal.json');
   const statePath = path.join(root, 'provider-health.json');
   const existing = safeExistsSync(statePath)
-    ? JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string)
+    ? readJson<{ phase?: string; resumed?: boolean; restored_from?: string }>(statePath)
     : {};
   safeWriteFile(
     heartbeatPath,
@@ -103,7 +104,9 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
 
   if (phase === 'bootstrap') {
     const bootstrapState = writeBootstrapState(root);
+    let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
     const shutdown = () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       safeWriteFile(
         bootstrapState.journal_path,
         JSON.stringify(
@@ -112,16 +115,16 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
           2
         )
       );
-      process.exit(0);
     };
     process.once('SIGTERM', shutdown);
     process.once('SIGINT', shutdown);
-    setInterval(() => {
-      safeAppendFileSync(
-        bootstrapState.heartbeat_path,
-        JSON.stringify({ pid: process.pid, phase, alive: true, ts: new Date().toISOString() }) +
-          '\n'
-      );
+    heartbeatTimer = setInterval(() => {
+      appendJsonLine(bootstrapState.heartbeat_path, {
+        pid: process.pid,
+        phase,
+        alive: true,
+        ts: new Date().toISOString(),
+      });
     }, 100).unref?.();
     await new Promise<void>(() => {});
     return;
@@ -218,7 +221,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   });
   await resumeExit;
 
-  const restored = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+  const restored = readJson<{ resumed?: boolean; restored_from?: string }>(statePath);
   return {
     timestamp: new Date().toISOString(),
     root,
@@ -235,8 +238,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   };
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export async function main(args: string[] = []): Promise<void> {
   if (args[0] === '--worker') {
     const phase = args[1] === 'resume' ? 'resume' : 'bootstrap';
     const rootArgIndex = args.indexOf('--root');
@@ -252,10 +254,14 @@ async function main(): Promise<void> {
   console.log(JSON.stringify(report, null, 2));
 }
 
-const isDirect = process.argv[1] && /soak_restart_e2e\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
-    logger.error(`[soak-restart-e2e] failed: ${(error as Error).message ?? error}`);
-    process.exit(1);
-  });
-}
+export const runSoakRestartScript = defineScript({
+  name: 'soak:restart-e2e',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'soak_restart_e2e.ts') ||
+  isDirectScript(import.meta.url, 'soak_restart_e2e.js')
+)
+  void runSoakRestartScript();

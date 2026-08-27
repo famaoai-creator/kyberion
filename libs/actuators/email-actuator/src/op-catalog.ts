@@ -8,6 +8,29 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
+const EMAIL_SCHEMA = {
+  type: 'object',
+  properties: {
+    backend: { type: 'string' },
+    to: { type: 'string' },
+    cc: { type: 'string' },
+    subject: { type: 'string' },
+    body: { type: 'string' },
+    body_file: { type: 'string' },
+    from: { type: 'string' },
+    export_as: { type: 'string' },
+  },
+  additionalProperties: false,
+};
+
+const EMAIL_EXAMPLES = {
+  create_draft: [{ to: 'operator@example.com', subject: 'Draft', body: '内容' }],
+  send: [{ to: 'operator@example.com', subject: 'Notice', body: '内容' }],
+  send_from_file: [
+    { to: 'operator@example.com', subject: 'Notice', body_file: 'active/shared/tmp/body.txt' },
+  ],
+};
+
 export const EMAIL_ACTUATOR_CAPTURE_OPS = [] as const;
 
 export const EMAIL_ACTUATOR_TRANSFORM_OPS = [] as const;
@@ -15,7 +38,15 @@ export const EMAIL_ACTUATOR_TRANSFORM_OPS = [] as const;
 export const EMAIL_ACTUATOR_APPLY_OPS = ['create_draft', 'send', 'send_from_file'] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
-  return { op, kind };
+  return {
+    op,
+    kind,
+    input_schema: {
+      ...EMAIL_SCHEMA,
+      required: op === 'send_from_file' ? ['to', 'body_file'] : ['to', 'subject'],
+    },
+    examples: EMAIL_EXAMPLES[op as keyof typeof EMAIL_EXAMPLES],
+  };
 }
 
 export function describeOps() {

@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   pathResolver,
   GENERATION_QUOTA_COUNTER_REPO_SUBPATH,
@@ -9,7 +8,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeLstat,
   safeMoveSync,
@@ -21,6 +19,8 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
@@ -462,25 +462,6 @@ function runRequired(
     timeoutMs: 120000,
     maxOutputMB: 50,
     env,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `${errorPrefix}: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
-    );
-  }
-}
-
-function runRequiredIn(
-  cwd: string,
-  command: string,
-  args: string[],
-  errorPrefix: string,
-  timeoutMs = 120000
-): void {
-  const result = safeExecResult(command, args, {
-    cwd,
-    timeoutMs,
-    maxOutputMB: 50,
   });
   if (result.status !== 0) {
     throw new Error(
@@ -963,9 +944,7 @@ function findRestoredManifests(target: string): string[] {
 function restoreMissionGitBundles(target: string): void {
   const [manifestPath] = findRestoredManifests(target);
   if (!manifestPath) return;
-  const manifest = JSON.parse(
-    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
-  ) as RestoredBackupManifest;
+  const manifest = readJson<RestoredBackupManifest>(manifestPath);
   if (manifest.format !== 'kyberion-backup-v1') return;
 
   for (const entry of manifest.mission_git_repos || []) {
@@ -1227,7 +1206,7 @@ export function summarizeBackupStatus(
   };
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export function main(argv: string[]): void {
   assertProtocolServiceRegistered('backup-restore');
   const options = parseBackupArgs(argv);
   if (options.command === 'create') {
@@ -1255,7 +1234,7 @@ export function main(argv = process.argv.slice(2)): void {
       scope,
       actorRole: 'infrastructure_sentinel',
       principal: { kind: 'service', id: 'backup-restore' },
-      requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+      requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
       metadata: {
         archive: portableProtocolServicePathRef(result.archive),
         target: portableProtocolServicePathRef(result.target),
@@ -1270,7 +1249,7 @@ export function main(argv = process.argv.slice(2)): void {
         scope,
         actorRole: 'infrastructure_sentinel',
         principal: { kind: 'service', id: 'backup-restore' },
-        requestedBy: process.env.KYBERION_PERSONA || 'backup-operator',
+        requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
         metadata: { quarantine_count: result.quarantinePaths.length },
       });
       if (!quarantineReceipt) console.warn('[backup] quarantine lifecycle receipt unavailable');
@@ -1306,15 +1285,9 @@ export function main(argv = process.argv.slice(2)): void {
   console.log(JSON.stringify({ ok: true, backups }, null, 2));
 }
 
-const isDirectRun =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun) {
-  try {
-    main();
-  } catch (err: any) {
-    const message = err?.message || String(err);
-    if (message.includes('Usage:')) console.error(message);
-    else console.error(`[backup] ${message}`);
-    process.exit(1);
-  }
-}
+if (isDirectScript(import.meta.url, 'backup.ts') || isDirectScript(import.meta.url, 'backup.js'))
+  void defineScript({
+    name: 'backup',
+    flags: [],
+    run: ({ argv }) => main(argv),
+  })();

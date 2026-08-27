@@ -1,5 +1,4 @@
-import { logger, safeExistsSync, safeReadFile } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { loadJson, logger, safeExistsSync } from '@agent/core';
 import { pathResolver } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -23,6 +22,10 @@ interface OrchestratorAction {
   };
 }
 
+interface StrategyConfig {
+  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
+}
+
 async function handleAction(input: OrchestratorAction) {
   if (input.action === 'reconcile') {
     return await performReconcile(input);
@@ -38,7 +41,7 @@ async function performReconcile(input: OrchestratorAction) {
     input.strategy_path || 'knowledge/product/governance/orchestration-strategy.json'
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string);
+  const config = loadJson<StrategyConfig>(strategyPath);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }
@@ -58,8 +61,16 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
 export { handleAction };
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'orchestrator-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

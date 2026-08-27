@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/contextual-intent-clarification-policy.schema.json",
   "version": "1.0.0",
   "defaults": {
     "max_missing_inputs_without_clarification": 1,
@@ -38,7 +39,12 @@
       "shapes": ["task_session"],
       "max_missing_inputs_without_clarification": 0,
       "min_confidence_to_skip": 0.75,
-      "always_ask_for": ["schedule_scope", "date_range", "fixed_constraints", "calendar_action_boundary"],
+      "always_ask_for": [
+        "schedule_scope",
+        "date_range",
+        "fixed_constraints",
+        "calendar_action_boundary"
+      ],
       "rationale": "Calendar edit requests should stay in clarification until the target scope and authority boundary are explicit."
     },
     {

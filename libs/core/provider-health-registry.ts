@@ -7,8 +7,12 @@ import {
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { getRegisteredEnv } from './env-validator.js';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { getRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
+import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
+
+export { listDemotedProviders } from './provider-health-view.js';
 
 /**
  * Provider Health Registry v1.0
@@ -76,9 +80,7 @@ function ensureLoaded(now: number = Date.now()): void {
   demotions.clear();
   if (!safeExistsSync(filePath)) return;
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) || '{}')) as {
-      demotions?: Demotion[];
-    };
+    const parsed = readJson<{ demotions?: Demotion[] }>(filePath);
     for (const entry of parsed.demotions || []) {
       if (!entry?.provider || !entry.instance || !Number.isFinite(entry.until)) continue;
       if (entry.until <= now) continue; // TTL recovery across restarts
@@ -214,6 +216,8 @@ export function healthyInstances(provider: string, now: number = Date.now()): st
   );
 }
 
+registerHealthyInstancesResolver((provider, now) => healthyInstances(provider, now));
+
 /**
  * Pick a healthy instance for a provider, or null when the whole pool is demoted.
  */
@@ -224,16 +228,6 @@ export function selectHealthyInstance(provider: string, now: number = Date.now()
 /**
  * Providers whose *every* instance is currently demoted — these should be excluded from resolution.
  */
-export function listDemotedProviders(
-  providers: ProviderInfo[] = discoverProviders(),
-  now: number = Date.now()
-): string[] {
-  return providers
-    .filter((entry) => entry.installed)
-    .filter((entry) => healthyInstances(entry.provider, now).length === 0)
-    .map((entry) => entry.provider);
-}
-
 /**
  * Reset all health state, including the persisted file. Intended for tests
  * and process re-init.

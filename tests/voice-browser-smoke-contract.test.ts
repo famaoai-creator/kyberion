@@ -84,9 +84,26 @@ describe('voice and browser smoke contract', () => {
     expect(packageJson).toContain('libs/actuators/meeting-actuator/src/index.test.ts');
 
     expect(smokePipeline).toContain('presence/displays/presence-studio/server.ts');
-    expect(smokePipeline).toContain('pipelines/voice-hello.json');
-    expect(smokePipeline).toContain('pipelines/verify-session.json');
-    expect(smokePipeline).toContain('libs/actuators/meeting-actuator/src/index.js');
+    // SX-11: the smoke pipeline dropped the `system:exec node dist/...` wrappers
+    // for typed ops and `core:include` fragments; the contract is that it still
+    // drives the same surface, voice, session and meeting-consent checks.
+    const smokeSteps = (
+      JSON.parse(smokePipeline) as { steps: Array<{ op?: string; params?: { fragment?: string } }> }
+    ).steps;
+    expect(smokeSteps.some((step) => step.op === 'process:spawn')).toBe(true);
+    expect(
+      smokeSteps.some(
+        (step) =>
+          step.op === 'core:include' && step.params?.fragment === 'pipelines/voice-hello.json'
+      )
+    ).toBe(true);
+    expect(
+      smokeSteps.some(
+        (step) =>
+          step.op === 'core:include' && step.params?.fragment === 'pipelines/verify-session.json'
+      )
+    ).toBe(true);
+    expect(smokeSteps.some((step) => step.op === 'meeting:check_consent')).toBe(true);
     expect(smokePipeline).toContain('meeting consent gate');
   });
 });

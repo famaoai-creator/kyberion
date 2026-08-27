@@ -30,11 +30,12 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
+  loadJson,
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -154,7 +155,7 @@ const _trustedExecutableManifests = new WeakSet<EnvironmentManifest>();
  * ------------------------------------------------------------------ */
 
 export type RegisteredProbe = () => Promise<{ available: boolean; reason?: string }>;
-const environmentProbeSeam = defineSeam<RegisteredProbe>({
+const environmentProbeSeam = createSeam<RegisteredProbe>({
   key: 'environment.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
@@ -308,7 +309,7 @@ async function runProbe(
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
       if (!probe.require_field) return { available: true };
       try {
-        const data = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+        const data = loadJson<unknown>(file);
         const value = probe.require_field.path
           .split('.')
           .reduce<any>((acc, key) => (acc != null ? acc[key] : undefined), data);
@@ -645,7 +646,7 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
   const file = receiptPath(manifestId, missionId);
   if (!safeExistsSync(file)) return null;
   try {
-    return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as SetupReceipt;
+    return loadJson<SetupReceipt>(file);
   } catch (err: any) {
     logger.warn(`[environment-capability] receipt parse failed: ${err?.message ?? err}`);
     return null;

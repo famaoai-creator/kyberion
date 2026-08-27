@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /* eslint-disable no-restricted-imports */
 /**
  * ChromeExtensionMeetingJoinDriver — browser meeting attendance driven through
@@ -23,11 +24,12 @@
 
 import type { AudioBus } from './audio-bus.js';
 import { randomBytes } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { scrubContent } from './pii-scrubber.js';
-import { safeAppendFileSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import { registerMeetingJoinDriver } from './meeting-join-driver.js';
 import type {
@@ -79,7 +81,8 @@ interface WsServerLike {
 }
 
 function resolveExtensionAuthToken(options: ChromeExtensionMeetingDriverOptions): string {
-  const token = options.wsAuthToken?.trim() || process.env.KYBERION_MEET_EXTENSION_TOKEN?.trim();
+  const token =
+    options.wsAuthToken?.trim() || getRegisteredEnvText('KYBERION_MEET_EXTENSION_TOKEN')?.trim();
   if (!token || token.length < 32) {
     throw new Error(
       'Meet extension authentication is not configured. Set KYBERION_MEET_EXTENSION_TOKEN (32+ characters) and the same meetCopilotAuthToken in Chrome storage.'
@@ -402,10 +405,7 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
                   ? { speaker: redactMeetingText(parsed.speaker) }
                   : {}),
               };
-              safeAppendFileSync(
-                captionsPath,
-                `${JSON.stringify({ ...safeCaption, ts: new Date().toISOString() })}\n`
-              );
+              appendJsonLine(captionsPath, { ...safeCaption, ts: new Date().toISOString() });
               pushCaption(
                 typeof safeCaption.text === 'string' ? safeCaption.text : '',
                 typeof safeCaption.speaker === 'string' ? safeCaption.speaker : undefined

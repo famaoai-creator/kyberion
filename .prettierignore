@@ -4,6 +4,7 @@ coverage/
 evidence/
 *.min.js
 package-lock.json
+pnpm-lock.yaml
 # Scaffold fixtures are source TEMPLATES: prettier rewrites {{VAR}} into
 # "{ { VAR } }" (YAML flow mapping) and breaks placeholder substitution.
 knowledge/product/scaffolds/

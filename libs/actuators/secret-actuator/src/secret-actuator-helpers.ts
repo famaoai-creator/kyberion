@@ -5,7 +5,6 @@ import {
   safeExec,
   ledger,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   safeExistsSync,
   safeMkdir,

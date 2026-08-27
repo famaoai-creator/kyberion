@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import { secureFetch } from './network.js';
@@ -71,12 +72,7 @@ export interface ServiceRuntimeState {
 }
 
 export type ServiceRuntimeLifecycleStage =
-  | 'trial'
-  | 'approved_install'
-  | 'installed'
-  | 'pinned'
-  | 'install_required'
-  | 'unsupported';
+  'trial' | 'approved_install' | 'installed' | 'pinned' | 'install_required' | 'unsupported';
 
 export interface ServiceRuntimeResolution {
   service: ServiceRuntimeRecord;
@@ -168,7 +164,9 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: ServiceRuntimeRegistry | null = null;
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  );
 }
 
 function loadRegistryFromPath(registryPath: string): ServiceRuntimeRegistry {

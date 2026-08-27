@@ -209,7 +209,7 @@ describe('plugin packs (QM-07)', () => {
       safeWriteFile(
         path.join(portable, 'plugin.json'),
         JSON.stringify({
-          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          $schema: 'https://agent-plugins.org/knowledge/product/schemas/1.0.0/plugin.schema.json',
           name: 'portable-root-plugin',
         })
       );
@@ -230,7 +230,7 @@ describe('plugin packs (QM-07)', () => {
       safeWriteFile(
         path.join(portable, 'plugin.json'),
         JSON.stringify({
-          $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+          $schema: 'https://agent-plugins.org/knowledge/product/schemas/1.0.0/plugin.schema.json',
           name: 'portable-import-plugin',
         })
       );

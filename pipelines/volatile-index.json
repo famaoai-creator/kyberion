@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "Volatile Knowledge Layer — regenerates active/INDEX.volatile.{md,json} by scanning all *.volatile.json sidecars. Uses working-memory:build-index (no external scripts). Safe to run at any time.",
   "_refs": {
-    "schema": "schemas/volatile-knowledge.schema.json",
+    "schema": "knowledge/product/schemas/volatile-knowledge.schema.json",
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 5"
   },

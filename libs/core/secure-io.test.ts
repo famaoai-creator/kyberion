@@ -155,6 +155,20 @@ describe('secure-io core', () => {
       expect(loadJson<{ hello: string }>(testFile)).toEqual({ hello: 'world' });
     });
 
+    it('preserves root $schema metadata for catalog read-modify-write flows', () => {
+      const testFile = path.join(tmpDir, 'catalog.json');
+      fs.writeFileSync(
+        testFile,
+        JSON.stringify({ $schema: 'knowledge/product/schemas/catalog.schema.json', entries: [] })
+      );
+      const catalog = loadJson<Record<string, unknown>>(testFile);
+      expect(catalog.$schema).toBe('knowledge/product/schemas/catalog.schema.json');
+      expect(catalog).toEqual({
+        $schema: 'knowledge/product/schemas/catalog.schema.json',
+        entries: [],
+      });
+    });
+
     it('returns null for a missing or invalid optional JSON file', () => {
       const missing = path.join(tmpDir, 'missing.json');
       const invalid = path.join(tmpDir, 'invalid.json');

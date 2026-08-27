@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * PI-15: governed input queues for an agent operation.
  *
@@ -11,7 +12,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { missionDir } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { escapeXml } from './text-escaping.js';
 import { withLock } from './src/lock-utils.js';
 
@@ -293,11 +294,11 @@ export class AgentInputQueue {
     }
     await withLock(this.lockId, async () => {
       safeMkdir(path.dirname(this.queuePath), { recursive: true });
-      safeAppendFileSync(
-        this.queuePath,
-        `${JSON.stringify({ kind: 'enqueued', entry, recorded_at: now() } satisfies AgentInputQueueRecord)}\n`,
-        { encoding: 'utf8' }
-      );
+      appendJsonLine(this.queuePath, {
+        kind: 'enqueued',
+        entry,
+        recorded_at: now(),
+      } satisfies AgentInputQueueRecord);
     });
     return entry;
   }
@@ -326,11 +327,11 @@ export class AgentInputQueue {
         .filter((entry) => entry.delivery === 'next_run' && scopeMatches(entry.scope, scope))
         .slice(0, limit);
       for (const entry of entries) {
-        safeAppendFileSync(
-          this.queuePath,
-          `${JSON.stringify({ kind: 'consumed', entry_id: entry.id, recorded_at: now() } satisfies AgentInputQueueRecord)}\n`,
-          { encoding: 'utf8' }
-        );
+        appendJsonLine(this.queuePath, {
+          kind: 'consumed',
+          entry_id: entry.id,
+          recorded_at: now(),
+        } satisfies AgentInputQueueRecord);
       }
       return entries;
     });
@@ -390,11 +391,11 @@ export class AgentInputQueue {
     return withLock(this.lockId, async () => {
       const state = this.readDurableState();
       if (state.active.has(id)) {
-        safeAppendFileSync(
-          this.queuePath,
-          `${JSON.stringify({ kind: 'cancelled', entry_id: id, recorded_at: now() } satisfies AgentInputQueueRecord)}\n`,
-          { encoding: 'utf8' }
-        );
+        appendJsonLine(this.queuePath, {
+          kind: 'cancelled',
+          entry_id: id,
+          recorded_at: now(),
+        } satisfies AgentInputQueueRecord);
         return 'cancelled';
       }
       if (state.consumed.has(id)) return 'already_consumed';

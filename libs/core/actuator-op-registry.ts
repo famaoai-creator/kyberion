@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 import { suggestClosestStrings } from './op-suggestions.js';
 import { loadActuatorManifestCatalog } from './src/actuator-manifest-index.js';
@@ -33,6 +33,7 @@ interface DomainOpRegistry {
   capture?: string[];
   transform?: string[];
   apply?: string[];
+  control?: string[];
 }
 
 interface ActuatorOpRegistryFile {
@@ -60,6 +61,28 @@ const DEFAULT_CONTROL_OPS = [
 ];
 
 const pluginOperations = new Map<string, ResolvedActuatorOperation>();
+
+const DEFAULT_ACTUATOR_OP_REGISTRY: ActuatorOpRegistryFile = {
+  shared_capture_ops: [],
+  shared_transform_ops: [],
+  shared_apply_ops: [],
+  operation_timeouts_ms: {},
+  domains: {},
+};
+
+const actuatorOpCatalog = defineCatalog<ActuatorOpRegistryFile>({
+  id: 'actuator-op-registry',
+  path: pathResolver.knowledge('product/governance/actuator-op-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/actuator-op-registry.schema.json'),
+  fallback: DEFAULT_ACTUATOR_OP_REGISTRY,
+  onFallback: (error) => {
+    recordConfigFallback({
+      knowledgePath: 'product/governance/actuator-op-registry.json',
+      error,
+      defaults: DEFAULT_ACTUATOR_OP_REGISTRY,
+    });
+  },
+});
 
 export function registerPluginActuatorOperation(input: {
   domain: string;
@@ -147,26 +170,7 @@ function collectKnownOps(domain: string, registry: ActuatorOpRegistryFile): stri
 
 function loadActuatorOpRegistry(): ActuatorOpRegistryFile {
   if (_cachedOpRegistry) return _cachedOpRegistry;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/actuator-op-registry.json');
-    _cachedOpRegistry = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ActuatorOpRegistryFile;
-  } catch (err) {
-    const defaults: ActuatorOpRegistryFile = {
-      shared_capture_ops: [],
-      shared_transform_ops: [],
-      shared_apply_ops: [],
-      operation_timeouts_ms: {},
-      domains: {},
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/actuator-op-registry.json',
-      error: err,
-      defaults,
-    });
-    _cachedOpRegistry = defaults;
-  }
+  _cachedOpRegistry = actuatorOpCatalog.load();
   return _cachedOpRegistry;
 }
 
@@ -204,6 +208,7 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   if (registry?.apply?.includes(action)) return 'apply';
   if (registry?.capture?.includes(action)) return 'capture';
   if (registry?.transform?.includes(action)) return 'transform';
+  if (registry?.control?.includes(action)) return 'control';
 
   if (shared_capture_ops.includes(action)) return 'capture';
   if (shared_transform_ops.includes(action)) return 'transform';

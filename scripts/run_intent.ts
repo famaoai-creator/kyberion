@@ -3,6 +3,7 @@ import {
   createAssistantCompilerRequest,
   createAssistantDelegationRequest,
   createTaskSession,
+  getRegisteredEnv,
   executeApprovedClaudeTaskSession,
   formatClarificationPacket,
   getTaskIntentBuilder,
@@ -18,8 +19,13 @@ import {
 } from '@agent/core';
 import type { IntentResolutionPacket } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+// Registers the Super-Nerve executor on the core execution port at load;
+// the resolver alone does not, and without it intents fall back to the
+// conversational path (which stalls where no reasoning backend exists).
+import '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import { resolveAndExecuteIntent } from '../libs/actuators/orchestrator-actuator/src/super-nerve/resolver.js';
 import { readJsonInput, resolveAdfInputPath } from './refactor/adf-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 // Task types executeApprovedClaudeTaskSession can run; others stop at session creation.
 const CLAUDE_TASK_SESSION_TYPES = new Set(['browser', 'report_document', 'document_generation']);
@@ -106,7 +112,7 @@ async function tryTaskSessionDispatch(
   return true;
 }
 
-async function main() {
+export async function main(args: string[] = []) {
   const argv = await createStandardYargs()
     .option('intent', { alias: 'n', type: 'string', description: 'Semantic intent ID or keyword' })
     .option('input', { alias: 'i', type: 'string', description: 'Context ADF path' })
@@ -160,12 +166,14 @@ async function main() {
       type: 'string',
       description: 'Preferred backend/provider hint for assistant-side delegation',
     })
-    .parseSync();
+    .parseSync(args);
 
   const intent = argv.intent || (argv._[0] as string);
   if (!intent) {
-    logger.error('Usage: node dist/scripts/run_intent.js <intent_id> [--input context.json]');
-    process.exit(1);
+    throw new ScriptExitError(
+      1,
+      'Usage: node dist/scripts/run_intent.js <intent_id> [--input context.json]'
+    );
   }
 
   // Bootstrap the reasoning backend before any compile/clarification step, so
@@ -182,8 +190,8 @@ async function main() {
     (context as any)?.tenantId ||
     (context as any)?.tenant_slug ||
     (context as any)?.tenantSlug ||
-    process.env.KYBERION_TENANT ||
-    process.env.KYBERION_CUSTOMER;
+    (getRegisteredEnv<string>('KYBERION_TENANT') as string | undefined) ||
+    (getRegisteredEnv<string>('KYBERION_CUSTOMER') as string | undefined);
   const packet = resolveIntentResolutionPacket(intent, {
     tier,
     tenantId: typeof tenantId === 'string' ? tenantId : undefined,
@@ -408,4 +416,14 @@ async function main() {
   }
 }
 
-main();
+export const runIntent = defineScript({
+  name: 'intent:run',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'run_intent.ts') ||
+  isDirectScript(import.meta.url, 'run_intent.js')
+)
+  void runIntent();

@@ -4,9 +4,10 @@
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
-import { resolveIdentityContext } from './authority.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
@@ -27,8 +28,21 @@ export const TIERS: TierWeightMap = {
   public: 1,
 };
 
-const PROJECT_ROOT = pathResolver.rootDir();
 const POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
+
+// Resolve lazily because foundation/env -> foundation/json -> secure-io imports
+// tier-guard during module bootstrap. A top-level root lookup is otherwise
+// observable before this module's lexical bindings have finished initializing.
+function projectRoot(): string {
+  try {
+    return pathResolver.rootDir();
+  } catch {
+    // The secure-io -> audit-chain -> tier-guard bootstrap cycle can invoke
+    // the guard before the path-resolver binding is initialized. The process
+    // root is the safe fallback for that one-time project-local probe.
+    return process.cwd();
+  }
+}
 
 function normalizePath(p: string): string {
   // Policy paths use POSIX separators even when Kyberion runs on Windows.
@@ -127,7 +141,7 @@ function checkProjectScope(
 }
 
 function expandPolicyPath(pattern: string, missionId?: string): string {
-  const customerSlug = process.env.KYBERION_CUSTOMER?.trim() || 'NONE';
+  const customerSlug = getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || 'NONE';
   return pattern
     .replace('${MISSION_ID}', missionId || 'NONE')
     .replace('${KYBERION_CUSTOMER}', customerSlug);
@@ -186,7 +200,8 @@ function tenantScopeConfig(policy: any): {
     // server-resolved binding. Unpartitioned legacy roots remain governed by
     // the existing tier/persona checks until their storage migration lands.
     requireTenantBinding:
-      cfg.require_tenant_binding === true || process.env.KYBERION_TENANT_SCOPE_REQUIRED === 'true',
+      cfg.require_tenant_binding === true ||
+      getRegisteredEnvBool('KYBERION_TENANT_SCOPE_REQUIRED') === true,
     slugPattern,
     brokerRequirements: {
       requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
@@ -534,7 +549,7 @@ function recordGroupAccess(input: {
 
 export function validateWritePermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
+  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
   const currentMission = process.env.MISSION_ID;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -553,7 +568,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-  } = resolveIdentityContext();
+  } = resolvePolicyIdentityContext();
 
   const loaded = loadPolicy();
   if (loaded.status === 'missing') return { allowed: true };
@@ -640,7 +655,7 @@ export function detectTier(filePath: string): TierLevel {
  */
 export function validateReadPermission(filePath: string): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(PROJECT_ROOT, resolvedPath));
+  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
 
   if (isOutsideProjectRoot(relativePath)) {
     return {
@@ -681,7 +696,7 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-  } = resolveIdentityContext();
+  } = resolvePolicyIdentityContext();
 
   // Tenant scope — deny cross-tenant reads from confidential.
   const tenantDenial = checkTenantScope(

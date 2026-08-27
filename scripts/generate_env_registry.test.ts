@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { classifyEnvName, mergeRegistry, type EnvRegistryFile } from './generate_env_registry.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  classifyEnvName,
+  discoverEnvNames,
+  mergeRegistry,
+  validateEnvRegistryQuality,
+  type EnvRegistryFile,
+} from './generate_env_registry.js';
 
 describe('classifyEnvName', () => {
   it('classifies secrets, paths, flags, tuning, and providers', () => {
@@ -15,6 +23,35 @@ describe('classifyEnvName', () => {
     });
     expect(classifyEnvName('KYBERION_LOCAL_LLM_URL').category).toBe('provider');
     expect(classifyEnvName('KYBERION_SOMETHING_ELSE').category).toBe('runtime');
+    expect(classifyEnvName('KYBERION_STT_WINDOW_SEC')).toEqual({
+      category: 'tuning',
+      type: 'number',
+    });
+  });
+});
+
+describe('discoverEnvNames', () => {
+  const fixtureRoot = pathResolver.sharedTmp('generate-env-registry-tests');
+
+  afterEach(() => {
+    safeRmSync(fixtureRoot, { recursive: true, force: true });
+  });
+
+  it('covers Python runtime bridges while ignoring tests and dynamic prefixes', () => {
+    const scriptsRoot = path.join(fixtureRoot, 'scripts');
+    safeMkdir(scriptsRoot, { recursive: true });
+    safeWriteFile(
+      path.join(scriptsRoot, 'voice_bridge.py'),
+      ['os.environ.get("KYBERION_PYTHON_ONLY")', 'os.environ.get("KYBERION_DYNAMIC_${role}")'].join(
+        '\n'
+      )
+    );
+    safeWriteFile(path.join(scriptsRoot, 'voice_bridge.test.py'), 'KYBERION_TEST_ONLY\n');
+
+    const discovered = discoverEnvNames(fixtureRoot);
+    expect(discovered).toContain('KYBERION_PYTHON_ONLY');
+    expect(discovered).not.toContain('KYBERION_TEST_ONLY');
+    expect(discovered).not.toContain('KYBERION_DYNAMIC_');
   });
 });
 
@@ -61,5 +98,65 @@ describe('mergeRegistry', () => {
     const merged = mergeRegistry(['KYBERION_A'], null);
     expect(merged.version).toBe('1.0.0');
     expect(merged.entries).toHaveLength(1);
+  });
+});
+
+describe('validateEnvRegistryQuality', () => {
+  const base = (entry: Partial<EnvRegistryFile['entries'][number]>): EnvRegistryFile => ({
+    version: '1.0.0',
+    description: 'test',
+    entries: [
+      {
+        name: 'KYBERION_TEST',
+        category: 'runtime',
+        type: 'string',
+        required: false,
+        description: '',
+        documented: false,
+        ...entry,
+      },
+    ],
+  });
+
+  it('requires descriptions for required or documented variables', () => {
+    expect(validateEnvRegistryQuality(base({ required: true, documented: true }))).toEqual([
+      'KYBERION_TEST: required/documented entries must have a description',
+    ]);
+    expect(validateEnvRegistryQuality(base({ documented: true }))).toEqual([
+      'KYBERION_TEST: required/documented entries must have a description',
+    ]);
+  });
+
+  it('requires unconditional settings to be operator-documented', () => {
+    expect(
+      validateEnvRegistryQuality(
+        base({ required: true, documented: false, description: 'startup prerequisite' })
+      )
+    ).toEqual(['KYBERION_TEST: required entries must be documented']);
+  });
+
+  it('rejects required secrets', () => {
+    expect(
+      validateEnvRegistryQuality(
+        base({ category: 'secret', required: true, documented: true, description: 'test secret' })
+      )
+    ).toEqual(['KYBERION_TEST: secrets may not be required through the shared registry']);
+  });
+
+  it('rejects secret defaults and non-opaque secret types without requiring secrets', () => {
+    expect(
+      validateEnvRegistryQuality(
+        base({ category: 'secret', description: 'credential', default: 'placeholder' })
+      )
+    ).toEqual(['KYBERION_TEST: secrets may not define a registry default']);
+    expect(
+      validateEnvRegistryQuality(
+        base({ category: 'secret', type: 'number', description: 'credential' })
+      )
+    ).toEqual(['KYBERION_TEST: secrets must use the opaque string type']);
+  });
+
+  it('accepts optional undocumented discovery entries', () => {
+    expect(validateEnvRegistryQuality(base({}))).toEqual([]);
   });
 });

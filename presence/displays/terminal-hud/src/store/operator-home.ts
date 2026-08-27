@@ -44,5 +44,7 @@ export function operatorHomeWatchPaths(): string[] {
     pathResolver.active('shared/runtime'),
     pathResolver.active('shared/coordination/channels'),
     pathResolver.shared('inbox/entries.jsonl'),
+    pathResolver.active('shared/coordination/channels'),
+    pathResolver.shared('inbox/entries.jsonl'),
   ];
 }

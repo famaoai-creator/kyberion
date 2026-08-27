@@ -12,13 +12,7 @@
  */
 
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, loadJson, safeWriteFile } from '@agent/core';
 
 const COOKIE_DIR_REL = 'active/shared/state/browser-cookies';
 
@@ -30,7 +24,7 @@ export function readCookies(accountSlug: string): unknown[] {
   const file = cookiePathFor(accountSlug);
   if (!safeExistsSync(file)) return [];
   try {
-    const data = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+    const data = loadJson<unknown>(file);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];

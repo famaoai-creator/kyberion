@@ -570,7 +570,7 @@ export function createPolicyAndManifestChecks(deps: PolicyCheckDeps): ContractCh
     },
     {
       id: 'secret-mutation-approval',
-      schemaPath: 'schemas/secret-mutation-approval.schema.json',
+      schemaPath: 'knowledge/product/schemas/secret-mutation-approval.schema.json',
       validPayloads: [
         {
           request_id: 'req-schema-1',

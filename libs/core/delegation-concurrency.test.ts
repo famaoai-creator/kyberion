@@ -23,6 +23,8 @@ let tmpDir: string;
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     shared: (sub = '') => path.join(tmpDir, sub),
+    knowledge: (sub = '') => path.join('/tmp', 'kyberion-test-knowledge', sub),
+    rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),
   },
   // Named exports (as opposed to the `pathResolver` object above) are what
   // `storage-janitor.ts` imports — provided here too so the shape-drift /
@@ -43,6 +45,7 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data);
     },
+    loadJsonIfPresent: () => null,
   };
 });
 

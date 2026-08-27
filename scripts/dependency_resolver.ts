@@ -27,6 +27,7 @@ import {
   loadActuatorDependencyBundles,
   type ActuatorDependencyBundleEntry,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -380,18 +381,16 @@ export function formatResolutionReport(result: ResolutionResult): string {
 
 // ─── CLI entry ────────────────────────────────────────────────────────────────
 
-async function main() {
-  const args = process.argv.slice(2);
+async function main(args: string[]) {
   const actuatorIdx = args.indexOf('--actuator');
   const actuator = actuatorIdx >= 0 ? args[actuatorIdx + 1] : 'all';
   const jsonOutput = args.includes('--json');
 
   const deps = ACTUATOR_DEPS[actuator ?? 'all'];
   if (!deps) {
-    console.error(
+    throw new Error(
       `Unknown actuator: ${actuator}. Available: ${Object.keys(ACTUATOR_DEPS).join(', ')}`
     );
-    process.exit(1);
   }
 
   const result = await resolveDependencies(deps);
@@ -403,12 +402,17 @@ async function main() {
     console.log(formatResolutionReport(result));
   }
 
-  process.exit(result.allMustsSatisfied ? 0 : 1);
+  if (!result.allMustsSatisfied) throw new Error('one or more required dependencies are missing');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((err) => {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'dependency_resolver.ts') ||
+  isDirectScript(import.meta.url, 'dependency_resolver.js')
+)
+  void defineScript({
+    name: 'dependency:resolve',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

@@ -223,3 +223,11 @@ export const INGEST_ACTUATOR_OPS = [
   'staleness_report',
   'commit',
 ] as const;
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'ingest-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

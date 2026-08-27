@@ -15,6 +15,7 @@
     "questions"
   ],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string",
       "minLength": 1
@@ -111,7 +112,17 @@
           "minItems": 1,
           "items": {
             "type": "string",
-            "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+            "enum": [
+              "planning",
+              "status_update",
+              "decision",
+              "facilitation",
+              "workshop",
+              "incident",
+              "one_on_one",
+              "review",
+              "default"
+            ]
           }
         },
         "required_item": {
@@ -167,7 +178,17 @@
           "minItems": 1,
           "items": {
             "type": "string",
-            "enum": ["planning", "status_update", "decision", "facilitation", "workshop", "incident", "one_on_one", "review", "default"]
+            "enum": [
+              "planning",
+              "status_update",
+              "decision",
+              "facilitation",
+              "workshop",
+              "incident",
+              "one_on_one",
+              "review",
+              "default"
+            ]
           }
         },
         "required_item": {
@@ -223,13 +244,7 @@
         },
         "state": {
           "type": "string",
-          "enum": [
-            "required",
-            "recommended",
-            "optional",
-            "blocked_by_authority",
-            "not_needed"
-          ]
+          "enum": ["required", "recommended", "optional", "blocked_by_authority", "not_needed"]
         },
         "reason": {
           "type": "string",

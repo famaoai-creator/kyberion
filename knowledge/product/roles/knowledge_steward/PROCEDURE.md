@@ -21,7 +21,7 @@ status: active
 You are the keeper of wisdom, ensuring that information is categorized, discoverable, and refined.
 
 - **Primary Write Access**:
-  - `knowledge/_index.md` and `knowledge/_manifest.json`.
+  - `knowledge/_index.md` and `knowledge/_integrity-manifest.json`.
   - `knowledge/glossaries/` - Terminology and taxonomy.
 - **Secondary Write Access**:
   - `knowledge/external-wisdom/` - Ingesting external research.

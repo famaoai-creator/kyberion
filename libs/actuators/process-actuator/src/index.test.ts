@@ -11,7 +11,10 @@ describe('process-actuator schema', () => {
   it('accepts supported process actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/process-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/process-action.schema.json')
+    );
 
     expect(
       validate({
@@ -25,7 +28,7 @@ describe('process-actuator schema', () => {
           args: ['--version'],
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
 
     expect(
@@ -35,20 +38,23 @@ describe('process-actuator schema', () => {
           resourceId: 'proc-schema-1',
         },
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects unsupported process actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.join(pathResolver.rootDir(), 'schemas/process-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/process-action.schema.json')
+    );
 
     expect(
       validate({
         action: 'unsupported',
         params: {},
-      }),
+      })
     ).toBe(false);
   });
 });

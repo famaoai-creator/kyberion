@@ -22,7 +22,7 @@ export interface BrowserDistillCandidateAssessment {
   targetKind: 'pattern';
 }
 
-function normalizeText(value: string | undefined): string {
+function normalizeBrowserDistillText(value: string | undefined): string {
   return String(value || '').trim();
 }
 
@@ -45,11 +45,11 @@ function summarizeActionKinds(actions: BrowserDistillCandidateActionSummary[]): 
 export function assessBrowserDistillCandidate(
   input: BrowserDistillCandidateAssessmentInput
 ): BrowserDistillCandidateAssessment {
-  const goalSummary = normalizeText(input.goalSummary);
-  const previewText = normalizeText(input.previewText);
-  const tracePath = normalizeText(input.tracePath);
-  const targetUrl = normalizeText(input.targetUrl);
-  const windowTitle = normalizeText(input.windowTitle);
+  const goalSummary = normalizeBrowserDistillText(input.goalSummary);
+  const previewText = normalizeBrowserDistillText(input.previewText);
+  const tracePath = normalizeBrowserDistillText(input.tracePath);
+  const targetUrl = normalizeBrowserDistillText(input.targetUrl);
+  const windowTitle = normalizeBrowserDistillText(input.windowTitle);
   const recentActions = Array.isArray(input.recentActions) ? input.recentActions : [];
   const summary = summarizeActionKinds(recentActions);
 

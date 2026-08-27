@@ -1,6 +1,6 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { buildGuidedCoordinationBrief } from './guided-coordination-brief.js';
 import {
   buildContextualIntentFrame,
@@ -15,9 +15,6 @@ import type { GuidedCoordinationBrief } from './src/types/guided-coordination-br
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import { resolveInputBindings, type InputBinding } from './input-binding.js';
 import { type WorkflowExecutionShape } from './execution-shape.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const EXECUTION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/actuator-execution-brief.schema.json'
@@ -58,12 +55,7 @@ export interface ApprovalWorkflowStep {
   description: string;
   actuator: string;
   phase:
-    | 'resolve_system'
-    | 'authenticate'
-    | 'list_pending'
-    | 'review_item'
-    | 'decide'
-    | 'summarize';
+    'resolve_system' | 'authenticate' | 'list_pending' | 'review_item' | 'decide' | 'summarize';
   requires_confirmation?: boolean;
   input_refs?: string[];
   output_refs?: string[];
@@ -74,7 +66,7 @@ let executionBriefValidateFn: ValidateFunction | null = null;
 
 function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
-  executionBriefValidateFn = compileSchemaFromPath(ajv, EXECUTION_BRIEF_SCHEMA_PATH);
+  executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
 }
 
@@ -278,62 +270,6 @@ function inferArchetypeId(seed: ExecutionBriefSeed): string {
   return 'general-request';
 }
 
-function inferTargetActuators(seed: ExecutionBriefSeed): string[] {
-  const taskType = seed.taskType || '';
-  const intentId = seed.intentId || '';
-
-  if (taskType === 'presentation_deck') return ['presentation-outline-compiler', 'pptx-generator'];
-  if (taskType === 'report_document' || taskType === 'document_generation')
-    return ['document-outline-compiler', 'document-generator'];
-  if (taskType === 'service_operation') return ['task-session-manager', 'service-orchestrator'];
-  if (taskType === 'analysis') return ['analysis-engine', 'knowledge-retriever'];
-  if (taskType === 'browser') return ['browser-actuator', 'web-retriever'];
-  if (taskType === 'capture_photo')
-    return ['virtual-camera-bridge', 'vision-actuator', 'artifact-actuator'];
-  if (taskType === 'workbook_wbs') return ['workbook-builder', 'spreadsheet-actuator'];
-  if (isScheduleAgendaRead(seed)) return ['calendar-actuator', 'service-actuator'];
-  if (isApprovalWorkflowRequest(seed.requestText))
-    return ['browser-actuator', 'approval-actuator', 'service-actuator'];
-  if (isMeetingRequest(seed.requestText)) return ['meeting-actuator', 'meeting-browser-driver'];
-  if (isScheduleRequest(seed.requestText)) return ['browser-actuator', 'service-actuator'];
-  if (isProjectBootstrapRequest(seed.requestText))
-    return ['orchestrator-actuator', 'artifact-actuator', 'wisdom-actuator'];
-
-  if (/booking|reservation|appointment|purchase|order|schedule/i.test(intentId)) {
-    return ['concierge-router', 'search-and-compare'];
-  }
-  return ['intent-compiler', 'work-loop-compiler'];
-}
-
-function inferDeliverables(seed: ExecutionBriefSeed): string[] {
-  const outcomeIds = toStringArray(seed.outcomeIds);
-  if (outcomeIds.length > 0) return outcomeIds;
-
-  switch (seed.taskType) {
-    case 'presentation_deck':
-      return ['artifact:pptx'];
-    case 'report_document':
-    case 'document_generation':
-      return ['artifact:doc'];
-    case 'analysis':
-      return ['artifact:analysis-report'];
-    case 'browser':
-      return ['artifact:browser-session'];
-    case 'service_operation':
-      return ['artifact:managed-program-plan'];
-    case 'workbook_wbs':
-      return ['artifact:xlsx'];
-    default:
-      if (isScheduleAgendaRead(seed)) return ['calendar_agenda_summary'];
-      if (isApprovalRequestResolution(seed.requestText)) return ['approval_resolved'];
-      if (isApprovalRequestCreation(seed.requestText)) return ['approval_request_created'];
-      if (isMeetingRequest(seed.requestText)) return ['meeting_operations_summary'];
-      if (isScheduleRequest(seed.requestText)) return ['schedule_coordination_summary'];
-      if (isProjectBootstrapRequest(seed.requestText)) return ['project_created'];
-      return [seed.intentId ? `intent:${seed.intentId}` : 'artifact:governed-outcome'];
-  }
-}
-
 function inferMissingInputs(
   seed: ExecutionBriefSeed,
   guidedMissingInputs: string[] = []
@@ -428,10 +364,6 @@ function inferReadinessReason(seed: ExecutionBriefSeed, missingInputs: string[])
   return 'The request can be routed through a governed execution path.';
 }
 
-function inferSummary(seed: ExecutionBriefSeed): string {
-  return seed.goalSummary?.trim() || seed.summaryHint?.trim() || seed.requestText.trim();
-}
-
 function inferUserFacingSummary(summary: string): string {
   if (summary.length <= 120) return summary;
   return `${summary.slice(0, 117)}...`;
@@ -455,18 +387,6 @@ function inferServiceBindingRefs(seed: ExecutionBriefSeed): string[] {
   return Array.isArray(seed.serviceBindings)
     ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
     : [];
-}
-
-function inferAssumptions(seed: ExecutionBriefSeed, missingInputs: string[]): string[] {
-  const assumptions: string[] = [];
-  if (seed.tier) assumptions.push(`Operate within the ${seed.tier} knowledge tier.`);
-  if (seed.serviceBindings && seed.serviceBindings.length > 0) {
-    assumptions.push(`Reuse configured service bindings: ${seed.serviceBindings.join(', ')}.`);
-  }
-  if (missingInputs.length === 0) {
-    assumptions.push('Proceed with governed defaults unless the user overrides them.');
-  }
-  return assumptions;
 }
 
 function inferClarificationQuestions(seed: ExecutionBriefSeed, missingInputs: string[]) {

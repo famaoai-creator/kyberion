@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Durable graph-run journal for mission follow-up dispatch (GE-05).
  *
@@ -6,7 +7,7 @@
  * process stops between node completion and NEXT_TASKS persistence.
  */
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 export const MISSION_GRAPH_RUN_JOURNAL_VERSION = 1;
 
@@ -78,7 +79,7 @@ function appendEvent(
     timestamp: new Date().toISOString(),
     payload,
   };
-  safeAppendFileSync(filePath, `${JSON.stringify(envelope)}\n`);
+  appendJsonLine(filePath, envelope);
   return envelope;
 }
 

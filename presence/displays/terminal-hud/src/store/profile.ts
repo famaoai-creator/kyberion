@@ -6,7 +6,7 @@ import {
   listAgentIdentities,
   loadOrganizationProfile,
 } from '@agent/core';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync } from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
@@ -26,7 +26,7 @@ export function loadProfile(): ProfileData {
   try {
     const statePath = path.join(profileRoot, 'onboarding', 'onboarding-state.json');
     if (safeExistsSync(statePath)) {
-      const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string);
+      const state = loadJson<Record<string, unknown>>(statePath);
       onboardingLines = Object.entries(state)
         .filter(([, value]) => typeof value !== 'object' || value === null)
         .slice(0, 10)

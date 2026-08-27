@@ -7,10 +7,9 @@ import {
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import * as AjvModule from 'ajv';
+import { createAjv } from '@agent/core/foundation';
 import * as addFormatsModule from 'ajv-formats';
-import type { Ajv as AjvInstance, Options, ValidateFunction } from 'ajv';
-import * as path from 'node:path';
+import type { ValidateFunction } from 'ajv';
 import {
   calendarBackendRegistry,
   createJxaCalendarBackend,
@@ -25,23 +24,16 @@ export type CalendarAction = {
   params?: CalendarParams;
 };
 
-type AjvConstructor = new (options?: Options) => AjvInstance;
-type AddFormats = (instance: AjvInstance) => AjvInstance;
-const AjvCtor =
-  (AjvModule as unknown as { default?: AjvConstructor }).default ||
-  (AjvModule as unknown as AjvConstructor);
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormats }).default ||
-  (addFormatsModule as unknown as AddFormats);
+const addFormats = (addFormatsModule as any).default || addFormatsModule;
 const CALENDAR_SCHEMA_PATH = pathResolver.rootResolve(
-  'libs/actuators/calendar-actuator/schemas/calendar-action.schema.json'
+  'knowledge/product/schemas/calendar-action.schema.json'
 );
 
 let cachedValidator: ValidateFunction | null = null;
 
 function getValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
-  const ajv = new AjvCtor({ allErrors: true });
+  const ajv = createAjv();
   addFormats(ajv);
   cachedValidator = compileSchemaFromPath(ajv, CALENDAR_SCHEMA_PATH);
   return cachedValidator;

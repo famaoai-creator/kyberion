@@ -4,8 +4,7 @@
  */
 
 import * as path from 'node:path';
-import AjvModule from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import * as pathResolver from './path-resolver.js';
 import {
   findMissionPath,
@@ -27,14 +26,11 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import { hasAuthority } from './governance.js';
 import { readJsonFile } from './cli-input.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
-const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
-const missionStateAjv = new AjvCtor({ allErrors: true });
-let missionStateValidate: ReturnType<typeof compileSchemaFromPath> | undefined;
+let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 
 function getMissionStateValidator() {
-  return (missionStateValidate ??= compileSchemaFromPath(
-    missionStateAjv,
-    pathResolver.rootResolve('schemas/mission-state.schema.json')
+  return (missionStateValidate ??= compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/mission-state.schema.json')
   ));
 }
 

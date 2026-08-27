@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/service-runtime-registry.schema.json",
   "version": "1.0.0",
   "default_service_id": "comfyui",
   "services": [

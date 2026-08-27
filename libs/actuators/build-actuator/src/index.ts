@@ -1,7 +1,14 @@
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
-import { logger, runActuatorCli } from '@agent/core';
+import { logger, runActuatorCli, defineCatalogBackedActuator } from '@agent/core';
 import { handleAction } from './build-actuator-helpers.js';
+import { describeOps } from './op-catalog.js';
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'build-actuator',
+  describeOps,
+  handleAction,
+});
 
 const main = async () => {
   await runActuatorCli({
@@ -16,7 +23,7 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

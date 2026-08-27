@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import {
   loadWorkScopePolicy,
   resolveWorkScopeDecision,
@@ -145,17 +146,21 @@ describe('work-scope-decision', () => {
       ajv,
       path.resolve(root, 'knowledge/product/schemas/work-scope-policy.schema.json')
     );
-    const policy = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/product/governance/work-scope-policy.json'), {
-        encoding: 'utf8',
-      }) as string
+    const policy = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(path.resolve(root, 'knowledge/product/governance/work-scope-policy.json'), {
+          encoding: 'utf8',
+        }) as string
+      )
     );
 
     expect(validate(policy)).toBe(true);
     expect(loadWorkScopePolicy().version).toBe('1.0.0');
 
-    const secureIo = await import('./secure-io.js');
-    const spy = vi.spyOn(secureIo, 'safeReadFile').mockReturnValue('{"version":1}') as unknown as {
+    const foundationJson = await import('./foundation/json.js');
+    const spy = vi
+      .spyOn(foundationJson, 'readJson')
+      .mockReturnValue({ version: 1 } as unknown) as unknown as {
       mockRestore(): void;
     };
     expect(() => loadWorkScopePolicy()).toThrow('Invalid work-scope-policy');

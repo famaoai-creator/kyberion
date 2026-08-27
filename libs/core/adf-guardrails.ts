@@ -1,5 +1,7 @@
+import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, validateUrl } from './secure-io.js';
+import { safeExistsSync, validateUrl } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import {
   evaluateShellCommandPolicy,
   loadShellCommandPolicy,
@@ -20,6 +22,38 @@ export interface AdfGuardrailFinding {
 export interface AdfGuardrailReport {
   ok: boolean;
   findings: AdfGuardrailFinding[];
+}
+
+export interface AdfScriptWrapperBaselineEntry {
+  file: string;
+  pattern: string;
+  match: string;
+}
+
+export interface AdfGuardrailOptions {
+  /** Explicit, exact migration exceptions. New wrappers remain blocking. */
+  scriptWrapperBaseline?: readonly AdfScriptWrapperBaselineEntry[];
+}
+
+function normalizeGuardrailSourcePath(sourcePath: string): string {
+  const relative = path.relative(pathResolver.rootDir(), sourcePath).replaceAll('\\', '/');
+  return relative.startsWith('../') || path.isAbsolute(relative)
+    ? sourcePath.replaceAll('\\', '/')
+    : relative;
+}
+
+export function isBaselinedScriptWrapper(
+  sourcePath: string,
+  command: string,
+  baseline: readonly AdfScriptWrapperBaselineEntry[] = []
+): boolean {
+  const normalizedSource = normalizeGuardrailSourcePath(sourcePath);
+  return baseline.some(
+    (entry) =>
+      entry.file === normalizedSource &&
+      entry.pattern === 'script-wrapper' &&
+      entry.match === command
+  );
 }
 
 interface AdfExecutionPolicy {
@@ -65,9 +99,7 @@ function loadAdfExecutionPolicy(): AdfExecutionPolicy {
   }
 
   try {
-    const parsed = JSON.parse(
-      safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-    ) as Partial<AdfExecutionPolicy>;
+    const parsed = readJson<Partial<AdfExecutionPolicy>>(POLICY_PATH);
     cachedPolicy = {
       limits: {
         max_steps: coercePositiveInt(parsed?.limits?.max_steps, DEFAULT_POLICY.limits.max_steps),
@@ -123,9 +155,28 @@ export function forbiddenGitCoexecutionMutation(command: string): string | undef
   return checks.find(([pattern]) => pattern.test(command))?.[1];
 }
 
+function isScriptWrapperCommand(command: string, args: readonly string[]): boolean {
+  const normalizedCommand = [command, ...args].join(' ');
+  const typedWrapper =
+    (command.trim() === 'node' && args[0]?.startsWith('dist/')) ||
+    (command.trim() === 'npx' && args[0] === 'tsx') ||
+    (command.trim() === 'pnpm' && (args[0] === 'exec' || args[0] === 'dlx'));
+
+  // Keep the existing raw command-string behavior in addition to the typed
+  // command/args shape above.
+  return (
+    typedWrapper ||
+    /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
+      normalizedCommand
+    ) ||
+    /dist\/libs\/actuators\//iu.test(normalizedCommand)
+  );
+}
+
 export function validatePipelineGuardrails(
   pipeline: PipelineAdf,
-  sourcePath = 'pipeline'
+  sourcePath = 'pipeline',
+  options: AdfGuardrailOptions = {}
 ): AdfGuardrailReport {
   const findings: AdfGuardrailFinding[] = [];
   const policy = loadAdfExecutionPolicy();
@@ -233,12 +284,28 @@ export function validatePipelineGuardrails(
           (value): value is string => typeof value === 'string' && value.trim().length > 0
         );
         if (command) {
-          const forbidden = forbiddenGitCoexecutionMutation(command);
+          const commandArgs = Array.isArray(params.args)
+            ? params.args.filter((value): value is string => typeof value === 'string')
+            : [];
+          const normalizedCommand = [command, ...commandArgs].join(' ');
+          const forbidden = forbiddenGitCoexecutionMutation(normalizedCommand);
           if (forbidden) {
             findings.push({
               code: 'git-coexecution-mutation-forbidden',
               severity: 'error',
               message: `${forbidden} is forbidden in an ADF shell step because it can mutate another session's worktree; use a governed explicit-path/recovery surface.`,
+              path: `${stepPath}.params.cmd`,
+            });
+          }
+          if (
+            isScriptWrapperCommand(command, commandArgs) &&
+            !isBaselinedScriptWrapper(sourcePath, normalizedCommand, options.scriptWrapperBaseline)
+          ) {
+            findings.push({
+              code: 'script-wrapper-forbidden',
+              severity: 'error',
+              message:
+                'ADF shell steps must not wrap scripts or actuators; use a typed operation or core:include.',
               path: `${stepPath}.params.cmd`,
             });
           }
@@ -293,7 +360,7 @@ export function validatePipelineGuardrails(
         if (script.length > policy.limits.max_transform_script_chars) {
           findings.push({
             code: 'transform-script-oversized',
-            severity: 'warn',
+            severity: 'error',
             message: `core:transform script is ${script.length} chars (limit ${policy.limits.max_transform_script_chars}) — move this logic into a typed actuator op instead of JS-in-a-string`,
             path: stepPath,
           });

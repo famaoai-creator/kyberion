@@ -2,7 +2,14 @@ import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { compileSchemaFromPath, pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '@agent/core';
+import {
+  compileSchemaFromPath,
+  pathResolver,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+} from '@agent/core';
 import { enqueueMission } from './mission-queue.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -22,7 +29,10 @@ describe('mission-queue', () => {
     const entry = JSON.parse(raw.trim().split('\n')[0] || '{}');
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, pathResolver.rootResolve('schemas/mission-queue.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      pathResolver.rootResolve('knowledge/product/schemas/mission-queue.schema.json')
+    );
     const valid = validate(entry);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
   });

@@ -5,12 +5,12 @@
  *
  * The canonical location is
  *   active/missions/<mission_id>/evidence/requirements-draft.json
- * conforming to schemas/requirements-draft.schema.json.
+ * conforming to knowledge/product/schemas/requirements-draft.schema.json.
  */
 
 import * as path from 'node:path';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   ExtractedRequirements,
   FunctionalRequirement,
@@ -37,7 +37,13 @@ export interface RequirementsDraft {
   project_name: string;
   customer?: { name?: string; person_slug?: string; org?: string };
   elicitation_source?: {
-    type: 'call_recording' | 'call_transcript' | 'meeting_notes' | 'document_pack' | 'chat_log' | 'mixed';
+    type:
+      | 'call_recording'
+      | 'call_transcript'
+      | 'meeting_notes'
+      | 'document_pack'
+      | 'chat_log'
+      | 'mixed';
     refs?: string[];
     language?: string;
   };
@@ -61,7 +67,7 @@ function draftPath(missionId: string): string | null {
 export function readRequirementsDraft(missionId: string): RequirementsDraft | null {
   const file = draftPath(missionId);
   if (!file || !safeExistsSync(file)) return null;
-  return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as RequirementsDraft;
+  return loadJson<RequirementsDraft>(file);
 }
 
 export interface SaveRequirementsDraftParams {
@@ -100,7 +106,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
   const file = draftPath(params.missionId);
   if (!file) {
     throw new Error(
-      `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`,
+      `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
   safeWriteFile(file, `${JSON.stringify(draft, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
@@ -126,7 +132,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
   const existing = readRequirementsDraft(params.missionId);
   if (!existing) {
     throw new Error(
-      `[requirements-draft-store] cannot record signoff — no draft found for ${params.missionId}`,
+      `[requirements-draft-store] cannot record signoff — no draft found for ${params.missionId}`
     );
   }
   existing.stakeholder_signoff = {
@@ -139,7 +145,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
   const file = draftPath(params.missionId);
   if (!file) {
     throw new Error(
-      `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`,
+      `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
   safeWriteFile(file, `${JSON.stringify(existing, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
@@ -169,17 +175,15 @@ export function evaluateRequirementsCompletenessGate(missionId: string): GateRes
     reasons.push('functional_requirements is empty');
   }
   const mustsWithoutCriteria = draft.functional_requirements.filter(
-    (r) =>
-      r.priority === 'must' &&
-      (!r.acceptance_criteria || r.acceptance_criteria.length === 0),
+    (r) => r.priority === 'must' && (!r.acceptance_criteria || r.acceptance_criteria.length === 0)
   );
   if (mustsWithoutCriteria.length > 0) {
     reasons.push(
-      `must-have FRs without acceptance_criteria: ${mustsWithoutCriteria.map((r) => r.id).join(', ')}`,
+      `must-have FRs without acceptance_criteria: ${mustsWithoutCriteria.map((r) => r.id).join(', ')}`
     );
   }
   const openBlocking = draft.open_questions.filter(
-    (q) => (q.status ?? 'open') === 'open' && q.blocking !== false,
+    (q) => (q.status ?? 'open') === 'open' && q.blocking !== false
   );
   if (openBlocking.length > 0) {
     reasons.push(`${openBlocking.length} open question(s) unresolved`);
@@ -196,7 +200,10 @@ export function evaluateCustomerSignoffGate(missionId: string): GateResult {
     return { passed: false, reasons: ['no requirements-draft.json present'] };
   }
   if (!draft.stakeholder_signoff?.customer_signed_off) {
-    return { passed: false, reasons: ['stakeholder_signoff.customer_signed_off is false or absent'] };
+    return {
+      passed: false,
+      reasons: ['stakeholder_signoff.customer_signed_off is false or absent'],
+    };
   }
   return { passed: true, reasons: [] };
 }

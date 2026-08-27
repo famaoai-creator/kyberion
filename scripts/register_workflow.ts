@@ -18,19 +18,16 @@
  *                      by id (authority role: register_workflow). Run `pnpm validate`
  *                      (or the governance checks) afterwards to gate the change.
  *
- * The request is validated against schemas/workflow-registration-request.schema.json.
+ * The request is validated against knowledge/product/schemas/workflow-registration-request.schema.json.
  * All I/O goes through @agent/core secure-io. This tool never writes secrets or
  * customer-specific values; those belong in confidential-tier instantiations.
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
-import * as AjvModule from 'ajv';
+import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
-
-const AjvCtor = ((AjvModule as { default?: unknown }).default ?? AjvModule) as new (
-  opts?: Record<string, unknown>
-) => { compile: (schema: unknown) => (data: unknown) => boolean & { errors?: unknown } };
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_REL = 'knowledge/product/governance/mission-workflow-catalog.json';
 const INTENTS_REL = 'knowledge/product/governance/standard-intents.json';
@@ -99,7 +96,7 @@ function abs(rel: string): string {
 }
 
 function readJson(rel: string): Json {
-  return JSON.parse(safeReadFile(abs(rel)) as string) as Json;
+  return readFoundationJson<Json>(abs(rel));
 }
 
 function writeJson(rel: string, obj: unknown): void {
@@ -118,8 +115,8 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
 }
 
 function validateRequest(req: unknown): void {
-  const schema = JSON.parse(safeReadFile(abs(SCHEMA_REL)) as string);
-  const ajv = new AjvCtor({ allErrors: true, strict: false });
+  const schema = readFoundationJson<unknown>(abs(SCHEMA_REL));
+  const ajv = createAjv();
   const validate = ajv.compile(schema);
   const ok = validate(req);
   if (!ok) {
@@ -394,16 +391,15 @@ function proposeBundle(req: RegistrationRequest): string {
   return dirRel;
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
+function main(argv: string[]): void {
+  const args = parseArgs(argv);
   if (!args.request) {
     process.stderr.write('Usage: register_workflow --request <path> [--propose|--apply]\n');
-    process.exit(2);
-    return;
+    throw new ScriptExitError(2);
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
-  const req = JSON.parse(safeReadFile(requestPath) as string) as RegistrationRequest;
+  const req = readFoundationJson<RegistrationRequest>(requestPath);
   validateRequest(req);
 
   if (args.mode === 'apply') {
@@ -438,4 +434,14 @@ function main(): void {
   );
 }
 
-main();
+const script = defineScript({
+  name: 'workflow:register',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'register_workflow.ts') ||
+  isDirectScript(import.meta.url, 'register_workflow.js')
+) {
+  void script();
+}

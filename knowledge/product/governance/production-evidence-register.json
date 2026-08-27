@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/production-evidence-register.schema.json",
   "version": "1.0.0",
   "last_updated": "2026-05-15",
   "release_decision": "pending_external_evidence",
@@ -68,7 +69,10 @@
         {
           "id": "review_record",
           "description": "Review, merge, or completed contribution evidence template",
-          "accepted_ref_patterns": ["docs/operator/templates/production-evidence-external-contribution.md", "https://github.com/"]
+          "accepted_ref_patterns": [
+            "docs/operator/templates/production-evidence-external-contribution.md",
+            "https://github.com/"
+          ]
         }
       ],
       "evidence_refs": []

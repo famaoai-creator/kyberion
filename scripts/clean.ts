@@ -8,6 +8,7 @@ import { safeRmSync } from '../libs/core/secure-io.js';
 import { pathResolver } from '../libs/core/path-resolver.js';
 import { getAllFiles } from '../libs/core/fs-utils.js';
 import { findSensitivePathMatch } from '../libs/core/sensitive-path-policy.js';
+import { getRegisteredEnvText, setRegisteredEnv } from '../libs/core/foundation/env.js';
 
 function removeIfExists(targetPath: string): void {
   if (!isProjectGeneratedFile(targetPath)) return;
@@ -29,8 +30,8 @@ function isProjectGeneratedFile(filePath: string): boolean {
 
 function main(): void {
   withExecutionContext('mission_controller', () => {
-    const previousSudo = process.env.KYBERION_SUDO;
-    process.env.KYBERION_SUDO = 'true';
+    const previousSudo = getRegisteredEnvText('KYBERION_SUDO');
+    setRegisteredEnv('KYBERION_SUDO', 'true');
     try {
       removeIfExists(pathResolver.rootResolve('dist'));
       removeIfExists(pathResolver.rootResolve('coverage'));
@@ -41,8 +42,7 @@ function main(): void {
         }
       }
     } finally {
-      if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
-      else process.env.KYBERION_SUDO = previousSudo;
+      setRegisteredEnv('KYBERION_SUDO', previousSudo);
     }
   });
 }

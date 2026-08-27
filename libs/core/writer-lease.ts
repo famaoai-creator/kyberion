@@ -9,7 +9,8 @@
 
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLock, withLockSync } from './src/lock-utils.js';
 
 export interface FencedWriterLease {
@@ -65,7 +66,7 @@ function readLease(leasePath: string): FencedWriterLease | undefined {
   if (!safeExistsSync(leasePath)) return undefined;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(leasePath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(leasePath);
   } catch {
     throw new Error(`[WRITER_LEASE_CORRUPT] unreadable lease: ${leasePath}`);
   }

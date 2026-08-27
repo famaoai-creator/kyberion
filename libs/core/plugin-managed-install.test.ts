@@ -141,7 +141,7 @@ describe('installPluginManaged', () => {
     const managedRoot = managedRootDir('portable-manifest');
     const src = sourceDir('portable-manifest');
     writePortableManifest(src, {
-      $schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+      $schema: 'https://agent-plugins.org/knowledge/product/schemas/1.0.0/plugin.schema.json',
       name: 'portable-sample',
       version: '1.0.0',
     });

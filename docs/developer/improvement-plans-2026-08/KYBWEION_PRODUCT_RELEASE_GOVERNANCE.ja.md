@@ -2,6 +2,7 @@
 title: Kybweion Services / kyberion プロダクトリリース運用改善計画
 tags: [tenant, project, mission, release-governance, kybweion-services]
 last_updated: 2026-08-12
+status: active
 ---
 
 # Kybweion Services / kyberion プロダクトリリース運用改善計画

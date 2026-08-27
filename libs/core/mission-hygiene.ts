@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -56,7 +56,7 @@ export interface MissionHygieneReport {
 function readJson<T>(filePath: string): T | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(filePath);
   } catch {
     return null;
   }

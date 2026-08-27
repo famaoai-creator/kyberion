@@ -8,9 +8,9 @@
  */
 
 import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { readJsonFile } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface DeniedPattern {
   name: string;
@@ -40,7 +40,7 @@ const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
 
 async function loadPolicy(): Promise<Policy> {
   const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return readJsonFile<Policy>(absolute);
+  return readJson<Policy>(absolute);
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {
@@ -366,31 +366,31 @@ export async function scan(): Promise<Violation[]> {
   return violations;
 }
 
-export async function main(): Promise<void> {
-  const violations = await scan();
-  if (violations.length === 0) {
-    console.log('[check:tier-hygiene] OK');
-    return;
-  }
-  console.error(`[check:tier-hygiene] ${violations.length} violation(s) detected:`);
-  for (const v of violations) {
-    console.error(`  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`);
-    console.error(`    → ${v.rationale}`);
-  }
-  console.error('');
-  console.error(
-    'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
-      'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.'
-  );
-  process.exit(1);
-}
+export const runCheckTierHygiene = defineScript({
+  name: 'check:tier-hygiene',
+  flags: [],
+  async run(context) {
+    const violations = await scan();
+    if (violations.length === 0) {
+      context.print('[check:tier-hygiene] OK');
+      return;
+    }
+    console.error(`[check:tier-hygiene] ${violations.length} violation(s) detected:`);
+    for (const v of violations) {
+      console.error(`  ${v.file}:${v.line} [${v.pattern}] ${v.matched}`);
+      console.error(`    → ${v.rationale}`);
+    }
+    console.error('');
+    console.error(
+      'Fix by moving the value into knowledge/confidential/{org}/ and using a placeholder (${VAR} / <PLACEHOLDER>) in public. ' +
+        'Legitimate industry terms should be added to allowlist_patterns in the tier-hygiene-policy.'
+    );
+    process.exitCode = 1;
+  },
+});
 
-const isDirectExecution =
-  process.argv[1] != null && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-
-if (isDirectExecution) {
-  main().catch((err) => {
-    console.error(`[check:tier-hygiene] fatal: ${err?.message ?? err}`);
-    process.exit(2);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'check_tier_hygiene.ts') ||
+  isDirectScript(import.meta.url, 'check_tier_hygiene.js')
+)
+  void runCheckTierHygiene();

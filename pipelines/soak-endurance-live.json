@@ -17,25 +17,12 @@
     {
       "id": "run_live_soak_pulse",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_soak_endurance",
       "produces": {
         "channel": "soak_endurance_live_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": [
-          "--import",
-          "./scripts/ts-loader.mjs",
-          "scripts/soak_endurance.ts",
-          "--live",
-          "--cycles",
-          "1",
-          "--fail-on-regression",
-          "--json"
-        ],
-        "timeout_ms": 120000
-      }
+      "params": { "cycles": 1, "mode": "live" }
     }
   ]
 }

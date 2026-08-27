@@ -14,14 +14,14 @@ tags:
     governance,
   ]
 last_updated: 2026-08-17
-status: in_progress
+status: active
 ---
 
 # スコープ運用性計画 — UX・自律性・持続性(KO-01〜19)
 
 ## 目的
 
-[KNOWLEDGE_SCOPE_ALIGNMENT_PLAN(KS-01〜16)](./KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md)で、ナレッジ供給・学習ループ・
+[KNOWLEDGE_SCOPE_ALIGNMENT_PLAN(KS-01〜16)](../improvement-plans-archive/2026-08/KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md)で、ナレッジ供給・学習ループ・
 UX 経路は正準 chain(`tenant_slug → organization_id → project_id → mission_id → task_id → session`)で **隔離される**ようになった。
 本計画はその次段として、スコープを「**見える・切り替えられる・説明できる**」(UX)、「**ループが人の再駆動なしに閉じる**」(自律性)、
 「**数か月運用しても正しく・有界に保てる**」(持続性)状態にする。KS の実装直後 read-only 監査(実装検証 / UX / 自律性の 3 経路)で
@@ -178,9 +178,9 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 
 ## 関連
 
-- [KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16](./KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md)(前提・隔離)
-- [KM-03_PROMOTION_GOVERNANCE_LOOP](../improvement-plans-2026-07/KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md) / [KM-04_KNOWLEDGE_STORE_HYGIENE](../improvement-plans-2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)
-- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-08 curation / ingest ceremony)
+- [KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16](../improvement-plans-archive/2026-08/KNOWLEDGE_SCOPE_ALIGNMENT_PLAN_2026-08-16.ja.md)(前提・隔離)
+- [KM-03_PROMOTION_GOVERNANCE_LOOP](../improvement-plans-archive/2026-07/KM-03_PROMOTION_GOVERNANCE_LOOP.ja.md) / [KM-04_KNOWLEDGE_STORE_HYGIENE](../improvement-plans-archive/2026-07/KM-04_KNOWLEDGE_STORE_HYGIENE.ja.md)
+- [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md)(DA-08 curation / ingest ceremony)
 - [ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09](./ENTITY_GOVERNANCE_UNIFICATION_PLAN_2026-08-09.ja.md)(scope-migration / physical namespace)
 - [LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08](./LIFECYCLE_SMOOTHNESS_PLAN_2026-08-08.ja.md)(改善ループ信号品質)
 - `scripts/watch_tenant_drift.ts` / `pipelines/tenant-drift-watch.json`(KO-18 の雛形)、`pipelines/knowledge-curation-weekly.json`(KO-03/14/16/17 の実行基盤)

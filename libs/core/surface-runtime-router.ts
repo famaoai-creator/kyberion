@@ -15,6 +15,7 @@ import type {
   SlackExecutionMode,
   ParsedSlackSurfacePrompt,
   SlackSurfaceMetadata,
+  SurfaceAsyncChannel,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
 
@@ -60,7 +61,7 @@ export function parseSlackSurfacePrompt(query: string): ParsedSlackSurfacePrompt
     userMessage,
   };
 }
-export function surfaceChannelFromAgentId(agentId: string): string {
+export function surfaceChannelFromAgentId(agentId: string): SurfaceAsyncChannel {
   const normalized = agentId.trim();
   if (!normalized) return 'slack';
   const manifests = listSurfaceProviderManifests();
@@ -74,7 +75,7 @@ export function surfaceChannelFromAgentId(agentId: string): string {
 
 export function deriveSurfaceDelegationReceiver(
   text: string,
-  surface: string = 'slack'
+  surface: SurfaceAsyncChannel = 'slack'
 ): SurfaceDelegationReceiver | undefined {
   return deriveSurfaceDelegationReceiverForProvider(surface, text);
 }
@@ -92,7 +93,7 @@ export function normalizeSurfaceDelegationReceiver(
 export function resolveSurfaceConversationReceiver(
   forcedReceiver: string | undefined,
   compiledFlow: UserIntentFlow | null | undefined,
-  surface: string = 'slack'
+  surface: SurfaceAsyncChannel = 'slack'
 ): SurfaceDelegationReceiver | undefined {
   if (forcedReceiver) return forcedReceiver as SurfaceDelegationReceiver;
   return resolveSurfaceConversationReceiverForProvider(surface, compiledFlow) || 'chronos-mirror';

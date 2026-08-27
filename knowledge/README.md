@@ -1,5 +1,11 @@
 # Kyberion Knowledge Base: Rights & Usage
 
+## Retrieval and integrity files
+
+`knowledge/_index.md` and `knowledge/_integrity-manifest.json` are generated integrity and navigation artifacts. They are not the retrieval contract. Task delivery resolves the scoped corpus through [`product/governance/knowledge-slices.json`](product/governance/knowledge-slices.json), validated by [`product/schemas/knowledge-slices.schema.json`](product/schemas/knowledge-slices.schema.json) and consumed by `libs/core/knowledge-slices.ts`.
+
+The legacy content-first documents that intentionally do not carry task-card frontmatter are listed in [`product/governance/frontmatter-exclusions.json`](product/governance/frontmatter-exclusions.json). New scoped knowledge cards must carry frontmatter; the exclusion manifest is reviewed with the knowledge taxonomy rather than inferred from missing metadata.
+
 本ディレクトリ（`knowledge/`）に含まれる情報の取り扱いについて。
 
 ## 1. ライセンス (Original Content)
