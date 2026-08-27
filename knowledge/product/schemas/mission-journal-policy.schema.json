@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "title", "summary_title", "trust_scores_title", "empty_message", "relationship_labels"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },
     "summary_title": { "type": "string", "minLength": 1 },
