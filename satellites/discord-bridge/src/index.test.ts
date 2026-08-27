@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { Message } from 'discord.js';
 import {
   approvalRequestLogicalPath,
   createSurfaceApprovalRequest,
@@ -116,16 +117,14 @@ describe('discord bridge thread context', () => {
         // No `channel.messages.fetch` — force the persisted-history fallback.
         channel: {},
         reply: vi.fn().mockResolvedValue(undefined),
-      } as any);
+      } as unknown as Message);
 
     await send('1', '最初の相談');
     await send('2', 'それで、どうなりましたか');
 
     expect(captured.conversationInputs).toHaveLength(2);
     expect(captured.conversationInputs[0].threadContext).toBeUndefined();
-    expect(captured.conversationInputs[1].threadContext).toContain(
-      'User (alice#0001): 最初の相談'
-    );
+    expect(captured.conversationInputs[1].threadContext).toContain('User (alice#0001): 最初の相談');
     expect(captured.conversationInputs[1].threadContext).not.toContain('それで、どうなりましたか');
   });
 
