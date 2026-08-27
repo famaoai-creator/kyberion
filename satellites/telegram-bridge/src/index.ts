@@ -642,8 +642,9 @@ export async function handleTelegramUpdate(
             return;
           }
 
-          if (!result.text) {
-            // UX-01: an empty agent reply must not read as silence.
+          // UX-01: an empty agent reply must not read as silence. Trim first so a
+          // whitespace-only reply matches the shared channel-adapter delivery gate.
+          if (!result.text.trim()) {
             deliveredReply = await sendTelegramMessage(
               { chatId, text: buildBridgeEmptyReplyText({ locale: resolveOperatorLocale() }) },
               options

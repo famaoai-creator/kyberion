@@ -1,6 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core';
 import { appendJsonLine } from '@agent/core/foundation';
+import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
@@ -679,10 +680,13 @@ async function start() {
           );
         },
       };
+      // The `'text' in message` narrowing above is lost inside the afterTurn
+      // closure under the per-package strict tsconfig; capture the text once.
+      const sourceText = message.text;
       await runSlackChannelTurn(
         channelAdapter,
         {
-          text: message.text,
+          text: sourceText,
           channel: message.channel,
           threadTs,
           correlationId: artifact.correlationId,
@@ -716,7 +720,7 @@ async function start() {
                 correlationId: artifact.correlationId,
                 channel: message.channel,
                 threadTs,
-                sourceText: message.text,
+                sourceText,
                 route,
                 outcome: 'approval_request',
                 approvalCount: conversation.approvalRequests.length,
@@ -729,7 +733,7 @@ async function start() {
                   correlationId: artifact.correlationId,
                   requestedBy: SLACK_SURFACE_AGENT_ID,
                   draft: approval,
-                  sourceText: message.text,
+                  sourceText,
                 });
               }
               return;
@@ -752,7 +756,7 @@ async function start() {
                 correlationId: artifact.correlationId,
                 channel: message.channel,
                 threadTs,
-                sourceText: message.text,
+                sourceText,
                 route,
                 outcome: 'mission_proposal',
                 approvalCount: conversation.approvalRequests.length,
@@ -762,7 +766,7 @@ async function start() {
                 channel: message.channel,
                 threadTs,
                 proposal,
-                sourceText: message.text,
+                sourceText,
                 routingDecision: conversation.routingDecision,
               });
               const response = await postSlackTextWithBlocks(client, {
@@ -781,7 +785,9 @@ async function start() {
               return;
             }
 
-            if (conversation.text) {
+            // Match the shared delivery gate in channel-adapter: a whitespace-only
+            // reply is silence, so it must take the empty-reply path.
+            if (conversation.text.trim()) {
               await reflectSlackPresence({
                 status: 'speaking',
                 expression: 'joy',
@@ -792,7 +798,7 @@ async function start() {
                 correlationId: artifact.correlationId,
                 channel: message.channel,
                 threadTs,
-                sourceText: message.text,
+                sourceText,
                 route,
                 outcome: 'plain_reply',
                 approvalCount: conversation.approvalRequests.length,
@@ -805,7 +811,7 @@ async function start() {
               correlationId: artifact.correlationId,
               channel: message.channel,
               threadTs,
-              sourceText: message.text,
+              sourceText,
               route,
               outcome: 'empty_reply',
               approvalCount: conversation.approvalRequests.length,
@@ -1093,11 +1099,17 @@ async function start() {
   logger.info('🛡️ Slack Sensory Satellite is online (Socket Mode). Listening for stimuli...');
 }
 
-// Same guard as the Discord/Telegram bridges: importing this module in a test
-// must not open a Socket Mode connection.
-if (!process.env.VITEST) {
+// Same guard as the Telegram bridge: only a direct `node index.js` invocation
+// starts the bridge, so importing this module in a test cannot open a Socket
+// Mode connection — and a leaked VITEST env cannot silently no-op a real start.
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+if (directEntry && !process.env.VITEST) {
   start().catch((err) => {
     logger.error(`SlackBridge crashed: ${err.message}`);
     process.exit(1);
   });
+} else if (directEntry) {
+  logger.warn('[SlackBridge] VITEST is set — suppressing the direct-entry start.');
 }
