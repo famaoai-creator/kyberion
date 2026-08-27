@@ -1065,7 +1065,12 @@ export async function runInlineCoreTransform(
   const { Buffer } = await import('node:buffer');
   const vm = await import('node:vm');
   const util = await import('node:util');
-  const input = resolveVars(params.input || ctx, ctx);
+  // A declared `input` is honoured even when it resolves to a falsy value.
+  // `dispatchLeafOp` template-resolves params before this handler runs, so a
+  // `{{loop.count}}` of 0 arrives here as the number 0; a `||` fallback would
+  // silently swap that valid input for the whole context object and turn the
+  // script's `Number(input)` into NaN. Only an absent input means "whole ctx".
+  const input = resolveVars(params.input ?? ctx, ctx);
   const script = String(params.script || 'input');
   // Wrap in IIFE so pipeline scripts can use `return` statements naturally
   const wrappedScript = `(function() { ${script} })()`;
