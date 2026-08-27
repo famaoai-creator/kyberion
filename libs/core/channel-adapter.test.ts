@@ -167,6 +167,103 @@ describe('runChannelTurn', () => {
     expect(calls).toEqual(['stop']);
   });
 
+  it('never starts typing when thread context resolution fails', async () => {
+    // M3g-ii: iMessage arms its "処理中です" note inside typing.start, so a
+    // thread-context failure must leave no armed timer behind.
+    const calls: string[] = [];
+    await expect(
+      runChannelTurn(
+        {
+          channel: 'imessage',
+          actorId: 'operator-1',
+          threadContext: () => {
+            throw new Error('history unavailable');
+          },
+          typing: () => {
+            calls.push('typing:start');
+            return { stop: () => calls.push('typing:stop') };
+          },
+          send: () => calls.push('send'),
+        },
+        { text: 'hello', channel: 'c', threadTs: 't' },
+        () => {
+          calls.push('conversation');
+          return {
+            text: 'reply',
+            a2uiMessages: [],
+            a2aMessages: [],
+            delegationResults: [],
+            approvalRequests: [],
+          };
+        }
+      )
+    ).rejects.toThrow('history unavailable');
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps typing alive until a bridge has posted its post-turn envelopes', async () => {
+    // M3g-iii: shouldSend withholds delivery exactly on the proposal/approval
+    // paths, so stopping typing before afterTurn would clear the indicator
+    // while the operator-visible work is still pending.
+    const calls: string[] = [];
+    await runChannelTurn(
+      {
+        channel: 'slack',
+        actorId: 'operator-1',
+        typing: () => {
+          calls.push('typing:start');
+          return { stop: () => calls.push('typing:stop') };
+        },
+        shouldSend: ({ result }) => !result.missionProposals?.length,
+        send: (message) => calls.push(`send:${message.text}`),
+      },
+      { text: 'make it a mission', channel: 'c', threadTs: 't' },
+      () => ({
+        text: 'proposal',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        missionProposals: [{ mission_id: 'm1' } as never],
+      }),
+      {
+        afterTurn: (result) => {
+          calls.push(`afterTurn:${result.text}`);
+        },
+      }
+    );
+
+    expect(calls).toEqual(['typing:start', 'afterTurn:proposal', 'typing:stop']);
+  });
+
+  it('stops typing when a post-turn envelope send fails', async () => {
+    const calls: string[] = [];
+    await expect(
+      runChannelTurn(
+        {
+          channel: 'telegram',
+          actorId: 'operator-1',
+          typing: () => ({ stop: () => calls.push('typing:stop') }),
+          send: () => calls.push('send'),
+        },
+        { text: 'hello', channel: 'c', threadTs: 't' },
+        () => ({
+          text: 'reply',
+          a2uiMessages: [],
+          a2aMessages: [],
+          delegationResults: [],
+          approvalRequests: [],
+        }),
+        {
+          afterTurn: () => {
+            throw new Error('envelope post failed');
+          },
+        }
+      )
+    ).rejects.toThrow('envelope post failed');
+    expect(calls).toEqual(['send', 'typing:stop']);
+  });
+
   it('lets a bridge defer delivery for proposal and approval envelopes', async () => {
     const sent: string[] = [];
     await runChannelTurn(

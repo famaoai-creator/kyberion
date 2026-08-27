@@ -127,11 +127,23 @@ export function formatChannelTurnText(
   ].join('\n');
 }
 
+export interface RunChannelTurnOptions {
+  /**
+   * UX-02: post-turn provider sends a bridge performs itself — the
+   * mission-proposal and approval envelopes that `shouldSend` deliberately
+   * withholds from common delivery. They run while the typing indicator is
+   * still active, so it stops only once the operator-visible work for this
+   * turn is actually finished.
+   */
+  afterTurn?: (result: SurfaceConversationResult) => void | Promise<void>;
+}
+
 /** Run the common thread-context, typing, conversation, and delivery sequence. */
 export async function runChannelTurn(
   adapter: ChannelAdapter,
   input: ChannelTurnInput,
-  conversation: ChannelTurnConversation
+  conversation: ChannelTurnConversation,
+  options: RunChannelTurnOptions = {}
 ): Promise<SurfaceConversationResult> {
   let typing: ChannelTypingHandle | undefined;
   try {
@@ -159,6 +171,7 @@ export async function runChannelTurn(
     ) {
       await adapter.send(deliveryMessage);
     }
+    await options.afterTurn?.(deliveredResult);
     return deliveredResult;
   } finally {
     await typing?.stop();
