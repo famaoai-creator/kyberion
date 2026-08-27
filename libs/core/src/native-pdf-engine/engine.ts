@@ -52,15 +52,6 @@ import type {
   PdfDocumentPart,
 } from '../types/pdf-protocol.js';
 
-// ─── Registry ───────────────────────────────────────────────
-
-interface ObjEntry {
-  id: number;
-  offset: number;
-  inStream?: number;
-  indexInStream?: number;
-}
-
 // ─── PDF 2.0 Writer ─────────────────────────────────────────
 
 function decodeImage(imgPath: string): ImageInfo {
@@ -1272,10 +1263,8 @@ export async function generateNativePdf(
 
   // ── P3-4: AES-256 Encryption (must go in catalog) ───
   let encryptId: number | undefined;
-  let encryptFileId = '';
   if (opts.encrypt?.ownerPassword) {
-    const { dictStr, key: _key, encryptId: eid } = buildEncryptDict(opts.encrypt);
-    encryptFileId = eid;
+    const { dictStr, key: _key } = buildEncryptDict(opts.encrypt);
     encryptId = writer.addObj(dictStr);
   }
 
@@ -1296,7 +1285,6 @@ export async function generateNativePdf(
   // P3 catalog entries
   if (ocPropertiesId !== undefined) catalogParts.push(`/OCProperties ${ocPropertiesId} 0 R`);
   if (acroFormId !== undefined || sigFieldId !== undefined) {
-    const allFields: number[] = [];
     if (acroFormId !== undefined) {
       // AcroForm fields are already in the acroFormId dict; we reference it directly
       // For sig: merge into an AcroForm dict

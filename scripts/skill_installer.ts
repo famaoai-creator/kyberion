@@ -16,15 +16,6 @@ function question(rl: readline.Interface, query: string): Promise<string> {
   });
 }
 
-function checkBinary(bin: string): boolean {
-  try {
-    safeExec('command', ['-v', bin]);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
 function printUsage(): void {
   console.log(chalk.bold.cyan('\n📦 [KYBERION] Interactive Skill Installer\n'));
   console.log('Usage: pnpm skill:install <bundle-id>');

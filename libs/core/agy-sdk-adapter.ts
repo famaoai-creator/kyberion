@@ -258,7 +258,6 @@ export class AgySdkAdapter {
       return Promise.reject(this.unavailable('AGY SDK bridge is not ready.'));
     if (signal?.aborted) return Promise.reject(this.unavailable('AGY SDK request aborted.'));
     const id = `agy-sdk-${++this.sequence}`;
-    const request = JSON.stringify({ id, ...payload });
     return new Promise<BridgeResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);

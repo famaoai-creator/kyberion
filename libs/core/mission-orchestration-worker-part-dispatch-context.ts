@@ -17,7 +17,6 @@ import { type MissionContextPackPruningSummary } from './mission-context-pack.js
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext } from './src/trace.js';
-import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import {

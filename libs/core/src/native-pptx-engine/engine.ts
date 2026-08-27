@@ -305,9 +305,7 @@ export async function generateNativePptx(
       } else if (el.type === 'raw' && el.rawXml) {
         let finalXml = el.rawXml;
         if (el.rawRels) {
-          for (const [oldRId, imgPath] of Object.entries(el.rawRels) as [string, any][]) {
-            const ext = path.extname(imgPath).toLowerCase() || '.png';
-            const targetName = `image${imageCounter}${ext}`;
+          for (const [oldRId] of Object.entries(el.rawRels) as [string, any][]) {
             const newRId = `rId${masterIdCounter++}`;
             finalXml = finalXml.replace(
               new RegExp(`r:embed="${oldRId}"`, 'g'),
@@ -931,8 +929,6 @@ export function filterPptxSlides(
     newRelsEntry: `ppt/slides/_rels/slide${i + 1}.xml.rels`,
   }));
 
-  const keepOldEntries = new Set(plan.map((p) => p.oldEntry));
-  const keepOldRels = new Set(plan.map((p) => p.oldRelsEntry));
 
   // Snapshot of content we must carry forward, then delete all slide artifacts
   // from the zip before re-inserting with new numbering. We cannot do in-place

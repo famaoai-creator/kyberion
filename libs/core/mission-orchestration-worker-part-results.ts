@@ -2,8 +2,6 @@ import { a2aBridge } from './a2a-bridge.js';
 import { type DelegationChain } from './delegation-chain.js';
 import { type PlanningPacket } from './channel-surface.js';
 import { draftRefine } from './draft-refine.js';
-import { ledger } from './ledger.js';
-import { updateWorkItem } from './work-coordination.js';
 import { logger } from './core.js';
 import { missionDir, missionEvidenceDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
@@ -72,7 +70,6 @@ import {
   emitWorkerKickoffSnapshot,
   missionProgressController,
   buildUnassignedRoleSummary,
-  buildUpstreamResultLines,
   resolveMissionType,
   runMissionController,
   recordMissionContextTask,

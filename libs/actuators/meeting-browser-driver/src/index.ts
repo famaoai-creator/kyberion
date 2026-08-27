@@ -349,7 +349,6 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
     const speakerDevice = this.opts.speaker_device;
     const cameraDevice = this.opts.camera_device;
     const stepTimeout = this.opts.step_timeout_ms ?? DEFAULT_TIMEOUT;
-    const headed = this.opts.headed ?? false;
 
     const runtime = await createPlaywrightJoinRuntime(chromium, this.opts);
     const { context } = runtime;

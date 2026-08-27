@@ -102,7 +102,6 @@ function buildPptxSlideFromPattern(
   const themeColors = resolveThemeColors(theme);
   const primaryHex = (themeColors.primary || '#3867D6').replace('#', '');
   const accentHex = (themeColors.accent || '#0070C0').replace('#', '');
-  const textHex = (themeColors.text || '#000000').replace('#', '');
   const semanticType =
     data.semantic_type || classifyRenderSemantic(data.layout_key, data.media_kind);
   const semanticTokens = resolveSemanticRenderTokens(rootDir, semanticType, data.design_system_id);
