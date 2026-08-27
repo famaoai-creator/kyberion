@@ -1,6 +1,7 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
+import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
@@ -397,8 +398,9 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
             return;
           }
 
-          if (!result.text) {
-            // UX-01: an empty agent reply must not read as silence.
+          // UX-01: an empty agent reply must not read as silence. Trim first so a
+          // whitespace-only reply matches the shared channel-adapter delivery gate.
+          if (!result.text.trim()) {
             await sendIMessageText(
               buildIMessageReplyRequest(
                 msg,
@@ -578,11 +580,18 @@ async function main() {
   });
 }
 
-// Same guard as the Discord/Telegram bridges: importing this module in a test
-// must not start the HTTP listener or the poll loop.
-if (!process.env.VITEST) {
+// Same guard as the Telegram bridge: only a direct `node index.js` invocation
+// starts the bridge, so importing this module in a test cannot start the HTTP
+// listener or the poll loop — and a leaked VITEST env cannot silently no-op a
+// real start.
+const directEntry = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href === import.meta.url
+  : false;
+if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });
+} else if (directEntry) {
+  logger.warn('[iMessageBridge] VITEST is set — suppressing the direct-entry start.');
 }
