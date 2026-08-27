@@ -2,14 +2,15 @@
 
 import {
   createStandardYargs,
+  isSurfaceAsyncChannel,
   listSurfaceDeadLetters,
-  logger,
   replaySurfaceDeadLetter,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type SurfaceOutboxCommand = 'list' | 'replay';
 
-export function runSurfaceOutbox(args = process.argv.slice(2)): number {
+export function runSurfaceOutbox(args: string[] = []): number {
   const commandToken = args[0] && !args[0].startsWith('-') ? args[0] : undefined;
   const command = (commandToken || 'list') as SurfaceOutboxCommand;
   if (command !== 'list' && command !== 'replay') {
@@ -42,6 +43,9 @@ export function runSurfaceOutbox(args = process.argv.slice(2)): number {
   const surface = String(argv.surface || '')
     .trim()
     .toLowerCase();
+  if (!isSurfaceAsyncChannel(surface)) {
+    throw new Error(`Surface "${surface}" is not registered in the surface manifest.`);
+  }
   if (command === 'list') {
     const records = listSurfaceDeadLetters(surface);
     if (argv.json) {
@@ -73,12 +77,17 @@ export function runSurfaceOutbox(args = process.argv.slice(2)): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /surface_outbox\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  try {
-    process.exit(runSurfaceOutbox());
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  }
-}
+export const main = defineScript({
+  name: 'surface-outbox',
+  flags: [],
+  run(context) {
+    const status = runSurfaceOutbox(context.argv);
+    if (status !== 0) throw new Error(`surface-outbox failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'surface_outbox.ts') ||
+  isDirectScript(import.meta.url, 'surface_outbox.js')
+)
+  void main();

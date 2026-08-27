@@ -1,7 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
 
 type UnknownScopeBehavior = 'allow_with_warning' | 'block';
@@ -11,10 +12,13 @@ interface PathScopePolicyFile {
   defaults: {
     unknown_scope_behavior: UnknownScopeBehavior;
   };
-  scope_classes: Record<string, {
-    allow_prefixes: string[];
-    description?: string;
-  }>;
+  scope_classes: Record<
+    string,
+    {
+      allow_prefixes: string[];
+      description?: string;
+    }
+  >;
 }
 
 export interface DelegatedTaskEnvelope {
@@ -32,9 +36,10 @@ export interface DelegationPreflightResult {
   warnings: string[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const PATH_SCOPE_POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/path-scope-policy.schema.json');
+const ajv = createAjv();
+const PATH_SCOPE_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/path-scope-policy.schema.json'
+);
 const PATH_SCOPE_POLICY_PATH = pathResolver.knowledge('product/governance/path-scope-policy.json');
 
 let pathScopePolicyValidateFn: ValidateFunction | null = null;
@@ -46,21 +51,31 @@ function ensurePathScopePolicyValidator(): ValidateFunction {
 }
 
 function normalizePath(value: string): string {
-  return value.trim().replace(/\\/g, '/').replace(/^\.\/+/, '').toLowerCase();
+  return value
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/^\.\/+/, '')
+    .toLowerCase();
 }
 
 function loadPathScopePolicy(): PathScopePolicyFile {
-  const parsed = JSON.parse(safeReadFile(PATH_SCOPE_POLICY_PATH, { encoding: 'utf8' }) as string) as PathScopePolicyFile;
+  const parsed = loadJson<PathScopePolicyFile>(PATH_SCOPE_POLICY_PATH);
   const validate = ensurePathScopePolicyValidator();
   if (!validate(parsed)) {
-    const errors = (validate.errors || []).map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`).join('; ');
+    const errors = (validate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
     throw new Error(`Invalid path-scope-policy: ${errors}`);
   }
   return parsed;
 }
 
-export function inferTaskTargetPath(task: { target_path?: string; deliverable?: string }): string | undefined {
-  if (typeof task.target_path === 'string' && task.target_path.trim()) return task.target_path.trim();
+export function inferTaskTargetPath(task: {
+  target_path?: string;
+  deliverable?: string;
+}): string | undefined {
+  if (typeof task.target_path === 'string' && task.target_path.trim())
+    return task.target_path.trim();
   const deliverable = typeof task.deliverable === 'string' ? task.deliverable.trim() : '';
   if (!deliverable) return undefined;
   if (deliverable.includes('/') && !/\s/.test(deliverable)) {
@@ -134,7 +149,9 @@ export function validateDelegatedTaskPreflight(input: {
     };
   }
 
-  const resolvedScopes = new Set(input.assignment.delegation_contract?.resolved_scope_classes || []);
+  const resolvedScopes = new Set(
+    input.assignment.delegation_contract?.resolved_scope_classes || []
+  );
   if (resolvedScopes.size && !resolvedScopes.has(targetScopeClass)) {
     return {
       allowed: false,

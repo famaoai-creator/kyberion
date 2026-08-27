@@ -296,7 +296,37 @@ export interface SlackSurfaceMetadata {
   execution_mode?: SlackExecutionMode;
 }
 
-export type SurfaceAsyncChannel = string; // Extensible string, replacing fixed unions
+/**
+ * Channels declared by the governed surface-provider manifest.
+ * Keep this closed: a new channel must be registered in the manifest and
+ * intentionally added here before it can participate in async delivery.
+ */
+export type SurfaceAsyncChannel =
+  | 'slack'
+  | 'chronos'
+  | 'presence'
+  | 'imessage'
+  | 'discord'
+  | 'telegram'
+  | 'cowork'
+  | 'cli'
+  | 'terminal';
+
+export const SURFACE_ASYNC_CHANNELS: readonly SurfaceAsyncChannel[] = [
+  'slack',
+  'chronos',
+  'presence',
+  'imessage',
+  'discord',
+  'telegram',
+  'cowork',
+  'cli',
+  'terminal',
+];
+
+export function isSurfaceAsyncChannel(value: string): value is SurfaceAsyncChannel {
+  return (SURFACE_ASYNC_CHANNELS as readonly string[]).includes(value);
+}
 
 export interface BaseSurfaceMetadata {
   surface: SurfaceAsyncChannel;
@@ -339,12 +369,22 @@ export type SurfaceConversationMetadata =
   | DiscordSurfaceMetadata
   | BaseSurfaceMetadata;
 
+export interface SurfaceConversationAttachment {
+  id?: string;
+  filename?: string;
+  mimeType?: string;
+  uti?: string;
+  path?: string;
+  size?: number;
+}
+
 interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
   correlationId?: string;
   surfaceText?: string;
+  attachments?: SurfaceConversationAttachment[];
   threadContext?: string;
   cwd?: string;
   delegationSummaryInstruction?: string;
@@ -363,6 +403,7 @@ export type SurfaceConversationInput = SurfaceConversationInputBase & {
 interface SurfaceConversationMessageInputBase {
   text: string;
   surfaceText?: string;
+  attachments?: SurfaceConversationAttachment[];
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;

@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import { logger } from './core.js';
+import { createAjv as createFoundationAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   loadStandardIntentCatalog,
   resolveIntentResolutionPacket,
@@ -12,7 +15,6 @@ import {
   type StandardIntentDefinition,
 } from './intent-resolution.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 export type OperatorKnowledgeTier = 'personal' | 'confidential' | 'public';
@@ -255,12 +257,11 @@ export interface OperatorLearningDispatchResult {
 
 let operatorProfileValidateFn: ValidateFunction | null = null;
 let operatorRequestLogValidateFn: ValidateFunction | null = null;
-let operatorLearningDispatchRegistryValidateFn: ValidateFunction | null = null;
 let operatorLearningDispatchRegistryCachePath: string | null = null;
 let operatorLearningDispatchRegistryCache: OperatorLearningDispatchRegistry | null = null;
 
 function createAjv() {
-  const ajv = new Ajv({ allErrors: true });
+  const ajv = createFoundationAjv();
   addFormats(ajv);
   return ajv;
 }
@@ -287,15 +288,6 @@ function ensureOperatorRequestLogValidator(): ValidateFunction {
     pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
   );
   return operatorRequestLogValidateFn;
-}
-
-function ensureOperatorLearningDispatchRegistryValidator(): ValidateFunction {
-  if (operatorLearningDispatchRegistryValidateFn) return operatorLearningDispatchRegistryValidateFn;
-  operatorLearningDispatchRegistryValidateFn = compileSchemaFromPath(
-    createAjv(),
-    pathResolver.knowledge('product/schemas/operator-learning-dispatch-registry.schema.json')
-  );
-  return operatorLearningDispatchRegistryValidateFn;
 }
 
 const DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
@@ -495,37 +487,55 @@ const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegi
   ],
 };
 
+const dispatchRegistryCatalogs = new Map<
+  string,
+  GovernedCatalog<OperatorLearningDispatchRegistry>
+>();
+
+function getDispatchRegistryCatalog(
+  registryPath: string
+): GovernedCatalog<OperatorLearningDispatchRegistry> {
+  const existing = dispatchRegistryCatalogs.get(registryPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<OperatorLearningDispatchRegistry>({
+    id: 'operator-learning-dispatch-registry',
+    path: registryPath,
+    schema: pathResolver.knowledge(
+      'product/schemas/operator-learning-dispatch-registry.schema.json'
+    ),
+  });
+  dispatchRegistryCatalogs.set(registryPath, catalog);
+  return catalog;
+}
+
 function getOperatorLearningDispatchRegistryPath(): string {
-  return process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
-    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
+    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH
+  );
 }
 
 function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
-  if (process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim())
+    return null;
   const configured =
-    process.env.KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
   return safeExistsSync(configured) ? configured : null;
 }
 
 function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
-  if (process.env.KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim())
+    return null;
   const configured =
-    process.env.KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH?.trim() ||
-    DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+    getRegisteredEnvText(
+      'KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH'
+    )?.trim() || DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
   return safeExistsSync(configured) ? configured : null;
 }
 
 function loadDispatchRegistryFromPath(registryPath: string): OperatorLearningDispatchRegistry {
-  const parsed = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string) as OperatorLearningDispatchRegistry;
-  const validate = ensureOperatorLearningDispatchRegistryValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid operator learning dispatch registry: ${errors}`);
-  }
-  return parsed;
+  return getDispatchRegistryCatalog(registryPath).load();
 }
 
 function mergeDispatchRegistries(
@@ -551,8 +561,13 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
   const registryPath = getOperatorLearningDispatchRegistryPath();
   const personalOverlayPath = getPersonalOperatorLearningDispatchRegistryPath();
   const confidentialOverlayPath = getConfidentialOperatorLearningDispatchRegistryPath();
-  const cacheKey = [registryPath, personalOverlayPath, confidentialOverlayPath].filter(Boolean).join('::');
-  if (operatorLearningDispatchRegistryCachePath === cacheKey && operatorLearningDispatchRegistryCache) {
+  const cacheKey = [registryPath, personalOverlayPath, confidentialOverlayPath]
+    .filter(Boolean)
+    .join('::');
+  if (
+    operatorLearningDispatchRegistryCachePath === cacheKey &&
+    operatorLearningDispatchRegistryCache
+  ) {
     return operatorLearningDispatchRegistryCache;
   }
 
@@ -565,7 +580,10 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
   try {
     let parsed = loadDispatchRegistryFromPath(registryPath);
     if (confidentialOverlayPath) {
-      parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(confidentialOverlayPath));
+      parsed = mergeDispatchRegistries(
+        parsed,
+        loadDispatchRegistryFromPath(confidentialOverlayPath)
+      );
     }
     if (personalOverlayPath) {
       parsed = mergeDispatchRegistries(parsed, loadDispatchRegistryFromPath(personalOverlayPath));
@@ -586,7 +604,7 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
 function matchDispatchRule(
   rule: OperatorLearningDispatchRule,
   intent?: StandardIntentDefinition,
-  packet?: IntentResolutionPacket,
+  packet?: IntentResolutionPacket
 ): boolean {
   const match = rule.match;
   if (!match) return true;
@@ -600,7 +618,10 @@ function matchDispatchRule(
     return false;
   }
 
-  if (match.mission_classes?.length && !match.mission_classes.includes(String(intent?.mission_class || ''))) {
+  if (
+    match.mission_classes?.length &&
+    !match.mission_classes.includes(String(intent?.mission_class || ''))
+  ) {
     return false;
   }
 
@@ -614,11 +635,7 @@ function matchDispatchRule(
 
   if (match.risk_profiles?.length) {
     const riskProfile = intent?.risk_profile as
-      | 'low'
-      | 'review_required'
-      | 'approval_required'
-      | 'high_stakes'
-      | undefined;
+      'low' | 'review_required' | 'approval_required' | 'high_stakes' | undefined;
     if (!riskProfile || !match.risk_profiles.includes(riskProfile)) {
       return false;
     }
@@ -637,17 +654,28 @@ function matchDispatchRule(
   }
 
   const utterance = String(packet?.utterance || '').toLowerCase();
-  if (match.surface_contains_any?.length && !match.surface_contains_any.some((term) => utterance.includes(term.toLowerCase()))) {
+  if (
+    match.surface_contains_any?.length &&
+    !match.surface_contains_any.some((term) => utterance.includes(term.toLowerCase()))
+  ) {
     return false;
   }
 
   if (match.trigger_keywords_any?.length) {
-    const triggerKeywords = new Set([
-      ...(intent?.trigger_keywords || []),
-      ...(packet?.candidates || []).flatMap((candidate) => candidate.matched_keywords || []),
-    ].map((value) => String(value).toLowerCase()));
-    const triggerText = `${utterance}\n${[...(intent?.surface_examples || [])].join('\n')}`.toLowerCase();
-    if (!match.trigger_keywords_any.some((term) => triggerKeywords.has(term.toLowerCase()) || triggerText.includes(term.toLowerCase()))) {
+    const triggerKeywords = new Set(
+      [
+        ...(intent?.trigger_keywords || []),
+        ...(packet?.candidates || []).flatMap((candidate) => candidate.matched_keywords || []),
+      ].map((value) => String(value).toLowerCase())
+    );
+    const triggerText =
+      `${utterance}\n${[...(intent?.surface_examples || [])].join('\n')}`.toLowerCase();
+    if (
+      !match.trigger_keywords_any.some(
+        (term) =>
+          triggerKeywords.has(term.toLowerCase()) || triggerText.includes(term.toLowerCase())
+      )
+    ) {
       return false;
     }
   }
@@ -661,9 +689,12 @@ function dispatchOperatorLearningSignals(input: {
 }): OperatorLearningDispatchResult {
   const registry = getOperatorLearningDispatchRegistry();
   const orderedRules = [...registry.rules].sort(
-    (left, right) => (right.priority ?? 0) - (left.priority ?? 0) || left.rule_id.localeCompare(right.rule_id)
+    (left, right) =>
+      (right.priority ?? 0) - (left.priority ?? 0) || left.rule_id.localeCompare(right.rule_id)
   );
-  const matchedRules = orderedRules.filter((rule) => matchDispatchRule(rule, input.intent, input.packet));
+  const matchedRules = orderedRules.filter((rule) =>
+    matchDispatchRule(rule, input.intent, input.packet)
+  );
   const result: OperatorLearningDispatchResult = {};
 
   for (const rule of matchedRules) {
@@ -728,7 +759,10 @@ function countValues(values: string[]): Array<{ family: string; sample_count: nu
   for (const value of values) counts.set(value, (counts.get(value) || 0) + 1);
   return [...counts.entries()]
     .map(([family, sample_count]) => ({ family, sample_count }))
-    .sort((left, right) => right.sample_count - left.sample_count || left.family.localeCompare(right.family));
+    .sort(
+      (left, right) =>
+        right.sample_count - left.sample_count || left.family.localeCompare(right.family)
+    );
 }
 
 function recommendTier(logs: OperatorRequestLog[]): OperatorKnowledgeTier {
@@ -761,7 +795,10 @@ function findIntent(intentId?: string): StandardIntentDefinition | undefined {
   return loadStandardIntentCatalog().find((intent) => intent.id === intentId);
 }
 
-function inferDecisionStyle(intentId: string, intent?: StandardIntentDefinition): string | undefined {
+function inferDecisionStyle(
+  intentId: string,
+  intent?: StandardIntentDefinition
+): string | undefined {
   const dispatched = dispatchOperatorLearningSignals({
     intent,
     packet: {
@@ -774,7 +811,10 @@ function inferDecisionStyle(intentId: string, intent?: StandardIntentDefinition)
   return dispatched.decision_style_observed;
 }
 
-function inferRecurringTaskCandidate(intentId: string, intent?: StandardIntentDefinition): string[] {
+function inferRecurringTaskCandidate(
+  intentId: string,
+  intent?: StandardIntentDefinition
+): string[] {
   if (!intentId || intentId === 'unresolved_intent') return [];
   const dispatched = dispatchOperatorLearningSignals({
     intent,
@@ -808,7 +848,9 @@ function maybeJaLocale(value: string): string | undefined {
 }
 
 function withDefinedValues<T extends Record<string, unknown>>(value: T): Partial<T> {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined)
+  ) as Partial<T>;
 }
 
 export function buildOperatorRequestLogFromIntentResolution(
@@ -917,12 +959,16 @@ export function buildOperatorLearningProposal(input: {
   const profileId = input.profile?.profile_id || input.requestLogs[0]?.profile_id;
   const sampleCount = input.requestLogs.length;
   const requiredSamples = input.profile?.learning.min_samples_to_promote || 5;
-  const recurringTasks = countValues(input.requestLogs.flatMap((log) => log.signals.recurring_task_candidate || []));
+  const recurringTasks = countValues(
+    input.requestLogs.flatMap((log) => log.signals.recurring_task_candidate || [])
+  );
   const correctionCount = input.requestLogs.reduce(
     (sum, log) => sum + log.verification.operator_correction_count,
     0
   );
-  const mismatchCount = input.requestLogs.filter((log) => log.verification.result === 'mismatch').length;
+  const mismatchCount = input.requestLogs.filter(
+    (log) => log.verification.result === 'mismatch'
+  ).length;
   const eligible = sampleCount >= requiredSamples && mismatchCount === 0;
   const recommendedTier = recommendTier(input.requestLogs);
 
@@ -948,10 +994,14 @@ export function buildOperatorLearningProposal(input: {
         question_budget_default: input.profile?.communication.question_budget_default,
       },
       decision_style: {
-        observed_styles: unique(input.requestLogs.map((log) => log.signals.decision_style_observed)),
+        observed_styles: unique(
+          input.requestLogs.map((log) => log.signals.decision_style_observed)
+        ),
       },
       terminology: {
-        observed_terms: unique(input.requestLogs.flatMap((log) => log.signals.terminology_observed || [])),
+        observed_terms: unique(
+          input.requestLogs.flatMap((log) => log.signals.terminology_observed || [])
+        ),
       },
       recurring_tasks: recurringTasks,
       approval_policy: {
@@ -1016,7 +1066,9 @@ function assertValidOperatorLearningProposal(input: OperatorLearningProposal): v
     throw new Error('Invalid operator learning proposal: proposal_id and profile_id are required');
   }
   if (!['personal', 'confidential', 'public'].includes(input.recommended_tier)) {
-    throw new Error(`Invalid operator learning proposal: unsupported tier ${input.recommended_tier}`);
+    throw new Error(
+      `Invalid operator learning proposal: unsupported tier ${input.recommended_tier}`
+    );
   }
   if (!input.promotion_decision || typeof input.promotion_decision.eligible !== 'boolean') {
     throw new Error('Invalid operator learning proposal: promotion_decision is required');
@@ -1024,11 +1076,13 @@ function assertValidOperatorLearningProposal(input: OperatorLearningProposal): v
 }
 
 function safeSegment(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 96) || 'operator-learning';
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 96) || 'operator-learning'
+  );
 }
 
 function defaultPromotionPath(input: {

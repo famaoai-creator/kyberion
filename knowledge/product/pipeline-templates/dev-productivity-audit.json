@@ -53,11 +53,13 @@
     },
     {
       "role": "transform",
-      "op": "system:shell",
+      "op": "core:calculate_productivity_score",
       "consumes": ["ts_file_count", "test_file_count", "fixme_count"],
-      "produces": { "channel": "productivity_score", "type": "ShellResult" },
+      "produces": { "channel": "productivity_score", "type": "ProductivityScoreResult" },
       "params": {
-        "cmd": "node -e \"const ts = parseInt('{{ts_file_count}}'); const tests = parseInt('{{test_file_count}}'); const fixme = parseInt('{{fixme_count}}'); console.log(Math.round((tests / ts) * 100 - fixme))\""
+        "ts_file_count": "{{ts_file_count}}",
+        "test_file_count": "{{test_file_count}}",
+        "fixme_count": "{{fixme_count}}"
       }
     },
     {

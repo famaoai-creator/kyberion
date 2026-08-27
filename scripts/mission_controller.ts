@@ -21,37 +21,19 @@ import {
   discoverProviders,
   discoverReasoningEndpoints,
   getInstalledReasoningMode,
+  getRegisteredEnv,
   getReasoningBackend,
   installReasoningBackends,
-  customerResolver,
-  listMemoryPromotionCandidates,
-  reviewMemoryPromotionCandidate,
-  reviewMemoryPromotionQueue,
-  assertMemoryPromotionReviewReady,
-  type MemoryPromotionReview,
-  listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
-  loadProjectRecord,
-  loadProjectTrackRecord,
-  loadOrganizationProfile,
   logger,
   pathResolver,
-  promoteMemoryCandidateToKnowledge,
-  promotePersonalMemoryCandidates,
   resolveMissionClassification,
   resolveMissionWorkflowDesign,
-  resolveOrganizationMissionTeamTemplateCatalogId,
-  updateMemoryPromotionCandidateStatus,
   safeExec,
-  safeReadFile,
-  safeWriteFile,
   safeExistsSync,
-  safeLstat,
   TraceContext,
   persistTrace,
   safeReaddir,
-  findMissionPath,
   missionEvidenceDir,
-  validateWritePermission,
   killSwitch,
   renderStatus,
   buildHandoffPacket,
@@ -63,15 +45,20 @@ import {
   recordMissionHandoff,
 } from '@agent/core';
 
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
+
+let activeMissionControllerArgs: string[] = [];
+
 // --- Sub-module imports ---
 import {
-  type ResolvedMissionCliInput,
   resolveMissionStartCreateInputFromArgv,
   resolveMissionTicketDispatchOptionsFromArgv,
   resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
-import { type MissionRelationships } from './refactor/mission-types.js';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import {
   extractMissionControllerPositionalArgs,
   extractMissionStartCreateOptionsFromArgv,
@@ -81,18 +68,27 @@ import {
 } from './refactor/mission-cli-args.js';
 import { withOrganizationContext } from './refactor/organization-context.js';
 import {
+  listOrganizationCatalogs,
+  listOrganizationProfiles,
+  showOrganizationDiscovery,
+  showOrganizationProfile,
+} from './refactor/mission-organization-commands.js';
+import {
+  acceptRubricOverride,
+  approveMemoryCandidate,
+  listMemoryQueue,
+  promoteMemoryCandidate,
+  promotePendingMemoryCandidates,
+  rejectMemoryCandidate,
+  showMemoryReview,
+} from './refactor/mission-memory-commands.js';
+import {
   assertCanGrantMissionAuthority,
-  normalizeRelationships,
-  readFocusedMissionId as _readFocusedMissionId,
   writeFocusedMissionId as _writeFocusedMissionId,
   loadState,
   saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import {
-  resolveProjectLedgerJsonPath,
-  resolveProjectLedgerPath,
-} from './refactor/mission-project-ledger.js';
 import {
   dispatchNextQueuedMission,
   enqueueMission as _enqueueMission,
@@ -124,6 +120,7 @@ export {
   resolveMissionWorkItemDispatchOptionsFromArgv,
 };
 export type { ResolvedMissionCliInput } from './refactor/mission-controller-args.js';
+export { buildOrganizationDiscoveryReport } from './refactor/mission-organization-commands.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const ROOT_DIR = pathResolver.rootDir();
@@ -131,10 +128,6 @@ const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
 
 // ─── Focus helpers (thin wrappers binding MISSION_FOCUS_PATH) ────────────────
-function readFocusedMissionId(): string | null {
-  return _readFocusedMissionId(MISSION_FOCUS_PATH);
-}
-
 function writeFocusedMissionId(missionId: string): void {
   _writeFocusedMissionId(MISSION_FOCUS_PATH, missionId);
 }
@@ -228,307 +221,6 @@ async function dispatchNextMission() {
   );
 }
 
-function reviewForCli(candidateId: string, tenantSlug?: string): MemoryPromotionReview {
-  const reviews = reviewMemoryPromotionCandidate(candidateId).filter((review) =>
-    tenantSlug ? review.candidate.scope?.tenant_slug === tenantSlug : true
-  );
-  if (reviews.length === 0) {
-    throw new Error(
-      `Memory promotion candidate not found: ${candidateId}${tenantSlug ? ` (tenant=${tenantSlug})` : ''}`
-    );
-  }
-  if (reviews.length > 1) {
-    const scopes = reviews
-      .map((review) => review.candidate.scope?.tenant_slug || 'legacy/global')
-      .join(', ');
-    throw new Error(
-      `[MEMORY_PROMOTION_AMBIGUOUS] candidate '${candidateId}' exists in multiple scopes: ${scopes}; use --tenant-slug <slug>`
-    );
-  }
-  return reviews[0];
-}
-
-function listMemoryQueue(filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') {
-  const rows = reviewMemoryPromotionQueue(filterStatus);
-  if (rows.length === 0) {
-    logger.info(
-      filterStatus
-        ? `No memory promotion candidates with status "${filterStatus}".`
-        : 'No memory promotion candidates in queue.'
-    );
-    return;
-  }
-  const header = `${'CANDIDATE_ID'.padEnd(30)} ${'STATUS'.padEnd(10)} ${'DECISION'.padEnd(17)} ${'BLOCKERS'.padEnd(8)} ${'RECORDS'.padEnd(8)} ${'KIND'.padEnd(18)} ${'TIER'.padEnd(13)} SOURCE`;
-  console.log('');
-  console.log(header);
-  console.log('-'.repeat(header.length + 6));
-  for (const review of rows) {
-    const candidate = review.candidate;
-    console.log(
-      `${review.candidate_id.padEnd(30)} ${candidate.status.padEnd(10)} ${review.review_status.padEnd(17)} ${String(review.blockers.length).padEnd(8)} ${String(review.physical_record_count).padEnd(8)} ${candidate.proposed_memory_kind.padEnd(18)} ${candidate.sensitivity_tier.padEnd(13)} ${candidate.source_ref}`
-    );
-  }
-  console.log('');
-}
-
-function showMemoryReview(candidateId: string, tenantSlug?: string, jsonOutput = false) {
-  const review = reviewForCli(candidateId, tenantSlug);
-  if (jsonOutput) {
-    console.log(JSON.stringify(review, null, 2));
-    return;
-  }
-  const candidate = review.candidate;
-  console.log('');
-  console.log(`Candidate: ${review.candidate_id}`);
-  console.log(`Decision: ${review.review_status}`);
-  console.log(`Summary: ${candidate.summary}`);
-  console.log(`Source: ${candidate.source_type} / ${candidate.source_ref}`);
-  console.log(`Kind: ${candidate.proposed_memory_kind} -> ${review.target_kind}`);
-  console.log(`Target: ${review.target_path}`);
-  console.log(`Tier: ${candidate.sensitivity_tier}`);
-  console.log(`Scope: ${candidate.scope?.tenant_slug || 'legacy/global'}`);
-  console.log(`Ratification required: ${review.approval_required ? 'yes' : 'no'}`);
-  console.log(`Physical records: ${review.physical_record_count}`);
-  console.log(
-    `Audit: ${review.audit.status}${review.audit.audit_id ? ` (${review.audit.audit_id})` : ''}`
-  );
-  console.log('Evidence:');
-  for (const evidence of review.evidence) {
-    console.log(`  - [${evidence.status}] ${evidence.ref}`);
-  }
-  if (review.blockers.length > 0) {
-    console.log('Blockers:');
-    for (const blocker of review.blockers) console.log(`  - ${blocker.code}: ${blocker.detail}`);
-  }
-  if (review.warnings.length > 0) {
-    console.log('Warnings:');
-    for (const warning of review.warnings) console.log(`  - ${warning}`);
-  }
-  console.log('');
-  console.log(
-    review.review_status === 'ready_to_approve'
-      ? 'Next: memory-approve <CANDIDATE_ID> --note "<reason>"'
-      : review.review_status === 'ready_to_promote'
-        ? 'Next: memory-promote <CANDIDATE_ID> --note "<reason>"'
-        : 'Next: resolve the blockers before approval or promotion.'
-  );
-}
-
-function approveMemoryCandidate(candidateId: string, note?: string, tenantSlug?: string) {
-  if (!candidateId) {
-    logger.error(
-      'Usage: mission_controller memory-approve <CANDIDATE_ID> [--tenant-slug <SLUG>] [--note <TEXT>]'
-    );
-    return;
-  }
-  try {
-    const review = reviewForCli(candidateId, tenantSlug);
-    assertMemoryPromotionReviewReady(review, 'approve');
-    const updated = updateMemoryPromotionCandidateStatus({
-      candidateId,
-      status: 'approved',
-      ratificationNote: note || 'Approved for promotion.',
-      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
-    });
-    if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
-    logger.success(`✅ Memory candidate approved: ${updated.candidate_id}`);
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-function rejectMemoryCandidate(
-  candidateId: string,
-  note?: string,
-  tenantSlug?: string,
-  allDuplicates = false
-) {
-  if (!candidateId) {
-    logger.error(
-      'Usage: mission_controller memory-reject <CANDIDATE_ID> [--tenant-slug <SLUG>] [--all-duplicates] [--note <TEXT>]'
-    );
-    return;
-  }
-  try {
-    const review = reviewForCli(candidateId, tenantSlug);
-    if (review.duplicate_count > 0 && !allDuplicates) {
-      throw new Error(
-        `[MEMORY_PROMOTION_DUPLICATES] ${candidateId} has ${review.physical_record_count} physical records; re-run with --all-duplicates to reject every record in this scope.`
-      );
-    }
-    const updated = updateMemoryPromotionCandidateStatus({
-      candidateId,
-      status: 'rejected',
-      ratificationNote: note || 'Rejected by operator review.',
-      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
-      allMatching: allDuplicates,
-    });
-    if (!updated) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
-    logger.success(`✅ Memory candidate rejected: ${updated.candidate_id}`);
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-/**
- * Record an explicit operator override of a counterfactual rubric warn/poor
- * (IP-9). Does not mutate the simulation output — only emits a tamper-
- * evident audit event so reviewers can see who accepted the un-rubric'd
- * branch and why. Required by counterfactual-degradation-policy.json
- * for `warn` severity; forbidden for `poor` unless tenant_risk_officer
- * documents it separately.
- */
-function acceptRubricOverride(hypothesisOrBranchId: string, reason?: string, severity?: string) {
-  if (!hypothesisOrBranchId) {
-    logger.error(
-      'Usage: mission_controller accept-with-override <HYPOTHESIS_OR_BRANCH_ID> --reason "<text>" [--severity warn|poor]'
-    );
-    return;
-  }
-  if (!reason) {
-    logger.error(
-      'accept-with-override requires --reason "<text>" — overrides without reasoning are not auditable.'
-    );
-    process.exitCode = 1;
-    return;
-  }
-  const sev = (severity || 'warn').toLowerCase();
-  if (!['warn', 'poor'].includes(sev)) {
-    logger.error('--severity must be warn or poor');
-    process.exitCode = 1;
-    return;
-  }
-  if (sev === 'poor') {
-    logger.warn(
-      "Override of 'poor' severity is not permitted by default per " +
-        'counterfactual-degradation-policy.json; only proceed if tenant_risk_officer ' +
-        'has documented the exception.'
-    );
-  }
-  const missionId = process.env.MISSION_ID || getOptionValue('--mission-id') || '';
-  const entry = auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'mission_controller',
-    action: 'rubric.override_accepted',
-    operation: `accept-with-override:${hypothesisOrBranchId}`,
-    result: 'allowed',
-    reason,
-    metadata: {
-      hypothesis_or_branch_id: hypothesisOrBranchId,
-      severity: sev,
-      mission_id: missionId || undefined,
-      policy_ref: 'knowledge/product/governance/counterfactual-degradation-policy.json',
-    },
-    compliance: {
-      framework: 'counterfactual-degradation-policy.json',
-      control: `severity-${sev}-override`,
-    },
-  });
-  logger.success(
-    `✅ rubric.override_accepted recorded: ${entry.id} (severity=${sev}, branch=${hypothesisOrBranchId})`
-  );
-}
-
-async function promoteMemoryCandidate(
-  candidateId: string,
-  executionRole: 'mission_controller' | 'chronos_gateway' = 'mission_controller',
-  note?: string,
-  supersedes?: string,
-  tenantSlug?: string
-) {
-  if (!candidateId) {
-    logger.error(
-      'Usage: mission_controller memory-promote <CANDIDATE_ID> [--tenant-slug <SLUG>] [--execution-role <mission_controller|chronos_gateway>] [--note <TEXT>] [--supersedes <PATH_OR_ID>]'
-    );
-    return;
-  }
-  try {
-    const review = reviewForCli(candidateId, tenantSlug);
-    assertMemoryPromotionReviewReady(review, 'promote');
-    const result = await promoteMemoryCandidateToKnowledge({
-      candidateId,
-      executionRole,
-      ratificationNote: note,
-      supersedes,
-      ...(review.candidate.scope ? { scope: review.candidate.scope } : {}),
-    });
-    logger.success(
-      `✅ Memory candidate promoted: ${result.candidate.candidate_id} -> ${result.promotedRef}`
-    );
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
-}
-
-async function promotePendingMemoryCandidates(input: {
-  executionRole?: 'mission_controller' | 'chronos_gateway';
-  dryRun?: boolean;
-  note?: string;
-  supersedes?: string;
-}) {
-  const executionRole = input.executionRole || 'mission_controller';
-  const pending = listMemoryPromotionCandidates()
-    .filter((row) => row.status === 'approved')
-    .sort((a, b) => a.queued_at.localeCompare(b.queued_at));
-
-  if (pending.length === 0) {
-    logger.info('No approved memory candidates to promote.');
-  }
-
-  let promoted = 0;
-  let failed = 0;
-  if (input.dryRun && pending.length > 0) {
-    logger.info(`Dry run: ${pending.length} approved memory candidate(s) would be promoted.`);
-    for (const row of pending) {
-      try {
-        const review = reviewForCli(row.candidate_id);
-        console.log(
-          `- ${row.candidate_id} (${row.proposed_memory_kind}, ${row.sensitivity_tier}) -> ${review.target_path}`
-        );
-        if (review.blockers.length > 0) {
-          console.log(`  HOLD: ${review.blockers.map((blocker) => blocker.code).join(', ')}`);
-        }
-      } catch (error) {
-        console.log(
-          `- ${row.candidate_id} HOLD: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-  } else {
-    for (const row of pending) {
-      try {
-        const review = reviewForCli(row.candidate_id);
-        assertMemoryPromotionReviewReady(review, 'promote');
-        const result = await promoteMemoryCandidateToKnowledge({
-          candidateId: row.candidate_id,
-          executionRole,
-          ratificationNote: input.note,
-          supersedes: input.supersedes,
-          ...(row.scope ? { scope: row.scope } : {}),
-        });
-        promoted += 1;
-        logger.info(`🟢 promoted ${result.candidate.candidate_id} -> ${result.promotedRef}`);
-      } catch (err: any) {
-        failed += 1;
-        logger.warn(`⚠️ failed to promote ${row.candidate_id}: ${err?.message || err}`);
-      }
-    }
-  }
-  const autopromote = await promotePersonalMemoryCandidates({
-    executionRole,
-    ratificationNote: input.note,
-    dryRun: input.dryRun,
-  });
-  if (autopromote.enabled) {
-    logger.info(
-      `🟣 personal autopromote: considered=${autopromote.considered}, promoted=${autopromote.promoted.length}, skipped=${autopromote.skipped.length}`
-    );
-  }
-  logger.success(`✅ Memory bulk promotion finished. promoted=${promoted}, failed=${failed}`);
-}
-
 async function createMission(
   id: string,
   tier: 'personal' | 'confidential' | 'public' = 'confidential',
@@ -554,16 +246,6 @@ async function createMission(
       { ...options, organizationId }
     )
   );
-}
-
-function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return { raw };
-  }
 }
 
 function formatRoutingDecisionSummary(
@@ -913,471 +595,6 @@ function listMissions(filterStatus?: string) {
   logger.info(`${missions.length} mission(s) found.`);
 }
 
-function listOrganizationCatalogs(organizationId?: string, jsonOutput = false) {
-  return withOrganizationContext(organizationId, () => {
-    const summaryOnly = process.argv.includes('--summary') || process.argv.includes('--compact');
-    const selectedOnly = process.argv.includes('--selected-only');
-    const organizationProfile = loadOrganizationProfile();
-    const catalogs =
-      listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
-    const selectedCatalogId =
-      resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
-    const requestedLabel = organizationId?.trim() || 'default';
-    const organizationLabel = organizationProfile
-      ? `${organizationProfile.name} (${organizationProfile.organization_id})`
-      : 'default';
-    const filteredCatalogs = selectedOnly
-      ? catalogs.filter((catalog) => catalog.selected)
-      : catalogs;
-    const summary = {
-      total_count: filteredCatalogs.length,
-      selected_count: filteredCatalogs.filter((catalog) => catalog.selected).length,
-      template_count: filteredCatalogs.reduce((acc, catalog) => acc + catalog.template_count, 0),
-      required_role_count: filteredCatalogs.reduce(
-        (acc, catalog) => acc + catalog.required_role_count,
-        0
-      ),
-      optional_role_count: filteredCatalogs.reduce(
-        (acc, catalog) => acc + catalog.optional_role_count,
-        0
-      ),
-    };
-
-    if (jsonOutput) {
-      const payload = {
-        requested: requestedLabel,
-        resolved: organizationLabel,
-        selected_catalog: selectedCatalogId,
-        selected_only: selectedOnly,
-        summary,
-        catalogs: filteredCatalogs.map((catalog) => ({
-          catalog_id: catalog.catalog_id,
-          organization_id: catalog.organization_id,
-          selected: catalog.selected,
-          template_ids: catalog.template_ids,
-          template_count: catalog.template_count,
-          required_role_count: catalog.required_role_count,
-          optional_role_count: catalog.optional_role_count,
-        })),
-      };
-      console.log(JSON.stringify(payload, null, 2));
-      return;
-    }
-
-    if (filteredCatalogs.length === 0) {
-      logger.info('No organization team template catalogs found.');
-      return;
-    }
-
-    logger.info(
-      `[organization] requested=${requestedLabel} resolved=${organizationLabel} selected=${selectedCatalogId || 'default'}`
-    );
-    if (selectedOnly) {
-      logger.info('[organization] filters=selected-only');
-    }
-    logger.info(
-      `[organization] summary total=${summary.total_count} selected=${summary.selected_count} templates=${summary.template_count} required_roles=${summary.required_role_count} optional_roles=${summary.optional_role_count}`
-    );
-    if (summaryOnly) {
-      return;
-    }
-
-    const header = `${'SEL'.padEnd(4)} ${'CATALOG'.padEnd(20)} ${'ORG'.padEnd(14)} ${'TEMPLATES'.padEnd(10)} ${'REQ'.padStart(4)} ${'OPT'.padStart(4)} TEMPLATE IDS`;
-    console.log('');
-    console.log(header);
-    console.log('-'.repeat(header.length + 6));
-    for (const catalog of filteredCatalogs) {
-      const templateIds = catalog.template_ids.length ? catalog.template_ids.join(', ') : '-';
-      const marker = catalog.selected ? '*' : ' ';
-      console.log(
-        `${marker.padEnd(4)} ${catalog.catalog_id.padEnd(20)} ${catalog.organization_id.padEnd(14)} ${String(catalog.template_count).padEnd(10)} ${String(catalog.required_role_count).padStart(4)} ${String(catalog.optional_role_count).padStart(4)} ${templateIds}`
-      );
-    }
-    console.log('');
-    logger.info(`${filteredCatalogs.length} organization team template catalog(s) found.`);
-  });
-}
-
-function listOrganizationProfiles(organizationId?: string) {
-  const jsonOutput = process.argv.includes('--json');
-  const summaryOnly = process.argv.includes('--summary') || process.argv.includes('--compact');
-  const activeOnly = process.argv.includes('--active-only');
-  const readyOnly = process.argv.includes('--ready-only');
-  const missingOnly = process.argv.includes('--missing-only');
-  const sourceFilter = getOptionValue('--source')?.trim();
-  const customerRoot = path.join(ROOT_DIR, 'customer');
-  const activeCustomer = customerResolver.activeCustomer();
-  const requestedLabel = organizationId?.trim() || activeCustomer || 'default';
-  const resolvedOrganizationProfile = organizationId
-    ? withOrganizationContext(organizationId, () => loadOrganizationProfile())
-    : null;
-  const selectedOrganizationId =
-    resolvedOrganizationProfile?.organization_id || organizationId || activeCustomer || 'default';
-  const rows: Array<{
-    slug: string;
-    active: boolean;
-    ready: boolean;
-    profile: ReturnType<typeof loadOrganizationProfile> | null;
-    source: 'customer' | 'public';
-  }> = [];
-
-  const publicProfile = loadOrganizationProfile();
-  const publicProfileLabel = publicProfile
-    ? `${publicProfile.name} (${publicProfile.organization_id})`
-    : 'default';
-  rows.push({
-    slug: publicProfile?.organization_id || 'default',
-    active: selectedOrganizationId === (publicProfile?.organization_id || 'default'),
-    ready: Boolean(publicProfile),
-    profile: publicProfile,
-    source: 'public',
-  });
-
-  if (safeExistsSync(customerRoot) && safeLstat(customerRoot).isDirectory()) {
-    for (const entry of safeReaddir(customerRoot).sort()) {
-      if (entry === 'README.md' || entry === '_template') continue;
-      const full = path.join(customerRoot, entry);
-      if (!safeLstat(full).isDirectory()) continue;
-      const profilePath = path.join(full, 'organization-profile.json');
-      const profile = safeExistsSync(profilePath)
-        ? withOrganizationContext(entry, () => loadOrganizationProfile())
-        : null;
-      rows.push({
-        slug: entry,
-        active: entry === selectedOrganizationId,
-        ready: Boolean(profile),
-        profile,
-        source: 'customer',
-      });
-    }
-  }
-
-  rows.sort((a, b) => {
-    if (a.source !== b.source) return a.source === 'public' ? -1 : 1;
-    return a.slug.localeCompare(b.slug);
-  });
-
-  const filteredRows = rows.filter((row) => {
-    if (activeOnly && !row.active) return false;
-    if (readyOnly && !row.ready) return false;
-    if (missingOnly && row.ready) return false;
-    if (sourceFilter && row.source !== sourceFilter) return false;
-    return true;
-  });
-
-  if (filteredRows.length === 0) {
-    logger.info('No organization profiles found.');
-    return;
-  }
-
-  const summary = {
-    total_count: filteredRows.length,
-    ready_count: filteredRows.filter((row) => row.ready).length,
-    missing_count: filteredRows.filter((row) => !row.ready).length,
-    customer_count: filteredRows.filter((row) => row.source === 'customer').length,
-    public_count: filteredRows.filter((row) => row.source === 'public').length,
-    active_count: filteredRows.filter((row) => row.active).length,
-  };
-
-  const jsonRows = filteredRows.map((row) => ({
-    slug: row.slug,
-    source: row.source,
-    active: row.active,
-    ready: row.ready,
-    organization_id: row.profile?.organization_id || row.slug,
-    name: row.profile?.name || row.slug,
-    mission_default_template:
-      row.profile?.mission_defaults?.default_team_template ||
-      row.profile?.team_defaults?.default_team_template ||
-      'default',
-    team_default_template:
-      row.profile?.team_defaults?.default_team_template ||
-      row.profile?.mission_defaults?.default_team_template ||
-      'default',
-    team_template_catalog_id: row.profile?.team_defaults?.team_template_catalog_id || 'default',
-    llm_default: row.profile?.llm?.default_profile || 'default',
-    operating_principles_count: row.profile?.operating_principles?.length || 0,
-  }));
-
-  if (jsonOutput) {
-    console.log(
-      JSON.stringify(
-        {
-          requested: requestedLabel,
-          resolved: resolvedOrganizationProfile
-            ? `${resolvedOrganizationProfile.name} (${resolvedOrganizationProfile.organization_id})`
-            : publicProfileLabel,
-          selected_organization_id: selectedOrganizationId,
-          active_only: activeOnly,
-          ready_only: readyOnly,
-          missing_only: missingOnly,
-          source_filter: sourceFilter || null,
-          summary,
-          profiles: jsonRows,
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
-
-  logger.info(`[organization] requested=${requestedLabel} selected=${selectedOrganizationId}`);
-  if (activeOnly || readyOnly || missingOnly || sourceFilter) {
-    logger.info(
-      `[organization] filters=${[
-        activeOnly ? 'active-only' : null,
-        readyOnly ? 'ready-only' : null,
-        missingOnly ? 'missing-only' : null,
-        sourceFilter ? `source=${sourceFilter}` : null,
-      ]
-        .filter(Boolean)
-        .join(', ')}`
-    );
-  }
-  logger.info(
-    `[organization] summary total=${summary.total_count} ready=${summary.ready_count} missing=${summary.missing_count} customer=${summary.customer_count} public=${summary.public_count} active=${summary.active_count}`
-  );
-  if (summaryOnly) {
-    return;
-  }
-  const header = `${'SEL'.padEnd(4)} ${'SOURCE'.padEnd(10)} ${'ORG'.padEnd(14)} ${'TEAM'.padEnd(14)} ${'CATALOG'.padEnd(12)} ${'LLM'.padEnd(10)} STATUS`;
-  console.log('');
-  console.log(header);
-  console.log('-'.repeat(header.length + 6));
-  for (const row of jsonRows) {
-    const status = row.ready ? 'ready' : 'missing profile';
-    const marker = row.active ? '*' : ' ';
-    console.log(
-      `${marker.padEnd(4)} ${row.source.padEnd(10)} ${`${row.name} (${row.organization_id})`.padEnd(14)} ${row.team_default_template.padEnd(14)} ${row.team_template_catalog_id.padEnd(12)} ${row.llm_default.padEnd(10)} ${status}`
-    );
-  }
-  console.log('');
-  logger.info(`${jsonRows.length} organization profile(s) found.`);
-}
-
-function showOrganizationProfile(organizationId?: string, summaryOnly = false, jsonOutput = false) {
-  return withOrganizationContext(organizationId, () => {
-    const requestedLabel = organizationId?.trim() || 'default';
-    const organizationProfile = loadOrganizationProfile();
-    if (!organizationProfile) {
-      const payload = {
-        requested: requestedLabel,
-        resolved: 'default',
-        selected_catalog: 'default',
-        template_catalogs: 0,
-        selected_catalog_templates: [] as string[],
-        profile: null,
-      };
-      if (jsonOutput) {
-        console.log(JSON.stringify(payload, null, 2));
-        return;
-      }
-      logger.info(`[organization] requested=${requestedLabel} resolved=default selected=default`);
-      console.log(
-        JSON.stringify(
-          { organization_id: 'default', selected_catalog: 'default', profile: null },
-          null,
-          2
-        )
-      );
-      return;
-    }
-
-    const selectedCatalogId =
-      resolveOrganizationMissionTeamTemplateCatalogId(organizationProfile) || 'default';
-    const catalogs =
-      listOrganizationMissionTeamTemplateCatalogSummariesForOrganization(organizationProfile);
-    const selectedCatalog = catalogs.find((catalog) => catalog.catalog_id === selectedCatalogId);
-    const payload = {
-      requested: requestedLabel,
-      resolved: `${organizationProfile.name} (${organizationProfile.organization_id})`,
-      selected_catalog: selectedCatalogId,
-      mission_default_template:
-        organizationProfile.mission_defaults?.default_team_template || 'default',
-      agent_profile: organizationProfile.mission_defaults?.default_agent_profile || 'default',
-      team_default_template: organizationProfile.team_defaults?.default_team_template || 'default',
-      lifecycle: organizationProfile.team_defaults?.default_lifecycle_template || 'default',
-      max_parallel_missions: organizationProfile.team_defaults?.max_parallel_missions ?? null,
-      llm_default: organizationProfile.llm?.default_profile || 'default',
-      template_catalogs: catalogs.length,
-      selected_catalog_templates: selectedCatalog?.template_ids || [],
-      operating_principles: organizationProfile.operating_principles || [],
-      profile: organizationProfile,
-    };
-    if (jsonOutput) {
-      console.log(JSON.stringify(payload, null, 2));
-      return;
-    }
-    logger.info(
-      `[organization] requested=${requestedLabel} resolved=${organizationProfile.name} (${organizationProfile.organization_id}) selected=${selectedCatalogId}`
-    );
-    logger.info(
-      `[organization] mission_default_template=${payload.mission_default_template} ` +
-        `agent_profile=${payload.agent_profile} ` +
-        `catalog=${selectedCatalogId} llm_default=${payload.llm_default}`
-    );
-    logger.info(
-      `[organization] team_default_template=${payload.team_default_template} ` +
-        `lifecycle=${payload.lifecycle} ` +
-        `max_parallel_missions=${payload.max_parallel_missions ?? 'n/a'}`
-    );
-    logger.info(
-      `[organization] template_catalogs=${payload.template_catalogs} ` +
-        `selected_catalog=${selectedCatalogId}`
-    );
-    logger.info(
-      `[organization] selected_catalog_templates=${payload.selected_catalog_templates.length ? payload.selected_catalog_templates.join(', ') : '-'}`
-    );
-    if (payload.operating_principles.length) {
-      logger.info(`[organization] operating_principles=${payload.operating_principles.length}`);
-    }
-    if (summaryOnly) {
-      return;
-    }
-    console.log(
-      JSON.stringify(
-        {
-          organization_id: organizationProfile.organization_id,
-          selected_catalog: selectedCatalogId,
-          profile: organizationProfile,
-        },
-        null,
-        2
-      )
-    );
-  });
-}
-
-export function buildOrganizationDiscoveryReport() {
-  const documents = [
-    {
-      name: 'Organization Selection Guide',
-      path: 'knowledge/product/orchestration/organization-selection-guide.md',
-      purpose: 'Select or switch the active organization context',
-      text_command:
-        'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --summary',
-      json_command:
-        'node dist/scripts/mission_controller.js organization-profile --organization-id <ORG> --json --summary',
-    },
-    {
-      name: 'Organization Discovery Reports',
-      path: 'knowledge/product/orchestration/organization-discovery-reports.md',
-      purpose: 'Inspect inventory, readiness, and template overlays',
-      text_command: 'node dist/scripts/mission_controller.js organization-profiles --summary',
-      json_command:
-        'node dist/scripts/mission_controller.js organization-profiles --json --summary',
-    },
-    {
-      name: 'Organization Discovery Copy/Paste',
-      path: 'knowledge/product/orchestration/README.md',
-      purpose: 'Copy the most common organization discovery commands',
-      text_command:
-        'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
-      json_command:
-        'node dist/scripts/mission_controller.js organization-catalogs --json --selected-only --summary',
-    },
-  ];
-
-  const examples = [
-    {
-      name: 'Organization Discovery Example',
-      path: 'knowledge/product/schemas/organization-discovery-report.example.json',
-      schema: 'knowledge/product/schemas/organization-discovery-report.schema.json',
-      purpose: 'Validate the discovery overview contract and operator entrypoints',
-    },
-    {
-      name: 'Organization Profile Example',
-      path: 'knowledge/product/schemas/organization-profile-report.example.json',
-      schema: 'knowledge/product/schemas/organization-profile-report.schema.json',
-      purpose: 'Validate the resolved organization profile contract',
-    },
-    {
-      name: 'Organization Profiles Example',
-      path: 'knowledge/product/schemas/organization-profiles-report.example.json',
-      schema: 'knowledge/product/schemas/organization-profiles-report.schema.json',
-      purpose: 'Validate the organization roster and readiness inventory contract',
-    },
-    {
-      name: 'Organization Catalog Example',
-      path: 'knowledge/product/schemas/organization-catalog-report.example.json',
-      schema: 'knowledge/product/schemas/organization-catalog-report.schema.json',
-      purpose: 'Validate the selected template overlay contract',
-    },
-  ];
-
-  const commonQuestions = [
-    {
-      question: 'What organization is selected right now?',
-      command: 'node dist/scripts/mission_controller.js organization-profile --summary',
-    },
-    {
-      question: 'Which customer orgs are missing a profile?',
-      command:
-        'node dist/scripts/mission_controller.js organization-profiles --missing-only --summary',
-    },
-    {
-      question: 'Which team template overlays are active for this org?',
-      command:
-        'node dist/scripts/mission_controller.js organization-catalogs --selected-only --summary',
-    },
-    {
-      question: 'Which organization profiles are ready to use?',
-      command:
-        'node dist/scripts/mission_controller.js organization-profiles --ready-only --summary',
-    },
-  ];
-
-  return {
-    title: 'Organization Discovery',
-    summary:
-      'Operator entrypoint for organization selection, inventory, and template overlay inspection.',
-    documents,
-    examples,
-    common_questions: commonQuestions,
-  };
-}
-
-function showOrganizationDiscovery(jsonOutput = false, summaryOnly = false) {
-  const report = buildOrganizationDiscoveryReport();
-
-  if (jsonOutput) {
-    console.log(JSON.stringify(report, null, 2));
-    return;
-  }
-
-  logger.info('Organization Discovery');
-  logger.info(
-    'Use these entry points to switch organization context, inspect inventory, or copy commands.'
-  );
-  console.log('');
-  for (const doc of report.documents) {
-    console.log(`${doc.name}`);
-    console.log(`  path: ${doc.path}`);
-    console.log(`  purpose: ${doc.purpose}`);
-    console.log(`  text: ${doc.text_command}`);
-    console.log(`  json: ${doc.json_command}`);
-    console.log('');
-  }
-  console.log('Canonical examples:');
-  for (const example of report.examples) {
-    console.log(`  - ${example.name}`);
-    console.log(`    path: ${example.path}`);
-    console.log(`    schema: ${example.schema}`);
-    console.log(`    purpose: ${example.purpose}`);
-  }
-  console.log('');
-  if (summaryOnly) {
-    return;
-  }
-  console.log('Common questions:');
-  for (const item of report.common_questions) {
-    console.log(`  - ${item.question}`);
-    console.log(`    ${item.command}`);
-  }
-  console.log('');
-}
-
 function showMissionStatus(id: string, follow: boolean = false) {
   if (!id) {
     logger.error('Usage: mission_controller status <MISSION_ID>');
@@ -1471,17 +688,19 @@ function showMissionStatus(id: string, follow: boolean = false) {
 function showReasoningBackendStatus() {
   const selectedMode = getInstalledReasoningMode();
   const forceRefresh =
-    process.argv.includes('--refresh-providers') ||
-    process.env.KYBERION_PROVIDER_DISCOVERY_REFRESH === '1';
+    activeMissionControllerArgs.includes('--refresh-providers') ||
+    registeredEnv('KYBERION_PROVIDER_DISCOVERY_REFRESH') === '1';
   const providers = discoverProviders(forceRefresh).filter((provider) =>
     ['claude', 'gemini', 'codex'].includes(provider.provider)
   );
 
   console.log('');
   console.log('  Reasoning Backend:');
-  console.log(`    Selected: ${selectedMode || process.env.KYBERION_REASONING_BACKEND || 'auto'}`);
   console.log(
-    `    Wisdom profile: ${process.env.KYBERION_WISDOM_LLM_PROFILE || 'distill policy default'}`
+    `    Selected: ${selectedMode || registeredEnv('KYBERION_REASONING_BACKEND') || 'auto'}`
+  );
+  console.log(
+    `    Wisdom profile: ${registeredEnv('KYBERION_WISDOM_LLM_PROFILE') || 'distill policy default'}`
   );
   for (const provider of providers) {
     const state = provider.installed
@@ -1919,7 +1138,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     if (stored.found && stored.evaluation) {
       const upperId = missionId.toUpperCase();
       auditChain.record({
-        agentId: process.env.KYBERION_PERSONA || 'operator',
+        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
         action: stored.evaluation.verdict === 'pass' ? 'gate.passed' : 'gate.rejected',
         operation: `gate-pass:${gateFile}`,
         result: 'completed',
@@ -1960,11 +1179,11 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'passed',
     note,
-    actorId: process.env.KYBERION_PERSONA || 'operator',
+    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
     action: 'gate.passed',
     operation: `gate-pass:${path.basename(gatePath)}`,
     result: 'completed',
@@ -1996,7 +1215,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
       const upperId = missionId.toUpperCase();
       const reworked = stored.phase ? markPhaseTasksForRework(upperId, stored.phase) : 0;
       auditChain.record({
-        agentId: process.env.KYBERION_PERSONA || 'operator',
+        agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
         action: 'gate.rejected',
         operation: `gate-fail:${gateFile}`,
         result: 'completed',
@@ -2022,11 +1241,11 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
     gateId: path.basename(gatePath).replace(/-\w+\.json$/u, ''),
     outcome: 'rejected',
     note,
-    actorId: process.env.KYBERION_PERSONA || 'operator',
+    actorId: registeredEnv('KYBERION_PERSONA') || 'operator',
     evidenceDir: path.dirname(gatePath),
   });
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'operator',
+    agentId: registeredEnv('KYBERION_PERSONA') || 'operator',
     action: 'gate.rejected',
     operation: `gate-fail:${path.basename(gatePath)}`,
     result: 'completed',
@@ -2065,15 +1284,16 @@ async function approveScopeChange(
 /**
  * 7. Main Entry
  */
-export async function main() {
-  const requestedAction = process.argv[2];
-  const isHelpFlag = process.argv.includes('--help') || process.argv.includes('-h');
+export async function main(args: string[] = currentProcessArgv()): Promise<void> {
+  activeMissionControllerArgs = [...args];
+  const requestedAction = args[0];
+  const isHelpFlag = args.includes('--help') || args.includes('-h');
   if (isHelpFlag && requestedAction !== 'help') {
     showHelp();
     return;
   }
 
-  const earlyPositionalArgs = extractMissionControllerPositionalArgs(process.argv);
+  const earlyPositionalArgs = extractMissionControllerPositionalArgs(args);
   assertMissionIdArgument(earlyPositionalArgs[0], earlyPositionalArgs[1]);
   if (earlyPositionalArgs[1]) {
     process.env.MISSION_ID = earlyPositionalArgs[1].toUpperCase();
@@ -2086,9 +1306,9 @@ export async function main() {
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   installReasoningBackends();
-  killSwitch.startMonitor(Number(process.env.KYBERION_KILL_SWITCH_INTERVAL_MS || 10000));
+  killSwitch.startMonitor(Number(registeredEnv('KYBERION_KILL_SWITCH_INTERVAL_MS') || 10000));
 
-  const positionalArgs = extractMissionControllerPositionalArgs(process.argv);
+  const positionalArgs = extractMissionControllerPositionalArgs(args);
 
   const action = positionalArgs[0];
   const arg1 = positionalArgs[1];
@@ -2099,10 +1319,10 @@ export async function main() {
   const arg6 = positionalArgs[6];
   const arg7 = positionalArgs[7];
 
-  const hasRefresh = process.argv.includes('--refresh');
-  const hasDryRun = process.argv.includes('--dry-run');
+  const hasRefresh = args.includes('--refresh');
+  const hasDryRun = args.includes('--dry-run');
   await runMissionControllerAction({
-    argv: process.argv,
+    argv: args,
     action,
     arg1,
     arg2,
@@ -2152,8 +1372,10 @@ export async function main() {
     purgeMissions,
     archiveMissions,
     listMissions,
-    listOrganizationCatalogs,
-    listOrganizationProfiles,
+    listOrganizationCatalogs: (organizationId, jsonOutput) =>
+      listOrganizationCatalogs(organizationId, jsonOutput, args),
+    listOrganizationProfiles: (organizationId) =>
+      listOrganizationProfiles(organizationId, args, ROOT_DIR),
     showOrganizationProfile,
     showOrganizationDiscovery,
     showMissionStatus,
@@ -2174,7 +1396,14 @@ export async function main() {
   });
 }
 
-main().catch((err) => {
-  logger.error(err.message);
-  process.exit(1);
+export const runMissionController = defineScript({
+  name: 'mission:controller',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'mission_controller.ts') ||
+  isDirectScript(import.meta.url, 'mission_controller.js')
+)
+  void runMissionController();

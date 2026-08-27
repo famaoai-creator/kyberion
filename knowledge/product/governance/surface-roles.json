@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "UI サーフェスの役割定義。各サーフェスは1つの明確な役割を持ち、ヘッダに tagline_ja を表示する。surface-responsibility-model.md / docs/SURFACES.md と対応。writes は 'full'|'scoped'|'none'|'orchestrator' のいずれか。'orchestrator' は SO-03 で追加した語彙で、OrchestratorSession + mission-ownership work-item claim を経由してミッション所有者権限を持てるサーフェスを表す(multi-provider-coexecution-contract.md の「Surface orchestrator sessions」節を参照)。この時点ではどの既存ロールの値も変更しない — 語彙のみを追加し、各サーフェスの opt-in は今後の変更で行う。",
   "roles": [
@@ -12,6 +13,7 @@
       "dir": "presence/displays/concierge",
       "port": 3050,
       "writes": "scoped",
+      "tagline_key": "surface:concierge_surface_tagline",
       "enabled": true
     },
     {
@@ -24,6 +26,7 @@
       "dir": "presence/displays/presence-studio",
       "port": 3031,
       "writes": "full",
+      "tagline_key": "surface:presence_studio_surface_tagline",
       "enabled": true
     },
     {
@@ -32,7 +35,7 @@
       "name_en": "Chronos Mirror",
       "role_ja": "ミッション運用",
       "tagline_ja": "ミッションの状況を確認し、必要なときだけ対応します。",
-      "tagline_key": "chronos_surface_role_tagline",
+      "tagline_key": "surface:chronos_surface_tagline",
       "metaphor": "control tower",
       "dir": "presence/displays/chronos-mirror-v2",
       "port": 3000,
@@ -49,6 +52,7 @@
       "dir": "presence/displays/operator-surface",
       "port": 3331,
       "writes": "none",
+      "tagline_key": "surface:operator_surface_tagline",
       "enabled": true
     },
     {
@@ -61,6 +65,7 @@
       "dir": "presence/displays/computer-surface",
       "port": 3040,
       "writes": "none",
+      "tagline_key": "surface:computer_surface_tagline",
       "enabled": true
     }
   ]

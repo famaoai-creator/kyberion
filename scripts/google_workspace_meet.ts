@@ -1,5 +1,5 @@
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -51,8 +51,8 @@ function readPayload(args: ArgMap): Record<string, unknown> {
   return JSON.parse(rawJson);
 }
 
-async function main(): Promise<void> {
-  const { command, args, help } = parseArgs(process.argv.slice(2));
+async function main(argv: string[]): Promise<void> {
+  const { command, args, help } = parseArgs(argv);
 
   if (help || command === 'help') {
     printUsage();
@@ -75,10 +75,14 @@ async function main(): Promise<void> {
   console.log(output);
 }
 
-const isDirect = process.argv[1] && /google_workspace_meet\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message || String(err));
-    process.exit(1);
-  });
+const script = defineScript({
+  name: 'google-workspace:meet',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'google_workspace_meet.ts') ||
+  isDirectScript(import.meta.url, 'google_workspace_meet.js')
+) {
+  void script();
 }

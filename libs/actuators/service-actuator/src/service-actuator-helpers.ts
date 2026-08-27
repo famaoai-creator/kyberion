@@ -1,9 +1,9 @@
 import {
   logger,
+  loadJson,
   safeExec,
   safeReadFile,
   safeWriteFile,
-  safeAppendFile,
   safeExistsSync,
   safeMkdir,
   safeOpenAppendFile,
@@ -42,6 +42,8 @@ import {
   type OsKnowledgeTier,
   type ResourceScope,
 } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
@@ -128,7 +130,7 @@ function emitRecoveryStimulus(serviceId: string) {
       evidence: [{ step: 'auto_recovery', ts: date.toISOString(), agent: 'service-actuator' }],
     },
   };
-  safeAppendFile(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+  appendJsonLine(STIMULI_PATH, stimulus);
 }
 
 function buildPipelineRetryPolicy(stepRetry: RetryPolicy | undefined): Required<RetryPolicy> {
@@ -598,7 +600,7 @@ function recordServiceObservation(observation: PreparedObservation | null, _resu
 
 async function reconcileServices(input: ServiceAction) {
   const manifestPath = pathResolver.rootResolve(input.params.manifest_path);
-  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+  const manifest = loadJson<unknown>(manifestPath);
   const pids = loadPids();
   let changed = false;
 
@@ -699,7 +701,7 @@ async function executeCliRequest(input: ServiceAction) {
 }
 
 function isUnsafeCliAllowed(): boolean {
-  return process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true';
+  return getRegisteredEnv<boolean>('KYBERION_ALLOW_UNSAFE_CLI', { defaultValue: false }) === true;
 }
 
 function assertUnsafeCliAllowed() {

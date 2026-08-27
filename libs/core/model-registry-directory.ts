@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 
 import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { isRecord } from './foundation/text.js';
 
 export type ModelRegistryDirectoryIndex = {
   version: string;
@@ -24,10 +25,6 @@ export type ModelRegistryDirectorySnapshot<T> = {
   default_model_id: string;
   models: T[];
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function hasExactKeys(value: Record<string, unknown>, expected: string[]): boolean {
   return JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...expected].sort());

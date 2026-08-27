@@ -1,15 +1,8 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "description": "Canonical registry of KYBERION_* environment variables (OP-05). Regenerate with pnpm generate:env-registry; curated fields are preserved.",
   "entries": [
-    {
-      "name": "KYBERION_A",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
     {
       "name": "KYBERION_A2A_SECRET",
       "category": "secret",
@@ -229,56 +222,56 @@
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow explicitly opted-in development flows to reach local or private network addresses; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_STUB_FALLBACK",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Keep the reasoning stub fallback when the configured provider chain is unavailable; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_TEST_NOTIFICATIONS",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow operator notification delivery during tests; test-only opt-in.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNAUTH_REMOTE",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow unauthenticated remote Chronos readonly access only when no API or localadmin token is configured; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_CLI",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow the service actuator to execute CLI commands; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_JS",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow code or system actuators to evaluate JavaScript; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_SHELL",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow shell execution by code, system, or network actuators; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTHROPIC_FAST_MODEL",
@@ -386,14 +379,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_AUDIT_FORWARDER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_AUDIT_FORWARDER_COMMAND",
       "category": "provider",
       "type": "string",
@@ -424,6 +409,15 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_AUTO_SEAL",
+      "category": "runtime",
+      "type": "boolean",
+      "required": false,
+      "description": "Automatically seal completed personal-tier missions.",
+      "documented": true,
+      "subsystem": "mission"
     },
     {
       "name": "KYBERION_AUTONOMOUS_OPS_POLICY_PATH",
@@ -717,8 +711,8 @@
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -733,16 +727,16 @@
     },
     {
       "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
     },
     {
       "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
-      "category": "secret",
-      "type": "string",
+      "category": "tuning",
+      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -835,14 +829,6 @@
       "description": "Active customer profile slug used to resolve the profile root.",
       "documented": true,
       "subsystem": "tenancy"
-    },
-    {
-      "name": "KYBERION_DEFAULT_LOCALE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
     },
     {
       "name": "KYBERION_DELEGATION_DEPTH",
@@ -989,14 +975,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_DOCUMENTED",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_DRAFT_REFINE",
       "category": "runtime",
       "type": "string",
@@ -1054,22 +1032,24 @@
     },
     {
       "name": "KYBERION_ENV_REGISTRY_STRICT",
-      "category": "runtime",
-      "type": "string",
+      "category": "flag",
+      "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "1",
+      "description": "Strict startup validation of KYBERION_* variables; on by default. Set to 0/false to downgrade unregistered or mistyped variables to warnings. Register new names in env-registry.json via pnpm generate:env-registry.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_ENV_REGISTRY_STRICT_DOCS",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Generator-only strictness: when enabled, the env-registry drift check also fails while any registry entry remains undocumented. Off by default; independent of KYBERION_ENV_REGISTRY_STRICT (CLI startup validation).",
+      "documented": true,
+      "default": "0"
     },
     {
       "name": "KYBERION_FIRST_WIN_LIVE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_FLAG",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1407,14 +1387,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_KEPT",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_KI_CACHE_DIR",
       "category": "path",
       "type": "path",
@@ -1466,14 +1438,6 @@
       "name": "KYBERION_KNOWLEDGE_REFS",
       "category": "runtime",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_KNOWLEDGE_ROOT",
-      "category": "path",
-      "type": "path",
       "required": false,
       "description": "",
       "documented": false
@@ -1907,31 +1871,16 @@
       "documented": false
     },
     {
-      "name": "KYBERION_MOBILE_TOOLCHAIN",
-      "category": "runtime",
+      "name": "KYBERION_MLX_WHISPER_MODEL",
+      "category": "provider",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_MODE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
+      "default": "mlx-community/whisper-large-v3-turbo",
+      "description": "Model identifier used by the managed MLX Whisper streaming adapter.",
+      "documented": true
     },
     {
       "name": "KYBERION_MOS_PRINCIPAL",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_MYSTERY",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -1958,14 +1907,6 @@
       "name": "KYBERION_NEMOTRON_URL",
       "category": "provider",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_NEW_TIMEOUT_MS",
-      "category": "tuning",
-      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -2479,48 +2420,8 @@
       "documented": false
     },
     {
-      "name": "KYBERION_REASONING_ROLE_",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REASONING_ROLE_SUBAGENT",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REHYDRATE_ITEM",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_REMINDER_CC_AFTER_N",
       "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REMOVED",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_REQUIRED_TOKEN",
-      "category": "secret",
       "type": "string",
       "required": false,
       "description": "",
@@ -2716,14 +2617,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_SKILL_PLUGIN_TEST_MARKER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_SKIP_TYPE_RATCHET",
       "category": "flag",
       "type": "boolean",
@@ -2757,14 +2650,6 @@
     },
     {
       "name": "KYBERION_SMTP_USER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_SOMETHING_ELSE",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -2846,6 +2731,40 @@
       "subsystem": "voice"
     },
     {
+      "name": "KYBERION_STT_COMPUTE_TYPE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Compute type passed to faster-whisper; CPU defaults to int8 and non-CPU devices default to float16.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_DEVICE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "cpu",
+      "description": "Device selected by the faster-whisper speech-to-text bridge, such as cpu or cuda.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_LANGUAGE",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Language hint for local Whisper speech-to-text adapters; managed streaming adapters default to ja when unset.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_STT_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "default": "small",
+      "description": "Model identifier or size used by faster-whisper when STT_MODEL_DIR is not set.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_STT_MODEL_DIR",
       "category": "path",
       "type": "path",
@@ -2876,6 +2795,14 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_STT_WINDOW_SEC",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Audio window length in seconds for streaming Whisper adapters; defaults are adapter-specific.",
+      "documented": true
     },
     {
       "name": "KYBERION_STYLE_KEYS",
@@ -3073,22 +3000,6 @@
       "documented": false
     },
     {
-      "name": "KYBERION_TEST_MARKER",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_TEST_MISSING_ENV",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
       "name": "KYBERION_TEST_OBSERVABILITY_DIR",
       "category": "path",
       "type": "path",
@@ -3100,14 +3011,6 @@
       "name": "KYBERION_TIER",
       "category": "runtime",
       "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_TIMEOUT_MS",
-      "category": "tuning",
-      "type": "number",
       "required": false,
       "description": "",
       "documented": false
@@ -3145,6 +3048,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TRUST_PROXY",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Trust x-forwarded-for and x-real-ip as the client peer for local-surface detection. Keep disabled unless a trusted reverse proxy overwrites these headers.",
+      "documented": true,
+      "subsystem": "surfaces"
+    },
+    {
       "name": "KYBERION_TTS_ARGS",
       "category": "runtime",
       "type": "string",
@@ -3178,14 +3090,6 @@
     },
     {
       "name": "KYBERION_UI_LOCALE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
-    },
-    {
-      "name": "KYBERION_UNDOCUMENTED",
       "category": "runtime",
       "type": "string",
       "required": false,
@@ -3237,17 +3141,9 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.",
+      "description": "Chronos viewer tenant audit mode: off, warn, or enforce. Unregistered tenant expansion is denied in every mode; warn records the attempt first. Defaults to warn.",
       "documented": true,
       "subsystem": "surfaces"
-    },
-    {
-      "name": "KYBERION_VITEST_NETWORK_ALLOWLIST",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
     },
     {
       "name": "KYBERION_VLLM_KEY",

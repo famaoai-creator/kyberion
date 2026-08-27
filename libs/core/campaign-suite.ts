@@ -1,6 +1,6 @@
 import { resolveCreativeDesign, type ResolvedCreativeDesign } from './creative-design-resolver.js';
 import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
-import { slugify } from './text-utils.js';
+import { slugify } from './foundation/text.js';
 import { escapeHtml } from './text-escaping.js';
 
 /**

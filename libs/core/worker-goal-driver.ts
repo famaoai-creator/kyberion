@@ -68,7 +68,6 @@ import {
   type DynamicInjectionProvider,
 } from './dynamic-injection.js';
 import type { ScopedRegistryScope } from './scoped-registry.js';
-import type { AgentInputQueueScope } from './agent-input-queue.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import type {
   GenerateWithToolsResult,

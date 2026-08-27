@@ -27,27 +27,27 @@
 
 **今も生きている（LIVE）コア資産:**
 
-| 資産 | 役割 | 注意点 |
-|---|---|---|
-| `libs/core/mission-working-memory.ts` (`MissionWorkingMemory`) | ミッション/タスク/エージェント scope の作業メモリ | **インメモリのみ**。ディスク永続（`MEMORY.md` 等）には未接続 |
-| `libs/core/memory-promotion-queue.ts` (`MemoryCandidate`) | 昇格候補キュー（kind: sop/template/heuristic/risk_rule/clarification_prompt、status: queued→approved→rejected→promoted、tier付き） | distill 配管の中核。**再発明不要** |
-| `libs/core/memory-promotion-workflow.ts` | memory kind → distill target への対応付け、`distill-candidate-registry` 連携 | Phase 4 はこれを土台にする |
-| `libs/core/promoted-memory.ts` | 昇格済みレコードの永続化（pattern/sop_candidate/knowledge_hint/report_template） | secure-io 経由で実装済み |
-| `libs/core/contextual-intent-memory.ts` | personal の文脈メモリを `knowledge/personal/contextual-intent-memory.json` に永続化 | **personal 永続メモリの既存前例** |
-| `schemas/memory-candidate.schema.json` | 昇格候補スキーマ | 流用 |
-| `scripts/mission_journal.ts` | ミッション履歴の人間可読ビュー（読み取り専用） | 揮発面の journal 表示に拡張可 |
-| `pipelines/fragments/memory-distillation.json` | 最近のミッション trace → `knowledge/product/governance/HINTS.md` へ distill | 出力先 HINTS.md は**未生成**。Phase 4 で接続 |
+| 資産                                                           | 役割                                                                                                                               | 注意点                                                       |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `libs/core/mission-working-memory.ts` (`MissionWorkingMemory`) | ミッション/タスク/エージェント scope の作業メモリ                                                                                  | **インメモリのみ**。ディスク永続（`MEMORY.md` 等）には未接続 |
+| `libs/core/memory-promotion-queue.ts` (`MemoryCandidate`)      | 昇格候補キュー（kind: sop/template/heuristic/risk_rule/clarification_prompt、status: queued→approved→rejected→promoted、tier付き） | distill 配管の中核。**再発明不要**                           |
+| `libs/core/memory-promotion-workflow.ts`                       | memory kind → distill target への対応付け、`distill-candidate-registry` 連携                                                       | Phase 4 はこれを土台にする                                   |
+| `libs/core/promoted-memory.ts`                                 | 昇格済みレコードの永続化（pattern/sop_candidate/knowledge_hint/report_template）                                                   | secure-io 経由で実装済み                                     |
+| `libs/core/contextual-intent-memory.ts`                        | personal の文脈メモリを `knowledge/personal/contextual-intent-memory.json` に永続化                                                | **personal 永続メモリの既存前例**                            |
+| `schemas/memory-candidate.schema.json`                         | 昇格候補スキーマ                                                                                                                   | 流用                                                         |
+| `scripts/mission_journal.ts`                                   | ミッション履歴の人間可読ビュー（読み取り専用）                                                                                     | 揮発面の journal 表示に拡張可                                |
+| `pipelines/fragments/memory-distillation.json`                 | 最近のミッション trace → `knowledge/product/governance/HINTS.md` へ distill                                                        | 出力先 HINTS.md は**未生成**。Phase 4 で接続                 |
 
 **「削除」ではなく `public/` → `product/` へ移設されていた（仕様・思想は健在）** — commit `cda1b0f5 "import claude update patch"` は `knowledge/public/` を `knowledge/product/` へ棚卸しする変更で、メモリ機構の仕様・思想ドキュメントは**今も `product/` 配下に生存**している:
 
-| 概念 | 現在地（生存） | 種別 |
-|---|---|---|
-| Corporate Memory Loop（capture→assess→distill→promote→reuse、importance 9） | `knowledge/product/architecture/corporate-memory-loop.md` | 思想（健在） |
-| Memory Snapshot Protocol（実行中snapshot固定／durable書込分離、importance 8） | `knowledge/product/orchestration/memory-snapshot-protocol.md` | 思想（健在） |
-| Enterprise Operating Kernel / Organization Work Loop | `knowledge/product/architecture/{enterprise-operating-kernel,organization-work-loop}.md` | 思想（健在） |
-| 日次ルーチン | `knowledge/product/pipeline-templates/daily-routine.yml` | **テンプレ止まり**（稼働配線なし） |
-| personal TODO | `knowledge/product/orchestration/work-coordination-examples/personal-todo.json` | **サンプル止まり** |
-| mission-journal-policy | `knowledge/product/schemas/mission-journal-policy.schema.json` | スキーマ（健在、`libs/core/mission-journal-policy.ts` が利用） |
+| 概念                                                                          | 現在地（生存）                                                                           | 種別                                                           |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Corporate Memory Loop（capture→assess→distill→promote→reuse、importance 9）   | `knowledge/product/architecture/corporate-memory-loop.md`                                | 思想（健在）                                                   |
+| Memory Snapshot Protocol（実行中snapshot固定／durable書込分離、importance 8） | `knowledge/product/orchestration/memory-snapshot-protocol.md`                            | 思想（健在）                                                   |
+| Enterprise Operating Kernel / Organization Work Loop                          | `knowledge/product/architecture/{enterprise-operating-kernel,organization-work-loop}.md` | 思想（健在）                                                   |
+| 日次ルーチン                                                                  | `knowledge/product/pipeline-templates/daily-routine.yml`                                 | **テンプレ止まり**（稼働配線なし）                             |
+| personal TODO                                                                 | `knowledge/product/orchestration/work-coordination-examples/personal-todo.json`          | **サンプル止まり**                                             |
+| mission-journal-policy                                                        | `knowledge/product/schemas/mission-journal-policy.schema.json`                           | スキーマ（健在、`libs/core/mission-journal-policy.ts` が利用） |
 
 **本当に失われた（GONE）もの:**
 
@@ -60,10 +60,10 @@
 
 ### 1.1 現状の二層
 
-| 層 | 物理位置 | 性質 | 既存の索引 |
-|---|---|---|---|
-| 永続ナレッジ | `knowledge/`（`personal/` → `confidential/` → `public/` ＋ `product/` `evolution/`） | tier 分離・distill 済み・SSoT | `knowledge/_index.md`, `knowledge/_manifest.json` |
-| 揮発状態（実在するが未概念化） | `active/`（`missions/` `projects/` `shared/` `audit/` `archive/`） | ミッション/プロジェクトのランタイム状態 | なし（横断索引が存在しない） |
+| 層                             | 物理位置                                                                             | 性質                                    | 既存の索引                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------ | --------------------------------------- | ----------------------------------------------------------- |
+| 永続ナレッジ                   | `knowledge/`（`personal/` → `confidential/` → `public/` ＋ `product/` `evolution/`） | tier 分離・distill 済み・SSoT           | `knowledge/_index.md`, `knowledge/_integrity-manifest.json` |
+| 揮発状態（実在するが未概念化） | `active/`（`missions/` `projects/` `shared/` `audit/` `archive/`）                   | ミッション/プロジェクトのランタイム状態 | なし（横断索引が存在しない）                                |
 
 `active/` には既に揮発的な仕組みがある:
 
@@ -112,6 +112,7 @@
 - **軸B: cadence（時間的サイクル）** — `resident`（常駐・期間なし） / `daily`（日次） / `weekly`（週次） / `adhoc-ttl`（任意TTL）
 
 例:
+
 - ミッション作業記憶 = `scope:mission × cadence:resident`
 - 今日の TODO = `scope:personal × cadence:daily`
 - 週次振り返り = `scope:personal(or global) × cadence:weekly`
@@ -119,27 +120,28 @@
 
 ### 3.1 scope 別の常駐面（cadence:resident）
 
-| scope | 揮発面の物理位置（規約） | 主な内容 | 既定 lifetime |
-|---|---|---|---|
-| `session` | `active/shared/runtime/session/<session_id>/NOW.md` | 今の対話・直近の意図・次の一手 | `session`（短命） |
-| `mission` | `active/missions/<TIER>/<MISSION_ID>/MEMORY.md` ＋ 既存 `TASK_BOARD.md` | ミッション内の作業記憶・判断ログ・残タスク | `mission`（finish まで） |
-| `project` | `active/projects/<TIER>/<project>/MEMORY.md` | プロジェクト横断の進行メモ・決定事項の下書き | `until-distilled` |
-| `personal` | `active/personal/MEMORY.md`（tier=personal、新設 `active/personal/`） | 個人の継続メモ・申し送り・気付き | `until-distilled` |
-| `tenant` | `active/projects/<TIER>/<tenant>/MEMORY.md`（tenant スコープ） | テナント単位の運用上の留意・継続課題 | `ttl:30d` 既定 |
-| `global` | `active/shared/MEMORY.md`（＝オペレータの「MEMORY.md」） | 横断アクションアイテム・申し送り・運用メモ | `until-distilled` ＋ 上限件数 |
+| scope      | 揮発面の物理位置（規約）                                                | 主な内容                                     | 既定 lifetime                 |
+| ---------- | ----------------------------------------------------------------------- | -------------------------------------------- | ----------------------------- |
+| `session`  | `active/shared/runtime/session/<session_id>/NOW.md`                     | 今の対話・直近の意図・次の一手               | `session`（短命）             |
+| `mission`  | `active/missions/<TIER>/<MISSION_ID>/MEMORY.md` ＋ 既存 `TASK_BOARD.md` | ミッション内の作業記憶・判断ログ・残タスク   | `mission`（finish まで）      |
+| `project`  | `active/projects/<TIER>/<project>/MEMORY.md`                            | プロジェクト横断の進行メモ・決定事項の下書き | `until-distilled`             |
+| `personal` | `active/personal/MEMORY.md`（tier=personal、新設 `active/personal/`）   | 個人の継続メモ・申し送り・気付き             | `until-distilled`             |
+| `tenant`   | `active/projects/<TIER>/<tenant>/MEMORY.md`（tenant スコープ）          | テナント単位の運用上の留意・継続課題         | `ttl:30d` 既定                |
+| `global`   | `active/shared/MEMORY.md`（＝オペレータの「MEMORY.md」）                | 横断アクションアイテム・申し送り・運用メモ   | `until-distilled` ＋ 上限件数 |
 
 ### 3.2 cadence 別の時限面（日次・週次・TTL）★今回の追加要望
 
 期間で区切られ、**期末に繰越（rollover）または上位へ集約（rollup）→ 最終的に distill** されるサイクル面。ファイル名に期間キーを含める。
 
-| 用途 | 物理位置（規約） | scope | cadence / lifetime | 期末アクション |
-|---|---|---|---|---|
-| **今日の TODO** | `active/personal/today/TODO.md`（＋日付スナップ `active/personal/journal/<YYYY-MM-DD>.md` の `## TODO`） | personal | `daily` | 未完は翌日へ **rollover**、完了は日次ログへ確定 |
-| **日次作業ログ** | `active/personal/journal/<YYYY-MM-DD>.md` | personal | `daily` / `ttl:14d` | 14日後に GC。週次へ **rollup** |
-| **週次振り返り** | `active/personal/weekly/<YYYY>-W<WW>.md` | personal / global | `weekly` / `ttl:8w` | 当週の日次ログを集約。重要事項を昇格キューへ |
-| **任意時限メモ** | `active/shared/runtime/ttl/<id>.md` | any | `adhoc-ttl` | `expires_at` で GC |
+| 用途             | 物理位置（規約）                                                                                         | scope             | cadence / lifetime  | 期末アクション                                  |
+| ---------------- | -------------------------------------------------------------------------------------------------------- | ----------------- | ------------------- | ----------------------------------------------- |
+| **今日の TODO**  | `active/personal/today/TODO.md`（＋日付スナップ `active/personal/journal/<YYYY-MM-DD>.md` の `## TODO`） | personal          | `daily`             | 未完は翌日へ **rollover**、完了は日次ログへ確定 |
+| **日次作業ログ** | `active/personal/journal/<YYYY-MM-DD>.md`                                                                | personal          | `daily` / `ttl:14d` | 14日後に GC。週次へ **rollup**                  |
+| **週次振り返り** | `active/personal/weekly/<YYYY>-W<WW>.md`                                                                 | personal / global | `weekly` / `ttl:8w` | 当週の日次ログを集約。重要事項を昇格キューへ    |
+| **任意時限メモ** | `active/shared/runtime/ttl/<id>.md`                                                                      | any               | `adhoc-ttl`         | `expires_at` で GC                              |
 
 > **rollover / rollup の定義**
+>
 > - **rollover（繰越）**: 期をまたいで残る要素（未完 TODO 等）を次期の面へ移送。
 > - **rollup（集約）**: 期末に下位 cadence を上位へ要約集約（日次×7 → 週次、週次 → 昇格候補）。
 > - これにより「日次ログ → 週次振り返り → distill → `knowledge/`」という**時間方向の昇格レーン**が、既存の `memory-promotion-queue` に接続される。
@@ -148,15 +150,15 @@
 
 ### 3.3 ライフタイム
 
-| lifetime | 失効条件 | GC の扱い |
-|---|---|---|
-| `session` | セッション終了 or `expires_at` 到達 | セッション終了フックで purge |
-| `mission` | `mission_controller finish` | finish フローで distill 候補化→アーカイブ |
-| `daily` | その日の終わり（または翌セッション開始） | 未完を rollover、本体を `ttl` 化して GC レーンへ |
-| `weekly` | その週の終わり | 日次を rollup、重要事項を昇格キューへ |
-| `ttl:<dur>` | `expires_at`（生成時に `created_at + dur`） | GC が期限超過を回収 |
-| `until-distilled` | `status=promoted` になるまで | GC 対象外。上限超過時は古い順に distill を促す |
-| `sticky` | 手動のみ | GC 対象外。scope あたり上限（既定5）を超えたら警告 |
+| lifetime          | 失効条件                                    | GC の扱い                                          |
+| ----------------- | ------------------------------------------- | -------------------------------------------------- |
+| `session`         | セッション終了 or `expires_at` 到達         | セッション終了フックで purge                       |
+| `mission`         | `mission_controller finish`                 | finish フローで distill 候補化→アーカイブ          |
+| `daily`           | その日の終わり（または翌セッション開始）    | 未完を rollover、本体を `ttl` 化して GC レーンへ   |
+| `weekly`          | その週の終わり                              | 日次を rollup、重要事項を昇格キューへ              |
+| `ttl:<dur>`       | `expires_at`（生成時に `created_at + dur`） | GC が期限超過を回収                                |
+| `until-distilled` | `status=promoted` になるまで                | GC 対象外。上限超過時は古い順に distill を促す     |
+| `sticky`          | 手動のみ                                    | GC 対象外。scope あたり上限（既定5）を超えたら警告 |
 
 ### 3.4 sidecar メタスキーマ（`<name>.volatile.json`）
 
@@ -167,19 +169,19 @@
   "$schema": "../../schemas/volatile-knowledge.schema.json",
   "scope": "session|mission|project|personal|tenant|global",
   "scope_ref": "MSN-... | PRJ-... | <tenant-slug> | <session_id> | null",
-  "cadence": "resident|daily|weekly|adhoc-ttl",   // 軸B
-  "period_key": "2026-06-22 | 2026-W25 | null",   // daily/weekly のみ
+  "cadence": "resident|daily|weekly|adhoc-ttl", // 軸B
+  "period_key": "2026-06-22 | 2026-W25 | null", // daily/weekly のみ
   "tier": "personal|confidential|public",
   "lifetime": "session|mission|daily|weekly|ttl|until-distilled|sticky",
-  "expires_at": "2026-07-22T00:00:00.000Z",        // ttl/session/daily/weekly。それ以外 null
+  "expires_at": "2026-07-22T00:00:00.000Z", // ttl/session/daily/weekly。それ以外 null
   "created_at": "2026-06-22T00:00:00.000Z",
   "updated_at": "2026-06-22T00:00:00.000Z",
-  "rollover_to": "active/personal/journal/2026-06-23.md | null",  // 期末の繰越先（任意）
-  "rollup_to": "active/personal/weekly/2026-W25.md | null",        // 期末の集約先（任意）
-  "promote_target": "knowledge/product/...",       // distill 先のヒント（任意）
-  "promotion_candidate_id": "MEM-... | null",      // memory-promotion-queue 連携
+  "rollover_to": "active/personal/journal/2026-06-23.md | null", // 期末の繰越先（任意）
+  "rollup_to": "active/personal/weekly/2026-W25.md | null", // 期末の集約先（任意）
+  "promote_target": "knowledge/product/...", // distill 先のヒント（任意）
+  "promotion_candidate_id": "MEM-... | null", // memory-promotion-queue 連携
   "status": "active|expired|rolled-over|promoted|archived",
-  "pinned": false                                   // sticky 補助
+  "pinned": false, // sticky 補助
 }
 ```
 
@@ -274,7 +276,7 @@
 - **タスク**
   1. `working-memory` から昇格時、`memory-promotion-queue` に `MemoryCandidate` を投入（`source_type`/`proposed_memory_kind`/`sensitivity_tier` を sidecar から導出）。sidecar に `promotion_candidate_id` と `status: promoted` を反映。
   2. `pipelines/fragments/memory-distillation.json` の出力先 `knowledge/product/governance/HINTS.md`（**現状未生成**）を初期化し、distill レーンを通す。
-  3. Review フェーズ（`knowledge/product/governance/phases/review.md`）に「揮発面 → 昇格キュー → `knowledge/` → 索引再生成」を明文化。distill 後に `knowledge/_manifest.json` / `_index.md` を既存索引生成で更新。
+  3. Review フェーズ（`knowledge/product/governance/phases/review.md`）に「揮発面 → 昇格キュー → `knowledge/` → 索引再生成」を明文化。distill 後に `knowledge/_integrity-manifest.json` / `_index.md` を既存索引生成で更新。
 - **変更ファイル**: actuator/workflow 連携, `knowledge/product/governance/HINTS.md`(新), `knowledge/product/governance/phases/review.md`, 索引生成スクリプト連携。
 - **受入条件**: ミッション/週次完了時、learnings が昇格キュー経由で `knowledge/` 適切 tier に草稿化され、元面が `promoted` になり GC 対象から外れる。
 
@@ -347,7 +349,7 @@ Phase 0 (監査・生存資産確認)
 - ミッション生成/ephemeral: `scripts/refactor/mission-creation.ts`
 - ミッション制御/finish purge: `scripts/mission_controller.ts`
 - フェーズ: `knowledge/product/governance/phases/recovery.md`, `.../review.md`
-- 索引: `knowledge/_index.md`, `knowledge/_manifest.json`
+- 索引: `knowledge/_index.md`, `knowledge/_integrity-manifest.json`
 - 用語: [`docs/GLOSSARY.md`](./GLOSSARY.md)
 
 **再利用する生存メモリ資産（§1.0 LIVE）**

@@ -9,9 +9,7 @@ import type {
   XlsxBorder,
   XlsxBorderEdge,
   XlsxCellStyle,
-  XlsxNumberFormat,
   XlsxColor,
-  XlsxDxfStyle,
 } from '../types/xlsx-protocol.js';
 import { resolveLatinFontFamily } from '../../design-fonts.js';
 import { escapeXml as escXml } from '../../text-escaping.js';

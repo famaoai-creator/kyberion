@@ -1,8 +1,8 @@
-import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExec, safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExec, safeExistsSync, safeRmSync } from './secure-io.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import {
   emitMissionOrchestrationObservation,
@@ -107,9 +107,7 @@ export function getMissionProposalState(
     missionProposalStateLogicalPath(surface.trim().toLowerCase(), channel, threadTs)
   );
   if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(
-    safeReadFile(resolved, { encoding: 'utf8' }) as string
-  ) as SurfaceMissionProposalState;
+  return readJson<SurfaceMissionProposalState>(resolved);
 }
 
 export function clearMissionProposalState(
@@ -165,9 +163,7 @@ export function getSlackMissionProposalState(
   const logicalPath = missionProposalStateLogicalPath('slack', channel, threadTs);
   const resolved = pathResolver.resolve(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(
-    safeReadFile(resolved, { encoding: 'utf8' }) as string
-  ) as SlackMissionProposalState;
+  return readJson<SlackMissionProposalState>(resolved);
 }
 
 export function saveSlackMissionProposalState(params: {
@@ -208,9 +204,7 @@ export function getChronosMissionProposalState(
   const logicalPath = missionProposalStateLogicalPath('chronos', 'chronos', sessionId);
   const resolved = pathResolver.resolve(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(
-    safeReadFile(resolved, { encoding: 'utf8' }) as string
-  ) as ChronosMissionProposalState;
+  return readJson<ChronosMissionProposalState>(resolved);
 }
 
 export function saveChronosMissionProposalState(params: {

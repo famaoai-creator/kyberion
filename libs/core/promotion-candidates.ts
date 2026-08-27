@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -28,7 +28,7 @@ function readLedger(): AdhocRunTally[] {
   try {
     const filePath = ledgerPath();
     if (!safeExistsSync(filePath)) return [];
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

@@ -1,4 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
@@ -216,8 +217,7 @@ const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions')
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');
 const BROWSER_SNAPSHOT_DIR = pathResolver.shared('runtime/browser/snapshots');
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 
 let sessionValidateFn: ValidateFunction | null = null;
 let commandValidateFn: ValidateFunction | null = null;

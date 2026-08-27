@@ -9,7 +9,7 @@ the abstraction.
 - Actuator-specific examples / fixtures live here.
 
 Each example must validate against
-[`schemas/meeting-action.schema.json`](../../../../schemas/meeting-action.schema.json).
+[`knowledge/product/schemas/meeting-action.schema.json`](../../../../knowledge/product/schemas/meeting-action.schema.json).
 The schema test fails CI if any example here drifts.
 
 ## Example: join a Zoom meeting

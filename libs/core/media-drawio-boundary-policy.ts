@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface MediaDrawioBoundaryPaletteOverrideEntry {
   boundary?: string;
@@ -27,15 +24,10 @@ interface MediaDrawioBoundaryPolicyCatalog {
   icon_rules: MediaDrawioBoundaryIconRuleEntry[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-drawio-boundary-policy.json');
-const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-drawio-boundary-policy.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MediaDrawioBoundaryPolicyCatalog | null = null;
-let cachedCatalogPath: string | null = null;
+const SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/media-drawio-boundary-policy.schema.json'
+);
 
 const FALLBACK_CATALOG: MediaDrawioBoundaryPolicyCatalog = {
   version: '1.0.0',
@@ -152,40 +144,15 @@ const FALLBACK_CATALOG: MediaDrawioBoundaryPolicyCatalog = {
   ],
 };
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MediaDrawioBoundaryPolicyCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid media drawio boundary policy catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as MediaDrawioBoundaryPolicyCatalog;
-}
+const catalog = defineCatalog<MediaDrawioBoundaryPolicyCatalog>({
+  id: 'media-drawio-boundary-policy',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_CATALOG,
+});
 
 export function loadMediaDrawioBoundaryPolicyCatalog(): MediaDrawioBoundaryPolicyCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = FALLBACK_CATALOG;
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return catalog.load();
 }
 
 export function resolveDrawioBoundaryPaletteOverride(input: {
@@ -194,16 +161,25 @@ export function resolveDrawioBoundaryPaletteOverride(input: {
   tier?: string;
   name?: string;
 }): { fill: string; stroke: string } | null {
-  const boundary = String(input.boundary || '').trim().toLowerCase();
-  const type = String(input.type || '').trim().toLowerCase();
-  const tier = String(input.tier || '').trim().toLowerCase();
-  const name = String(input.name || '').trim().toLowerCase();
+  const boundary = String(input.boundary || '')
+    .trim()
+    .toLowerCase();
+  const type = String(input.type || '')
+    .trim()
+    .toLowerCase();
+  const tier = String(input.tier || '')
+    .trim()
+    .toLowerCase();
+  const name = String(input.name || '')
+    .trim()
+    .toLowerCase();
   const catalog = loadMediaDrawioBoundaryPolicyCatalog();
-  const matched = catalog.palette_overrides.find((entry) =>
-    (!entry.boundary || entry.boundary === boundary)
-      && (!entry.type || entry.type === type)
-      && (!entry.tier || entry.tier === tier)
-      && (!entry.name_contains || name.includes(entry.name_contains))
+  const matched = catalog.palette_overrides.find(
+    (entry) =>
+      (!entry.boundary || entry.boundary === boundary) &&
+      (!entry.type || entry.type === type) &&
+      (!entry.tier || entry.tier === tier) &&
+      (!entry.name_contains || name.includes(entry.name_contains))
   );
   return matched ? { fill: matched.fill, stroke: matched.stroke } : null;
 }
@@ -214,21 +190,29 @@ export function resolveDrawioBoundaryIconCandidates(input: {
   tier?: string;
   name?: string;
 }): string[] {
-  const boundary = String(input.boundary || '').trim().toLowerCase();
-  const type = String(input.type || '').trim().toLowerCase();
-  const tier = String(input.tier || '').trim().toLowerCase();
-  const name = String(input.name || '').trim().toLowerCase();
+  const boundary = String(input.boundary || '')
+    .trim()
+    .toLowerCase();
+  const type = String(input.type || '')
+    .trim()
+    .toLowerCase();
+  const tier = String(input.tier || '')
+    .trim()
+    .toLowerCase();
+  const name = String(input.name || '')
+    .trim()
+    .toLowerCase();
   const catalog = loadMediaDrawioBoundaryPolicyCatalog();
-  const matched = catalog.icon_rules.find((entry) =>
-    (!entry.boundary || entry.boundary === boundary)
-      && (!entry.type || entry.type === type)
-      && (!entry.tier || entry.tier === tier)
-      && (!entry.name_contains || name.includes(entry.name_contains))
+  const matched = catalog.icon_rules.find(
+    (entry) =>
+      (!entry.boundary || entry.boundary === boundary) &&
+      (!entry.type || entry.type === type) &&
+      (!entry.tier || entry.tier === tier) &&
+      (!entry.name_contains || name.includes(entry.name_contains))
   );
   return matched?.icons || [];
 }
 
 export function resetMediaDrawioBoundaryPolicyCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
+  catalog.reset();
 }

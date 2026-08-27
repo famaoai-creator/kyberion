@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-domain-ontology.schema.json",
   "version": "1.0.0",
   "notes": [
     "Canonical join layer between user-facing intents and governed execution design.",

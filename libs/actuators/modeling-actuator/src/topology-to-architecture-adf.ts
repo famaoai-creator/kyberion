@@ -269,10 +269,6 @@ function inferExampleRegion(blocks: TerraformBlock[]): string {
   return 'default-region';
 }
 
-function isWithinModuleSourceDir(dir: string, moduleSourceDirs: string[]): boolean {
-  return moduleSourceDirs.some((sourceDir) => dir === sourceDir || dir.startsWith(`${sourceDir}/`));
-}
-
 function collectVpcScopeDirs(blocks: TerraformBlock[]): Set<string> {
   const dirs = new Set<string>();
   for (const block of blocks) {

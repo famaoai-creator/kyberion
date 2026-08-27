@@ -50,4 +50,4 @@ CIでは `StubAudioBus` と決定的TTS/STTを使用します。live testのskip
 
 ## 保持・停止・復旧
 
-raw audioは既定で削除します。音声またはtranscriptを保持する場合はrequestで明示し、mission/tenant/tier配下のgoverned pathだけを使用します。SIGINT/SIGTERM、timeout、cancelではTTS、capture、output、process group、queue、device leaseを解放します。残ったleaseやorphan processは `pnpm doctor:meeting` で確認し、Audio MIDI設定変更やinstaller実行はoperatorが行います。
+raw audioは既定で削除します。音声またはtranscriptを保持する場合はrequestで明示し、mission/tenant/tier配下のgoverned pathだけを使用します。SIGINT/SIGTERM、timeout、cancelではTTS、capture、output、process group、queue、device leaseを解放します。残ったleaseやorphan processは `pnpm doctor -- --runtime meeting` で確認し、Audio MIDI設定変更やinstaller実行はoperatorが行います。

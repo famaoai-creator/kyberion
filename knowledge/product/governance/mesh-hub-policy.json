@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "placement": {
     "mode": "in_process_local_control_plane",
@@ -21,7 +22,14 @@
       "notification.publish"
     ],
     "automatic_peer_selection": "deny",
-    "load_signals": ["enrollment", "tenant", "presence", "advertised_capability", "request_kind", "policy"]
+    "load_signals": [
+      "enrollment",
+      "tenant",
+      "presence",
+      "advertised_capability",
+      "request_kind",
+      "policy"
+    ]
   },
   "data_tier": {
     "personal": "deny",

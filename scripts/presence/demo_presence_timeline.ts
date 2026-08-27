@@ -11,9 +11,13 @@ async function main() {
       { at_ms: 900, op: 'set_status', params: { value: 'speaking' } },
       { at_ms: 900, op: 'set_expression', params: { value: 'joy' } },
       { at_ms: 900, op: 'set_subtitle', params: { text: 'Timeline playback is now active.' } },
-      { at_ms: 900, op: 'append_transcript', params: { speaker: 'Kyberion', text: 'Timeline playback is now active.' } },
+      {
+        at_ms: 900,
+        op: 'append_transcript',
+        params: { speaker: 'Kyberion', text: 'Timeline playback is now active.' },
+      },
       { at_ms: 2200, op: 'clear_subtitle' },
-      { at_ms: 2200, op: 'set_status', params: { value: 'ready' } }
+      { at_ms: 2200, op: 'set_status', params: { value: 'ready' } },
     ],
   };
 
@@ -33,5 +37,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

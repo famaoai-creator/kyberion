@@ -9,6 +9,24 @@
 
 type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
 
+const SECRET_SCHEMA = {
+  type: 'object',
+  properties: {
+    account: { type: 'string' },
+    export_as: { type: 'string' },
+    service: { type: 'string' },
+    value: { type: 'string' },
+  },
+  additionalProperties: false,
+} as const;
+
+const SECRET_EXAMPLES = {
+  get: [{ service: 'github', account: 'api-token', export_as: 'token' }],
+  list: [{ service: 'github' }],
+  set: [{ service: 'github', account: 'api-token', value: 'use-secret-reference' }],
+  delete: [{ service: 'github', account: 'api-token' }],
+};
+
 export const SECRET_ACTUATOR_CAPTURE_OPS = ['get', 'list'] as const;
 
 export const SECRET_ACTUATOR_TRANSFORM_OPS = ['set'] as const;
@@ -16,7 +34,18 @@ export const SECRET_ACTUATOR_TRANSFORM_OPS = ['set'] as const;
 export const SECRET_ACTUATOR_APPLY_OPS = ['delete'] as const;
 
 function toSpec(op: string, kind: OpSpecKind) {
-  return { op, kind };
+  const required =
+    op === 'set'
+      ? ['service', 'account', 'value']
+      : op === 'delete'
+        ? ['service', 'account']
+        : ['service'];
+  return {
+    op,
+    kind,
+    input_schema: { ...SECRET_SCHEMA, required },
+    examples: SECRET_EXAMPLES[op as keyof typeof SECRET_EXAMPLES],
+  };
 }
 
 export function describeOps() {

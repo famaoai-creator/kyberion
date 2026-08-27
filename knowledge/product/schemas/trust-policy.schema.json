@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "trust-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "weights": { "type": "object", "additionalProperties": { "type": "number", "minimum": 0 } },
+        "dimension_max": { "type": "number", "minimum": 0 }
+      },
+      "required": ["weights", "dimension_max"]
+    },
+    "tier_thresholds": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "min_score": { "type": "number" },
+          "tier": { "type": "string", "minLength": 1 }
+        },
+        "required": ["min_score", "tier"]
+      }
+    },
+    "decay": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "minimum": 0 },
+      "required": ["rate_per_hour", "floor"]
+    },
+    "propagation": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "minimum": 0 },
+      "required": ["factor", "max_depth"]
+    },
+    "regime_shift": {
+      "type": "object",
+      "additionalProperties": { "type": "number", "minimum": 0 },
+      "required": ["threshold"]
+    },
+    "anomaly_detection": { "type": "object", "additionalProperties": true }
+  },
+  "required": [
+    "version",
+    "scoring",
+    "tier_thresholds",
+    "decay",
+    "propagation",
+    "regime_shift",
+    "anomaly_detection"
+  ]
+}

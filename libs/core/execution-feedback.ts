@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   createDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -12,8 +12,6 @@ import {
 } from './distill-candidate-registry.js';
 import { t } from './t.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/execution-feedback.schema.json'
 );
@@ -186,7 +184,7 @@ export function parseExecutionFeedbackText(text: string): ExecutionFeedbackInput
   };
   const scenarioId = match[1];
   const label = match[2];
-  const detail = normalizeText(match[3]);
+  const detail = normalizeFeedbackText(match[3]);
   return {
     scenario_id: scenarioId,
     intent_id: scenarioId.slice('use-case-'.length),
@@ -205,7 +203,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, FEEDBACK_SCHEMA_PATH);
+  validateFn = compileSchema(FEEDBACK_SCHEMA_PATH);
   return validateFn;
 }
 
@@ -227,15 +225,13 @@ function validateStore(store: unknown): ExecutionFeedbackStore {
 function loadStoreFromDisk(): ExecutionFeedbackStore {
   if (!safeExistsSync(FEEDBACK_STORE_PATH)) return defaultStore();
   try {
-    return validateStore(
-      JSON.parse(safeReadFile(FEEDBACK_STORE_PATH, { encoding: 'utf8' }) as string)
-    );
+    return validateStore(loadJson(FEEDBACK_STORE_PATH));
   } catch {
     return defaultStore();
   }
 }
 
-function normalizeText(value: string | undefined): string | undefined {
+function normalizeFeedbackText(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   if (!normalized) return undefined;
   return normalized.slice(0, MAX_FEEDBACK_TEXT_LENGTH);
@@ -261,8 +257,12 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     recorded_at: new Date().toISOString(),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
     ...(input.surface?.trim() ? { surface: input.surface.trim() } : {}),
-    ...(normalizeText(input.comment) ? { comment: normalizeText(input.comment) } : {}),
-    ...(normalizeText(input.correction) ? { correction: normalizeText(input.correction) } : {}),
+    ...(normalizeFeedbackText(input.comment)
+      ? { comment: normalizeFeedbackText(input.comment) }
+      : {}),
+    ...(normalizeFeedbackText(input.correction)
+      ? { correction: normalizeFeedbackText(input.correction) }
+      : {}),
   };
   const store = loadStoreFromDisk();
   const nextStore = validateStore({

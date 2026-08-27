@@ -15,6 +15,7 @@ vi.mock('./secure-io.js', async () => {
     safeWriteFile: fsModule.writeFileSync,
     safeAppendFileSync: fsModule.appendFileSync,
     safeMkdir: fsModule.mkdirSync,
+    loadJsonIfPresent: () => null,
     rawExistsSync: fsModule.existsSync,
     rawReadTextFile: (filePath: string) => fsModule.readFileSync(filePath, 'utf8'),
   };
@@ -134,7 +135,9 @@ describe('tier-guard tenant scope (IP-1)', () => {
 
   it('fails closed when a protected tenant path has no tenant binding', async () => {
     delete process.env.KYBERION_TENANT;
-    process.env.KYBERION_TENANT_SCOPE_REQUIRED = 'true';
+    // Registered boolean settings use the canonical 1/0 representation at
+    // runtime; the guard must not compare the normalized text with "true".
+    process.env.KYBERION_TENANT_SCOPE_REQUIRED = '1';
     process.env.KYBERION_PERSONA = 'ecosystem_architect';
     const target = path.join(ROOT, 'knowledge/confidential/other-tenant/file.md');
     const result = validateWritePermission(target);

@@ -1,15 +1,32 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import {
-  safeCreateExclusiveFileSync,
-  safeChmodSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type ChainAlg = 'sha256' | 'hmac-sha256';
+
+export interface ChainIntegrityIo {
+  exists(filePath: string): boolean;
+  read(filePath: string): string;
+  mkdir(dirPath: string): void;
+  createExclusive(filePath: string, content: string): void;
+  chmod(filePath: string, mode: number): void;
+}
+
+let chainIo: ChainIntegrityIo | undefined;
+
+function testChainIntegrityIo(): ChainIntegrityIo | undefined {
+  if (!process.env.VITEST) return undefined;
+  return (
+    globalThis as typeof globalThis & {
+      __kyberionVitestIo?: { chainIo?: ChainIntegrityIo };
+    }
+  ).__kyberionVitestIo?.chainIo;
+}
+
+export function registerChainIntegrityIo(io: ChainIntegrityIo): void {
+  chainIo = io;
+}
 
 export const GENESIS_HASH = '0'.repeat(64);
 
@@ -40,26 +57,28 @@ function auditKeyPath(): string {
 }
 
 export function resolveAuditChainKey(options: { createIfMissing?: boolean } = {}): string | null {
-  const fromEnv = process.env.KYBERION_AUDIT_CHAIN_KEY?.trim();
+  const fromEnv = getRegisteredEnvText('KYBERION_AUDIT_CHAIN_KEY')?.trim();
   if (fromEnv) return fromEnv;
 
   const keyPath = auditKeyPath();
-  if (safeExistsSync(keyPath)) {
-    const existing = String(safeReadFile(keyPath, { encoding: 'utf8' })).trim();
+  chainIo ||= testChainIntegrityIo();
+  if (!chainIo) throw new Error('secure_chain_io_not_registered');
+  if (chainIo.exists(keyPath)) {
+    const existing = chainIo.read(keyPath).trim();
     return existing || null;
   }
   if (!options.createIfMissing) return null;
 
   const dir = path.dirname(keyPath);
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  if (!chainIo.exists(dir)) chainIo.mkdir(dir);
   const generated = randomBytes(32).toString('hex');
   try {
-    safeCreateExclusiveFileSync(keyPath, `${generated}\n`);
+    chainIo.createExclusive(keyPath, `${generated}\n`);
     // Restrict access to owner-only (read+write) — key must not be world-readable.
-    safeChmodSync(keyPath, 0o600);
+    chainIo.chmod(keyPath, 0o600);
   } catch {
-    if (safeExistsSync(keyPath)) {
-      const existing = String(safeReadFile(keyPath, { encoding: 'utf8' })).trim();
+    if (chainIo.exists(keyPath)) {
+      const existing = chainIo.read(keyPath).trim();
       return existing || null;
     }
     throw new Error('failed_to_create_audit_chain_key');

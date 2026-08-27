@@ -28,9 +28,15 @@ vi.mock('./audit-chain.js', () => ({
 }));
 
 const recordGovernanceAction = vi.fn();
-vi.mock('./kill-switch.js', () => ({
-  recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
-}));
+vi.mock('./governance-action-recorder.js', async () => {
+  const actual = await vi.importActual<typeof import('./governance-action-recorder.js')>(
+    './governance-action-recorder.js'
+  );
+  return {
+    ...actual,
+    recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
+  };
+});
 
 describe('subagent-capability-profiles (KD-05)', () => {
   beforeEach(() => {

@@ -20,6 +20,7 @@
 import { execSync } from 'node:child_process';
 import * as path from 'node:path';
 import { resolveChangelogPolicy, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = execSync('git rev-parse --show-toplevel').toString().trim();
 const CHANGELOG_PATH = path.join(ROOT, 'CHANGELOG.md');
@@ -182,36 +183,40 @@ function prependToChangelog(content: string): void {
   }
 }
 
-function main(): void {
-  const args = process.argv.slice(2);
-  let from: string | null = null;
-  let to = 'HEAD';
-  let prepend = false;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--from') from = args[++i];
-    else if (args[i] === '--to') to = args[++i];
-    else if (args[i] === '--prepend') prepend = true;
-  }
-  if (!from) from = findLatestTag();
+export const main = defineScript({
+  name: 'generate:changelog',
+  run(context) {
+    const args = context.argv;
+    let from: string | null = null;
+    let to = 'HEAD';
+    let prepend = false;
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--from') from = args[++i];
+      else if (args[i] === '--to') to = args[++i];
+      else if (args[i] === '--prepend') prepend = true;
+    }
+    if (!from) from = findLatestTag();
 
-  const commits = listCommits(from, to);
-  const section = renderSection(commits, from, to);
+    const commits = listCommits(from, to);
+    const section = renderSection(commits, from, to);
 
-  if (prepend) {
-    prependToChangelog(section);
-    console.log(`✅ Prepended to ${CHANGELOG_PATH}`);
-  } else {
-    const policy = resolveChangelogPolicy();
-    console.log(
-      `${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`
-    );
-    console.log(section);
-  }
-}
+    if (prepend) {
+      prependToChangelog(section);
+      context.print(`✅ Prepended to ${CHANGELOG_PATH}`);
+    } else {
+      const policy = resolveChangelogPolicy();
+      context.print(
+        `${policy.header_template.replace('{from}', from ?? 'root').replace('{count}', String(commits.length))}\n`
+      );
+      context.print(section);
+    }
+  },
+});
 
-const isDirect = process.argv[1] && /generate_changelog\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'generate_changelog.ts') ||
+  isDirectScript(import.meta.url, 'generate_changelog.js')
+)
+  void main();
 
 export { parseCommit, classify, renderSection };

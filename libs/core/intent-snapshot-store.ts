@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * Intent Snapshot Store — append-only per-mission snapshot persistence
  * plus drift-gate helpers for origin-baseline management.
@@ -10,7 +11,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeAppendFileSync, safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
+import { safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,
@@ -63,7 +64,7 @@ function readJsonl<T>(filePath: string): T[] {
 
 function appendJsonl(filePath: string, record: unknown): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
+  appendJsonLine(filePath, record);
 }
 
 export function listSnapshots(missionId: string): IntentSnapshot[] {

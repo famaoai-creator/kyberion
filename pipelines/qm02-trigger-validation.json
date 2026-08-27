@@ -17,10 +17,14 @@
     {
       "id": "trigger-contract-tests",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "trigger_contract_tests", "type": "ShellResult" },
+      "op": "core:run_vitest",
+      "produces": { "channel": "trigger_contract_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run libs/core/trigger-runner.test.ts libs/core/managed-process.watch.test.ts libs/core/src/pipeline-scheduler.test.ts"
+        "files": [
+          "libs/core/trigger-runner.test.ts",
+          "libs/core/managed-process.watch.test.ts",
+          "libs/core/src/pipeline-scheduler.test.ts"
+        ]
       }
     },
     {

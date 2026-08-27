@@ -35,8 +35,9 @@ import {
   loadKnowledgeUsageAggregate,
   loadKnowledgeRankingWeights,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -138,7 +139,7 @@ function loadTaxonomy(): TaxonomyManifest {
   }
 
   try {
-    cachedTaxonomy = readJsonFile<TaxonomyManifest>(taxonomyPath);
+    cachedTaxonomy = readJson<TaxonomyManifest>(taxonomyPath);
   } catch (_) {
     cachedTaxonomy = {};
   }
@@ -421,7 +422,7 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   };
   if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
-    const config = readJsonFile<any>(configPath);
+    const config = readJson<any>(configPath);
     return {
       ...defaults,
       ...config.algorithms?.ranking?.weights,
@@ -432,8 +433,7 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   }
 }
 
-async function main() {
-  const args = process.argv.slice(2);
+async function main(args: string[] = []) {
   const intentIdx = args.indexOf('--intent');
   const roleIdx = args.indexOf('--role');
   const phaseIdx = args.indexOf('--phase');
@@ -459,10 +459,10 @@ async function main() {
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
 
   if (!intent) {
-    console.log(
+    throw new ScriptExitError(
+      1,
       'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--explain] [--json]'
     );
-    process.exit(1);
   }
 
   logger.info(
@@ -565,11 +565,14 @@ async function main() {
   }
 }
 
-// Only run when executed directly (not when imported by tests)
-const isDirectRun = process.argv[1]?.includes('context_ranker');
-if (isDirectRun) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
+const script = defineScript({
+  name: 'knowledge:context-ranker',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'context_ranker.ts') ||
+  isDirectScript(import.meta.url, 'context_ranker.js')
+) {
+  void script();
 }

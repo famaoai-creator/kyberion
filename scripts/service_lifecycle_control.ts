@@ -3,12 +3,12 @@ import {
   logger,
   pathResolver,
   safeExistsSync,
-  safeReadFile,
   safeWriteFile,
   safeExec,
   loadSurfaceManifest,
   loadSurfaceState,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 
@@ -35,14 +35,11 @@ function isRunningPid(pid: unknown): pid is number {
 function loadPidMap(): Record<string, number> {
   if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const parsed = JSON.parse(safeReadFile(PID_FILE, { encoding: 'utf8' }) as string) as Record<
-      string,
-      unknown
-    >;
+    const parsed = readJson<Record<string, unknown>>(PID_FILE);
     return Object.fromEntries(
       Object.entries(parsed)
         .filter(([, pid]) => isRunningPid(pid))
-        .map(([serviceName, pid]) => [serviceName, pid as number]),
+        .map(([serviceName, pid]) => [serviceName, pid as number])
     );
   } catch {
     return {};
@@ -60,7 +57,7 @@ function loadStartableChoices(): SurfaceStartableChoice[] {
     const runningSurfaceIds = new Set(
       Object.entries(state.surfaces || {})
         .filter(([, record]) => isRunningPid((record as { pid?: unknown }).pid))
-        .map(([surfaceId]) => surfaceId),
+        .map(([surfaceId]) => surfaceId)
     );
     return (manifest.surfaces || [])
       .filter((entry: any) => entry && entry.enabled !== false)
@@ -76,7 +73,7 @@ function loadStartableChoices(): SurfaceStartableChoice[] {
         (choice: SurfaceStartableChoice) =>
           choice.service_name &&
           choice.startup_mode === 'background' &&
-          !runningSurfaceIds.has(choice.surface_id),
+          !runningSurfaceIds.has(choice.surface_id)
       )
       .sort((left, right) => left.service_name.localeCompare(right.service_name));
   } catch {
@@ -223,8 +220,8 @@ async function main() {
             startable_services: listStartableServices(),
           },
           null,
-          2,
-        ),
+          2
+        )
       );
       return;
     }
@@ -244,8 +241,8 @@ async function main() {
             running_services: listRunningServices(),
           },
           null,
-          2,
-        ),
+          2
+        )
       );
       return;
     }
@@ -265,5 +262,5 @@ async function main() {
 
 main().catch((error: any) => {
   logger.error(error?.message || String(error));
-  process.exit(1);
+  process.exitCode = 1;
 });

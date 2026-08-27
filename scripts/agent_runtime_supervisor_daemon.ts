@@ -1,7 +1,7 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectScript } from './lib/harness.js';
 import {
   appendSupervisorEvent,
   askAgentRuntime,
@@ -10,6 +10,7 @@ import {
   hasPendingDelegatedTaskInbox,
   getAgentRuntimeLog,
   getAgentRuntimeSnapshot,
+  getRegisteredEnv,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
   loadDelegatedTaskRecord,
@@ -25,7 +26,6 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  safeStat,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
   safeChmodSync,
@@ -39,6 +39,10 @@ import { installProcessGuards, recordRuntimeHealthSample } from '@agent/core';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('agent-runtime-supervisor');
+
+function registeredEnv(name: string): string | undefined {
+  return getRegisteredEnv<string>(name) as string | undefined;
+}
 
 // OP-04: hourly RSS/heap samples feed the degradation watch's trend
 // evaluation (leak / restart-storm detection over a 24h window).
@@ -84,8 +88,8 @@ const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
 const SOCKET_PATH = `${SOCKET_DIR}/agent-runtime-supervisor.sock`;
 const DAEMON_LOCK_PATH = `${SOCKET_DIR}/agent-supervisor-daemon.lock`;
 
-const GLOBAL_LIMIT = Number(process.env.KYBERION_GLOBAL_INFLIGHT_LIMIT || 8);
-const AGENT_LIMIT = Number(process.env.KYBERION_AGENT_INFLIGHT_LIMIT || 2);
+const GLOBAL_LIMIT = Number(registeredEnv('KYBERION_GLOBAL_INFLIGHT_LIMIT') || 8);
+const AGENT_LIMIT = Number(registeredEnv('KYBERION_AGENT_INFLIGHT_LIMIT') || 2);
 
 let daemonGlobalInflight = 0;
 const daemonAgentInflightMap = new Map<string, number>();
@@ -93,6 +97,7 @@ const delegatedWorkerStarts = new Map<string, Promise<{ resourceId: string; pid?
 const delegatedWorkerRestartCounts = new Map<string, number>();
 const MAX_DELEGATED_WORKER_RESTARTS = 3;
 let delegatedWorkerShutdown = false;
+let requestShutdown: ((exitCode: number) => void) | undefined;
 
 setInterval(
   () => {
@@ -110,7 +115,7 @@ setInterval(
       logger.warn(`[agent_runtime_supervisor_daemon] suppressed error in best-effort step: ${err}`);
     }
   },
-  Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000)
+  Number(registeredEnv('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
 ).unref?.();
 
 export interface AgentRuntimeSupervisorDaemonOptions {
@@ -131,6 +136,13 @@ export interface AgentRuntimeSupervisorDaemonInstance {
   port?: number;
   lockPath: string;
   cleanup: () => void;
+}
+
+class DaemonExit extends Error {
+  constructor(public readonly code: number) {
+    super(`agent runtime supervisor exiting with code ${code}`);
+    this.name = 'DaemonExit';
+  }
 }
 
 type TcpListenTarget = { host: string; port: number };
@@ -160,20 +172,24 @@ function readTaskModelHint(value: unknown): TaskModelHint | undefined {
 function resolveTransport(options: AgentRuntimeSupervisorDaemonOptions = {}): 'unix' | 'tcp' {
   return (
     options.transport ||
-    (process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT as 'unix' | 'tcp' | undefined) ||
+    (registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TRANSPORT') as 'unix' | 'tcp' | undefined) ||
     'unix'
   );
 }
 
 function resolveSocketPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
   return (
-    options.socketPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH || SOCKET_PATH
+    options.socketPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_SOCKET_PATH') ||
+    SOCKET_PATH
   );
 }
 
 function resolveLockPath(options: AgentRuntimeSupervisorDaemonOptions = {}): string {
   return (
-    options.lockPath || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH || DAEMON_LOCK_PATH
+    options.lockPath ||
+    registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_LOCK_PATH') ||
+    DAEMON_LOCK_PATH
   );
 }
 
@@ -183,8 +199,8 @@ function resolveListenTarget(
 ): ListenTarget {
   if (resolveTransport(options) === 'tcp') {
     return {
-      host: options.host || process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST || '127.0.0.1',
-      port: options.port ?? Number(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT || 0),
+      host: options.host || registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_HOST') || '127.0.0.1',
+      port: options.port ?? Number(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_PORT') || 0),
     };
   }
   return socketPath;
@@ -229,7 +245,7 @@ function writeResponse(socket: net.Socket, response: SupervisorResponse): void {
 }
 
 function supervisorTokenValid(candidate: string | undefined): boolean {
-  const configured = process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN;
+  const configured = registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN');
   if (!configured) return true;
   if (!candidate) return false;
   const left = Buffer.from(candidate);
@@ -416,7 +432,7 @@ async function handleRequest(
           } catch (_) {
             /* best-effort drain */
           }
-          process.exit(0);
+          requestShutdown?.(0);
         });
         return {
           id: request.id,
@@ -676,8 +692,8 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
         `${JSON.stringify({
           id: 'health-probe',
           method: 'health',
-          ...(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN
-            ? { auth_token: process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN }
+          ...(registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')
+            ? { auth_token: registeredEnv('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN') }
             : {}),
         })}\n`
       );
@@ -741,7 +757,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         logger.info(
           `[agent-runtime-supervisor-daemon] another instance (pid ${pid}) is already running. exiting.`
         );
-        process.exit(0);
+        throw new DaemonExit(0);
       } catch (killErr: any) {
         // EPERM means the process exists but this launcher cannot inspect it
         // (common under a sandbox or across users). Treating that as ESRCH
@@ -750,7 +766,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         if (killErr?.code === 'EPERM') {
           const message = `daemon lock is held by an existing process (pid ${pid}) but its liveness cannot be inspected`;
           logger.warn(`[agent-runtime-supervisor-daemon] ${message}`);
-          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
           throw new Error(message);
         }
         // Process does not exist, stale lock
@@ -793,7 +809,7 @@ export async function startAgentRuntimeSupervisorDaemon(
     if (healthy) {
       const message = `an existing healthy daemon is already bound at ${socketPath}`;
       logger.info(`[agent-runtime-supervisor-daemon] ${message}`);
-      if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+      if (options.exitOnExistingHealthyDaemon !== false) throw new DaemonExit(0);
       throw new Error(message);
     }
     try {
@@ -850,7 +866,10 @@ export async function startAgentRuntimeSupervisorDaemon(
           logger.info(
             `[agent-runtime-supervisor-daemon] existing healthy daemon already bound at ${transport === 'tcp' ? `${(listenTarget as net.ListenOptions).host}:${(listenTarget as net.ListenOptions).port}` : socketPath}`
           );
-          if (options.exitOnExistingHealthyDaemon !== false) process.exit(0);
+          if (options.exitOnExistingHealthyDaemon !== false) {
+            process.exitCode = 0;
+            if (server.listening) server.close();
+          }
           return;
         }
         logger.warn(
@@ -865,7 +884,10 @@ export async function startAgentRuntimeSupervisorDaemon(
             `[agent-runtime-supervisor-daemon] retry after EADDRINUSE failed: ${retryError?.message || retryError}`
           );
         }
-        if (options.exitOnFatalError !== false) process.exit(1);
+        if (options.exitOnFatalError !== false) {
+          process.exitCode = 1;
+          if (server.listening) server.close();
+        }
       })();
       return;
     }
@@ -890,7 +912,10 @@ export async function startAgentRuntimeSupervisorDaemon(
         `[agent-runtime-supervisor-daemon] failed to write ops alert: ${alertError?.message || alertError}`
       );
     }
-    if (options.exitOnFatalError !== false) process.exit(1);
+    if (options.exitOnFatalError !== false) {
+      process.exitCode = 1;
+      if (server.listening) server.close();
+    }
   });
 
   await new Promise<void>((resolve, reject) => {
@@ -960,16 +985,17 @@ export async function startAgentRuntimeSupervisorDaemon(
   const stopDaemon = (exitCode: number) => {
     cleanup();
     if (!server.listening) {
-      process.exit(exitCode);
+      process.exitCode = exitCode;
       return;
     }
-    const forceExit = setTimeout(() => process.exit(exitCode), 1500);
+    const forceExit = setTimeout(() => (process.exitCode = exitCode), 1500);
     forceExit.unref?.();
     server.close(() => {
       clearTimeout(forceExit);
-      process.exit(exitCode);
+      process.exitCode = exitCode;
     });
   };
+  requestShutdown = stopDaemon;
   process.once('SIGINT', () => stopDaemon(130));
   process.once('SIGTERM', () => stopDaemon(143));
   process.once('exit', cleanup);
@@ -996,9 +1022,14 @@ async function main() {
 }
 
 const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.ts') ||
+  isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.js');
 if (isDirect) {
   main().catch((error: any) => {
+    if (error instanceof DaemonExit) {
+      process.exitCode = error.code;
+      return;
+    }
     const message = error?.message || String(error);
     logger.error(message);
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
@@ -1026,6 +1057,6 @@ if (isDirect) {
         `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
       );
     }
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

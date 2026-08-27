@@ -28,13 +28,15 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { isDirectScript } from './lib/harness.js';
+import { safeExistsSync } from '@agent/core/secure-io';
 import {
   computeApprovalPayloadHash,
   findMissionPath,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
@@ -69,7 +71,7 @@ export interface AlignmentDecisionReport {
 function readBriefHash(briefPath: string): string | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
   try {
-    const parsed = JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string);
+    const parsed = readJson<unknown>(briefPath);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
     return computeApprovalPayloadHash(parsed as Record<string, unknown>);
   } catch {
@@ -205,4 +207,8 @@ export async function main(): Promise<void> {
   process.exitCode = argv.strict && !report.satisfied ? 1 : 0;
 }
 
-if (process.argv[1] && /mission_alignment_decision\.(ts|js)$/u.test(process.argv[1])) void main();
+if (
+  isDirectScript(import.meta.url, 'mission_alignment_decision.ts') ||
+  isDirectScript(import.meta.url, 'mission_alignment_decision.js')
+)
+  void main();

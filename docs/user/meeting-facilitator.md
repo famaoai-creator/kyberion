@@ -94,7 +94,7 @@ Use the participation path only when the meeting is real and the mission
 has the required environment readiness.
 
 ```bash
-pnpm doctor:meeting --mission MSN-...
+pnpm doctor -- --runtime meeting --mission MSN-...
 pnpm meeting:consent grant --mission MSN-... --operator <handle>
 pnpm meeting:participate \
   --mission MSN-... \

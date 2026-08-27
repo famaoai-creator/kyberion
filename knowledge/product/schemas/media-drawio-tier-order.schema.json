@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "tier_order"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "tier_order": {
       "type": "array",

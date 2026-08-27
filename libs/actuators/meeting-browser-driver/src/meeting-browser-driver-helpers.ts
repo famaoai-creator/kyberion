@@ -1,4 +1,4 @@
-import { buildGovernedRetryOptions, classifyError, safeReadFile, pathResolver } from '@agent/core';
+import { buildGovernedRetryOptions, pathResolver } from '@agent/core';
 
 const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/meeting-browser-driver/manifest.json'

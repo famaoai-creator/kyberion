@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { logger, pathResolver, safeExistsSync, safeReaddir, safeExec } from '@agent/core';
 import chalk from 'chalk';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -44,17 +44,17 @@ function discoverCapabilities() {
     if (!safeExistsSync(manifestPath)) continue;
 
     try {
-      const manifest: ActuatorManifest = readJsonFile<ActuatorManifest>(manifestPath);
+      const manifest: ActuatorManifest = readJson<ActuatorManifest>(manifestPath);
       console.log(`${chalk.bold.white(manifest.actuator_id)} (${manifest.version})`);
       console.log(`${chalk.dim(manifest.description)}`);
 
-      manifest.capabilities.forEach(cap => {
+      manifest.capabilities.forEach((cap) => {
         const platformMatch = cap.platforms.includes(currentPlatform);
         let requirementsMet = true;
         const missingBins: string[] = [];
 
         if (cap.requirements?.bin) {
-          cap.requirements.bin.forEach(bin => {
+          cap.requirements.bin.forEach((bin) => {
             if (!checkBinary(bin)) {
               requirementsMet = false;
               missingBins.push(bin);
@@ -62,9 +62,12 @@ function discoverCapabilities() {
           });
         }
 
-        const statusIcon = (platformMatch && requirementsMet) ? chalk.green('✅') : chalk.red('❌');
-        const platformInfo = platformMatch ? '' : chalk.red(` [OS Mismatch: ${cap.platforms.join('/')}]`);
-        const binInfo = missingBins.length > 0 ? chalk.red(` [Missing: ${missingBins.join(', ')}]`) : '';
+        const statusIcon = platformMatch && requirementsMet ? chalk.green('✅') : chalk.red('❌');
+        const platformInfo = platformMatch
+          ? ''
+          : chalk.red(` [OS Mismatch: ${cap.platforms.join('/')}]`);
+        const binInfo =
+          missingBins.length > 0 ? chalk.red(` [Missing: ${missingBins.join(', ')}]`) : '';
 
         console.log(`  ${statusIcon} ${cap.op.padEnd(20)} ${platformInfo}${binInfo}`);
       });

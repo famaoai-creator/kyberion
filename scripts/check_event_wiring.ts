@@ -13,6 +13,7 @@
  */
 import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface EventWiringSources {
   /** Repo-relative path → file contents, for every scanned .ts/.md/.json file. */
@@ -350,18 +351,26 @@ export function collectEventWiringViolations(sources: EventWiringSources): strin
   ];
 }
 
-export function main(): void {
-  const sources = collectEventWiringSources();
-  const violations = collectEventWiringViolations(sources);
-  if (violations.length > 0) {
-    for (const violation of violations) console.error(`[check:event-wiring] ${violation}`);
-    console.error(`[check:event-wiring] ${violations.length} violation(s)`);
-    process.exitCode = 1;
-    return;
-  }
-  console.log(
-    `[check:event-wiring] OK — ${Object.keys(sources.files).length} files scanned, 6 rules satisfied`
-  );
-}
+export const runCheckEventWiring = defineScript({
+  name: 'check:event-wiring',
+  flags: [],
+  run(context) {
+    const sources = collectEventWiringSources();
+    const violations = collectEventWiringViolations(sources);
+    if (violations.length > 0) {
+      for (const violation of violations) console.error(`[check:event-wiring] ${violation}`);
+      console.error(`[check:event-wiring] ${violations.length} violation(s)`);
+      process.exitCode = 1;
+      return;
+    }
+    context.print(
+      `[check:event-wiring] OK — ${Object.keys(sources.files).length} files scanned, 6 rules satisfied`
+    );
+  },
+});
 
-if (process.argv[1]?.endsWith('check_event_wiring.ts')) main();
+if (
+  isDirectScript(import.meta.url, 'check_event_wiring.ts') ||
+  isDirectScript(import.meta.url, 'check_event_wiring.js')
+)
+  void runCheckEventWiring();

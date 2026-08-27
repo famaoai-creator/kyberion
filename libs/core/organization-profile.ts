@@ -1,12 +1,11 @@
 import * as path from 'node:path';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-profile.schema.json'
 );
@@ -52,7 +51,7 @@ export interface OrganizationProfile {
 
 function ensureOrganizationProfileValidator(): ValidateFunction {
   if (organizationProfileValidateFn) return organizationProfileValidateFn;
-  organizationProfileValidateFn = compileSchemaFromPath(ajv, ORGANIZATION_PROFILE_SCHEMA_PATH);
+  organizationProfileValidateFn = compileSchema(ORGANIZATION_PROFILE_SCHEMA_PATH);
   return organizationProfileValidateFn;
 }
 
@@ -85,9 +84,7 @@ export function loadOrganizationProfile(rootDir?: string): OrganizationProfile |
   for (const profilePath of candidatePaths) {
     if (!safeExistsSync(profilePath)) continue;
     try {
-      const parsed = JSON.parse(
-        safeReadFile(profilePath, { encoding: 'utf8' }) as string
-      ) as OrganizationProfile;
+      const parsed = readJson<OrganizationProfile>(profilePath);
       const validate = ensureOrganizationProfileValidator();
       if (!validate(parsed)) {
         throw new Error(`Invalid organization-profile: ${errorsFrom(validate).join('; ')}`);

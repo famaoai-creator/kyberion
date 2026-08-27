@@ -3,11 +3,18 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 import { guardRequest } from '../../../lib/api-guard';
 import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
+import {
+  buildSurfaceMissionId,
+  intentResolutionA2ui,
+  sanitizeMissionSlug,
+  withMissionRole,
+} from './agent-route-helpers';
 import {
   normalizeChronosLocale,
   uxMessage,
@@ -29,6 +36,7 @@ async function loadChronosCore() {
     orchestrationEvents,
     toolRuntimeRegistry,
     coreLogger,
+    foundation,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
@@ -42,11 +50,13 @@ async function loadChronosCore() {
     import('@agent/core/mission-orchestration-events'),
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
+    import('@agent/core/foundation'),
   ]);
 
   return {
     logger: coreLogger.logger,
     pathResolver: pathResolverModule.pathResolver,
+    readJson: foundation.readJson,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
     safeReadFile: secureIo.safeReadFile,
@@ -85,7 +95,7 @@ const PROJECT_ROOT = projectPathResolver.rootDir();
 
 const CHRONOS_AGENT_ID = 'chronos-mirror';
 const CHRONOS_IDLE_TIMEOUT_MS = Number(
-  process.env.KYBERION_CHRONOS_IDLE_TIMEOUT_MS || 10 * 60 * 1000
+  getRegisteredEnvText('KYBERION_CHRONOS_IDLE_TIMEOUT_MS') || 10 * 60 * 1000
 );
 const RUN_PIPELINE_PATTERN = /^node\s+dist\/scripts\/run_pipeline\.js\s+--input\s+(\S+)/;
 const QUICK_ACTION_PATTERN = /^chronos:\/\/quick-action\/([a-z-]+)$/;
@@ -205,20 +215,6 @@ type ChronosMissionProposalState = {
   createdAt: string;
 };
 
-function withMissionRole<T>(role: string, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
-  process.env.MISSION_ROLE = role;
-  try {
-    return fn();
-  } finally {
-    if (previousRole === undefined) {
-      delete process.env.MISSION_ROLE;
-    } else {
-      process.env.MISSION_ROLE = previousRole;
-    }
-  }
-}
-
 function chronosMissionProposalStatePath(
   sessionId: string,
   pathResolver: Awaited<ReturnType<typeof loadChronosCore>>['pathResolver']
@@ -227,28 +223,6 @@ function chronosMissionProposalStatePath(
   return pathResolver.resolve(
     `active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`
   );
-}
-
-function sanitizeMissionSlug(value: string): string {
-  return (
-    value
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24) || 'REQUEST'
-  );
-}
-
-function buildSurfaceMissionId(
-  prefix: string,
-  threadTs: string,
-  proposal: MissionProposal,
-  sourceText?: string
-): string {
-  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || 'request';
-  const slug = sanitizeMissionSlug(base);
-  const numericThread = threadTs.replace(/\D+/g, '').slice(-8) || Date.now().toString().slice(-8);
-  return `MSN-${prefix}-${slug}-${numericThread}`;
 }
 
 function getChronosMissionProposalState(
@@ -477,7 +451,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
         const missionDir = path.join(root.dir, item);
         const statePath = path.join(missionDir, 'mission-state.json');
         if (!core.safeExistsSync(statePath)) continue;
-        const state = JSON.parse(core.safeReadFile(statePath, { encoding: 'utf8' }) as string);
+        const state = core.loadJson<Record<string, any>>(statePath);
         missions.push({
           missionId: state.mission_id || item,
           status: state.status,
@@ -485,13 +459,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
           missionType: state.mission_type,
           checkpoints: state.git?.checkpoints?.length || 0,
           nextTaskCount: core.safeExistsSync(path.join(missionDir, 'NEXT_TASKS.json'))
-            ? (
-                JSON.parse(
-                  core.safeReadFile(path.join(missionDir, 'NEXT_TASKS.json'), {
-                    encoding: 'utf8',
-                  }) as string
-                ) as any[]
-              )?.length || 0
+            ? core.loadJson<any[]>(path.join(missionDir, 'NEXT_TASKS.json'))?.length || 0
             : 0,
           planReady: core.safeExistsSync(path.join(missionDir, 'PLAN.md')),
         });
@@ -501,8 +469,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
     return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
   };
 
-  const readJson = (filePath: string) =>
-    JSON.parse(core.safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const readJson = <T = unknown>(filePath: string) => core.loadJson<T>(filePath);
 
   const runCommandQuickAction = (title: string, command: string[], description: string) => {
     const result = core.safeExecResult('pnpm', command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });
@@ -1233,7 +1200,13 @@ export async function POST(req: NextRequest) {
     };
     const body = await req.json();
     const locale = normalizeChronosLocale(body.locale);
-    const query = (body.query || body.intent || '').trim();
+    const action =
+      body.action === 'approve_mission' || body.action === 'reject_mission'
+        ? (body.action as 'approve_mission' | 'reject_mission')
+        : undefined;
+    const query =
+      (body.query || body.intent || '').trim() ||
+      (action === 'approve_mission' ? '1' : action === 'reject_mission' ? '2' : '');
     const sessionId =
       typeof body.sessionId === 'string' && body.sessionId.trim()
         ? body.sessionId
@@ -1328,9 +1301,7 @@ export async function POST(req: NextRequest) {
       sessionId,
       requesterId: body.requesterId || 'chronos-ui',
     });
-    const requestArtifact = JSON.parse(
-      safeReadFile(requestArtifactPath, { encoding: 'utf8' }) as string
-    );
+    const requestArtifact = core.readJson<{ correlation_id: string }>(requestArtifactPath);
 
     const deterministicPipelineResponse = await tryHandleDeterministicPipelineQuery(query, locale);
     if (deterministicPipelineResponse) {
@@ -1416,6 +1387,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: 'ok',
         response: confirmationText,
+        intentResolution: conversation.intentResolution,
         a2ui: [
           {
             type: 'display:hero',
@@ -1461,6 +1433,9 @@ export async function POST(req: NextRequest) {
               ],
             },
           },
+          ...(conversation.intentResolution
+            ? intentResolutionA2ui(conversation.intentResolution)
+            : []),
         ],
         delegations: delegationResults.length > 0 ? delegationResults : undefined,
         timestamp: new Date().toISOString(),
@@ -1478,7 +1453,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       status: 'ok',
       response: conversation.text,
-      a2ui: conversation.a2uiMessages,
+      intentResolution: conversation.intentResolution,
+      a2ui: [
+        ...(conversation.intentResolution
+          ? intentResolutionA2ui(conversation.intentResolution)
+          : []),
+        ...(conversation.a2uiMessages || []),
+      ],
       delegations: delegationResults.length > 0 ? delegationResults : undefined,
       timestamp: new Date().toISOString(),
     });

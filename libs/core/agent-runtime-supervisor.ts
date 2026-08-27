@@ -1,25 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { resolveSharedObservabilityDir } from './observability-gate.js';
+import { readJson } from './foundation/json.js';
+import { appendSupervisorEvent } from './agent-runtime-events.js';
+import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
+import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
 import {
   ensureMissionTeamRuntime,
   type EnsureMissionTeamRuntimeOptions,
   type MissionTeamRuntimePlan,
 } from './mission-team-orchestrator.js';
-import {
-  agentLifecycle,
-  type SpawnOptions,
-  type AgentHandle,
-  type AgentRuntimeSnapshot,
-} from './agent-lifecycle.js';
+import { agentLifecycle, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
@@ -30,6 +22,9 @@ import {
   assertRuntimeScopeCompatible,
   resolveRuntimeScope,
 } from './runtime-scope.js';
+
+export { appendSupervisorEvent } from './agent-runtime-events.js';
+export type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
 
 export interface AgentRuntimeEnsureRequest {
   request_id: string;
@@ -53,13 +48,6 @@ export interface AgentRuntimeEnsureResult {
   runtime_plan: MissionTeamRuntimePlan;
 }
 
-export interface EnsureAgentRuntimeOptions extends SpawnOptions {
-  requestedBy: string;
-  runtimeMetadata?: Record<string, unknown>;
-  runtimeOwnerId?: string;
-  runtimeOwnerType?: string;
-}
-
 interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeamRuntimeOptions {
   requestedBy: string;
   scope?: EventScopeInput;
@@ -70,11 +58,6 @@ interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeam
 
 const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
 const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
-const EVENTS_PATH = pathResolver.shared(
-  'observability/mission-control/agent-runtime-supervisor-events.jsonl'
-);
-const EVENTS_DIR = pathResolver.shared('observability/mission-control');
-let supervisorEventWriteWarned = false;
 
 function estimateRuntimeTokens(chars: unknown): number {
   const count = Number(chars || 0);
@@ -117,34 +100,6 @@ export function resolveRuntimeTokenUsage(input: {
 function ensureQueueDirs(): void {
   safeMkdir(REQUESTS_DIR);
   safeMkdir(RESULTS_DIR);
-}
-
-function ensureEventDir(): void {
-  safeMkdir(EVENTS_DIR);
-}
-
-export function appendSupervisorEvent(event: Record<string, unknown>): void {
-  try {
-    const obsDir = resolveSharedObservabilityDir(EVENTS_DIR);
-    if (!obsDir) return;
-    safeMkdir(obsDir);
-    safeAppendFileSync(
-      `${obsDir}/agent-runtime-supervisor-events.jsonl`,
-      `${JSON.stringify({
-        ts: new Date().toISOString(),
-        ...event,
-      })}\n`
-    );
-  } catch (error: any) {
-    // Some narrow authority roles can ensure/stop runtimes without observability write scope.
-    // Runtime control should still succeed even if supervisor event logging is unavailable.
-    if (!supervisorEventWriteWarned) {
-      supervisorEventWriteWarned = true;
-      logger.warn(
-        `[agent-runtime-supervisor] failed to write supervisor event: ${error?.message || error}`
-      );
-    }
-  }
 }
 
 export function getAgentRuntimeEnsureRequestPath(requestId: string): string {
@@ -190,9 +145,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  const request = JSON.parse(
-    safeReadFile(requestPath, { encoding: 'utf8' }) as string
-  ) as AgentRuntimeEnsureRequest;
+  const request = readJson<AgentRuntimeEnsureRequest>(requestPath);
   return {
     ...request,
     mission_id: request.mission_id.toUpperCase(),
@@ -277,9 +230,7 @@ export async function waitForMissionTeamPrewarmResult(
 
   while (Date.now() < deadline) {
     if (safeExistsSync(resultPath)) {
-      return JSON.parse(
-        safeReadFile(resultPath, { encoding: 'utf8' }) as string
-      ) as AgentRuntimeEnsureResult;
+      return readJson<AgentRuntimeEnsureResult>(resultPath);
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
@@ -316,7 +267,7 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
   });
   assertRuntimeNhiScope(runtimeScope);
   const existing = getAgentRuntimeHandle(options.agentId || '');
-  assertRuntimeScopeCompatible(existing?.getRecord()?.scope, runtimeScope);
+  if (existing) assertRuntimeScopeCompatible(existing.getRecord()?.scope, runtimeScope);
   const taskModelHint = options.runtimeMetadata?.task_model_hint;
   appendSupervisorEvent({
     decision: 'agent_runtime_ensure_requested',
@@ -355,6 +306,8 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
   });
   return handle;
 }
+
+registerAgentRuntimeEnsurer(ensureAgentRuntime);
 
 export async function stopAgentRuntime(agentId: string, requestedBy: string): Promise<void> {
   const scope = getAgentRuntimeHandle(agentId)?.getRecord()?.scope;

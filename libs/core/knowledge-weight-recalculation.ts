@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { auditChain } from './audit-chain.js';
+import { readJson } from './foundation/json.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   loadKnowledgeUsageAggregate,
@@ -216,9 +217,7 @@ export function applyKnowledgeRankingWeightProposal(input: {
   if (input.dry_run) return result;
 
   const raw = safeExistsSync(governancePath)
-    ? (JSON.parse(
-        safeReadFile(governancePath, { encoding: 'utf8' }) as string
-      ) as KnowledgeRankingWeightConfig)
+    ? readJson<KnowledgeRankingWeightConfig>(governancePath)
     : { version: '1.0.0', defaults: { proximity: 1, usage_yield: 4 } };
   const nextConfig: KnowledgeRankingWeightConfig = {
     ...raw,

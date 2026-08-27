@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -54,7 +55,8 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -292,7 +294,7 @@ function appendGrantRecord(record: TaskScopedGrant): void {
     if (dir && dir !== storePath && !safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
-    safeAppendFileSync(storePath, `${JSON.stringify(validated)}\n`);
+    appendJsonLine(storePath, validated);
   });
 }
 
@@ -344,7 +346,8 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
   if (!missionId) {
     throw new TaskGrantValidationError('audience.mission_id is required');
   }
-  const tenantSlug = params.scope?.tenant_slug?.trim() || process.env.KYBERION_TENANT?.trim();
+  const tenantSlug =
+    params.scope?.tenant_slug?.trim() || getRegisteredEnvText('KYBERION_TENANT')?.trim();
   if (!tenantSlug || !isValidTenantSlug(tenantSlug)) {
     throw new TaskGrantValidationError(
       'tenant-scoped task grant requires a valid tenant_slug (or server-resolved KYBERION_TENANT)'
@@ -512,7 +515,7 @@ export function resolveGrantsForActor(
   options?: ResolveGrantsForActorOptions
 ): TaskScopedGrant[] {
   const now = options?.now ?? Date.now();
-  const tenantSlug = audience.tenantSlug?.trim() || process.env.KYBERION_TENANT?.trim();
+  const tenantSlug = audience.tenantSlug?.trim() || getRegisteredEnvText('KYBERION_TENANT')?.trim();
   const served: TaskScopedGrant[] = [];
   for (const grant of readGrantRecords().values()) {
     if (grant.grantee_nhi_id !== nhiId) continue;

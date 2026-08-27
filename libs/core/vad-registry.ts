@@ -11,8 +11,9 @@
  */
 
 import { EnergyVad, type VoiceActivityDetector } from './voice-activity-detector.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface VadFactoryOptions {
   /** Calibrated or explicit RMS threshold; null when calibration is skipped. */
@@ -38,7 +39,7 @@ export const ENERGY_VAD_BACKEND: VadBackend = {
     new EnergyVad({ rms_threshold: opts.rmsThreshold ?? 800, endpoint_ms: opts.endpointMs }),
 };
 
-const vadBackendSeam = defineSeam<VadBackend>({
+const vadBackendSeam = createSeam<VadBackend>({
   key: 'voice.vad-backend',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
@@ -82,7 +83,7 @@ export interface ResolvedVadBackend {
  * callers must surface it (fail-soft, never silent).
  */
 export function resolveVadBackend(id?: string): ResolvedVadBackend {
-  const explicit = id?.trim() || process.env.KYBERION_VAD?.trim();
+  const explicit = id?.trim() || getRegisteredEnvText('KYBERION_VAD')?.trim();
   const requested = explicit || getAdapterDefault('voice.vad') || 'energy';
   const backend = vadBackendSeam
     .list()

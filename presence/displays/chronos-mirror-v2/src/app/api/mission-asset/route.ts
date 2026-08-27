@@ -8,7 +8,7 @@ import {
 } from '../../../lib/api-guard';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
-import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
+import { loadJson, safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
@@ -74,10 +74,10 @@ function artifactTenant(artifact: {
   const statePath = path.join(missionPath, 'mission-state.json');
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = JSON.parse(safeReadFile(statePath, { encoding: 'utf8' }) as string) as {
+    const state = loadJson<{
       tenant_slug?: string;
       tenant_id?: string;
-    };
+    }>(statePath);
     return state.tenant_slug || state.tenant_id;
   } catch {
     return undefined;

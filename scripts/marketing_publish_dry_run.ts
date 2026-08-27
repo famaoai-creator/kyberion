@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import {
   evaluatePublicationVerification,
   escapeHtml,
-  loadJson,
   loadApprovalRequest,
   logger,
   loadMarketingRiskPolicy,
@@ -20,7 +19,9 @@ import {
   type ArtifactBinding,
   type PublicationApproval,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
 
 function currentArtifactBindings(
   approved: Record<string, ArtifactBinding>
@@ -51,7 +52,7 @@ export function runMarketingPublishDryRun(input: {
   preview: string;
   verification: string;
 } {
-  const approval = loadJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
+  const approval = readJson<PublicationApproval>(pathResolver.rootResolve(input.approvalPath));
   const sharedApprovalRequest =
     input.sharedApprovalRequest ||
     loadApprovalRequest(
@@ -185,9 +186,12 @@ async function main(): Promise<void> {
   );
 }
 
-if (process.argv[1] && /marketing_publish_dry_run\.(ts|js)$/.test(process.argv[1])) {
+if (
+  isDirectScript(import.meta.url, 'marketing_publish_dry_run.ts') ||
+  isDirectScript(import.meta.url, 'marketing_publish_dry_run.js')
+) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

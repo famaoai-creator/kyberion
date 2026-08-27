@@ -1,13 +1,13 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import path from 'node:path';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 let validator: ValidateFunction | null = null;
 
@@ -39,7 +39,7 @@ export interface DesktopPipelineValidationResult {
 
 function getValidator(): ValidateFunction {
   if (!validator) {
-    const ajv = new Ajv({ allErrors: true });
+    const ajv = createAjv();
     addFormats(ajv);
     validator = compileSchemaFromPath(
       ajv,
@@ -87,7 +87,7 @@ export function loadDesktopPipeline(
     };
   }
   try {
-    const raw = JSON.parse(safeReadFile(absolute, { encoding: 'utf8' }) as string);
+    const raw = loadJson<unknown>(absolute);
     return validateDesktopPipeline(raw);
   } catch (error) {
     return {

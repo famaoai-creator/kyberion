@@ -14,7 +14,7 @@ describe('Secret mutation approval schema', () => {
   it('accepts the initial sovereign-only approval workflow', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schema = loadJson('schemas/secret-mutation-approval.schema.json');
+    const schema = loadJson('knowledge/product/schemas/secret-mutation-approval.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
@@ -26,25 +26,25 @@ describe('Secret mutation approval schema', () => {
         surface: 'slack',
         actor_id: 'slack-bridge',
         actor_role: 'slack_bridge',
-        mission_id: 'MSN-SLACK-001'
+        mission_id: 'MSN-SLACK-001',
       },
       target: {
         service_id: 'slack',
         secret_key: 'SLACK_BOT_TOKEN',
         mutation: 'rotate',
         store: 'os_keychain',
-        existing_value_present: true
+        existing_value_present: true,
       },
       justification: {
         reason: 'Socket Mode auth failed during reconcile',
         impact_summary: 'slack-bridge cannot reconnect until the token is updated',
-        evidence: ['active/shared/logs/surfaces/slack-bridge.log']
+        evidence: ['active/shared/logs/surfaces/slack-bridge.log'],
       },
       risk: {
         level: 'high',
         restart_scope: 'service',
         requires_strong_auth: true,
-        policy_id: 'secret-slack-rotation'
+        policy_id: 'secret-slack-rotation',
       },
       workflow: {
         workflow_id: 'wf_secret_single_sovereign_v1',
@@ -55,16 +55,16 @@ describe('Secret mutation approval schema', () => {
           {
             stage_id: 'primary_approval',
             required_roles: ['sovereign'],
-            description: 'Initial sovereign-only operating mode'
-          }
+            description: 'Initial sovereign-only operating mode',
+          },
         ],
         approvals: [
           {
             role: 'sovereign',
-            status: 'pending'
-          }
-        ]
-      }
+            status: 'pending',
+          },
+        ],
+      },
     };
 
     const valid = validate(payload);
@@ -74,7 +74,7 @@ describe('Secret mutation approval schema', () => {
   it('rejects requests that omit approval roles', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const schema = loadJson('schemas/secret-mutation-approval.schema.json');
+    const schema = loadJson('knowledge/product/schemas/secret-mutation-approval.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
@@ -85,28 +85,28 @@ describe('Secret mutation approval schema', () => {
       requested_by: {
         surface: 'terminal',
         actor_id: 'operator-1',
-        actor_role: 'chronos_localadmin'
+        actor_role: 'chronos_localadmin',
       },
       target: {
         service_id: 'github',
         secret_key: 'GITHUB_TOKEN',
-        mutation: 'set'
+        mutation: 'set',
       },
       justification: {
-        reason: 'manual repair'
+        reason: 'manual repair',
       },
       risk: {
         level: 'medium',
         restart_scope: 'none',
-        requires_strong_auth: false
+        requires_strong_auth: false,
       },
       workflow: {
         workflow_id: 'wf_invalid',
         mode: 'all_required',
         required_roles: [],
         stages: [],
-        approvals: []
-      }
+        approvals: [],
+      },
     };
 
     const valid = validate(payload);

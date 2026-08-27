@@ -10,6 +10,7 @@ import {
   safeExistsSync,
   safeReadFile,
   inspectMeshHub,
+  type SurfaceAsyncChannel,
   isSurfaceOutboxDue,
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
@@ -36,6 +37,8 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { t } from '@agent/core/t';
 import { summarizeBackupStatus } from './backup.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
+import { defineScript, isDirectScript, type ScriptContext } from './lib/harness.js';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
 const MISSION_MANIFESTS = [
@@ -167,10 +170,10 @@ export function collectPipelineScheduleDoctorLines(): string[] {
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   try {
     const tenantId = String(
-      process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || ''
+      getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
     ).trim();
     const aliasNotice =
-      !process.env.KYBERION_TENANT && process.env.KYBERION_TENANT_ID
+      !getRegisteredEnvText('KYBERION_TENANT') && getRegisteredEnvText('KYBERION_TENANT_ID')
         ? ' (deprecated KYBERION_TENANT_ID alias; prefer KYBERION_TENANT)'
         : '';
     const report = await inspectMeshHub({
@@ -203,7 +206,13 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
   }
 }
 
-const DOCTOR_SURFACES = ['slack', 'telegram', 'imessage', 'discord', 'chronos'];
+const DOCTOR_SURFACES: SurfaceAsyncChannel[] = [
+  'slack',
+  'telegram',
+  'imessage',
+  'discord',
+  'chronos',
+];
 
 export function collectSurfaceDeliveryDoctorLines(): string[] {
   const summaries = DOCTOR_SURFACES.map((surface) => {
@@ -424,8 +433,14 @@ async function collectLocalCapabilityDoctorLines(): Promise<string[]> {
   }
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function parseDoctorArguments(args: string[]): Promise<{
+  manifest?: string;
+  runtime?: string;
+  all?: boolean;
+  mission?: string;
+  json?: boolean;
+}> {
+  return createStandardYargs(['node', 'run_doctor', ...args])
     .option('manifest', { type: 'string' })
     .option('runtime', {
       type: 'string',
@@ -433,59 +448,70 @@ async function main(): Promise<void> {
     })
     .option('all', { type: 'boolean', default: false })
     .option('mission', { type: 'string' })
+    .option('json', { type: 'boolean', default: false })
     .parseSync();
+}
 
-  const report = await collectDoctorReport(argv);
-
-  for (const line of report.rollupLines) {
-    console.log(line);
+function printDoctorReport(
+  report: DoctorRunReport,
+  argv: { manifest?: string; runtime?: string; all?: boolean; mission?: string; json?: boolean },
+  print: (value: unknown) => void
+): void {
+  if (argv.json) {
+    print(report);
+    process.exitCode = report.totalMissing === 0 ? 0 : 1;
+    return;
   }
-  console.log('');
+  for (const line of report.rollupLines) {
+    print(line);
+  }
+  print('');
   for (const summary of report.summaries) {
     for (const line of summary.lines) {
-      console.log(line);
+      print(line);
     }
-    console.log('');
+    print('');
   }
   for (const line of report.scheduleLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.maintenanceLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.governanceLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.backupLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.localCapabilityLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.meshDeliveryLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.surfaceDeliveryLines) {
-    console.log(line);
+    print(line);
   }
   for (const line of report.desktopObservationLines) {
-    console.log(line);
+    print(line);
   }
-  console.log('');
+  print('');
 
   if (report.totalMissing === 0) {
-    console.log('All required capabilities are satisfied.');
+    print('All required capabilities are satisfied.');
     if (!argv.manifest && !argv.runtime && !argv.all) {
-      console.log(
+      print(
         'Want the right surface next? Run `pnpm setup:report --persona first-time-user` for a recommended surface guide.'
       );
     }
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   }
 
   const missionId = argv.mission ? String(argv.mission) : process.env.MISSION_ID || undefined;
   if (!missionId && !argv.manifest && !argv.runtime && !argv.all) {
-    console.log(
+    print(
       'Tip: pass `--runtime meeting --mission <id>` to include browser, voice, audio, and mission-scoped consent checks.'
     );
   }
@@ -500,16 +526,16 @@ async function main(): Promise<void> {
   );
   if (firstMissingSummary) {
     const nextStep = formatMissingCapabilityNextStep(firstMissingSummary);
-    console.log(
+    print(
       needsMeetingHint && !isReasoningBackendSummary(firstMissingSummary)
         ? `${nextStep.message} For meeting runtime gaps, use \`pnpm env:bootstrap --manifest meeting-participation-runtime --apply\`.`
         : nextStep.message
     );
-    console.log(
+    print(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
     if (onDemandActuator) {
-      console.log(
+      print(
         `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
       );
     }
@@ -522,28 +548,36 @@ async function main(): Promise<void> {
       suggested_command: nextStep.command,
     });
     for (const line of formatNextAction(nextAction)) {
-      console.log(line);
+      print(line);
     }
   } else {
-    console.log('Next step: inspect doctor findings above and rerun the relevant setup command.');
-    console.log(
+    print('Next step: inspect doctor findings above and rerun the relevant setup command.');
+    print(
       'Need to decide which surface to use after bootstrap? Run `pnpm setup:report --persona first-time-user`.'
     );
     if (onDemandActuator) {
-      console.log(
+      print(
         `For actuator-level pulls, run \`pnpm deps:check --actuator ${onDemandActuator}\` before starting that surface.`
       );
     }
   }
-  process.exit(1);
+  process.exitCode = 1;
 }
 
-const isDirect = process.argv[1] && /run_doctor\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+export const runDoctor = defineScript<DoctorRunReport>({
+  name: 'doctor',
+  // Doctor owns its yargs options; do not consume them as shared harness flags.
+  flags: [],
+  async run(context: ScriptContext): Promise<DoctorRunReport> {
+    const argv = await parseDoctorArguments(context.argv);
+    const report = await collectDoctorReport(argv);
+    printDoctorReport(report, argv, context.print);
+    return report;
+  },
+});
 
-export { main as runDoctor };
+if (
+  isDirectScript(import.meta.url, 'run_doctor.ts') ||
+  isDirectScript(import.meta.url, 'run_doctor.js')
+)
+  void runDoctor();

@@ -1,4 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
@@ -23,8 +24,7 @@ export interface ServiceBindingRecord {
   metadata?: Record<string, unknown>;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const BINDING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-binding-record.schema.json'
 );

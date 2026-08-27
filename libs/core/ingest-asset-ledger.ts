@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -25,7 +26,7 @@ import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { safeAppendFile, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -195,7 +196,7 @@ export function appendAssetRecord(
   assertAssetRecord(record);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   safeMkdir(path.dirname(ledgerFile), { recursive: true });
-  safeAppendFile(ledgerFile, `${JSON.stringify(record)}\n`);
+  appendJsonLine(ledgerFile, record);
   return record;
 }
 

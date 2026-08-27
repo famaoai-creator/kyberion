@@ -1,4 +1,5 @@
 import * as net from 'node:net';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { pathResolver, rootDir } from './path-resolver.js';
 import {
@@ -167,8 +168,8 @@ function makeRequest<T>(method: SupervisorMethod, payload?: T): SupervisorReques
   return {
     id: `${method}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     method,
-    ...(process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN
-      ? { auth_token: process.env.KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN }
+    ...(getRegisteredEnvText('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN')
+      ? { auth_token: getRegisteredEnvText('KYBERION_AGENT_RUNTIME_SUPERVISOR_TOKEN') }
       : {}),
     payload,
   };

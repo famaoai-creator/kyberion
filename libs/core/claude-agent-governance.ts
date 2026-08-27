@@ -1,5 +1,6 @@
 import * as nodePath from 'node:path';
 import type { CanUseTool, McpServerConfig, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { auditChain } from './audit-chain.js';
 import { evaluatePreToolUse } from './claude-code-hook.js';
@@ -146,7 +147,7 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
         const { requireApprovalForOp } = await import('./risky-op-registry.js');
         const approval = requireApprovalForOp({
           opId: 'subagent:bash',
-          agentId: process.env.KYBERION_PERSONA || 'sub-agent',
+          agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'sub-agent',
           payload: { command },
           actionDescriptor: shellCommandApprovalDescriptor(decision),
           draft: {
@@ -181,7 +182,7 @@ export function buildKyberionMcpServerConfig(
       command: 'node',
       args: [nodePath.join(repoRoot, 'dist/scripts/mcp_server.js')],
       cwd: repoRoot,
-      env: { KYBERION_PERSONA: process.env.KYBERION_PERSONA ?? 'sovereign_concierge' },
+      env: { KYBERION_PERSONA: getRegisteredEnvText('KYBERION_PERSONA') ?? 'sovereign_concierge' },
     } as McpServerConfig,
   };
 }

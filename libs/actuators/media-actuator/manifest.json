@@ -2,7 +2,7 @@
   "actuator_id": "media-actuator",
   "version": "1.2.0",
   "description": "Document and asset generation engine. Includes document_digest, pptx_slide_text, and pptx_filter_slides for template-inheriting partial-update workflows.",
-  "contract_schema": "schemas/media-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "native_then_cli",
@@ -18,7 +18,7 @@
   "capabilities": [
     {
       "op": "pipeline",
-      "schema_ref": "schemas/media-pipeline.schema.json",
+      "schema_ref": "knowledge/product/schemas/media-pipeline.schema.json",
       "platforms": ["darwin", "linux", "win32"]
     }
   ],

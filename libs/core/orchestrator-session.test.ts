@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 import * as secureIo from './secure-io.js';
+import { getFoundationIo } from './foundation/io.js';
 import { withExecutionContext } from './authority.js';
 import {
   buildMissionLifecycleService,
@@ -640,14 +641,15 @@ describe('orchestrator-session x mission-lifecycle-service — finish-release ho
 
     // Surgical failure: only the orchestrator-session journal append throws
     // (never audit-chain's own append, which shares safeAppendFileSync).
-    const originalAppend = secureIo.safeAppendFileSync;
+    const foundationIo = getFoundationIo();
+    const originalAppend = foundationIo.appendFile;
     const appendSpy = vi
-      .spyOn(secureIo, 'safeAppendFileSync')
-      .mockImplementation((filePath: string, data: any, options?: any) => {
+      .spyOn(foundationIo, 'appendFile')
+      .mockImplementation((filePath: string, data: string) => {
         if (String(filePath).includes('orchestrator-sessions')) {
           throw new Error('simulated journal write failure');
         }
-        return originalAppend(filePath, data, options);
+        return originalAppend.call(foundationIo, filePath, data);
       });
 
     try {

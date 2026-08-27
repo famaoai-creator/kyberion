@@ -1,9 +1,9 @@
 import * as path from 'node:path';
+import { readJson } from '@agent/core/foundation';
 import {
   collectMissionHygieneReport,
   pathResolver,
   safeExistsSync,
-  safeReadFile,
   secureIo,
   withExecutionContext,
   type PlannedMissionFinding,
@@ -42,9 +42,7 @@ function readMissionStateSnapshot(missionId: string): MissionStateSnapshot | nul
     return withExecutionContext('sovereign_concierge', () =>
       secureIo.withSensitivePathMediation(() => {
         if (!safeExistsSync(statePath)) return null;
-        return JSON.parse(
-          safeReadFile(statePath, { encoding: 'utf8' }) as string
-        ) as MissionStateSnapshot;
+        return readJson<MissionStateSnapshot>(statePath);
       })
     );
   } catch {

@@ -25,6 +25,8 @@ import {
   verifyReady,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { isDirectScript } from './lib/harness.js';
+import { defineScript, ScriptExitError } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
 
 // Register every probe so the manifest's `kind: 'probe'` entries
@@ -144,7 +146,7 @@ async function main(): Promise<void> {
       : [];
   if (targetIds.length === 0) {
     logger.error('Pass --manifest <id> or --all (and optionally --list).');
-    process.exit(2);
+    throw new ScriptExitError(2);
   }
 
   let totalMissing = 0;
@@ -166,15 +168,20 @@ async function main(): Promise<void> {
     logger.info('Pass --apply --force to also install operator-confirmed ones.');
     logger.info('Pass --all to bootstrap every manifest in the catalog at once.');
   }
-  process.exit(totalMissing === 0 ? 0 : 1);
+  if (totalMissing !== 0) throw new Error(`${totalMissing} environment prerequisite(s) remain`);
 }
 
-const isDirect = process.argv[1] && /bootstrap_environment\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+if (
+  isDirectScript(import.meta.url, 'bootstrap_environment.ts') ||
+  isDirectScript(import.meta.url, 'bootstrap_environment.js')
+) {
+  void defineScript({
+    name: 'env:bootstrap',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();
 }
 
 export { main as runBootstrapEnvironment };

@@ -16,8 +16,9 @@ import {
 } from '@agent/core';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
-import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report.js';
+import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
 
 type ServiceSetupRow = {
   service: string;
@@ -267,11 +268,13 @@ async function main(): Promise<void> {
   logger.success('Service setup check completed.');
 }
 
-const isDirect = process.argv[1] && /services_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'services_setup.ts') ||
+  isDirectScript(import.meta.url, 'services_setup.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

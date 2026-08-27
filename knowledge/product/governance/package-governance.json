@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "ignore_deps": ["@agent/core", "chalk", "yargs", "axios", "js-yaml"],
   "normalization": {
     "private": true,

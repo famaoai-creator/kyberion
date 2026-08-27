@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-drawio-security-group-order.schema.json",
   "version": "1.0.0",
   "relation_prefix": "aws_security_group."
 }

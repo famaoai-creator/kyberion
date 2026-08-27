@@ -2,7 +2,7 @@
   "actuator_id": "agent-actuator",
   "version": "1.1.0",
   "description": "Meta-Actuator for Agent Lifecycle and A2A",
-  "contract_schema": "schemas/agent-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/agent-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "daemon_then_local",

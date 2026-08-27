@@ -40,6 +40,7 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { auditChain } from './audit-chain.js';
 import { getAgentIdentity, NHI_ID_PREFIX, parseNhiId } from './agent-identity.js';
 
@@ -51,7 +52,7 @@ export type NhiActorMode = 'off' | 'warn' | 'enforce';
 
 /** Staged rollout switch. Default `warn`; unknown values degrade to `warn`. */
 export function resolveNhiActorMode(): NhiActorMode {
-  const raw = process.env.KYBERION_NHI_ACTOR?.trim();
+  const raw = getRegisteredEnvText('KYBERION_NHI_ACTOR')?.trim();
   if (raw === 'off' || raw === 'enforce') return raw;
   return 'warn';
 }

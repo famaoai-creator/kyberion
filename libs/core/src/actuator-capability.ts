@@ -8,10 +8,9 @@
 
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import * as path from 'path';
-import { safeExec, safeExistsSync, safeReadFile } from '../secure-io.js';
+import { loadJson, safeExec, safeExistsSync } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from '../seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ActuatorCapability {
   op: string;
@@ -49,7 +48,7 @@ interface ManifestCapability {
 
 export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
 
-const capabilityProbeSeam = defineSeam<ActuatorCapabilityProbe>({
+const capabilityProbeSeam = createSeam<ActuatorCapabilityProbe>({
   key: 'actuator.capability-probe',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
@@ -189,7 +188,11 @@ export async function checkActuatorCapabilities(
   manifestPath: string
 ): Promise<ActuatorStatus> {
   // Read manifest
-  const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string);
+  const manifest = loadJson<{
+    capabilities?: ManifestCapability[];
+    actuator_id?: string;
+    version?: string;
+  }>(manifestPath);
   const manifestCapabilities = ((manifest.capabilities || []) as ManifestCapability[]).map(
     evaluateManifestCapability
   );

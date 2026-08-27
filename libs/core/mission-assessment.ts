@@ -28,14 +28,14 @@ export interface MissionSeedAssessment {
   shouldPromote: boolean;
 }
 
-function normalizeText(value?: string): string {
+function normalizeAssessmentText(value?: string): string {
   return String(value || '').trim();
 }
 
 function inferMissionMemoryKind(
   missionType?: string
 ): MissionMemoryCandidateAssessment['proposedKind'] {
-  const normalized = normalizeText(missionType).toLowerCase();
+  const normalized = normalizeAssessmentText(missionType).toLowerCase();
   if (normalized.includes('incident') || normalized.includes('risk')) return 'risk_rule';
   if (normalized.includes('report') || normalized.includes('template')) return 'template';
   if (normalized.includes('research') || normalized.includes('analysis'))
@@ -47,8 +47,8 @@ function inferMissionMemoryKind(
 export function assessMissionMemoryCandidate(
   input: MissionMemoryCandidateAssessmentInput
 ): MissionMemoryCandidateAssessment {
-  const missionType = normalizeText(input.missionType);
-  const summary = normalizeText(input.summary);
+  const missionType = normalizeAssessmentText(input.missionType);
+  const summary = normalizeAssessmentText(input.summary);
   if (!input.missionId.trim()) {
     return {
       eligible: false,
@@ -94,9 +94,9 @@ export function assessMissionMemoryCandidate(
 export function assessMissionSeedCandidate(
   input: MissionSeedAssessmentInput
 ): MissionSeedAssessment {
-  const title = normalizeText(input.title);
-  const summary = normalizeText(input.summary);
-  if (!normalizeText(input.projectId)) {
+  const title = normalizeAssessmentText(input.title);
+  const summary = normalizeAssessmentText(input.summary);
+  if (!normalizeAssessmentText(input.projectId)) {
     return {
       eligible: false,
       reason: 'Mission seed is missing a project id.',
@@ -119,11 +119,12 @@ export function assessMissionSeedCandidate(
   }
 
   const sourceLinked = Boolean(
-    normalizeText(input.sourceTaskSessionId) || normalizeText(input.sourceWorkId)
+    normalizeAssessmentText(input.sourceTaskSessionId) ||
+    normalizeAssessmentText(input.sourceWorkId)
   );
   const bootstrapHint =
     /bootstrap|kickoff|seed|architecture|implementation|verification|analysis/i.test(
-      normalizeText(input.missionTypeHint) || `${title} ${summary}`
+      normalizeAssessmentText(input.missionTypeHint) || `${title} ${summary}`
     );
   return {
     eligible: sourceLinked && bootstrapHint,

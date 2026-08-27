@@ -1,10 +1,5 @@
-import {
-  safeAppendFileSync,
-  safeExec,
-  safeMkdir,
-  safeExistsSync,
-  safeReadFile,
-} from './secure-io.js';
+import { appendJsonLine } from './foundation/json.js';
+import { safeExec, safeMkdir, safeExistsSync, safeReadFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import {
@@ -124,23 +119,19 @@ function recordUndeliveredOpsAlert(
   // Keep the delivery failure in the same append-only queue consumed by
   // `ops:alerts --redeliver`. The original ops_alert record remains the audit
   // event; this companion record is the retryable delivery envelope.
-  safeAppendFileSync(
-    alertLogPath,
-    `${JSON.stringify({
-      ts: timestamp,
-      kind: 'operator_notification_undelivered',
-      event: 'ops_alert',
-      title: input.title,
-      reason,
-      correlation_id: id,
-      alert_id: id,
-      severity: input.severity,
-      context: input.context,
-      recommendation: input.recommendation,
-      options: input.options ?? [],
-    })}\n`,
-    { encoding: 'utf8' }
-  );
+  appendJsonLine(alertLogPath, {
+    ts: timestamp,
+    kind: 'operator_notification_undelivered',
+    event: 'ops_alert',
+    title: input.title,
+    reason,
+    correlation_id: id,
+    alert_id: id,
+    severity: input.severity,
+    context: input.context,
+    recommendation: input.recommendation,
+    options: input.options ?? [],
+  });
 }
 
 export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}): OpsAlertReceipt {
@@ -160,7 +151,7 @@ export function sendOpsAlert(input: OpsAlertInput, options: OpsAlertOptions = {}
     suppressed,
     ...input,
   };
-  safeAppendFileSync(alertLogPath, `${JSON.stringify(record)}\n`, { encoding: 'utf8' });
+  appendJsonLine(alertLogPath, record);
 
   if (suppressed) {
     return {
@@ -509,16 +500,12 @@ export function acknowledgeOpsAlerts(
     readOpsAlertLogRecords(alertLogPath)
   ).filter((record) => record.timestampMs !== null && record.timestampMs <= beforeMs);
   ensureParent(alertLogPath);
-  safeAppendFileSync(
-    alertLogPath,
-    `${JSON.stringify({
-      ts: now.toISOString(),
-      kind: 'ops_alert_ack',
-      before,
-      acked_count: outstanding.length,
-    })}\n`,
-    { encoding: 'utf8' }
-  );
+  appendJsonLine(alertLogPath, {
+    ts: now.toISOString(),
+    kind: 'ops_alert_ack',
+    before,
+    acked_count: outstanding.length,
+  });
   return { acked_count: outstanding.length, before, recorded_path: alertLogPath };
 }
 
@@ -586,18 +573,14 @@ export function redeliverUndeliveredOpsAlerts(
       delivered = false;
       errorMessage = error instanceof Error ? error.message : String(error);
     }
-    safeAppendFileSync(
-      alertLogPath,
-      `${JSON.stringify({
-        ts: now.toISOString(),
-        kind: 'ops_alert_redelivery',
-        ref: record.ref,
-        channel: 'webhook',
-        delivered,
-        ...(errorMessage ? { error: errorMessage.slice(0, 300) } : {}),
-      })}\n`,
-      { encoding: 'utf8' }
-    );
+    appendJsonLine(alertLogPath, {
+      ts: now.toISOString(),
+      kind: 'ops_alert_redelivery',
+      ref: record.ref,
+      channel: 'webhook',
+      delivered,
+      ...(errorMessage ? { error: errorMessage.slice(0, 300) } : {}),
+    });
     outcomes.push({
       ref: record.ref,
       title,

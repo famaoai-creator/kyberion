@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
 import type { ArtifactRecord } from './artifact-record.js';
 import type { ProjectRecord } from './project-registry.js';
@@ -65,11 +65,14 @@ function loadGateCatalog(): SdlcGateCatalogRecord {
     cachedCatalog = { gates: [] };
     return cachedCatalog;
   }
-  cachedCatalog = JSON.parse(safeReadFile(GATE_CATALOG_PATH, { encoding: 'utf8' }) as string) as SdlcGateCatalogRecord;
+  cachedCatalog = loadJson<SdlcGateCatalogRecord>(GATE_CATALOG_PATH);
   return cachedCatalog;
 }
 
-function buildArtifactEvidenceSet(input: { track: ProjectTrackRecord; artifacts: ArtifactRecord[] }): Set<string> {
+function buildArtifactEvidenceSet(input: {
+  track: ProjectTrackRecord;
+  artifacts: ArtifactRecord[];
+}): Set<string> {
   const refs = new Set<string>();
   for (const artifact of input.artifacts) {
     if (artifact.project_id !== input.track.project_id) continue;
@@ -91,19 +94,33 @@ function resolveTemplateRef(artifactId: string): string | undefined {
 }
 
 function sanitizeSeedFragment(value: string): string {
-  return String(value).toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return String(value)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
 function inferSpecialistForArtifact(artifactId: string): string {
   if (artifactId.includes('test') || artifactId.includes('validation')) return 'quality-engineer';
-  if (artifactId.includes('security') || artifactId.includes('compliance')) return 'risk-compliance';
-  if (artifactId.includes('runbook') || artifactId.includes('deployment') || artifactId.includes('rollback')) return SPECIALIST_IDS.serviceOperator;
+  if (artifactId.includes('security') || artifactId.includes('compliance'))
+    return 'risk-compliance';
+  if (
+    artifactId.includes('runbook') ||
+    artifactId.includes('deployment') ||
+    artifactId.includes('rollback')
+  )
+    return SPECIALIST_IDS.serviceOperator;
   return 'ecosystem-architect';
 }
 
 function inferMissionTypeForArtifact(artifactId: string): string {
   if (artifactId.includes('test') || artifactId.includes('validation')) return 'verification';
-  if (artifactId.includes('deployment') || artifactId.includes('rollback') || artifactId.includes('runbook')) return 'operations';
+  if (
+    artifactId.includes('deployment') ||
+    artifactId.includes('rollback') ||
+    artifactId.includes('runbook')
+  )
+    return 'operations';
   if (artifactId.includes('security') || artifactId.includes('compliance')) return 'governance';
   return 'documentation';
 }
@@ -127,8 +144,12 @@ export function buildTrackGateReadinessSummary(input: {
     .filter((gate) => gate.scope === 'track')
     .map((gate) => {
       const required = gate.required_artifacts || [];
-      const present = required.filter((artifactId) => evidence.has(String(artifactId).toLowerCase()));
-      const missing = required.filter((artifactId) => !evidence.has(String(artifactId).toLowerCase()));
+      const present = required.filter((artifactId) =>
+        evidence.has(String(artifactId).toLowerCase())
+      );
+      const missing = required.filter(
+        (artifactId) => !evidence.has(String(artifactId).toLowerCase())
+      );
       return {
         gate_id: gate.gate_id,
         phase: gate.phase,
@@ -148,10 +169,12 @@ export function buildTrackGateReadinessSummary(input: {
     current_gate_id: currentGate?.gate_id,
     current_phase: currentGate?.phase,
     ready: gates.length > 0 && gates.every((gate) => gate.ready),
-    next_required_artifacts: (currentGate?.missing_artifacts || []).slice(0, 3).map((artifactId) => ({
-      artifact_id: artifactId,
-      template_ref: resolveTemplateRef(artifactId),
-    })),
+    next_required_artifacts: (currentGate?.missing_artifacts || [])
+      .slice(0, 3)
+      .map((artifactId) => ({
+        artifact_id: artifactId,
+        template_ref: resolveTemplateRef(artifactId),
+      })),
     gates,
   };
 }
@@ -160,7 +183,9 @@ export function buildTrackGateReadinessSummaries(input: {
   tracks: ProjectTrackRecord[];
   artifacts: ArtifactRecord[];
 }): TrackGateReadinessSummary[] {
-  return input.tracks.map((track) => buildTrackGateReadinessSummary({ track, artifacts: input.artifacts }));
+  return input.tracks.map((track) =>
+    buildTrackGateReadinessSummary({ track, artifacts: input.artifacts })
+  );
 }
 
 export function buildTrackNextWorkProposal(input: {
@@ -170,7 +195,9 @@ export function buildTrackNextWorkProposal(input: {
   artifactId?: string;
 }): TrackNextWorkProposal | null {
   const target = input.artifactId
-    ? input.readiness.next_required_artifacts.find((artifact) => artifact.artifact_id === input.artifactId)
+    ? input.readiness.next_required_artifacts.find(
+        (artifact) => artifact.artifact_id === input.artifactId
+      )
     : input.readiness.next_required_artifacts[0];
   if (!target) return null;
   const specialistId = inferSpecialistForArtifact(target.artifact_id);
@@ -184,7 +211,7 @@ export function buildTrackNextWorkProposal(input: {
     'tracks',
     input.track.track_id,
     phaseDirectoryForPhase(input.readiness.current_phase),
-    `${target.artifact_id}.md`,
+    `${target.artifact_id}.md`
   );
   const workLoop: OrganizationWorkLoopSummary = {
     intent: {
@@ -207,14 +234,24 @@ export function buildTrackNextWorkProposal(input: {
       workflow_id: 'coordinated-multi-track',
       pattern: 'coordinated_multi_track_execution',
       stage: 'planning',
-      phases: ['intake', 'classification', 'planning', 'contract_authoring', 'execution', 'verification', 'delivery'],
-      rationale: 'Track gate artifact work spans multiple dependent steps and is coordinated by the track owner.',
+      phases: [
+        'intake',
+        'classification',
+        'planning',
+        'contract_authoring',
+        'execution',
+        'verification',
+        'delivery',
+      ],
+      rationale:
+        'Track gate artifact work spans multiple dependent steps and is coordinated by the track owner.',
     },
     review_design: {
       review_mode: 'standard',
       required_gate_ids: ['CONTRACT_VALID', 'QA_READY'],
       all_gate_ids: ['CONTRACT_VALID', 'QA_READY', 'ARCHITECTURE_READY'],
-      rationale: 'Track gate artifact synthesis should pass contract and validation checks before execution.',
+      rationale:
+        'Track gate artifact synthesis should pass contract and validation checks before execution.',
     },
     outcome_design: {
       outcome_ids: [target.artifact_id],
@@ -226,11 +263,7 @@ export function buildTrackNextWorkProposal(input: {
         'capture the governed artifact evidence',
         'advance the blocked gate with verified output',
       ],
-      intake_requirements: [
-        'track context',
-        'target artifact',
-        'template reference',
-      ],
+      intake_requirements: ['track context', 'target artifact', 'template reference'],
       operator_checklist: [
         'open the template or skeleton',
         'materialize the governed artifact in the project track path',
@@ -267,11 +300,7 @@ export function buildTrackNextWorkProposal(input: {
         ],
       },
       knowledge_zone: {
-        owns: [
-          'gate catalog',
-          'required artifacts',
-          'template references',
-        ],
+        owns: ['gate catalog', 'required artifacts', 'template references'],
       },
       compiler_zone: {
         responsibilities: [
@@ -330,7 +359,10 @@ export function materializeTrackArtifactSkeleton(input: {
   }
   if (!safeExistsSync(targetPath)) {
     const templateBody = safeReadFile(templatePath, { encoding: 'utf8' }) as string;
-    safeWriteFile(targetPath, `<!-- Instantiated from ${input.proposal.template_ref} -->\n${templateBody}`);
+    safeWriteFile(
+      targetPath,
+      `<!-- Instantiated from ${input.proposal.template_ref} -->\n${templateBody}`
+    );
   }
   return logicalTarget;
 }

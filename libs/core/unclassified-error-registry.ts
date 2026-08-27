@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unclassified-error-registry');
@@ -39,7 +39,7 @@ function readRegistry(): UnclassifiedErrorRegistry {
   try {
     const p = registryPath();
     if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string) as UnclassifiedErrorRegistry;
+    return loadJson<UnclassifiedErrorRegistry>(p);
   } catch {
     return { version: '1.0.0', entries: [] };
   }

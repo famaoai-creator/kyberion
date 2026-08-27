@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * libs/core/nerve-bridge.ts
  * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
@@ -8,9 +9,12 @@
  */
 
 import * as os from 'node:os';
-import { logger, pathResolver, safeAppendFileSync } from './index.js';
+import { createLogger } from './logger.js';
+import { pathResolver } from './path-resolver.js';
 import { subscribeJsonl } from './jsonl-tail.js';
 import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
+
+const logger = createLogger('nerve-bridge');
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;
@@ -59,7 +63,7 @@ export function sendNerveMessage(input: {
   };
 
   try {
-    safeAppendFileSync(STIMULI_PATH, JSON.stringify(msg) + '\n');
+    appendJsonLine(STIMULI_PATH, msg);
     rotateStimuliJournalIfNeeded();
     logger.info(`📡 [BRIDGE:${NODE_ID}] Message sent: ${msg.intent} (${msg.from} -> ${msg.to})`);
   } catch (err) {

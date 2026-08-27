@@ -1,6 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
 
+type DiscoveryOperation = {
+  op?: string;
+  input_schema?: Record<string, unknown>;
+  examples?: Array<Record<string, unknown>>;
+};
+
+type DiscoveryActuator = {
+  n?: string;
+  ops?: DiscoveryOperation[];
+};
+
+type DiscoveryDocument = {
+  actuators: DiscoveryActuator[];
+};
+
 describe('generate_op_registry discovery output', () => {
   it('includes input schemas and examples for contract-backed ops', () => {
     const discovery = JSON.parse(
@@ -9,28 +24,28 @@ describe('generate_op_registry discovery output', () => {
           encoding: 'utf8',
         }) || '{}'
       )
-    );
-    const browser = discovery.actuators.find((entry: any) => entry.n === 'browser-actuator');
-    const system = discovery.actuators.find((entry: any) => entry.n === 'system-actuator');
-    const file = discovery.actuators.find((entry: any) => entry.n === 'file-actuator');
+    ) as DiscoveryDocument;
+    const browser = discovery.actuators.find((entry) => entry.n === 'browser-actuator');
+    const system = discovery.actuators.find((entry) => entry.n === 'system-actuator');
+    const file = discovery.actuators.find((entry) => entry.n === 'file-actuator');
 
-    expect(browser?.ops.find((item: any) => item.op === 'goto')).toMatchObject({
+    expect(browser?.ops?.find((item) => item.op === 'goto')).toMatchObject({
       input_schema: expect.objectContaining({
         required: ['url'],
       }),
       examples: expect.arrayContaining([expect.objectContaining({ url: 'https://example.com' })]),
     });
-    expect(system?.ops.find((item: any) => item.op === 'open_url')).toMatchObject({
+    expect(system?.ops?.find((item) => item.op === 'open_url')).toMatchObject({
       input_schema: expect.objectContaining({
         required: ['url'],
       }),
     });
-    expect(system?.ops.find((item: any) => item.op === 'app_quit')).toMatchObject({
+    expect(system?.ops?.find((item) => item.op === 'app_quit')).toMatchObject({
       input_schema: expect.objectContaining({
         required: ['application'],
       }),
     });
-    expect(system?.ops.find((item: any) => item.op === 'process_kill')).toMatchObject({
+    expect(system?.ops?.find((item) => item.op === 'process_kill')).toMatchObject({
       input_schema: expect.objectContaining({
         anyOf: expect.arrayContaining([
           expect.objectContaining({ required: ['pid'] }),
@@ -38,13 +53,43 @@ describe('generate_op_registry discovery output', () => {
         ]),
       }),
     });
-    expect(file?.ops.find((item: any) => item.op === 'read_json')).toMatchObject({
+    expect(file?.ops?.find((item) => item.op === 'read_json')).toMatchObject({
       input_schema: expect.objectContaining({
         required: ['path'],
       }),
       examples: expect.arrayContaining([
         expect.objectContaining({ path: 'knowledge/product/config.json' }),
       ]),
+    });
+  });
+
+  it('publishes authored field contracts for every actuator dispatch', () => {
+    const discovery = JSON.parse(
+      String(
+        safeReadFile(pathResolver.knowledge('product/orchestration/actuator-op-discovery.json'), {
+          encoding: 'utf8',
+        }) || '{}'
+      )
+    ) as DiscoveryDocument;
+    const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
+    expect(operations).toHaveLength(552);
+    expect(operations.every((item) => item.input_schema)).toBe(true);
+    expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
+    expect(
+      operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'legacy-open')
+    ).toBe(false);
+    expect(
+      operations.some((item) => item.input_schema?.['x-kyberion-contract'] === 'inferred-legacy')
+    ).toBe(true);
+
+    const agentSpawn = discovery.actuators
+      .find((entry) => entry.n === 'agent-actuator')
+      ?.ops?.find((item) => item.op === 'spawn');
+    expect(agentSpawn?.input_schema).toMatchObject({
+      properties: expect.objectContaining({
+        provider: expect.any(Object),
+        missionId: expect.any(Object),
+      }),
     });
   });
 });

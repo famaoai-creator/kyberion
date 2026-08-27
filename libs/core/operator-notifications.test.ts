@@ -14,12 +14,33 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    if (!fs.existsSync(filePath)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    } catch {
+      return null;
+    }
+  },
+  loadJson: <T>(filePath: string): T => JSON.parse(String(fs.readFileSync(filePath, 'utf8'))) as T,
   safeWriteFile: (filePath: string, data: string | Buffer) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, data);
   },
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: realFsSecureIo.loadJson,
+    loadJsonIfPresent: realFsSecureIo.loadJsonIfPresent,
+    appendFile: realFsSecureIo.safeAppendFileSync,
+    exists: realFsSecureIo.safeExistsSync,
+    readFile: (filePath: string) => String(realFsSecureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: realFsSecureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));

@@ -1,16 +1,14 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import { loadJson, logger, pathResolver, defineCatalogBackedActuator } from '@agent/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './wisdom-pipeline-helpers.js';
+import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core';
 
 const main = async () => {
-  const schema = JSON.parse(
-    safeReadFile(pathResolver.rootResolve('schemas/wisdom-action.schema.json'), {
-      encoding: 'utf8',
-    }) as string
-  ) as object;
+  const schema = loadJson<object>(
+    pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json')
+  );
   await runActuatorCli({
     name: 'wisdom-actuator',
     handleAction,
@@ -24,16 +22,21 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
 export { handleAction } from './wisdom-pipeline-helpers.js';
-export { dispatchDecisionOp } from './decision-ops.js';
+export const actuator = defineCatalogBackedActuator({
+  id: 'wisdom-actuator',
+  describeOps,
+  handleAction,
+});
+export { dispatchWisdomOperation } from './decision-ops.js';
 export { createWisdomDispatcher } from './wisdom-dispatcher.js';
 export type { WisdomContext } from './contracts/wisdom-context.js';
 export type { ExecutionKind, IdempotencyClass, WisdomReceipt } from './contracts/wisdom-result.js';
 export type { WisdomOperationSpec } from './contracts/wisdom-operation.js';
 export { validateWisdomRequest } from './contracts/wisdom-request.js';
 
-export { describeOps } from './op-catalog.js';
+export { describeOps };

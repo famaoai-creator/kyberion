@@ -15,11 +15,18 @@ import {
   resetDefaultLifecycleHookEngine,
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { runInlineProductivityScore } from './pipeline-domain-ops.js';
+import {
+  DEFAULT_CORE_WAIT_MS,
+  resolveReasoningContextParam,
+  resolveWaitDurationMs,
+} from './pipeline-execution-part-bootstrap.js';
 
 const {
   normalizePipelineOp,
   runSteps,
   runValidatedSteps,
+  executePipelineFile,
   recordFallbackOutcome,
   finalizePipelineTrace,
   formatPipelineFailure,
@@ -80,6 +87,21 @@ describe('findStepByIdRecursive', () => {
   });
 });
 
+describe('typed pipeline domain operations', () => {
+  it('computes productivity score from resolved shell metrics without eval', () => {
+    const result = runInlineProductivityScore(
+      { op: 'core:calculate_productivity_score', role: 'transform', produces: 'score' } as any,
+      {
+        ts_file_count: '{{ts_file_count}}',
+        test_file_count: '{{test_file_count}}',
+        fixme_count: '{{fixme_count}}',
+      },
+      { ts_file_count: '3126\n', test_file_count: '1033\n', fixme_count: '0\n' }
+    );
+    expect(result.score).toBe(33);
+  });
+});
+
 describe('run_pipeline compatibility', () => {
   type TestSuspension = {
     step_id: string;
@@ -89,6 +111,21 @@ describe('run_pipeline compatibility', () => {
     timeout_at?: string;
     reason?: string;
   };
+
+  it('executes a validated pipeline file in-process through the shared lifecycle', async () => {
+    const result = await executePipelineFile(
+      'pipelines/fragments/_test-run-pipeline-include.json',
+      {
+        context: { greeting: 'hello' },
+        quiet: true,
+        trace: new TraceContext('pipeline:library-entry', { pipelineId: 'library-entry' }),
+      }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.fragment_result).toBe('hello from fragment');
+    expect(result.context.trace_persisted_path).toContain('active/shared/logs/traces/');
+  });
 
   it('persists a recovered fallback as one successful causal trace', () => {
     const trace = new TraceContext('pipeline:fallback-recovery', {
@@ -964,6 +1001,33 @@ describe('run_pipeline compatibility', () => {
     ]);
   });
 
+  it('exports an include envelope and applies fragment context defaults', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:include',
+          params: {
+            fragment: 'fragments/_test-run-pipeline-include.json',
+            context: { greeting: '{{name}}' },
+            export_as: 'fragment_run',
+          },
+        },
+      ],
+      { name: 'world' }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.fragment_default).toBe('fragment default');
+    expect(result.context.fragment_run).toMatchObject({
+      status: 'succeeded',
+      results: [{ op: 'core:transform', status: 'success' }],
+      context: {
+        fragment_default: 'fragment default',
+        fragment_result: 'world from fragment',
+      },
+    });
+  });
+
   it('detects circular core:include references', async () => {
     const result = await runSteps([
       {
@@ -1178,6 +1242,42 @@ describe('Typed Flow role resolution', () => {
     expect(result.context.shell_data).toBe('typed-flow');
   });
 
+  it('runs nested pipelines through the injected library runner', async () => {
+    const nestedRunner = vi.fn(async () => ({
+      status: 'succeeded',
+      results: [{ op: 'system:log', status: 'success' }],
+      context: { nested_value: 'ready' },
+    }));
+
+    const result = await runValidatedSteps(
+      [
+        {
+          id: 'nested',
+          op: 'core:run_pipeline',
+          role: 'source',
+          produces: 'nested_result',
+          params: { input: 'pipelines/vital-check.json' },
+        },
+      ],
+      {},
+      { quiet: true, runPipelineFile: nestedRunner }
+    );
+
+    expect(nestedRunner).toHaveBeenCalledWith('pipelines/vital-check.json', {
+      // The child inherits user-level data only; the nesting ancestry is the
+      // one engine key attached on purpose (see pipeline-run-pipeline-nesting).
+      context: {
+        __pipeline_ancestry: [path.resolve(pathResolver.rootDir(), 'pipelines/vital-check.json')],
+      },
+      quiet: true,
+      hasHuman: undefined,
+    });
+    expect(result.context.nested_result).toMatchObject({
+      status: 'succeeded',
+      context: { nested_value: 'ready' },
+    });
+  });
+
   it('treats role:transform step output as accessible via produces channel', async () => {
     const result = await runSteps([
       {
@@ -1265,5 +1365,108 @@ describe('Typed Flow role resolution', () => {
     });
     expect(result.context.parallel_items).toHaveLength(2);
     expect(result.context.accumulated_items.collected).toHaveLength(2);
+  });
+});
+
+describe('falsy resolved params in inline core handlers', () => {
+  // Regression guard for the class fixed in runInlineCoreTransform: params are
+  // template-resolved before dispatch, so a `||` default silently discards a
+  // legitimately falsy value (0 / false / '').
+
+  describe('resolveWaitDurationMs', () => {
+    it('honours an explicit zero-length wait', () => {
+      expect(resolveWaitDurationMs(0)).toBe(0);
+      expect(resolveWaitDurationMs('0')).toBe(0);
+    });
+
+    it('accepts finite numeric durations from either a number or a numeric string', () => {
+      expect(resolveWaitDurationMs(120)).toBe(120);
+      expect(resolveWaitDurationMs('250')).toBe(250);
+    });
+
+    it('treats non-durations as "not supplied" so the next alias still applies', () => {
+      // '' is what resolveVars yields for an unresolved single-var template —
+      // it must keep falling through to the default rather than waiting 0ms.
+      expect(resolveWaitDurationMs('')).toBeUndefined();
+      expect(resolveWaitDurationMs('   ')).toBeUndefined();
+      expect(resolveWaitDurationMs(undefined)).toBeUndefined();
+      expect(resolveWaitDurationMs(null)).toBeUndefined();
+      expect(resolveWaitDurationMs(false)).toBeUndefined();
+      expect(resolveWaitDurationMs('soon')).toBeUndefined();
+      expect(resolveWaitDurationMs(Number.NaN)).toBeUndefined();
+      expect(resolveWaitDurationMs(-1)).toBeUndefined();
+    });
+  });
+
+  it('waits 0ms for core:wait with duration_ms: 0 instead of the 1000ms default', async () => {
+    const startedAt = Date.now();
+    const result = await runSteps([{ op: 'core:wait', params: { duration_ms: 0 } }]);
+    const elapsed = Date.now() - startedAt;
+
+    expect(result.status).toBe('succeeded');
+    expect(DEFAULT_CORE_WAIT_MS).toBe(1000);
+    expect(elapsed).toBeLessThan(DEFAULT_CORE_WAIT_MS / 2);
+  });
+
+  it('resolves core:wait duration_ms from a template that evaluates to 0', async () => {
+    const startedAt = Date.now();
+    const result = await runSteps(
+      [{ op: 'core:wait', params: { duration_ms: '{{backoff_ms}}' } }],
+      { backoff_ms: 0 }
+    );
+    const elapsed = Date.now() - startedAt;
+
+    expect(result.status).toBe('succeeded');
+    expect(elapsed).toBeLessThan(DEFAULT_CORE_WAIT_MS / 2);
+  });
+
+  describe('resolveReasoningContextParam', () => {
+    const ctx = { loop: { count: 0 }, flag: false, note: 'hi' };
+
+    it('honours a declared context that resolves to a falsy value', () => {
+      expect(resolveReasoningContextParam({ context: 0 }, ctx)).toBe(0);
+      expect(resolveReasoningContextParam({ context: false }, ctx)).toBe(false);
+      expect(resolveReasoningContextParam({ context: '{{loop.count}}' }, ctx)).toBe(0);
+      expect(resolveReasoningContextParam({ context: '{{flag}}' }, ctx)).toBe(false);
+    });
+
+    it('falls back to the whole pipeline context only when context is absent', () => {
+      expect(resolveReasoningContextParam({}, ctx)).toBe(ctx);
+      expect(resolveReasoningContextParam({ context: undefined }, ctx)).toBe(ctx);
+      expect(resolveReasoningContextParam({ context: null }, ctx)).toBe(ctx);
+    });
+
+    it('still resolves string and array contexts element-wise', () => {
+      expect(resolveReasoningContextParam({ context: '{{note}}' }, ctx)).toBe('hi');
+      expect(resolveReasoningContextParam({ context: ['{{note}}', 7] }, ctx)).toEqual(['hi', 7]);
+    });
+  });
+
+  it('passes a falsy core:transform input through instead of the whole context', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:transform',
+          params: {
+            input: '{{loop_count}}',
+            script: 'return { type: typeof input, value: input };',
+            export_as: 'zero_probe',
+          },
+        },
+        {
+          op: 'core:transform',
+          params: {
+            input: false,
+            script: 'return { type: typeof input, value: input };',
+            export_as: 'false_probe',
+          },
+        },
+      ],
+      { loop_count: 0 }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.zero_probe).toEqual({ type: 'number', value: 0 });
+    expect(result.context.false_probe).toEqual({ type: 'boolean', value: false });
   });
 });

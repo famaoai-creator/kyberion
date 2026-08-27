@@ -1,19 +1,13 @@
 import { createHash } from 'node:crypto';
 
-import AjvModule, { type Ajv as AjvInstance } from 'ajv';
-
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import type { SourceAnalysisIr } from './source-analysis.js';
 
 const VERIFICATION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agentic-source-review-verification.schema.json'
 );
-const AjvCtor = AjvModule as unknown as new (options: { allErrors: boolean }) => AjvInstance;
-const validateVerificationSchema = compileSchemaFromPath(
-  new AjvCtor({ allErrors: true }),
-  VERIFICATION_SCHEMA_PATH
-);
+const validateVerificationSchema = compileSchema(VERIFICATION_SCHEMA_PATH);
 
 export const REVIEW_TRACKS = ['access_control', 'data_flow', 'dependency_supply_chain'] as const;
 export type ReviewTrack = (typeof REVIEW_TRACKS)[number];

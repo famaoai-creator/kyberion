@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 /** KO-19: weekly tenant-scope reconciliation and steward-facing report. */
-import * as path from 'node:path';
 import {
   listTenantProfileSlugs,
   pathResolver,
@@ -9,6 +8,7 @@ import {
   withExecutionContext,
   type ScopeContext,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import {
   runKnowledgeValidationSweep,
   proposeKnowledgeRankingWeightRecalculation,
@@ -20,6 +20,7 @@ import {
   scan as scanTierHygiene,
   type Violation as TierHygieneViolation,
 } from './check_tier_hygiene.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeReconciliationReport {
   generated_at: string;
@@ -34,7 +35,7 @@ export interface KnowledgeScopeReconciliationReport {
 
 function reportPath(): string {
   return pathResolver.rootResolve(
-    process.env.KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH')?.trim() ||
       'active/shared/runtime/reports/knowledge-scope-reconciliation-latest.json'
   );
 }
@@ -87,17 +88,18 @@ export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconcil
   });
 }
 
-const isDirect =
-  process.argv[1] != null && /reconcile_knowledge_scopes\.(ts|js)$/u.test(process.argv[1]);
-if (isDirect) {
-  reconcileKnowledgeScopes()
-    .then((report) => {
-      if (process.argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
+export const runKnowledgeScopeReconciliation = defineScript({
+  name: 'knowledge:scope-reconcile',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      const report = await reconcileKnowledgeScopes();
+      if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
       else
         console.log(
           `${report.status}: ${report.migration_plans.length} migration plans; report=${reportPath()}`
         );
-      if (process.argv.includes('--alert') && report.status === 'attention') {
+      if (argv.includes('--alert') && report.status === 'attention') {
         const receipt = sendOpsAlert({
           ...buildHealthAlert(report.health),
           title: 'Weekly tenant knowledge scope reconciliation requires attention',
@@ -109,14 +111,23 @@ if (isDirect) {
           },
           dedupe_key: 'knowledge-scope-reconciliation',
         });
-        if (!process.argv.includes('--quiet')) console.warn(`ops alert: ${receipt.recorded_path}`);
+        if (!argv.includes('--quiet')) console.warn(`ops alert: ${receipt.recorded_path}`);
       }
-      if (process.argv.includes('--fail') && report.status !== 'healthy') process.exitCode = 1;
-    })
-    .catch((error) => {
-      console.error(
+      if (argv.includes('--fail') && report.status !== 'healthy') {
+        throw new ScriptExitError(1, '', true);
+      }
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      throw new ScriptExitError(
+        2,
         `[knowledge-scope-reconciliation] fatal: ${error instanceof Error ? error.message : String(error)}`
       );
-      process.exitCode = 2;
-    });
-}
+    }
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reconcile_knowledge_scopes.ts') ||
+  isDirectScript(import.meta.url, 'reconcile_knowledge_scopes.js')
+)
+  void runKnowledgeScopeReconciliation();

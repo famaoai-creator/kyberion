@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   applyOnboardingContextBinding,
   applyOnboardingFirstWork,
@@ -11,6 +10,7 @@ import {
   resolveOnboardingFirstWork,
   type OrganizationTier,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type ParsedArgs = {
   command: string;
@@ -109,7 +109,7 @@ function usage(): string {
   ].join('\n');
 }
 
-function run(args = process.argv.slice(2)): void {
+export function run(args: string[] = []): void {
   const parsed = parseArgs(args);
   if (parsed.command === 'help') {
     console.log(usage());
@@ -173,30 +173,32 @@ function run(args = process.argv.slice(2)): void {
   );
 }
 
-const isDirectExecution = (() => {
-  try {
-    return process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-  } catch {
-    return false;
-  }
-})();
+export const runOnboardingContext = defineScript({
+  name: 'onboarding:context',
+  flags: [],
+  run: ({ argv }) => {
+    try {
+      run(argv);
+    } catch (error) {
+      console.error(
+        JSON.stringify(
+          {
+            error_code: 'ONBOARDING_CONTEXT_FAILED',
+            message: error instanceof Error ? error.message : String(error),
+          },
+          null,
+          2
+        )
+      );
+      throw new ScriptExitError(1);
+    }
+  },
+});
 
-if (isDirectExecution) {
-  try {
-    run();
-  } catch (error) {
-    console.error(
-      JSON.stringify(
-        {
-          error_code: 'ONBOARDING_CONTEXT_FAILED',
-          message: error instanceof Error ? error.message : String(error),
-        },
-        null,
-        2
-      )
-    );
-    process.exitCode = 1;
-  }
-}
+if (
+  isDirectScript(import.meta.url, 'onboarding_context.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_context.js')
+)
+  void runOnboardingContext();
 
-export { parseArgs, run };
+export { parseArgs };

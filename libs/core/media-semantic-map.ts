@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
 
 export interface MediaSemanticRuleEntry {
   layout?: string;
@@ -26,9 +26,6 @@ interface MediaSemanticMapCatalog {
   proposal_evidence_rules: ProposalEvidenceRuleEntry[];
   proposal_section_keywords: ProposalSectionKeywordRuleEntry[];
 }
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-semantic-map.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-semantic-map.schema.json');
@@ -90,7 +87,7 @@ const FALLBACK_PROPOSAL_SECTION_KEYWORDS: ProposalSectionKeywordRuleEntry[] = [
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 
@@ -103,7 +100,9 @@ function errorsFrom(validate: ValidateFunction): string[] {
 function validateCatalog(value: unknown, label: string): MediaSemanticMapCatalog {
   const validate = ensureValidator();
   if (!validate(value)) {
-    throw new Error(`Invalid media semantic map catalog at ${label}: ${errorsFrom(validate).join('; ')}`);
+    throw new Error(
+      `Invalid media semantic map catalog at ${label}: ${errorsFrom(validate).join('; ')}`
+    );
   }
   return value as MediaSemanticMapCatalog;
 }
@@ -120,10 +119,9 @@ export function loadMediaSemanticMapCatalog(): MediaSemanticMapCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(
-    JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string),
-    CATALOG_PATH
-  );
+  const source = loadJson<Record<string, unknown>>(CATALOG_PATH);
+  const { $schema: _schema, ...catalog } = source;
+  const parsed = validateCatalog(catalog, CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;
@@ -153,7 +151,9 @@ export function resolveProposalSectionKeywords(sectionId: string): string[] {
   const normalized = String(sectionId || '').trim();
   if (!normalized) return [];
   const catalog = loadMediaSemanticMapCatalog();
-  const matched = catalog.proposal_section_keywords.find((entry) => entry.section_id === normalized);
+  const matched = catalog.proposal_section_keywords.find(
+    (entry) => entry.section_id === normalized
+  );
   return matched?.keywords || [];
 }
 

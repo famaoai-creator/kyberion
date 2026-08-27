@@ -1,15 +1,13 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import {
   normalizeExecutionShape,
   projectExecutionShapeToWorkflowShape,
   type ExecutionShape,
 } from './execution-shape.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const POLICY_SCHEMA_PATH = pathResolver.knowledge('product/schemas/work-scope-policy.schema.json');
 const POLICY_PATH = pathResolver.knowledge('product/governance/work-scope-policy.json');
 
@@ -118,14 +116,12 @@ let policyValidateFn: ValidateFunction | null = null;
 
 function ensurePolicyValidator(): ValidateFunction {
   if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
+  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
   return policyValidateFn;
 }
 
 export function loadWorkScopePolicy(): WorkScopePolicy {
-  const value = JSON.parse(
-    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as WorkScopePolicy;
+  const value = readJson<WorkScopePolicy>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(value)) {
     const errors = (validate.errors || [])

@@ -1,10 +1,10 @@
 # Quick Start
 
-**Just want to run something?** → Jump to [§2 First Win Smoke](#2-first-win-smoke): `pnpm doctor` then `pnpm pipeline --input pipelines/verify-session.json`.
+**Just want to run something?** → Run the five commands in [§2 First Win Smoke](#2-first-win-smoke). This is the canonical first-win command order. The broader documentation source map is [`documentation-source-map.json`](./documentation-source-map.json).
 
 ---
 
-Kyberion should be approached as an intent-driven system.
+Kyberion should be approached as a request-driven system.
 
 Start with:
 
@@ -12,36 +12,39 @@ Start with:
 Intent -> Plan -> Result
 ```
 
-Not with:
+The system keeps internal runtime detail behind that conversation.
 
-```text
-Actuator -> ADF -> internal runtime detail
-```
+At every step it makes the request, plan, result, and next action visible.
 
 ## 1. Setup
 
-> **Canonical cold-start source: [docs/INITIALIZATION.md](./INITIALIZATION.md).** The block below is a summary; when in doubt (ordering, prerequisites, troubleshooting), follow INITIALIZATION.md. Tenant / organization / activation の業務順序は [オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md) を参照してください。
+> This document is the canonical first-win source. Day-2 tenant / organization / activation work is in [INITIALIZATION.md](./INITIALIZATION.md), and the operational lifecycle is in the [onboarding standard flow](../knowledge/product/governance/onboarding-flow.md).
 
 Prerequisites:
 
 - Node.js `24+` (matches `package.json` engines and `.nvmrc`)
 - `pnpm`
 
-If you want the shortest setup path first, you can use the same one-liner the initialization guide documents:
+The canonical first-win command sequence is deliberately short:
+
+# kyberion-first-win
 
 ```bash
-pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+pnpm install
+pnpm build
+pnpm prereq:check
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ```bash
 git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
-pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
-pnpm exec playwright install chromium   # recommended: needed for the browser first-win
 pnpm build
-pnpm surfaces:reconcile
-pnpm onboard          # customer/{slug}/ preferred when KYBERION_CUSTOMER is set
+pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
 ```
 
 ### Start an AI company in one governed step
@@ -57,7 +60,11 @@ pnpm company:onboard --vertical saas-product-company --slug acme-ai \
   --goal "Define the first customer outcome and launch plan"
 ```
 
+`pnpm onboard` uses `customer/{slug}/ preferred when KYBERION_CUSTOMER is set` for the customer stance overlay.
+
 The dry-run shows the write scope and next commands without changing files. The applied flow creates the customer overlay, binds the accountable human, registers the initial AI worker and approval boundaries, and writes a first-work plan that remains paused until human review. Add `--tenant-slug <tenant>` when the tenant profile is known; the flow will then create or reuse the organization context binding. Tenant activation is still a separate human-accepted gate.
+
+When `KYBERION_CUSTOMER` is set, `customer/{slug}/` is preferred for customer-specific identity and onboarding artifacts.
 
 Before starting the first work, activate the tenant after the readiness probes, then review its management unit:
 

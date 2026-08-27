@@ -2,7 +2,8 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 
 export const GENERATION_QUOTA_POLICY_REPO_PATH =
@@ -102,12 +103,12 @@ function readPolicy(options: GenerationQuotaOptions): GenerationQuotaPolicy {
   const policyPath = path.join(rootDir(options), ...GENERATION_QUOTA_POLICY_REPO_PATH.split('/'));
   if (!safeExistsSync(policyPath)) return { ...DEFAULT_GENERATION_QUOTA_POLICY };
   try {
-    const parsed = JSON.parse(String(safeReadFile(policyPath, { encoding: 'utf8' }) || '{}')) as {
+    const parsed = readJson<{
       max_units_per_day?: unknown;
       warn_ratio?: unknown;
       operation_units?: unknown;
       tenant_overrides?: unknown;
-    };
+    }>(policyPath);
     const operationUnits = Object.fromEntries(
       Object.entries(parsed.operation_units ?? {}).filter(([, value]) => positive(value))
     ) as Record<string, number>;
@@ -176,9 +177,9 @@ function effectivePolicy(policy: GenerationQuotaPolicy, tenantSlug: string, acti
 function readUsage(counterPath: string): ReadGenerationQuotaUsage {
   if (!safeExistsSync(counterPath)) return { usage: { units: 0 }, invalid: false };
   try {
-    const parsed = JSON.parse(String(safeReadFile(counterPath, { encoding: 'utf8' }) || '{}')) as {
+    const parsed = readJson<{
       units?: unknown;
-    };
+    }>(counterPath);
     if (parsed.units === 0 || positive(parsed.units)) {
       return { usage: { units: parsed.units as number }, invalid: false };
     }

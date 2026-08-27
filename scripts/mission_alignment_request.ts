@@ -21,7 +21,9 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { isDirectScript } from './lib/harness.js';
+import { readJson } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
   computeApprovalPayloadHash,
@@ -90,7 +92,7 @@ export function openAlignmentApproval(
 
   let brief: MissionBriefShape & Record<string, unknown>;
   try {
-    brief = JSON.parse(safeReadFile(briefPath, { encoding: 'utf8' }) as string);
+    brief = readJson<MissionBriefShape & Record<string, unknown>>(briefPath);
   } catch (error) {
     return {
       missionId,
@@ -198,4 +200,8 @@ export async function main(): Promise<void> {
   process.exitCode = result.reason ? 1 : 0;
 }
 
-if (process.argv[1] && /mission_alignment_request\.(ts|js)$/u.test(process.argv[1])) void main();
+if (
+  isDirectScript(import.meta.url, 'mission_alignment_request.ts') ||
+  isDirectScript(import.meta.url, 'mission_alignment_request.js')
+)
+  void main();

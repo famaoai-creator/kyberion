@@ -25,13 +25,20 @@
       }
     },
     {
+      "id": "load_video_action",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "video_action", "type": "NarratedVideoAction" },
+      "params": { "path": "{{video_action_path}}" }
+    },
+    {
       "id": "generate_video",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "video_result", "type": "ShellResult" },
+      "op": "video-composition:create_narrated_intro_movie",
+      "consumes": "video_action",
+      "produces": { "channel": "video_result", "type": "VideoCompositionResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{video_action_path}}",
-        "timeout_ms": 900000
+        "narrated_video_brief": "{{video_action.params.narrated_video_brief}}"
       }
     },
     {

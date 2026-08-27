@@ -25,8 +25,6 @@ import {
   runOpPreflight,
 } from '@agent/core';
 
-const PLATFORMS_DARWIN = process.platform === 'darwin';
-
 interface EmailParams {
   backend?: string;
   to?: string;
@@ -149,3 +147,11 @@ export async function handleAction(input: {
 }
 
 export const EMAIL_ACTUATOR_OPS = ['create_draft', 'send', 'send_from_file'] as const;
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'email-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

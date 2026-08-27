@@ -58,6 +58,14 @@ vi.mock('@agent/core', async () => {
   };
 });
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T => JSON.parse(String(mocks.safeReadFile(filePath))) as T,
+  };
+});
+
 vi.mock('@actuator/system', () => ({
   handleAction: mocks.handleSystemAction,
 }));
@@ -435,7 +443,7 @@ describe('media-generation-actuator', () => {
       expect(
         compileSchemaFromPath(
           new Ajv({ allErrors: true }),
-          pathResolver.rootResolve('schemas/media-generation-action.schema.json')
+          pathResolver.rootResolve('knowledge/product/schemas/media-generation-action.schema.json')
         )(request),
         action
       ).toBe(true);
@@ -868,7 +876,10 @@ describe('media-generation-actuator', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json')
+      path.join(
+        pathResolver.rootDir(),
+        'knowledge/product/schemas/media-generation-action.schema.json'
+      )
     );
 
     expect(
@@ -903,7 +914,10 @@ describe('media-generation-actuator', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/media-generation-action.schema.json')
+      path.join(
+        pathResolver.rootDir(),
+        'knowledge/product/schemas/media-generation-action.schema.json'
+      )
     );
 
     expect(
@@ -969,7 +983,7 @@ describe('media-generation-actuator', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      pathResolver.rootResolve('schemas/media-generation-action.schema.json')
+      pathResolver.rootResolve('knowledge/product/schemas/media-generation-action.schema.json')
     );
 
     for (const example of catalog.examples) {

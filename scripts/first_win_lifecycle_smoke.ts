@@ -11,6 +11,8 @@ import {
 } from '@agent/core';
 import { loadState } from '@agent/core/mission-state';
 import type { Trace, TraceSpan } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_LIFECYCLE_STAGES = [
   'onboard',
@@ -740,30 +742,38 @@ export function runFirstWinLifecycleLive(
   return report();
 }
 
-export function main(): void {
-  if (process.argv.includes('--live')) {
-    const identityIndex = process.argv.indexOf('--identity');
-    const runIdIndex = process.argv.indexOf('--run-id');
-    const confirmIndex = process.argv.indexOf('--confirm-live');
+export function main(args: string[] = []): FirstWinLifecycleReport {
+  if (args.includes('--live')) {
+    const identityIndex = args.indexOf('--identity');
+    const runIdIndex = args.indexOf('--run-id');
+    const confirmIndex = args.indexOf('--confirm-live');
     const options: FirstWinLifecycleLiveOptions = {
-      identityFile: identityIndex >= 0 ? process.argv[identityIndex + 1] || '' : '',
-      runId: runIdIndex >= 0 ? process.argv[runIdIndex + 1] || '' : '',
-      confirm: confirmIndex >= 0 ? process.argv[confirmIndex + 1] || '' : '',
-      allowWrites: process.env.KYBERION_FIRST_WIN_LIVE,
+      identityFile: identityIndex >= 0 ? args[identityIndex + 1] || '' : '',
+      runId: runIdIndex >= 0 ? args[runIdIndex + 1] || '' : '',
+      confirm: confirmIndex >= 0 ? args[confirmIndex + 1] || '' : '',
+      allowWrites: getRegisteredEnvText('KYBERION_FIRST_WIN_LIVE'),
     };
-    const report = runFirstWinLifecycleLive(options);
-    console.log(JSON.stringify(report, null, 2));
-    if (report.status !== 'passed') process.exitCode = 1;
-    return;
+    return runFirstWinLifecycleLive(options);
   }
-  if (!process.argv.includes('--dry-run')) {
-    console.error('first_win_lifecycle_smoke requires --dry-run or --live');
-    process.exitCode = 2;
-    return;
+  if (!args.includes('--dry-run')) {
+    throw new ScriptExitError(2, 'first_win_lifecycle_smoke requires --dry-run or --live');
   }
-  const report = runFirstWinLifecycleDryRun();
-  console.log(JSON.stringify(report, null, 2));
-  if (report.status !== 'passed') process.exitCode = 1;
+  return runFirstWinLifecycleDryRun();
 }
 
-if (process.argv[1]?.endsWith('first_win_lifecycle_smoke.js')) main();
+export const runFirstWinLifecycleSmoke = defineScript({
+  name: 'check:first-win-smoke',
+  flags: ['json'],
+  run: ({ argv, print }) => {
+    const report = main(argv);
+    print(report);
+    if (report.status !== 'passed') throw new ScriptExitError(1, '', true);
+    return report;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'first_win_lifecycle_smoke.ts') ||
+  isDirectScript(import.meta.url, 'first_win_lifecycle_smoke.js')
+)
+  void runFirstWinLifecycleSmoke();

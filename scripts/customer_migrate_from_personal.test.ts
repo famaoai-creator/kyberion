@@ -8,7 +8,11 @@ const mocks = vi.hoisted(() => ({
     rootDir: vi.fn(() => '/tmp/kyberion'),
     knowledge: vi.fn((p = '') => `/tmp/kyberion/knowledge/${String(p).replace(/^\/+/, '')}`),
   },
-  createCustomer: vi.fn((slug: string) => ({ slug, root: `/tmp/kyberion/customer/${slug}`, template: '/tmp/template' })),
+  createCustomer: vi.fn((slug: string) => ({
+    slug,
+    root: `/tmp/kyberion/customer/${slug}`,
+    template: '/tmp/template',
+  })),
   safeCopyFileSync: vi.fn(),
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
@@ -16,7 +20,11 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeReaddir: vi.fn(),
   safeWriteFile: vi.fn(),
-  classifyError: vi.fn((err: any) => ({ category: 'unknown', message: String(err?.message || err) })),
+  loadJson: vi.fn((target: string) => JSON.parse(String(mocks.safeReadFile(target) || ''))),
+  classifyError: vi.fn((err: any) => ({
+    category: 'unknown',
+    message: String(err?.message || err),
+  })),
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
@@ -31,6 +39,13 @@ vi.mock('@agent/core', () => ({
   safeReadFile: mocks.safeReadFile,
   safeReaddir: mocks.safeReaddir,
   safeWriteFile: mocks.safeWriteFile,
+}));
+
+// customer.json is read through the foundation JSON facade, which dispatches
+// through its own registered IO bridge to the real secure-io — so it has to be
+// stubbed here, or the tmpdir fixture trips the project-root read policy.
+vi.mock('@agent/core/foundation', () => ({
+  readJson: mocks.loadJson,
 }));
 
 vi.mock('./customer_create.js', () => ({
@@ -60,12 +75,21 @@ describe('customer_migrate_from_personal', () => {
     fs.writeFileSync(path.join(personalRoot, 'my-vision.md'), '# Personal vision');
     fs.writeFileSync(path.join(personalRoot, 'connections', 'slack.json'), '{"id":"slack"}');
     fs.writeFileSync(path.join(personalRoot, 'tenants', 'default.json'), '{"tenant":"default"}');
-    fs.writeFileSync(path.join(personalRoot, 'voice', 'profile-registry.json'), '{"voice":"registry"}');
+    fs.writeFileSync(
+      path.join(personalRoot, 'voice', 'profile-registry.json'),
+      '{"voice":"registry"}'
+    );
     fs.writeFileSync(path.join(customerRoot, 'customer.json'), '{"slug":"acme","display_name":""}');
 
     mocks.pathResolver.rootDir.mockReturnValue(tmpDir);
-    mocks.pathResolver.knowledge.mockImplementation((p = '') => path.join(tmpDir, 'knowledge', String(p).replace(/^\/+/, '')));
-    mocks.createCustomer.mockReturnValue({ slug: 'acme', root: customerRoot, template: '/tmp/template' });
+    mocks.pathResolver.knowledge.mockImplementation((p = '') =>
+      path.join(tmpDir, 'knowledge', String(p).replace(/^\/+/, ''))
+    );
+    mocks.createCustomer.mockReturnValue({
+      slug: 'acme',
+      root: customerRoot,
+      template: '/tmp/template',
+    });
     mocks.safeExistsSync.mockImplementation((target: string) => fs.existsSync(target));
     mocks.safeLstat.mockImplementation((target: string) => fs.lstatSync(target));
     mocks.safeReaddir.mockImplementation((target: string) => fs.readdirSync(target));
@@ -83,11 +107,21 @@ describe('customer_migrate_from_personal', () => {
     const migrated = mod.migratePersonalCustomer('acme');
 
     expect(migrated).toBe(customerRoot);
-    expect(fs.readFileSync(path.join(customerRoot, 'identity.json'), 'utf8')).toBe('{"name":"Personal"}');
+    expect(fs.readFileSync(path.join(customerRoot, 'identity.json'), 'utf8')).toBe(
+      '{"name":"Personal"}'
+    );
     expect(fs.readFileSync(path.join(customerRoot, 'vision.md'), 'utf8')).toBe('# Personal vision');
-    expect(fs.readFileSync(path.join(customerRoot, 'connections', 'slack.json'), 'utf8')).toBe('{"id":"slack"}');
-    expect(fs.readFileSync(path.join(customerRoot, 'tenants', 'default.json'), 'utf8')).toBe('{"tenant":"default"}');
-    expect(fs.readFileSync(path.join(customerRoot, 'voice', 'profile-registry.json'), 'utf8')).toBe('{"voice":"registry"}');
-    expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'customer.json'), 'utf8')).slug).toBe('acme');
+    expect(fs.readFileSync(path.join(customerRoot, 'connections', 'slack.json'), 'utf8')).toBe(
+      '{"id":"slack"}'
+    );
+    expect(fs.readFileSync(path.join(customerRoot, 'tenants', 'default.json'), 'utf8')).toBe(
+      '{"tenant":"default"}'
+    );
+    expect(fs.readFileSync(path.join(customerRoot, 'voice', 'profile-registry.json'), 'utf8')).toBe(
+      '{"voice":"registry"}'
+    );
+    expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'customer.json'), 'utf8')).slug).toBe(
+      'acme'
+    );
   });
 });

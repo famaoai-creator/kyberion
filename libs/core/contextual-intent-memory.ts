@@ -1,7 +1,9 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type ScheduleSourceKind =
   'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';
@@ -23,8 +25,9 @@ export interface ContextualIntentMemory {
 }
 
 function memoryPath(scope?: ScopeContext): string {
-  const base = process.env.KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH?.trim()
-    ? pathResolver.rootResolve(process.env.KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH.trim())
+  const configuredPath = getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH')?.trim();
+  const base = configuredPath
+    ? pathResolver.rootResolve(configuredPath)
     : pathResolver.knowledge('personal/contextual-intent-memory.json');
   if (!scope?.tenant_slug) return base;
   return (
@@ -43,9 +46,7 @@ export function loadContextualIntentMemory(scope?: ScopeContext): ContextualInte
   const filePath = memoryPath(scope);
   if (!safeExistsSync(filePath)) return defaultMemory();
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as ContextualIntentMemory;
+    const parsed = readJson<ContextualIntentMemory>(filePath);
     return parsed && typeof parsed === 'object' ? parsed : defaultMemory();
   } catch {
     return defaultMemory();

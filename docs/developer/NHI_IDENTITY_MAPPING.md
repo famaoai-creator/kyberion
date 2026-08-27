@@ -1,6 +1,6 @@
 # NHI identity: internal model ⇄ external standards
 
-> **Purpose**: show that Kyberion's internal Non-Human Identity (NHI) model is _projectable_ onto the 2026 industry vocabulary — not to implement any of these protocols. Interop is deliberately deferred until a requirement asks for it (NI-05 §3, plan [ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26](./improvement-plans-2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)). This page is the seam: if the internal shapes below stop mapping cleanly, that is a design regression worth catching early.
+> **Purpose**: show that Kyberion's internal Non-Human Identity (NHI) model is _projectable_ onto the 2026 industry vocabulary — not to implement any of these protocols. Interop is deliberately deferred until a requirement asks for it (NI-05 §3, plan [ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26](./improvement-plans-archive/2026-07/ARTIFACT_AGENT_LIFECYCLE_NHI_PLAN_2026-07-26.ja.md)). This page is the seam: if the internal shapes below stop mapping cleanly, that is a design regression worth catching early.
 
 ## The four mappings
 

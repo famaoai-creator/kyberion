@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * MissionEvidenceDoc — typed JSON document under a mission's
  * `evidence/` directory.
@@ -16,13 +17,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-  safeAppendFileSync,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile, loadJson } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 
 export interface MissionEvidenceDocOptions<T> {
@@ -50,9 +45,7 @@ export class MissionEvidenceDoc<T> {
   get filePath(): string {
     const evidenceDir =
       pathResolver.missionEvidenceDir(this.options.mission_id) ??
-      pathResolver.rootResolve(
-        `active/missions/confidential/${this.options.mission_id}/evidence`,
-      );
+      pathResolver.rootResolve(`active/missions/confidential/${this.options.mission_id}/evidence`);
     return path.join(evidenceDir, this.options.filename);
   }
 
@@ -63,16 +56,16 @@ export class MissionEvidenceDoc<T> {
   read(): T | null {
     if (!this.exists()) return null;
     try {
-      const data = JSON.parse(safeReadFile(this.filePath, { encoding: 'utf8' }) as string) as unknown;
+      const data = loadJson<unknown>(this.filePath);
       if (this.options.validate && !this.options.validate(data)) {
-        logger.warn(
-          `[mission-evidence-doc] ${this.filePath} failed validator; ignoring`,
-        );
+        logger.warn(`[mission-evidence-doc] ${this.filePath} failed validator; ignoring`);
         return null;
       }
       return data as T;
     } catch (err: any) {
-      logger.warn(`[mission-evidence-doc] failed to parse ${this.filePath}: ${err?.message ?? err}`);
+      logger.warn(
+        `[mission-evidence-doc] failed to parse ${this.filePath}: ${err?.message ?? err}`
+      );
       return null;
     }
   }
@@ -92,7 +85,7 @@ export class MissionEvidenceDoc<T> {
       metadata?: Record<string, unknown>;
       missionAudit?: boolean;
       tier?: 'personal' | 'confidential' | 'public';
-    },
+    }
   ): { audit_event_id: string } {
     safeMkdir(path.dirname(this.filePath), { recursive: true });
     safeWriteFile(this.filePath, JSON.stringify(record, null, 2));
@@ -114,10 +107,7 @@ export class MissionEvidenceDoc<T> {
           const tier = audit.tier ?? 'confidential';
           const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
           const date = new Date().toISOString().slice(0, 10);
-          safeAppendFileSync(
-            path.join(auditDir, `audit-${date}.jsonl`),
-            JSON.stringify(entry) + '\n',
-          );
+          appendJsonLine(path.join(auditDir, `audit-${date}.jsonl`), entry);
         } catch (err: any) {
           logger.warn(`[mission-evidence-doc] mission audit write failed: ${err?.message ?? err}`);
         }

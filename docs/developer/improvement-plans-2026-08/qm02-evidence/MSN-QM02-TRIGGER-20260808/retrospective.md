@@ -1,3 +1,10 @@
+---
+title: retrospective.md
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # QM-02 retrospective
 
 ## 成功

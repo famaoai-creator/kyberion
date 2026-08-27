@@ -13,6 +13,7 @@ import {
   validateFacetPurity,
 } from '@agent/core';
 import type { FacetKind, FacetRequest } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface FacetEvalFixture {
   kind: FacetKind;
@@ -75,7 +76,7 @@ export function evaluateFacetFixtures(
     });
 }
 
-export function main(argv = process.argv.slice(2)): number {
+export function main(argv: string[] = []): number {
   const results = evaluateFacetFixtures();
   const report = {
     schema_version: 'facet-eval.v1',
@@ -94,6 +95,15 @@ export function main(argv = process.argv.slice(2)): number {
   return report.passed ? 0 : 1;
 }
 
-if (process.argv[1] && /eval_facets\.(ts|js)$/.test(process.argv[1])) {
-  process.exitCode = main();
-}
+if (
+  isDirectScript(import.meta.url, 'eval_facets.ts') ||
+  isDirectScript(import.meta.url, 'eval_facets.js')
+)
+  void defineScript({
+    name: 'eval:facets',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`facet evaluation failed with exit code ${status}`);
+    },
+  })();

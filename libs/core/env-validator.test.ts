@@ -6,6 +6,7 @@ import {
   validateEnvAgainstRegistry,
   type EnvRegistryValidationEntry,
 } from './env-validator.js';
+import { getRegisteredEnvBool } from './foundation/env.js';
 
 const ENTRIES: EnvRegistryValidationEntry[] = [
   { name: 'KYBERION_FLAG', type: 'boolean', required: false },
@@ -64,6 +65,26 @@ describe('validateEnvAgainstRegistry', () => {
     expect(report.unknown).toEqual(['KYBERION_MYSTERY']);
   });
 
+  it('promotes unknown variables and type mismatches to errors in strict mode', () => {
+    const report = validateEnvAgainstRegistry(
+      ENTRIES,
+      {
+        KYBERION_MYSTERY: '1',
+        KYBERION_FLAG: 'not-a-boolean',
+        KYBERION_REQUIRED_TOKEN: 'x',
+      },
+      { strict: true }
+    );
+    expect(report.errors).toEqual([
+      { name: 'KYBERION_MYSTERY', issue: 'variable is not registered' },
+      {
+        name: 'KYBERION_FLAG',
+        issue: 'expected a boolean value (1/0/true/false/yes/no/on/off)',
+      },
+    ]);
+    expect(report.warnings).toHaveLength(0);
+  });
+
   it('reports registry entries without operator documentation separately from runtime errors', () => {
     const report = validateEnvAgainstRegistry(
       [
@@ -79,6 +100,23 @@ describe('validateEnvAgainstRegistry', () => {
 });
 
 describe('registry-backed validation', () => {
+  it.each([
+    ['1', true],
+    ['true', true],
+    ['yes', true],
+    ['on', true],
+    ['0', false],
+    ['false', false],
+    ['no', false],
+    ['off', false],
+  ])('normalizes boolean env %s to %s', (raw, expected) => {
+    expect(
+      getRegisteredEnvBool('KYBERION_ALLOW_LOCAL_NETWORK', {
+        env: { KYBERION_ALLOW_LOCAL_NETWORK: raw },
+      })
+    ).toBe(expected);
+  });
+
   it('loads the committed registry and validates the current env without errors', () => {
     const entries = loadEnvRegistryEntries();
     expect(entries.length).toBeGreaterThan(100);

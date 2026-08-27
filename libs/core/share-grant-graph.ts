@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
@@ -5,7 +6,6 @@ import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  safeAppendFileSync,
   safeChmodSync,
   safeCreateExclusiveFileSync,
   safeExistsSync,
@@ -891,7 +891,7 @@ export class ShareGrantGraph {
         key: this.#resolveHmacKey(),
       });
       const envelope: PersistedEnvelope = { ...unsignedEnvelope, hash };
-      safeAppendFileSync(this.#storePath, `${JSON.stringify(envelope)}\n`);
+      appendJsonLine(this.#storePath, envelope);
       safeFsyncFile(this.#storePath);
       this.#lastLedgerHash = hash;
     });

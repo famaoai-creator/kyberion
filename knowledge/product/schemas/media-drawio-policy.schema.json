@@ -2,6 +2,7 @@
   "type": "object",
   "required": ["version", "boundary_palettes", "node_sizes"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string"
     },

@@ -1,21 +1,12 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { type StandardIntentDefinition, type IntentResolutionPacket } from './intent-resolution.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-level-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-level-policy.schema.json');
 
 export type ReasoningLevel =
-  | 'COGNITIVE_EXPLORATORY'
-  | 'COGNITIVE_STANDARD'
-  | 'REACTION_FAST'
-  | 'REFLEX_DETERMINISTIC';
+  'COGNITIVE_EXPLORATORY' | 'COGNITIVE_STANDARD' | 'REACTION_FAST' | 'REFLEX_DETERMINISTIC';
 
 export type TaskModelPhaseKind = 'plan' | 'implement' | 'review' | 'mechanical';
 export type TaskModelTier = 'small' | 'standard' | 'large';
@@ -87,49 +78,25 @@ export interface ReasoningLevelPolicy {
   };
 }
 
-let validateFn: ValidateFunction | null = null;
-let cachedPolicy: ReasoningLevelPolicy | null = null;
-let cachedPolicyPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
+const policyCatalog = defineCatalog<ReasoningLevelPolicy>({
+  id: 'reasoning-level-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+});
 
 export function validateReasoningLevelPolicy(
   value: unknown,
   label = POLICY_PATH
 ): ReasoningLevelPolicy {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid reasoning level policy at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
+  try {
+    return policyCatalog.validate(value, label);
+  } catch (error) {
+    throw new Error(`Invalid reasoning level policy at ${label}: ${String(error)}`);
   }
-  return value as ReasoningLevelPolicy;
-}
-
-function loadPolicyFile(): ReasoningLevelPolicy | null {
-  if (!safeExistsSync(POLICY_PATH)) return null;
-  const parsed = JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string);
-  return validateReasoningLevelPolicy(parsed, POLICY_PATH);
 }
 
 export function loadReasoningLevelPolicy(): ReasoningLevelPolicy {
-  if (cachedPolicy && cachedPolicyPath === POLICY_PATH) return cachedPolicy;
-  cachedPolicy = loadPolicyFile();
-  if (!cachedPolicy) {
-    throw new Error(`Reasoning level policy missing at ${POLICY_PATH}`);
-  }
-  cachedPolicyPath = POLICY_PATH;
-  return cachedPolicy;
+  return policyCatalog.load();
 }
 
 function getSelectedIntent(input: {
@@ -256,6 +223,5 @@ export function resolveReasoningLevelDecision(
 }
 
 export function resetReasoningLevelPolicyCache(): void {
-  cachedPolicy = null;
-  cachedPolicyPath = null;
+  policyCatalog.reset();
 }

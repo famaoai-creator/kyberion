@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -153,12 +154,13 @@ function resolveTtsCandidate(engine: VoiceEngineRecord): VoiceTtsSelectionCandid
 function resolveSttAvailability(): VoiceSttAvailability {
   const mlxWhisper = probeToolRuntime('mlx_whisper', 'installed');
   const fluidAudio = Boolean(
-    process.platform === 'darwin' && process.env.KYBERION_FLUID_AUDIO_STT_COMMAND?.trim()
+    process.platform === 'darwin' &&
+    getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
   );
   const fasterWhisper = Boolean(
     process.platform === 'win32' &&
-    (process.env.KYBERION_WINDOWS_STT_BACKEND === 'faster_whisper' ||
-      process.env.KYBERION_STT_MODEL_DIR?.trim())
+    (getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper' ||
+      getRegisteredEnvText('KYBERION_STT_MODEL_DIR')?.trim())
   );
   return {
     server: Boolean(

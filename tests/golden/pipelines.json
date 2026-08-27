@@ -2,12 +2,18 @@
   {
     "id": "baseline-check",
     "pipeline": "pipelines/baseline-check.json",
-    "note": "Session-start health check. The shape of its output is stable: any change is either intentional or a regression."
+    "note": "Session-start health check. The shape of its output is stable: any change is either intentional or a regression.",
+    "ignore_paths": ["context.baseline_check", "context.timestamp"]
   },
   {
     "id": "vital-check",
     "pipeline": "pipelines/vital-check.json",
     "note": "System vitals probe. Verifies that the dependency resolver, doctor script, and layer checks produce a consistent status shape.",
-    "ignore_paths": ["context.active_missions", "context.p_state", "context.runtime_state", "context.timestamp"]
+    "ignore_paths": [
+      "context.active_missions",
+      "context.p_state",
+      "context.runtime_state",
+      "context.timestamp"
+    ]
   }
 ]

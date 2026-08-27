@@ -1,5 +1,4 @@
 import {
-  safeReadFile,
   safeWriteFile,
   safeCopyFileSync,
   safeExistsSync,
@@ -17,6 +16,7 @@ import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
 } from '@agent/core';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { GenerationJob } from '@agent/core';
@@ -61,7 +61,7 @@ export type GenerationBackend = {
 
 // External, operator-configured ComfyUI output dir; KYBERION_COMFY_OUTPUT_DIR overrides this default.
 const DEFAULT_COMFY_OUTPUT_DIR =
-  process.env.KYBERION_COMFY_OUTPUT_DIR || pathResolver.sharedTmp('comfy/output');
+  getRegisteredEnvText('KYBERION_COMFY_OUTPUT_DIR') || pathResolver.sharedTmp('comfy/output');
 const GENERATION_JOB_DIR = 'active/shared/runtime/media-generation/jobs';
 const MEDIA_GENERATION_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/media-generation-actuator/manifest.json'
@@ -108,10 +108,6 @@ function resolveGenerationBackend(
     kind: 'service_preset',
     provider: 'comfyui',
   };
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -189,7 +185,7 @@ function readJob(jobId: string): GenerationJob {
   const jobPath = generationJobPath(jobId);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(jobPath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(jobPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`generation job JSON parse failed: ${message}`);
@@ -386,52 +382,6 @@ async function waitForPromptCompletion(
     await sleep(pollIntervalMs);
   }
   throw new Error(`Timed out waiting for Comfy prompt ${promptId}`);
-}
-
-function selectPrimaryArtifact(
-  action: string,
-  params: Record<string, unknown>,
-  artifacts: GeneratedArtifact[]
-): GeneratedArtifact | undefined {
-  const adfKey =
-    action === 'generate_image'
-      ? 'image_adf'
-      : action === 'generate_video'
-        ? 'video_adf'
-        : action === 'generate_music'
-          ? 'music_adf'
-          : '';
-  const adf = adfKey && isPlainObject(params[adfKey]) ? params[adfKey] : undefined;
-  const output = adf && isPlainObject(adf.output) ? adf.output : undefined;
-  const requestedFormat =
-    typeof params.format === 'string'
-      ? params.format
-      : output && typeof output.format === 'string'
-        ? output.format
-        : undefined;
-  const allowedFormats: Record<string, readonly string[]> = {
-    generate_image: ['png', 'jpg', 'jpeg', 'webp'],
-    generate_video: ['mp4', 'mov', 'webm', 'gif'],
-    generate_music: ['mp3', 'wav', 'flac'],
-  };
-  const modalityFormats = allowedFormats[action];
-  const available = artifacts.filter(
-    (artifact) =>
-      safeExistsSync(artifact.path) &&
-      (!modalityFormats ||
-        modalityFormats.some((format) => artifact.filename.toLowerCase().endsWith(`.${format}`)))
-  );
-  const byFormat = requestedFormat
-    ? available.filter((artifact) =>
-        artifact.filename.toLowerCase().endsWith(`.${requestedFormat}`)
-      )
-    : available;
-  const candidates = byFormat.length > 0 ? byFormat : available;
-  return (
-    candidates.find((artifact) => artifact.type === 'output') ||
-    candidates.find((artifact) => artifact.kind !== 'preview' && artifact.kind !== 'temp') ||
-    candidates[0]
-  );
 }
 
 async function collectGenerationResult(

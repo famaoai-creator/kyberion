@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/legacy-media-ops.schema.json",
   "version": "1.0.0",
   "ops": [
     "document_report_design_from_brief",

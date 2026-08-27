@@ -8,7 +8,7 @@ import {
   type SurfaceRuntimeStateRecord,
   type DaemonHeartbeatStatus,
 } from '@agent/core';
-import { statusColor, theme } from '../theme.js';
+import { theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { DetailLine, PanelViewModel } from './types.js';
 

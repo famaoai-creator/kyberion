@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
   id: string;
@@ -45,7 +46,7 @@ function loadScenario(scenarioId: string): TaskScenario {
   if (!safeExistsSync(filePath)) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
   }
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as TaskScenario;
+  return readJson<TaskScenario>(filePath);
 }
 
 function buildSmokeProfile(
@@ -72,7 +73,7 @@ function profilePathForScenario(scenarioId: string): string {
   return path.join(SMOKE_PROFILE_DIR, `${scenarioId}.json`);
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
+export async function main(argv: string[] = []): Promise<void> {
   const scenarioId = argv.find((arg) => !arg.startsWith('--'));
   if (!scenarioId) {
     throw new Error('Usage: pnpm task:smoke <scenario-id>');
@@ -99,11 +100,14 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   console.log(`TaskScenario smoke passed: ${scenario.id}`);
 }
 
-const isDirect =
-  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
+const script = defineScript({
+  name: 'task:smoke',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+if (
+  isDirectScript(import.meta.url, 'task_smoke.ts') ||
+  isDirectScript(import.meta.url, 'task_smoke.js')
+) {
+  void script();
 }

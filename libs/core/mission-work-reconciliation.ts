@@ -2,7 +2,7 @@
  * Adopt work completed outside dispatch-workitems without weakening the mission exit gate.
  */
 
-import { Ajv, type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as nodePath from 'node:path';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
@@ -13,7 +13,9 @@ import {
   type ArtifactReviewReceipt,
 } from './artifact-review.js';
 import { auditChain } from './audit-chain.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson as readFoundationJson } from './foundation/json.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
@@ -146,9 +148,7 @@ let validateManifest: ValidateFunction | null = null;
 
 function getManifestValidator(): ValidateFunction {
   if (validateManifest) return validateManifest;
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  validateManifest = compileSchemaFromPath(
-    ajv,
+  validateManifest = compileSchema(
     pathResolver.knowledge('product/schemas/mission-work-reconciliation.schema.json')
   );
   return validateManifest;
@@ -178,7 +178,7 @@ function resolveInsideRoot(rawPath: string, label: string): string {
 function readJson<T>(filePath: string, label: string): T {
   if (!safeExistsSync(filePath)) throw new Error(`${label} not found: ${filePath}`);
   try {
-    return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+    return readFoundationJson<T>(filePath);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`${label} is not valid JSON: ${message}`);
@@ -649,7 +649,8 @@ export function generateMissionWorkReconciliationScaffold(input: {
     mission_id: missionId,
     generated_at: new Date().toISOString(),
     source: { repository: '.', branch, commit },
-    adopted_by: process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller',
+    adopted_by:
+      getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller',
     reason: input.reason || `Adopt verified existing work for ${missionId}.`,
     tasks: tasks.map((task) => ({
       task_id: String(task.task_id || ''),
@@ -697,7 +698,8 @@ export async function reconcileMissionExistingWork(input: {
       `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`
     );
   }
-  const actorId = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
+  const actorId =
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
   if (manifest.adopted_by !== actorId) {
     throw new Error(
       `Manifest adopted_by ${manifest.adopted_by} does not match execution actor ${actorId}`

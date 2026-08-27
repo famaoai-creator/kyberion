@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core';
 
 const mocks = vi.hoisted(() => ({
+  loadJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeExec: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('@agent/core', async () => {
   const actual = (await vi.importActual('@agent/core')) as any;
   return {
     ...actual,
+    loadJson: mocks.loadJson,
     safeReadFile: mocks.safeReadFile,
     safeWriteFile: mocks.safeWriteFile,
     safeExec: mocks.safeExec,

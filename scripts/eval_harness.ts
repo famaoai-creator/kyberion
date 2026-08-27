@@ -8,15 +8,10 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import {
-  pathResolver,
-  resolveFacets,
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-} from '@agent/core';
+import { pathResolver, resolveFacets, safeExistsSync, safeMkdir } from '@agent/core';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import type { FacetRequest, FacetScope, ResolvedFacets } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface EvalHarnessConfiguration {
   name: string;
@@ -150,11 +145,7 @@ function defaultExecutor(prompt: string, context: EvalHarnessContext): string {
 function appendRunRecord(runPath: string, result: EvalHarnessTableResult): void {
   const directory = path.dirname(runPath);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  safeAppendFileSync(
-    runPath,
-    `${JSON.stringify({ ...result, recorded_at: new Date().toISOString() })}\n`,
-    'utf8'
-  );
+  appendJsonLine(runPath, { ...result, recorded_at: new Date().toISOString() });
 }
 
 /** Run every named configuration against the same ordered multi-step brief. */
@@ -224,7 +215,7 @@ export function loadEvalHarnessTable(
   }
   let parsed: unknown;
   try {
-    parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' })));
+    parsed = readJson<unknown>(filePath);
   } catch {
     throw new Error(`[EVAL_HARNESS_CONFIG] invalid table JSON: ${filePath}`);
   }
@@ -232,7 +223,7 @@ export function loadEvalHarnessTable(
   return parsed as EvalHarnessConfiguration[];
 }
 
-export async function main(argv = process.argv.slice(2)): Promise<number> {
+export async function main(argv: string[] = []): Promise<number> {
   const table = loadEvalHarnessTable();
   const briefIndex = argv.indexOf('--brief');
   const brief =
@@ -250,8 +241,15 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   return 0;
 }
 
-if (process.argv[1] && /eval_harness\.(ts|js)$/u.test(process.argv[1])) {
-  void main().then((code) => {
-    process.exitCode = code;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'eval_harness.ts') ||
+  isDirectScript(import.meta.url, 'eval_harness.js')
+)
+  void defineScript({
+    name: 'eval:harness',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`eval harness failed with exit code ${status}`);
+    },
+  })();

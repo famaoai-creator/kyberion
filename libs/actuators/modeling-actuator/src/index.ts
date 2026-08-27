@@ -1,20 +1,18 @@
 import {
   logger,
-  safeReadFile,
-  pathResolver,
   ensureDefaultOpPreflight,
   runOpPreflight,
+  defineCatalogBackedActuator,
 } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import {
-  buildRetryOptions,
   executePipeline,
   performReconcile,
   type ModelingAction,
 } from './modeling-pipeline-helpers.js';
 import { runActuatorCli } from '@agent/core';
+import { describeOps } from './op-catalog.js';
 
 /**
  * Main Entry Point
@@ -54,8 +52,13 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
-export { describeOps } from './op-catalog.js';
+export const actuator = defineCatalogBackedActuator({
+  id: 'modeling-actuator',
+  describeOps,
+  handleAction,
+});
+export { describeOps };

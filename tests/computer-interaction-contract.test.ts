@@ -12,7 +12,7 @@ function loadJson(filePath: string) {
 describe('Computer interaction contract schema', () => {
   it('accepts a governed snapshot request', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schema = loadJson('schemas/computer-interaction.schema.json');
+    const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
@@ -23,7 +23,7 @@ describe('Computer interaction contract schema', () => {
         surface_id: 'computer-surface',
         runtime_id: 'browser-runtime-1',
         tab_id: 'tab-1',
-        domain: 'app.example.com'
+        domain: 'app.example.com',
       },
       observation: {
         mode: 'mixed',
@@ -33,18 +33,18 @@ describe('Computer interaction contract schema', () => {
         viewport: {
           width: 1024,
           height: 768,
-          scale: 1
-        }
+          scale: 1,
+        },
       },
       action: {
         type: 'snapshot',
-        timeout_ms: 1500
+        timeout_ms: 1500,
       },
       risk: {
         level: 'low',
         requires_approval: false,
-        approval_scope: 'none'
-      }
+        approval_scope: 'none',
+      },
     };
 
     const valid = validate(payload);
@@ -53,7 +53,7 @@ describe('Computer interaction contract schema', () => {
 
   it('accepts a risky publish-style click proposal', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schema = loadJson('schemas/computer-interaction.schema.json');
+    const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
@@ -62,14 +62,14 @@ describe('Computer interaction contract schema', () => {
       session_id: 'browser-session-2',
       action: {
         type: 'click_ref',
-        ref: '@publishButton'
+        ref: '@publishButton',
       },
       risk: {
         level: 'high',
         reason: 'publishes content to an external service',
         requires_approval: true,
-        approval_scope: 'workflow'
-      }
+        approval_scope: 'workflow',
+      },
     };
 
     const valid = validate(payload);
@@ -78,7 +78,7 @@ describe('Computer interaction contract schema', () => {
 
   it('accepts a voice input toggle proposal', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schema = loadJson('schemas/computer-interaction.schema.json');
+    const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
@@ -87,14 +87,14 @@ describe('Computer interaction contract schema', () => {
       session_id: 'system-session-voice',
       action: {
         type: 'voice_input_toggle',
-        dictation_keycode: 176
+        dictation_keycode: 176,
       },
       risk: {
         level: 'medium',
         reason: 'toggles a system-wide dictation shortcut',
         requires_approval: false,
-        approval_scope: 'none'
-      }
+        approval_scope: 'none',
+      },
     };
 
     const valid = validate(payload);
@@ -103,13 +103,13 @@ describe('Computer interaction contract schema', () => {
 
   it('rejects payloads without action', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schema = loadJson('schemas/computer-interaction.schema.json');
+    const schema = loadJson('knowledge/product/schemas/computer-interaction.schema.json');
     const validate = ajv.compile(schema);
 
     const payload = {
       version: '0.1',
       kind: 'computer_interaction',
-      session_id: 'browser-session-3'
+      session_id: 'browser-session-3',
     };
 
     const valid = validate(payload);

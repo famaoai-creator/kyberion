@@ -2,7 +2,7 @@
 title: PM / OM 実装レビュー受領記録 2026-08-08
 tags: [review, project, organization, acceptance, evidence]
 last_updated: 2026-08-08
-status: accepted-with-follow-ups
+status: partial
 ---
 
 # PM / OM 実装レビュー受領記録

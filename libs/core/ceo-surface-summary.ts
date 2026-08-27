@@ -14,6 +14,7 @@ import {
   type OperatorHomeSummary,
 } from './operator-home-summary.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
+import { t, type VocabularyKey } from './t.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -93,6 +94,24 @@ const MISSION_STATUS_JA: Record<string, string> = {
 };
 
 const ATTENTION_STATUSES = new Set(['paused', 'failed', 'validating']);
+const NEXT_ACTION_JA_BY_KEY: Partial<Record<VocabularyKey, VocabularyKey>> = {
+  'chronos:chronos_home_action_blocked': 'chronos:chronos_home_action_blocked',
+  'chronos:chronos_home_action_approvals': 'chronos:chronos_home_action_approvals',
+  'chronos:chronos_home_action_inbox': 'chronos:chronos_home_action_inbox',
+  'home.next_action': 'home.next_action',
+};
+
+function nextActionJapanese(action: OperatorHomeSummary['nextAction']): string | undefined {
+  const title = action?.title;
+  if (!title?.trim()) return undefined;
+  if (/[^\u0000-\u007f]/u.test(title)) return title;
+  const key = action.next_action_key ? NEXT_ACTION_JA_BY_KEY[action.next_action_key] : undefined;
+  // Keep newly introduced actions visible until their vocabulary key is
+  // registered; the clear-state message must never hide operator work.
+  if (!key) return title;
+  if (key === 'home.next_action') return t(key, { value: title }, 'ja');
+  return t(key, undefined, 'ja');
+}
 const EXCEPTION_NOTIFICATION_STATUSES = new Set(['attention', 'blocked', 'failed', 'error']);
 
 function notificationMatchesScope(
@@ -199,21 +218,20 @@ export function composeCeoSurfaceSummary(input: {
   const unreadOutcomes = home.counts.unreadInbox;
   const parts: string[] = [];
   if (home.counts.pendingApprovals > 0) {
-    parts.push(`ご承認待ちが${home.counts.pendingApprovals}件ございます`);
+    parts.push(t('home.briefing_approval', { count: home.counts.pendingApprovals }, 'ja'));
   }
   if (home.counts.activeMissions > 0) {
-    parts.push(`進行中のご依頼が${home.counts.activeMissions}件ございます`);
+    parts.push(t('home.briefing_missions', { count: home.counts.activeMissions }, 'ja'));
   }
   if (unreadOutcomes > 0) {
-    parts.push(`未確認の成果物が${unreadOutcomes}件届いております`);
+    parts.push(t('home.briefing_outcomes', { count: unreadOutcomes }, 'ja'));
   }
   if (exceptionFeed.length > 0) {
-    parts.push(`ご確認いただきたい例外が${exceptionFeed.length}件ございます`);
+    parts.push(t('home.briefing_exceptions', { count: exceptionFeed.length }, 'ja'));
   }
-  const sentence =
-    parts.length > 0
-      ? `本日は${parts.join('。')}。`
-      : '本日は特にご対応いただく案件はございません。';
+  const sentence = parts.length
+    ? t('home.briefing_summary', { details: parts.join('。') }, 'ja')
+    : t('home.briefing_clear', undefined, 'ja');
 
   return {
     generated_at: input.now || new Date().toISOString(),
@@ -225,7 +243,7 @@ export function composeCeoSurfaceSummary(input: {
         unread_outcomes: unreadOutcomes,
         exceptions: exceptionFeed.length,
       },
-      next_action_ja: home.nextAction?.title ? String(home.nextAction.title) : undefined,
+      next_action_ja: nextActionJapanese(home.nextAction),
     },
     intent_inbox: intentInbox,
     approval_queue: approvalQueue,

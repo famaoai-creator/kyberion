@@ -26,14 +26,15 @@ import {
   listSurfaceOutboxMessages,
   pathResolver,
   recordBackgroundReviewActivity,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
   withExecutionContext,
   type EventScope,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -50,13 +51,11 @@ function assertActiveMission(missionId: string): void {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) throw new Error(`Mission not found: ${missionId}`);
   const statePath = path.join(missionPath, 'mission-state.json');
-  const state = withExecutionContext(
-    'mission_controller',
-    () =>
-      JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }))) as {
-        mission_id?: string;
-        status?: string;
-      }
+  const state = withExecutionContext('mission_controller', () =>
+    readJson<{
+      mission_id?: string;
+      status?: string;
+    }>(statePath)
   );
   if (state.mission_id?.toUpperCase() !== missionId || state.status !== 'active') {
     throw new Error(`Mission must be active: ${missionId} (status=${state.status || 'unknown'})`);
@@ -86,8 +85,7 @@ async function waitForApproval(
   throw new Error(`Timed out waiting for background-review approval on ${channel}/${threadTs}`);
 }
 
-async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
+async function main(argv: string[]): Promise<void> {
   const missionId = flag(argv, '--mission-id').toUpperCase();
   const surface = flag(argv, '--surface') || 'slack';
   if (!missionId) usage();
@@ -213,9 +211,7 @@ async function main(): Promise<void> {
       approvalRef: approval.id,
     });
     backupRef = applied.backup_ref;
-    const patched = JSON.parse(String(safeReadFile(targetPath, { encoding: 'utf8' }))) as {
-      steps?: unknown[];
-    };
+    const patched = readJson<{ steps?: unknown[] }>(targetPath);
     if (patched.steps?.length !== 2) throw new Error('Mission E2E patch was not applied.');
 
     process.stdout.write(
@@ -274,7 +270,14 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-  process.exitCode = 1;
+const script = defineScript({
+  name: 'background-review:mission-e2e',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+if (
+  isDirectScript(import.meta.url, 'background_review_mission_e2e.ts') ||
+  isDirectScript(import.meta.url, 'background_review_mission_e2e.js')
+) {
+  void script();
+}

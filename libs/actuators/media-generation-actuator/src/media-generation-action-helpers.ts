@@ -27,12 +27,10 @@ type MediaActionInput = {
 const SUPPORTED_ACTIONS = new Set<string>(MEDIA_GENERATION_ACTIONS);
 import {
   resolveGenerationBackend,
-  buildRetryOptions,
   createGenerationJobId,
   type GeneratedArtifact,
   writeJob,
   readJob,
-  extractArtifacts,
   isTerminalStatus,
   maybeCopyArtifact,
   resolveImageArtifactFormat,
@@ -44,7 +42,6 @@ import {
   nowIso,
   isPlainObject,
   loadRecoveryPolicy,
-  resolveArtifactPath,
 } from './media-generation-helpers.js';
 import { getGenerationHistoryAdapterForAction } from './generation-artifact-adapters.js';
 import { createGenerationProviderHistoryClient } from './generation-provider-clients.js';

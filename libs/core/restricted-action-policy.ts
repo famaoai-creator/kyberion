@@ -15,8 +15,9 @@
  */
 
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 
 export interface RestrictedActionRule {
   id: string;
@@ -35,16 +36,12 @@ export interface RestrictedActionMatch {
 
 const DEFAULT_POLICY_PATH = 'knowledge/product/governance/restricted-action-kinds-policy.json';
 
-export function loadRestrictedActionRules(opts?: {
-  path?: string;
-}): RestrictedActionRule[] {
+export function loadRestrictedActionRules(opts?: { path?: string }): RestrictedActionRule[] {
   const rel =
-    opts?.path ??
-    process.env.KYBERION_RESTRICTED_ACTIONS_POLICY ??
-    DEFAULT_POLICY_PATH;
+    opts?.path ?? getRegisteredEnvText('KYBERION_RESTRICTED_ACTIONS_POLICY') ?? DEFAULT_POLICY_PATH;
   try {
     const abs = pathResolver.rootResolve(rel);
-    const data = JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string);
+    const data = loadJson<{ rules?: unknown }>(abs);
     return Array.isArray(data?.rules) ? (data.rules as RestrictedActionRule[]) : [];
   } catch (err: any) {
     logger.warn(`[restricted-actions] policy load failed: ${err?.message ?? err}`);
@@ -62,7 +59,7 @@ export function loadRestrictedActionRules(opts?: {
  */
 export function matchRestrictedAction(
   item: { title: string; summary?: string },
-  rules?: RestrictedActionRule[],
+  rules?: RestrictedActionRule[]
 ): RestrictedActionMatch | null {
   const allRules = rules ?? loadRestrictedActionRules();
   if (!allRules.length) return null;

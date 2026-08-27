@@ -4,6 +4,7 @@
   "additionalProperties": false,
   "required": ["version", "scenarios"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "scenarios": {
       "type": "array",

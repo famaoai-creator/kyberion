@@ -1,6 +1,6 @@
 import {
+  loadJson,
   logger,
-  safeReadFile,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
@@ -8,7 +8,6 @@ import {
   resolveProposalSectionKeywords,
   resolveProposalEvidenceIndex,
   resolveSignalToneRank,
-  resolveMediaSemanticType,
   resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
@@ -567,7 +566,7 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
   let protocol = input.payload.protocol;
   if (!protocol && input.payload.protocol_path) {
     const protocolPath = path.resolve(rootDir, input.payload.protocol_path);
-    protocol = JSON.parse(safeReadFile(protocolPath, { encoding: 'utf8' }) as string);
+    protocol = loadJson<unknown>(protocolPath);
   }
   if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {
     throw new Error(

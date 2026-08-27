@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
@@ -9,6 +8,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 const CUSTOMER_ENV_PATH = pathResolver.shared('runtime/customer.env');
@@ -33,7 +33,9 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   const slug = validateSlug(slugInput);
   const customerDir = path.join(pathResolver.rootDir(), 'customer', slug);
   if (!safeExistsSync(customerDir)) {
-    throw new Error(`Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm customer:create first.`);
+    throw new Error(
+      `Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm customer:create first.`
+    );
   }
 
   const missing = REQUIRED_FILES.filter((required) => {
@@ -41,7 +43,9 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
     return !safeExistsSync(requiredPath);
   });
   if (missing.length > 0) {
-    throw new Error(`Customer overlay is not ready: ${path.relative(pathResolver.rootDir(), customerDir)} is missing ${missing.join(', ')}. Run pnpm customer:list to inspect readiness.`);
+    throw new Error(
+      `Customer overlay is not ready: ${path.relative(pathResolver.rootDir(), customerDir)} is missing ${missing.join(', ')}. Run pnpm customer:list to inspect readiness.`
+    );
   }
 
   safeMkdir(path.dirname(CUSTOMER_ENV_PATH), { recursive: true });
@@ -49,11 +53,15 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   return { slug, envPath: CUSTOMER_ENV_PATH };
 }
 
-function main(): void {
-  const slug = process.argv[2];
+function main(argv: string[]): void {
+  const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    console.error('Usage: customer_switch <slug>');
-    process.exit(slug ? 0 : 2);
+    const usage = 'Usage: customer_switch <slug>';
+    if (slug) {
+      console.error(usage);
+      throw new ScriptExitError(0);
+    }
+    throw new ScriptExitError(2, usage);
   }
 
   try {
@@ -62,12 +70,18 @@ function main(): void {
     console.log(`Activation profile: ${path.relative(pathResolver.rootDir(), result.envPath)}`);
     console.log(`Source it with: source ${path.relative(pathResolver.rootDir(), result.envPath)}`);
   } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
+    throw new Error(formatClassification(classifyError(err)));
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'customer_switch.ts') ||
+  isDirectScript(import.meta.url, 'customer_switch.js')
+)
+  void defineScript({
+    name: 'customer:switch',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

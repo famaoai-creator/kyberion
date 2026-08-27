@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/mission-classification-policy.schema.json",
   "version": "1.0.0",
   "defaults": {
     "mission_class": "code_change",

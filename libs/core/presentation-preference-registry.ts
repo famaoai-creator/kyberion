@@ -1,11 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
-import {
-  type PresentationPreferenceProfile,
-} from './src/types/presentation-preference-profile.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
+import { type PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
 
 export interface PresentationPreferenceRegistry {
   version: string;
@@ -13,8 +11,6 @@ export interface PresentationPreferenceRegistry {
   profiles: PresentationPreferenceProfile[];
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/presentation-preference-registry.schema.json'
 );
@@ -49,10 +45,7 @@ const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
         {
           label: 'Proposal deck',
           deck_purposes: ['proposal'],
-          questions: [
-            '誰に見せる資料ですか?',
-            '最終的に何を決めたいですか?',
-          ],
+          questions: ['誰に見せる資料ですか?', '最終的に何を決めたいですか?'],
         },
       ],
       theme_sets: [
@@ -69,41 +62,25 @@ const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
 
 let registryCacheKey: string | null = null;
 let registryCache: PresentationPreferenceRegistry | null = null;
-let registryValidateFn: ValidateFunction | null = null;
-
-function ensureRegistryValidator(): ValidateFunction {
-  if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchemaFromPath(ajv, REGISTRY_SCHEMA_PATH);
-  return registryValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
 function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegistry {
-  const parsed = JSON.parse(
-    safeReadFile(registryPath, { encoding: 'utf8' }) as string
-  ) as PresentationPreferenceRegistry;
-  const validate = ensureRegistryValidator();
-  if (!validate(parsed)) {
-    throw new Error(
-      `Invalid presentation preference registry at ${registryPath}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return parsed;
+  return defineCatalog<PresentationPreferenceRegistry>({
+    id: 'presentation-preference-registry',
+    path: registryPath,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).load();
 }
 
 function getRegistryPath(): string {
-  return process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() || DEFAULT_REGISTRY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
+    DEFAULT_REGISTRY_PATH
+  );
 }
 
 function getPersonalOverlayPath(): string | null {
-  if (process.env.KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim()) return null;
+  if (getRegisteredEnvText('KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim()) return null;
   return (
-    process.env.KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH
   );
 }
@@ -131,7 +108,7 @@ export function getPresentationPreferenceRegistryPath(): string {
 
 export function getPersonalPresentationPreferenceRegistryPath(): string {
   return (
-    process.env.KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OVERLAY_PATH
   );
 }
@@ -168,7 +145,9 @@ export function getPresentationPreferenceRegistry(): PresentationPreferenceRegis
     return merged;
   } catch (error: any) {
     const target = overlayPath ? `${registryPath} or overlay ${overlayPath}` : registryPath;
-    logger.warn(`[PRESENTATION_PREFERENCE_REGISTRY] Failed to load registry at ${target}: ${error.message}`);
+    logger.warn(
+      `[PRESENTATION_PREFERENCE_REGISTRY] Failed to load registry at ${target}: ${error.message}`
+    );
     registryCacheKey = cacheKey;
     registryCache = FALLBACK_REGISTRY;
     return registryCache;

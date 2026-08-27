@@ -8,6 +8,7 @@ import {
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
+import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import {
   eventScopeMatches,
   normalizeEventScope,
@@ -158,7 +159,7 @@ export interface ApprovalSteeringAction {
   verb: 'verify' | 'finish';
   missionId: string;
   note?: string;
-  surface: string;
+  surface: SurfaceAsyncChannel;
   channel: string;
   threadTs: string;
   correlationId: string;
@@ -1014,7 +1015,9 @@ function scheduleSteeringApprovalExecution(
   const task = (async () => {
     let applyResult: ApprovalApplyResult;
     try {
+      // Existing approval/steering cycle is tracked by the module-boundary baseline.
       const { executeApprovedMissionSteeringApproval } =
+        // eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
         await import('./surface-mission-steering.js');
       const outcome = await executeApprovedMissionSteeringApproval(record);
       applyResult = {

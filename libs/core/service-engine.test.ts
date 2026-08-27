@@ -45,6 +45,26 @@ vi.mock('./async-utils.js', () => ({
   retry: mocks.retry,
 }));
 
+vi.mock('./service-endpoint-registry.js', async () => {
+  const actual = await vi.importActual<typeof import('./service-endpoint-registry.js')>(
+    './service-endpoint-registry.js'
+  );
+  return {
+    ...actual,
+    loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
+  };
+});
+
+vi.mock('./network.js', async () => {
+  const actual = await vi.importActual<typeof import('./network.js')>('./network.js');
+  return { ...actual, secureFetch: mocks.secureFetch };
+});
+
+vi.mock('./platform.js', async () => {
+  const actual = await vi.importActual<typeof import('./platform.js')>('./platform.js');
+  return { ...actual, checkBinary: mocks.checkBinary };
+});
+
 vi.mock('./customer-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));
@@ -65,9 +85,36 @@ vi.mock('./secure-io.js', async () => {
       const mocked = mocks.safeReadFile(filePath, options);
       return mocked === undefined ? actual.safeReadFile(filePath, options) : mocked;
     },
+    safeExec: mocks.safeExec,
     safeExistsSync: mocks.safeExistsSync,
     safeReaddir: mocks.safeReaddir,
     safeStat: mocks.safeStat,
+    loadJson: <T>(filePath: string): T => {
+      const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+      return JSON.parse(String(raw)) as T;
+    },
+  };
+});
+
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T => {
+      const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+      if (raw === undefined || raw === '') return actual.readJson<T>(filePath);
+      return JSON.parse(String(raw)) as T;
+    },
+    readJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
+        if (raw === undefined || raw === '') return actual.readJsonIfPresent<T>(filePath);
+        return JSON.parse(String(raw)) as T;
+      } catch {
+        return null;
+      }
+    },
   };
 });
 

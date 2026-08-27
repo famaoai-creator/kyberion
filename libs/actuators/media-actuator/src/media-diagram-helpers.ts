@@ -1,5 +1,5 @@
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
-import { safeExistsSync, safeReadFile } from '@agent/core';
+import { loadJson, safeExistsSync } from '@agent/core';
 import * as path from 'node:path';
 
 export function buildMermaidConfig(theme: any, backgroundColor?: string): Record<string, any> {
@@ -45,7 +45,7 @@ export function resolveGraphDefinition(
 
   if (params.input_path) {
     const inputPath = path.resolve(rootDir, resolve(params.input_path));
-    return JSON.parse(safeReadFile(inputPath, { encoding: 'utf8' }) as string);
+    return loadJson<unknown>(inputPath);
   }
 
   throw new Error('drawio_from_graph requires params.from, params.graph, or params.input_path');
@@ -63,7 +63,7 @@ export function resolveDrawioIconMap(rootDir: string, params: any, resolve: Func
     return { resources: {} };
   }
 
-  return JSON.parse(safeReadFile(mapPath, { encoding: 'utf8' }) as string);
+  return loadJson<unknown>(mapPath);
 }
 
 export function loadFallbackDrawioTheme(

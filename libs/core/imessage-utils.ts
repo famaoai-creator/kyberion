@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { homedir } from 'node:os';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface IMessageAttachment {
   id: string;
@@ -13,14 +14,7 @@ export interface IMessageAttachment {
 }
 
 export type IMessageTapbackKind =
-  | 'love'
-  | 'like'
-  | 'dislike'
-  | 'laugh'
-  | 'emphasize'
-  | 'question'
-  | 'remove'
-  | 'unknown';
+  'love' | 'like' | 'dislike' | 'laugh' | 'emphasize' | 'question' | 'remove' | 'unknown';
 
 export interface IMessageTapback {
   kind: IMessageTapbackKind;
@@ -168,7 +162,9 @@ export function inferIMessageGroup(chat: Record<string, unknown>): boolean {
   return Array.isArray(participants) && participants.length > 1;
 }
 
-export function resolveIMessageWakeWord(value = process.env.KYBERION_IMESSAGE_WAKE_WORD): string {
+export function resolveIMessageWakeWord(
+  value = getRegisteredEnvText('KYBERION_IMESSAGE_WAKE_WORD')
+): string {
   return String(value || DEFAULT_IMESSAGE_WAKE_WORD).trim() || DEFAULT_IMESSAGE_WAKE_WORD;
 }
 

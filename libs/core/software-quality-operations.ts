@@ -1,8 +1,10 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import type {
   DefectCandidate,
   SoftwareQualityContract,
@@ -35,11 +37,9 @@ export interface DeriveTestInventoryInput {
 }
 
 function loadViewpointCatalog(): TestViewpointCatalog {
-  return JSON.parse(
-    safeReadFile(pathResolver.knowledge('product/governance/software-test-viewpoints.json'), {
-      encoding: 'utf8',
-    }) as string
-  ) as TestViewpointCatalog;
+  return readJson<TestViewpointCatalog>(
+    pathResolver.knowledge('product/governance/software-test-viewpoints.json')
+  );
 }
 
 function deterministicInventory(input: DeriveTestInventoryInput): TestInventoryItem[] {
@@ -110,12 +110,7 @@ export async function deriveTestInventory(input: DeriveTestInventoryInput): Prom
 }
 
 export type TestDispatchStatus =
-  | 'passed'
-  | 'failed'
-  | 'error'
-  | 'awaiting_approval'
-  | 'manual_required'
-  | 'prohibited';
+  'passed' | 'failed' | 'error' | 'awaiting_approval' | 'manual_required' | 'prohibited';
 
 export interface TestDispatchResult {
   item_id: string;
@@ -326,7 +321,7 @@ export function recordDefectCandidate(
 
 function appendDefectEvent(event: DefectTransitionEvent, filePath: string): DefectTransitionEvent {
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeAppendFileSync(filePath, `${JSON.stringify(event)}\n`, { encoding: 'utf8' });
+  appendJsonLine(filePath, event);
   return event;
 }
 

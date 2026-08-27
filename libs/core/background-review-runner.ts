@@ -9,6 +9,8 @@
  */
 
 import { z } from 'zod';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { truncateNormalizedText } from './foundation/text.js';
 import {
   buildBackgroundReviewPrompt,
   evaluateBackgroundReviewText,
@@ -233,13 +235,6 @@ function boundedSnapshot(snapshot: string): string {
 const BACKGROUND_REVIEW_KNOWLEDGE_HINT_LIMIT = 2;
 const BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX = 200;
 
-function truncateKnowledgeExcerpt(value: string, max: number): string {
-  const text = String(value || '')
-    .trim()
-    .replace(/\s+/g, ' ');
-  return text.length <= max ? text : `${text.slice(0, Math.max(0, max - 3))}...`;
-}
-
 /**
  * KP-02: attach a compact "Relevant knowledge" section to the delegateTask
  * context.
@@ -309,7 +304,7 @@ async function buildBackgroundReviewKnowledgeContext(
       'Relevant knowledge:',
       ...entries.map(
         (entry) =>
-          `- ${entry.title} (${entry.path}): ${truncateKnowledgeExcerpt(entry.excerpt, BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX)}`
+          `- ${entry.title} (${entry.path}): ${truncateNormalizedText(entry.excerpt, BACKGROUND_REVIEW_KNOWLEDGE_EXCERPT_MAX)}`
       ),
     ];
     recordKnowledgeDelivery({
@@ -450,7 +445,7 @@ export async function runBackgroundReviewFork(
     const raw = await withReasoningPayloadScope(
       {
         tier: input.missionId ? 'confidential' : 'personal',
-        tenant_slug: process.env.KYBERION_CUSTOMER?.trim() || undefined,
+        tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
         purpose: 'background review snapshot',
       },
       async () => {

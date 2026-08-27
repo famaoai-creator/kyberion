@@ -24,6 +24,8 @@
  * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md §KP-06.
  */
 import * as path from 'node:path';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -124,19 +126,19 @@ type ArchiveHistoryEntry = {
 };
 
 function sloConfigPath(): string {
-  const override = process.env.KYBERION_CURATION_SLO_CONFIG_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_SLO_CONFIG_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/knowledge-curation-slo.json');
 }
 
 function taxonomyPath(): string {
-  const override = process.env.KYBERION_CURATION_TAXONOMY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_TAXONOMY_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
 }
 
 function reportPath(): string {
-  const override = process.env.KYBERION_CURATION_REPORT_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_REPORT_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.knowledge('product/governance/CURATION_REPORT.md');
 }
@@ -151,7 +153,7 @@ function archiveHistoryPath(tenantSlug?: string): string {
       )
     );
   }
-  const override = process.env.KYBERION_CURATION_ARCHIVE_HISTORY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_ARCHIVE_HISTORY_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('runtime/feedback-loop/curation-archive-history.json');
 }
@@ -172,7 +174,7 @@ function readArchiveHistory(tenantSlug?: string): ArchiveHistoryEntry[] {
   const filePath = archiveHistoryPath(tenantSlug);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as unknown;
+    const parsed = readJson<unknown>(filePath);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (entry): entry is ArchiveHistoryEntry =>
@@ -318,8 +320,7 @@ export function loadCurationSloConfig(): CurationSloConfig {
   const filePath = sloConfigPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_SLO_CONFIG };
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as Partial<CurationSloConfig>;
+    const parsed = readJson<Partial<CurationSloConfig>>(filePath);
     const freshnessByKind: Record<string, number> = {};
     if (parsed.freshness_days_by_kind && typeof parsed.freshness_days_by_kind === 'object') {
       for (const [kind, days] of Object.entries(parsed.freshness_days_by_kind)) {
@@ -352,8 +353,7 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
   const filePath = taxonomyPath();
   if (!safeExistsSync(filePath)) return [];
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { directory_defaults?: TaxonomyDirectoryDefault[] };
+    const parsed = readJson<{ directory_defaults?: TaxonomyDirectoryDefault[] }>(filePath);
     return Array.isArray(parsed.directory_defaults) ? parsed.directory_defaults : [];
   } catch {
     return [];
@@ -367,7 +367,7 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
  * hermetic tests via `KYBERION_CURATION_SCAN_ROOTS` (comma-separated).
  */
 function scanRoots(): string[] {
-  const override = process.env.KYBERION_CURATION_SCAN_ROOTS?.trim();
+  const override = getRegisteredEnvText('KYBERION_CURATION_SCAN_ROOTS')?.trim();
   if (override) {
     return override
       .split(',')

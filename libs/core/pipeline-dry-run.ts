@@ -1,4 +1,5 @@
 import type { PipelineAdf, PipelineAdfStep } from './pipeline-contract.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { determineActuatorStepType } from './actuator-op-registry.js';
 import {
   peekProviderCapabilityRegistry,
@@ -91,7 +92,7 @@ function requiredProvider(pipeline: PipelineAdf, steps: PipelineAdfStep[]): stri
   if (stepProvider) return stepProvider;
 
   if (steps.some((step) => step.op.startsWith('reasoning:'))) {
-    const configured = process.env.KYBERION_REASONING_BACKEND?.trim();
+    const configured = getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim();
     if (configured) return configured.replace(/-cli$/u, '');
   }
   return undefined;

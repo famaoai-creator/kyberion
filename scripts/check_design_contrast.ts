@@ -5,10 +5,11 @@ import {
   createCompanionWebThemePack,
   createConciergeWebThemePack,
   pathResolver,
-  safeReadFile,
   webThemePackToCssVars,
   type WebThemePack,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Palette = Record<string, string>;
 
@@ -20,7 +21,7 @@ type ContrastPair = {
 };
 
 function parseJson<T>(filePath: string): T {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }) as string)) as T;
+  return readJson<T>(filePath);
 }
 
 function normalizeHex(value: string): string | null {
@@ -35,12 +36,6 @@ function normalizeHex(value: string): string | null {
   }
   if (/^[0-9a-fA-F]{6}$/.test(hex)) return hex.toUpperCase();
   return null;
-}
-
-function parseRgb(value: string): [number, number, number] | null {
-  const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
 function parseRgba(value: string): [number, number, number, number] | null {
@@ -84,22 +79,9 @@ function opaqueRgb(value: string, base?: string): [number, number, number] {
   if (!rgba) throw new Error(`Unsupported color value: ${value}`);
   if (rgba[3] >= 1) return [rgba[0], rgba[1], rgba[2]];
   const baseRgba = (base ? parseRgba(base) : [255, 255, 255, 1]) as
-    | [number, number, number, number]
-    | null;
+    [number, number, number, number] | null;
   if (!baseRgba) throw new Error(`Unsupported base color value: ${base}`);
   return blendOver(rgba, baseRgba);
-}
-
-function parseColor(value: string): [number, number, number] | null {
-  const hex = normalizeHex(value);
-  if (hex) {
-    return [
-      Number.parseInt(hex.slice(0, 2), 16),
-      Number.parseInt(hex.slice(2, 4), 16),
-      Number.parseInt(hex.slice(4, 6), 16),
-    ];
-  }
-  return parseRgb(value);
 }
 
 function relativeLuminance(value: string, base?: string): number {
@@ -199,7 +181,7 @@ function checkDerivedWebThemePacks(): string[] {
   return violations;
 }
 
-function main(): void {
+function main(): number {
   const brandTokens = parseJson<{ tokens: { colors: { light: Palette; dark: Palette } } }>(
     pathResolver.rootResolve('knowledge/public/design-patterns/brand-tokens/kyberion.json')
   );
@@ -269,10 +251,24 @@ function main(): void {
   if (violations.length > 0) {
     console.error('[check:design-contrast] violations detected:');
     for (const violation of violations) console.error(`- ${violation}`);
-    process.exit(1);
+    return 1;
   }
 
   console.log('[check:design-contrast] OK');
+  return 0;
 }
 
-main();
+export const runCheckDesignContrast = defineScript({
+  name: 'check:design-contrast',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0) throw new Error(`design contrast check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_design_contrast.ts') ||
+  isDirectScript(import.meta.url, 'check_design_contrast.js')
+)
+  void runCheckDesignContrast();

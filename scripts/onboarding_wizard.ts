@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import chalk from 'chalk';
 import {
@@ -20,14 +19,20 @@ import {
   type SupportedLocale,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   withExecutionContext,
   withLock,
 } from '@agent/core';
+import {
+  createAjv,
+  getRegisteredEnvText,
+  readJson,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
 import { isExpressOnboarding, shouldRefuseNonInteractiveOnboarding } from './onboarding_mode.js';
@@ -51,9 +56,8 @@ import {
   resolveReasoningBackendMenuSelection,
 } from './reasoning_backend_selection.js';
 
-const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
-const onboardingStateAjv = new AjvCtor({ allErrors: true });
+const onboardingStateAjv = createAjv();
 addFormats(onboardingStateAjv);
 const onboardingStateValidate = compileSchemaFromPath(
   onboardingStateAjv,
@@ -323,9 +327,7 @@ function loadState(): OnboardingState | null {
   const filePath = statePath();
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as OnboardingState;
+    const parsed = readJson<OnboardingState>(filePath);
     if (parsed.identity && !parsed.identity.persona) {
       parsed.identity.persona = 'sovereign';
     }
@@ -620,7 +622,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
           )
         );
         rl.close();
-        process.exit(2);
+        throw new ScriptExitError(2);
       }
     }
     reasoning = markReasoningStubAcknowledged(reasoning);
@@ -632,7 +634,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
   if (interactive && !expressMode) {
     const choices = listReasoningBackendChoices();
     const persisted =
-      process.env.KYBERION_REASONING_BACKEND?.trim() || readPersistedReasoningBackend();
+      getRegisteredEnvText('KYBERION_REASONING_BACKEND')?.trim() || readPersistedReasoningBackend();
     console.log('');
     console.log(
       t(
@@ -669,7 +671,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
       }
       if (proceed) {
         const envLocal = persistReasoningBackend(selection);
-        process.env.KYBERION_REASONING_BACKEND = selection;
+        setRegisteredEnv('KYBERION_REASONING_BACKEND', selection);
         reasoning = { ...reasoning, backend_hint: selection };
         console.log(
           t(
@@ -1063,9 +1065,9 @@ function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPha
   );
 }
 
-async function runOnboarding() {
+async function runOnboarding(args: string[] = []): Promise<void> {
   process.env.MISSION_ROLE = 'sovereign_concierge';
-  process.env.KYBERION_PERSONA = 'sovereign';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();
   let customerSlug = customerResolver.activeCustomer();
 
@@ -1078,7 +1080,7 @@ async function runOnboarding() {
           createCustomer(slugInput);
           switchCustomer(slugInput);
           customerSlug = slugInput.trim();
-          process.env.KYBERION_CUSTOMER = customerSlug;
+          setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
         } catch (error) {
           console.log(chalk.red(String(error)));
         }
@@ -1092,7 +1094,7 @@ async function runOnboarding() {
     shouldRefuseNonInteractiveOnboarding({
       interactive,
       express: expressMode,
-      allowDefaults: process.env.KYBERION_ONBOARDING_NON_INTERACTIVE_OK,
+      allowDefaults: getRegisteredEnvText('KYBERION_ONBOARDING_NON_INTERACTIVE_OK'),
     })
   ) {
     console.error(
@@ -1137,7 +1139,7 @@ async function runOnboarding() {
       '    4. To intentionally accept defaults, re-run with KYBERION_ONBOARDING_NON_INTERACTIVE_OK=1'
     );
     rl.close();
-    process.exit(2);
+    throw new ScriptExitError(2);
   }
 
   console.log(
@@ -1175,17 +1177,17 @@ async function runOnboarding() {
     safeMkdir(onboardingRoot(), { recursive: true });
   }
 
-  const isMenuMode = process.argv.includes('--menu') || process.argv.includes('--reconfig');
+  const isMenuMode = args.includes('--menu') || args.includes('--reconfig');
 
   let state = loadState();
   if (state?.identity?.language) {
     setWizardLanguage(state.identity.language);
   }
 
-  const servicesOnly = process.argv.includes('--services-only');
-  const serviceArgIndex = process.argv.indexOf('--service');
+  const servicesOnly = args.includes('--services-only');
+  const serviceArgIndex = args.indexOf('--service');
   const selectedService =
-    serviceArgIndex >= 0 ? process.argv[serviceArgIndex + 1]?.trim() || undefined : undefined;
+    serviceArgIndex >= 0 ? args[serviceArgIndex + 1]?.trim() || undefined : undefined;
   if (servicesOnly) {
     state ??= createInitialState();
     await runServicesPhase(state, selectedService ? [selectedService] : undefined);
@@ -1342,8 +1344,14 @@ async function runOnboarding() {
   rl.close();
 }
 
-runOnboarding().catch((err) => {
-  console.error('Onboarding failed:', err);
-  rl.close();
-  process.exit(1);
+export const runOnboardingScript = defineScript({
+  name: 'onboard',
+  flags: [],
+  run: ({ argv }) => runOnboarding(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'onboarding_wizard.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_wizard.js')
+)
+  void runOnboardingScript();

@@ -48,10 +48,10 @@
     {
       "id": "inspect_runtime_supervisor",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "runtime_supervisor_status", "type": "ShellResult" },
+      "op": "system:list_service_runtimes",
+      "produces": { "channel": "runtime_supervisor_status", "type": "ServiceRuntimeInventory" },
       "params": {
-        "cmd": "node dist/scripts/agent_runtime_supervisor_status.js"
+        "requested_mode": "trial"
       }
     }
   ]

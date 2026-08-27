@@ -4,7 +4,6 @@ import mammoth from 'mammoth';
 import Tesseract from 'tesseract.js';
 import { safeWriteFile, safeReadFile, safeUnlink, pathResolver } from '@agent/core';
 import AdmZip from 'adm-zip';
-import * as PDFJS from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { distillPdfDesign, distillPptxDesign } from '@agent/core/media-contracts';
 import { distillExcelDesign } from '@agent/shared-media';
 

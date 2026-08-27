@@ -1,6 +1,6 @@
 /**
  * Kyberion Local Chat — Interactive REPL using Local LLM with Tool Use.
- * 
+ *
  * Usage:
  *   KYBERION_REASONING_BACKEND=local pnpm exec ts-node scripts/chat_local.ts
  */
@@ -14,7 +14,8 @@ async function main() {
   const success = installReasoningBackends({ mode: 'local', force: true });
   if (!success) {
     logger.error('Failed to initialize local reasoning backend.');
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const backend = getReasoningBackend();
@@ -50,11 +51,11 @@ async function main() {
     rl.prompt();
   }).on('close', () => {
     console.log('\nSession closed. Goodbye.');
-    process.exit(0);
+    process.exitCode = 0;
   });
 }
 
 main().catch((err) => {
   logger.error(err.message);
-  process.exit(1);
+  process.exitCode = 1;
 });

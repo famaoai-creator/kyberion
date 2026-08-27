@@ -7,11 +7,8 @@
  * (inbox / approvals) is actionable in place; `ask` talks to the same brain
  * every other surface uses.
  */
-import {
-  formatNextAction,
-  getGovernanceControlSummary,
-  resolveOperatorDisplayName,
-} from '@agent/core';
+import { resolveOperatorDisplayName } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   createScreenRecordingBridge,
@@ -20,12 +17,8 @@ import {
   DesktopDemonstrationRecorder,
   dispatchProcedure,
   decideApprovalRequest,
-  ingestAudioIntoDealRequirements,
-  listDistillCandidateRecords,
   loadDesktopPipeline,
   listApprovalRequests,
-  listCustomerChannelBindings,
-  listDeals,
   listInboxEntries,
   loadProcedures,
   loadNotificationPreferences,
@@ -37,10 +30,8 @@ import {
   reviewDesktopIntent,
   validateDesktopIntentDraft,
   redactScreenVideoFrame,
-  recordExecutionFeedback,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-  updateDistillCandidateRecord,
   validateBrowserExtensionRecording,
   validateDesktopRecording,
   sanitizeDesktopObservationText,
@@ -48,7 +39,6 @@ import {
   withExecutionContext,
   pathResolver,
   markInboxEntry,
-  readDealRequirementsCapture,
   runSurfaceMessageConversation,
   saveNotificationPreferences,
   safeReadFile,
@@ -64,8 +54,15 @@ import {
   type NotificationChannelTarget,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { collectOperatorHomeSummary } from '@agent/core';
-import { collectDoctorReport } from './run_doctor.js';
+import { runDoctor } from './run_doctor.js';
+import {
+  handleDealsIngestAudio,
+  handleDealsSubcommand,
+  handleFeedbackSubcommand,
+  handleImprovements,
+} from './operator-home-secondary-actions.js';
+import { printCommands, showHome } from './operator-home-view.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -100,58 +97,6 @@ function localizeRecorderWarning(warning: string): string {
   if (warning.startsWith('native operation suggestions remain'))
     return ui('recorder:recorder_native_plan_deferred');
   return warning;
-}
-
-const COMMANDS: ReadonlyArray<readonly [string, string]> = [
-  ['pnpm kyberion', 'i18n:recorder:recorder_help_home'],
-  ['pnpm kyberion ask "<request>"', 'i18n:recorder:recorder_help_ask'],
-  ['pnpm kyberion intent "<intent>"', 'i18n:recorder:recorder_help_intent'],
-  ['pnpm kyberion procedure list', 'i18n:recorder:recorder_help_procedure_list'],
-  ['pnpm kyberion procedure inspect <id>', 'i18n:recorder:recorder_help_procedure_inspect'],
-  ['pnpm kyberion procedure repair <id>', 'i18n:recorder:recorder_help_procedure_repair'],
-  [
-    'pnpm kyberion procedure promote <id> --substrate desktop --recording <path> --intent "..."',
-    'i18n:recorder:recorder_help_procedure_promote',
-  ],
-  [
-    "pnpm kyberion procedure run <id> --inputs '{}' [--cdp-port <port>] [--record-video]",
-    'i18n:recorder:recorder_help_procedure_run',
-  ],
-  [
-    'pnpm kyberion feedback <intent-id> --outcome dissatisfied --correction "..."',
-    'i18n:recorder:recorder_help_feedback',
-  ],
-  ['pnpm kyberion improvements', 'i18n:recorder:recorder_help_improvements'],
-  ['pnpm kyberion record desktop [--duration <sec>]', 'i18n:recorder:recorder_help_record_desktop'],
-  ['pnpm kyberion recording inspect <path>', 'i18n:recorder:recorder_help_recording_inspect'],
-  [
-    'pnpm kyberion recording review <path> --approve-recording --approve-intent',
-    'i18n:recorder:recorder_help_recording_review',
-  ],
-  ['pnpm kyberion inbox [--read <id>|--accept <id>]', 'i18n:recorder:recorder_help_inbox'],
-  ['pnpm kyberion inbox --read-all [--match <text>]', 'i18n:recorder:recorder_help_inbox_all'],
-  ['pnpm kyberion approvals [--approve <id>|--deny <id>]', 'i18n:recorder:recorder_help_approvals'],
-  ['pnpm kyberion notify [--set slack:<channel>]', 'i18n:recorder:recorder_help_notify'],
-  ['pnpm kyberion deals [--requirements <deal-id>]', 'i18n:recorder:recorder_help_deals'],
-  [
-    'pnpm kyberion deals --ingest-audio <deal-id> --audio <path>',
-    'i18n:recorder:recorder_help_deals_audio',
-  ],
-  ['pnpm mission create', 'i18n:recorder:recorder_help_mission'],
-  ['pnpm app:preflight', 'i18n:recorder:recorder_help_preflight'],
-  ['pnpm doctor', 'i18n:recorder:recorder_help_doctor'],
-  ['pnpm dashboard', 'i18n:recorder:recorder_help_dashboard'],
-  ['pnpm office [-- --watch 30]', 'i18n:recorder:recorder_help_office'],
-] as const;
-
-function printCommands(): void {
-  console.log(ui('recorder:recorder_commands_header'));
-  for (const [command, description] of COMMANDS) {
-    const rendered = description.startsWith('i18n:')
-      ? ui(description.slice('i18n:'.length) as VocabularyKey)
-      : description;
-    console.log(`  ${command.padEnd(52)} ${rendered}`);
-  }
 }
 
 // E2E-04 Task 2: `pnpm kyberion notify --set slack:C012345` writes the
@@ -306,7 +251,7 @@ function handleApprovalsSubcommand(argv: {
   console.log(ui('recorder:recorder_approvals_summary'));
 }
 
-async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
+async function handleAskSubcommand(text: string, json: boolean, explain: boolean): Promise<void> {
   if (!text.trim()) {
     console.error(ui('recorder:recorder_ask_usage'));
     process.exitCode = 1;
@@ -333,6 +278,18 @@ async function handleAskSubcommand(text: string, json: boolean): Promise<void> {
   if (json) {
     console.log(JSON.stringify({ ...result, intentResolution, improvement }, null, 2));
     return;
+  }
+  if (explain && intentResolution) {
+    console.log(`[intent] ${intentResolution.normalized_intent}`);
+    console.log(`  request_id: ${intentResolution.request_id}`);
+    console.log(`  shape: ${intentResolution.resolution_shape}`);
+    console.log(`  outcome: ${intentResolution.outcome_kind}`);
+    console.log(`  authority: ${intentResolution.authority_level}`);
+    console.log(`  missing_inputs: ${intentResolution.missing_inputs.join(', ') || '(none)'}`);
+    console.log(`  next_action: ${intentResolution.next_action.kind}`);
+    console.log(`  next_action_label: ${intentResolution.next_action.label}`);
+    console.log(`  consequence: ${intentResolution.next_action.consequence}`);
+    console.log('');
   }
   if (intentResolution && intentResolution.normalized_intent !== 'unresolved_intent') {
     console.log(
@@ -475,7 +432,7 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
   }
   let raw: unknown;
   try {
-    raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+    raw = readJson<unknown>(recordingPath);
   } catch (error) {
     return {
       error: ui('recorder:recorder_recording_read_failed', {
@@ -677,7 +634,7 @@ function loadDesktopRecording(ref: string): {
   if (!recordingPath)
     return { error: 'recording path is outside the allowlisted recording stores' };
   try {
-    const raw = JSON.parse(safeReadFile(recordingPath, { encoding: 'utf8' }) as string);
+    const raw = readJson<unknown>(recordingPath);
     const validation = validateDesktopRecording(raw);
     return validation.value ? { value: validation.value } : { error: validation.errors.join('; ') };
   } catch (error) {
@@ -712,9 +669,7 @@ function loadDesktopIntent(
   }
   try {
     return {
-      intent: validateDesktopIntentDraft(
-        JSON.parse(safeReadFile(intentPath, { encoding: 'utf8' }) as string)
-      ),
+      intent: validateDesktopIntentDraft(readJson<unknown>(intentPath)),
       intentPath,
       reconstructed: false,
     };
@@ -1202,321 +1157,33 @@ function handleProcedureRepair(procedureId: string, json: boolean): void {
   }
 }
 
-function handleFeedbackSubcommand(argv: {
-  intentId?: string;
-  scenarioId?: string;
-  outcome?: string;
-  comment?: string;
-  correction?: string;
-  procedureId?: string;
-  correlationId?: string;
-  json?: boolean;
-}): void {
-  const intentId = String(argv.intentId || '').trim();
-  const outcome = String(argv.outcome || '').trim() as
-    'satisfied' | 'partially_satisfied' | 'dissatisfied';
-  if (!intentId || !['satisfied', 'partially_satisfied', 'dissatisfied'].includes(outcome)) {
-    console.error(ui('recorder:recorder_feedback_usage'));
-    process.exitCode = 1;
-    return;
-  }
-  const feedback = recordExecutionFeedback({
-    scenario_id: argv.scenarioId || `use-case-${intentId}`,
-    intent_id: intentId,
-    outcome,
-    comment: argv.comment,
-    correction: argv.correction,
-    correlation_id: argv.correlationId,
-    source: 'operator',
-    surface: 'cli',
-  });
-  const improvement = materializeExecutionFeedbackCandidate({
-    feedback,
-    procedureId: argv.procedureId || intentId,
-  });
-  const payload = { feedback, summary: improvement.summary, candidate: improvement.candidate };
-  if (argv.json) {
-    console.log(JSON.stringify(payload, null, 2));
-    return;
-  }
-  console.log(
-    ui('recorder:recorder_feedback_recorded', {
-      id: feedback.feedback_id,
-      outcome: feedback.outcome,
-    })
-  );
-  if (improvement.candidate) {
-    console.log(
-      ui('recorder:recorder_feedback_candidate', { id: improvement.candidate.candidate_id })
-    );
-    console.log(
-      ui('recorder:recorder_feedback_review', { id: improvement.candidate.candidate_id })
-    );
-  } else {
-    console.log(ui('recorder:recorder_no_improvement'));
-  }
-}
-
-function handleImprovements(argv: {
-  approve?: string;
-  deny?: string;
-  note?: string;
-  json?: boolean;
-}): void {
-  if (argv.approve || argv.deny) {
-    const candidateId = String(argv.approve || argv.deny);
-    const candidate = listDistillCandidateRecords().find(
-      (entry) => entry.candidate_id === candidateId
-    );
-    if (!candidate || candidate.status !== 'proposed') {
-      console.error(ui('recorder:recorder_improvement_not_found', { id: candidateId }));
-      process.exitCode = 1;
-      return;
-    }
-    const reviewed = updateDistillCandidateRecord(candidateId, {
-      status: argv.approve ? 'promoted' : 'archived',
-      ...(argv.approve ? { promoted_ref: `procedure-improvement:${candidateId}` } : {}),
-      metadata: {
-        ...(candidate.metadata || {}),
-        review: {
-          status: argv.approve ? 'approved' : 'rejected',
-          reviewer: 'human:operator',
-          note: argv.note || 'reviewed via pnpm kyberion improvements',
-        },
-      },
-    });
-    console.log(
-      ui('recorder:recorder_improvement_updated', {
-        id: reviewed?.candidate_id || candidateId,
-        status: reviewed?.status || 'unknown',
-      })
-    );
-    if (argv.approve) console.log(ui('recorder:recorder_catalog_review_note'));
-    return;
-  }
-  const candidates = listDistillCandidateRecords().filter(
-    (candidate) => candidate.metadata?.improvement_kind === 'execution_feedback'
-  );
-  if (argv.json) {
-    console.log(JSON.stringify(candidates, null, 2));
-    return;
-  }
-  if (candidates.length === 0) {
-    console.log(ui('recorder:recorder_no_candidates'));
-    return;
-  }
-  console.log(ui('recorder:recorder_improvement_header', { count: candidates.length }));
-  for (const candidate of candidates) {
-    console.log(`  [${candidate.candidate_id}] ${candidate.status} ${candidate.title}`);
-    console.log(`      ${candidate.summary}`);
-  }
-  console.log(ui('recorder:recorder_improvement_approve'));
-}
-
-function printCustomerBindingsWarning(): void {
-  try {
-    const bindings = listCustomerChannelBindings().filter(
-      (entry) => entry.binding.active !== false
-    );
-    if (bindings.length === 0) return;
-    console.log('');
-    console.log(ui('recorder:recorder_customer_binding_warning', { count: bindings.length }));
-    for (const entry of bindings.slice(0, 5)) {
-      console.log(
-        `  - ${entry.binding.surface}:${entry.binding.channel_id} → ${entry.tenantSlug}` +
-          (entry.binding.counterpart?.org ? ` (${entry.binding.counterpart.org})` : '')
-      );
-    }
-    if (bindings.length > 5)
-      console.log(ui('recorder:recorder_customer_binding_more', { count: bindings.length - 5 }));
-  } catch {
-    // home must never fail on an optional panel
-  }
-}
-
-async function showHome(json: boolean): Promise<void> {
-  const doctor = await collectDoctorReport({});
-  const governance = getGovernanceControlSummary();
-  const home = collectOperatorHomeSummary({ limit: 8 });
-
-  if (json) {
-    console.log(
-      JSON.stringify(
-        {
-          doctor,
-          governance,
-          home,
-          commands: COMMANDS.map(([command, description]) => ({ command, description })),
-        },
-        null,
-        2
-      )
-    );
-    return;
-  }
-
-  console.log(ui('recorder:recorder_home_title'));
-  console.log(
-    ui('recorder:recorder_home_status', { label: home.statusLabel, detail: home.statusDetail })
-  );
-  console.log(ui('recorder:recorder_home_doctor', { count: doctor.totalMissing }));
-  console.log(
-    ui('recorder:recorder_home_counts', {
-      approvals: governance.pending_approvals,
-      questions: home.counts.clarificationQuestions,
-      inbox: home.counts.unreadInbox,
-    })
-  );
-  const recent = [...home.activeMissions]
-    .sort((left, right) =>
-      String(right.updatedAt || '').localeCompare(String(left.updatedAt || ''))
-    )
-    .slice(0, 3);
-  console.log(
-    ui('recorder:recorder_home_missions', {
-      active: home.counts.activeMissions,
-      recent: home.counts.recentlyActiveMissions,
-      suffix: recent.length > 0 ? ' — recent:' : '',
-    })
-  );
-  for (const mission of recent) {
-    console.log(
-      `  - ${mission.missionId} [${mission.missionType || 'mission'}] ${String(mission.goalSummary || '').slice(0, 70)}`
-    );
-  }
-  console.log('');
-  for (const line of formatNextAction(home.nextAction)) {
-    console.log(line);
-  }
-  printCustomerBindingsWarning();
-  console.log('');
-  printCommands();
-}
-
-// Customer-path operator view: which deals are live, at what stage, and what
-// the requirements hearing has captured so far (E2E-06 follow-up).
-async function handleDealsIngestAudio(argv: {
-  ingestAudio?: string;
-  audio?: string;
-}): Promise<void> {
-  const bindings = listCustomerChannelBindings();
-  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
-  const match = tenants
-    .flatMap((tenantSlug) => listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal })))
-    .find((entry) => entry.deal.deal_id === argv.ingestAudio);
-  if (!match) {
-    console.error(ui('recorder:recorder_deal_not_found', { id: argv.ingestAudio || '' }));
-    process.exitCode = 1;
-    return;
-  }
-  if (!argv.audio) {
-    console.error(ui('recorder:recorder_deal_audio_usage'));
-    process.exitCode = 1;
-    return;
-  }
-  const result = await ingestAudioIntoDealRequirements({
-    tenantSlug: match.tenantSlug,
-    dealId: match.deal.deal_id,
-    audioPath: argv.audio,
-    projectName: match.deal.summary?.slice(0, 80),
-  });
-  if (!result) {
-    console.error(ui('recorder:recorder_deal_audio_failed'));
-    process.exitCode = 1;
-    return;
-  }
-  console.log(ui('recorder:recorder_deal_audio_updated', { count: result.capture.turns_captured }));
-  if (result.transcript_path)
-    console.log(ui('recorder:recorder_deal_transcript', { path: result.transcript_path }));
-  console.log(ui('recorder:recorder_deal_requirements_next', { id: match.deal.deal_id }));
-}
-
-function handleDealsSubcommand(argv: { requirements?: string; json?: boolean }): void {
-  const bindings = listCustomerChannelBindings();
-  const tenants = Array.from(new Set(bindings.map((binding) => binding.tenantSlug)));
-  const deals = tenants.flatMap((tenantSlug) =>
-    listDeals(tenantSlug).map((deal) => ({ tenantSlug, deal }))
-  );
-
-  if (argv.requirements) {
-    const match = deals.find((entry) => entry.deal.deal_id === argv.requirements);
-    if (!match) {
-      console.error(ui('recorder:recorder_deal_not_found', { id: argv.requirements }));
-      process.exitCode = 1;
-      return;
-    }
-    const capture = readDealRequirementsCapture(match.tenantSlug, match.deal.deal_id);
-    if (!capture) {
-      console.log(
-        ui('recorder:recorder_deal_requirements_none', {
-          id: match.deal.deal_id,
-          stage: match.deal.stage,
-        })
-      );
-      return;
-    }
-    if (argv.json) {
-      console.log(JSON.stringify(capture, null, 2));
-      return;
-    }
-    const req = capture.requirements;
-    console.log(
-      ui('recorder:recorder_deal_requirements_header', {
-        id: match.deal.deal_id,
-        turns: capture.turns_captured,
-        updated: capture.updated_at,
-      })
-    );
-    for (const fr of req.functional_requirements || []) {
-      console.log(`  [${fr.priority}] ${fr.id}: ${fr.description}`);
-    }
-    for (const nfr of req.non_functional_requirements || []) {
-      console.log(`  [nfr:${nfr.category}] ${nfr.description}`);
-    }
-    const open = (req.open_questions || []).filter((q) => (q.status || 'open') === 'open');
-    if (open.length > 0) {
-      console.log(ui('recorder:recorder_deal_open_questions'));
-      for (const q of open) console.log(`    - ${q.blocking ? '[blocking] ' : ''}${q.question}`);
-    }
-    return;
-  }
-
-  if (argv.json) {
-    console.log(JSON.stringify(deals, null, 2));
-    return;
-  }
-  if (deals.length === 0) {
-    console.log(ui('recorder:recorder_deal_empty'));
-    return;
-  }
-  console.log(ui('recorder:recorder_deal_header', { count: deals.length }));
-  for (const { tenantSlug, deal } of deals) {
-    console.log(
-      `  [${deal.deal_id}] ${tenantSlug} / ${deal.stage.padEnd(10)} ${deal.summary.slice(0, 60)}`
-    );
-  }
-  console.log('');
-  console.log(ui('recorder:recorder_deal_requirements_command'));
-}
-
-async function main(): Promise<void> {
+export async function main(args: string[] = []): Promise<void> {
   // The home CLI acts with the operator's own authority — same role the
   // mission controller CLI assumes (inbox/approvals live under active/shared).
   if (!process.env.MISSION_ROLE) {
     process.env.MISSION_ROLE = 'mission_controller';
   }
-  const localeFlagIndex = process.argv.indexOf('--locale');
-  if (localeFlagIndex >= 0 && process.argv[localeFlagIndex + 1]) {
-    cliLocale = resolveLocale({ explicit: process.argv[localeFlagIndex + 1] });
+  if (args.length === 1 && (args[0] === '--help' || args[0] === '-h')) {
+    printCommands(ui);
+    return;
+  }
+  const localeFlagIndex = args.indexOf('--locale');
+  if (localeFlagIndex >= 0 && args[localeFlagIndex + 1]) {
+    cliLocale = resolveLocale({ explicit: args[localeFlagIndex + 1] });
   }
   // yargs intercepts a literal `help` positional with its own dump — answer
   // with the command table (what the home screen advertises) instead.
-  if (process.argv[2] === 'help') {
-    printCommands();
+  if (args[0] === 'help') {
+    printCommands(ui);
     return;
   }
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(['node', 'kyberion_home', ...args])
     .option('json', { type: 'boolean', default: false })
+    .option('explain', {
+      type: 'boolean',
+      default: false,
+      description: 'show the shared intent-resolution contract before the reply',
+    })
     .option('locale', {
       type: 'string',
       choices: ['en', 'ja', 'qps-ploc'],
@@ -1624,16 +1291,25 @@ async function main(): Promise<void> {
       return;
     case 'deals':
       if (argv['ingest-audio']) {
-        await handleDealsIngestAudio({
+        await handleDealsIngestAudio(ui, {
           ingestAudio: String(argv['ingest-audio']),
           audio: argv.audio ? String(argv.audio) : undefined,
         });
         return;
       }
-      handleDealsSubcommand(argv as { requirements?: string; json?: boolean });
+      handleDealsSubcommand(ui, argv as { requirements?: string; json?: boolean });
       return;
     case 'ask':
-      await handleAskSubcommand(argv._.slice(1).map(String).join(' '), Boolean(argv.json));
+      await handleAskSubcommand(
+        argv._.slice(1).map(String).join(' '),
+        Boolean(argv.json),
+        Boolean(argv.explain)
+      );
+      return;
+    case 'doctor':
+      // Keep the user-facing single CLI as the canonical doctor entrypoint;
+      // runtime-specific checks remain options of the shared doctor command.
+      await runDoctor(args.slice(1));
       return;
     case 'intent':
       await handleIntentSubcommand(
@@ -1704,7 +1380,7 @@ async function main(): Promise<void> {
       });
       return;
     case 'feedback':
-      handleFeedbackSubcommand({
+      handleFeedbackSubcommand(ui, {
         intentId: String(argv._[1] || ''),
         scenarioId: argv['scenario-id'] ? String(argv['scenario-id']) : undefined,
         outcome: argv.outcome ? String(argv.outcome) : undefined,
@@ -1716,7 +1392,7 @@ async function main(): Promise<void> {
       });
       return;
     case 'improvements':
-      handleImprovements({
+      handleImprovements(ui, {
         approve: argv.approve ? String(argv.approve) : undefined,
         deny: argv.deny ? String(argv.deny) : undefined,
         note: argv.note ? String(argv.note) : undefined,
@@ -1724,16 +1400,26 @@ async function main(): Promise<void> {
       });
       return;
     case 'help':
-      printCommands();
+      printCommands(ui);
       return;
     case '':
-      await showHome(Boolean(argv.json));
+      await showHome(ui, Boolean(argv.json));
       return;
     default:
       console.error(ui('recorder:recorder_unknown_subcommand', { subcommand }));
-      printCommands();
+      printCommands(ui);
       process.exitCode = 1;
   }
 }
 
-void main();
+if (
+  isDirectScript(import.meta.url, 'kyberion_home.ts') ||
+  isDirectScript(import.meta.url, 'kyberion_home.js')
+)
+  void defineScript({
+    name: 'kyberion',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

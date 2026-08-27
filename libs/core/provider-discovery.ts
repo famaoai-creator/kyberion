@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import {
@@ -368,7 +369,7 @@ function checkCopilot(): ProviderInfo {
 function checkCodex(): ProviderInfo {
   const which = run('which', ['codex']);
   const installed = which.ok;
-  const mode = (process.env.KYBERION_CODEX_MODE || 'app-server').toLowerCase();
+  const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
   const protocol: ProviderInfo['protocol'] =
     mode === 'exec' || mode === 'legacy' ? 'exec' : 'json-rpc';
   const entry = capabilityEntryFor('codex');

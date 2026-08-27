@@ -1,4 +1,8 @@
-import { assertScopeContext, type ScopeContext, type ScopeContextInput } from './scope-context.js';
+import {
+  assertScopeContext,
+  type ScopeContext,
+  type ScopeContextInput,
+} from './scope-context-validation.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type { TierLevel } from './types.js';
 
@@ -216,12 +220,12 @@ export function parseEventScopeFromRecord(record: Record<string, unknown>): Even
     'task_id',
     'session_id',
   ];
-  const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  const toRecordOrUndefined = (value: unknown): Record<string, unknown> | undefined =>
     value && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : undefined;
-  const nestedContextRecord = asRecord(nestedContext);
-  const nestedScopeRecord = asRecord(nestedScope);
+  const nestedContextRecord = toRecordOrUndefined(nestedContext);
+  const nestedScopeRecord = toRecordOrUndefined(nestedScope);
   const valuesConflict = (
     left: Record<string, unknown> | undefined,
     right: Record<string, unknown> | undefined
@@ -239,7 +243,7 @@ export function parseEventScopeFromRecord(record: Record<string, unknown>): Even
   if (valuesConflict(nestedContextRecord, nestedScopeRecord)) {
     return { has_scope: true, invalid: true };
   }
-  const nestedRecord = asRecord(nested);
+  const nestedRecord = toRecordOrUndefined(nested);
   if (
     nestedRecord &&
     comparableKeys.some(

@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "defaults", "intent_rules"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string",
       "minLength": 1

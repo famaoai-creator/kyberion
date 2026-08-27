@@ -2,7 +2,7 @@
 title: Lifecycle Smoothness Plan 2026-08-08
 tags: [onboarding, lifecycle, organization, mission, schedule, operations, continuous-improvement]
 last_updated: 2026-08-08
-status: phase4-in-progress
+status: active
 ---
 
 # ライフサイクル円滑化計画(オンボーディング → 運用 → 持続的改善)

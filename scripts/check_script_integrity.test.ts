@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
-import { checkScriptIntegrity } from './check_script_integrity.js';
+import { checkScriptIntegrity, findDirectScriptGuardViolations } from './check_script_integrity.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-script-integrity');
 
@@ -20,6 +20,21 @@ describe('check_script_integrity', () => {
     if (safeExistsSync(FIXTURE_DIR)) {
       safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
     }
+  });
+
+  it('requires compiled direct-script guards alongside TypeScript guards', () => {
+    expect(
+      findDirectScriptGuardViolations(
+        'scripts/example.ts',
+        "if (isDirectScript(import.meta.url, 'example.ts')) void main();"
+      )
+    ).toEqual(['scripts/example.ts: direct-script guard is missing compiled entry example.js']);
+    expect(
+      findDirectScriptGuardViolations(
+        'scripts/example.ts',
+        "if (isDirectScript(import.meta.url, 'example.ts') || isDirectScript(import.meta.url, 'example.js')) void main();"
+      )
+    ).toEqual([]);
   });
 
   it('flags dist script references without TypeScript sources', () => {
@@ -77,6 +92,22 @@ describe('check_script_integrity', () => {
 
     expect(violations).toEqual([
       'active/shared/tmp/check-script-integrity/pipelines/broken.json: referenced path not found (libs/missing/tool.mjs)',
+    ]);
+  });
+
+  it('flags missing pnpm scripts inside pipeline definitions', () => {
+    writeJson('pipelines/broken.json', {
+      steps: [{ op: 'system:exec', params: { cmd: 'pnpm run check:removed-gate' } }],
+    });
+
+    const packageJsonPath = writeJson('package.json', { scripts: { typecheck: 'tsc --noEmit' } });
+    const violations = checkScriptIntegrity({
+      packageJsonPath,
+      pipelineRoots: ['active/shared/tmp/check-script-integrity/pipelines'],
+    });
+
+    expect(violations).toEqual([
+      'active/shared/tmp/check-script-integrity/pipelines/broken.json: pnpm script not found (check:removed-gate)',
     ]);
   });
 });

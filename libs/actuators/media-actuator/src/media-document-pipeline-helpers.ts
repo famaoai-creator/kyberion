@@ -1,10 +1,9 @@
 import {
-  safeReadFile,
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
   pathResolver,
-  resolveVars,
   retry,
   designDefaultsFromMediaTheme,
 } from '@agent/core';
@@ -13,14 +12,11 @@ import {
   generateNativePdf,
   generateNativePptx,
   generateNativeXlsx,
-  type PdfDesignProtocol,
 } from '@agent/core/media-contracts';
 import * as path from 'node:path';
 import {
   buildMediaGenerationBoundary,
   normalizeInvoiceDocumentBrief,
-  normalizeBriefForCategory,
-  resolveMediaBriefCategory,
   type MediaBriefCategory,
   type ProtocolKind,
 } from './media-document-helpers.js';
@@ -375,7 +371,15 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);
     }
-    const catalog = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+    const catalog = loadJson<{
+      documents: Record<
+        string,
+        {
+          default_template?: string;
+          templates?: Record<string, unknown>;
+        }
+      >;
+    }>(catalogPath);
     const documentType = brief.document_type || 'invoice';
     const documentCatalog = catalog.documents?.[documentType];
     if (!documentCatalog) {

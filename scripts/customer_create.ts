@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   classifyError,
   formatClassification,
@@ -11,6 +10,7 @@ import {
   safeMkdir,
   safeReaddir,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -62,7 +62,11 @@ function copyTree(srcDir: string, dstDir: string): void {
   }
 }
 
-export function createCustomer(slugInput: string): { slug: string; root: string; template: string } {
+export function createCustomer(slugInput: string): {
+  slug: string;
+  root: string;
+  template: string;
+} {
   const slug = validateSlug(slugInput);
   const template = templateRoot();
   if (!safeExistsSync(template) || !safeLstat(template).isDirectory()) {
@@ -71,30 +75,42 @@ export function createCustomer(slugInput: string): { slug: string; root: string;
 
   const dest = customerRoot(slug);
   if (safeExistsSync(dest) && !isDirectoryEmpty(dest)) {
-    throw new Error(`Customer directory already exists and is not empty: ${path.relative(rootDir(), dest)}`);
+    throw new Error(
+      `Customer directory already exists and is not empty: ${path.relative(rootDir(), dest)}`
+    );
   }
 
   copyTree(template, dest);
   return { slug, root: dest, template };
 }
 
-function main(): void {
-  const slug = process.argv[2];
+function main(argv: string[]): void {
+  const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
-    console.error('Usage: customer_create <slug>');
-    process.exit(slug ? 0 : 2);
+    const usage = 'Usage: customer_create <slug>';
+    if (slug) {
+      console.error(usage);
+      throw new ScriptExitError(0);
+    }
+    throw new ScriptExitError(2, usage);
   }
 
   try {
     const created = createCustomer(slug);
     console.log(`Created customer template at ${path.relative(rootDir(), created.root)}`);
   } catch (err) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(1);
+    throw new Error(formatClassification(classifyError(err)));
   }
 }
 
-const isDirect = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirect) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'customer_create.ts') ||
+  isDirectScript(import.meta.url, 'customer_create.js')
+)
+  void defineScript({
+    name: 'customer:create',
+    flags: [],
+    run(context) {
+      return main(context.argv);
+    },
+  })();

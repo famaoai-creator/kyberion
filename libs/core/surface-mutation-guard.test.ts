@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { authorizeSurfaceMutation } from './surface-mutation-guard.js';
+import { createHash } from 'node:crypto';
+import {
+  authorizeSurfaceMutation,
+  defaultSurfaceViewerTierAccess,
+  extractSurfaceBearerToken,
+  narrowSurfaceViewerScope,
+  narrowSurfaceViewerTenant,
+  narrowSurfaceViewerTier,
+  resolveSurfaceViewerToken,
+  resolveSurfaceViewerTierAccess,
+} from './surface-mutation-guard.js';
 
 function makeRequest(url: string, headers: Record<string, string> = {}) {
   const normalized = Object.fromEntries(
@@ -19,6 +29,45 @@ afterEach(() => {
 });
 
 describe('surface-mutation-guard', () => {
+  it('resolves registered and configured viewer credentials through one boundary', () => {
+    const registered = resolveSurfaceViewerToken('registered-token', {
+      registrations: [
+        {
+          token_hash: createHash('sha256').update('registered-token').digest('hex'),
+          role: 'readonly',
+          tenant_slugs: ['tenant-a'],
+          label: 'registered viewer',
+        },
+      ],
+      apiToken: 'registered-token',
+    });
+    expect(registered).toMatchObject({
+      role: 'readonly',
+      registration: { label: 'registered viewer' },
+    });
+
+    expect(resolveSurfaceViewerToken('api-token', { apiToken: 'api-token' })).toMatchObject({
+      role: 'readonly',
+    });
+    expect(
+      resolveSurfaceViewerToken('admin-token', { localadminToken: 'admin-token' })
+    ).toMatchObject({ role: 'localadmin' });
+    expect(
+      resolveSurfaceViewerToken('presence-token', {
+        configuredCredentials: [{ token: 'presence-token', role: 'readonly' }],
+      })
+    ).toMatchObject({ role: 'readonly' });
+  });
+
+  it('extracts bearer credentials without broadening the accepted header form', () => {
+    expect(extractSurfaceBearerToken('Bearer secret-token')).toBe('secret-token');
+    expect(extractSurfaceBearerToken('Bearer   secret-token  ')).toBe('secret-token');
+    expect(extractSurfaceBearerToken('bearer secret-token')).toBe('');
+    expect(extractSurfaceBearerToken('Basic secret-token')).toBe('');
+    expect(extractSurfaceBearerToken('Bearer')).toBe('');
+    expect(extractSurfaceBearerToken(undefined)).toBe('');
+  });
+
   it('does not trust a loopback request URL without request authentication', () => {
     for (const host of ['localhost', '127.0.0.1', '[::1]']) {
       const decision = authorizeSurfaceMutation(makeRequest(`http://${host}:3050/api/x`));
@@ -83,5 +132,48 @@ describe('surface-mutation-guard', () => {
     );
     expect(decision.ok).toBe(false);
     expect(decision.status).toBe(403);
+  });
+});
+
+describe('surface viewer scope', () => {
+  it('keeps role tier policy and permits only narrower registrations', () => {
+    expect(defaultSurfaceViewerTierAccess('readonly')).toEqual(['public', 'confidential']);
+    expect(defaultSurfaceViewerTierAccess('localadmin')).toEqual([
+      'personal',
+      'confidential',
+      'public',
+    ]);
+    expect(resolveSurfaceViewerTierAccess('localadmin', ['public'])).toEqual(['public']);
+    expect(() => resolveSurfaceViewerTierAccess('readonly', ['personal'])).toThrow(
+      'exceeds the readonly role policy'
+    );
+  });
+
+  it('rejects invalid or widening tenant and entity selections', () => {
+    const viewer = {
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+    };
+    expect(narrowSurfaceViewerScope(viewer, { tenant: 'tenant-a' })).toEqual({
+      tenantSlugs: ['tenant-a'],
+      organizationIds: ['org-a'],
+      projectIds: ['project-a'],
+    });
+    expect(() => narrowSurfaceViewerTenant(viewer, 'tenant-b')).toThrow(
+      'viewer tenant scope denied'
+    );
+    expect(() => narrowSurfaceViewerScope(viewer, { organizationId: 'org-b' })).toThrow(
+      'viewer organization scope denied'
+    );
+  });
+
+  it('enforces the resolved tier at the data-bearing boundary', () => {
+    expect(narrowSurfaceViewerTier({ role: 'readonly', tierAccess: ['public'] }, 'public')).toBe(
+      'public'
+    );
+    expect(() =>
+      narrowSurfaceViewerTier({ role: 'readonly', tierAccess: ['public'] }, 'confidential')
+    ).toThrow('viewer tier scope denied');
   });
 });

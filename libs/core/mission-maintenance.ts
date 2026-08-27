@@ -1,14 +1,15 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * scripts/refactor/mission-maintenance.ts
  * Maintenance and recovery operations for missions.
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  safeAppendFileSync,
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -57,7 +58,8 @@ import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 
 function resolveApprovalActor(requestedBy?: string): string {
-  const resolvedActor = process.env.KYBERION_PERSONA || process.env.USER || 'mission_controller';
+  const resolvedActor =
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller';
   const requested = String(requestedBy || '').trim();
   if (requested && requested !== resolvedActor) {
     throw new Error(
@@ -156,7 +158,7 @@ async function recordCheckpointForMission(
   let traceStatus: 'ok' | 'error' = 'ok';
   try {
     await withLock(`mission-${activeMissionId}`, async () => {
-      const stageSpan = traceCtx.startSpan('git.stage');
+      traceCtx.startSpan('git.stage');
       try {
         safeExec('git', ['add', '.'], { cwd: missionPath });
         traceCtx.endSpan('ok');
@@ -166,7 +168,7 @@ async function recordCheckpointForMission(
       }
 
       let commitCreated = true;
-      const commitSpan = traceCtx.startSpan('git.commit');
+      traceCtx.startSpan('git.commit');
       try {
         safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], {
           cwd: missionPath,
@@ -182,7 +184,7 @@ async function recordCheckpointForMission(
       }
 
       const hash = getGitHash(missionPath);
-      const saveSpan = traceCtx.startSpan('state.save');
+      traceCtx.startSpan('state.save');
       const currentState = loadState(activeMissionId)!;
       currentState.git.latest_commit = hash;
       currentState.git.checkpoints.push({
@@ -203,7 +205,7 @@ async function recordCheckpointForMission(
       );
     });
 
-    const ledgerSpan = traceCtx.startSpan('project_ledger.sync');
+    traceCtx.startSpan('project_ledger.sync');
     try {
       await syncProjectLedgerIfLinked(activeMissionId);
       traceCtx.endSpan('ok');
@@ -213,7 +215,7 @@ async function recordCheckpointForMission(
       throw err;
     }
 
-    const intentSpan = traceCtx.startSpan('intent_delta.emit');
+    traceCtx.startSpan('intent_delta.emit');
     try {
       await emitMissionLifecycleIntentSnapshot({
         missionId: activeMissionId,
@@ -945,11 +947,7 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   try {
     const auditPath = pathResolver.sharedLogsAudit('mission-purge.jsonl');
     safeMkdir(path.dirname(auditPath), { recursive: true });
-    safeAppendFileSync(
-      auditPath,
-      `${JSON.stringify({ ts: new Date().toISOString(), ...record })}\n`,
-      { encoding: 'utf8' }
-    );
+    appendJsonLine(auditPath, { ts: new Date().toISOString(), ...record });
   } catch (err) {
     logger.warn(
       `Failed to record mission purge audit entry for ${String(record.mission)}: ${err instanceof Error ? err.message : String(err)}`

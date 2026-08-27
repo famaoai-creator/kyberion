@@ -33,6 +33,7 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
@@ -171,7 +172,8 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     this.extraArgs = options.extraArgs ?? [];
     this.nativeSubagentEnabled =
       options.nativeSubagent ??
-      (options.harnessSession !== undefined || process.env.KYBERION_CLAUDE_NATIVE_SUBAGENT === '1');
+      (options.harnessSession !== undefined ||
+        getRegisteredEnvText('KYBERION_CLAUDE_NATIVE_SUBAGENT') === '1');
     if (options.harnessSession) this.injectedHarnessSession = options.harnessSession;
     this.nativeSubagentAdopter = {
       id: 'claude-cli',

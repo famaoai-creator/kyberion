@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -39,10 +40,6 @@ export type ScopedGenerationSchedule = GenerationSchedule & { scope: EventScope 
 export interface GenerationScheduleTenantRegistryOptions {
   /** Test seam; production resolves the durable tenant registry. */
   resolveTenant?: (tenantSlug: string) => unknown;
-}
-
-function nowIso(date = new Date()): string {
-  return date.toISOString();
 }
 
 function ensureScheduleDir(): void {
@@ -204,9 +201,7 @@ export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): 
 }
 
 export function readGenerationSchedule(logicalPath: string): GenerationSchedule {
-  const schedule = JSON.parse(
-    safeReadFile(logicalPath, { encoding: 'utf8' }) as string
-  ) as GenerationSchedule;
+  const schedule = readJson<GenerationSchedule>(logicalPath);
   return normalizeGenerationSchedule(schedule);
 }
 

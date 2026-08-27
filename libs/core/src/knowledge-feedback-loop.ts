@@ -1,3 +1,4 @@
+import { appendJsonLine, readJson } from '../foundation/json.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
  * aggregation — the return half of the loop KP-01 opened up.
@@ -21,16 +22,12 @@
  * See docs/developer/improvement-plans-2026-07/
  * TASK_KNOWLEDGE_PROVISIONING_PLAN_2026-07-25.ja.md §KP-05.
  */
+
+import { getRegisteredEnvText } from '../foundation/env.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -132,7 +129,7 @@ const DEFAULT_KNOWLEDGE_FEEDBACK_CAP: KnowledgeFeedbackCap = {
 };
 
 function feedbackPolicyPath(): string {
-  const override = process.env.KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH')?.trim();
   return override
     ? pathResolver.rootResolve(override)
     : pathResolver.knowledge('product/governance/knowledge-feedback-policy.json');
@@ -142,10 +139,10 @@ function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {
   const filePath = feedbackPolicyPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP };
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as {
+    const parsed = readJson<{
       defaults?: Partial<KnowledgeFeedbackCap>;
       tenant_overrides?: Record<string, Partial<KnowledgeFeedbackCap>>;
-    };
+    }>(filePath);
     const override = scope?.tenant_slug ? parsed.tenant_overrides?.[scope.tenant_slug] : undefined;
     const values = {
       ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP,
@@ -203,7 +200,7 @@ function scopedRuntimePath(base: string, scope?: ScopeContext): string {
 }
 
 function deliveryLogDir(scope?: ScopeContext): string {
-  const override = process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_DELIVERY_DIR')?.trim();
   const base = override
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('runtime/feedback-loop/knowledge-delivery');
@@ -211,7 +208,7 @@ function deliveryLogDir(scope?: ScopeContext): string {
 }
 
 function usageAggregatePath(scope?: ScopeContext): string {
-  const override = process.env.KYBERION_KNOWLEDGE_USAGE_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_USAGE_PATH')?.trim();
   const base = override
     ? pathResolver.rootResolve(override)
     : pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json');
@@ -229,8 +226,9 @@ export function knowledgeUsageAggregatePath(scope?: ScopeContext): string {
 }
 
 function scopedFeedbackPath(kind: 'human' | 'gaps', scope?: ScopeContext): string {
-  const base = process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR?.trim()
-    ? pathResolver.rootResolve(process.env.KYBERION_KNOWLEDGE_FEEDBACK_DIR.trim())
+  const feedbackDir = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_DIR')?.trim();
+  const base = feedbackDir
+    ? pathResolver.rootResolve(feedbackDir)
     : pathResolver.shared('runtime/feedback-loop');
   const scopedDirectory = scopedRuntimePath(base, scope);
   return path.join(scopedDirectory, `knowledge-${kind}.jsonl`);
@@ -270,7 +268,7 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
   const target = scopedFeedbackPath('human', input.scope);
   const dir = path.dirname(target);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeAppendFileSync(target, `${JSON.stringify(record)}\n`);
+  appendJsonLine(target, record);
   bumpUsageAggregate(
     documentPath,
     input.verdict === 'useful' ? { used_count: 1 } : { not_used_count: 1 },
@@ -314,7 +312,7 @@ export function recordKnowledgeGap(input: {
       priorCount = 0;
     }
   }
-  safeAppendFileSync(target, `${JSON.stringify(record)}\n`);
+  appendJsonLine(target, record);
   if (input.promoteOnCluster && priorCount + 1 === 3) {
     try {
       const candidate = createMemoryPromotionCandidate({
@@ -495,7 +493,7 @@ export function recordKnowledgeDelivery(input: {
   };
 
   try {
-    safeAppendFileSync(filePath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(filePath, record);
     for (const ref of refs) {
       bumpUsageAggregate(ref.path, { delivered_count: 1 }, now, input.scope);
     }

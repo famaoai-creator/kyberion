@@ -2,7 +2,7 @@
   "actuator_id": "file-actuator",
   "version": "1.1.0",
   "description": "Generic File-Actuator for Kyberion",
-  "contract_schema": "schemas/file-pipeline.schema.json",
+  "contract_schema": "knowledge/product/schemas/file-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "filesystem_retry",
@@ -16,6 +16,10 @@
     "retryable_categories": ["resource_unavailable", "timeout"]
   },
   "capabilities": [
-    { "op": "pipeline", "schema_ref": "schemas/file-pipeline.schema.json", "platforms": ["darwin", "linux", "win32"] }
+    {
+      "op": "pipeline",
+      "schema_ref": "knowledge/product/schemas/file-pipeline.schema.json",
+      "platforms": ["darwin", "linux", "win32"]
+    }
   ]
 }

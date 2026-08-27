@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 /**
  * KC-06: claim-based delegation completion notifications.
  *
@@ -13,15 +14,10 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
 export interface DelegationNotification {
   notification_id: string;
@@ -57,7 +53,7 @@ export interface DelegationNotificationFilter {
 // Tests namespace the queue via KYBERION_DELEGATION_NOTIFICATIONS_PATH so
 // parallel suites never clobber the real queue file (resolved lazily per call).
 function resolveQueuePath(): string {
-  const override = process.env.KYBERION_DELEGATION_NOTIFICATIONS_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_NOTIFICATIONS_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('runtime/delegations/notifications.jsonl');
 }
@@ -130,7 +126,7 @@ export function enqueueDelegationNotification(input: {
   }
   withLockSync('delegation-notifications', () => {
     ensureQueueDir();
-    safeAppendFileSync(resolveQueuePath(), `${JSON.stringify(notification)}\n`, 'utf8');
+    appendJsonLine(resolveQueuePath(), notification);
   });
   return notification;
 }

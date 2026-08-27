@@ -1,7 +1,5 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
 import {
   pathResolver,
   resolveActiveProfileRoot,
@@ -11,6 +9,7 @@ import {
   safeStat,
   buildAgentCollaborationProjection,
 } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CheckResult {
   id: string;
@@ -148,8 +147,8 @@ export function buildVitalReport() {
   };
 }
 
-async function main() {
-  const argv = await yargs(hideBin(process.argv))
+async function main(args: string[] = []): Promise<number> {
+  const argv = await yargs(args)
     .option('format', { type: 'string', choices: ['json', 'text'] as const, default: 'json' })
     .option('exit-on-missing', { type: 'boolean', default: true })
     .strict()
@@ -171,15 +170,21 @@ async function main() {
   }
 
   if (argv['exit-on-missing'] && result.overall !== 'healthy') {
-    process.exit(3);
+    return 3;
   }
+  return 0;
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
-
-if (isMainModule) {
-  main().catch((err) => {
-    console.error('vital_check failed:', err.message || err);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'vital_check.ts') ||
+  isDirectScript(import.meta.url, 'vital_check.js')
+)
+  void defineScript({
+    name: 'vital:check',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0)
+        throw new ScriptExitError(status, `vital:check failed with exit code ${status}`);
+    },
+  })();

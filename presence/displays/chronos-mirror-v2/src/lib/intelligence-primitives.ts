@@ -70,6 +70,7 @@ export {
 export { pathResolver } from '@agent/core/path-resolver';
 export {
   safeExistsSync,
+  loadJson,
   safeReadFile,
   safeReaddir,
   safeStat,

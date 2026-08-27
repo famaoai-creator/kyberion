@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/operator-learning-scenario-pack.schema.json",
   "version": "1.0.0",
   "scenarios": [
     {

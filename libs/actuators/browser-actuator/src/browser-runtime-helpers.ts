@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -8,9 +9,9 @@ import {
   safeRmSync,
   safeExec,
   secureFetch,
-  buildGovernedRetryOptions,
   pathResolver,
   normalizeBrowserPipelineOp,
+  getOpInputContract,
   validateOpInput,
 } from '@agent/core';
 import {
@@ -178,37 +179,7 @@ const BROWSER_SESSION_DIR = path.join(BROWSER_RUNTIME_DIR, 'sessions');
 const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const BROWSER_ACTION_TRAIL_DIR = path.join(BROWSER_RUNTIME_DIR, 'action-trails');
 const BROWSER_APPROVAL_DIR = path.join(BROWSER_RUNTIME_DIR, 'approvals');
-const BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
-  'libs/actuators/browser-actuator/manifest.json'
-);
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
-
-const DEFAULT_BROWSER_RETRY = {
-  maxRetries: 2,
-  initialDelayMs: 500,
-  maxDelayMs: 5000,
-  factor: 2,
-  jitter: true,
-};
-
-function buildRetryOptions(stepParams: Record<string, any>) {
-  const explicitRetry =
-    stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
-      ? { ...(stepParams.retry as Record<string, any>) }
-      : {};
-  if (stepParams?.max_retries !== undefined)
-    explicitRetry.maxRetries = Number(stepParams.max_retries);
-  if (stepParams?.retry_delay_ms !== undefined)
-    explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildGovernedRetryOptions({
-    manifestPath: BROWSER_MANIFEST_PATH,
-    defaults: DEFAULT_BROWSER_RETRY,
-    override: explicitRetry,
-    fallbackCategories: ['network', 'timeout', 'resource_unavailable'],
-    additionalShouldRetry: (error) =>
-      /selector|not visible|strict mode violation|detached/i.test(error.message),
-  });
-}
 
 function createBrowserRuntime(
   context: BrowserContext,
@@ -371,9 +342,7 @@ function assertNavigationAllowed(
 function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as BrowserSessionMetadata;
+    return loadJson<BrowserSessionMetadata>(filePath);
   } catch {
     return null;
   }
@@ -547,7 +516,7 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const value = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+    const value = loadJson<unknown>(filePath);
     return Array.isArray(value) ? value.slice(-200) : [];
   } catch {
     return [];
@@ -600,7 +569,7 @@ function completeOperatorApproval(
   let current: Record<string, unknown> = {};
   if (safeExistsSync(filePath)) {
     try {
-      current = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      current = loadJson<Record<string, unknown>>(filePath);
     } catch {
       // A corrupt approval artifact is replaced with a fresh terminal state.
     }
@@ -922,9 +891,23 @@ function renderPlaywrightSkeleton(
     assertionLines.push(rendered);
   };
 
+  const validateRecordedAction = (op: string, action: BrowserRecordedAction) => {
+    const contract = getOpInputContract('browser', op);
+    const properties = contract?.schema?.properties;
+    const input =
+      properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? Object.fromEntries(
+            Object.keys(action)
+              .filter((key) => key in (properties as Record<string, unknown>))
+              .map((key) => [key, (action as unknown as Record<string, unknown>)[key]])
+          )
+        : action;
+    return validateOpInput('browser', op, input);
+  };
+
   for (const action of trail) {
     const op = normalizeBrowserPipelineOp(action.op);
-    const validation = validateOpInput('browser', op, action);
+    const validation = validateRecordedAction(op, action);
     if (!validation.valid) {
       throw new Error(
         `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
@@ -1062,7 +1045,17 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
   const steps: PipelineStep[] = [];
   for (const action of trail) {
     const op = normalizeBrowserPipelineOp(action.op);
-    const validation = validateOpInput('browser', op, action);
+    const contract = getOpInputContract('browser', op);
+    const properties = contract?.schema?.properties;
+    const input =
+      properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? Object.fromEntries(
+            Object.keys(action)
+              .filter((key) => key in (properties as Record<string, unknown>))
+              .map((key) => [key, (action as unknown as Record<string, unknown>)[key]])
+          )
+        : action;
+    const validation = validateOpInput('browser', op, input);
     if (!validation.valid) {
       throw new Error(
         `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`

@@ -8,6 +8,7 @@
 
 import { safeExec, pathResolver } from '@agent/core';
 import { checkTitle } from './check_pr_title.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const MERGE_PULL_REQUEST_SUBJECT_RE = /^Merge pull request #\d+ from [^\s]+\/[^\s]+$/;
 
@@ -26,21 +27,17 @@ export function checkCommitSubject(subject: string): ReturnType<typeof checkTitl
   return checkTitle(subject, 'HEAD commit subject');
 }
 
-async function main(): Promise<void> {
-  const result = checkCommitSubject(readHeadSubject());
-  if (result.ok) {
-    console.log(`✅ ${result.source}: ${result.value}`);
-  } else {
-    console.error(`❌ ${result.source}: ${result.value}`);
-    console.error(`   ${result.reason}`);
-  }
-  process.exit(result.ok ? 0 : 1);
-}
+export const runCheckCommitSubject = defineScript({
+  name: 'check:commit-subject',
+  run(context) {
+    const result = checkCommitSubject(readHeadSubject());
+    if (!result.ok) throw new Error(`${result.source}: ${result.value} (${result.reason})`);
+    context.print(context.json ? result : `✅ ${result.source}: ${result.value}`);
+  },
+});
 
-const isDirect = process.argv[1] && /check_commit_subject\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'check_commit_subject.ts') ||
+  isDirectScript(import.meta.url, 'check_commit_subject.js')
+)
+  void runCheckCommitSubject();

@@ -1,11 +1,12 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import { appendJsonLine } from './foundation/json.js';
+import type { ValidateFunction } from 'ajv';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -57,9 +58,9 @@ export interface MemoryCandidate {
   };
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-const SCHEMA_PATH = pathResolver.rootResolve('schemas/memory-candidate.schema.json');
+const SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/memory-candidate.schema.json'
+);
 const GLOBAL_QUEUE_PATH = 'active/shared/runtime/memory/promotion-queue.jsonl';
 const TENANT_RUNTIME_ROOT = 'active/shared/runtime/tenants';
 
@@ -81,7 +82,7 @@ function tenantQueueScope(scope: MemoryScopeEnvelope): {
 // tenant runtime namespace; legacy/unscoped candidates remain in the global
 // queue until the migration steward adopts them.
 function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
-  const override = process.env.KYBERION_MEMORY_QUEUE_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   if (scope?.tenant_slug) {
     return pathResolver.rootResolve(
@@ -97,7 +98,7 @@ function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
 }
 
 function queuePathsForAllScopes(): string[] {
-  if (process.env.KYBERION_MEMORY_QUEUE_PATH?.trim()) return [resolveQueuePath()];
+  if (getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim()) return [resolveQueuePath()];
   const paths = [resolveQueuePath()];
   const tenantRoot = pathResolver.rootResolve(TENANT_RUNTIME_ROOT);
   if (!safeExistsSync(tenantRoot) || !safeStat(tenantRoot).isDirectory()) return paths;
@@ -114,7 +115,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  validateFn = compileSchema(SCHEMA_PATH);
   return validateFn;
 }
 
@@ -329,7 +330,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!nextCandidate.audit_ref && process.env.NODE_ENV !== 'test') {
     try {
       const audit = auditChain.record({
-        agentId: process.env.KYBERION_AGENT_ID || 'knowledge-promotion-queue',
+        agentId: getRegisteredEnvText('KYBERION_AGENT_ID') || 'knowledge-promotion-queue',
         action: 'knowledge_promotion_candidate',
         operation: 'enqueue',
         result: 'completed',
@@ -351,7 +352,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   if (!nextValidation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${nextValidation.errors.join('; ')}`);
   }
-  safeAppendFileSync(queuePath, `${JSON.stringify(nextCandidate)}\n`);
+  appendJsonLine(queuePath, nextCandidate);
   return queuePath;
 }
 

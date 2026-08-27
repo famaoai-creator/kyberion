@@ -24,12 +24,13 @@ import {
   compileBrowserRecording,
   invalidateProcedureCache,
   resolveAllowlistedRecordingRef,
-  safeReadFile,
   safeWriteFile,
   validateBrowserExtensionRecording,
   pathResolver,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import type { ProcedureCatalog, ProcedureEntry } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -53,20 +54,20 @@ function parseArgs(argv: string[]): Record<string, string> {
 
 function fail(message: string): never {
   process.stderr.write(`[promote-procedure] ${message}\n`);
-  process.exit(1);
+  throw new ScriptExitError(1, '', true);
 }
 
 function printUsage(): void {
   process.stderr.write(
-    '[promote-procedure] Usage: node dist/scripts/promote_procedure.js --recording <path> --procedure-id <id> --intent-phrases <json> [--status active|deprecated] [--mission-id <id>]\n',
+    '[promote-procedure] Usage: node dist/scripts/promote_procedure.js --recording <path> --procedure-id <id> --intent-phrases <json> [--status active|deprecated] [--mission-id <id>]\n'
   );
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
+export function main(argv: string[] = []): void {
+  const args = parseArgs(argv);
   if (args.help === 'true') {
     printUsage();
-    process.exit(0);
+    return;
   }
 
   const recordingRef = args['recording'];
@@ -81,7 +82,7 @@ function main(): void {
   if (!missionId) {
     process.stderr.write(
       '[promote-procedure] WARNING: no --mission-id / MISSION_ID — promotion is not mission-attributed. ' +
-        'Run within a mission for a governed audit trail.\n',
+        'Run within a mission for a governed audit trail.\n'
     );
   }
 
@@ -102,7 +103,11 @@ function main(): void {
   let intentPhrases: string[];
   try {
     const parsed = intentPhrasesRaw ? JSON.parse(intentPhrasesRaw) : [];
-    if (!Array.isArray(parsed) || parsed.some((p) => typeof p !== 'string') || parsed.length === 0) {
+    if (
+      !Array.isArray(parsed) ||
+      parsed.some((p) => typeof p !== 'string') ||
+      parsed.length === 0
+    ) {
       throw new Error('must be a non-empty JSON array of strings');
     }
     intentPhrases = parsed;
@@ -113,7 +118,7 @@ function main(): void {
   // Load + schema-validate the recording (data, never code).
   let rawRecording: unknown;
   try {
-    rawRecording = JSON.parse(safeReadFile(recordingAbs, { encoding: 'utf8' }) as string);
+    rawRecording = readJson<unknown>(recordingAbs);
   } catch (err) {
     return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -134,7 +139,7 @@ function main(): void {
   const catalogAbs = pathResolver.rootResolve(CATALOG_PATH);
   let catalog: ProcedureCatalog;
   try {
-    catalog = JSON.parse(safeReadFile(catalogAbs, { encoding: 'utf8' }) as string) as ProcedureCatalog;
+    catalog = readJson<ProcedureCatalog>(catalogAbs);
   } catch {
     catalog = { schema_version: 'procedures.v1', procedures: [] };
   }
@@ -155,7 +160,12 @@ function main(): void {
       operation: 'procedure:promote',
       result: 'allowed',
       reason: `Promoted procedure "${procedureId}" from recording`,
-      metadata: { procedureId, recordingRef, missionId: missionId || null, riskClass: compiled.procedureEntry.risk_class },
+      metadata: {
+        procedureId,
+        recordingRef,
+        missionId: missionId || null,
+        riskClass: compiled.procedureEntry.risk_class,
+      },
     });
   } catch {
     // audit is best-effort; never block promotion on audit failure
@@ -163,8 +173,18 @@ function main(): void {
 
   process.stdout.write(
     `[promote-procedure] registered "${procedureId}" (risk=${compiled.procedureEntry.risk_class}, ` +
-      `status=${status}, mission=${missionId || 'none'})\n`,
+      `status=${status}, mission=${missionId || 'none'})\n`
   );
 }
 
-main();
+export const runPromoteProcedure = defineScript({
+  name: 'procedure:promote',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'promote_procedure.ts') ||
+  isDirectScript(import.meta.url, 'promote_procedure.js')
+)
+  void runPromoteProcedure();

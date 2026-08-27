@@ -1,18 +1,28 @@
 # 🚀 Kyberion Ecosystem: Onboarding & Initialization Guide
 
-この文書は、Kyberion エコシステムの物理的起動と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）の完全なプロセスを定義します。
+この文書は、first-win 後の Day-2 初期化と、主権者（Sovereign）としてのアイデンティティ確立（オンボーディング）を定義します。first-win の正本は [QUICKSTART.md](./QUICKSTART.md) です。文書カテゴリごとの正本・補足資料の対応は [documentation-source-map.json](./documentation-source-map.json) を参照してください。
 tenant・organization・activation・最初の仕事までの業務フローは、[オンボーディング標準フロー](../knowledge/product/governance/onboarding-flow.md)を正本とします。
 
-> **この文書がコールドスタート手順の唯一の正本です。** README / QUICKSTART / AGENTS.md は要約とここへのリンクのみを持ち、手順が食い違う場合は本書を正とします。
+> **first-win の手順は QUICKSTART.md が正本です。** README は要約のみを持ち、この文書は first-win 後の tenant / organization / activation 手順を扱います。
 
 ## 📋 クイック・スタート (Quick Commands)
 
 システムをゼロから立ち上げるための標準的なコマンド列です。
 
-最短経路だけ先に知りたい場合は、次の 1 本から始められます。
+first-win をまだ実行していない場合は、先に QUICKSTART.md の5コマンドを完了してください。Day-2 の最短経路は次です。
+
+# kyberion-first-win
 
 ```bash
-pnpm install && pnpm prereq:check && pnpm build && pnpm setup:report --persona first-time-user
+pnpm install
+pnpm build
+pnpm prereq:check
+pnpm doctor
+pnpm pipeline --input pipelines/verify-session.json
+```
+
+```bash
+pnpm setup:report --persona first-time-user
 ```
 
 前提:
@@ -39,15 +49,20 @@ winget install --id Microsoft.FoundryLocal --exact --source winget --accept-sour
 導入後に PowerShell を開き直し、通常の手順を続けてください。既存の governed manifest を使う場合は、次のコマンドで不足を確認し、承認付きで適用できます。
 
 ```powershell
+pnpm install
+pnpm build
 pnpm prereq:check
 pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ```
 
-````bash
+```bash
 # 1. 物理的基盤の確立 (依存関係のインストール)
 pnpm install
 
-# 2. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
+# 2. システムの具現化 (ビルド。dist/を使う後続コマンドの前提)
+pnpm build
+
+# 3. 事前ツール確認 (Node 24+ floor / pnpm / git / Playwright ブラウザ有無 などを一括チェック)
 pnpm prereq:check
 
 # 2b. (推奨) ブラウザ first-win 用の Playwright ブラウザ導入
@@ -60,9 +75,6 @@ pnpm exec playwright install chromium
 pnpm deps:check --actuator browser
 pnpm deps:check --actuator voice
 pnpm deps:check --actuator media-generation
-
-# 3. システムの具現化 (ビルド)
-pnpm build
 
 # 4. バックグラウンド surface の認証準備を確認
 pnpm surfaces:setup
@@ -81,6 +93,7 @@ pnpm surfaces:reconcile
 
 # 9. 魂の注入 (オンボーディング)
 pnpm onboard
+```
 
 `pnpm onboard` は `dist/` が必要です。`pnpm build` を先に実行してから起動してください。
 
@@ -92,7 +105,7 @@ pnpm onboard
 pnpm company:onboard --vertical saas-product-company --slug <company-slug> \
   --name "<会社名>" --owner-id human:founder \
   --goal "最初に達成する顧客成果" --dry-run
-````
+```
 
 dry-runで書き込み範囲を確認してから同じコマンドを実行してください。適用後は `customer/<company-slug>/onboarding/ai-company-readiness.json` と `first-work-plan.md` を確認します。AI workerは作業を準備・実行できますが、契約、支払、外部公開、権限変更などの最終判断は `--owner-id` の人間が保持します。
 
@@ -120,8 +133,6 @@ pnpm tenant:activation activate \
 
 その後に `onboarding:context first-work --dry-run --json` で管理単位を確認します。
 
-````
-
 ---
 
 ## 🔍 詳細プロセスと物理的効果 (Detailed Process)
@@ -134,17 +145,7 @@ pnpm tenant:activation activate \
   - `node_modules/` が生成されます。
   - ワークスペース間のシンボリックリンク（`@agent/core` など）が構築されます。
 
-### Stage 2: 事前ツール確認 (Prerequisite Toolchain Check)
-
-- **実行コマンド**: `pnpm prereq:check`
-- **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
-- **チェック内容の補足**:
-  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
-  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。
-- **物理的変化**:
-  - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
-
-### Stage 3: システムの具現化 (System Manifestation)
+### Stage 2: システムの具現化 (System Manifestation)
 
 - **実行コマンド**: `pnpm build`
 - **目的**: 依存関係をコンパイルし、実行可能なバイナリ（JavaScript）を生成します。
@@ -154,6 +155,16 @@ pnpm tenant:activation activate \
   - workspace 間の runtime contract が再構築されます。
 - **ステップ構成**: `build:packages` → `build:actuators` → `build:repo` → `build:ui`。
   個別実行する場合は `pnpm build:ui` のみで Chronos UI を再ビルドできます。
+
+### Stage 3: 事前ツール確認 (Prerequisite Toolchain Check)
+
+- **実行コマンド**: `pnpm prereq:check`
+- **目的**: Node / pnpm / git / TypeScript / tsx / vitest など、Kyberion をソースから動かすための基本ツールが揃っているかを確認します。
+- **チェック内容の補足**:
+  - **Node floor 検証**: 実行中の Node が `package.json` の `engines`（`>=24.0.0`）を満たすかを実バージョン比較で検証し、不足なら `nvm install 24 && nvm use 24` を案内して失敗します（バイナリ存在確認だけの素通りはしません）。
+  - **Playwright ブラウザ有無**: ブラウザキャッシュ（`ms-playwright`）が見つからない場合、**非致命の警告**として `pnpm exec playwright install chromium` を案内します。ブラウザ first-win を使うなら導入してください。
+- **物理的変化**:
+  - まだ実体の変更は行いません。足りないツールやローカル依存が要約されます。
 
 ### Python Runtime Resolution
 
@@ -213,11 +224,11 @@ pnpm tenant:activation activate \
 ### Media Runtime Preflight
 
 - **実行コマンド**: `pnpm service:preflight -- --service media-generation`
-- **補助コマンド**: `pnpm media:preflight`
+- **補助コマンド**: `pnpm service:preflight -- --service media-generation`
 - **目的**: `media-generation` 系の実装や MV パイプラインを開始する前に、ローカルの ComfyUI サービス runtime が試行可能かを確認します。
 - **使いどころ**:
   - `pnpm service:preflight -- --service media-generation` が通るなら、`media-generation` の runtime 側前提は少なくとも到達可能です。
-  - `pnpm media:preflight` は同じ runtime の簡易確認として使えます。
+  - `pnpm service:preflight -- --service media-generation` が auth と runtime の両方を確認する canonical 入口です。
   - 失敗した場合は `pnpm services:setup` とあわせて、ComfyUI の起動・プロビジョニング・接続先の確認を進めます。
 
 ### Stage 8: Runtime Surface Reconciliation
@@ -265,11 +276,11 @@ pnpm tenant:activation activate \
 
 会社・顧客オンボーディング後は、最初の仕事を作る前に customer・tenant・organization の対応を確認します。ここで 3 つの別物が結び付けられるので、先に区別しておきます:
 
-| 何を指すか                             | 役割                                                             | 置き場                                          |
-| -------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------- |
-| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定**   | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
-| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**               | `knowledge/confidential/{tenant-slug}/`         |
-| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル   | `active/organizations/{tier}/{tenant}/{org_id}` |
+| 何を指すか                             | 役割                                                           | 置き場                                          |
+| -------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------- |
+| **customer-slug**（stance / 運用主体） | 「いま自分はどの主体として振る舞っているか」— **実行時の設定** | `customer/{slug}/` + `KYBERION_CUSTOMER`        |
+| **tenant-slug**（テナント）            | 「いまどの機密境界の内側にいるか」— **データ境界**             | `knowledge/confidential/{tenant-slug}/`         |
+| **organization-id**（組織）            | 「そのテナントをどう運営しているか」— テナント配下の運用モデル | `active/organizations/{tier}/{tenant}/{org_id}` |
 
 `customer-slug` と `tenant-slug` は同じ綴りになることが多いですが同一物ではありません（前者は設定、後者は境界）。包含順の正本は [entity-scope-hierarchy](../knowledge/product/architecture/entity-scope-hierarchy.md)、3 層の区別は [stance-tenant-customer-model](../knowledge/product/architecture/stance-tenant-customer-model.md) を参照。テナント自身の顧客は `knowledge/confidential/{tenant-slug}/customers/` に置き、`customer/{slug}/` には置きません。
 
@@ -319,7 +330,7 @@ Project Bootstrap 候補になり、定常運用・サービス運用・イン�
 
 ```bash
 pnpm vital
-````
+```
 
 **期待される出力例**:
 

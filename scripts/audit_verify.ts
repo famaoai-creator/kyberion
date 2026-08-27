@@ -8,6 +8,8 @@ import {
   formatAuditVerifyReport,
   type AuditVerifyCliReport,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { collectAuditVerifyReport, formatAuditVerifyReport, type AuditVerifyCliReport };
 
@@ -34,22 +36,22 @@ function validateSince(value: unknown, days?: number): string | undefined {
   return since;
 }
 
-function readArgValue(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  if (index >= 0 && process.argv[index + 1] && !process.argv[index + 1].startsWith('--')) {
-    return process.argv[index + 1];
+function readArgValue(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index >= 0 && args[index + 1] && !args[index + 1].startsWith('--')) {
+    return args[index + 1];
   }
   const prefix = `${name}=`;
-  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  const match = args.find((arg) => arg.startsWith(prefix));
   return match ? match.slice(prefix.length) : undefined;
 }
 
-function hasArg(name: string): boolean {
-  return process.argv.includes(name) || process.argv.some((arg) => arg.startsWith(`${name}=`));
+function hasArg(args: string[], name: string): boolean {
+  return args.includes(name) || args.some((arg) => arg.startsWith(`${name}=`));
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = await createStandardYargs(['node', 'audit_verify', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('since', { type: 'string', describe: 'Audit file lower bound in YYYY-MM-DD form' })
     .option('days', { type: 'number', describe: 'Verify only the last N days (overrides --since)' })
@@ -66,16 +68,16 @@ async function main(): Promise<void> {
 
   const report = collectAuditVerifyReport({
     since: validateSince(
-      argv.since ?? readArgValue('--since'),
+      argv.since ?? readArgValue(args, '--since'),
       argv.days
         ? Number(argv.days)
-        : readArgValue('--days')
-          ? Number(readArgValue('--days'))
+        : readArgValue(args, '--days')
+          ? Number(readArgValue(args, '--days'))
           : undefined
     ),
-    ledgers: parseLedgerArgs(argv.ledger ?? readArgValue('--ledger')),
+    ledgers: parseLedgerArgs(argv.ledger ?? readArgValue(args, '--ledger')),
   });
-  if (argv.json || hasArg('--json')) {
+  if (argv.json || hasArg(args, '--json')) {
     console.log(JSON.stringify(report, null, 2));
   } else {
     for (const line of formatAuditVerifyReport(report)) console.log(line);
@@ -85,21 +87,26 @@ async function main(): Promise<void> {
   // switches go through a warn observation period first. Set
   // KYBERION_AUDIT_CONTINUITY_ENFORCE=true (or drop --warn-only) to enforce.
   const warnOnly =
-    (argv.warnOnly || hasArg('--warn-only')) &&
-    process.env.KYBERION_AUDIT_CONTINUITY_ENFORCE !== 'true';
+    (argv.warnOnly || hasArg(args, '--warn-only')) &&
+    getRegisteredEnvText('KYBERION_AUDIT_CONTINUITY_ENFORCE') !== 'true';
   if (!report.ok && warnOnly) {
     console.warn(
       '[audit:verify] findings detected but running in warn observation mode (SA-01); exiting 0.'
     );
-    process.exit(0);
+    return 0;
   }
-  process.exit(report.ok ? 0 : 1);
+  return report.ok ? 0 : 1;
 }
 
-const isDirect = process.argv[1] && /audit_verify\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'audit_verify.ts') ||
+  isDirectScript(import.meta.url, 'audit_verify.js')
+)
+  void defineScript({
+    name: 'audit:verify',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`audit:verify failed with exit code ${status}`);
+    },
+  })();

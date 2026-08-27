@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
-import { Ajv, type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import type { DeliverableKind } from './deliverable-quality.js';
@@ -75,14 +76,13 @@ export interface ArtifactReviewReceiptInput {
   reviewedAt?: string;
 }
 
-const ajv = new Ajv({ allErrors: true });
 const RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/artifact-review-receipt.schema.json'
 );
 let receiptValidator: ValidateFunction | null = null;
 
 function getReceiptValidator(): ValidateFunction {
-  if (!receiptValidator) receiptValidator = compileSchemaFromPath(ajv, RECEIPT_SCHEMA_PATH);
+  if (!receiptValidator) receiptValidator = compileSchema(RECEIPT_SCHEMA_PATH);
   return receiptValidator;
 }
 
@@ -161,7 +161,7 @@ export function validateArtifactReviewReceipt(value: unknown): {
 }
 
 export function loadArtifactReviewReceipt(path: string): ArtifactReviewReceipt {
-  const value = JSON.parse(String(safeReadFile(path, { encoding: 'utf8' }))) as unknown;
+  const value = readJson<unknown>(path);
   const validation = validateArtifactReviewReceipt(value);
   if (!validation.valid || !validation.receipt) {
     throw new Error(`Invalid artifact review receipt ${path}: ${validation.errors.join('; ')}`);

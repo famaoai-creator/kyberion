@@ -28,6 +28,11 @@ vi.mock('./secure-io.js', () => ({
     if (!files.has(p)) throw new Error('ENOENT');
     return files.get(p)!;
   },
+  loadJson: <T>(p: string) => JSON.parse(files.get(p) || '{}') as T,
+  loadJsonIfPresent: <T>(p: string) => {
+    const value = files.get(p);
+    return value === undefined ? null : (JSON.parse(value) as T);
+  },
   safeWriteFile: (p: string, data: string) => {
     files.set(p, data);
   },
@@ -39,6 +44,22 @@ vi.mock('./secure-io.js', () => ({
     files.delete(p);
   },
   safeAppendFileSync: () => undefined,
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(p: string): T => JSON.parse(files.get(p) || '{}') as T,
+    loadJsonIfPresent: <T>(p: string): T | null => {
+      const value = files.get(p);
+      return value === undefined ? null : (JSON.parse(value) as T);
+    },
+    appendFile: () => undefined,
+    exists: (p: string) => files.has(p),
+    readFile: (p: string) => files.get(p) || '',
+    stat: () => ({ mtimeMs: 1, size: 1 }),
+    writeFile: (p: string, data: string) => files.set(p, data),
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 function provider(

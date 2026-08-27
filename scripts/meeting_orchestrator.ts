@@ -37,8 +37,9 @@ import {
   listActionItems,
   summarizeActionItemLifecycle,
 } from '@agent/core';
+import { isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { readTextFile } from './refactor/cli-input.js';
+import { readTextFile } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;
@@ -298,11 +299,13 @@ async function main(): Promise<void> {
   summarize(options.mission);
 }
 
-const isDirect = process.argv[1] && /meeting_orchestrator\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'meeting_orchestrator.ts') ||
+  isDirectScript(import.meta.url, 'meeting_orchestrator.js')
+) {
   main().catch((err) => {
     logger.error(err?.message ?? String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

@@ -4,6 +4,7 @@ import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { resolveSecretSync } from './secret-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   decryptConnectionDocument,
   encryptConnectionDocument,
@@ -57,14 +58,14 @@ const _loadPersonalSecrets = () => {
         const serviceName = item.toUpperCase();
         const subFiles = safeReaddir(fullPath).filter((f) => f.endsWith('.json'));
         for (const subFile of subFiles) {
-          const content = JSON.parse(
-            safeReadFile(path.join(fullPath, subFile), { encoding: 'utf8' }) as string
+          const content = secureIo.withSensitivePathMediation(() =>
+            readJson<unknown>(path.join(fullPath, subFile))
           );
           _mapContentToSecrets(serviceName, content);
         }
       } else if (item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
-        let content = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        let content = secureIo.loadJson<unknown>(fullPath);
         if (isEncryptedConnectionEnvelope(content)) {
           // Startup scan runs at module import — an undecryptable file must
           // degrade to a warning here, not crash every importer.
@@ -116,7 +117,7 @@ function _loadConnectionDocument(serviceId: string): Record<string, any> {
   if (!safeExistsSync(fullPath)) return {};
   let parsed: unknown;
   try {
-    parsed = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+    parsed = secureIo.loadJson<unknown>(fullPath);
   } catch (_) {
     return {};
   }
@@ -270,7 +271,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
-      const secrets = JSON.parse(safeReadFile(SECRETS_FILE, { encoding: 'utf8' }) as string);
+      const secrets = secureIo.loadJson<unknown>(SECRETS_FILE);
       value = secrets[key];
     } catch (_) {
       /* secrets file absent or corrupt: fall back to env-only resolution */

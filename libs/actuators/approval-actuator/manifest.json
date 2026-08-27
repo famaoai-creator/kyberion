@@ -2,7 +2,7 @@
   "actuator_id": "approval-actuator",
   "version": "1.1.0",
   "description": "Human approval request state transitions and decision handling",
-  "contract_schema": "schemas/approval-action.schema.json",
+  "contract_schema": "knowledge/product/schemas/approval-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
     "fallback_strategy": "approval_read_retry",

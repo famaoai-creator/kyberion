@@ -25,6 +25,7 @@
  * state, so gating/auditing it would only add noise.
  */
 import { buildMissionSystem, missionSystem } from './mission-system.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveRole } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { buildMissionStatusView, listMissionSummaries } from './mission-read-model.js';
@@ -65,7 +66,9 @@ function assertMissionControllerContext(verb: string): void {
 }
 
 function resolveActor(): string {
-  return process.env.KYBERION_PERSONA || process.env.MISSION_ROLE || 'mission_controller';
+  return (
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'mission_controller'
+  );
 }
 
 /**

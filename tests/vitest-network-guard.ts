@@ -1,7 +1,65 @@
 import { syncBuiltinESMExports } from 'node:module';
 import http from 'node:http';
 import https from 'node:https';
-import { afterAll } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { afterAll, beforeEach, vi } from 'vitest';
+function testPath(filePath: string): string {
+  return path.isAbsolute(filePath)
+    ? filePath
+    : path.join(process.env.KYBERION_ROOT || process.cwd(), filePath);
+}
+
+async function installTestIoSeams(): Promise<void> {
+  const lockIo = {
+    exists: (filePath: string): boolean => fs.existsSync(testPath(filePath)),
+    mkdir: (dirPath: string): void => fs.mkdirSync(testPath(dirPath), { recursive: true }),
+    createExclusive: (filePath: string, content: string): void => {
+      const resolved = testPath(filePath);
+      fs.mkdirSync(path.dirname(resolved), { recursive: true });
+      fs.writeFileSync(resolved, content, { encoding: 'utf8', flag: 'wx' });
+    },
+    unlink: (filePath: string): void => fs.unlinkSync(testPath(filePath)),
+    loadJson: <T>(filePath: string): T =>
+      JSON.parse(fs.readFileSync(testPath(filePath), 'utf8')) as T,
+  };
+  const chainIo = {
+    exists: (filePath: string): boolean => fs.existsSync(testPath(filePath)),
+    read: (filePath: string): string => fs.readFileSync(testPath(filePath), 'utf8'),
+    mkdir: (dirPath: string): void => fs.mkdirSync(testPath(dirPath), { recursive: true }),
+    createExclusive: (filePath: string, content: string): void => {
+      const resolved = testPath(filePath);
+      fs.mkdirSync(path.dirname(resolved), { recursive: true });
+      fs.writeFileSync(resolved, content, { encoding: 'utf8', flag: 'wx' });
+    },
+    chmod: (filePath: string, mode: number): void => fs.chmodSync(testPath(filePath), mode),
+  };
+  const auditIo = {
+    read: (filePath: string): string => fs.readFileSync(testPath(filePath), 'utf8'),
+    loadJson: <T>(filePath: string): T =>
+      JSON.parse(fs.readFileSync(testPath(filePath), 'utf8')) as T,
+    exists: (filePath: string): boolean => fs.existsSync(testPath(filePath)),
+    mkdir: (dirPath: string): void => fs.mkdirSync(testPath(dirPath), { recursive: true }),
+    readdir: (dirPath: string): string[] => fs.readdirSync(testPath(dirPath)),
+    append: (filePath: string, content: string): void => {
+      const resolved = testPath(filePath);
+      fs.mkdirSync(path.dirname(resolved), { recursive: true });
+      fs.appendFileSync(resolved, content, 'utf8');
+    },
+  };
+  // Foundation JSON is never globally replaced by a raw filesystem adapter.
+  // Production foundation imports bootstrap secure-io; isolated suites own an
+  // explicit, path-confined FoundationIo fixture in that suite.
+  (globalThis as typeof globalThis & { __kyberionVitestIo?: unknown }).__kyberionVitestIo = {
+    lockIo,
+    chainIo,
+    auditIo,
+  };
+}
+
+// Lock/chain/audit test seams remain explicit because those modules expose
+// narrow test adapters. Foundation JSON always uses the real secure-io bridge.
+beforeEach(async () => installTestIoSeams());
 
 export interface VitestNetworkEgressAttempt {
   origin: string;

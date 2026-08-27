@@ -1,15 +1,17 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
-  findChronosTokenRegistration,
   currentScope,
-  isValidChronosScopeId,
-  isValidTenantSlug,
-  matchesChronosToken,
   readChronosTokenRegistrations,
+  defaultSurfaceViewerTierAccess,
+  narrowSurfaceViewerScope,
+  resolveSurfaceViewerTierAccess,
+  extractSurfaceBearerToken,
+  resolveSurfaceViewerToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
@@ -34,21 +36,18 @@ export class ConciergeViewerError extends Error {
 }
 
 function isLoopbackRequest(req: NextRequest): boolean {
-  const hostname = req.nextUrl.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const loopbackHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  if (!loopbackHost) return false;
-  return (
-    !forwarded ||
-    forwarded === '127.0.0.1' ||
-    forwarded === '::1' ||
-    forwarded === '::ffff:127.0.0.1'
-  );
+  const directIp = (req as NextRequest & { ip?: string }).ip;
+  const peerIp =
+    directIp ||
+    (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true
+      ? req.headers.get('x-real-ip')?.trim() ||
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      : undefined);
+  return peerIp === '127.0.0.1' || peerIp === '::1' || peerIp === '::ffff:127.0.0.1';
 }
 
 function bearerToken(req: NextRequest): string | null {
-  const value = req.headers.get('authorization') || '';
-  return value.startsWith('Bearer ') ? value.slice(7).trim() || null : null;
+  return extractSurfaceBearerToken(req.headers.get('authorization')) || null;
 }
 
 function registrations(): ChronosTokenRegistration[] | null {
@@ -59,47 +58,70 @@ function registrations(): ChronosTokenRegistration[] | null {
   }
 }
 
-function registeredViewer(token: string): ChronosTokenRegistration | null {
-  const registry = registrations();
-  return registry ? findChronosTokenRegistration(token, registry) : null;
+type ConciergeTier = ConciergeViewerContext['tierAccess'][number];
+
+/** Concierge roles currently expose public/confidential; personal remains masked. */
+function maskPersonalTier(tiers: readonly ConciergeTier[]): ConciergeViewerContext['tierAccess'] {
+  return tiers.filter((tier) => tier !== 'personal');
 }
 
-function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
-  return role === 'localadmin'
-    ? ['personal', 'confidential', 'public']
-    : ['confidential', 'public'];
+/** Concierge roles currently expose public/confidential; personal remains masked. */
+export function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tierAccess'] {
+  return maskPersonalTier(defaultSurfaceViewerTierAccess(role));
 }
 
 function serverTenant(): string {
   try {
-    return String(currentScope({}, { ...process.env }).tenant_slug || '').trim();
+    return (
+      getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
+      String(currentScope().tenant_slug || '').trim()
+    );
   } catch {
     return '';
   }
 }
 
-function resolveTierAccess(
+/**
+ * A registration can narrow a role, but never widen it — and never reach `personal`:
+ * an explicit request for it is denied, and the role default is masked down.
+ */
+export function resolveTierAccess(
   role: ChronosAccessRole,
-  requested?: readonly ConciergeViewerContext['tierAccess'][number][]
+  requested?: readonly ConciergeTier[]
 ): ConciergeViewerContext['tierAccess'] {
-  const allowed = defaultTierAccess(role);
-  if (!requested) return allowed;
-  const normalized = [...new Set(requested)];
-  if (!normalized.length || normalized.some((tier) => !allowed.includes(tier))) {
+  try {
+    if (requested?.includes('personal')) {
+      throw new Error(`viewer tier scope exceeds the ${role} role policy.`);
+    }
+    const resolved = maskPersonalTier(resolveSurfaceViewerTierAccess(role, requested));
+    if (!resolved.length) {
+      throw new Error(`viewer tier scope exceeds the ${role} role policy.`);
+    }
+    return resolved;
+  } catch (error) {
     throw new ConciergeViewerError(
       403,
-      `Concierge viewer tier scope exceeds the ${role} role policy.`
+      error instanceof Error
+        ? `Concierge ${error.message}`
+        : `Concierge viewer tier scope exceeds the ${role} role policy.`
     );
   }
-  return normalized;
 }
 
 export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewerContext {
   const local = isLoopbackRequest(req);
   const token = bearerToken(req);
-  const registration = token ? registeredViewer(token) : null;
-  const apiToken = process.env.KYBERION_API_TOKEN;
-  const localadminToken = process.env.KYBERION_LOCALADMIN_TOKEN;
+  const registry = token ? registrations() : null;
+  const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
+  const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
+  const resolution = token
+    ? resolveSurfaceViewerToken(token, {
+        registrations: registry,
+        apiToken,
+        localadminToken,
+      })
+    : null;
+  const registration = resolution?.registration;
 
   if (registration) {
     return {
@@ -113,13 +135,8 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
     };
   }
 
-  if (
-    token &&
-    (matchesChronosToken(token, apiToken) || matchesChronosToken(token, localadminToken))
-  ) {
-    const role: ChronosAccessRole = matchesChronosToken(token, localadminToken)
-      ? 'localadmin'
-      : 'readonly';
+  if (token && resolution) {
+    const role: ChronosAccessRole = resolution.role;
     const tenant = serverTenant();
     if (!local && !tenant) {
       throw new ConciergeViewerError(
@@ -170,30 +187,18 @@ export function resolveConciergeViewer(
   }
 }
 
-function strictScope(
-  kind: 'tenant' | 'organization' | 'project',
-  allowed: string[] | 'all',
-  requested?: string | null
-): string[] | 'all' {
-  const value = requested?.trim() || undefined;
-  if (value && (kind === 'tenant' ? !isValidTenantSlug(value) : !isValidChronosScopeId(value))) {
-    throw new ConciergeViewerError(403, `invalid viewer ${kind} scope: ${value}`);
-  }
-  if (value && allowed !== 'all' && !allowed.includes(value)) {
-    throw new ConciergeViewerError(403, `viewer ${kind} scope denied: ${value}`);
-  }
-  return value ? [value] : allowed;
-}
-
 export function narrowConciergeScope(
   viewer: ConciergeViewerContext,
   query: { tenant?: string | null; organizationId?: string | null; projectId?: string | null }
 ) {
-  return {
-    tenantSlugs: strictScope('tenant', viewer.tenantSlugs, query.tenant),
-    organizationIds: strictScope('organization', viewer.organizationIds, query.organizationId),
-    projectIds: strictScope('project', viewer.projectIds, query.projectId),
-  };
+  try {
+    return narrowSurfaceViewerScope(viewer, query);
+  } catch (error) {
+    throw new ConciergeViewerError(
+      403,
+      error instanceof Error ? `Concierge ${error.message}` : 'Concierge viewer scope denied'
+    );
+  }
 }
 
 export function conciergeHeadlessScope(viewer: ConciergeViewerContext): HeadlessViewerScope {
@@ -203,7 +208,7 @@ export function conciergeHeadlessScope(viewer: ConciergeViewerContext): Headless
     tenant_slugs: viewer.tenantSlugs,
     organization_ids: viewer.organizationIds,
     project_ids: viewer.projectIds,
-    tier_access: viewer.tierAccess,
+    tier_access: maskPersonalTier(viewer.tierAccess),
   };
 }
 
@@ -215,7 +220,7 @@ export function toSurfaceAuthorizationContext(
     tenantSlugs: viewer.tenantSlugs,
     organizationIds: viewer.organizationIds,
     projectIds: viewer.projectIds,
-    tierAccess: viewer.tierAccess,
+    tierAccess: maskPersonalTier(viewer.tierAccess),
     principalId: viewer.principalId,
     source: viewer.source,
   };

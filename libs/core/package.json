@@ -15,6 +15,14 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./foundation": {
+      "types": "./dist/foundation/index.d.ts",
+      "default": "./dist/foundation/index.js"
+    },
+    "./foundation/env": {
+      "types": "./dist/foundation/env.d.ts",
+      "default": "./dist/foundation/env.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
@@ -252,8 +260,8 @@
       "default": "./dist/mission-orchestration-events.js"
     },
     "./mission-team-composer": {
-      "types": "./dist/mission-team-composer.d.ts",
-      "default": "./dist/mission-team-composer.js"
+      "types": "./dist/mission-team-plan-composer.d.ts",
+      "default": "./dist/mission-team-plan-composer.js"
     },
     "./mission-team-plan-composer": {
       "types": "./dist/mission-team-plan-composer.d.ts",

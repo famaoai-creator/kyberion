@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { resolveMissionClassification } from './mission-classification.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
@@ -23,20 +24,24 @@ type Scenario = {
 };
 
 function loadPack(): { scenarios: Scenario[] } {
-  return JSON.parse(
-    safeReadFile(
-      pathResolver.knowledge('product/governance/mission-orchestration-scenario-pack.json'),
-      {
-        encoding: 'utf8',
-      }
-    ) as string
-  ) as { scenarios: Scenario[] };
+  return withoutSchemaMetadata(
+    JSON.parse(
+      safeReadFile(
+        pathResolver.knowledge('product/governance/mission-orchestration-scenario-pack.json'),
+        {
+          encoding: 'utf8',
+        }
+      ) as string
+    ) as { scenarios: Scenario[] }
+  );
 }
 
 function loadJson(relativePath: string): Record<string, any> {
-  return JSON.parse(
-    safeReadFile(pathResolver.knowledge(relativePath), { encoding: 'utf8' }) as string
-  ) as Record<string, any>;
+  return withoutSchemaMetadata(
+    JSON.parse(
+      safeReadFile(pathResolver.knowledge(relativePath), { encoding: 'utf8' }) as string
+    ) as Record<string, any>
+  );
 }
 
 describe('mission orchestration scenario pack', () => {

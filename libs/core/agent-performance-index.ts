@@ -1,12 +1,7 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 
 /**
  * Agent×role performance index — the deterministic data path from mission
@@ -67,10 +62,7 @@ export function recordAgentRoleOutcomes(outcomes: AgentRoleOutcome[]): void {
   if (outcomes.length === 0) return;
   const outcomesPath = agentRoleOutcomesPath();
   safeMkdir(path.dirname(outcomesPath), { recursive: true });
-  safeAppendFileSync(
-    outcomesPath,
-    outcomes.map((outcome) => JSON.stringify(outcome)).join('\n') + '\n'
-  );
+  for (const outcome of outcomes) appendJsonLine(outcomesPath, outcome);
   rebuildAgentPerformanceIndex();
 }
 
@@ -128,11 +120,8 @@ export function getAgentRolePerformance(
       const indexPath = agentPerformanceIndexPath();
       if (safeExistsSync(indexPath)) {
         byKey =
-          (
-            JSON.parse(String(safeReadFile(indexPath, { encoding: 'utf8' }))) as {
-              by_agent_role?: Record<string, AgentRolePerformance>;
-            }
-          ).by_agent_role || {};
+          readJson<{ by_agent_role?: Record<string, AgentRolePerformance> }>(indexPath)
+            .by_agent_role || {};
       }
     } catch {
       byKey = {};

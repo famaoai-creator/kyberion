@@ -1,21 +1,14 @@
-import AjvModule from 'ajv';
 import {
-  compileSchemaFromPath,
-  logger,
   pathResolver,
-  safeReadFile,
   buildGovernedRetryOptions,
   loadRecoveryPolicy as loadRecoveryPolicyFromManifest,
   waitForJob,
-  classifyError,
   VideoRenderRuntime,
 } from '@agent/core';
+import { compileSchema } from '@agent/core/foundation';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-export const videoCompositionActionValidate = compileSchemaFromPath(
-  ajv,
-  pathResolver.rootResolve('schemas/video-composition-action.schema.json')
+export const videoCompositionActionValidate = compileSchema(
+  pathResolver.rootResolve('knowledge/product/schemas/video-composition-action.schema.json')
 );
 export const VIDEO_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/video-composition-actuator/manifest.json'

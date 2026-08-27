@@ -1,12 +1,9 @@
-import { loadEnvironmentManifest, probeManifest } from '@agent/core';
+import { getRegisteredEnv, loadEnvironmentManifest, probeManifest } from '@agent/core';
 
 import '@agent/core/environment-capability-probes';
 
 export type OnboardingReasoningMode =
-  | 'real_backend_detected'
-  | 'stub_explicit'
-  | 'stub_acknowledged'
-  | 'missing';
+  'real_backend_detected' | 'stub_explicit' | 'stub_acknowledged' | 'missing';
 
 export interface OnboardingReasoningState {
   mode: OnboardingReasoningMode;
@@ -19,7 +16,9 @@ export interface OnboardingReasoningState {
 export async function evaluateReasoningBackend(
   now = new Date()
 ): Promise<OnboardingReasoningState> {
-  const explicitBackend = process.env.KYBERION_REASONING_BACKEND?.trim();
+  const explicitBackend = (
+    getRegisteredEnv<string>('KYBERION_REASONING_BACKEND') as string | undefined
+  )?.trim();
   if (explicitBackend === 'stub') {
     return {
       mode: 'stub_explicit',

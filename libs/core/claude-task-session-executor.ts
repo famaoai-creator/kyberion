@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeWriteFile } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
@@ -34,7 +35,7 @@ export async function maybeRefineDocumentOutput(input: {
 }): Promise<TaskSessionRefineOutcome> {
   const passthrough = { content: input.output, refined: false, passes: 0 };
   if (input.kind !== 'document') return passthrough;
-  if (process.env.KYBERION_DRAFT_REFINE === '0') return passthrough;
+  if (getRegisteredEnvText('KYBERION_DRAFT_REFINE') === '0') return passthrough;
   if (input.output.trim().length < DRAFT_REFINE_MIN_CHARS) return passthrough;
   try {
     // Lazy import: draft-refine pulls the reasoning-backend graph, which

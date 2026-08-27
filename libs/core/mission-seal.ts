@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { findMissionPath } from './path-resolver.js';
 import {
   safeExec,
@@ -35,7 +36,7 @@ export function missionSealArchiveDir(missionId: string): string {
   let archiveSubPath = 'active/archive/missions';
   if (safeExistsSync(configPath)) {
     try {
-      const config = JSON.parse(String(safeReadFile(configPath, { encoding: 'utf8' })));
+      const config = readJson<{ directories?: { archive?: string } }>(configPath);
       archiveSubPath = config.directories?.archive || archiveSubPath;
     } catch (_) {
       /* fall back to the default archive dir */

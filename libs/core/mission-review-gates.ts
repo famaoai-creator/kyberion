@@ -1,7 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 import type {
   MissionClass,
   MissionDeliveryShape,
@@ -95,8 +95,6 @@ export interface ArtifactReviewerProfile {
   rationale: string;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-review-gate-registry.schema.json'
 );
@@ -105,18 +103,17 @@ const REGISTRY_PATH = pathResolver.knowledge(
 );
 const RESULT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/review-gate-result.schema.json');
 
-let registryValidateFn: ValidateFunction | null = null;
 let resultValidateFn: ValidateFunction | null = null;
 
-function ensureRegistryValidator(): ValidateFunction {
-  if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchemaFromPath(ajv, REGISTRY_SCHEMA_PATH);
-  return registryValidateFn;
-}
+const registryCatalog = defineCatalog<ReviewGateRegistry>({
+  id: 'mission-review-gate-registry',
+  path: REGISTRY_PATH,
+  schema: REGISTRY_SCHEMA_PATH,
+});
 
 function ensureResultValidator(): ValidateFunction {
   if (resultValidateFn) return resultValidateFn;
-  resultValidateFn = compileSchemaFromPath(ajv, RESULT_SCHEMA_PATH);
+  resultValidateFn = compileSchema(RESULT_SCHEMA_PATH);
   return resultValidateFn;
 }
 
@@ -157,17 +154,7 @@ function matchRule(
 }
 
 function loadRegistry(): ReviewGateRegistry {
-  const parsed = JSON.parse(
-    safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string
-  ) as ReviewGateRegistry;
-  const validate = ensureRegistryValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid mission-review-gate-registry: ${errors}`);
-  }
-  return parsed;
+  return registryCatalog.load();
 }
 
 export function resolveMissionReviewDesign(

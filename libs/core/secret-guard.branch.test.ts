@@ -15,12 +15,31 @@ const mocks = vi.hoisted(() => ({
 vi.mock('./secure-io.js', () => ({
   withSensitivePathMediation: <T>(fn: () => T) => fn(),
   safeReadFile: mocks.safeReadFile,
+  loadJson: <T>(filePath: string) =>
+    JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
   safeWriteFile: mocks.safeWriteFile,
   safeReaddir: mocks.safeReaddir,
   safeStat: mocks.safeStat,
   safeFsyncFile: mocks.safeFsyncFile,
   safeExistsSync: mocks.safeExistsSync,
 }));
+
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T =>
+      JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
+    readJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        return JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+      } catch {
+        return null;
+      }
+    },
+  };
+});
 
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },

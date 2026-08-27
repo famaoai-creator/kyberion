@@ -1,9 +1,30 @@
 import { describe, expect, it } from 'vitest';
 
 import { extractMissionControllerPositionalArgs } from '../scripts/refactor/mission-cli-args.js';
-import { resolveMissionTicketDispatchOptionsFromArgv, resolveMissionWorkItemDispatchOptionsFromArgv } from '../scripts/mission_controller.js';
+import {
+  resolveMissionTicketDispatchOptionsFromArgv,
+  resolveMissionWorkItemDispatchOptionsFromArgv,
+} from '../scripts/mission_controller.js';
 
 describe('extractMissionControllerPositionalArgs', () => {
+  it('accepts the harness argv shape without node/script prefixes', () => {
+    expect(
+      extractMissionControllerPositionalArgs([
+        'create',
+        'MSN-FIRST-WIN-SMOKE',
+        '--tier',
+        'personal',
+        '--project-id',
+        'PRJ-FIRST-WIN-SMOKE',
+        '--project-path',
+        'active/shared/tmp/first-win-lifecycle',
+        '--project-relationship',
+        'belongs_to',
+        '--dry-run',
+      ])
+    ).toEqual(['create', 'MSN-FIRST-WIN-SMOKE']);
+  });
+
   it('skips persona and other value flags from positional args', () => {
     const argv = [
       'node',

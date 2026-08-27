@@ -2,6 +2,7 @@
 /** Optional TEN VAD bridge using the upstream Python binding over NDJSON. */
 
 import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { buildSafeExecEnv, safeExistsSync } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import { registerVadBackend, type VadFactoryOptions } from './vad-registry.js';
@@ -30,8 +31,8 @@ export function defaultTenVadScriptPath(): string {
 function resolvePythonBin(opts: TenVadOptions): string {
   return (
     opts.pythonBin ||
-    process.env.KYBERION_TEN_VAD_PYTHON ||
-    process.env.KYBERION_PYTHON_BIN ||
+    getRegisteredEnvText('KYBERION_TEN_VAD_PYTHON') ||
+    getRegisteredEnvText('KYBERION_PYTHON_BIN') ||
     'python3'
   );
 }

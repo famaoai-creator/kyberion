@@ -1,13 +1,10 @@
 import {
   logger,
   safeReadFile,
-  safeAppendFileSync,
   safeMkdir,
   safeExistsSync,
-  createStandardYargs,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ensureDefaultOpPreflight,
   runOpPreflight,
@@ -16,6 +13,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -166,7 +164,7 @@ async function verifyAnchor(params: any) {
 function _writeToMockChain(tx: any) {
   const dir = path.dirname(MOCK_CHAIN_PATH);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeAppendFileSync(MOCK_CHAIN_PATH, JSON.stringify(tx) + '\n');
+  appendJsonLine(MOCK_CHAIN_PATH, tx);
 }
 
 const main = async () => {
@@ -182,8 +180,16 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
 export { handleAction };
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'blockchain-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as unknown as Parameters<typeof handleAction>[0]),
+});
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

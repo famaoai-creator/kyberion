@@ -29,11 +29,13 @@ import {
   probeNativeTts,
   classifyError,
   formatClassification,
+  getRegisteredEnv,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Tier = 0 | 1 | 2;
 
@@ -54,11 +56,10 @@ function printUsage(): void {
   console.log('  pnpm voice:upgrade --tier 0');
 }
 
-function parseArgs(): Tier {
-  const args = process.argv.slice(2);
+function parseArgs(args: string[]): Tier {
   if (args.includes('--help') || args.includes('-h')) {
     printUsage();
-    process.exit(0);
+    throw new ScriptExitError(0);
   }
   const tierIdx = args.indexOf('--tier');
   if (tierIdx >= 0 && args[tierIdx + 1]) {
@@ -67,8 +68,8 @@ function parseArgs(): Tier {
     throw new Error(`--tier must be 0, 1, or 2 (got ${args[tierIdx + 1]})`);
   }
   // Inferred from script alias (set by package.json scripts).
-  if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'cloud') return 1;
-  if (process.env.KYBERION_VOICE_UPGRADE_ALIAS === 'local') return 2;
+  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'cloud') return 1;
+  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'local') return 2;
   printUsage();
   throw new Error('Missing --tier');
 }
@@ -83,7 +84,9 @@ async function checkTier0(): Promise<{ name: string; ok: boolean; detail?: strin
     },
     {
       name: 'presence-studio',
-      ok: safeExistsSync(path.join(pathResolver.rootDir(), 'presence', 'displays', 'presence-studio')),
+      ok: safeExistsSync(
+        path.join(pathResolver.rootDir(), 'presence', 'displays', 'presence-studio')
+      ),
       detail: 'Browser surface for Web Speech API input',
     },
   ];
@@ -114,7 +117,9 @@ function checkTier1(): { name: string; ok: boolean; detail?: string }[] {
 function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
   const { spawnSync } = require('node:child_process') as typeof import('node:child_process');
   function whichOk(cmd: string): boolean {
-    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], { stdio: 'ignore' });
+    const r = spawnSync(process.platform === 'win32' ? 'where' : 'which', [cmd], {
+      stdio: 'ignore',
+    });
     return r.status === 0;
   }
   return [
@@ -123,7 +128,8 @@ function checkTier2(): { name: string; ok: boolean; detail?: string }[] {
     {
       name: 'Style-Bert-VITS2 server',
       ok: false,
-      detail: 'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (Tier 1 → Tier 2 section)',
+      detail:
+        'Manual setup required — see docs/developer/VOICE_FIRST_WIN.md (Tier 1 → Tier 2 section)',
     },
   ];
 }
@@ -142,7 +148,7 @@ function writeTier(tier: Tier): string {
   let existing: Record<string, unknown> = {};
   if (safeExistsSync(out)) {
     try {
-      existing = JSON.parse(safeReadFile(out, { encoding: 'utf8' }) as string);
+      existing = readJson<Record<string, unknown>>(out);
     } catch {
       existing = {};
     }
@@ -190,13 +196,13 @@ function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
   }
 }
 
-async function main(): Promise<void> {
+async function main(args: string[]): Promise<void> {
   let tier: Tier;
   try {
-    tier = parseArgs();
+    tier = parseArgs(args);
   } catch (err: any) {
-    console.error(formatClassification(classifyError(err)));
-    process.exit(2);
+    if (err instanceof ScriptExitError) throw err;
+    throw new ScriptExitError(2, formatClassification(classifyError(err)));
   }
 
   console.log(`🎙️  Voice tier upgrade → tier ${tier}`);
@@ -212,9 +218,10 @@ async function main(): Promise<void> {
   }
 
   // For tier 1, "ok" means at least one provider is set.
-  const required = tier === 1
-    ? prereqs.find(p => p.name === 'At least one cloud voice provider')!.ok
-    : prereqs.every(p => p.ok || p.name === 'Style-Bert-VITS2 server'); // tier-2 server is informational
+  const required =
+    tier === 1
+      ? prereqs.find((p) => p.name === 'At least one cloud voice provider')!.ok
+      : prereqs.every((p) => p.ok || p.name === 'Style-Bert-VITS2 server'); // tier-2 server is informational
   const configPath = writeTier(tier);
   const report: UpgradeReport = {
     requested_tier: tier,
@@ -229,13 +236,24 @@ async function main(): Promise<void> {
   console.log(`\n📝 Profile written: ${path.relative(pathResolver.rootDir(), configPath)}`);
 
   if (!required) {
-    console.error(`\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`);
-    process.exit(1);
+    console.error(
+      `\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`
+    );
+    throw new Error(`Voice tier ${tier} prerequisites are not fully satisfied`);
   }
   console.log(`\n✅ Voice tier ${tier} configured.`);
 }
 
-main().catch(err => {
-  console.error('Fatal:', formatClassification(classifyError(err)));
-  process.exit(1);
+export const runVoiceUpgrade = defineScript({
+  name: 'voice:upgrade',
+  flags: [],
+  run(context) {
+    return main(context.argv);
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'voice_upgrade.ts') ||
+  isDirectScript(import.meta.url, 'voice_upgrade.js')
+)
+  void runVoiceUpgrade();

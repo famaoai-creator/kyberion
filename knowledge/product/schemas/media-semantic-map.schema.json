@@ -2,6 +2,7 @@
   "type": "object",
   "required": ["version", "rules", "proposal_evidence_rules", "proposal_section_keywords"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": {
       "type": "string"
     },

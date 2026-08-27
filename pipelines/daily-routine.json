@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "Volatile Knowledge Layer — daily routine: opens today's journal + TODO, rolls over pending items from previous TODO.md.",
   "_refs": {
-    "schema": "schemas/volatile-knowledge.schema.json",
+    "schema": "knowledge/product/schemas/volatile-knowledge.schema.json",
     "actuator": "working-memory-actuator",
     "plan": "docs/VOLATILE_KNOWLEDGE_PLAN.ja.md § Phase 2b"
   },

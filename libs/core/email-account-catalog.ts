@@ -1,5 +1,5 @@
 import { safeExec } from './secure-io.js';
-import { coreSeamCatalog, defineSeam, type SeamProviderMetadata } from './seam.js';
+import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
 
 /** Provider IDs are open-ended so a new account connector does not require a core type change. */
 export type EmailAccountId = string;
@@ -50,7 +50,7 @@ export interface EmailAccountDescriptor {
   capabilities: EmailAccountOperation[];
 }
 
-const emailAccountProviderSeam = defineSeam<EmailAccountDescriptor>({
+const emailAccountProviderSeam = createSeam<EmailAccountDescriptor>({
   key: 'email-account-provider',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '../secure-io.js';
+import { readJson } from '../foundation/json.js';
+import { safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 
 export interface ActuatorManifestFile {
   actuator_id: string;
@@ -30,9 +31,7 @@ const DEFAULT_ACTUATORS_DIR = pathResolver.rootResolve('libs/actuators');
 const catalogCache = new Map<string, ActuatorCatalogEntry[]>();
 
 function readManifest(manifestPath: string): ActuatorManifestFile {
-  return JSON.parse(
-    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
-  ) as ActuatorManifestFile;
+  return readJson<ActuatorManifestFile>(manifestPath);
 }
 
 function listOps(manifest: ActuatorManifestFile): string[] {

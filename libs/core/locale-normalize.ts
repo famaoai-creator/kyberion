@@ -16,7 +16,8 @@
  * duplicated browser-side copy would keep accepting only `ja`/`en` and the
  * I18N-07 third-locale proof would fail on chronos alone.
  *
- * Keep this file import-free.
+ * Keep this file browser-safe and import-free. Browser surfaces pass their
+ * statically imported catalog to the shared resolver below.
  *
  * I18N-02: `SUPPORTED_LOCALES` below is generated from the vocabulary
  * catalog's `required_locales` field by `scripts/generate_vocabulary_types.ts`
@@ -68,4 +69,70 @@ export function normalizeLocale(value: unknown): SupportedLocale | null {
     if (normalized.startsWith(locale)) return locale;
   }
   return null;
+}
+
+export type BrowserVocabularyEntry = Record<string, string>;
+
+export interface BrowserVocabularyCatalog {
+  default_locale: string;
+  domains?: Record<string, Record<string, BrowserVocabularyEntry>>;
+}
+
+export function createBrowserVocabularyResolver(catalog: BrowserVocabularyCatalog) {
+  let index: Map<string, Array<{ namespace: string; entry: BrowserVocabularyEntry }>> | null = null;
+  const buildIndex = () => {
+    const next = new Map<string, Array<{ namespace: string; entry: BrowserVocabularyEntry }>>();
+    for (const [namespace, entries] of Object.entries(catalog.domains || {})) {
+      for (const [key, entry] of Object.entries(entries || {})) {
+        const matches = next.get(key) || [];
+        matches.push({ namespace, entry });
+        next.set(key, matches);
+      }
+    }
+    return next;
+  };
+  const resolveEntry = (
+    key: string
+  ): { namespace: string; key: string; entry: BrowserVocabularyEntry } | null => {
+    const separator = key.indexOf(':');
+    const namespace = separator < 0 ? undefined : key.slice(0, separator);
+    const bareKey = separator < 0 ? key : key.slice(separator + 1);
+    if (namespace) {
+      const entry = catalog.domains?.[namespace]?.[bareKey];
+      return entry ? { namespace, key: bareKey, entry } : null;
+    }
+    index ||= buildIndex();
+    const matches = index.get(bareKey) || [];
+    if (matches.length > 1) {
+      throw new Error(
+        `[vocabulary] ambiguous bare key "${bareKey}" matches multiple namespaces; qualify the lookup.`
+      );
+    }
+    const match = matches[0];
+    return match ? { namespace: match.namespace, key: bareKey, entry: match.entry } : null;
+  };
+  const defaultLocale = () => catalog.default_locale || 'en';
+  const renderText = (key: string, locale = 'en') => {
+    const resolved = resolveEntry(key);
+    if (!resolved) return key;
+    return (
+      resolved.entry[locale] ||
+      resolved.entry[defaultLocale()] ||
+      resolved.entry.en ||
+      resolved.entry.ja ||
+      key
+    );
+  };
+  return {
+    defaultLocale,
+    resolveEntry,
+    renderText,
+    renderMessage: (key: string, params: Record<string, string | number>, locale = 'en') => {
+      let value = renderText(key, locale);
+      for (const [name, replacement] of Object.entries(params)) {
+        value = value.replaceAll(`{${name}}`, String(replacement));
+      }
+      return value;
+    },
+  };
 }

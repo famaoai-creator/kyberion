@@ -18,6 +18,8 @@ const allowedManagedProcessConsumers = [
   'libs/actuators/service-actuator/src/service-actuator-helpers.ts',
   'libs/core/acp-mediator.ts',
   'libs/core/agent-adapter.ts',
+  // Codex app-server adapter extracted from agent-adapter.ts; same long-lived runtime ownership.
+  'libs/core/agent-codex-app-server-adapter.ts',
   // Adapter tests replace the managed-process owner with a hermetic test
   // double; keep the boundary inventory aligned with that explicit mock.
   'libs/core/agent-adapter.test.ts',

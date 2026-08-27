@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/task-session-policy.schema.json",
   "version": "1.0.0",
   "intents": [
     {

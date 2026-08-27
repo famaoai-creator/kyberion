@@ -1,13 +1,12 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface SmokeRule {
   file: string;
   required: string[];
 }
-
-const ROOT = pathResolver.rootDir();
 
 const RULES: SmokeRule[] = [
   {
@@ -70,7 +69,7 @@ const RULES: SmokeRule[] = [
     required: [
       'first-win-lifecycle-weekly',
       'No state is applied',
-      'first_win_lifecycle_smoke.js',
+      'core:run_first_win_lifecycle',
       'lifecycle-dry-run',
     ],
   },
@@ -79,7 +78,7 @@ const RULES: SmokeRule[] = [
 function readJson(file: string): any | null {
   const abs = pathResolver.rootResolve(file);
   try {
-    return JSON.parse(String(safeReadFile(abs, { encoding: 'utf8' }) || ''));
+    return readFoundationJson<unknown>(abs);
   } catch {
     return null;
   }
@@ -168,14 +167,11 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
     );
   }
   const dryRunStep = steps.find((step) => step.id === 'lifecycle-dry-run');
-  const params = jsonRecord(dryRunStep?.params);
-  const args = Array.isArray(params.args) ? params.args : [];
-  if (
-    dryRunStep?.op !== 'system:exec' ||
-    !args.includes('dist/scripts/first_win_lifecycle_smoke.js') ||
-    !args.includes('--dry-run') ||
-    !args.includes('--json')
-  ) {
+  // The weekly lifecycle smoke runs through the typed engine op
+  // `core:run_first_win_lifecycle`, which always executes the dry-run JSON
+  // smoke (see runInlineFirstWinLifecycle). A shell wrapper around
+  // dist/scripts/first_win_lifecycle_smoke.js is no longer accepted.
+  if (dryRunStep?.op !== 'core:run_first_win_lifecycle') {
     violations.push(
       'pipelines/first-win-lifecycle-weekly.json: lifecycle-dry-run must execute the explicit dry-run JSON smoke command'
     );
@@ -213,19 +209,24 @@ export function checkFirstWinSmoke(): string[] {
   return violations;
 }
 
-export function main(): void {
-  const violations = checkFirstWinSmoke();
-  if (violations.length > 0) {
-    console.error('[check:first-win-smoke] violations detected:');
-    for (const violation of violations) {
-      console.error(`- ${violation}`);
+export const runCheckFirstWinSmoke = defineScript({
+  name: 'check:first-win-smoke',
+  flags: [],
+  run(context) {
+    const violations = checkFirstWinSmoke();
+    if (violations.length > 0) {
+      console.error('[check:first-win-smoke] violations detected:');
+      for (const violation of violations) {
+        console.error(`- ${violation}`);
+      }
+      throw new Error(`${violations.length} first-win smoke violation(s)`);
     }
-    process.exit(1);
-  }
-  console.log('[check:first-win-smoke] OK');
-}
+    context.print('[check:first-win-smoke] OK');
+  },
+});
 
-const isDirectRun = process.argv[1] && /check_first_win_smoke\.(ts|js)$/.test(process.argv[1]);
-if (isDirectRun) {
-  main();
-}
+if (
+  isDirectScript(import.meta.url, 'check_first_win_smoke.ts') ||
+  isDirectScript(import.meta.url, 'check_first_win_smoke.js')
+)
+  void runCheckFirstWinSmoke();

@@ -1,8 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson as readFoundationJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 
 type JsonObject = Record<string, unknown>;
@@ -87,19 +88,16 @@ interface IntentRoutingMap {
   track_intent_policy_map?: Record<string, TrackIntentPolicyMapping>;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 let overrideValidator: ValidateFunction | null = null;
 
 function readJson(filePath: string): JsonObject {
-  return JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' }))) as JsonObject;
+  return readFoundationJson<JsonObject>(filePath);
 }
 
 function ensureOverrideValidator(): ValidateFunction {
   if (overrideValidator) return overrideValidator;
-  overrideValidator = compileSchemaFromPath(
-    ajv,
-    pathResolver.rootResolve('schemas/track-policy-override.schema.json')
+  overrideValidator = compileSchema(
+    pathResolver.rootResolve('knowledge/product/schemas/track-policy-override.schema.json')
   );
   return overrideValidator;
 }

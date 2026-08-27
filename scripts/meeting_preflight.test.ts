@@ -223,9 +223,9 @@ describe('meeting_preflight', () => {
 
     const { main } = await import('./meeting_preflight.js');
 
-    await main();
+    const status = await main();
 
-    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(status).toBe(1);
     expect(logSpy).toHaveBeenCalledWith(
       expect.stringContaining('[meeting-preflight] doctor.meeting: fail')
     );

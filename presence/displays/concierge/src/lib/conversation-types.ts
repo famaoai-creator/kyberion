@@ -1,3 +1,5 @@
+import type { IntentResolutionContract } from '@agent/core';
+
 /**
  * Shared request/response contract for the concierge conversation core
  * (CS-01). Used by both the /api/message route (server) and the
@@ -36,4 +38,5 @@ export interface ConversationMessageResponse {
   shape: ConversationShape;
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
+  intentResolution?: IntentResolutionContract;
 }

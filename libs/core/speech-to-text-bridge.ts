@@ -23,7 +23,7 @@ import { safeExistsSync, safeExecResult, safeReadFile, safeWriteFile } from './s
 import { rootResolve } from './path-resolver.js';
 import { resolveLocale } from './locale.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface TranscribeInput {
   audioPath: string;
@@ -80,7 +80,7 @@ export function getSpeechToTextCapabilities(
   return bridge.capabilities ?? NO_TIMESTAMP_STT_CAPABILITIES;
 }
 
-const speechToTextSeam = defineSeam<SpeechToTextBridge>({
+const speechToTextSeam = createSeam<SpeechToTextBridge>({
   key: 'speech-to-text-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,

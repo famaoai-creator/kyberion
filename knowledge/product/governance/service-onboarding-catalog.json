@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/service-onboarding-catalog.schema.json",
   "version": "1.0.0",
   "services": [
     {

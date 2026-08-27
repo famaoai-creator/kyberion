@@ -1,9 +1,6 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import AjvModule from 'ajv';
 import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
-import { hideBin } from 'yargs/helpers';
 import {
   compileSchemaFromPath,
   pathResolver,
@@ -12,7 +9,6 @@ import {
   resolveOnboardingSummaryPolicy,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   withExecutionContext,
   withLock,
@@ -20,6 +16,8 @@ import {
   resolveOperatorLocale,
   isValidTenantSlug,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { createAjv, setRegisteredEnv } from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -32,8 +30,8 @@ import {
   persistPersona,
   readPersistedPersona,
 } from './reasoning_backend_selection.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const AjvCtor: any = (AjvModule as any).default || (AjvModule as any);
 const addFormats: any = (AjvFormats as any).default || AjvFormats;
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
@@ -120,7 +118,7 @@ export async function readInput(file?: string): Promise<ApplyInput> {
         `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
       );
     }
-    return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as ApplyInput;
+    return readJson<ApplyInput>(file);
   }
   // stdin fallback
   if (process.stdin.isTTY) {
@@ -400,55 +398,31 @@ export function buildApplySummary(
   return lines.join('\n');
 }
 
-export async function main() {
-  const argv = await yargs(hideBin(process.argv))
-    .option('identity', {
-      type: 'string',
-      describe: 'Path to identity JSON (or pipe JSON via stdin)',
-    })
-    .option('dry-run', { type: 'boolean', default: false })
-    .option('json', {
-      type: 'boolean',
-      default: false,
-      describe: 'Emit machine-readable JSON output',
-    })
-    .strict()
-    .parse();
-
-  process.env.MISSION_ROLE = 'sovereign_concierge';
-  process.env.KYBERION_PERSONA = 'sovereign';
-
-  const input = await readInput(argv.identity as string | undefined);
+/** Library entry used by governed pipelines; the CLI below remains a facade. */
+export async function applyOnboardingInput(input: ApplyInput) {
   validateInput(input);
-
-  if (argv['dry-run']) {
-    console.log(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
-    return;
-  }
-
-  const ajv = new AjvCtor({ allErrors: true });
+  const ajv = createAjv();
   addFormats(ajv);
   const validateState = compileSchemaFromPath(
     ajv,
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
   );
 
+  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const now = new Date().toISOString();
   const persona = resolveInputPersona(input);
   const personaEnvPath = persistPersona(persona);
-  process.env.KYBERION_PERSONA = persona;
+  setRegisteredEnv('KYBERION_PERSONA', persona);
   console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
   await applyIdentity(input, now);
   const tenantEntries = await applyTenants(input, now);
   const tutorial = await applyTutorial(input, now);
-  // LC-05: an explicitly supplied backend is persisted before evaluation so
-  // the recorded choice (not auto-discovery) drives the reasoning check and
-  // every later run. Non-interactive input is explicit consent to overwrite.
   if (input.reasoning_backend !== undefined) {
     const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
     if (backend) {
       const envLocal = persistReasoningBackend(backend);
-      process.env.KYBERION_REASONING_BACKEND = backend;
+      setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
       console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
     }
   }
@@ -469,9 +443,8 @@ export async function main() {
     buildSummary(input, tenantEntries, tutorial, reasoning),
     'onboarding-summary'
   );
-
-  const result = {
-    status: 'complete',
+  return {
+    status: 'complete' as const,
     identity_name: input.identity.name,
     agent_id: input.identity.agent_id,
     tenants: tenantEntries.length,
@@ -479,24 +452,72 @@ export async function main() {
     state_path: statePath(),
     summary_path: summaryPath(),
     runbook_skill_path: runbookSkill.skillPath,
+    tutorial,
   };
-  if (argv.json) {
+}
+
+export async function main(argv: string[] = []) {
+  const parsed = await yargs(argv)
+    .option('identity', {
+      type: 'string',
+      describe: 'Path to identity JSON (or pipe JSON via stdin)',
+    })
+    .option('dry-run', { type: 'boolean', default: false })
+    .option('json', {
+      type: 'boolean',
+      default: false,
+      describe: 'Emit machine-readable JSON output',
+    })
+    .strict()
+    .parse();
+
+  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+
+  const input = await readInput(parsed.identity as string | undefined);
+  validateInput(input);
+
+  if (parsed['dry-run']) {
+    console.log(JSON.stringify({ status: 'validated', identity: input.identity }, null, 2));
+    return;
+  }
+
+  const result = await applyOnboardingInput(input);
+  if (parsed.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
   console.log(
-    buildApplySummary(input, tenantEntries, tutorial, reasoning, {
-      statePath: statePath(),
-      summaryPath: summaryPath(),
-    })
+    buildApplySummary(
+      input,
+      Array.from({ length: result.tenants }),
+      result.tutorial,
+      result.reasoning,
+      {
+        statePath: statePath(),
+        summaryPath: summaryPath(),
+      }
+    )
   );
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
+export const runOnboardingApply = defineScript({
+  name: 'onboarding:apply',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      return await main(argv);
+    } catch (error) {
+      throw new ScriptExitError(
+        1,
+        `onboarding_apply failed: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  },
+});
 
-if (isMainModule) {
-  main().catch((err) => {
-    console.error('onboarding_apply failed:', err.message || err);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'onboarding_apply.ts') ||
+  isDirectScript(import.meta.url, 'onboarding_apply.js')
+)
+  void runOnboardingApply();

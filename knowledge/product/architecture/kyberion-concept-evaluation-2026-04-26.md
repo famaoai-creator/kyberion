@@ -69,23 +69,23 @@ receive -> clarify -> preserve -> execute -> verify -> learn
 
 ### 3.1 強い点
 
-| 評価軸 | 判定 | 理由 |
-|---|---:|---|
-| ユーザー体験の単純化 | 高 | `Intent -> Plan -> Result` により、ADF、Actuator、Mission を利用者へ露出しすぎない。 |
-| 内部統治モデル | 高 | Project、Mission、Task Session、Artifact、Service Binding、Vault、Evidence の分離が明確。 |
-| 実行責任の分離 | 高 | Mission は契約、Agent は権限を受けた actor、Actuator は物理実行層という責務分離がある。 |
-| モデル可換性 | 高 | 推論モデル、CLI ホスト、Actuator 実装を可換層として扱い、意図ループを不可換にしている。 |
-| 学習ループ | 中高 | Corporate Memory Loop により、実行を再利用可能な組織知へ戻す思想がある。 |
+| 評価軸               | 判定 | 理由                                                                                      |
+| -------------------- | ---: | ----------------------------------------------------------------------------------------- |
+| ユーザー体験の単純化 |   高 | `Intent -> Plan -> Result` により、ADF、Actuator、Mission を利用者へ露出しすぎない。      |
+| 内部統治モデル       |   高 | Project、Mission、Task Session、Artifact、Service Binding、Vault、Evidence の分離が明確。 |
+| 実行責任の分離       |   高 | Mission は契約、Agent は権限を受けた actor、Actuator は物理実行層という責務分離がある。   |
+| モデル可換性         |   高 | 推論モデル、CLI ホスト、Actuator 実装を可換層として扱い、意図ループを不可換にしている。   |
+| 学習ループ           | 中高 | Corporate Memory Loop により、実行を再利用可能な組織知へ戻す思想がある。                  |
 
 ### 3.2 弱い点
 
-| 課題 | 影響 | 症状 |
-|---|---|---|
-| 上位概念が複数文書に分散 | 新規実装時にどれを正とするか迷う | Work Loop、Enterprise Kernel、Concept Map、Intent Loop が並列に見える。 |
-| Resolution の実装契約が薄い | direct answer / task session / mission / project bootstrap の分岐が surface ごとに揺れる | 文書上のルールはあるが、型と contract test が弱い。 |
-| Outcome Design が開始条件として固定されていない | 完了判定が「作業した」寄りになる | success criteria、expected artifact、evidence requirement が必須化されていない。 |
-| Artifact / Evidence / Memory の lineage が薄い | Accounting と Learning が閉じにくい | 証跡は残っても、再利用知識への promotion が定型化されていない。 |
-| Surface ごとの語彙統一が不足 | Slack、Chronos、Presence、Terminal で同じ仕事が違う体験に見える | User Experience Contract はあるが、実装を縛るテストが不足。 |
+| 課題                                            | 影響                                                                                     | 症状                                                                             |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 上位概念が複数文書に分散                        | 新規実装時にどれを正とするか迷う                                                         | Work Loop、Enterprise Kernel、Concept Map、Intent Loop が並列に見える。          |
+| Resolution の実装契約が薄い                     | direct answer / task session / mission / project bootstrap の分岐が surface ごとに揺れる | 文書上のルールはあるが、型と contract test が弱い。                              |
+| Outcome Design が開始条件として固定されていない | 完了判定が「作業した」寄りになる                                                         | success criteria、expected artifact、evidence requirement が必須化されていない。 |
+| Artifact / Evidence / Memory の lineage が薄い  | Accounting と Learning が閉じにくい                                                      | 証跡は残っても、再利用知識への promotion が定型化されていない。                  |
+| Surface ごとの語彙統一が不足                    | Slack、Chronos、Presence、Terminal で同じ仕事が違う体験に見える                          | User Experience Contract はあるが、実装を縛るテストが不足。                      |
 
 ## 4. 推奨する抽象化
 
@@ -95,26 +95,26 @@ receive -> clarify -> preserve -> execute -> verify -> learn
 
 利用者に見せる語彙は次の 4 つに寄せる。
 
-| 外部語彙 | 意味 | 内部対応 |
-|---|---|---|
-| Request | 何を頼んだか | Intent、execution brief |
-| Plan | どう進めるか | Resolution、Outcome Design、Runtime Design |
-| State | 今どうなっているか | Mission state、Task Session state、approval state |
-| Result | 何が返ったか | Artifact、Delivery Pack、Evidence summary |
+| 外部語彙 | 意味               | 内部対応                                          |
+| -------- | ------------------ | ------------------------------------------------- |
+| Request  | 何を頼んだか       | Intent、execution brief                           |
+| Plan     | どう進めるか       | Resolution、Outcome Design、Runtime Design        |
+| State    | 今どうなっているか | Mission state、Task Session state、approval state |
+| Result   | 何が返ったか       | Artifact、Delivery Pack、Evidence summary         |
 
 ### 4.2 内部カーネル
 
 内部 primitive は次の 7 つを正本にする。
 
-| 内部 primitive | 役割 |
-|---|---|
-| Project | 長期的な意味と事業文脈 |
-| Mission | 監査可能な durable execution |
-| Task Session | 会話的で bounded な作業 |
-| Artifact | 成果物または delivery record |
-| Service Binding | 外部システム接続の統治契約 |
-| Evidence | 説明責任と検証の材料 |
-| Memory Candidate | 再利用知識へ昇格する候補 |
+| 内部 primitive   | 役割                         |
+| ---------------- | ---------------------------- |
+| Project          | 長期的な意味と事業文脈       |
+| Mission          | 監査可能な durable execution |
+| Task Session     | 会話的で bounded な作業      |
+| Artifact         | 成果物または delivery record |
+| Service Binding  | 外部システム接続の統治契約   |
+| Evidence         | 説明責任と検証の材料         |
+| Memory Candidate | 再利用知識へ昇格する候補     |
 
 ### 4.3 不可換ループ
 
@@ -185,9 +185,9 @@ interface IntentResolutionContract {
   request_id: string;
   normalized_intent: string;
   missing_inputs: string[];
-  resolution_shape: "direct_answer" | "task_session" | "mission" | "project_bootstrap";
-  outcome_kind: "answer" | "artifact" | "approval_ready_plan" | "service_change" | "status_report";
-  authority_level: "autonomous" | "approval_required" | "human_clarification_required";
+  resolution_shape: 'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
+  outcome_kind: 'answer' | 'artifact' | 'approval_ready_plan' | 'service_change' | 'status_report';
+  authority_level: 'autonomous' | 'approval_required' | 'human_clarification_required';
   project_context?: { project_id?: string; confidence: number };
   rationale: string;
 }
@@ -227,7 +227,7 @@ interface OutcomeContract {
   success_criteria: string[];
   evidence_required: boolean;
   expected_artifacts: Array<{ kind: string; storage_class: string }>;
-  verification_method: "self_check" | "review_gate" | "human_acceptance" | "test";
+  verification_method: 'self_check' | 'review_gate' | 'human_acceptance' | 'test';
 }
 ```
 
@@ -251,7 +251,7 @@ interface OutcomeContract {
 実装候補:
 
 - 新規: `libs/core/artifact-registry.ts`
-- 新規: `schemas/artifact-record.schema.json`
+- 新規: `knowledge/product/schemas/artifact-ownership-record.schema.json`
 - 保存先: `active/shared/artifacts/registry.jsonl`
 - 更新候補: `artifact-actuator`、`media-actuator`、`task-session` artifact path 周辺
 
@@ -264,7 +264,7 @@ interface ArtifactRecord {
   mission_id?: string;
   task_session_id?: string;
   kind: string;
-  storage_class: "repo" | "artifact_store" | "vault" | "tmp" | "external_ref";
+  storage_class: 'repo' | 'artifact_store' | 'vault' | 'tmp' | 'external_ref';
   path?: string;
   external_ref?: string;
   created_at: string;
@@ -281,7 +281,7 @@ interface ArtifactRecord {
 実装状況:
 
 - `libs/core/artifact-registry.ts` と `libs/core/artifact-registry.test.ts` で固定済み。
-- `schemas/artifact-record.schema.json` と契約ゲートに接続済み。
+- `knowledge/product/schemas/artifact-ownership-record.schema.json` と契約ゲートに接続済み。
 
 ### P1-3. Surface UX Contract Tests を追加する
 
@@ -347,14 +347,14 @@ interface ArtifactRecord {
 ```ts
 interface MemoryCandidate {
   candidate_id: string;
-  source_type: "mission" | "task_session" | "artifact" | "incident";
+  source_type: 'mission' | 'task_session' | 'artifact' | 'incident';
   source_ref: string;
-  proposed_memory_kind: "sop" | "template" | "heuristic" | "risk_rule" | "clarification_prompt";
+  proposed_memory_kind: 'sop' | 'template' | 'heuristic' | 'risk_rule' | 'clarification_prompt';
   summary: string;
   evidence_refs: string[];
-  sensitivity_tier: "public" | "confidential" | "personal";
+  sensitivity_tier: 'public' | 'confidential' | 'personal';
   ratification_required: boolean;
-  status: "queued" | "approved" | "rejected" | "promoted";
+  status: 'queued' | 'approved' | 'rejected' | 'promoted';
 }
 ```
 

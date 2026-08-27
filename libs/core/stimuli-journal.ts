@@ -1,11 +1,6 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeReadFile,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeReadFile, safeStat, safeWriteFile } from './secure-io.js';
 import { createLogger } from './logger.js';
 import type { NerveMessage } from './nerve-bridge.js';
 
@@ -116,7 +111,7 @@ export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTE
 }
 
 export function appendStimulus(stimulus: NerveMessage): void {
-  safeAppendFileSync(STIMULI_PATH, JSON.stringify(stimulus) + '\n');
+  appendJsonLine(STIMULI_PATH, stimulus);
   rotateStimuliJournalIfNeeded();
 }
 

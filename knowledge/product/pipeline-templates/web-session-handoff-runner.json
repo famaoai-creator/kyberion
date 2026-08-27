@@ -13,9 +13,9 @@
     },
     {
       "role": "sink",
-      "op": "system:shell",
+      "op": "core:run_pipeline",
       "params": {
-        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json"
+        "input": "libs/actuators/browser-actuator/examples/web-runtime-session-handoff-export-template.json"
       }
     },
     {
@@ -27,9 +27,9 @@
     },
     {
       "role": "sink",
-      "op": "system:shell",
+      "op": "core:run_pipeline",
       "params": {
-        "cmd": "node dist/scripts/cli.js run browser-actuator -- --input libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json"
+        "input": "libs/actuators/browser-actuator/examples/web-runtime-session-handoff-import.json"
       }
     }
   ]

@@ -102,7 +102,7 @@ pnpm tenant create <tenant-slug> \
   --assigned-role owner \
   --apply
 pnpm tenant show <tenant-slug> --json
-pnpm run check:tenant-registry
+pnpm check -- --only tenant-registry
 ```
 
 registry が `active` でない tenant、未登録 tenant、tier 名と衝突する tenant は後続の
@@ -281,4 +281,4 @@ tenant-bound read/write、memory retrieval、NHI、grant、projection を fail-c
 - [テナント追加手順](./tenant-onboarding-procedure.md)
 - [entity-scope-hierarchy](../architecture/entity-scope-hierarchy.md)
 - [stance-tenant-customer-model](../architecture/stance-tenant-customer-model.md)
-- [Tenant / Organization / Onboarding / Autonomous Operations 統合計画](../../../docs/developer/improvement-plans-2026-08/TENANT_ORGANIZATION_ONBOARDING_AUTONOMY_PLAN_2026-08-15.ja.md)
+- [Tenant / Organization / Onboarding / Autonomous Operations 統合計画](../../../docs/developer/improvement-plans-archive/2026-08/TENANT_ORGANIZATION_ONBOARDING_AUTONOMY_PLAN_2026-08-15.ja.md)

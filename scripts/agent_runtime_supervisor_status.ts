@@ -32,13 +32,19 @@ async function main() {
 }
 
 main().catch((error: any) => {
-  console.log(JSON.stringify({
-    health: {
-      ok: false,
-      degraded: true,
-      reason: error?.message || String(error),
-    },
-    runtimes: [],
-  }, null, 2));
-  process.exit(0);
+  console.log(
+    JSON.stringify(
+      {
+        health: {
+          ok: false,
+          degraded: true,
+          reason: error?.message || String(error),
+        },
+        runtimes: [],
+      },
+      null,
+      2
+    )
+  );
+  process.exitCode = 0;
 });

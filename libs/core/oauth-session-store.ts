@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   safeExistsSync,
   safeCreateExclusiveFileSync,
@@ -98,9 +99,7 @@ export function loadPendingOAuthSession(
     const filePath = serviceSessionPath(serviceId, state);
     if (!safeExistsSync(filePath)) return null;
     try {
-      const session = JSON.parse(
-        safeReadFile(filePath, { encoding: 'utf8' }) as string
-      ) as PendingOAuthSession;
+      const session = readJson<PendingOAuthSession>(filePath);
       if (session.serviceId !== serviceId || !statesEqual(session.state, state)) {
         clearPendingOAuthSession(serviceId, state);
         return null;
@@ -121,9 +120,7 @@ export function loadPendingOAuthSession(
       .sort()
       .reverse();
     if (files.length === 0) return null;
-    const session = JSON.parse(
-      safeReadFile(path.join(dir, files[0]), { encoding: 'utf8' }) as string
-    ) as PendingOAuthSession;
+    const session = readJson<PendingOAuthSession>(path.join(dir, files[0]));
     if (isOAuthSessionExpired(session)) {
       clearPendingOAuthSession(serviceId, session.state);
       return null;
@@ -151,9 +148,7 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
       for (const fileName of safeReaddir(fullDir)) {
         if (!fileName.endsWith('.json')) continue;
         try {
-          const session = JSON.parse(
-            safeReadFile(path.join(fullDir, fileName), { encoding: 'utf8' }) as string
-          ) as PendingOAuthSession;
+          const session = readJson<PendingOAuthSession>(path.join(fullDir, fileName));
           if (!isSafeOAuthState(session.state)) {
             continue;
           }

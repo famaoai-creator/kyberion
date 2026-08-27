@@ -15,6 +15,7 @@ import {
   loadMissionOrchestrationJournal,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
 type JsonRecord = Record<string, unknown> & { [key: string]: unknown };
@@ -99,12 +100,12 @@ interface TraceAuditEntry {
   intentId: string | null;
 }
 
-function normalizeText(value: unknown): string {
+function normalizeIntentTraceText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
 function normalizeId(value: unknown): string | null {
-  const text = normalizeText(value);
+  const text = normalizeIntentTraceText(value);
   return text.length > 0 ? text : null;
 }
 
@@ -240,9 +241,9 @@ function collectAuditEntries(
         const entryIntentId = normalizeId(metadata?.intentId);
         if (entryCorrelationId !== correlationId && entryIntentId !== correlationId) continue;
         entries.push({
-          timestamp: normalizeText(entry.timestamp),
-          operation: normalizeText(entry.operation),
-          result: normalizeText(entry.result),
+          timestamp: normalizeIntentTraceText(entry.timestamp),
+          operation: normalizeIntentTraceText(entry.operation),
+          result: normalizeIntentTraceText(entry.result),
           correlationId: entryCorrelationId,
           intentId: entryIntentId,
         });
@@ -537,21 +538,29 @@ async function main(): Promise<void> {
     .help()
     .parse();
 
-  const subcommand = normalizeText(argv._[0]);
-  const correlationId = normalizeText(argv._[1]);
+  const subcommand = normalizeIntentTraceText(argv._[0]);
+  const correlationId = normalizeIntentTraceText(argv._[1]);
   if (subcommand !== 'trace' || !correlationId) {
-    console.error('Usage: pnpm intent trace <correlation_id> [--locale en|ja]');
-    process.exit(1);
+    throw new Error('Usage: pnpm intent trace <correlation_id> [--locale en|ja]');
   }
 
   const evidence = collectIntentTraceEvidence(correlationId, {
-    locale: normalizeText(argv.locale) || 'en',
+    locale: normalizeIntentTraceText(argv.locale) || 'en',
   });
-  console.log(formatTraceReport(evidence, normalizeText(argv.locale) || 'en'));
+  console.log(formatTraceReport(evidence, normalizeIntentTraceText(argv.locale) || 'en'));
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  void main();
+if (
+  isDirectScript(import.meta.url, 'intent_trace.ts') ||
+  isDirectScript(import.meta.url, 'intent_trace.js')
+) {
+  void defineScript({
+    name: 'intent:trace',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();
 }
 
 export {

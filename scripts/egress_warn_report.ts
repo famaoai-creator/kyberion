@@ -11,6 +11,7 @@
  */
 
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   loadEgressPolicy,
   logger,
@@ -108,8 +109,8 @@ export function buildEgressWarnReport(auditDir?: string): EgressWarnReport {
   return { mode, files_scanned: filesScanned, hosts, recommendation };
 }
 
-function main(): number {
-  const argv = createStandardYargs()
+function main(args: string[] = []): number {
+  const argv = createStandardYargs(['node', 'egress_warn_report', ...args])
     .option('json', { type: 'boolean', default: false })
     .parseSync();
   const report = buildEgressWarnReport();
@@ -128,7 +129,16 @@ function main(): number {
   return 0;
 }
 
-const isDirect = process.argv[1] && /egress_warn_report\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  process.exit(main());
+if (
+  isDirectScript(import.meta.url, 'egress_warn_report.ts') ||
+  isDirectScript(import.meta.url, 'egress_warn_report.js')
+) {
+  void defineScript({
+    name: 'egress:report',
+    flags: [],
+    run(context) {
+      const status = main(context.argv);
+      if (status !== 0) throw new Error(`egress:report failed with exit code ${status}`);
+    },
+  })();
 }

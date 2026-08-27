@@ -9,6 +9,7 @@ const realFsSecureIo = vi.hoisted(() => ({
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
 vi.mock('./core.js', () => ({

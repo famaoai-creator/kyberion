@@ -1,3 +1,4 @@
+import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -6,12 +7,12 @@ import {
   type RetentionArtifactClass,
 } from './storage-retention-catalog.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 
 export type GovernedArtifactRole =
@@ -77,7 +78,7 @@ export function appendGovernedArtifactJsonl(
     const resolved = resolveGovernedArtifactPath(logicalPath);
     const dir = path.dirname(resolved);
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-    safeAppendFileSync(logicalPath, JSON.stringify(value) + '\n', 'utf8');
+    appendJsonLine(logicalPath, value);
     return resolved;
   });
 }
@@ -85,7 +86,7 @@ export function appendGovernedArtifactJsonl(
 export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
   const resolved = resolveGovernedArtifactPath(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(resolved);
 }
 
 export function listGovernedArtifacts(logicalDir: string): string[] {
@@ -339,7 +340,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
   const performWrite = (): void => {
     if (!safeExistsSync(targetDir)) safeMkdir(targetDir, { recursive: true });
     safeWriteFile(absolutePath, data);
-    safeAppendFileSync(indexPath, JSON.stringify(entry) + '\n', 'utf8');
+    appendJsonLine(indexPath, entry);
   };
   if (input.role) withRole(input.role, performWrite);
   else performWrite();

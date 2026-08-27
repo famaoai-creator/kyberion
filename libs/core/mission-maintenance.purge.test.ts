@@ -67,7 +67,7 @@ describe('purgeMissions (AL-01)', () => {
     // mission-state.ts compiles this schema at import time — seed the real one.
     fs.mkdirSync(path.join(tmpRoot, 'schemas'), { recursive: true });
     fs.copyFileSync(
-      path.join(REPO_ROOT, 'schemas', 'mission-state.schema.json'),
+      path.join(REPO_ROOT, 'knowledge/product/schemas', 'mission-state.schema.json'),
       path.join(tmpRoot, 'schemas', 'mission-state.schema.json')
     );
 

@@ -8,6 +8,7 @@
  * fatal to the rest of the campaign.
  */
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   buildCampaignPlan,
   logger,
@@ -109,8 +110,8 @@ export function runCampaignSuite(options: {
   return manifest;
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+async function main(args: string[] = []): Promise<number> {
+  const argv = createStandardYargs(['node', 'campaign_suite', ...args])
     .option('brief', {
       type: 'string',
       demandOption: true,
@@ -126,13 +127,19 @@ async function main(): Promise<void> {
     dryRun: Boolean(argv['dry-run']),
   });
   const failed = manifest.deliverables.filter((entry) => entry.status === 'failed');
-  process.exit(failed.length > 0 ? 1 : 0);
+  return failed.length > 0 ? 1 : 0;
 }
 
-const isDirect = process.argv[1] && /campaign_suite\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((err) => {
-    logger.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  });
+if (
+  isDirectScript(import.meta.url, 'campaign_suite.ts') ||
+  isDirectScript(import.meta.url, 'campaign_suite.js')
+) {
+  void defineScript({
+    name: 'campaign:suite',
+    flags: [],
+    async run(context) {
+      const status = await main(context.argv);
+      if (status !== 0) throw new Error(`campaign:suite failed with exit code ${status}`);
+    },
+  })();
 }

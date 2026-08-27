@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeCreateExclusiveFileSync,
@@ -48,9 +49,7 @@ function fileHash(filePath: string): string | null {
 
 function readMarker(procedureId: string): Partial<DesktopPromotionTransaction> | null {
   try {
-    return JSON.parse(
-      String(safeReadFile(transactionPath(procedureId), { encoding: 'utf8' }))
-    ) as Partial<DesktopPromotionTransaction>;
+    return readJson<Partial<DesktopPromotionTransaction>>(transactionPath(procedureId));
   } catch {
     return null;
   }
@@ -65,9 +64,7 @@ export function acquireDesktopPromotionLock(): void {
     );
   } catch {
     try {
-      const lock = JSON.parse(String(safeReadFile(LOCK_PATH, { encoding: 'utf8' }))) as {
-        created_at?: number;
-      };
+      const lock = readJson<{ created_at?: number }>(LOCK_PATH);
       if (typeof lock.created_at === 'number' && Date.now() - lock.created_at > 10 * 60_000) {
         safeRmSync(LOCK_PATH, { force: true });
         safeCreateExclusiveFileSync(
@@ -86,9 +83,7 @@ export function acquireDesktopPromotionLock(): void {
 function activeDesktopPromotionLock(): boolean {
   if (!safeExistsSync(LOCK_PATH)) return false;
   try {
-    const lock = JSON.parse(String(safeReadFile(LOCK_PATH, { encoding: 'utf8' }))) as {
-      created_at?: number;
-    };
+    const lock = readJson<{ created_at?: number }>(LOCK_PATH);
     return typeof lock.created_at === 'number' && Date.now() - lock.created_at <= 10 * 60_000;
   } catch {
     return true;

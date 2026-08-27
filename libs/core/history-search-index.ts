@@ -9,6 +9,8 @@ import {
   safeReadFile,
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -109,7 +111,7 @@ export function resolveHistoryTier(raw: unknown): HistorySearchTier | undefined 
 }
 
 function databasePath(): string {
-  const configured = process.env.KYBERION_HISTORY_SEARCH_DB?.trim();
+  const configured = getRegisteredEnvText('KYBERION_HISTORY_SEARCH_DB')?.trim();
   const resolved = configured
     ? pathResolver.rootResolve(configured)
     : pathResolver.shared('runtime/history-search/history.sqlite');
@@ -539,10 +541,7 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
   }
   let state: Record<string, unknown>;
   try {
-    state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-      string,
-      unknown
-    >;
+    state = readJson<Record<string, unknown>>(statePath);
   } catch {
     throw new Error(`[POLICY_VIOLATION] Mission state is unreadable: ${missionId}`);
   }
@@ -556,7 +555,8 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
 
 function assertMissionHistoryAccess(scope: MissionHistorySearchScope): void {
   const activeMission = process.env.MISSION_ID?.trim();
-  if (process.env.KYBERION_SUDO === 'true' || activeMission === scope.missionId) return;
+  const sudo = getRegisteredEnvText('KYBERION_SUDO');
+  if (sudo === '1' || sudo === 'true' || activeMission === scope.missionId) return;
   throw new Error(
     `[POLICY_VIOLATION] Governed history search requires MISSION_ID=${scope.missionId} or KYBERION_SUDO=true`
   );
@@ -586,10 +586,7 @@ function matchesMission(raw: unknown, missionId: string): boolean {
 function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryIndexEntry[] {
   const entries: HistoryIndexEntry[] = [];
   const statePath = path.join(scope.missionPath, 'mission-state.json');
-  const state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-    string,
-    unknown
-  >;
+  const state = readJson<Record<string, unknown>>(statePath);
   const history = Array.isArray(state.history) ? state.history : [];
   history.forEach((raw, index) => {
     const item = raw as Record<string, unknown>;
@@ -736,13 +733,12 @@ function scopedDatabasePath(scope: MissionHistorySearchScope): string {
 }
 
 function withDatabasePath<T>(database: string, callback: () => T): T {
-  const previous = process.env.KYBERION_HISTORY_SEARCH_DB;
-  process.env.KYBERION_HISTORY_SEARCH_DB = database;
+  const previous = getRegisteredEnvText('KYBERION_HISTORY_SEARCH_DB');
+  setRegisteredEnv('KYBERION_HISTORY_SEARCH_DB', database);
   try {
     return callback();
   } finally {
-    if (previous === undefined) delete process.env.KYBERION_HISTORY_SEARCH_DB;
-    else process.env.KYBERION_HISTORY_SEARCH_DB = previous;
+    setRegisteredEnv('KYBERION_HISTORY_SEARCH_DB', previous);
   }
 }
 
@@ -817,10 +813,7 @@ function collectPublicMissionEntries(): HistoryIndexEntry[] {
     if (!safeExistsSync(statePath)) continue;
     let state: Record<string, unknown>;
     try {
-      state = JSON.parse(String(safeReadFile(statePath, { encoding: 'utf8' }) || '{}')) as Record<
-        string,
-        unknown
-      >;
+      state = readJson<Record<string, unknown>>(statePath);
     } catch {
       continue;
     }

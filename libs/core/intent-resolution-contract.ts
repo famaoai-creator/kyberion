@@ -16,6 +16,14 @@ export type IntentOutcomeKind =
 export type IntentAuthorityLevel =
   'autonomous' | 'approval_required' | 'human_clarification_required';
 
+export type IntentNextActionKind = 'request_approval' | 'provide_input' | 'continue';
+
+export interface IntentResolutionNextAction {
+  kind: IntentNextActionKind;
+  label: string;
+  consequence: string;
+}
+
 export interface IntentResolutionContract {
   request_id: string;
   normalized_intent: string;
@@ -23,6 +31,7 @@ export interface IntentResolutionContract {
   resolution_shape: IntentResolutionShape;
   outcome_kind: IntentOutcomeKind;
   authority_level: IntentAuthorityLevel;
+  next_action: IntentResolutionNextAction;
   project_context?: {
     project_id?: string;
     confidence: number;
@@ -166,6 +175,25 @@ export function resolveIntentResolutionContract(
   const rationale = packet.selected_intent_id
     ? `resolved from intent '${packet.selected_intent_id}' with confidence ${String(packet.selected_confidence || 0)}`
     : 'no confident intent match; clarification required';
+  const nextAction: IntentResolutionNextAction =
+    missingInputs.length > 0
+      ? {
+          kind: 'provide_input',
+          label: 'Provide the missing information to continue.',
+          consequence: 'Execution remains waiting until the missing information is provided.',
+        }
+      : authorityLevel === 'approval_required'
+        ? {
+            kind: 'request_approval',
+            label: 'Approve this plan to continue.',
+            consequence:
+              'The requested action remains waiting and does not execute without approval.',
+          }
+        : {
+            kind: 'continue',
+            label: 'Continue with the resolved request.',
+            consequence: 'The request can proceed under the current authority boundary.',
+          };
 
   return {
     request_id: requestIdFrom(trimmed),
@@ -174,6 +202,7 @@ export function resolveIntentResolutionContract(
     resolution_shape: resolutionShape,
     outcome_kind: inferOutcomeKind(selectedIntent, packet.selected_resolution?.result_shape),
     authority_level: authorityLevel,
+    next_action: nextAction,
     project_context: inferProjectContext(resolutionShape),
     rationale,
   };

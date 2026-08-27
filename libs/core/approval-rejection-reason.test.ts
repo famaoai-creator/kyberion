@@ -21,6 +21,16 @@ const secureIo = vi.hoisted(() => {
       options.encoding === null
         ? fs.readFileSync(abs(filePath))
         : fs.readFileSync(abs(filePath), 'utf8'),
+    loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(abs(filePath), 'utf8')) as T,
+    loadJsonIfPresent: <T>(filePath: string): T | null => {
+      const resolved = abs(filePath);
+      if (!fs.existsSync(resolved)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(resolved, 'utf8')) as T;
+      } catch {
+        return null;
+      }
+    },
     safeReaddir: (dirPath: string) =>
       fs.existsSync(abs(dirPath)) ? fs.readdirSync(abs(dirPath)) : [],
     safeWriteFile: (filePath: string, data: string | Buffer) => {
@@ -31,6 +41,37 @@ const secureIo = vi.hoisted(() => {
 });
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./path-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
+  const root = () => process.env.KYBERION_ROOT || process.cwd();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      resolve: (filePath: string) =>
+        path.isAbsolute(filePath) ? filePath : path.join(root(), filePath),
+      shared: (subPath = '') => path.join(root(), 'active/shared', subPath),
+    },
+  };
+});
+
+// Explicit, path-confined fixture for foundation JSON. The production
+// FoundationIo registry must not be replaced by a raw global adapter.
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: secureIo.loadJson,
+    loadJsonIfPresent: secureIo.loadJsonIfPresent,
+    appendFile: secureIo.safeAppendFileSync,
+    exists: secureIo.safeExistsSync,
+    readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+    stat: (filePath: string) =>
+      fs.statSync(
+        path.isAbsolute(filePath) ? filePath : path.join(process.env.KYBERION_ROOT || '', filePath)
+      ),
+    writeFile: secureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 
 // The work-loop summary drags in the whole intent catalog + schema registry;
 // it is irrelevant to reason capture, so stub it out.

@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
-  loadJson,
   safeMkdir,
   safeWriteFile,
   type SoftwareQualityContract,
   type TestExecutionRecord,
   type TestInventory,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface SoftwareQualityReportInput {
   contractPath: string;
@@ -35,9 +35,9 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   recommendation: string;
   defectCount: number;
 } {
-  const contract = loadJson<SoftwareQualityContract>(input.contractPath);
-  const inventory = loadJson<TestInventory>(input.inventoryPath);
-  const execution = loadJson<TestExecutionRecord>(input.executionPath);
+  const contract = readJson<SoftwareQualityContract>(input.contractPath);
+  const inventory = readJson<TestInventory>(input.inventoryPath);
+  const execution = readJson<TestExecutionRecord>(input.executionPath);
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,
@@ -102,13 +102,18 @@ function parseArgs(args: string[]): SoftwareQualityReportInput {
   };
 }
 
-const isMainModule = fileURLToPath(import.meta.url) === path.resolve(process.argv[1] ?? '');
-if (isMainModule) {
-  try {
-    const result = generateSoftwareQualityArtifacts(parseArgs(process.argv.slice(2)));
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
-  }
-}
+export const runSoftwareQualityReport = defineScript({
+  name: 'software-quality-report',
+  flags: [],
+  run(context) {
+    const result = generateSoftwareQualityArtifacts(parseArgs(context.argv));
+    context.print(result);
+    return result;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'software_quality_report.ts') ||
+  isDirectScript(import.meta.url, 'software_quality_report.js')
+)
+  void runSoftwareQualityReport();

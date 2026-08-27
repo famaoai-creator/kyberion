@@ -1,32 +1,8 @@
-import { randomUUID } from 'node:crypto';
-
-import {
-  buildScopedIndex,
-  queryKnowledgeHybrid,
-  DEFAULT_SCOPE,
-  type KnowledgeHintIndex,
-  type KnowledgeScope,
-} from './src/knowledge-index.js';
-import { secureFetch } from './network.js';
-import { safeExec } from './secure-io.js';
-import { resolveFallbackLocationSummary } from './location-fallback.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import {
-  recordSchedulePreference,
-  resolveDefaultScheduleSource,
-} from './contextual-intent-memory.js';
-import { recordContextualIntentLearning } from './contextual-intent-learning.js';
-import type { UserIntentFlow } from './intent-contract.js';
-import type { ContractCandidate } from './intent-contract-learning.js';
 import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
-import type { SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
 } from './channel-surface-types.js';
-import { resolveSurfaceIntent } from './router-contract.js';
-import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import {
   attachRoutingDecision,
   buildDelegatedSurfaceConversationResult,

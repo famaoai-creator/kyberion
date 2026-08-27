@@ -11,7 +11,7 @@
  */
 
 import { logger } from './core.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 import {
   listDemotedProviders,
   reportProviderHealthy,
@@ -139,7 +139,7 @@ export function buildFailoverVoiceBridge(candidates: VoiceBridgeCandidate[]): Vo
   return new FailoverVoiceBridge(candidates);
 }
 
-const voiceBridgeSeam = defineSeam<VoiceBridge>({
+const voiceBridgeSeam = createSeam<VoiceBridge>({
   key: 'voice-bridge',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

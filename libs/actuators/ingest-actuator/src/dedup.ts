@@ -13,7 +13,8 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver, safeAppendFile, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeReadFile } from '@agent/core';
+import { appendJsonLine } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -103,7 +104,7 @@ export function dedupContent(input: DedupInput): DedupResult {
       ...(input.target_path !== undefined ? { target_path: input.target_path } : {}),
     };
     safeMkdir(path.dirname(absPath), { recursive: true });
-    safeAppendFile(absPath, `${JSON.stringify(record)}\n`);
+    appendJsonLine(absPath, record);
     registered = true;
   }
 

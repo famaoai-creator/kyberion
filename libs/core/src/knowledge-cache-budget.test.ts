@@ -12,6 +12,7 @@ vi.mock('../path-resolver.js', () => ({
   pathResolver: {
     knowledge: (sub = '') => (sub ? `/tmp/test-knowledge-base/${sub}` : '/tmp/test-knowledge-base'),
     rootDir: () => '/tmp/test-root',
+    rootResolve: (sub = '') => (sub ? `/tmp/test-root/${sub}` : '/tmp/test-root'),
     shared: (sub = '') => (sub ? `/tmp/test-shared/${sub}` : '/tmp/test-shared'),
   },
 }));
@@ -24,6 +25,15 @@ vi.mock('../secure-io.js', () => ({
   safeMkdir: (p: string, opts: any) => fs.mkdirSync(p, opts),
   safeStat: (p: string) => fs.statSync(p),
   safeUnlinkSync: (p: string) => fs.unlinkSync(p),
+  loadJson: <T>(p: string): T => JSON.parse(fs.readFileSync(p, 'utf8')) as T,
+  loadJsonIfPresent: <T>(p: string): T | null => {
+    if (!fs.existsSync(p)) return null;
+    try {
+      return JSON.parse(fs.readFileSync(p, 'utf8')) as T;
+    } catch {
+      return null;
+    }
+  },
 }));
 
 import { enforceKnowledgeCacheBudget } from './knowledge-index.js';

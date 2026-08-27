@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
-import { getSurfaceCoordinationRole, resetSurfaceCoordinationRoleMapCache } from './surface-coordination-role-map.js';
+import {
+  getSurfaceCoordinationRole,
+  resetSurfaceCoordinationRoleMapCache,
+} from './surface-coordination-role-map.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 
@@ -20,10 +24,21 @@ describe('surface-coordination-role-map', () => {
 
   it('emits a map that satisfies the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/surface-coordination-role-map.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/surface-coordination-role-map.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
-    const payload = JSON.parse(
-      safeReadFile(path.join(pathResolver.rootDir(), 'knowledge/product/governance/surface-coordination-role-map.json'), { encoding: 'utf8' }) as string,
+    const payload = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile(
+          path.join(
+            pathResolver.rootDir(),
+            'knowledge/product/governance/surface-coordination-role-map.json'
+          ),
+          { encoding: 'utf8' }
+        ) as string
+      )
     );
     expect(validate(payload), JSON.stringify(validate.errors || [])).toBe(true);
   });

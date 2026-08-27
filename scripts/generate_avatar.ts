@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { generateImage, type ImageGenerationMode, safeExistsSync } from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
   const result: Record<string, string | boolean> = {};
@@ -43,8 +44,8 @@ function deriveAutoPreference(requireHostBridge: boolean): string[] {
   return [...bridgePreference, 'local_flux', 'comfyui', 'gemini_service', 'llm_api'];
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
+async function main(argv: string[] = []) {
+  const args = parseArgs(argv);
   const inputPhoto =
     typeof args['input-photo'] === 'string'
       ? args['input-photo']
@@ -66,8 +67,7 @@ async function main() {
   const resolvedOutput = path.resolve(outputPath);
 
   if (!safeExistsSync(resolvedInput)) {
-    console.error(`Input face photo not found at: ${resolvedInput}`);
-    process.exit(1);
+    throw new ScriptExitError(1, `Input face photo not found at: ${resolvedInput}`);
   }
 
   console.log(`Generating avatar based on: ${resolvedInput}`);
@@ -83,21 +83,26 @@ async function main() {
     });
 
     console.log(`Avatar generated successfully at: ${result.path}`);
-  } catch (err: any) {
-    const message = err?.message || String(err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
     if (
       message.includes('HOST_AGENT_IMAGE_GENERATION_REQUIRED') ||
       message.includes('HOST_BRIDGE_IMAGE_GENERATION_REQUIRED')
     ) {
-      console.error(message);
-      process.exit(100);
+      throw new ScriptExitError(100, message);
     }
-    console.error(`Avatar generation failed: ${message}`);
-    process.exit(1);
+    throw new ScriptExitError(1, `Avatar generation failed: ${message}`);
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
+export const runGenerateAvatar = defineScript({
+  name: 'avatar:generate',
+  flags: [],
+  run: async ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'generate_avatar.ts') ||
+  isDirectScript(import.meta.url, 'generate_avatar.js')
+)
+  void runGenerateAvatar();

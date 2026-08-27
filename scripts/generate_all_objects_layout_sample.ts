@@ -1469,7 +1469,7 @@ async function main() {
     console.log(`Successfully generated PowerPoint file at: ${outPath}`);
   } catch (error) {
     console.error('Error during generation:', error);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

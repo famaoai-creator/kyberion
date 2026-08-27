@@ -8,8 +8,9 @@
  * which catches structural breakage).
  *
  * Modes:
- *   pnpm check:golden                      # check mode (CI)
- *   pnpm check:golden -- --rebaseline      # update golden snapshots after intentional changes
+ *   pnpm check -- --scope pr --only golden  # check mode (CI)
+ *   node dist/scripts/check_golden_output.js --rebaseline
+ *                                            # update snapshots after intentional changes
  *
  * Registry: tests/golden/pipelines.json — list of pipelines to gate.
  * Snapshots: tests/golden/snapshots/{pipeline-id}.json
@@ -21,7 +22,10 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { withExecutionContext } from '@agent/core/governance';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface GoldenRegistryEntry {
   /** Stable pipeline identifier (matches `id` field in the ADF JSON). */
@@ -63,19 +67,21 @@ const DEFAULT_IGNORE_PATHS = [
 
 function loadRegistry(): GoldenRegistryEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
-  return JSON.parse(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string);
+  return readJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
 }
 
 function loadSnapshot(id: string): GoldenSnapshot | null {
   const p = path.join(SNAPSHOTS_DIR, `${id}.json`);
   if (!safeExistsSync(p)) return null;
-  return JSON.parse(safeReadFile(p, { encoding: 'utf8' }) as string);
+  return readJson<GoldenSnapshot>(p);
 }
 
 function writeSnapshot(snapshot: GoldenSnapshot): void {
-  if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
-  const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
-  safeWriteFile(p, JSON.stringify(snapshot, null, 2) + '\n', { encoding: 'utf8' });
+  withExecutionContext('ecosystem_architect', () => {
+    if (!safeExistsSync(SNAPSHOTS_DIR)) safeMkdir(SNAPSHOTS_DIR, { recursive: true });
+    const p = path.join(SNAPSHOTS_DIR, `${snapshot.pipeline_id}.json`);
+    safeWriteFile(p, JSON.stringify(snapshot, null, 2) + '\n', { encoding: 'utf8' });
+  });
 }
 
 function elidePath(obj: any, dotPath: string): void {
@@ -102,7 +108,9 @@ function normalizeResult(result: unknown, ignorePaths: string[]): unknown {
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return '[' + value.map(canonicalize).join(',') + ']';
-  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+  const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   return '{' + entries.map(([k, v]) => JSON.stringify(k) + ':' + canonicalize(v)).join(',') + '}';
 }
 
@@ -110,17 +118,23 @@ function hashResult(result: unknown): string {
   return createHash('sha256').update(canonicalize(result)).digest('hex');
 }
 
-async function runPipeline(pipelinePath: string, input: Record<string, unknown> = {}): Promise<unknown> {
+async function runPipeline(
+  pipelinePath: string,
+  input: Record<string, unknown> = {}
+): Promise<unknown> {
   // Lazy-import to keep CLI startup fast and to allow the script to load without a
   // built dist/ when only the registry is being inspected.
   const mod = await import('./run_pipeline.js' as string);
-  const adf = JSON.parse(safeReadFile(path.join(ROOT, pipelinePath), { encoding: 'utf8' }) as string);
+  const adf = readJson<unknown>(path.join(ROOT, pipelinePath));
   const steps = (adf as { steps?: unknown[] }).steps ?? [];
   const runStepsFn = (mod as Record<string, unknown>).runSteps;
   if (typeof runStepsFn !== 'function') {
     throw new Error('run_pipeline.js does not export runSteps');
   }
-  return await (runStepsFn as (s: unknown[], i?: Record<string, unknown>) => Promise<unknown>)(steps, input);
+  return await (runStepsFn as (s: unknown[], i?: Record<string, unknown>) => Promise<unknown>)(
+    steps,
+    input
+  );
 }
 
 interface Diagnostic {
@@ -129,10 +143,7 @@ interface Diagnostic {
   message: string;
 }
 
-async function checkOne(
-  entry: GoldenRegistryEntry,
-  rebaseline: boolean,
-): Promise<Diagnostic[]> {
+async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promise<Diagnostic[]> {
   const diags: Diagnostic[] = [];
   let result: unknown;
   try {
@@ -184,48 +195,57 @@ async function checkOne(
   return diags;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  const rebaseline = args.includes('--rebaseline');
+export const runCheckGoldenOutput = defineScript({
+  name: 'check:golden',
+  flags: [],
+  async run(context) {
+    const args = context.argv;
+    const rebaseline = args.includes('--rebaseline');
 
-  const registry = loadRegistry();
-  if (registry.length === 0) {
-    console.log(
-      `📝 No golden registry yet. Create ${path.relative(ROOT, REGISTRY_PATH)} ` +
-        `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`,
-    );
-    return;
-  }
+    const registry = loadRegistry();
+    if (registry.length === 0) {
+      context.print(
+        `📝 No golden registry yet. Create ${path.relative(ROOT, REGISTRY_PATH)} ` +
+          `with the pipelines you want gated. Example shape is in docs/developer/GOLDEN_OUTPUT_CHECK.md.`
+      );
+      return;
+    }
 
-  const allDiags: Diagnostic[] = [];
-  for (const entry of registry) {
-    const diags = await checkOne(entry, rebaseline);
-    allDiags.push(...diags);
-    const status = diags.find(d => d.severity === 'error') ? '❌' : diags.length > 0 ? '⚠️ ' : '✅';
-    console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
-  }
+    const allDiags: Diagnostic[] = [];
+    for (const entry of registry) {
+      const diags = await checkOne(entry, rebaseline);
+      allDiags.push(...diags);
+      const status = diags.find((d) => d.severity === 'error')
+        ? '❌'
+        : diags.length > 0
+          ? '⚠️ '
+          : '✅';
+      console.log(`  ${status}  ${entry.id} (${entry.pipeline})`);
+    }
 
-  const errors = allDiags.filter(d => d.severity === 'error');
-  const warnings = allDiags.filter(d => d.severity === 'warning');
+    const errors = allDiags.filter((d) => d.severity === 'error');
+    const warnings = allDiags.filter((d) => d.severity === 'warning');
 
-  if (warnings.length > 0) {
-    console.log('\nWarnings:');
-    for (const w of warnings) console.log(`  - ${w.pipeline_id}: ${w.message}`);
-  }
-  if (errors.length > 0) {
-    console.error('\nErrors:');
-    for (const e of errors) console.error(`  - ${e.pipeline_id}: ${e.message}`);
-    process.exit(1);
-  }
+    if (warnings.length > 0) {
+      console.log('\nWarnings:');
+      for (const w of warnings) console.log(`  - ${w.pipeline_id}: ${w.message}`);
+    }
+    if (errors.length > 0) {
+      console.error('\nErrors:');
+      for (const e of errors) console.error(`  - ${e.pipeline_id}: ${e.message}`);
+      throw new Error(`${errors.length} golden output violation(s)`);
+    }
 
-  if (rebaseline) {
-    console.log(`\n✅ Rebaselined ${registry.length} snapshots.`);
-  } else {
-    console.log(`\n✅ Golden output check passed (${registry.length} pipelines).`);
-  }
-}
-
-main().catch(err => {
-  console.error('Fatal:', err);
-  process.exit(1);
+    if (rebaseline) {
+      context.print(`\n✅ Rebaselined ${registry.length} snapshots.`);
+    } else {
+      context.print(`\n✅ Golden output check passed (${registry.length} pipelines).`);
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'check_golden_output.ts') ||
+  isDirectScript(import.meta.url, 'check_golden_output.js')
+)
+  void runCheckGoldenOutput();

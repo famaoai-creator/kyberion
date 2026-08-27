@@ -14,6 +14,7 @@ const realFsSecureIo = vi.hoisted(() => ({
     fs.mkdirSync(dirPath, { recursive: options?.recursive !== false }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
   loadJsonIfPresent: <T>(filePath: string): T | null => {
     if (!fs.existsSync(filePath)) return null;
     try {
@@ -28,6 +29,18 @@ const realFsSecureIo = vi.hoisted(() => ({
   },
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: realFsSecureIo.loadJson,
+    loadJsonIfPresent: realFsSecureIo.loadJsonIfPresent,
+    appendFile: realFsSecureIo.safeAppendFileSync,
+    exists: realFsSecureIo.safeExistsSync,
+    readFile: (filePath: string) => String(realFsSecureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: realFsSecureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));

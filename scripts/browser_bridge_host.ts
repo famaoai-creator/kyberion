@@ -38,7 +38,6 @@ import {
   resolveProcedure,
   saveProcedureDelta,
   pathResolver,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   auditChain,
@@ -58,6 +57,7 @@ import {
   type BrowserExtensionSessionRequest,
   type ProcedureEntry,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
 function loadBrowserProcedure(procedureId: string): {
@@ -79,7 +79,7 @@ function loadBrowserProcedure(procedureId: string): {
         };
       let raw: unknown;
       try {
-        raw = JSON.parse(safeReadFile(recordingPath) as string);
+        raw = readJson<unknown>(recordingPath);
       } catch (err) {
         return {
           error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
@@ -543,9 +543,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
     return { ok: false, error: 'delta_recording_ref is not in the allowlisted recordings store' };
   let deltaRecording;
   try {
-    const parsed = validateBrowserExtensionRecording(
-      JSON.parse(safeReadFile(deltaRecAbs) as string)
-    );
+    const parsed = validateBrowserExtensionRecording(readJson<unknown>(deltaRecAbs));
     if (!parsed.value)
       return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
     deltaRecording = parsed.value;
@@ -978,4 +976,4 @@ process.stdin.on('end', () => {
   inputEnded = true;
   exitWhenDrained();
 });
-process.stdin.on('error', () => process.exit(1));
+process.stdin.on('error', () => (process.exitCode = 1));

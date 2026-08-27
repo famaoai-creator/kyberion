@@ -11,14 +11,8 @@ import { metrics, MetricsCollector } from './metrics.js';
 import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { withLockSync } from './src/lock-utils.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeReaddir, safeStat, safeWriteFile } from './secure-io.js';
 
 export const GENERATION_COST_SETTLEMENT_ROOT =
   'active/shared/runtime/media-generation/cost-settlements';
@@ -118,9 +112,7 @@ export function extractProviderReportedCost(job: GenerationCostSettlementJob): n
 function readSettlement(filePath: string): GenerationCostSettlement | undefined {
   if (!safeExistsSync(filePath)) return undefined;
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as GenerationCostSettlement;
+    const parsed = readJson<GenerationCostSettlement>(filePath);
     if (
       parsed?.kind !== 'generation-cost-settlement' ||
       typeof parsed.job_id !== 'string' ||

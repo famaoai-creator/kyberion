@@ -1,14 +1,9 @@
+import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeReaddir,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, loadJson, safeReaddir, safeWriteFile } from './secure-io.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   createMemoryPromotionCandidate,
@@ -82,14 +77,10 @@ function dealLogPath(tenantSlug: string): string {
   return path.join(dealsDir(tenantSlug), 'deal-log.jsonl');
 }
 
-function nowIso(): string {
-  return new Date().toISOString();
-}
-
 function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void {
   try {
     safeMkdir(dealsDir(tenantSlug), { recursive: true });
-    safeAppendFileSync(dealLogPath(tenantSlug), `${JSON.stringify({ ts: nowIso(), ...event })}\n`);
+    appendJsonLine(dealLogPath(tenantSlug), { ts: nowIso(), ...event });
   } catch {
     // deal log is observability; never block the deal transition itself
   }
@@ -105,7 +96,7 @@ export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
   const filePath = dealPath(tenantSlug, dealId);
   try {
     if (!safeExistsSync(filePath)) return null;
-    return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as DealRecord;
+    return loadJson<DealRecord>(filePath);
   } catch {
     return null;
   }
@@ -393,7 +384,7 @@ export function loadPriceBook(tenantSlug?: string): PriceBook | null {
   for (const candidate of candidates) {
     try {
       if (!safeExistsSync(candidate)) continue;
-      return JSON.parse(safeReadFile(candidate, { encoding: 'utf8' }) as string) as PriceBook;
+      return loadJson<PriceBook>(candidate);
     } catch {
       continue;
     }

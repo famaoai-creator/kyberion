@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import {
   applyBrowserOnboarding,
   getInstalledReasoningMode,
@@ -12,7 +13,6 @@ import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   saveBrowserOnboardingVoiceSample,
   secureIo,
@@ -30,16 +30,12 @@ export function GET(req: NextRequest) {
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
     const root = pathResolver.rootDir();
-    const roles = JSON.parse(
-      safeReadFile(path.join(root, 'knowledge/product/governance/surface-roles.json'), {
-        encoding: 'utf8',
-      }) as string
-    ) as { roles: Array<Record<string, unknown>> };
-    const surfaces = JSON.parse(
-      safeReadFile(path.join(root, 'knowledge/product/governance/active-surfaces.json'), {
-        encoding: 'utf8',
-      }) as string
-    ) as { surfaces: Array<Record<string, unknown>> };
+    const roles = readJson<{ roles: Array<Record<string, unknown>> }>(
+      path.join(root, 'knowledge/product/governance/surface-roles.json')
+    );
+    const surfaces = readJson<{ surfaces: Array<Record<string, unknown>> }>(
+      path.join(root, 'knowledge/product/governance/active-surfaces.json')
+    );
     let reasoning = 'unknown';
     try {
       reasoning = String(getInstalledReasoningMode() || 'not-installed');
@@ -52,7 +48,7 @@ export function GET(req: NextRequest) {
     const avatarPath = path.join(profileRoot, 'avatar.png');
     const activeVoiceSampleRoot = path.resolve(profileRoot, 'voice', 'samples');
     const activeTenantSlug = String(
-      identity.tenant_slug || process.env.KYBERION_TENANT || 'default'
+      identity.tenant_slug || getRegisteredEnvText('KYBERION_TENANT') || 'default'
     );
     const tenantCatalog = withExecutionContext('sovereign_concierge', () =>
       listTenantProfileSlugs().flatMap((slug) => {
@@ -200,7 +196,7 @@ export function GET(req: NextRequest) {
         },
         tenant: {
           active_slug: activeTenantSlug,
-          runtime_bound: Boolean(process.env.KYBERION_TENANT),
+          runtime_bound: Boolean(getRegisteredEnvText('KYBERION_TENANT')),
           catalog: tenantCatalog,
         },
         agent_management: {
@@ -275,7 +271,7 @@ export async function POST(req: NextRequest) {
             safeWriteFile(avatarPath, fileData);
             const identityPath = path.join(profileRoot, 'my-identity.json');
             const identity = safeExistsSync(identityPath)
-              ? JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'))
+              ? readJson<Record<string, unknown>>(identityPath)
               : { name: 'user', language: 'ja', interaction_style: 'Concierge' };
             identity.avatar_path = 'avatar.png';
             identity.avatar_source = avatarSource === 'camera' ? 'camera' : 'upload';
@@ -296,7 +292,7 @@ export async function POST(req: NextRequest) {
       const tenantInput = body.tenant || {};
       const agentInput = body.agent || {};
       const activeSlug = String(
-        tenantInput.slug || process.env.KYBERION_TENANT || 'default'
+        tenantInput.slug || getRegisteredEnvText('KYBERION_TENANT') || 'default'
       ).trim();
       const profileRoot = resolveActiveProfileRoot();
       const identityPath = path.join(profileRoot, 'my-identity.json');
@@ -305,7 +301,7 @@ export async function POST(req: NextRequest) {
       const result = withExecutionContext('sovereign_concierge', () =>
         secureIo.withSensitivePathMediation(() => {
           const currentIdentity = safeExistsSync(identityPath)
-            ? JSON.parse(String(safeReadFile(identityPath, { encoding: 'utf8' }) || '{}'))
+            ? readJson<Record<string, unknown>>(identityPath)
             : {};
           const currentTenant = readTenantProfile(activeSlug) || {
             tenant_slug: activeSlug,
@@ -341,7 +337,7 @@ export async function POST(req: NextRequest) {
           safeWriteFile(identityPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
           safeWriteFile(visionPath, `# Sovereign Vision\n\n${vision}\n`, { encoding: 'utf8' });
           const currentAgent = safeExistsSync(agentPath)
-            ? JSON.parse(String(safeReadFile(agentPath, { encoding: 'utf8' }) || '{}'))
+            ? readJson<Record<string, unknown>>(agentPath)
             : {};
           const agentId = String(
             agentInput.agent_id || currentAgent.agent_id || 'sovereign-agent'

@@ -1,18 +1,9 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
-import {
-  findRelevantDistilledKnowledge,
-  type DistilledKnowledgeEntry,
-} from './distill-knowledge-injector.js';
-import {
-  resolveKnowledgeSlice,
-  isKnowledgePathExcluded,
-  isKnowledgePathInSearchRoots,
-} from './knowledge-slices.js';
-import { queryTenantKnowledge } from './tenant-knowledge-retrieval.js';
+import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   findReusableArtifactOwnershipRecord,
   listArtifactOwnershipRecordsForProject,
@@ -24,7 +15,6 @@ import {
   projectOperationalStatePath,
   type ProjectOperationalState,
 } from './project-operational-state-registry.js';
-import { loadProjectRecord } from './project-registry.js';
 import { loadProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
 import {
   getMissionTeamPlanPath,
@@ -34,13 +24,9 @@ import {
 } from './mission-team-plan-composer.js';
 import { getWorkItem, type WorkItem } from './work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from './task-session.js';
-import { slugify } from './text-utils.js';
-import {
-  compileScopedContextPack,
-  type ContextFragmentRejection,
-  type ContextSecurityScope,
-} from './context-security-scope.js';
-import { resolveFacets, type FacetRequest, type ResolvedFacets } from './facet-registry.js';
+import { slugify } from './foundation/text.js';
+import { compileScopedContextPack, type ContextSecurityScope } from './context-security-scope.js';
+import { resolveFacets, type ResolvedFacets } from './facet-registry.js';
 import {
   loadSkillResourceDescriptor,
   renderSkillResourceIndex,
@@ -48,379 +34,77 @@ import {
 } from './skill-resource-loader.js';
 import { isSkillAllowed } from './skill-plugin-loader.js';
 import type { ScopeContext } from './scope-context.js';
+import {
+  knowledgeHintFragment,
+  loadKnowledgeHintsIfPossible,
+  organizationIdFromContext,
+  resolveScopeBudget,
+} from './mission-context-pack-knowledge.js';
+import type {
+  BuildMissionContextPackInput,
+  MissionContextPack,
+  MissionContextPackArtifactHint,
+  MissionContextPackFacets,
+  MissionContextPackKnowledgeHint,
+  MissionContextPackMissionSummary,
+  MissionContextPackRecipient,
+  MissionContextPackScope,
+  MissionContextPackSource,
+  MissionContextPackTaskGuidance,
+  MissionContextRecipientKind,
+  MissionStateSummary,
+  MissionTier,
+  ResolveMissionContextPackInput,
+} from './mission-context-pack-types.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+export type {
+  BuildMissionContextPackInput,
+  LoadKnowledgeHintsInput,
+  MissionContextPack,
+  MissionContextPackArtifactHint,
+  MissionContextPackFacets,
+  MissionContextPackKnowledgeHint,
+  MissionContextPackMissionSummary,
+  MissionContextPackPruningSummary,
+  MissionContextPackProjectSummary,
+  MissionContextPackRecipient,
+  MissionContextPackScope,
+  MissionContextPackSource,
+  MissionContextPackTaskGuidance,
+  MissionContextPackTaskSessionSummary,
+  MissionContextPackTrackSummary,
+  MissionContextPackWorkItemSummary,
+  MissionContextRecipientKind,
+  MissionStateSummary,
+  MissionTier,
+  ResolveMissionContextPackInput,
+} from './mission-context-pack-types.js';
+export {
+  deriveGovernancePhaseFromMissionState,
+  loadKnowledgeHintsIfPossible,
+  resolveScopeBudget,
+  SCOPE_KNOWLEDGE_BUDGETS,
+} from './mission-context-pack-knowledge.js';
 
-const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve('schemas/mission-state.schema.json');
+const MISSION_STATE_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/mission-state.schema.json'
+);
 const MISSION_CONTEXT_PACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-context-pack.schema.json'
 );
-
-type MissionTier = 'personal' | 'confidential' | 'public';
-type MissionStatus =
-  | 'planned'
-  | 'active'
-  | 'validating'
-  | 'distilling'
-  | 'completed'
-  | 'paused'
-  | 'failed'
-  | 'archived';
-type MissionContextRecipientKind =
-  'agent' | 'subagent' | 'reviewer' | 'operator' | 'planner' | 'tester';
-type MissionContextDeliveryMode = 'prompt' | 'artifact';
-
-export interface MissionStateSummary {
-  mission_id: string;
-  mission_type?: string;
-  tenant_id?: string;
-  tenant_slug?: string;
-  vision_ref?: string;
-  tier: MissionTier;
-  status: MissionStatus | string;
-  execution_mode?: string;
-  assigned_persona: string;
-  priority?: number;
-  confidence_score?: number;
-  git: {
-    branch: string;
-    start_commit: string;
-    latest_commit: string;
-    checkpoints: Array<{ task_id: string; commit_hash: string; ts: string }>;
-  };
-  history: Array<{ ts: string; event: string; from?: string; to?: string; note: string }>;
-  relationships?: {
-    project?: {
-      project_id?: string;
-      organization_id?: string;
-      project_path?: string;
-      relationship_type?: string;
-      affected_artifacts?: string[];
-      gate_impact?: string;
-      traceability_refs?: string[];
-      note?: string;
-    };
-    track?: {
-      track_id?: string;
-      track_name?: string;
-      track_type?: string;
-      lifecycle_model?: string;
-      relationship_type?: string;
-      traceability_refs?: string[];
-      note?: string;
-    };
-  };
-  context?: {
-    last_action?: string;
-    next_step?: string;
-    routing_decision_summary?: string;
-    mission_finish_trace_persisted_path?: string;
-    distill_output_path?: string;
-  };
-  outcome_contract?: {
-    outcome_id?: string;
-    requested_result?: string;
-    deliverable_kind?: string;
-    success_criteria?: string[];
-    evidence_required?: boolean;
-    vision_ref?: {
-      raw: string;
-      kind: 'company' | 'vision' | 'legacy';
-      tenant_slug: string | null;
-      path: string | null;
-      query: string | null;
-    } | null;
-  };
-}
-
-export interface MissionContextPackSource {
-  kind:
-    | 'mission_state'
-    | 'mission_team'
-    | 'project_state'
-    | 'project_track'
-    | 'task_session'
-    | 'work_item'
-    | 'knowledge_hint'
-    | 'skill_resource'
-    | 'other';
-  ref: string;
-  path?: string;
-  summary?: string;
-  captured_at?: string;
-  tier?: MissionTier;
-  tenant_slug?: string;
-}
-
-export interface MissionContextPackRecipient {
-  kind: MissionContextRecipientKind;
-  team_role?: string;
-  agent_id?: string;
-  authority_role?: string;
-  provider?: string | null;
-  modelId?: string | null;
-  delegation_contract?: MissionTeamAssignment['delegation_contract'];
-  required_capabilities?: string[];
-  notes?: string;
-}
-
-export interface MissionContextPackScope {
-  tier: MissionTier;
-  mission_id: string;
-  tenant_slug?: string;
-  organization_id?: string;
-  project_id?: string;
-  track_id?: string;
-  task_session_id?: string;
-  work_item_id?: string;
-}
-
-export interface MissionContextPackKnowledgeHint {
-  path: string;
-  title: string;
-  excerpt: string;
-  tags: string[];
-  score?: number;
-  category?: string;
-  source_mission?: string;
-  last_updated?: string;
-}
-
-export interface MissionContextPackArtifactHint {
-  artifact_id: string;
-  kind: string;
-  storage_class: ArtifactOwnershipRecord['storage_class'];
-  project_id?: string;
-  mission_id?: string;
-  task_session_id?: string;
-  path?: string;
-  external_ref?: string;
-  created_at?: string;
-  evidence_refs?: string[];
-  reuse_reason: string;
-}
-
-export interface MissionContextPackTaskGuidance {
-  model_tier: 'fast' | 'standard' | 'deep';
-  acceptance_criteria: string[];
-  output_contract: string;
-  verification: string[];
-  seed?: string[];
-}
-
-export interface MissionContextPackFacets {
-  persona?: { name: string; source: string; content: string };
-  policies: Array<{ name: string; source: string; content: string }>;
-  instructions: Array<{ name: string; source: string; content: string }>;
-  output_contract?: { name: string; source: string; content: string };
-}
-
-export interface MissionContextPackPruningSummary {
-  budget_chars: number;
-  estimated_chars: number;
-  kept_sections: string[];
-  pruned_sections: string[];
-  rollup_path?: string;
-  rollup_summary: string;
-}
-
-export interface MissionContextPackMissionSummary {
-  mission_id: string;
-  mission_type?: string;
-  tier: MissionTier;
-  status: MissionStatus | string;
-  assigned_persona: string;
-  tenant_id?: string;
-  tenant_slug?: string;
-  vision_ref?: string;
-  execution_mode?: string;
-  priority?: number;
-  confidence_score?: number;
-  relationships?: MissionStateSummary['relationships'];
-  context?: MissionStateSummary['context'];
-  outcome_contract?: MissionStateSummary['outcome_contract'];
-}
-
-export interface MissionContextPackProjectSummary {
-  project_id: string;
-  name: string;
-  summary: string;
-  status: ProjectOperationalState['status'];
-  tier: ProjectOperationalState['tier'];
-  tenant_slug?: string;
-  project_path?: string;
-  current_phase?: ProjectOperationalState['current_phase'];
-  active_track_ids?: string[];
-  active_mission_ids?: string[];
-  active_task_session_ids?: string[];
-  source_refs?: string[];
-  distill_targets?: string[];
-  knowledge_refs?: string[];
-  last_distilled_at?: string;
-}
-
-export interface MissionContextPackTrackSummary {
-  track_id: string;
-  project_id: string;
-  name: string;
-  summary: string;
-  status: ProjectTrackRecord['status'];
-  track_type: ProjectTrackRecord['track_type'];
-  lifecycle_model: ProjectTrackRecord['lifecycle_model'];
-  tier: ProjectTrackRecord['tier'];
-  primary_locale?: string;
-  release_id?: string;
-  change_scope?: string;
-  gate_profile_id?: string;
-  active_mission_ids?: string[];
-  required_artifacts?: string[];
-}
-
-export interface MissionContextPackTaskSessionSummary {
-  session_id: string;
-  surface: TaskSession['surface'];
-  task_type: TaskSession['task_type'];
-  status: TaskSession['status'];
-  mode: TaskSession['mode'];
-  goal: TaskSession['goal'];
-  project_context?: TaskSession['project_context'];
-  requirements?: TaskSession['requirements'];
-  artifact?: TaskSession['artifact'];
-  control?: TaskSession['control'];
-  outcome_contract?: TaskSession['outcome_contract'];
-  updated_at: string;
-}
-
-export interface MissionContextPackWorkItemSummary {
-  item_id: string;
-  title: string;
-  description: string;
-  status: WorkItem['status'];
-  priority: WorkItem['priority'];
-  source: WorkItem['source'];
-  source_ref: string;
-  project_id: string;
-  assignee_peer_id?: string;
-  assignee_user_id?: string;
-  labels: string[];
-  dependencies: string[];
-  metadata?: Record<string, unknown>;
-}
-
-export interface MissionContextPack {
-  context_pack_id: string;
-  version: '1';
-  generated_at: string;
-  summary: string;
-  scope: MissionContextPackScope;
-  security_scope: ContextSecurityScope;
-  /** Present only when candidate fragments were rejected by the scope gate. */
-  scope_audit?: {
-    effective_scope: ContextSecurityScope;
-    rejected: ContextFragmentRejection[];
-  };
-  recipient: MissionContextPackRecipient;
-  mission: MissionContextPackMissionSummary;
-  project?: MissionContextPackProjectSummary;
-  track?: MissionContextPackTrackSummary;
-  task_session?: MissionContextPackTaskSessionSummary;
-  work_item?: MissionContextPackWorkItemSummary;
-  knowledge_hints?: MissionContextPackKnowledgeHint[];
-  /** PI-09: metadata-only skill descriptors; bodies are never part of a pack. */
-  skill_resources?: SkillResourceDescriptor[];
-  artifact_hints?: MissionContextPackArtifactHint[];
-  task_guidance?: MissionContextPackTaskGuidance;
-  facets?: MissionContextPackFacets;
-  sources: MissionContextPackSource[];
-  redactions: string[];
-  pruning?: MissionContextPackPruningSummary;
-  delivery: {
-    mode: MissionContextDeliveryMode;
-    summary: string;
-  };
-  context_pack_path?: string;
-}
-
-export interface BuildMissionContextPackInput {
-  missionState: MissionStateSummary;
-  missionPath?: string;
-  recipientKind?: MissionContextRecipientKind;
-  teamRole?: string;
-  assigneePeerId?: string;
-  workItem?: WorkItem | null;
-  taskSession?: TaskSession | null;
-  projectState?: ProjectOperationalState | null;
-  trackRecord?: ProjectTrackRecord | null;
-  missionTeamAssignment?: MissionTeamAssignment | null;
-  knowledgeHints?: MissionContextPackKnowledgeHint[];
-  /** Preloaded descriptors for a governed caller; bodies are not accepted. */
-  skillResources?: SkillResourceDescriptor[];
-  /** Explicit skill resources to expose as a metadata-only progressive index. */
-  skillPaths?: string[];
-  /** Set false for pre-trust callers; project-local skills are not inspected. */
-  trustResolved?: boolean;
-  contextPackId?: string;
-  contextBudgetChars?: number;
-  /**
-   * KP-04: when `contextBudgetChars` is not explicitly supplied, the prune
-   * budget is derived from `SCOPE_KNOWLEDGE_BUDGETS[estimatedScope]`. Omitted
-   * = `M` (pre-KP-04 default of 6000), so existing callers are unaffected.
-   */
-  estimatedScope?: 'S' | 'M' | 'L';
-  facets?: FacetRequest;
-}
-
-export interface ResolveMissionContextPackInput {
-  missionId: string;
-  tier?: MissionTier;
-  tenantSlug?: string;
-  recipientKind?: MissionContextRecipientKind;
-  teamRole?: string;
-  assigneePeerId?: string;
-  workItemId?: string;
-  taskSessionId?: string;
-  projectId?: string;
-  trackId?: string;
-  includeKnowledgeHints?: boolean;
-  /** Explicit skill resources to expose as a metadata-only progressive index. */
-  skillPaths?: string[];
-  /** Set false for pre-trust callers; project-local skills are not inspected. */
-  trustResolved?: boolean;
-  missionState?: MissionStateSummary | null;
-  workItem?: WorkItem | null;
-  taskSession?: TaskSession | null;
-  projectState?: ProjectOperationalState | null;
-  trackRecord?: ProjectTrackRecord | null;
-  contextPackId?: string;
-  contextBudgetChars?: number;
-  /**
-   * KP-04: scales both the knowledge hint count and (absent an explicit
-   * `contextBudgetChars`) the prune budget via `SCOPE_KNOWLEDGE_BUDGETS`.
-   * Omitted = `M`, matching pre-KP-04 behavior byte-for-byte.
-   */
-  estimatedScope?: 'S' | 'M' | 'L';
-  facets?: FacetRequest;
-  /**
-   * DA-07 test seam, forwarded to `loadKnowledgeHintsIfPossible`: repo root
-   * containing fixture `knowledge/`, `customer/`, and tenant profile
-   * directories for tenant-scoped retrieval. Defaults to the real repo root.
-   */
-  tenantKnowledgeRootDir?: string;
-}
 
 let missionStateValidateFn: ValidateFunction | null = null;
 let missionContextPackValidateFn: ValidateFunction | null = null;
 
 function ensureMissionStateValidator(): ValidateFunction {
   if (missionStateValidateFn) return missionStateValidateFn;
-  missionStateValidateFn = compileSchemaFromPath(ajv, MISSION_STATE_SCHEMA_PATH);
+  missionStateValidateFn = compileSchema(MISSION_STATE_SCHEMA_PATH);
   return missionStateValidateFn;
 }
 
 function ensureMissionContextPackValidator(): ValidateFunction {
   if (missionContextPackValidateFn) return missionContextPackValidateFn;
-  missionContextPackValidateFn = compileSchemaFromPath(ajv, MISSION_CONTEXT_PACK_SCHEMA_PATH);
+  missionContextPackValidateFn = compileSchema(MISSION_CONTEXT_PACK_SCHEMA_PATH);
   return missionContextPackValidateFn;
 }
 
@@ -532,9 +216,7 @@ function buildTaskGuidance(input: {
     );
     if (safeExistsSync(dispatchManifestPath)) {
       try {
-        const parsed = JSON.parse(
-          safeReadFile(dispatchManifestPath, { encoding: 'utf8' }) as string
-        ) as { records?: Array<Record<string, unknown>> };
+        const parsed = readJson<{ records?: Array<Record<string, unknown>> }>(dispatchManifestPath);
         const currentItemId = input.workItem?.item_id;
         const currentTeamRole = String(
           input.workItem?.metadata && typeof input.workItem.metadata === 'object'
@@ -578,14 +260,12 @@ function buildTaskGuidance(input: {
             );
           if (responsePath && safeExistsSync(responsePath)) {
             try {
-              const responsePayload = JSON.parse(
-                safeReadFile(responsePath, { encoding: 'utf8' }) as string
-              ) as {
+              const responsePayload = readJson<{
                 task_result?: {
                   artifacts?: Array<{ path?: string; kind?: string }>;
                   summary?: string;
                 };
-              };
+              }>(responsePath);
               const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
                 ? responsePayload.task_result.artifacts
                 : [];
@@ -810,9 +490,7 @@ function loadMissionState(missionId: string, tier: MissionTier): MissionStateSum
   const filePath = missionStatePath(missionId, tier);
   if (!safeExistsSync(filePath)) return null;
   try {
-    const parsed = JSON.parse(
-      safeReadFile(filePath, { encoding: 'utf8' }) as string
-    ) as MissionStateSummary;
+    const parsed = readJson<MissionStateSummary>(filePath);
     return ensureMissionStateValidator()(parsed) ? parsed : null;
   } catch {
     return null;
@@ -1089,472 +767,6 @@ function loadTrackStateIfPossible(input: {
   ).trim();
   if (!candidate) return null;
   return loadProjectTrackRecord(candidate);
-}
-
-/**
- * KP-04: hint count and pack char budget scale with the task's
- * `estimated_scope` (S/M/L). Declared as a single map — not scattered
- * literals — so the scope ↔ budget relationship stays visible in one place.
- * `M` reproduces the pre-KP-04 defaults exactly (flat hint limit 3, prune
- * budget 6000 — see the pre-KP-04 `KNOWLEDGE_HINT_LIMIT` constant and
- * `pruneMissionContextPack`'s default), so any caller that omits
- * `estimatedScope` (every caller before KP-04) gets byte-identical behavior.
- */
-export const SCOPE_KNOWLEDGE_BUDGETS: Record<
-  'S' | 'M' | 'L',
-  { hintLimit: number; contextBudgetChars: number }
-> = {
-  S: { hintLimit: 2, contextBudgetChars: 4000 },
-  M: { hintLimit: 3, contextBudgetChars: 6000 },
-  L: { hintLimit: 5, contextBudgetChars: 9000 },
-};
-
-function resolveScopeBudget(scope?: 'S' | 'M' | 'L'): {
-  hintLimit: number;
-  contextBudgetChars: number;
-} {
-  return SCOPE_KNOWLEDGE_BUDGETS[scope ?? 'M'] ?? SCOPE_KNOWLEDGE_BUDGETS.M;
-}
-
-const PINNED_EXCERPT_MAX_CHARS = 400;
-
-/**
- * Parse a leading `---\n...\n---\n` YAML-ish frontmatter block for a `title:`
- * field, mirroring the lightweight parsing distill-knowledge-injector.ts uses
- * for distilled docs. Pinned KP-03 docs are plain governance markdown and
- * rarely carry frontmatter, so this is a best-effort extraction, not the
- * primary title source (see `firstMarkdownHeading` below).
- */
-function pinnedFrontmatterTitle(text: string): { title?: string; body: string } {
-  if (!text.startsWith('---\n')) return { body: text };
-  const end = text.indexOf('\n---\n', 4);
-  if (end === -1) return { body: text };
-  const block = text.slice(4, end);
-  const body = text.slice(end + 5);
-  const match = block.match(/^title\s*:\s*(.+)$/m);
-  const title = match ? match[1].trim().replace(/^["']|["']$/g, '') : undefined;
-  return { title, body };
-}
-
-function firstMarkdownHeading(text: string): string | undefined {
-  const match = text.match(/^#\s+(.+)$/m);
-  return match ? match[1].trim() : undefined;
-}
-
-/** Truncate to the first paragraph, collapsed whitespace, ≤ max chars — same shape as distill excerpts. */
-function truncatePinnedExcerpt(body: string, max = PINNED_EXCERPT_MAX_CHARS): string {
-  const trimmed = body.trim();
-  const idx = trimmed.indexOf('\n\n');
-  const para = idx >= 0 ? trimmed.slice(0, idx) : trimmed;
-  return para.replace(/\s+/g, ' ').slice(0, max);
-}
-
-/**
- * Load one KP-03 `pinned` document as a knowledge hint. Read via secure-io;
- * missing/unreadable files are skipped (fail-open per document — the caller
- * does not reserve a budget slot for a pin that failed to load).
- */
-function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKnowledgeHint | null {
-  try {
-    const abs = pathResolver.rootResolve(repoRelativePath);
-    if (!safeExistsSync(abs)) return null;
-    const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
-    const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);
-    const bodyWithoutHeading = body.replace(/^#\s+.+\n/, '');
-    const title = frontmatterTitle || firstMarkdownHeading(body) || path.basename(repoRelativePath);
-    return {
-      path: repoRelativePath,
-      title,
-      excerpt: truncatePinnedExcerpt(bodyWithoutHeading),
-      tags: [],
-    };
-  } catch {
-    return null;
-  }
-}
-
-export interface LoadKnowledgeHintsInput {
-  missionState: MissionStateSummary;
-  projectState?: ProjectOperationalState | null;
-  trackRecord?: ProjectTrackRecord | null;
-  teamRole?: string;
-  /**
-   * Governance phase (alignment/execution/onboarding/recovery/review).
-   * DA-07 closed the KP-03 open question #1: when omitted, the phase is now
-   * DERIVED from mission/work-item state via
-   * `deriveGovernancePhaseFromMissionState` (work-item `metadata.phase` when
-   * it is already a governance token, else a documented mission-status
-   * mapping). An explicit value here still wins — tests and callers with
-   * better knowledge may override the derivation.
-   */
-  phase?: string;
-  workItem?: WorkItem | null;
-  taskSession?: TaskSession | null;
-  /**
-   * Test-only override for the KP-03 knowledge slices manifest path
-   * (repo-relative). Defaults to `knowledge/product/governance/knowledge-slices.json`.
-   */
-  knowledgeSlicesPath?: string;
-  /**
-   * KP-04: scales the hint budget via `SCOPE_KNOWLEDGE_BUDGETS`. Omitted =
-   * `M` (pre-KP-04 default of 3).
-   */
-  estimatedScope?: 'S' | 'M' | 'L';
-  /**
-   * DA-07 test seam: repo root containing the fixture `knowledge/`,
-   * `customer/`, and tenant profile directories used for tenant-scoped
-   * retrieval. Defaults to the real repo root.
-   */
-  tenantKnowledgeRootDir?: string;
-}
-
-/**
- * DA-07 (closes KP-03 open question #1): derive the governance phase
- * (alignment/execution/onboarding/recovery/review) from mission/work-item
- * state so phase-scoped knowledge slices and taxonomy `retrieval_priority`
- * stop falling through to '*'.
- *
- * Signal precedence (documented mapping — keep this comment authoritative):
- * 1. `workItem.metadata.phase`, only when it is ALREADY one of the five
- *    governance tokens. Mission workflow phase ids (MO-01 `phase_specs[].id`)
- *    are free-form strings with no reliable governance mapping, so they are
- *    deliberately NOT translated here.
- * 2. Mission status → governance phase:
- *    planned → alignment; active → execution; validating/distilling → review;
- *    completed/archived → review; paused/failed → recovery.
- * 3. Anything else → undefined, which slice resolution normalizes to '*'
- *    (the pre-DA-07 behavior).
- */
-const GOVERNANCE_PHASES: ReadonlySet<string> = new Set([
-  'alignment',
-  'execution',
-  'onboarding',
-  'recovery',
-  'review',
-]);
-
-export function deriveGovernancePhaseFromMissionState(
-  missionState: MissionStateSummary,
-  workItem?: WorkItem | null
-): string | undefined {
-  const metadataPhase =
-    workItem?.metadata && typeof workItem.metadata === 'object'
-      ? String((workItem.metadata as Record<string, unknown>).phase || '').trim()
-      : '';
-  if (metadataPhase && GOVERNANCE_PHASES.has(metadataPhase)) return metadataPhase;
-
-  switch (missionState.status) {
-    case 'planned':
-      return 'alignment';
-    case 'active':
-      return 'execution';
-    case 'validating':
-    case 'distilling':
-    case 'completed':
-    case 'archived':
-      return 'review';
-    case 'paused':
-    case 'failed':
-      return 'recovery';
-    default:
-      return undefined;
-  }
-}
-
-/**
- * DA-07: tenant identity as it reaches the pack builder. The mission state
- * itself carries `tenant_slug` (mission-state.schema.json), and project
- * operational state carries `tenant_slug` — there is no separate
- * project→tenant ledger, so these two fields ARE the mapping. The literal
- * `'shared'` is the tenantless placeholder used by project workspace paths
- * and is never a real tenant.
- */
-function tenantSlugFromContext(input: {
-  missionState: MissionStateSummary;
-  projectState?: ProjectOperationalState | null;
-}): string | undefined {
-  const slug = String(
-    input.missionState.tenant_slug || input.projectState?.tenant_slug || ''
-  ).trim();
-  if (!slug || slug === 'shared') return undefined;
-  return slug;
-}
-
-function organizationIdFromContext(input: {
-  missionState: MissionStateSummary;
-  projectState?: ProjectOperationalState | null;
-}): string | undefined {
-  const fromMission = input.missionState.relationships?.project?.organization_id;
-  const fromProject = input.projectState?.metadata?.organization_id;
-  const projectId = String(
-    input.projectState?.project_id || input.missionState.relationships?.project?.project_id || ''
-  ).trim();
-  const projectRecord = projectId ? loadProjectRecord(projectId) : null;
-  const missionTenant = String(input.missionState.tenant_slug || '').trim();
-  const registryMatchesScope = Boolean(
-    projectRecord &&
-    projectRecord.tier === input.missionState.tier &&
-    (!missionTenant || projectRecord.tenant_slug === missionTenant)
-  );
-  const fromRegistry = registryMatchesScope ? projectRecord?.organization_id : undefined;
-  const value = String(fromRegistry || fromMission || fromProject || '').trim();
-  return value || undefined;
-}
-
-/**
- * DA-07: gate tenant-knowledge retrieval by mission tier (fail-closed).
- * Tenant knowledge lives under the confidential tier; a public mission's
- * security scope reads only `['public']` and a personal mission's reads
- * `['public', 'personal']`, so only confidential-tier missions may pull
- * `knowledge/confidential/{tenant}/` content into their pack.
- */
-function tenantSlugForKnowledgeRetrieval(input: {
-  missionState: MissionStateSummary;
-  projectState?: ProjectOperationalState | null;
-}): string | undefined {
-  if (normalizeTier(input.missionState.tier) !== 'confidential') return undefined;
-  return tenantSlugFromContext(input);
-}
-
-function knowledgeHintFragment(hint: MissionContextPackKnowledgeHint, index: number) {
-  const normalized = hint.path.replace(/\\/g, '/');
-  const confidential = normalized.match(/(?:^|\/)confidential\/([^/]+)/);
-  const customer = normalized.match(/(?:^|\/)customer\/([^/]+)/);
-  const tenant = confidential?.[1] || customer?.[1];
-  // customer/{slug}/ is a tenant stance overlay, not public knowledge.
-  const sourceTier: MissionTier = confidential || customer ? 'confidential' : 'public';
-  const organization = normalized.match(/\/organizations\/([^/]+)/)?.[1];
-  const project = normalized.match(/\/projects\/([^/]+)/)?.[1];
-  const mission = normalized.match(/\/missions\/([^/]+)/)?.[1];
-  const task = normalized.match(/\/tasks\/([^/]+)/)?.[1];
-  const session = normalized.match(/\/sessions\/([^/]+)/)?.[1];
-  return {
-    fragment_id: `knowledge-hint-${index}`,
-    source_ref: hint.path,
-    source_tier: sourceTier,
-    ...(tenant && tenant !== 'common' ? { tenant_slug: tenant } : {}),
-    ...(organization ? { organization_id: organization } : {}),
-    ...(project ? { project_id: project } : {}),
-    ...(mission ? { mission_id: mission } : {}),
-    ...(task ? { task_id: task } : {}),
-    ...(session ? { session_id: session } : {}),
-    content: hint,
-  };
-}
-
-/**
- * DA-07 merge policy (deterministic, documented here as the single source):
- * - Pinned slice documents always come first and are never displaced.
- * - The remaining budget is filled by a two-list merge of (a) the distill
- *   corpus results in their existing slice-prioritized order and (b) the
- *   tenant-scoped results in score-descending order: at each step the list
- *   whose head has the higher score contributes the next hint; a TIE goes to
- *   the tenant document; a missing score counts as 0. Relative order within
- *   each list is preserved (distill keeps its search_roots prioritization).
- * - De-duplicated by path (first occurrence wins, pinned paths included),
- *   capped at the remaining `SCOPE_KNOWLEDGE_BUDGETS` hint budget.
- * When the tenant list is empty the caller returns the distill list
- * untouched, so tenantless dispatches stay byte-identical to pre-DA-07.
- */
-function mergeTenantKnowledgeHints(input: {
-  distill: MissionContextPackKnowledgeHint[];
-  tenant: MissionContextPackKnowledgeHint[];
-  cap: number;
-  deliveredPaths: ReadonlySet<string>;
-}): MissionContextPackKnowledgeHint[] {
-  const out: MissionContextPackKnowledgeHint[] = [];
-  const seen = new Set(input.deliveredPaths);
-  let d = 0;
-  let t = 0;
-  while (out.length < input.cap && (d < input.distill.length || t < input.tenant.length)) {
-    const distillHead = input.distill[d];
-    const tenantHead = input.tenant[t];
-    let takeTenant: boolean;
-    if (!distillHead) takeTenant = true;
-    else if (!tenantHead) takeTenant = false;
-    else takeTenant = (tenantHead.score ?? 0) >= (distillHead.score ?? 0);
-    const next = takeTenant ? tenantHead! : distillHead!;
-    if (takeTenant) t += 1;
-    else d += 1;
-    if (seen.has(next.path)) continue;
-    seen.add(next.path);
-    out.push(next);
-  }
-  return out;
-}
-
-/**
- * Resolve knowledge hints for a mission context pack.
- *
- * KP-03 wiring: resolves the matching knowledge slice for the dispatch
- * profile (team_role x phase x mission_type), delivers `pinned` documents
- * first (reserving hint-budget slots), then fills the remaining budget with
- * `findRelevantDistilledKnowledge`, filtered by the slice's `exclude` globs
- * and re-prioritized by its `search_roots`. When no slice matches, or the
- * manifest is missing/invalid, this reduces to exactly the pre-KP-03
- * behavior (flat top-N search scaled by `SCOPE_KNOWLEDGE_BUDGETS`, no
- * pinning/filtering) — `resolveKnowledgeSlice` fails open, so no explicit
- * branch is needed here.
- */
-export async function loadKnowledgeHintsIfPossible(
-  input: LoadKnowledgeHintsInput
-): Promise<MissionContextPackKnowledgeHint[]> {
-  const topic = [
-    input.missionState.mission_type,
-    input.teamRole,
-    input.projectState?.name,
-    input.projectState?.summary,
-    input.trackRecord?.name,
-    input.workItem?.title,
-    input.workItem?.description,
-    input.taskSession?.goal?.summary,
-  ]
-    .map((value) => String(value || '').trim())
-    .filter(Boolean)
-    .join(' ');
-  if (!topic) return [];
-
-  const tags = new Set<string>(
-    [
-      input.missionState.tier,
-      input.missionState.mission_type || '',
-      input.teamRole || '',
-      input.projectState?.project_id || '',
-      input.trackRecord?.track_type || '',
-    ]
-      .map((value) =>
-        String(value || '')
-          .trim()
-          .toLowerCase()
-      )
-      .filter(Boolean)
-  );
-
-  // DA-07: explicit phase wins; otherwise derive from mission/work-item state
-  // (see deriveGovernancePhaseFromMissionState for the documented mapping).
-  const phase =
-    input.phase ?? deriveGovernancePhaseFromMissionState(input.missionState, input.workItem);
-  const sliceTenant = tenantSlugFromContext(input);
-  const sliceProject = String(
-    input.projectState?.project_id ||
-      input.missionState.relationships?.project?.project_id ||
-      input.workItem?.project_id ||
-      ''
-  ).trim();
-  const sliceOrganization = organizationIdFromContext(input);
-
-  const slice = resolveKnowledgeSlice({
-    teamRole: input.teamRole,
-    phase,
-    missionType: input.missionState.mission_type,
-    ...(sliceTenant ? { tenant: sliceTenant } : {}),
-    ...(sliceProject ? { project: sliceProject } : {}),
-    slicesPath: input.knowledgeSlicesPath,
-  });
-
-  const hintLimit = resolveScopeBudget(input.estimatedScope).hintLimit;
-  const pinnedHints: MissionContextPackKnowledgeHint[] = [];
-  for (const pinnedPath of slice.pinned) {
-    if (pinnedHints.length >= hintLimit) break;
-    const hint = loadPinnedKnowledgeHint(pinnedPath);
-    if (hint) pinnedHints.push(hint);
-  }
-
-  const remaining = hintLimit - pinnedHints.length;
-  if (remaining <= 0) return pinnedHints;
-
-  // Over-fetch when exclude globs are in play so post-filtering can still fill the budget.
-  const searchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
-  const relevant = await findRelevantDistilledKnowledge({
-    topic,
-    tags: Array.from(tags),
-    limit: searchLimit,
-    minScore: 0.08,
-    ...(sliceTenant && normalizeTier(input.missionState.tier) === 'confidential'
-      ? {
-          scope: {
-            tier: 'confidential' as const,
-            tenant_slug: sliceTenant,
-            ...(sliceOrganization ? { organization_id: sliceOrganization } : {}),
-            ...(sliceProject ? { project_id: sliceProject } : {}),
-            mission_id: input.missionState.mission_id,
-          },
-        }
-      : {}),
-  });
-
-  const filtered =
-    slice.exclude.length > 0
-      ? relevant.filter((entry) => !isKnowledgePathExcluded(entry.path, slice.exclude))
-      : relevant;
-
-  const prioritized =
-    slice.searchRoots.length > 0
-      ? [
-          ...filtered.filter((entry) =>
-            isKnowledgePathInSearchRoots(entry.path, slice.searchRoots)
-          ),
-          ...filtered.filter(
-            (entry) => !isKnowledgePathInSearchRoots(entry.path, slice.searchRoots)
-          ),
-        ]
-      : filtered;
-
-  const distillHints = prioritized.map((entry: DistilledKnowledgeEntry) => ({
-    path: entry.path,
-    title: entry.title,
-    excerpt: entry.excerpt,
-    tags: entry.tags,
-    ...(typeof entry.score === 'number' ? { score: entry.score } : {}),
-    ...(entry.category ? { category: entry.category } : {}),
-    ...(entry.source_mission ? { source_mission: entry.source_mission } : {}),
-    ...(entry.last_updated ? { last_updated: entry.last_updated } : {}),
-  }));
-
-  // DA-07: tenant-scoped corpus, queried alongside (never instead of) the
-  // distill corpus, with the same topic string. Activates ONLY when the
-  // dispatch context carries a tenant slug AND the mission tier admits
-  // confidential knowledge — every other dispatch takes the exact pre-DA-07
-  // path below (byte-identical output, KP-01 compatibility).
-  const tenantSlug = tenantSlugForKnowledgeRetrieval(input);
-  let tenantHints: MissionContextPackKnowledgeHint[] = [];
-  if (tenantSlug) {
-    // Same over-fetch rule as the distill leg: excludes may filter results.
-    const tenantFetchLimit = slice.exclude.length > 0 ? remaining * 2 : remaining;
-    const tenantHits = await queryTenantKnowledge({
-      tenantSlug,
-      topic,
-      limit: tenantFetchLimit,
-      scope: {
-        tier: 'confidential',
-        tenant_slug: tenantSlug,
-        mission_id: input.missionState.mission_id,
-      },
-      ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
-    });
-    tenantHints = tenantHits
-      .filter((hit) => !isKnowledgePathExcluded(hit.path, slice.exclude))
-      .map((hit) => ({
-        path: hit.path,
-        title: hit.title,
-        excerpt: hit.excerpt,
-        tags: hit.tags,
-        score: hit.score,
-      }));
-  }
-
-  if (tenantHints.length === 0) {
-    // Pre-DA-07 path, byte-identical: pinned first, then distill results.
-    return [...pinnedHints, ...distillHints.slice(0, remaining)];
-  }
-
-  const merged = mergeTenantKnowledgeHints({
-    distill: distillHints,
-    tenant: tenantHints,
-    cap: remaining,
-    deliveredPaths: new Set(pinnedHints.map((hint) => hint.path)),
-  });
-  return [...pinnedHints, ...merged];
 }
 
 function loadArtifactHintsIfPossible(input: {

@@ -1,8 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import { compileSchema } from './foundation/ajv.js';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
   safeMkdir,
@@ -33,14 +33,12 @@ export interface MissionSeedRecord {
   metadata?: Record<string, unknown>;
 }
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 const SEED_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-seed-record.schema.json');
 let seedValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (seedValidateFn) return seedValidateFn;
-  seedValidateFn = compileSchemaFromPath(ajv, SEED_SCHEMA_PATH);
+  seedValidateFn = compileSchema(SEED_SCHEMA_PATH);
   return seedValidateFn;
 }
 

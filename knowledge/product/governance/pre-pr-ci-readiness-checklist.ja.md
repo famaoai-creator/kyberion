@@ -53,27 +53,27 @@ git diff --check
 
 変更した領域に応じて、正本と生成物を同じcommitへ含める。生成コマンドの実行後は、生成された差分が今回の変更だけか再確認する。
 
-| 変更した領域                         | 公開前に確認すること                                                                                                              |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `knowledge/`、語彙、ユーザー向け文言 | `pnpm run generate:pseudo-locale`、`pnpm run check:pseudo-locale`、`pnpm run generate:knowledge-index`、`pnpm run check:catalogs` |
-| vocabulary key / generated type      | `pnpm run generate:vocabulary-types`、`pnpm run check:vocabulary-types`                                                           |
-| actuator manifest / operation        | `pnpm sync:component-inventory`、`pnpm run generate:op-registry`、`pnpm run check:op-registry`                                    |
-| `agent-profiles/`                    | `agent-profile-index.json` を再生成し、差分を確認する                                                                             |
-| `surfaces/*.json`                    | `active-surfaces.json` のsnapshotを同期し、`pnpm run check:governance-rules` を実行する                                           |
-| `service-endpoints.json`             | 対応する `service-endpoints/` の正本が存在することを確認する                                                                      |
-| actuator manifest / stable contract  | `pnpm run check:contract-semver` を実行し、必要なbaseline更新と理由をPRに記録する                                                 |
-| improvement plan / roadmap           | 実装状況とcompletion ledgerを同じ変更で更新する                                                                                   |
+| 変更した領域                         | 公開前に確認すること                                                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge/`、語彙、ユーザー向け文言 | `pnpm run generate:pseudo-locale`、`pnpm check -- --only pseudo-locale`、`pnpm run generate:knowledge-index`、`pnpm check -- --only catalogs` |
+| vocabulary key / generated type      | `pnpm run generate:vocabulary-types`、`pnpm check -- --only vocabulary-types`                                                                 |
+| actuator manifest / operation        | `pnpm sync:component-inventory`、`pnpm run generate:op-registry`、`pnpm check -- --only op-registry`                                          |
+| `agent-profiles/`                    | `agent-profile-index.json` を再生成し、差分を確認する                                                                                         |
+| `surfaces/*.json`                    | `active-surfaces.json` のsnapshotを同期し、`pnpm check -- --only governance-rules` を実行する                                                 |
+| `service-endpoints.json`             | 対応する `service-endpoints/` の正本が存在することを確認する                                                                                  |
+| actuator manifest / stable contract  | `pnpm run check:contract-semver` を実行し、必要なbaseline更新と理由をPRに記録する                                                             |
+| improvement plan / roadmap           | 実装状況とcompletion ledgerを同じ変更で更新する                                                                                               |
 
 最低限のcatalog確認:
 
 ```bash
 pnpm run generate:knowledge-index
-pnpm run check:catalogs
-pnpm run check:pseudo-locale
-pnpm run check:vocabulary-types
+pnpm check -- --only catalogs
+pnpm check -- --only pseudo-locale
+pnpm check -- --only vocabulary-types
 ```
 
-`knowledge/` を変更した場合、lint-stagedやcommit hookが `_index.md`、`_manifest.json` などを追加・更新することがある。commit後にもstaged diffとPR changed-filesを再確認する。
+`knowledge/` を変更した場合、lint-stagedやcommit hookが `_index.md`、`_integrity-manifest.json` などを追加・更新することがある。commit後にもstaged diffとPR changed-filesを再確認する。
 
 ## 2. buildを先に通す
 
@@ -132,7 +132,7 @@ pnpm exec vitest run <surfaceまたはIntentの関連テスト>
 
 - [ ] `pnpm pipeline --input pipelines/baseline-check.json` が成功した。
 - [ ] ADFを直接実行せず、draft → preflight → auto-repair → commit → executeの契約を確認した。
-- [ ] `pnpm run check:contract-schemas`、`pnpm run check:governance-rules`、`pnpm run check:work-scope-policy` を実行した。
+- [ ] `pnpm run check:contract-schemas`、`pnpm check -- --only governance-rules`、`pnpm check -- --only work-scope-policy` を実行した。
 
 ## 4. validateとCIの対応関係
 
@@ -167,8 +167,8 @@ pnpm run test:integration
 
 | CI症状                               | 先に確認すること                                                                                                  |
 | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| pseudo-locale drift                  | `pnpm run generate:pseudo-locale` → `pnpm run check:pseudo-locale`                                                |
-| knowledge index / manifest drift     | `pnpm run generate:knowledge-index` → `pnpm run check:catalogs`                                                   |
+| pseudo-locale drift                  | `pnpm run generate:pseudo-locale` → `pnpm check -- --only pseudo-locale`                                          |
+| knowledge index / manifest drift     | `pnpm run generate:knowledge-index` → `pnpm check -- --only catalogs`                                             |
 | `ERR_MODULE_NOT_FOUND` for `dist/`   | buildを最初に実行したか。fresh checkoutでdistを前提にしていないか                                                 |
 | scriptsだけ失敗                      | `pnpm run test:scripts` を単独実行し、gitignored runtime queue / fixture依存を除く                                |
 | integrationだけ失敗                  | `pnpm run test:integration` と失敗テストのfocused runを実行し、surface delegation / approval / tenant scopeを確認 |

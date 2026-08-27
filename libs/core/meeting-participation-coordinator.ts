@@ -20,10 +20,11 @@
  */
 
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';
@@ -120,7 +121,7 @@ export function checkMeetingParticipationConsent(input: {
   tenant_slug?: string;
   purpose: 'recording' | 'voice';
 }): { allowed: boolean; reason?: string } {
-  if (process.env.KYBERION_SUDO === 'true') return { allowed: true };
+  if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = normalizeOptionalString(input.mission_id);
   if (!missionId) {
     return {
@@ -141,7 +142,7 @@ export function checkMeetingParticipationConsent(input: {
   }
   let raw: MeetingParticipationConsentRecord;
   try {
-    const parsed = JSON.parse(safeReadFile(consentPath, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(consentPath);
     if (!isPlainObject(parsed)) {
       return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
     }

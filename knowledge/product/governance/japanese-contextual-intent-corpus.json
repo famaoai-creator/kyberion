@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/japanese-contextual-intent-corpus.schema.json",
   "version": "1.0.0",
   "locale": "ja-JP",
   "description": "Golden corpus for Japanese contextual intent alignment and schedule/source-binding regression checks.",

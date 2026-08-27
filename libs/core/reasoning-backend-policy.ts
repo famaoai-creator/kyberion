@@ -1,8 +1,5 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 
 export type ReasoningBackendMode =
@@ -78,9 +75,6 @@ export interface ReasoningBackendProviderSnapshot {
   installed: boolean;
   healthy: boolean;
 }
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/reasoning-backend-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/reasoning-backend-policy.schema.json');
@@ -161,45 +155,15 @@ const FALLBACK_POLICY: ReasoningBackendPolicy = {
   },
 };
 
-let validateFn: ValidateFunction | null = null;
-let cachedPolicy: ReasoningBackendPolicy | null = null;
-let cachedPolicyPath: string | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validatePolicy(value: unknown, label: string): ReasoningBackendPolicy {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid reasoning backend policy at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as ReasoningBackendPolicy;
-}
-
-function loadPolicyFile(): ReasoningBackendPolicy | null {
-  if (!safeExistsSync(POLICY_PATH)) return null;
-  return validatePolicy(
-    JSON.parse(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string),
-    POLICY_PATH
-  );
-}
+const policyCatalog = defineCatalog<ReasoningBackendPolicy>({
+  id: 'reasoning-backend-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+  fallback: FALLBACK_POLICY,
+});
 
 export function loadReasoningBackendPolicy(): ReasoningBackendPolicy {
-  if (cachedPolicy && cachedPolicyPath === POLICY_PATH) return cachedPolicy;
-  cachedPolicy = loadPolicyFile() ?? FALLBACK_POLICY;
-  cachedPolicyPath = POLICY_PATH;
-  return cachedPolicy;
+  return policyCatalog.load();
 }
 
 export function normalizeReasoningBackendMode(
@@ -323,6 +287,5 @@ export function resolveScopedBackendPolicy(
 }
 
 export function resetReasoningBackendPolicyCache(): void {
-  cachedPolicy = null;
-  cachedPolicyPath = null;
+  policyCatalog.reset();
 }

@@ -1,6 +1,5 @@
 import { safeReadFile, safeExistsSync } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
-import * as path from 'node:path';
 import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
 
 // ---------------------------------------------------------------------------

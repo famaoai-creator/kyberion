@@ -31,7 +31,9 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -262,7 +264,7 @@ function cmdCreate(argv: string[]): void {
   if (errors.length > 0) {
     console.error('\n❌ Input validation failed:\n');
     for (const e of errors) console.error(`  • ${e}`);
-    process.exit(1);
+    throw new ScriptExitError(1, 'Input validation failed');
   }
 
   const instanceId = generateInstanceId();
@@ -286,7 +288,8 @@ function cmdCreate(argv: string[]): void {
     change_id: instanceId,
     scope: scopeInput,
     target_kind: targetKind,
-    requested_by: getOption(argv, '--requested-by') || process.env.KYBERION_PERSONA || 'operator',
+    requested_by:
+      getOption(argv, '--requested-by') || getRegisteredEnvText('KYBERION_PERSONA') || 'operator',
     nhi_id: getOption(argv, '--nhi-id'),
     risk,
     before_hash: getOption(argv, '--before-hash'),
@@ -317,7 +320,7 @@ function cmdCreate(argv: string[]): void {
   safeWriteFile(briefPath(tenant, instanceId), JSON.stringify(brief, null, 2));
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'config_mission.create',
     operation: `${presetId}/${instanceId}`,
     result: 'completed',
@@ -348,9 +351,7 @@ function cmdRequestApproval(argv: string[]): void {
   if (!id) throw new Error('--id is required');
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
-  const brief = JSON.parse(
-    safeReadFile(bPath, { encoding: 'utf8' }) as string
-  ) as ConfigMissionBrief;
+  const brief = readJson<ConfigMissionBrief>(bPath);
   const existing = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
@@ -493,7 +494,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'completed',
@@ -521,7 +522,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'config_mission.apply',
       operation: `${brief.preset_id}/${id}`,
       result: 'failed',
@@ -561,12 +562,13 @@ function printUsage(): void {
   console.error('  pnpm config-mission apply --tenant <slug> --id <cfg-id>');
 }
 
-async function main(): Promise<void> {
-  const [, , command, ...rest] = process.argv;
+async function main(args: string[] = []): Promise<void> {
+  const [command, ...rest] = args;
 
   if (!command || command === 'help' || command === '--help' || command === '-h') {
     printUsage();
-    process.exit(command ? 0 : 2);
+    if (!command) throw new ScriptExitError(2);
+    return;
   }
 
   switch (command) {
@@ -588,11 +590,18 @@ async function main(): Promise<void> {
     default:
       console.error(`Unknown command: ${command ?? '(none)'}`);
       printUsage();
-      process.exit(1);
+      throw new ScriptExitError(1, `Unknown command: ${command ?? '(none)'}`);
   }
 }
 
-main().catch((err) => {
-  logger.error(String(err));
-  process.exit(1);
+const script = defineScript({
+  name: 'config:mission',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+if (
+  isDirectScript(import.meta.url, 'config_mission.ts') ||
+  isDirectScript(import.meta.url, 'config_mission.js')
+) {
+  void script();
+}

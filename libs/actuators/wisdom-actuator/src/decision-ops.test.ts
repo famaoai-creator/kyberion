@@ -25,8 +25,10 @@ import {
   evaluateEnsembleConvergence,
   simulateAll,
   simulateAllEnsemble,
-  dispatchDecisionOp,
+  dispatchWisdomOperation,
 } from './decision-ops.js';
+
+const dispatchDecisionOp = dispatchWisdomOperation;
 import { generateFacilitationScriptOp } from '../../meeting-actuator/src/meeting-intelligence-ops.js';
 import { evaluateDecisionRightsOp as evaluateDecisionRightsApprovalOp } from '../../approval-actuator/src/approval-ops.js';
 import { findSlidesByOwner, pptxDiff } from '../../media-actuator/src/media-slide-ops.js';

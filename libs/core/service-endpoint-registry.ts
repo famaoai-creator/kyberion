@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('service-endpoint-registry');
@@ -48,18 +50,21 @@ let cachedServiceEndpointsDir: string | null = null;
 let cachedServiceEndpoints: ServiceEndpointsCatalog | null = null;
 
 function getServiceEndpointsPath(): string {
-  return process.env.KYBERION_SERVICE_ENDPOINTS_PATH?.trim() || DEFAULT_SERVICE_ENDPOINTS_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_ENDPOINTS_PATH')?.trim() ||
+    DEFAULT_SERVICE_ENDPOINTS_PATH
+  );
 }
 
 function getServiceEndpointsDir(): string {
-  return process.env.KYBERION_SERVICE_ENDPOINTS_DIR?.trim() || DEFAULT_SERVICE_ENDPOINTS_DIR;
+  return (
+    getRegisteredEnvText('KYBERION_SERVICE_ENDPOINTS_DIR')?.trim() || DEFAULT_SERVICE_ENDPOINTS_DIR
+  );
 }
 
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
   try {
-    return JSON.parse(
-      safeReadFile(pathResolver.rootResolve(catalogPath), { encoding: 'utf8' }) as string
-    ) as ServiceEndpointsCatalog;
+    return readJson<ServiceEndpointsCatalog>(pathResolver.rootResolve(catalogPath));
   } catch (error: any) {
     throw new Error(
       `Failed to load service endpoints catalog at ${catalogPath}: ${error?.message || error}`

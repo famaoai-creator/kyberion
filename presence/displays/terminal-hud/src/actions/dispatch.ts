@@ -1,4 +1,5 @@
 import { auditChain } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export interface ActionResult {
   ok: boolean;
@@ -12,7 +13,7 @@ export function auditAction(
   result: ActionResult,
   metadata?: Record<string, unknown>
 ): ActionResult {
-  if (process.env.KYBERION_TUI_DISABLE_AUDIT === '1') return result;
+  if (getRegisteredEnvText('KYBERION_TUI_DISABLE_AUDIT') === '1') return result;
   try {
     auditChain.record({
       agentId: TUI_AGENT_ID,

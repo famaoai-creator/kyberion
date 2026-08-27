@@ -1,13 +1,7 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from './authority.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeMoveSync,
-  safeReadFile,
-  safeRmSync,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { missionDir } from './path-resolver.js';
 
 export type MissionCoordinationChannel = 'task_contract' | 'handoff' | 'review' | 'runtime_notice';
@@ -101,8 +95,7 @@ export class MissionCoordinationBus {
           if (!trimmed) continue;
           try {
             const event = JSON.parse(trimmed) as
-              | MissionCoordinationEvent
-              | MissionCoordinationMessage;
+              MissionCoordinationEvent | MissionCoordinationMessage;
             if ((event as MissionCoordinationEvent).kind === 'ack') {
               const ack = event as Extract<MissionCoordinationEvent, { kind: 'ack' }>;
               const message = messages.get(ack.message_id);
@@ -161,7 +154,7 @@ export class MissionCoordinationBus {
       if (this.countBusLines(this.busPath(missionId)) >= this.maxLinesPerFile) {
         this.rotateBusFile(missionId);
       }
-      safeAppendFileSync(this.busPath(missionId), `${JSON.stringify(event)}\n`);
+      appendJsonLine(this.busPath(missionId), event);
     });
   }
 

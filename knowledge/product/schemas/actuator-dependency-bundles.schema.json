@@ -5,6 +5,7 @@
   "required": ["version", "bundles"],
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "bundles": {
       "type": "array",

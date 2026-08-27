@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { executeServicePreset } from './service-engine.js';
@@ -119,7 +120,7 @@ async function runLocalFluxGeneration(
   if (quantize !== undefined) {
     args.push('-q', String(quantize));
   }
-  const seed = process.env.KYBERION_MFLUX_SEED?.trim();
+  const seed = getRegisteredEnvText('KYBERION_MFLUX_SEED')?.trim();
   if (seed) {
     args.push('--seed', seed);
   }

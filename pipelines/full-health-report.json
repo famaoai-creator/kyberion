@@ -12,38 +12,35 @@
     },
     {
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "vital_results", "type": "ShellResult" },
-      "params": { "cmd": "node dist/scripts/run_pipeline.js --input pipelines/vital-check.json" }
+      "op": "core:run_pipeline",
+      "produces": { "channel": "vital_results", "type": "PipelineResult" },
+      "params": { "input": "pipelines/vital-check.json" }
     },
     {
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "diag_results", "type": "ShellResult" },
-      "params": {
-        "cmd": "node dist/scripts/run_pipeline.js --input pipelines/system-diagnostics.json"
-      }
+      "op": "core:run_pipeline",
+      "produces": { "channel": "diag_results", "type": "PipelineResult" },
+      "params": { "input": "pipelines/system-diagnostics.json" }
     },
     {
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "prod_results", "type": "ShellResult" },
-      "params": {
-        "cmd": "node dist/scripts/run_pipeline.js --input knowledge/product/pipeline-templates/dev-productivity-audit.json"
-      }
+      "op": "core:run_pipeline",
+      "produces": { "channel": "prod_results", "type": "PipelineResult" },
+      "params": { "input": "knowledge/product/pipeline-templates/dev-productivity-audit.json" }
     },
     {
       "role": "sink",
-      "op": "system:shell",
+      "op": "system:write_file",
       "consumes": ["vital_results", "diag_results", "prod_results"],
       "params": {
-        "cmd": "echo '# Kyberion System Health Report\n\nGenerated on: {{run_utc_now}}\n\n## Vital Check\n```\n{{vital_results}}\n```\n\n## Diagnostics\n```\n{{diag_results}}\n```\n\n## Productivity Audit\n```\n{{prod_results}}\n```' > HEALTH_REPORT.md"
+        "path": "active/shared/tmp/HEALTH_REPORT.md",
+        "content": "# Kyberion System Health Report\n\nGenerated on: {{run_utc_now}}\n\n## Vital Check\n```json\n{{vital_results}}\n```\n\n## Diagnostics\n```json\n{{diag_results}}\n```\n\n## Productivity Audit\n```json\n{{prod_results}}\n```\n"
       }
     },
     {
       "role": "sink",
       "op": "system:log",
-      "params": { "message": "✅ Full health report generated: HEALTH_REPORT.md" }
+      "params": { "message": "✅ Full health report generated: active/shared/tmp/HEALTH_REPORT.md" }
     }
   ]
 }

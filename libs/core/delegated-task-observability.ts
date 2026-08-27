@@ -1,12 +1,13 @@
+import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent-input-queue.js';
 import { enqueueDelegationNotification } from './delegation-notifications.js';
 import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -113,13 +114,13 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
 // KYBERION_DELEGATION_STORE_DIR so parallel suites never clobber the real
 // observability files (resolved lazily per call).
 function resolveTracePath(): string {
-  const override = process.env.KYBERION_DELEGATION_TRACE_PATH?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('observability/delegations.jsonl');
 }
 
 function resolveStoreDir(): string {
-  const override = process.env.KYBERION_DELEGATION_STORE_DIR?.trim();
+  const override = getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim();
   if (override) return pathResolver.rootResolve(override);
   return pathResolver.shared('observability/delegations');
 }
@@ -133,7 +134,7 @@ function ensureTraceDir(): void {
 
 function appendTrace(record: DelegatedTaskTrace): void {
   ensureTraceDir();
-  safeAppendFileSync(resolveTracePath(), `${JSON.stringify(record)}\n`, 'utf8');
+  appendJsonLine(resolveTracePath(), record);
 }
 
 function recordPath(delegationId: string): string {
@@ -695,7 +696,7 @@ export function createDelegationHandle(input: {
     owner:
       input.owner ||
       process.env.MISSION_ROLE ||
-      process.env.KYBERION_PERSONA ||
+      getRegisteredEnvText('KYBERION_PERSONA') ||
       'reasoning-backend',
     instruction: input.instruction,
     ...(input.context ? { context: input.context } : {}),
@@ -832,7 +833,9 @@ export async function resumeDelegatedTask(
   const activationId = record.continuable ? record.activation_id : undefined;
   let trace: DelegatedTaskTrace | undefined;
   try {
+    // Existing reasoning/delegation cycle is tracked by the module-boundary baseline.
     const backend =
+      // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
       options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
     const inboxEntries = record.continuable
       ? await (async () => {

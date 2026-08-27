@@ -4,7 +4,7 @@
  */
 
 import * as path from 'node:path';
-import { safeExistsSync, safeLstat, safeReadFile, safeStat } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeStat } from './secure-io.js';
 
 /**
  * Validate that a file path exists and points to a regular file.
@@ -52,16 +52,8 @@ export function safeJsonParse<T = unknown>(jsonString: string, label = 'JSON'): 
 }
 
 /**
- * Read and parse a JSON file safely.
- */
-export function readJsonFile<T = unknown>(filePath: string, label = 'JSON file'): T {
-  const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<T>(content, label);
-}
-
-/**
  * Validate that a file is 'fresh' (modified within the last X milliseconds).
- * 
+ *
  * @param filePath  - Path to the file
  * @param threshold - Maximum allowed age in milliseconds (default: 1 hour)
  * @throws {Error} If the file is older than the threshold
@@ -73,7 +65,9 @@ export function validateFileFreshness(filePath: string, threshold = 60 * 60 * 10
 
   if (age > threshold) {
     const ageMinutes = Math.round(age / 1000 / 60);
-    throw new Error(`STALE_STATE_ERROR: File at ${filePath} was last modified ${ageMinutes} minutes ago (Threshold: ${threshold / 1000 / 60} minutes). Potential cognitive drift detected.`);
+    throw new Error(
+      `STALE_STATE_ERROR: File at ${filePath} was last modified ${ageMinutes} minutes ago (Threshold: ${threshold / 1000 / 60} minutes). Potential cognitive drift detected.`
+    );
   }
 }
 

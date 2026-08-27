@@ -138,4 +138,69 @@ describe('voice engine registry', () => {
       'open_voice_clone',
     ]);
   });
+
+  it('keeps a configured snapshot authoritative over a configured directory', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    const snapshotPath = path.join(tmpDir, 'snapshot.json');
+    const dir = path.join(tmpDir, 'voice-engines');
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({
+        version: '1.0.0',
+        default_engine_id: 'snapshot_engine',
+        engines: [
+          {
+            engine_id: 'snapshot_engine',
+            display_name: 'Snapshot Engine',
+            kind: 'native_local',
+            provider: 'snapshot',
+            status: 'active',
+            platforms: ['any'],
+            supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      path.join(dir, 'directory_engine.json'),
+      JSON.stringify({
+        version: '1.0.0',
+        default_engine_id: 'directory_engine',
+        engines: [
+          {
+            engine_id: 'directory_engine',
+            display_name: 'Directory Engine',
+            kind: 'native_local',
+            provider: 'directory',
+            status: 'active',
+            platforms: ['any'],
+            supports: { list_voices: false, playback: true, artifact_formats: ['wav'] },
+          },
+        ],
+      })
+    );
+
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = snapshotPath;
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = dir;
+
+    const registry = getVoiceEngineRegistry();
+    expect(registry.default_engine_id).toBe('snapshot_engine');
+    expect(registry.engines.map((engine) => engine.engine_id)).toEqual(['snapshot_engine']);
+  });
+
+  it('uses the governed fallback when a configured snapshot violates its schema', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    const snapshotPath = path.join(tmpDir, 'invalid-snapshot.json');
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({ version: '1.0.0', default_engine_id: 'invalid', engines: [] })
+    );
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = snapshotPath;
+
+    const registry = getVoiceEngineRegistry();
+    expect(registry.version).toBe('fallback');
+    expect(registry.default_engine_id).toBe('local_say');
+    expect(registry.engines).toHaveLength(1);
+  });
 });

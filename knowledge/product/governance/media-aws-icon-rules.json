@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/media-aws-icon-rules.schema.json",
   "version": "1.0.0",
   "exact_resources": {
     "aws_provider": [

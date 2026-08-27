@@ -3,7 +3,9 @@ title: Kimi Code 概念取り込み計画(KD-01〜09)
 kind: improvement-plan
 scope: core / missions / agent-dispatch / plugins / pipelines
 authority: planning
-status: proposed
+status: active
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
 ---
 
 # Kimi Code 概念取り込み計画(KD-01〜09): Goal 自律駆動・イベントソーシング復元・信頼と並列実行の契約

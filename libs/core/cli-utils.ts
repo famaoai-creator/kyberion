@@ -1,10 +1,9 @@
-import AjvModule from 'ajv';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
+import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
+import { createAjv } from './foundation/ajv.js';
 
 /**
  * Creates a pre-configured yargs instance with common options.
@@ -54,12 +53,8 @@ function formatUnknownError(error: unknown): string {
  */
 async function runActuatorServeLoop(opts: {
   name: string;
-  handleAction: (input: unknown) => Promise<unknown> | unknown;
-  schema?: object;
+  actuator: ActuatorDefinition;
 }): Promise<void> {
-  const validate = opts.schema
-    ? new Ajv({ allErrors: true, allowUnionTypes: true }).compile(opts.schema)
-    : null;
   const emit = (response: Record<string, unknown>): void => {
     process.stdout.write(`${ACTUATOR_SERVE_RESULT_PREFIX}${JSON.stringify(response)}\n`);
   };
@@ -80,30 +75,58 @@ async function runActuatorServeLoop(opts: {
         continue;
       }
       const id = request.id ?? null;
-      if (validate && !validate(request.input)) {
-        const details = (validate.errors || [])
-          .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
-          .join('; ');
-        emit({ id, ok: false, error: `invalid input: ${details}` });
-        continue;
-      }
-      try {
-        const result = await opts.handleAction(request.input);
-        emit({ id, ok: true, result });
-      } catch (err: unknown) {
-        emit({ id, ok: false, error: formatUnknownError(err) });
-      }
+      const result = await opts.actuator.dispatch('execute', request.input);
+      emit(
+        result.ok
+          ? { id, ok: true, result: result.output }
+          : { id, ok: false, error: result.error || 'actuator execution failed' }
+      );
     }
   }
 }
 
 export async function runActuatorCli(opts: {
   name: string;
-  handleAction: (input: unknown) => Promise<unknown> | unknown;
+  handleAction?: (input: unknown) => Promise<unknown> | unknown;
   schema?: object;
+  /** Reuse an already-defined SDK actuator instead of creating a CLI-only ABI. */
+  actuator?: ActuatorDefinition;
   printResult?: (result: unknown) => void;
   args?: string[];
 }): Promise<void> {
+  const actuator =
+    opts.actuator ||
+    (() => {
+      if (!opts.handleAction) {
+        throw new Error('runActuatorCli requires handleAction when actuator is not provided');
+      }
+      const schemaValidator = opts.schema ? createAjv().compile(opts.schema) : undefined;
+      return defineActuator({
+        id: opts.name,
+        ops: {
+          execute: {
+            kind: 'apply',
+            ...(opts.schema ? { input_schema: opts.schema } : {}),
+            ...(schemaValidator
+              ? {
+                  validateInput: (input: unknown): unknown => {
+                    if (!schemaValidator(input)) {
+                      const details = (schemaValidator.errors || [])
+                        .map(
+                          (error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`
+                        )
+                        .join('; ');
+                      throw new Error(`invalid input: ${details}`);
+                    }
+                    return input;
+                  },
+                }
+              : {}),
+            handler: (input: unknown) => opts.handleAction!(input),
+          },
+        },
+      });
+    })();
   const argv = await createStandardYargs(opts.args || process.argv)
     .option('input', { alias: 'i', type: 'string' })
     .option('serve', {
@@ -114,18 +137,13 @@ export async function runActuatorCli(opts: {
     .parse();
 
   if (argv.serve) {
-    await runActuatorServeLoop({
-      name: opts.name,
-      handleAction: opts.handleAction,
-      ...(opts.schema ? { schema: opts.schema } : {}),
-    });
+    await runActuatorServeLoop({ name: opts.name, actuator });
     return;
   }
 
   if (!argv.input) {
     console.error(`[${opts.name}] --input is required (or use --serve)`);
-    process.exit(1);
-    return;
+    throw new Error('--input is required (or use --serve)');
   }
   const inputPath = pathResolver.rootResolve(String(argv.input));
 
@@ -134,8 +152,7 @@ export async function runActuatorCli(opts: {
     inputContent = String(safeReadFile(inputPath, { encoding: 'utf8' }) || '');
   } catch (err: any) {
     console.error(`[${opts.name}] failed to read input: ${err?.message || err}`);
-    process.exit(1);
-    return;
+    throw new Error(`failed to read input: ${err?.message || err}`);
   }
 
   let input: unknown;
@@ -143,28 +160,17 @@ export async function runActuatorCli(opts: {
     input = JSON.parse(inputContent);
   } catch (err: any) {
     console.error(`[${opts.name}] invalid JSON input: ${err?.message || err}`);
-    process.exit(1);
-    return;
+    throw new Error(`invalid JSON input: ${err?.message || err}`);
   }
 
-  if (opts.schema) {
-    const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
-    const validate = ajv.compile(opts.schema);
-    if (!validate(input)) {
-      const details = (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
-        .join('; ');
-      console.error(`[${opts.name}] invalid input: ${details}`);
-      process.exit(1);
-      return;
-    }
+  const result = await actuator.dispatch('execute', input);
+  if (!result.ok) {
+    const error = result.error || 'unknown error';
+    const label = error.startsWith('invalid input:') ? 'invalid input' : 'handleAction failed';
+    console.error(
+      `[${opts.name}] ${label}${label === 'invalid input' ? `: ${error.slice('invalid input:'.length).trim()}` : `: ${error}`}`
+    );
+    throw new Error(`${label}: ${error}`);
   }
-
-  try {
-    const result = await opts.handleAction(input);
-    (opts.printResult || ((value) => console.log(JSON.stringify(value, null, 2))))(result);
-  } catch (err: any) {
-    console.error(`[${opts.name}] handleAction failed: ${err?.message || err}`);
-    process.exit(1);
-  }
+  (opts.printResult || ((value) => console.log(JSON.stringify(value, null, 2))))(result.output);
 }

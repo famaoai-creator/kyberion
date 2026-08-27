@@ -1,6 +1,7 @@
 import { safeExecResult } from './secure-io.js';
 import { rootResolve } from './path-resolver.js';
 import type { AudioDeviceDescriptor } from './audio-route.js';
+import { isRecord } from './foundation/text.js';
 
 export const COREAUDIO_DEVICE_INVENTORY_BRIDGE_ID = 'coreaudio-device-inventory' as const;
 
@@ -35,10 +36,6 @@ export interface AudioDeviceResolution {
   descriptor?: AudioDeviceDescriptor;
   reason?: string;
   used_fallback_label: boolean;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseDevices(stdout: string): AudioDeviceDescriptor[] {

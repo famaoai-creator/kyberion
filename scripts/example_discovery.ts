@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeReaddir } from '@agent/core';
 import chalk from 'chalk';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 
 interface ActuatorExampleRecord {
   id: string;
@@ -21,7 +21,7 @@ function loadCatalogs(): ActuatorExampleCatalog[] {
   return safeReaddir(actuatorsDir)
     .map((entry) => path.join(actuatorsDir, entry, 'examples', 'catalog.json'))
     .filter((catalogPath) => safeExistsSync(catalogPath))
-    .map((catalogPath) => readJsonFile<ActuatorExampleCatalog>(catalogPath))
+    .map((catalogPath) => readJson<ActuatorExampleCatalog>(catalogPath))
     .sort((left, right) => left.actuator.localeCompare(right.actuator));
 }
 

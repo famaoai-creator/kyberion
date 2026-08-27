@@ -35,6 +35,7 @@ import {
   type OrganizationServiceRecord,
   type OrganizationServiceState,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ParsedArgs = {
   command: string;
@@ -441,7 +442,7 @@ function emit(value: unknown, json: boolean): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
-export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): void {
+export function runOrganizationOperatingModelCli(args: string[] = []): void {
   const parsed = parseArgs(args);
   if (parsed.command === 'help') {
     console.log(usage());
@@ -936,14 +937,14 @@ export function runOrganizationOperatingModelCli(args = process.argv.slice(2)): 
   throw new Error(`Unknown command '${parsed.command}'.\n${usage()}`);
 }
 
-const isDirect =
-  process.argv[1]?.endsWith('organization_operating_model.ts') ||
-  process.argv[1]?.endsWith('organization_operating_model.js');
-if (isDirect) {
-  try {
-    runOrganizationOperatingModelCli();
-  } catch (error) {
-    console.error(`[organization] ${error instanceof Error ? error.message : String(error)}`);
-    process.exitCode = 1;
-  }
-}
+export const runOrganizationOperatingModel = defineScript({
+  name: 'organization:operating-model',
+  flags: [],
+  run: ({ argv }) => runOrganizationOperatingModelCli(argv),
+});
+
+if (
+  isDirectScript(import.meta.url, 'organization_operating_model.ts') ||
+  isDirectScript(import.meta.url, 'organization_operating_model.js')
+)
+  void runOrganizationOperatingModel();

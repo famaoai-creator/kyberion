@@ -12,8 +12,12 @@
 
 import * as path from 'node:path';
 import { rootResolve } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
-import { createMemoryPromotionCandidate, enqueueMemoryPromotionCandidate, type MemoryCandidate } from './memory-promotion-queue.js';
+import { loadJson, safeExistsSync, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  createMemoryPromotionCandidate,
+  enqueueMemoryPromotionCandidate,
+  type MemoryCandidate,
+} from './memory-promotion-queue.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
 
@@ -82,7 +86,7 @@ function round(value: number): number {
 export function readHeuristic(entryId: string): HeuristicEntry | null {
   const file = heuristicFilePath(entryId);
   if (!safeExistsSync(file)) return null;
-  return JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string) as HeuristicEntry;
+  return loadJson<HeuristicEntry>(file);
 }
 
 export function listHeuristics(): HeuristicEntry[] {
@@ -146,11 +150,13 @@ export function summarizeHeuristics(limit = 5): HeuristicReport {
     validated.length > 0
       ? round(
           validated.reduce((sum, entry) => sum + (entry.validation?.validity_score ?? 0), 0) /
-            validated.length,
+            validated.length
         )
       : null;
   const recent = [...validated]
-    .sort((a, b) => (a.validation?.validated_at ?? '').localeCompare(b.validation?.validated_at ?? ''))
+    .sort((a, b) =>
+      (a.validation?.validated_at ?? '').localeCompare(b.validation?.validated_at ?? '')
+    )
     .reverse()
     .slice(0, limit);
   return {

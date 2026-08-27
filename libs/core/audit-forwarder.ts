@@ -23,14 +23,14 @@ import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { redactSensitiveObject } from './network.js';
 import type { AuditEntry } from './audit-chain.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface AuditForwarder {
   name: string;
   publish(entry: AuditEntry): Promise<void> | void;
 }
 
-const auditForwarderSeam = defineSeam<AuditForwarder>({
+const auditForwarderSeam = createSeam<AuditForwarder>({
   key: 'audit-forwarder',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

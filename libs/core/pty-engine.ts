@@ -6,6 +6,7 @@ import * as crypto from 'node:crypto';
 import * as os from 'node:os';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 /**
  * Kyberion PTY Engine (Logical Kernel) v2.1
@@ -90,7 +91,7 @@ class PtyRegistry {
   private readonly DSR_REQ = /\x1b\[\??6n/g;
   private readonly DSR_RES = '\x1b[1;1R';
   private readonly idleTimeoutMs = Number(
-    process.env.KYBERION_PTY_IDLE_TIMEOUT_MS || 15 * 60 * 1000
+    getRegisteredEnvText('KYBERION_PTY_IDLE_TIMEOUT_MS') || 15 * 60 * 1000
   );
 
   private detachThread(sessionId: string): void {
@@ -406,7 +407,9 @@ if (!(globalThis as any)[GLOBAL_PTY_KEY]) {
   // binding may still be mid-evaluation here; defer the sweep start one tick
   // so module init order can never crash the process.
   queueMicrotask(() => {
-    runtimeSupervisor?.startSweep(Number(process.env.KYBERION_RUNTIME_SWEEP_INTERVAL_MS || 30_000));
+    runtimeSupervisor?.startSweep(
+      Number(getRegisteredEnvText('KYBERION_RUNTIME_SWEEP_INTERVAL_MS') || 30_000)
+    );
   });
 }
 

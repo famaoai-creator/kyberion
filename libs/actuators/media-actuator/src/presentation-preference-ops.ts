@@ -1,8 +1,8 @@
 import {
+  loadJson,
   pathResolver,
   registerPresentationPreferenceProfile,
   safeExistsSync,
-  safeReadFile,
   type PresentationPreferenceProfile,
 } from '@agent/core';
 
@@ -26,9 +26,7 @@ export function registerPresentationPreferenceProfileOp(
   const profile =
     input.profile ??
     (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
-      ? JSON.parse(
-          safeReadFile(pathResolver.rootResolve(input.profile_path), { encoding: 'utf8' }) as string
-        )
+      ? loadJson<PresentationPreferenceProfile>(pathResolver.rootResolve(input.profile_path))
       : null);
   if (!profile || typeof profile !== 'object') {
     throw new Error(

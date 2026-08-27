@@ -1,10 +1,7 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { GuidedCoordinationBrief } from './src/types/guided-coordination-brief.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
 
 const GUIDED_COORDINATION_BRIEF_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/guided-coordination-brief.schema.json'
@@ -48,7 +45,7 @@ let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, GUIDED_COORDINATION_BRIEF_SCHEMA_PATH);
+  validateFn = compileSchema(GUIDED_COORDINATION_BRIEF_SCHEMA_PATH);
   return validateFn;
 }
 
@@ -76,7 +73,7 @@ function sanitizeQuestion(value: unknown, fallbackId: string): GuidedCoordinatio
   };
 }
 
-function normalizeText(value: unknown): string {
+function normalizeCoordinationText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
@@ -115,7 +112,9 @@ function inferCoordinationKind(
 
 function inferObjective(seed: GuidedCoordinationBriefSeed): string {
   return (
-    normalizeText(seed.goalSummary) || normalizeText(seed.summaryHint) || seed.requestText.trim()
+    normalizeCoordinationText(seed.goalSummary) ||
+    normalizeCoordinationText(seed.summaryHint) ||
+    seed.requestText.trim()
   );
 }
 
@@ -250,12 +249,6 @@ function inferPreferenceProfileRefs(kind: GuidedCoordinationBrief['coordination_
       return ['booking-preference-profile'];
     default:
       return [];
-  }
-
-  function inferServiceBindingRefs(seed: GuidedCoordinationBriefSeed): string[] {
-    return Array.isArray(seed.serviceBindings)
-      ? Array.from(new Set(seed.serviceBindings.map((value) => value.trim()).filter(Boolean)))
-      : [];
   }
 }
 

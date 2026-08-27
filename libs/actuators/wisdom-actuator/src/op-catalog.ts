@@ -5,8 +5,118 @@
 import type { WisdomOperationExecutor, WisdomOperationSpec } from './contracts/wisdom-operation.js';
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { DEPRECATED_WISDOM_ALIASES } from './compatibility/legacy-aliases.js';
+import { withCatalogInputContract } from '@agent/core';
 
 export type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+
+const WISDOM_INPUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    actuator: { type: 'string' },
+    append_to: { type: 'string' },
+    condition: { type: 'string' },
+    context: {},
+    context_fragments_from: { type: 'string' },
+    context_label: { type: 'string' },
+    convergence_severity: { type: 'number' },
+    convergence_threshold: { type: 'number' },
+    cost_cap_tokens: { type: 'number' },
+    count_all: { type: 'boolean' },
+    else: { type: 'array' },
+    execution_mode: { type: 'string' },
+    export_as: { type: 'string' },
+    field: { type: 'string' },
+    fr: {},
+    from: { type: 'string' },
+    goal: { type: 'string' },
+    idempotency_key: { type: 'string' },
+    include_scheduled: { type: 'boolean' },
+    instruction: { type: 'string' },
+    knowledge_path: { type: 'string' },
+    analogy: { type: 'string' },
+    anchor: { type: 'string' },
+    append: { type: 'boolean' },
+    allow_backend_delegation: { type: 'boolean' },
+    candidate_fragments: { type: 'array' },
+    limit: { type: 'number' },
+    max_iterations: { type: 'number' },
+    max_results: { type: 'number' },
+    max_steps: { type: 'number' },
+    max_steps_per_branch: { type: 'number' },
+    mean_convergence: { type: 'number' },
+    message: { type: 'string' },
+    min_hypotheses_per_participant: { type: 'number' },
+    min_hypotheses_per_persona: { type: 'number' },
+    min_score: { type: 'number' },
+    mission_id: { type: 'string' },
+    mode: { type: 'string' },
+    model_tier: { type: 'string' },
+    new_signals: {},
+    nodes: { type: 'array' },
+    op: { type: 'string' },
+    options: {},
+    origin_agent_id: { type: 'string' },
+    origin_project_id: { type: 'string' },
+    origin_tenant_id: { type: 'string' },
+    objective: { type: 'string' },
+    output_dir: { type: 'string' },
+    output_path: { type: 'string' },
+    output_tier: { type: 'string' },
+    package_id: { type: 'string' },
+    package_path: { type: 'string' },
+    participants: { type: 'array' },
+    participants_from: { type: 'string' },
+    path: { type: 'string' },
+    pattern: { type: 'string' },
+    persona: {},
+    persona_from: { type: 'string' },
+    personas_from: { type: 'string' },
+    pipeline: { type: 'array' },
+    preferred_label: { type: 'string' },
+    preferred_provider: { type: 'string' },
+    promotion_approval_id: { type: 'string' },
+    prompt: { type: 'string' },
+    query: { type: 'string' },
+    question: { type: 'string' },
+    refresh_public_index: { type: 'boolean' },
+    requested_target_tier: { type: 'string' },
+    runs: { type: 'number' },
+    session_id: { type: 'string' },
+    severity_from: { type: 'string' },
+    signals_from: { type: 'string' },
+    skill_path: { type: 'string' },
+    source_path: { type: 'string' },
+    source: { type: 'string' },
+    source_tier: { type: 'string' },
+    sources: { type: 'array' },
+    system_prompt: { type: 'string' },
+    tags: { type: 'array' },
+    tags_from: { type: 'string' },
+    template: { type: 'string' },
+    tenant_slug: { type: 'string' },
+    topic: { type: 'string' },
+    execution_profile: { type: 'string' },
+    session_log_path: { type: 'string' },
+    proposal_path: { type: 'string' },
+    readiness_ref: { type: 'string' },
+    signals: {},
+    decision: { type: 'string' },
+    then: { type: 'array' },
+    threshold: { type: 'number' },
+    tier: { type: 'string' },
+    time_budget_minutes: { type: 'number' },
+    tone: { type: 'string' },
+    tools: { type: 'array' },
+    use_subagent: { type: 'boolean' },
+    value: {},
+    vetoed_options: {},
+    vetoed_options_from: { type: 'string' },
+    visibility: { type: 'string' },
+    where: {},
+    yellow_threshold: { type: 'number' },
+  },
+  additionalProperties: false,
+};
 
 export const WISDOM_ACTUATOR_CAPTURE_OPS = [
   'glob_files',
@@ -192,6 +302,36 @@ const IDEMPOTENCY_BY_OP: Record<string, WisdomOperationSpec['idempotency']> = {
   transcribe_audio: 'external_effect',
 };
 
+const WISDOM_REQUIRED_INPUTS: Record<string, string[]> = {
+  a2a_fanout: ['personas', 'min_hypotheses_per_persona', 'topic', 'output_path'],
+  perspective_fanout: [
+    'participants',
+    'min_hypotheses_per_participant',
+    'topic',
+    'output_path',
+    'output_tier',
+  ],
+  typed_cross_critique: ['source_path', 'participants', 'output_path', 'output_tier'],
+  cross_critique: ['source_path', 'personas', 'output_path'],
+  synthesize_counterparty_persona: ['source_path'],
+  a2a_roleplay: ['persona', 'objective', 'time_budget_minutes', 'output_path'],
+  extract_dissent_signals: ['session_log_path', 'output_path'],
+  fork_branches: [
+    'source',
+    'execution_profile',
+    'cost_cap_tokens',
+    'max_steps_per_branch',
+    'output_dir',
+  ],
+  simulate_all: ['goal', 'output_dir'],
+  simulate_all_ensemble: ['goal', 'runs', 'output_dir'],
+  emit_dissent_log: ['source_path', 'output_path'],
+  render_hypothesis_report: ['source_path', 'output_path'],
+  resolve_hypothesis_conflict: ['source_path', 'output_path'],
+  adjust_proposal: ['proposal_path', 'signals'],
+  capture_intuition: ['decision', 'anchor', 'analogy'],
+};
+
 function toSpec(op: string, kind: OpSpecKind) {
   const canonicalOp = DEPRECATED_WISDOM_ALIASES[op as keyof typeof DEPRECATED_WISDOM_ALIASES];
   const forwardTo = FORWARD_TARGETS[op];
@@ -200,16 +340,19 @@ function toSpec(op: string, kind: OpSpecKind) {
     : SINGLE_REASONING_OPS.has(op)
       ? ('reasoning_single' as const)
       : ('deterministic' as const);
-  return {
+  return withCatalogInputContract('wisdom', op, kind, {
     op,
     kind,
     owner: forwardTo?.actuator || 'wisdom',
-    inputSchema: { type: 'object' },
+    input_schema: WISDOM_REQUIRED_INPUTS[op]
+      ? { ...WISDOM_INPUT_SCHEMA, required: WISDOM_REQUIRED_INPUTS[op] }
+      : WISDOM_INPUT_SCHEMA,
+    examples: [{ export_as: 'result' }],
     idempotency: IDEMPOTENCY_BY_OP[op] || 'non_idempotent',
     execution_kind: executionKind,
     ...(canonicalOp ? { canonical_op: canonicalOp, deprecated: true } : {}),
     ...(forwardTo ? { forward_to: forwardTo } : {}),
-  };
+  });
 }
 
 export function describeOps() {
@@ -242,7 +385,7 @@ export function buildWisdomOperationRegistry(
       {
         op,
         kind: descriptor.kind,
-        inputSchema: descriptor.inputSchema,
+        inputSchema: descriptor.input_schema,
         execute: (input: unknown, context: WisdomContext) => execute(op, input, context),
         idempotency: descriptor.idempotency,
         owner: descriptor.owner,

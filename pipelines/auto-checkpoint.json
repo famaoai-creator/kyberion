@@ -17,16 +17,12 @@
     {
       "id": "run_auto_checkpoint",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_auto_checkpoint",
       "produces": {
         "channel": "auto_checkpoint_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/auto_checkpoint.ts"],
-        "timeout_ms": 120000
-      }
+      "params": {}
     }
   ]
 }

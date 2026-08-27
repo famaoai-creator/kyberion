@@ -1,4 +1,5 @@
 import { logger } from './core.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { ptyEngine } from './pty-engine.js';
 import { dispatchA2UI } from './a2ui.js';
 import { getAgentManifest, isActuatorAllowed } from './agent-manifest.js';
@@ -529,7 +530,7 @@ export class ACPMediator {
             const { requireApprovalForOp } = await import('./risky-op-registry.js');
             const approval = requireApprovalForOp({
               opId: 'acp:tool',
-              agentId: process.env.KYBERION_PERSONA || 'acp-session',
+              agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'acp-session',
               payload: { title },
               draft: {
                 title: 'ACP tool approval required',
@@ -626,7 +627,7 @@ export class ACPMediator {
     const timeoutMs =
       options.timeoutMs ??
       this.options.turnTimeoutMs ??
-      Number(process.env.KYBERION_AGENT_TURN_TIMEOUT_MS || 60_000);
+      Number(getRegisteredEnvText('KYBERION_AGENT_TURN_TIMEOUT_MS') || 60_000);
     const response = await new Promise<any>((resolve, reject) => {
       const timeout =
         timeoutMs > 0
@@ -727,7 +728,7 @@ function coerceNumber(value: unknown): number | undefined {
 async function waitForBootSignal(
   child: ChildProcess,
   label: string,
-  timeoutMs = Number(process.env.KYBERION_AGENT_BOOT_READY_TIMEOUT_MS || 5000)
+  timeoutMs = Number(getRegisteredEnvText('KYBERION_AGENT_BOOT_READY_TIMEOUT_MS') || 5000)
 ): Promise<void> {
   await new Promise<void>((resolve) => {
     let settled = false;

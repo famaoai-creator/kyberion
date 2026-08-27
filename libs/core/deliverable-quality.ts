@@ -1,3 +1,5 @@
+import { isRecord } from './foundation/text.js';
+
 export type DeliverableKind = 'doc' | 'deck' | 'code' | 'media';
 export type DeliverableQualitySeverity = 'ok' | 'warn' | 'poor';
 
@@ -71,10 +73,6 @@ export function qualityScoreFromReport(report: DeliverableQualityReport): number
   if (report.severity === 'poor') return 0;
   if (report.severity === 'warn') return 50;
   return 100;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function readNestedRecord(value: unknown): Record<string, unknown> | undefined {

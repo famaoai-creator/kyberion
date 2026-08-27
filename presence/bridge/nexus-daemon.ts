@@ -8,6 +8,7 @@ import {
   installProcessGuards,
   logger,
   terminalBridge,
+  loadJson,
   safeReadFile,
   safeWriteFile,
   pathResolver,
@@ -32,6 +33,10 @@ const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl'
 const REGISTRY_PATH = pathResolver.resolve('presence/bridge/channel-registry.json');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
+
+function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
+  return loadJson(filePath);
+}
 
 /**
  * Ensures the system mission exists physically for TIBA compliance.
@@ -192,7 +197,7 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
     try {
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
       if (safeExistsSync(registryPath)) {
-        const registry = JSON.parse(safeReadFile(registryPath, { encoding: 'utf8' }) as string);
+        const registry = loadJsonValue(registryPath);
         if (registry.profiles[profile]) {
           return { profile, cleanPayload };
         }
@@ -231,9 +236,9 @@ async function scanAndDispatch(channels: Channel[]) {
 
       if (safeExistsSync(metaPath) && safeExistsSync(responsePath)) {
         try {
-          const meta = JSON.parse(safeReadFile(metaPath, { encoding: 'utf8' }) as string);
+          const meta = loadJsonValue(metaPath);
           if (meta.stimulus_id === stimulus.id) {
-            const response = JSON.parse(safeReadFile(responsePath, { encoding: 'utf8' }) as string);
+            const response = loadJsonValue(responsePath);
             const text = response.data?.message || JSON.stringify(response.data || {}, null, 2);
 
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);

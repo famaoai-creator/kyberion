@@ -7,6 +7,7 @@ import {
   resolveOnboardingText,
   resolveOperatorLocale,
 } from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
 
@@ -443,32 +444,36 @@ function formatSummary(summary: ProductionEvidenceSummary): string {
   return `${lines.join('\n')}\n`;
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  let json = false;
-  let requireComplete = false;
-  let registerPath = DEFAULT_REGISTER_PATH;
+export const runCheckProductionEvidence = defineScript({
+  name: 'check:production-evidence',
+  flags: [],
+  run(context) {
+    const args = context.argv;
+    let json = false;
+    let requireComplete = false;
+    let registerPath = DEFAULT_REGISTER_PATH;
 
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '--json') json = true;
-    else if (arg === '--require-complete') requireComplete = true;
-    else if (arg === '--register') registerPath = args[++i];
-  }
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--json') json = true;
+      else if (arg === '--require-complete') requireComplete = true;
+      else if (arg === '--register') registerPath = args[++i];
+    }
 
-  const register = loadProductionEvidenceRegister(registerPath);
-  const summary = checkProductionEvidenceRegister(register, { requireComplete });
-  const output = json ? `${JSON.stringify(summary, null, 2)}\n` : formatSummary(summary);
+    const register = loadProductionEvidenceRegister(registerPath);
+    const summary = checkProductionEvidenceRegister(register, { requireComplete });
+    const output = json ? `${JSON.stringify(summary, null, 2)}\n` : formatSummary(summary);
 
-  if (summary.ok) process.stdout.write(output);
-  else process.stderr.write(output);
-  process.exit(summary.ok ? 0 : 1);
-}
+    if (summary.ok) context.print(output);
+    else {
+      console.error(output.trimEnd());
+      process.exitCode = 1;
+    }
+  },
+});
 
-const isDirect = process.argv[1] && /check_production_evidence\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'check_production_evidence.ts') ||
+  isDirectScript(import.meta.url, 'check_production_evidence.js')
+)
+  void runCheckProductionEvidence();

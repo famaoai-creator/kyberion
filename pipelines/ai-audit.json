@@ -13,12 +13,10 @@
     {
       "id": "run-ai-audit",
       "role": "sink",
-      "op": "system:exec",
-      "comment": "safeExec scrubs env (SAFE_EXEC_ENV_ALLOWLIST), so the child resolves its own reasoning backend: real backend when one is available, explicit skip report when only the stub is. LLM fan-out needs more than the 30s exec default.",
+      "op": "core:run_ai_audit",
+      "comment": "Typed library entry preserves backend discovery, explicit stub skip, report persistence, and bounded LLM fan-out.",
       "params": {
-        "command": "node",
-        "args": ["dist/scripts/run_ai_audit.js"],
-        "timeout_ms": 1200000
+        "concurrency": 3
       }
     }
   ]

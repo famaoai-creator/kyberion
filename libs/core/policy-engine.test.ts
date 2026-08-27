@@ -1,5 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
 import { policyEngine } from './policy-engine.js';
+import { registerFoundationIo } from './foundation/io.js';
+
+// This suite imports policy-engine directly, before secure-io is part of the
+// module graph. Keep the fixture explicit and read-only instead of installing
+// a global raw filesystem fallback.
+registerFoundationIo({
+  loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+  loadJsonIfPresent: <T>(filePath: string): T | null => {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+  },
+  appendFile: () => undefined,
+  exists: (filePath: string) => fs.existsSync(filePath),
+  readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+  stat: (filePath: string) => fs.statSync(filePath),
+  writeFile: () => undefined,
+});
 
 // SA-05 regression: the previous hand-rolled YAML parser produced empty
 // rules arrays for every policy, so the engine never enforced anything.

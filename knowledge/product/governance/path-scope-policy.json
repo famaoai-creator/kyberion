@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/path-scope-policy.schema.json",
   "version": "1.0.0",
   "defaults": {
     "unknown_scope_behavior": "allow_with_warning"

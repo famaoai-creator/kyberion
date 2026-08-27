@@ -62,6 +62,13 @@ describe('api guard', () => {
     ).toBeNull();
   });
 
+  it('does not trust a spoofed forwarded loopback peer unless proxy trust is enabled', async () => {
+    vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+
+    expect(resolveChronosAccessRole(makeReq({ forwardedFor: '127.0.0.1' }))).toBeNull();
+  });
+
   it('still allows explicit loopback requests when the runtime exposes a local ip', async () => {
     vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
     const { resolveChronosAccessRole } = await import('./api-guard.js');
@@ -69,12 +76,12 @@ describe('api guard', () => {
     expect(resolveChronosAccessRole(makeReq({ ip: '127.0.0.1' }))).toBe('localadmin');
   });
 
-  it('allows direct localhost requests when self-hosted Next.js omits the client ip', async () => {
+  it('does not treat a localhost host header as a local peer when the client ip is unavailable', async () => {
     vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
     const { resolveChronosAccessRole } = await import('./api-guard.js');
 
-    expect(resolveChronosAccessRole(makeReq({ hostname: '127.0.0.1' }))).toBe('localadmin');
-    expect(resolveChronosAccessRole(makeReq({ hostname: 'localhost' }))).toBe('localadmin');
+    expect(resolveChronosAccessRole(makeReq({ hostname: '127.0.0.1' }))).toBeNull();
+    expect(resolveChronosAccessRole(makeReq({ hostname: 'localhost' }))).toBeNull();
   });
 
   it('does not trust a localhost hostname when forwarded identity is present', async () => {
@@ -95,6 +102,7 @@ describe('api guard', () => {
 
   it('accepts the loopback forwarding address added by the self-hosted Next.js server', async () => {
     vi.stubEnv('KYBERION_LOCALHOST_AUTOADMIN', 'true');
+    vi.stubEnv('KYBERION_TRUST_PROXY', 'true');
     const { resolveChronosAccessRole } = await import('./api-guard.js');
 
     expect(
@@ -117,5 +125,12 @@ describe('api guard', () => {
         })
       )
     ).toBe('readonly');
+  });
+
+  it('accepts the registry boolean 1 form for explicit unauthenticated remote readonly access', async () => {
+    vi.stubEnv('KYBERION_ALLOW_UNAUTH_REMOTE', '1');
+    const { resolveChronosAccessRole } = await import('./api-guard.js');
+
+    expect(resolveChronosAccessRole(makeReq({ ip: '203.0.113.10' }))).toBe('readonly');
   });
 });

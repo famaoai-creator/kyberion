@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
 import { safeJsonParse } from './validators.js';
 import { resolveIdentityContext } from './authority.js';
@@ -105,7 +106,7 @@ let cachedPolicySourceHealthy = false;
 let cachedPolicyMtimeMs: number | null = null;
 
 function getPolicyPath(): string {
-  return process.env.KYBERION_AUTONOMOUS_OPS_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
 }
 
 function loadPolicyFromPath(policyPath: string): AutonomousOpsPolicy {

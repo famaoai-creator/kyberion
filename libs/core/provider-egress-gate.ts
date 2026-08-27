@@ -38,17 +38,16 @@
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-03.
  */
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import { detectTier, TIERS } from './tier-guard.js';
 import type { TierLevel } from './types.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { createLogger } from './logger.js';
 import { resolveTenant } from './tenant-registry.js';
-
-const Ajv = (AjvModule as any).default ?? AjvModule;
+import { getRegisteredEnvText } from './foundation/env.js';
 
 const logger = createLogger('provider-egress-gate');
 
@@ -78,13 +77,14 @@ let cachedPolicyPath: string | null = null;
 let cachedResult: PolicyLoadResult | null = null;
 
 function policyPath(): string {
-  return process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH?.trim() || DEFAULT_POLICY_PATH;
+  return (
+    getRegisteredEnvText('KYBERION_PROVIDER_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH
+  );
 }
 
 function ensureValidator(): ValidateFunction {
   if (cachedValidator) return cachedValidator;
-  const ajv = new Ajv({ allErrors: true });
-  cachedValidator = compileSchemaFromPath(ajv, SCHEMA_PATH);
+  cachedValidator = compileSchema(SCHEMA_PATH);
   return cachedValidator;
 }
 

@@ -177,11 +177,14 @@ describe('entity governance acceptance boundaries', () => {
       })
     );
     safeWriteFile(
-      path.join(FIXTURE_ROOT, 'schemas/work-item.schema.json'),
+      path.join(FIXTURE_ROOT, 'knowledge/product/schemas/governed-work-item.schema.json'),
       String(
-        safeReadFile(pathResolver.rootResolve('schemas/work-item.schema.json'), {
-          encoding: 'utf8',
-        })
+        safeReadFile(
+          pathResolver.rootResolve('knowledge/product/schemas/governed-work-item.schema.json'),
+          {
+            encoding: 'utf8',
+          }
+        )
       )
     );
 

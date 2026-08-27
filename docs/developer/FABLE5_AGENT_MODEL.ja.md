@@ -2,7 +2,7 @@
 
 > **作成日**: 2026-07-03
 > **目的**: Claude Code ハーネス上のエージェント(Fable 5)の設計思想・振る舞いの原則を、参考のために明文化する。Kyberion のサブエージェント・mission worker・surface エージェントが「どう振る舞うべきか」の参照規範にもなる。
-> **著者帰属(2026-07-03 訂正)**: `improvement-plans-2026-07` の各計画は **Opus が調査ベースで起草**し、**Fable 5 が実コードに照らして再レビュー**した([REVIEW_FABLE5_2026-07-03](./improvement-plans-2026-07/REVIEW_FABLE5_2026-07-03.ja.md))。本文書は Fable 5 の動作原則の記述だが、計画群を Fable が執筆したという当初の記述は誤りだった(その over-claim 自体が本文書 §1 の第一原則「誇張しない」に反していた — 再レビューで是正)。
+> **著者帰属(2026-07-03 訂正)**: `improvement-plans-2026-07` の各計画は **Opus が調査ベースで起草**し、**Fable 5 が実コードに照らして再レビュー**した([REVIEW_FABLE5_2026-07-03](./improvement-plans-archive/2026-07/REVIEW_FABLE5_2026-07-03.ja.md))。本文書は Fable 5 の動作原則の記述だが、計画群を Fable が執筆したという当初の記述は誤りだった(その over-claim 自体が本文書 §1 の第一原則「誇張しない」に反していた — 再レビューで是正)。
 > **関係文書**: マルチエージェントの**指揮法**は [ORCHESTRATION_HARNESS_MODEL](./ORCHESTRATION_HARNESS_MODEL.ja.md)。本文書はその前提となる**エージェント個体**の動作原則。両者は補完的。
 > **注記**: 本文書は Fable 5 の動作原則を体系化したもの。原則の記述自体は実規範に忠実(再レビューで確認済み)。
 
@@ -99,4 +99,4 @@ Fable 5 の個体原則を Kyberion のエージェント(サブエージェン�
 
 **Fable 5 の考え方は「正直に・読み手のために・自律的に動き、完了を自分でも疑い、進め方をハーネスに固定する」。** Kyberion に取り込むべきは Fable 5 という重みでなく、この規範を軽量モデルでも成立させる仕組みである。
 
-→ 指揮法の詳細は [ORCHESTRATION_HARNESS_MODEL](./ORCHESTRATION_HARNESS_MODEL.ja.md)、実装は [improvement-plans-2026-07](./improvement-plans-2026-07/README.ja.md)。
+→ 指揮法の詳細は [ORCHESTRATION_HARNESS_MODEL](./ORCHESTRATION_HARNESS_MODEL.ja.md)、実装は [improvement-plans-2026-07](./improvement-plans-archive/2026-07/README.ja.md)。

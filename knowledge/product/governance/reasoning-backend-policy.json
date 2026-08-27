@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/reasoning-backend-policy.schema.json",
   "version": "1.0.0",
   "route_policy_ref": "knowledge/product/governance/reasoning-route-policy.json",
   "mode_aliases": {

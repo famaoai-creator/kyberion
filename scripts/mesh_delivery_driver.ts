@@ -15,10 +15,12 @@ import {
   type MeshDeliveryPassReport,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
 
-async function runOnce(options: {
+export async function runMeshDeliveryDriverOnce(options: {
   senderPeerId: string;
   sharedSecret?: string;
   batchLimit: number;
@@ -56,19 +58,21 @@ async function main(): Promise<void> {
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const senderPeerId = (process.env.KYBERION_MESH_PEER_ID || '').trim();
+  const senderPeerId = (getRegisteredEnvText('KYBERION_MESH_PEER_ID') || '').trim();
   if (!senderPeerId) {
     logger.error(
       "[mesh-delivery] KYBERION_MESH_PEER_ID is not set. Set it to this host's peer id from the peer network catalog."
     );
-    process.exit(2);
+    process.exitCode = 2;
+    return;
   }
-  const sharedSecret = process.env.KYBERION_MESH_SHARED_SECRET || undefined;
+  const sharedSecret = getRegisteredEnvText('KYBERION_MESH_SHARED_SECRET') || undefined;
 
   const locked = await acquireLock(DRIVER_LOCK_ID, 1000);
   if (!locked) {
     logger.warn('[mesh-delivery] another driver instance holds the lock; exiting (single-writer).');
-    process.exit(0);
+    process.exitCode = 0;
+    return;
   }
 
   let stopping = false;
@@ -80,7 +84,7 @@ async function main(): Promise<void> {
 
   try {
     do {
-      const report = await runOnce({
+      const report = await runMeshDeliveryDriverOnce({
         senderPeerId,
         sharedSecret,
         batchLimit: Number(argv.limit) || 10,
@@ -96,10 +100,12 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirect = process.argv[1] && /mesh_delivery_driver\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'mesh_delivery_driver.ts') ||
+  isDirectScript(import.meta.url, 'mesh_delivery_driver.js')
+) {
   main().catch((err) => {
     logger.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

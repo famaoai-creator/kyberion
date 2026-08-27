@@ -4,11 +4,12 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { SuperPipelineStep } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main() {
+export async function main(args: string[] = []) {
   const argv = await createStandardYargs()
     .option('input', { alias: 'i', type: 'string', required: true })
-    .parseSync();
+    .parseSync(args);
 
   const inputData = (await readValidatedWorkflowAdf(argv.input as string)) as {
     steps: SuperPipelineStep[];
@@ -34,7 +35,8 @@ async function main() {
     console.log(JSON.stringify(result, null, 2));
     if (result.status !== 'succeeded') {
       logger.error('❌ [SUPER_NERVE] Pipeline failed.');
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     logger.success('✅ [SUPER_NERVE] Pipeline completed successfully.');
   } catch (err: any) {
@@ -45,12 +47,18 @@ async function main() {
       `   [SUPER_NERVE] Trace: ${path.relative(pathResolver.rootDir(), persisted.path) || persisted.path}`
     );
     logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${message}`);
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 
-main().catch((err) => {
-  const message = err?.message ?? String(err);
-  logger.error(`❌ [SUPER_NERVE] Pipeline failed: ${message}`);
-  process.exit(1);
+export const runSuperPipeline = defineScript({
+  name: 'pipeline:super',
+  flags: [],
+  run: async ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'run_super_pipeline.ts') ||
+  isDirectScript(import.meta.url, 'run_super_pipeline.js')
+)
+  void runSuperPipeline();

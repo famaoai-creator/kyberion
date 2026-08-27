@@ -1,3 +1,4 @@
+import { appendJsonLine, readJson } from './foundation/json.js';
 /**
  * scripts/refactor/mission-governance.ts
  * Governance, trust, and observability helpers for mission orchestration.
@@ -16,7 +17,6 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
-  safeAppendFileSync,
   safeExec,
   safeExistsSync,
   safeReaddir,
@@ -204,7 +204,7 @@ export function validateMissionArtifactReviewGate(input: {
 
   let tasks: ArtifactReviewPlannedTask[];
   try {
-    const raw = JSON.parse(String(safeReadFile(taskPath, { encoding: 'utf8' }))) as unknown;
+    const raw = readJson<unknown>(taskPath);
     if (!Array.isArray(raw)) return { ok: false, reason: 'NEXT_TASKS.json must contain an array.' };
     tasks = raw.filter((entry): entry is ArtifactReviewPlannedTask =>
       Boolean(entry && typeof entry === 'object')
@@ -330,9 +330,7 @@ export function validateMarketingMissionCompletionGate(input: {
   }
   candidates.sort((left, right) => safeStat(right).mtimeMs - safeStat(left).mtimeMs);
   try {
-    const evidence = JSON.parse(
-      safeReadFile(candidates[0], { encoding: 'utf8' }) as string
-    ) as MarketingCompletionEvidence;
+    const evidence = readJson<MarketingCompletionEvidence>(candidates[0]);
     const currentArtifacts = Object.fromEntries(
       Object.entries(evidence.artifact_bindings || {}).map(([name, binding]) => {
         const artifactPath = path.isAbsolute(binding.path)
@@ -360,11 +358,5 @@ export function recordAgentRuntimeEvent(
 ): void {
   const dir = path.dirname(agentRuntimeEventPath);
   if (!safeExistsSync(dir)) safeWriteFile(agentRuntimeEventPath, '');
-  safeAppendFileSync(
-    agentRuntimeEventPath,
-    JSON.stringify({
-      ts: new Date().toISOString(),
-      ...event,
-    }) + '\n'
-  );
+  appendJsonLine(agentRuntimeEventPath, { ts: new Date().toISOString(), ...event });
 }

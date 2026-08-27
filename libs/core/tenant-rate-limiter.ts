@@ -28,6 +28,7 @@ import {
   safeCreateExclusiveFileSync,
   safeUnlinkSync,
 } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 const POLICY_PATH = 'knowledge/product/governance/tenant-rate-limit-policy.json';
@@ -83,7 +84,7 @@ function loadPolicy(): RateLimitPolicy {
     };
     return cachedPolicy;
   }
-  cachedPolicy = JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string) as RateLimitPolicy;
+  cachedPolicy = loadJson<RateLimitPolicy>(abs);
   return cachedPolicy;
 }
 
@@ -95,7 +96,7 @@ function loadState(): RateLimitState {
   const abs = pathResolver.rootResolve(STATE_PATH);
   if (!safeExistsSync(abs)) return { tenants: {} };
   try {
-    return JSON.parse(safeReadFile(abs, { encoding: 'utf8' }) as string) as RateLimitState;
+    return loadJson<RateLimitState>(abs);
   } catch {
     return { tenants: {} };
   }
@@ -140,7 +141,7 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
           pid: process.pid,
           created_at: new Date().toISOString(),
           resource: 'tenant-rate-limit-state',
-        }),
+        })
       );
       ownsLock = true;
       break;
@@ -156,7 +157,7 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
 
   if (!ownsLock) {
     throw new Error(
-      `[LOCK_TIMEOUT] Failed to acquire tenant rate-limit lock within ${LOCK_TIMEOUT_MS}ms`,
+      `[LOCK_TIMEOUT] Failed to acquire tenant rate-limit lock within ${LOCK_TIMEOUT_MS}ms`
     );
   }
 
@@ -180,7 +181,7 @@ function refillBucket(
   bucket: TenantBucket | undefined,
   tokensPerMinute: number,
   burstCapacity: number,
-  now: Date,
+  now: Date
 ): TenantBucket {
   if (!bucket) return { tokens: burstCapacity, updated_at: now.toISOString() };
   const elapsedMs = now.getTime() - new Date(bucket.updated_at).getTime();
@@ -223,14 +224,19 @@ export function consumeTenantBudget(input: {
 
   return withTenantRateLimitLock(() => {
     const state = loadState();
-    const refilled = refillBucket(state.tenants[tenantSlug], cfg.tokens_per_minute, cfg.burst_capacity, now);
+    const refilled = refillBucket(
+      state.tenants[tenantSlug],
+      cfg.tokens_per_minute,
+      cfg.burst_capacity,
+      now
+    );
 
     if (refilled.tokens < cost) {
       const deficit = cost - refilled.tokens;
       const refillRatePerMs = cfg.tokens_per_minute / 60_000;
       const retryAfterMs = Math.max(
         cfg.denial_grace_ms,
-        Math.ceil(deficit / Math.max(refillRatePerMs, 1e-9)),
+        Math.ceil(deficit / Math.max(refillRatePerMs, 1e-9))
       );
       state.tenants[tenantSlug] = refilled;
       saveState(state);
@@ -268,7 +274,7 @@ export function inspectTenantBudget(tenantSlug: string): {
     state.tenants[tenantSlug],
     cfg.tokens_per_minute,
     cfg.burst_capacity,
-    new Date(),
+    new Date()
   );
   return {
     tokens: bucket.tokens,
@@ -302,7 +308,7 @@ export class TenantRateLimitExceededError extends Error {
  */
 export async function withTenantBudget<T>(
   input: { op: string; cost?: number },
-  fn: () => Promise<T>,
+  fn: () => Promise<T>
 ): Promise<T> {
   const decision = consumeTenantBudget({
     op: input.op,

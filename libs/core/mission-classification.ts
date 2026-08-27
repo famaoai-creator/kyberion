@@ -1,7 +1,8 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
+import { createAjv } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
 
 export const MISSION_CLASS_VALUES = [
   'product_delivery',
@@ -100,8 +101,7 @@ type ClassificationPolicy = {
   }>;
 };
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-classification-policy.schema.json'
 );
@@ -215,9 +215,7 @@ function stageRuleMatches(
 }
 
 function loadPolicy(): ClassificationPolicy {
-  const parsed = JSON.parse(
-    safeReadFile(POLICY_PATH, { encoding: 'utf8' }) as string
-  ) as ClassificationPolicy;
+  const parsed = readJson<ClassificationPolicy>(POLICY_PATH);
   const validate = ensurePolicyValidator();
   if (!validate(parsed)) {
     const errors = (validate.errors || [])

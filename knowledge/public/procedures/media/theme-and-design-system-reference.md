@@ -269,7 +269,7 @@ Rules:
 
 Contrast is computed, never eyeballed (working-philosophy rule 7):
 
-- **CI gate**: `pnpm check:design-contrast` (part of `pnpm validate`) fails on
+- **CI gate**: `pnpm check -- --only design-contrast` (part of `pnpm validate`) fails on
   AA violations in brand tokens and every theme — body text, accent text,
   surface text, muted text.
 - **Runtime library**: `libs/core/design-qa.ts` (`contrastRatio`,

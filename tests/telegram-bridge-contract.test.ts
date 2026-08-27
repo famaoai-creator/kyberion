@@ -13,11 +13,17 @@ describe('Telegram bridge contract', () => {
     const pkg = JSON.parse(read('package.json')) as { scripts: Record<string, string> };
     const manifests = read('knowledge/product/governance/surface-provider-manifests.json');
     const activeSurfaces = read('knowledge/product/governance/active-surfaces.json');
-    const lifecycleModel = read('knowledge/product/architecture/runtime-surface-lifecycle-model.md');
+    const lifecycleModel = read(
+      'knowledge/product/architecture/runtime-surface-lifecycle-model.md'
+    );
     const operatorGuide = read('docs/OPERATOR_UX_GUIDE.md');
 
-    expect(pkg.scripts['telegram:bridge']).toBe('node dist/satellites/telegram-bridge/src/index.js');
-    expect(pkg.scripts['telegram:demo']).toBe('pnpm exec tsx scripts/demos/demo_telegram_flow.ts');
+    expect(pkg.scripts['telegram:bridge']).toBe(
+      'node dist/satellites/telegram-bridge/src/index.js'
+    );
+    expect(pkg.scripts['telegram:demo']).toBe(
+      'node --import ./scripts/ts-loader.mjs scripts/demos/demo_telegram_flow.ts'
+    );
     expect(manifests).toContain('"id": "telegram"');
     expect(manifests).toContain('"agentId": "telegram-surface-agent"');
     expect(activeSurfaces).toContain('"id": "telegram-bridge"');

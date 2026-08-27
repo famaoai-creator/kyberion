@@ -1,10 +1,10 @@
-import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { loadActuatorManifestCatalog, loadJson } from '@agent/core';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
+import { loadActuatorManifestCatalog } from '@agent/core';
+import { pathResolver, safeExistsSync } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
-import { describeOps as describeSystemOps } from '@actuator/system';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
+import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
 import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';
 import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
 import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
@@ -31,6 +31,7 @@ import { describeOps as describeVisionOps } from '../libs/actuators/vision-actua
 import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuator/src/op-catalog.js';
 import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
 import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
+import { describeOps as describeMediaOps } from '../libs/actuators/media-actuator/src/op-catalog.js';
 import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
 import { describeOps as describeDeploymentOps } from '../libs/actuators/deployment-actuator/src/op-catalog.js';
 
@@ -73,6 +74,7 @@ const DESCRIBE_OPS_SOURCES: Record<
   'voice-actuator': describeVoiceOps,
   'meeting-actuator': describeMeetingOps,
   'media-generation-actuator': describeMediaGenerationOps,
+  'media-actuator': describeMediaOps,
   'video-composition-actuator': describeVideoCompositionOps,
   'deployment-actuator': describeDeploymentOps,
 };
@@ -93,11 +95,13 @@ interface MediaManifestFile {
 
 interface DomainOpRegistry {
   capture?: string[];
+  control?: string[];
   transform?: string[];
   apply?: string[];
 }
 
 interface ActuatorOpRegistryFile {
+  $schema?: string;
   version: string;
   description: string;
   shared_capture_ops: string[];
@@ -124,6 +128,15 @@ interface OpDiscoveryReport {
   actuators: OpDiscoveryRecord[];
 }
 
+function enrichDescribedOp(item: {
+  op: string;
+  kind: PipelineOpKind;
+  input_schema?: Record<string, unknown>;
+  examples?: Array<Record<string, unknown>>;
+}) {
+  return { ...item };
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/actuator-op-registry.json');
 const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
@@ -137,6 +150,7 @@ function normalizeDomainRegistry(registry: DomainOpRegistry | undefined): Domain
     capture: uniqueSorted(registry?.capture ?? []),
     transform: uniqueSorted(registry?.transform ?? []),
     apply: uniqueSorted(registry?.apply ?? []),
+    ...(registry?.control?.length ? { control: uniqueSorted(registry.control) } : {}),
   };
 }
 
@@ -156,7 +170,7 @@ function loadMediaManifest(): MediaManifestFile | null {
   if (!safeExistsSync(MEDIA_MANIFEST_PATH)) {
     return null;
   }
-  return loadJson<MediaManifestFile>(MEDIA_MANIFEST_PATH);
+  return readJson<MediaManifestFile>(MEDIA_MANIFEST_PATH);
 }
 
 function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOpRegistry {
@@ -169,8 +183,9 @@ function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOp
 }
 
 function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
-  const registry = loadJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
+  const registry = readJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
   return {
+    $schema: '../schemas/actuator-op-registry.schema.json',
     version: registry.version || '1.0.0',
     description:
       registry.description ||
@@ -200,12 +215,7 @@ function buildOpDiscoveryReport(
         n: actuatorId,
         path: entry.path,
         source: 'describeOps',
-        ops: ops.map((item) => ({
-          op: item.op,
-          kind: item.kind,
-          input_schema: (item as { input_schema?: Record<string, unknown> }).input_schema,
-          examples: (item as { examples?: Array<Record<string, unknown>> }).examples,
-        })),
+        ops: ops.map((item) => enrichDescribedOp(item)),
       });
       continue;
     }
@@ -217,9 +227,9 @@ function buildOpDiscoveryReport(
         path: entry.path,
         source: 'manifest',
         ops: [
-          ...mediaOps.capture.map((op) => ({ op, kind: 'capture' as const })),
-          ...mediaOps.transform.map((op) => ({ op, kind: 'transform' as const })),
-          ...mediaOps.apply.map((op) => ({ op, kind: 'apply' as const })),
+          ...mediaOps.capture.map((op) => enrichDescribedOp({ op, kind: 'capture' as const })),
+          ...mediaOps.transform.map((op) => enrichDescribedOp({ op, kind: 'transform' as const })),
+          ...mediaOps.apply.map((op) => enrichDescribedOp({ op, kind: 'apply' as const })),
         ],
       });
       continue;
@@ -235,6 +245,7 @@ function buildOpDiscoveryReport(
         ...(domainOps.capture || []).map((op) => annotateOp(domainName, op, 'capture')),
         ...(domainOps.transform || []).map((op) => annotateOp(domainName, op, 'transform')),
         ...(domainOps.apply || []).map((op) => annotateOp(domainName, op, 'apply')),
+        ...(domainOps.control || []).map((op) => annotateOp(domainName, op, 'control')),
       ],
     });
   }
@@ -260,6 +271,7 @@ function buildGeneratedRegistry(): ActuatorOpRegistryFile {
       capture: ops.filter((item) => item.kind === 'capture').map((item) => item.op),
       transform: ops.filter((item) => item.kind === 'transform').map((item) => item.op),
       apply: ops.filter((item) => item.kind === 'apply').map((item) => item.op),
+      control: ops.filter((item) => item.kind === 'control').map((item) => item.op),
     });
   }
 
@@ -280,63 +292,22 @@ async function stringifyJson(value: unknown, filePath: string): Promise<string> 
   return prettierFormat(JSON.stringify(value, null, 2), { ...config, parser: 'json' });
 }
 
-function writeOutputs(registryJson: string, discoveryJson: string): void {
-  safeWriteFile(REGISTRY_PATH, registryJson);
-  safeWriteFile(DISCOVERY_PATH, discoveryJson);
-}
-
-function readCurrentFiles(): { registry: string; discovery: string | null } {
-  const registry = String(safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) || '');
-  const discovery = safeExistsSync(DISCOVERY_PATH)
-    ? String(safeReadFile(DISCOVERY_PATH, { encoding: 'utf8' }) || '')
-    : null;
-  return { registry, discovery };
-}
-
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const shouldWrite = argv.includes('--write') || !shouldCheck;
-  // withExecutionContext restores env synchronously when its callback
-  // returns, so every secure-io access stays inside a sync callback and the
-  // async prettier formatting runs between the two context sections.
-  const built = withExecutionContext('ecosystem_architect', () => {
+export const main = defineGenerator({
+  id: 'op-registry',
+  outputs: [REGISTRY_PATH, DISCOVERY_PATH],
+  async render() {
     const manifestCatalog = loadActuatorManifestCatalog();
     const registry = buildGeneratedRegistry();
     const discovery = buildOpDiscoveryReport(manifestCatalog, registry);
-    return { registry, discovery };
-  });
-  const nextRegistry = await stringifyJson(built.registry, REGISTRY_PATH);
-  const nextDiscovery = await stringifyJson(built.discovery, DISCOVERY_PATH);
-  return withExecutionContext('ecosystem_architect', () => {
-    if (shouldCheck) {
-      const current = readCurrentFiles();
-      const registryMatches = current.registry === nextRegistry;
-      const discoveryMatches = current.discovery === nextDiscovery;
-      if (registryMatches && discoveryMatches) {
-        console.log('op registry is up to date');
-        return;
-      }
-      console.error('op registry drift detected');
-      if (!registryMatches)
-        console.error(`- ${path.relative(pathResolver.rootDir(), REGISTRY_PATH)} differs`);
-      if (!discoveryMatches)
-        console.error(`- ${path.relative(pathResolver.rootDir(), DISCOVERY_PATH)} differs`);
-      process.exitCode = 1;
-      return;
-    }
+    return [
+      { path: REGISTRY_PATH, content: await stringifyJson(registry, REGISTRY_PATH) },
+      { path: DISCOVERY_PATH, content: await stringifyJson(discovery, DISCOVERY_PATH) },
+    ];
+  },
+});
 
-    if (shouldWrite) {
-      writeOutputs(nextRegistry, nextDiscovery);
-      console.log(
-        `wrote ${path.relative(pathResolver.rootDir(), REGISTRY_PATH)} and ${path.relative(pathResolver.rootDir(), DISCOVERY_PATH)}`
-      );
-    }
-  });
-}
-
-if (process.argv[1] && /generate_op_registry\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'generate_op_registry.ts') ||
+  isDirectScript(import.meta.url, 'generate_op_registry.js')
+)
+  void main();

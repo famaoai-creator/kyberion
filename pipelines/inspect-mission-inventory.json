@@ -8,11 +8,10 @@
     {
       "id": "list_missions",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "mission_inventory_output", "type": "ShellResult" },
+      "op": "system:list_missions",
+      "produces": { "channel": "mission_inventory_output", "type": "MissionInventory" },
       "params": {
-        "cmd": "node dist/scripts/mission_controller.js list",
-        "export_as": "mission_inventory_output"
+        "status": "active"
       }
     },
     {

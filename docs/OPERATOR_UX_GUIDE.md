@@ -6,7 +6,9 @@ Kyberion has a rich internal model, but the operator UX should still be easy to 
 Intent -> Plan -> State -> Result
 ```
 
-This guide explains how to operate Kyberion without forcing people to think in raw pipelines, runtime registries, or actuator contracts first.
+The operator can always see the request, plan, result, and next action.
+
+This guide explains how to operate Kyberion without forcing people to think in implementation details first.
 
 Surface map: [`docs/SURFACES.md`](./SURFACES.md).
 
@@ -70,9 +72,8 @@ When resuming a mission, the operator should expect the controller to rebuild st
 
 The resume path is now mechanically driven. The warning remains as context, not as the primary recovery mechanism.
 
-When Kyberion explains a complex capability, it should surface the
-governed capability bundle summary before expanding into the underlying
-actuator or pipeline details.
+When Kyberion explains a complex capability, it should first show the
+plain-language plan and expected result before expanding into technical detail.
 
 ## 2. Choosing A Surface
 
@@ -228,7 +229,7 @@ Use this when you want to register a new operator voice profile before meeting w
 pnpm meeting:preflight
 ```
 
-失敗したら `pnpm doctor:meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
+失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
 
 2. 初回だけ voice profile と consent をまとめて作る。
 
@@ -256,7 +257,7 @@ pnpm meeting:participate \
   --display-name "Kyberion (operator delegate)"
 ```
 
-失敗したら `pnpm doctor:meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
+失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
 
 5. 会議後フォローアップで議事録と action items を作る。
 

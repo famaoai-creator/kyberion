@@ -461,7 +461,7 @@ describe('service-actuator handleAction', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/service-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/service-action.schema.json')
     );
 
     const directRequest = {

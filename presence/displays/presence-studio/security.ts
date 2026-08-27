@@ -1,7 +1,13 @@
 import type { Request, RequestHandler } from 'express';
 import { isIP } from 'node:net';
 import { z } from 'zod';
-import { isValidTenantSlug, logger } from '@agent/core';
+import {
+  extractSurfaceBearerToken,
+  logger,
+  narrowSurfaceViewerTenant,
+  resolveSurfaceViewerToken,
+} from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 const LOCALHOST_NAMES = new Set([
@@ -46,7 +52,9 @@ function isPrivateIpv6(hostname: string): boolean {
 }
 
 export function getPresenceStudioAuthToken(): string {
-  return String(process.env.PRESENCE_STUDIO_TOKEN || process.env.KYBERION_API_TOKEN || '');
+  return String(
+    process.env.PRESENCE_STUDIO_TOKEN || getRegisteredEnvText('KYBERION_API_TOKEN') || ''
+  );
 }
 
 export function getPresenceStudioClientAddress(req: Pick<Request, 'socket'>): string {
@@ -71,11 +79,15 @@ export function isLoopbackOrPrivateAddress(address: string): boolean {
 }
 
 export function extractPresenceStudioToken(req: Pick<Request, 'headers'>): string {
-  const authHeader = req.headers.authorization;
-  if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim();
-  }
-  return '';
+  return extractSurfaceBearerToken(req.headers.authorization);
+}
+
+function resolvePresenceStudioCredential(presented: string) {
+  const configured = getPresenceStudioAuthToken();
+  return resolveSurfaceViewerToken(presented, {
+    apiToken: process.env.PRESENCE_STUDIO_TOKEN ? undefined : configured,
+    configuredCredentials: configured ? [{ token: configured, role: 'readonly' as const }] : [],
+  });
 }
 
 export function checkPresenceStudioRateLimit(
@@ -137,7 +149,8 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
       };
     }
     const presented = extractPresenceStudioToken(req);
-    if (presented === token) {
+    const resolution = resolvePresenceStudioCredential(presented);
+    if (resolution) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
@@ -150,7 +163,8 @@ export function authorizePresenceStudioRequest(req: Pick<Request, 'headers' | 's
   const token = getPresenceStudioAuthToken();
   if (token) {
     const presented = extractPresenceStudioToken(req);
-    if (presented === token) {
+    const resolution = resolvePresenceStudioCredential(presented);
+    if (resolution) {
       return { ok: true, status: 200, reason: 'token' };
     }
     return {
@@ -172,6 +186,16 @@ export interface PresenceStudioViewerContext {
   principalId: string;
   tenantSlugs: string[] | 'all';
   source: 'loopback' | 'token';
+}
+
+/** Held-action mutations are human operator actions, never readonly token actions. */
+export function requirePresenceStudioLocalAdmin(viewer: PresenceStudioViewerContext): void {
+  if (viewer.source !== 'loopback') {
+    throw new PresenceStudioViewerError(
+      403,
+      'Held-action mutations require a server-derived localadmin Presence Studio session.'
+    );
+  }
 }
 
 export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
@@ -231,14 +255,14 @@ export function narrowPresenceStudioTenant(
   viewer: PresenceStudioViewerContext,
   requested?: string
 ): string[] | 'all' {
-  const tenant = requested?.trim() || undefined;
-  if (tenant && !isValidTenantSlug(tenant)) {
-    throw new PresenceStudioViewerError(403, `invalid viewer tenant scope: ${tenant}`);
+  try {
+    return narrowSurfaceViewerTenant(viewer, requested);
+  } catch (error) {
+    throw new PresenceStudioViewerError(
+      403,
+      error instanceof Error ? error.message : 'viewer tenant scope denied'
+    );
   }
-  if (tenant && viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(tenant)) {
-    throw new PresenceStudioViewerError(403, `viewer tenant scope denied: ${tenant}`);
-  }
-  return tenant ? [tenant] : viewer.tenantSlugs;
 }
 
 export class PresenceStudioViewerError extends Error {
@@ -263,7 +287,7 @@ export function resolvePresenceStudioViewerContext(
   const auth = authorizePresenceStudioRequest(req);
   if (!auth.ok) throw new PresenceStudioViewerError(auth.status as 401 | 403, auth.reason);
 
-  const tenant = String(process.env.KYBERION_TENANT || '').trim();
+  const tenant = String(getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   if (isLoopbackAddress(getPresenceStudioClientAddress(req))) {
     return {
       principalId: 'human:presence-studio-localadmin',

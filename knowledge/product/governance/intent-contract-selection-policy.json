@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/intent-contract-selection-policy.schema.json",
   "version": "1.0.0",
   "weights": {
     "rule_match": 0.4,

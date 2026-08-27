@@ -27,6 +27,7 @@
  */
 
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import {
@@ -86,7 +87,7 @@ export interface GcMissionRuntimeResidueResult {
 
 function readJsonRecord(filePath: string): Record<string, unknown> | null {
   try {
-    const parsed = JSON.parse(String(safeReadFile(filePath, { encoding: 'utf8' })));
+    const parsed = readJson<unknown>(filePath);
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
@@ -315,7 +316,6 @@ export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors
 export const INGEST_DEDUP_REGISTRY_REPO_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
 const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
-const DATA_VAULT_REPO_SUBPATH = 'active/shared/data-vault';
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
 

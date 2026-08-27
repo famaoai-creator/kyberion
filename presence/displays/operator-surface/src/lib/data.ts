@@ -13,6 +13,7 @@
 import * as path from 'node:path';
 import {
   safeReadFile,
+  loadJson,
   safeReaddir,
   safeExistsSync,
   safeLstat,
@@ -35,6 +36,7 @@ import {
   type SurfaceLauncherRecommendation,
 } from '@agent/core';
 import { logger } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export {
   getSurfaceDirectory,
@@ -52,7 +54,7 @@ export type {
 };
 
 export function getTenantScope(): string | undefined {
-  const slug = (process.env.KYBERION_TENANT || '').trim();
+  const slug = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
   if (!slug) return undefined;
   return isValidTenantSlug(slug) ? slug : undefined;
 }
@@ -65,7 +67,7 @@ export function getTenantScope(): string | undefined {
  */
 export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
   const tenant = getTenantScope();
-  const configuredPrincipal = (process.env.KYBERION_MOS_PRINCIPAL || '').trim();
+  const configuredPrincipal = (getRegisteredEnvText('KYBERION_MOS_PRINCIPAL') || '').trim();
   if (tenant && !configuredPrincipal) {
     throw new Error(
       '[POLICY_VIOLATION] KYBERION_MOS_PRINCIPAL is required for tenant-scoped OS projection'
@@ -87,7 +89,7 @@ export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurface
 }
 
 export function getGuardedSurfaceUrl(): string | undefined {
-  const configured = (process.env.KYBERION_OS_GUARDED_SURFACE_URL || '').trim();
+  const configured = (getRegisteredEnvText('KYBERION_OS_GUARDED_SURFACE_URL') || '').trim();
   if (!configured) return undefined;
   try {
     const url = new URL(configured);
@@ -118,7 +120,7 @@ export interface MissionDetail extends MissionRow {
 function readJsonSafe<T>(absPath: string): T | null {
   try {
     if (!safeExistsSync(absPath)) return null;
-    return JSON.parse(safeReadFile(absPath, { encoding: 'utf8' }) as string) as T;
+    return loadJson<T>(absPath);
   } catch {
     return null;
   }
@@ -431,7 +433,7 @@ export function getProviderPins(): Record<string, any> {
   const defaultPath = pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
   if (safeExistsSync(defaultPath)) {
     try {
-      const data = JSON.parse(safeReadFile(defaultPath, { encoding: 'utf8' }) as string);
+      const data = loadJson<{ pins?: Record<string, unknown> }>(defaultPath);
       Object.assign(pins, data.pins || {});
     } catch (err) {
       logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
@@ -446,7 +448,7 @@ export function getProviderPins(): Record<string, any> {
       for (const file of files) {
         if (file === 'default.json' || !file.endsWith('.json')) continue;
         const fullPath = path.join(dirPath, file);
-        const data = JSON.parse(safeReadFile(fullPath, { encoding: 'utf8' }) as string);
+        const data = loadJson<{ pins?: Record<string, unknown> }>(fullPath);
         Object.assign(pins, data.pins || {});
       }
     } catch (err) {

@@ -1,14 +1,15 @@
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
+import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { safeMkdir } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
+const ajv = createAjv();
 
 const MEMORY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/intent-contract-memory.schema.json'
@@ -100,7 +101,7 @@ let policyValidateFn: ValidateFunction | null = null;
 const memorySnapshotCache = new Map<string, IntentContractMemoryFile>();
 
 function globalRuntimeMemoryPath(): string {
-  const configured = process.env.KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH?.trim();
+  const configured = getRegisteredEnvText('KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH')?.trim();
   if (!configured) return MEMORY_RUNTIME_PATH;
   return path.isAbsolute(configured) ? configured : pathResolver.rootResolve(configured);
 }
@@ -124,7 +125,7 @@ function ensurePolicyValidator(): ValidateFunction {
 }
 
 function parseJson<T>(filePath: string): T {
-  return JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+  return loadJson<T>(filePath);
 }
 
 function loadMemoryFile(filePath: string): IntentContractMemoryFile | null {

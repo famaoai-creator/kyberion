@@ -34,7 +34,7 @@ export interface IntentReconciliationOptions {
   model_tier?: 'fast' | 'standard' | 'deep';
 }
 
-function normalizeText(value: string): string {
+function normalizeReconciliationText(value: string): string {
   return String(value || '')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
@@ -42,13 +42,13 @@ function normalizeText(value: string): string {
 }
 
 function normalizeForMatch(value: string): string {
-  return normalizeText(value)
+  return normalizeReconciliationText(value)
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, '');
 }
 
 function splitGoalSegments(successCondition: string): string[] {
-  return normalizeText(successCondition)
+  return normalizeReconciliationText(successCondition)
     .split(/(?:\n|;|、|・)+/u)
     .map((segment) => segment.trim())
     .filter(Boolean);
@@ -93,7 +93,7 @@ function tokenize(text: string): string[] {
     'result',
   ]);
   return (
-    normalizeText(text)
+    normalizeReconciliationText(text)
       .toLowerCase()
       .match(/[\p{L}\p{N}]+/gu)
       ?.filter((token) => token.length >= 2 && !stopwords.has(token)) || []
@@ -145,7 +145,9 @@ function readEvidenceText(ref: string): string {
     if (BINARY_EVIDENCE_EXTENSIONS.has(ext)) return '';
   }
   try {
-    return normalizeText(String(safeReadFile(normalizedRef, { encoding: 'utf8' }) || ''));
+    return normalizeReconciliationText(
+      String(safeReadFile(normalizedRef, { encoding: 'utf8' }) || '')
+    );
   } catch {
     return '';
   }
@@ -162,11 +164,14 @@ function collectEvidenceBundle(
     )
   );
   const previewRefs = (input.evidenceTexts || [])
-    .map((entry) => normalizeText(entry))
+    .map((entry) => normalizeReconciliationText(entry))
     .filter(Boolean)
     .map((text) => ({ ref: 'preview_text', text }));
   const bundle = [
-    ...pathRefs.map((ref) => ({ ref, text: readEvidenceText(ref) || normalizeText(ref) })),
+    ...pathRefs.map((ref) => ({
+      ref,
+      text: readEvidenceText(ref) || normalizeReconciliationText(ref),
+    })),
     ...previewRefs,
   ];
   return Array.from(new Map(bundle.map((entry) => [`${entry.ref}:${entry.text}`, entry])).values());
@@ -175,8 +180,10 @@ function collectEvidenceBundle(
 function structuralReconcile(input: IntentReconciliationInput): CompletionReconciliation {
   const evidenceBundle = collectEvidenceBundle(input);
   const evidenceText = [...evidenceBundle.map((entry) => entry.text)].join('\n');
-  const goalSummary = normalizeText(input.goal.summary);
-  const successCondition = normalizeText(input.goal.success_condition || input.goal.summary);
+  const goalSummary = normalizeReconciliationText(input.goal.summary);
+  const successCondition = normalizeReconciliationText(
+    input.goal.success_condition || input.goal.summary
+  );
   const segments = splitGoalSegments(successCondition || goalSummary);
 
   const delivered = new Set<string>();

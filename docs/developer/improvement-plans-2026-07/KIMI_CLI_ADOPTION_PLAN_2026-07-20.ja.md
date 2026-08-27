@@ -3,7 +3,9 @@ title: Kimi CLI 概念取り込み計画(KC-01〜10)
 kind: improvement-plan
 scope: core / agent-dispatch / approval / hooks / testing / pipelines
 authority: planning
-status: proposed
+status: active
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
 ---
 
 # Kimi CLI 概念取り込み計画(KC-01〜10): 実行時セルフガバナンス・観測契約・委譲ハードニング
@@ -28,25 +30,25 @@ Kyberion は「外部エージェント CLI 群を reasoning backend として�
 
 ### 1.2 対応表(kimi-cli 実装 → Kyberion 現状 → 判定)
 
-| 機構                                 | kimi-cli 実装                                                                                                       | Kyberion 現状                                                                                                                         | 判定                            |
+| 機構 | kimi-cli 実装 | Kyberion 現状 | 判定 |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ---------------------------------------------------- | ------------------------------------ | -------- |
-| Agent loop / LLM 抽象                | `kosong.step()` + `KimiSoul`                                                                                        | `reasoning-backend.ts` + FailoverReasoningBackend                                                                                     | 既に成熟(方式差のみ)            |
-| ツール呼び出し反復検知・強制停止     | `soul/toolset.py`: 正規化引数の連続一致 streak を 3/5/8/12 段階でエスカレーション、12 で force-stop                 | `reasoning-drift-watchdog.ts` は mission-item 粒度(prompt/response 署名)のみ。tool-call 粒度の検知・文脈内エスカレーション無し        | **部分 → KC-01**                |
-| 型付きイベントストリーム + 記録/再生 | `wire/types.py` の Pydantic envelope、SPMC、`wire.jsonl` recorder、Wire 駆動 e2e                                    | `TraceContext`/`persistTrace` + `mission-orchestration-events.ts` は個別存在。統一 envelope・再生・イベント列 assert の e2e 無し      | **部分 → KC-02**                |
-| 承認 facade / runtime 分離           | `soul/approval.py` + `approval_runtime/`: セッション action キャッシュ、source(turn/agent)単位キャンセル、wire 投影 | `approval-gate.ts`/`approval-store.ts` は hash-bound・human-only で堅牢だが、セッション内同種行為キャッシュとソース単位キャンセル無し | **部分 → KC-03**                |
-| ライフサイクルフック                 | `hooks/`: 13 イベント × server/client 2 系統、並列 regex マッチ、fail-open + telemetry は fail-open 外              | `claude-code-hook.ts` は Claude Code 依存の 5 イベントのみ。内製ループ(worker/pipeline)のフック語彙無し                               | **部分 → KC-04**                |
-| AI 監査テスト                        | `tests_ai/`: markdown 自然言語不変条件 → subagent fan-out 監査 → `report.json`                                      | boundary/contract テスト + eval スクリプトはあるが、lint で書けない意味的不変条件の監査層無し                                         | **欠落 → KC-05**                |
-| Subagent registry / 再開可能 store   | `LaborMarket`(型別 ToolPolicy)+ `SubagentStore`(agent_id 単位永続・resume 可)+ 要約最短長 retry                     | `agent-dispatch.ts` + `delegation-preflight.ts`(深度・予算)。subagent 単位の永続 store と要約品質 retry 無し                          | **部分 → KC-06**                |
-| Background 完了通知の文脈注入        | claim-based `NotificationManager` → 次 step で LLM 文脈へ配達、圧縮後は active-task snapshot 再注入                 | `mission-task-events.ts` はあるが、実行中ワーカーの LLM 文脈への claim-based 配達契約無し                                             | **部分 → KC-06**                |
-| Checkpoint + 文脈巻き戻し(D-Mail)    | `Context.checkpoint()`/`revert_to` + `SendDMail` → `BackToTheFuture` 例外で失敗探索を折り畳み教訓のみ持ち帰る       | mission checkpoint は再開用のみ。ワーカー文脈の巻き戻しによる自己修正無し                                                             | **欠落 → KC-07**                |
-| コンテキスト自動圧縮                 | `soul/compaction.py`(85% 閾値、preserve-last-N、reactive 圧縮)                                                      | **OH-01 実装済**(`worker-context-compaction.ts`: 2 段階 + carryover + reactive + 3 連続失敗停止)                                      | 既に同等                        |
-| 動的注入 provider                    | `dynamic_injection.py`: throttle 付き provider + `on_context_compacted` リセット                                    | `working-principles.ts` 注入はあるが provider 契約(throttle・圧縮後リセット)無し                                                      | **部分 → KC-08**                |
-| completion token 動的予算            | `_compute_completion_overrides`: `max_completion = window − 入力見積 − margin`                                      | 無し(固定 max_tokens)                                                                                                                 | **欠落 → KC-09**                |
-| Flow スキル(図式ワークフロー)        | Mermaid/D2 フローチャートを SKILL.md に埋め、decision ノードは `<choice>` で分岐、Ralph loop 合成                   | `pipelines/` + `core:if`/`core:while` + `semantic-decide.ts`(selection mode)で機能同等。著述 UX(図 → 実行)のみ差                      | 既に同等 → **KC-10(条件付き)**  |
-| Skills 階層探索(brand 互換 `.kimi    | .claude                                                                                                             | .codex                                                                                                                                | .agents`)                       | klip-8: project > user > extra > builtin、scope 標示 | `skill_installer.ts` + plugins(Beta) | 既に同等 |
-| MCP(background 読込・OAuth)          | fastmcp、起動非ブロック読込                                                                                         | `scripts/mcp_server.ts`(Phase 0)                                                                                                      | OH-05 の管轄                    |
-| ACP                                  | `acp/server.py` + **ACPKaos**(exec/fs だけ OS 抽象層で IDE へリダイレクト)                                          | `acp-mediator.ts`(client 側、Copilot 用)                                                                                              | 不採用表参照(seam 原則のみ学ぶ) |
-| KLIP プロセス                        | 「本質的修正」限定の設計提案 + プロトタイプ同時育成                                                                 | improvement-plans + STATUS 運用で同等                                                                                                 | §4 にプロセス上の学びのみ記載   |
+| Agent loop / LLM 抽象 | `kosong.step()` + `KimiSoul` | `reasoning-backend.ts` + FailoverReasoningBackend | 既に成熟(方式差のみ) |
+| ツール呼び出し反復検知・強制停止 | `soul/toolset.py`: 正規化引数の連続一致 streak を 3/5/8/12 段階でエスカレーション、12 で force-stop | `reasoning-drift-watchdog.ts` は mission-item 粒度(prompt/response 署名)のみ。tool-call 粒度の検知・文脈内エスカレーション無し | **部分 → KC-01** |
+| 型付きイベントストリーム + 記録/再生 | `wire/types.py` の Pydantic envelope、SPMC、`wire.jsonl` recorder、Wire 駆動 e2e | `TraceContext`/`persistTrace` + `mission-orchestration-events.ts` は個別存在。統一 envelope・再生・イベント列 assert の e2e 無し | **部分 → KC-02** |
+| 承認 facade / runtime 分離 | `soul/approval.py` + `approval_runtime/`: セッション action キャッシュ、source(turn/agent)単位キャンセル、wire 投影 | `approval-gate.ts`/`approval-store.ts` は hash-bound・human-only で堅牢だが、セッション内同種行為キャッシュとソース単位キャンセル無し | **部分 → KC-03** |
+| ライフサイクルフック | `hooks/`: 13 イベント × server/client 2 系統、並列 regex マッチ、fail-open + telemetry は fail-open 外 | `claude-code-hook.ts` は Claude Code 依存の 5 イベントのみ。内製ループ(worker/pipeline)のフック語彙無し | **部分 → KC-04** |
+| AI 監査テスト | `tests_ai/`: markdown 自然言語不変条件 → subagent fan-out 監査 → `report.json` | boundary/contract テスト + eval スクリプトはあるが、lint で書けない意味的不変条件の監査層無し | **欠落 → KC-05** |
+| Subagent registry / 再開可能 store | `LaborMarket`(型別 ToolPolicy)+ `SubagentStore`(agent_id 単位永続・resume 可)+ 要約最短長 retry | `agent-dispatch.ts` + `delegation-preflight.ts`(深度・予算)。subagent 単位の永続 store と要約品質 retry 無し | **部分 → KC-06** |
+| Background 完了通知の文脈注入 | claim-based `NotificationManager` → 次 step で LLM 文脈へ配達、圧縮後は active-task snapshot 再注入 | `mission-task-events.ts` はあるが、実行中ワーカーの LLM 文脈への claim-based 配達契約無し | **部分 → KC-06** |
+| Checkpoint + 文脈巻き戻し(D-Mail) | `Context.checkpoint()`/`revert_to` + `SendDMail` → `BackToTheFuture` 例外で失敗探索を折り畳み教訓のみ持ち帰る | mission checkpoint は再開用のみ。ワーカー文脈の巻き戻しによる自己修正無し | **欠落 → KC-07** |
+| コンテキスト自動圧縮 | `soul/compaction.py`(85% 閾値、preserve-last-N、reactive 圧縮) | **OH-01 実装済**(`worker-context-compaction.ts`: 2 段階 + carryover + reactive + 3 連続失敗停止) | 既に同等 |
+| 動的注入 provider | `dynamic_injection.py`: throttle 付き provider + `on_context_compacted` リセット | `working-principles.ts` 注入はあるが provider 契約(throttle・圧縮後リセット)無し | **部分 → KC-08** |
+| completion token 動的予算 | `_compute_completion_overrides`: `max_completion = window − 入力見積 − margin` | 無し(固定 max_tokens) | **欠落 → KC-09** |
+| Flow スキル(図式ワークフロー) | Mermaid/D2 フローチャートを SKILL.md に埋め、decision ノードは `<choice>` で分岐、Ralph loop 合成 | `pipelines/` + `core:if`/`core:while` + `semantic-decide.ts`(selection mode)で機能同等。著述 UX(図 → 実行)のみ差 | 既に同等 → **KC-10(条件付き)** |
+| Skills 階層探索(brand 互換 `.kimi    | .claude                                                                                                             | .codex                                                                                                                                | .agents`) | klip-8: project > user > extra > builtin、scope 標示 | `skill_installer.ts` + plugins(Beta) | 既に同等 |
+| MCP(background 読込・OAuth) | fastmcp、起動非ブロック読込 | `scripts/mcp_server.ts`(Phase 0) | OH-05 の管轄 |
+| ACP | `acp/server.py` + **ACPKaos**(exec/fs だけ OS 抽象層で IDE へリダイレクト) | `acp-mediator.ts`(client 側、Copilot 用) | 不採用表参照(seam 原則のみ学ぶ) |
+| KLIP プロセス | 「本質的修正」限定の設計提案 + プロトタイプ同時育成 | improvement-plans + STATUS 運用で同等 | §4 にプロセス上の学びのみ記載 |
 
 ### 1.3 最大のギャップ: 実行時セルフガバナンスと観測契約
 

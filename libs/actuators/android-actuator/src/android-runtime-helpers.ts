@@ -1,5 +1,6 @@
 import {
   executeLlmDecideOp,
+  loadJson,
   logger,
   safeExec,
   safeReadFile,
@@ -12,7 +13,6 @@ import {
   assertValidMobileAppProfile,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   sleep,
   ensureDefaultOpPreflight,
   runOpPreflight,
@@ -876,15 +876,6 @@ function ensureParentDir(targetPath: string): void {
   }
 }
 
-function resolveKey(key: string, ctx: Record<string, any>): any {
-  const parts = key.split('.');
-  let current: any = ctx;
-  for (const part of parts) {
-    current = current?.[part];
-  }
-  return current;
-}
-
 function resolveUiTreeSource(
   params: any,
   ctx: Record<string, any>,
@@ -1088,7 +1079,7 @@ function serializeTapTarget(target: AndroidTapTarget) {
 function loadAndroidUiDefaults(): any {
   if (safeExistsSync(ANDROID_UI_DEFAULTS_PATH)) {
     try {
-      return JSON.parse(safeReadFile(ANDROID_UI_DEFAULTS_PATH, { encoding: 'utf8' }) as string);
+      return loadJson<unknown>(ANDROID_UI_DEFAULTS_PATH);
     } catch (err) {
       logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
     }

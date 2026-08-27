@@ -12,23 +12,27 @@ function readJson(relativePath: string): { steps?: Array<{ op?: string; consumes
 describe('surface smoke contract', () => {
   it('keeps the Chronos first-run surface and operator controls in place', () => {
     const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
+    // SX: page.tsx was split into a shell plus a static quick-action config
+    // module; each label/route is asserted against the file that owns it.
+    const shell = read('presence/displays/chronos-mirror-v2/src/app/ChronosMirrorShell.tsx');
+    const pageConfig = read('presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts');
     const banner = read('presence/displays/chronos-mirror-v2/src/components/FirstRunBanner.tsx');
 
     expect(page).toContain('FirstRunBanner');
     expect(page).toContain('IdentityBadge');
-    // UX-03: the label moved into the vocabulary catalog; the page renders it via its key.
-    expect(page).toContain("uxText('chronos_agent_runtimes'");
-    expect(page).toContain("uxText('chronos_qa_action_prereq_check'");
-    expect(page).toContain("uxText('chronos_qa_action_setup_report'");
-    expect(page).toContain("uxText('chronos_qa_action_schedule_tick'");
-    expect(page).toContain("uxText('chronos_qa_action_schedule_list'");
-    expect(page).toContain("uxText('chronos_qa_action_vital_check'");
-    expect(page).toContain("uxText('chronos_qa_action_build_test'");
-    expect(page).toContain('chronos://quick-action/prereq-check');
-    expect(page).toContain('chronos://quick-action/setup-report');
-    expect(page).toContain('chronos://quick-action/schedule-tick');
-    expect(page).toContain('chronos://quick-action/schedule-list');
-    expect(page).toContain('chronos://quick-action/vital-check');
+    // UX-03: the label moved into the vocabulary catalog; the shell renders it via its key.
+    expect(shell).toContain("uxText('chronos_agent_runtimes'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_prereq_check'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_setup_report'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_schedule_tick'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_schedule_list'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_vital_check'");
+    expect(pageConfig).toContain("uxText('chronos_qa_action_build_test'");
+    expect(pageConfig).toContain('chronos://quick-action/prereq-check');
+    expect(pageConfig).toContain('chronos://quick-action/setup-report');
+    expect(pageConfig).toContain('chronos://quick-action/schedule-tick');
+    expect(pageConfig).toContain('chronos://quick-action/schedule-list');
+    expect(pageConfig).toContain('chronos://quick-action/vital-check');
     expect(banner).toContain('chronos_first_run_eyebrow');
     expect(banner).toContain('chronos_first_run_welcome');
     expect(banner).toContain('chronos_first_run_step_prereq');

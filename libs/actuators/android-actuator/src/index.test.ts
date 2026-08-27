@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
-import { handleAction } from './index.js';
+import { actuator, handleAction } from './index.js';
 
 vi.mock('@agent/core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core')>();
@@ -37,6 +37,26 @@ describe('android-actuator', () => {
     // Reset safeExistsSync to return false by default (no artifacts dir)
     const { safeExistsSync } = await import('@agent/core');
     vi.mocked(safeExistsSync).mockReturnValue(false);
+  });
+
+  describe('catalog input contracts', () => {
+    it('rejects unknown UI selector fields before dispatch', async () => {
+      await expect(
+        actuator.dispatch('find_ui_nodes', { text: 'Login', typo_selector: 'ignored' })
+      ).resolves.toMatchObject({
+        ok: false,
+        status: 'failed',
+        error: expect.stringContaining('typo_selector'),
+      });
+    });
+
+    it('requires credentials for fill_login_form', async () => {
+      await expect(actuator.dispatch('fill_login_form', { dry_run: true })).resolves.toMatchObject({
+        ok: false,
+        status: 'failed',
+        error: expect.stringContaining("must have required property 'email'"),
+      });
+    });
   });
 
   describe('handleAction()', () => {

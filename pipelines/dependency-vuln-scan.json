@@ -17,16 +17,12 @@
     {
       "id": "scan_dependency_vulns",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_dependency_vulnerability_scan",
       "produces": {
         "channel": "dependency_vuln_scan_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/scan_dependency_vulns.ts"],
-        "timeout_ms": 120000
-      }
+      "params": {}
     }
   ]
 }

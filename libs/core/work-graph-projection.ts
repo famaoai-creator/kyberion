@@ -1,9 +1,10 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
+import { readJson } from './foundation/json.js';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface WorkGraphProjectionOptions {
   missionId: string;
@@ -150,7 +151,7 @@ function toProjectedTask(item: WorkItem): NextTask {
 
 function readExistingTasks(nextTasksPath: string): NextTask[] {
   if (!safeExistsSync(nextTasksPath)) return [];
-  const parsed = JSON.parse(String(safeReadFile(nextTasksPath, { encoding: 'utf8' }) || 'null'));
+  const parsed = readJson<unknown>(nextTasksPath);
   if (!Array.isArray(parsed))
     throw new Error(`NEXT_TASKS.json must contain an array: ${nextTasksPath}`);
   return parsed.map((entry, index) => {

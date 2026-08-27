@@ -16,16 +16,18 @@
  *
  * Usage:
  *   pnpm generate:env-registry          — rewrite the three artifacts
- *   pnpm check:env-registry             — fail if any artifact drifted
- *   KYBERION_ENV_REGISTRY_STRICT=1 pnpm check:env-registry
+ *   pnpm run check -- --scope full --only env-registry
+ *                                      — fail if any artifact drifted
+ *   KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm run check -- --scope full --only env-registry
  *                                      — also fail while entries remain undocumented
  */
 
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { getRegisteredEnv, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { withExecutionContext } from '@agent/core/governance';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 export type EnvCategory = 'secret' | 'path' | 'flag' | 'tuning' | 'provider' | 'runtime';
 export type EnvType = 'string' | 'boolean' | 'number' | 'enum' | 'path';
@@ -43,9 +45,32 @@ export interface EnvRegistryEntry {
 }
 
 export interface EnvRegistryFile {
+  $schema?: string;
   version: string;
   description: string;
   entries: EnvRegistryEntry[];
+}
+
+export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] {
+  const failures: string[] = [];
+  for (const entry of registry.entries) {
+    if (entry.required && entry.documented !== true) {
+      failures.push(`${entry.name}: required entries must be documented`);
+    }
+    if ((entry.required || entry.documented) && !entry.description.trim()) {
+      failures.push(`${entry.name}: required/documented entries must have a description`);
+    }
+    if (entry.required && entry.category === 'secret') {
+      failures.push(`${entry.name}: secrets may not be required through the shared registry`);
+    }
+    if (entry.category === 'secret' && entry.default !== undefined && entry.default !== null) {
+      failures.push(`${entry.name}: secrets may not define a registry default`);
+    }
+    if (entry.category === 'secret' && entry.type !== 'string') {
+      failures.push(`${entry.name}: secrets must use the opaque string type`);
+    }
+  }
+  return failures;
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/env-registry.json');
@@ -53,8 +78,15 @@ const ENV_EXAMPLE_PATH = pathResolver.rootResolve('docs/developer/env.example');
 const CONFIGURATION_DOC_PATH = pathResolver.rootResolve('docs/developer/CONFIGURATION.md');
 
 const SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'pipelines', 'tests'];
-const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs']);
-const EXCLUDED_PATH_SEGMENTS = ['/node_modules/', '/dist/', '/.next/', '/coverage/', '/vault/'];
+const SCAN_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.py']);
+const EXCLUDED_PATH_SEGMENTS = [
+  '/node_modules/',
+  '/dist/',
+  '/.next/',
+  '/coverage/',
+  '/vault/',
+  '/tests/',
+];
 const ENV_NAME_RE = /KYBERION_[A-Z0-9_]+/g;
 
 export function classifyEnvName(name: string): { category: EnvCategory; type: EnvType } {
@@ -65,6 +97,12 @@ export function classifyEnvName(name: string): { category: EnvCategory; type: En
     /_(ENABLED|DISABLED)$/.test(name)
   ) {
     return { category: 'flag', type: 'boolean' };
+  }
+  // Token counts are tuning values, not credentials. Keep this before the
+  // generic TOKEN secret rule so context-window settings cannot be mislabeled
+  // as secrets in generated configuration docs.
+  if (/(?:_TOKENS|_COUNT|_LIMIT|_MAX|_MIN|_SIZE|_TTL|_RETRIES|_FACTOR|_SEC|_SECONDS)$/.test(name)) {
+    return { category: 'tuning', type: 'number' };
   }
   if (/SECRET|TOKEN|_KEY$|_KEY_|PASSWORD|CREDENTIAL/.test(name)) {
     return { category: 'secret', type: 'string' };
@@ -90,10 +128,18 @@ export function discoverEnvNames(rootDir: string): string[] {
       const normalized = `/${filePath.split(path.sep).join('/')}/`;
       if (EXCLUDED_PATH_SEGMENTS.some((segment) => normalized.includes(segment))) continue;
       if (!SCAN_EXTENSIONS.has(path.extname(filePath))) continue;
-      if (filePath.endsWith('.d.ts')) continue;
+      if (
+        filePath.endsWith('.d.ts') ||
+        /(?:\.test|\.spec)\.[^.]+$/.test(filePath) ||
+        filePath.includes(`${path.sep}__tests__${path.sep}`)
+      ) {
+        continue;
+      }
       const content = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
       for (const match of content.matchAll(ENV_NAME_RE)) {
-        names.add(match[0]);
+        // A trailing underscore is a dynamic prefix (for example
+        // KYBERION_REASONING_ROLE_${role}), not a concrete registry key.
+        if (!match[0].endsWith('_')) names.add(match[0]);
       }
     }
   }
@@ -125,6 +171,7 @@ export function mergeRegistry(
     } satisfies EnvRegistryEntry;
   });
   return {
+    $schema: '../schemas/governance-catalog.schema.json',
     version: existing?.version || '1.0.0',
     description:
       existing?.description ||
@@ -157,11 +204,13 @@ function renderConfigurationDoc(registry: EnvRegistryFile): string {
     '# Kyberion Configuration Surface',
     '',
     '> Generated from `knowledge/product/governance/env-registry.json` by `pnpm generate:env-registry` — do not edit by hand.',
-    '> `pnpm check:env-registry` (part of `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
+    '> `pnpm run check -- --scope full --only env-registry` (included in `pnpm validate`) fails when code references an unregistered `KYBERION_*` variable.',
     '',
     '## What belongs where',
     '',
     '- **Environment variables**: secrets, environment-specific endpoints/paths, and feature flags. Validated at startup by `libs/core/env-validator.ts` (warn by default; missing required values are errors).',
+    '- **Registry fields**: `required: true` is reserved for an unconditional startup prerequisite and must also be `documented: true`; conditional capability prerequisites stay in the environment manifests. `documented: false` is an honest discovery state, not a runtime failure.',
+    '- **Secrets**: may be documented by name and purpose, but their values never belong in this registry and they cannot be marked required here. Secret requirements are enforced by the selected capability or command.',
     '- **Config files (`knowledge/product/**`)**: policy thresholds (SA plans), model IDs (IP-13), catalogs and vocabularies. These need review, diffing, and schema validation — not per-host overrides.',
     '',
     'Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).',
@@ -191,76 +240,48 @@ async function formatWithPrettier(content: string, filePath: string): Promise<st
   return prettierFormat(content, { ...config, parser });
 }
 
-function readIfExists(filePath: string): string | null {
-  return safeExistsSync(filePath)
-    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    : null;
-}
-
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const strictDocumentation = process.env.KYBERION_ENV_REGISTRY_STRICT === '1';
-  const rootDir = pathResolver.rootDir();
-
-  const built = withExecutionContext('ecosystem_architect', () => {
+export const main = defineGenerator({
+  id: 'env-registry',
+  outputs: [REGISTRY_PATH, ENV_EXAMPLE_PATH, CONFIGURATION_DOC_PATH],
+  async render(context) {
+    const strictDocumentation =
+      getRegisteredEnv<boolean>('KYBERION_ENV_REGISTRY_STRICT_DOCS', { defaultValue: false }) ===
+      true;
+    const rootDir = pathResolver.rootDir();
     const discovered = discoverEnvNames(rootDir);
-    const existingRaw = readIfExists(REGISTRY_PATH);
-    const existing = existingRaw ? (JSON.parse(existingRaw) as EnvRegistryFile) : null;
-    return mergeRegistry(discovered, existing);
-  });
-
-  const registryJson = await formatWithPrettier(JSON.stringify(built, null, 2), REGISTRY_PATH);
-  const envExample = renderEnvExample(built);
-  const configurationDoc = await formatWithPrettier(
-    renderConfigurationDoc(built),
-    CONFIGURATION_DOC_PATH
-  );
-
-  const targets: Array<{ label: string; filePath: string; next: string }> = [
-    { label: 'env registry', filePath: REGISTRY_PATH, next: registryJson },
-    // docs/developer/ writes are allowlisted for the ecosystem_architect
-    // persona in security-policy.json (registration ceremony, same pattern
-    // as CAPABILITIES_GUIDE.md).
-    { label: 'env.example', filePath: ENV_EXAMPLE_PATH, next: envExample },
-    { label: 'configuration doc', filePath: CONFIGURATION_DOC_PATH, next: configurationDoc },
-  ];
-
-  if (shouldCheck) {
-    const drifted = targets.filter((target) => readIfExists(target.filePath) !== target.next);
-    if (drifted.length === 0) {
-      if (strictDocumentation) {
-        const undocumented = built.entries.filter((entry) => !entry.documented);
-        if (undocumented.length > 0) {
-          console.error(
-            `env registry has ${undocumented.length} undocumented entr${undocumented.length === 1 ? 'y' : 'ies'} — ` +
-              'curate descriptions/documented before enabling strict mode'
-          );
-          process.exitCode = 1;
-          return;
-        }
+    const existing = safeExistsSync(REGISTRY_PATH)
+      ? readJson<EnvRegistryFile>(REGISTRY_PATH)
+      : null;
+    const built = mergeRegistry(discovered, existing);
+    const qualityFailures = validateEnvRegistryQuality(built);
+    if (qualityFailures.length > 0) {
+      throw new Error(`env registry quality violations: ${qualityFailures.join('; ')}`);
+    }
+    if (strictDocumentation && context.check) {
+      const undocumented = built.entries.filter((entry) => !entry.documented);
+      if (undocumented.length > 0) {
+        throw new Error(
+          `env registry has ${undocumented.length} undocumented entr${undocumented.length === 1 ? 'y' : 'ies'}`
+        );
       }
-      console.log('env registry is up to date');
-      return;
     }
-    console.error('env registry drift detected — run pnpm generate:env-registry');
-    for (const target of drifted) {
-      console.error(`- ${path.relative(rootDir, target.filePath)} differs`);
-    }
-    process.exitCode = 1;
-    return;
-  }
 
-  return withExecutionContext('ecosystem_architect', () => {
-    for (const target of targets) {
-      safeWriteFile(target.filePath, target.next);
-      console.log(`wrote ${path.relative(rootDir, target.filePath)}`);
-    }
-  });
-}
+    return [
+      {
+        path: REGISTRY_PATH,
+        content: await formatWithPrettier(JSON.stringify(built, null, 2), REGISTRY_PATH),
+      },
+      { path: ENV_EXAMPLE_PATH, content: renderEnvExample(built) },
+      {
+        path: CONFIGURATION_DOC_PATH,
+        content: await formatWithPrettier(renderConfigurationDoc(built), CONFIGURATION_DOC_PATH),
+      },
+    ];
+  },
+});
 
-if (process.argv[1] && /generate_env_registry\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'generate_env_registry.ts') ||
+  isDirectScript(import.meta.url, 'generate_env_registry.js')
+)
+  void main();

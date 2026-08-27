@@ -1,5 +1,12 @@
 import * as path from 'node:path';
-import { pathResolver, resolvePilotStrategyPolicy, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import {
+  pathResolver,
+  resolvePilotStrategyPolicy,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main() {
   const policy = resolvePilotStrategyPolicy();
@@ -21,7 +28,9 @@ async function main() {
 - 100% audit trail for all AI-driven decisions.
   `;
 
-  const outputDir = pathResolver.missionEvidenceDir('STRATEGY-PILOT-01') || pathResolver.active('missions/STRATEGY-PILOT-01/evidence');
+  const outputDir =
+    pathResolver.missionEvidenceDir('STRATEGY-PILOT-01') ||
+    pathResolver.active('missions/STRATEGY-PILOT-01/evidence');
   if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });
   }
@@ -31,7 +40,16 @@ async function main() {
   console.log(`✅ Strategy successfully distilled and saved to: ${outputPath}`);
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
+export const runPilotStrategy = defineScript({
+  name: 'pilot-strategy',
+  flags: [],
+  run() {
+    return main();
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'pilot_strategy_runner.ts') ||
+  isDirectScript(import.meta.url, 'pilot_strategy_runner.js')
+)
+  void runPilotStrategy();

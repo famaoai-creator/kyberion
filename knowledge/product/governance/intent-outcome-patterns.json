@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/governance-catalog.schema.json",
   "version": "1.0.0",
   "notes": [
     "This catalog defines the canonical completion pattern for each surface intent.",
@@ -21,21 +22,14 @@
         "mission_seed"
       ],
       "primary_outcome_ids": ["project_created"],
-      "evidence": [
-        "project record",
-        "kickoff task session artifact",
-        "bootstrap mission seeds"
-      ],
+      "evidence": ["project record", "kickoff task session artifact", "bootstrap mission seeds"],
       "completion_criteria": [
         "project record exists",
         "project has governed root path",
         "default track exists or resolves",
         "follow-up work items are seeded"
       ],
-      "follow_up": [
-        "Chronos or CLI can inspect tracks",
-        "mission seed can be promoted"
-      ]
+      "follow_up": ["Chronos or CLI can inspect tracks", "mission seed can be promoted"]
     },
     {
       "intent_id": "capture-photo",
@@ -53,18 +47,13 @@
         "artifact record"
       ],
       "primary_outcome_ids": ["artifact:image"],
-      "evidence": [
-        "captured image artifact",
-        "task session payload with capture intent"
-      ],
+      "evidence": ["captured image artifact", "task session payload with capture intent"],
       "completion_criteria": [
         "capture purpose resolves",
         "image is stored in a governed path",
         "surface can reference or download the result"
       ],
-      "follow_up": [
-        "captured image can feed OCR or later document work"
-      ]
+      "follow_up": ["captured image can feed OCR or later document work"]
     },
     {
       "intent_id": "generate-presentation",
@@ -84,11 +73,7 @@
         "artifact_record"
       ],
       "primary_outcome_ids": ["artifact:pptx"],
-      "evidence": [
-        "governed pptx file",
-        "artifact record",
-        "task session work loop"
-      ],
+      "evidence": ["governed pptx file", "artifact record", "task session work loop"],
       "completion_criteria": [
         "document_profile resolves",
         "sections are compiled into protocol",
@@ -109,16 +94,9 @@
         "governed integration registration",
         "onboarding report persistence"
       ],
-      "contract_layers": [
-        "task_session",
-        "organization_work_loop",
-        "integration_registry"
-      ],
+      "contract_layers": ["task_session", "organization_work_loop", "integration_registry"],
       "primary_outcome_ids": ["organization_toolchain_configured"],
-      "evidence": [
-        "integration registry entry",
-        "toolchain onboarding report"
-      ],
+      "evidence": ["integration registry entry", "toolchain onboarding report"],
       "completion_criteria": [
         "required integrations are identified",
         "approval and trust boundaries are explicit",
@@ -137,16 +115,9 @@
         "integration and preference discovery",
         "setup plan generation"
       ],
-      "contract_layers": [
-        "task_session",
-        "organization_work_loop",
-        "onboarding_plan"
-      ],
+      "contract_layers": ["task_session", "organization_work_loop", "onboarding_plan"],
       "primary_outcome_ids": ["onboarding_plan"],
-      "evidence": [
-        "first-run onboarding plan",
-        "workspace and baseline goal summary"
-      ],
+      "evidence": ["first-run onboarding plan", "workspace and baseline goal summary"],
       "completion_criteria": [
         "first-run onboarding path is explicit",
         "toolchain and preference follow-up steps are named",
@@ -166,11 +137,7 @@
         "registry persistence",
         "theme and brief hint return"
       ],
-      "contract_layers": [
-        "task_session",
-        "knowledge_profile",
-        "registry_record"
-      ],
+      "contract_layers": ["task_session", "knowledge_profile", "registry_record"],
       "primary_outcome_ids": ["presentation_preference_profile_registered"],
       "evidence": [
         "presentation preference registry entry",
@@ -204,11 +171,7 @@
         "artifact_record"
       ],
       "primary_outcome_ids": ["artifact:docx", "artifact:pdf"],
-      "evidence": [
-        "governed docx or pdf file",
-        "artifact record",
-        "task session work loop"
-      ],
+      "evidence": ["governed docx or pdf file", "artifact record", "task session work loop"],
       "completion_criteria": [
         "report profile resolves from knowledge",
         "sections-first structure is preserved",
@@ -238,11 +201,7 @@
         "artifact_record"
       ],
       "primary_outcome_ids": ["artifact:md", "artifact:html"],
-      "evidence": [
-        "governed markdown or html draft",
-        "artifact record",
-        "task session work loop"
-      ],
+      "evidence": ["governed markdown or html draft", "artifact record", "task session work loop"],
       "completion_criteria": [
         "blog topic and audience resolve",
         "article structure is compiled",
@@ -272,11 +231,7 @@
         "artifact_record"
       ],
       "primary_outcome_ids": ["artifact:xlsx"],
-      "evidence": [
-        "governed xlsx file",
-        "artifact record",
-        "task session work loop"
-      ],
+      "evidence": ["governed xlsx file", "artifact record", "task session work loop"],
       "completion_criteria": [
         "spreadsheet profile resolves",
         "semantic rows and columns compile into xlsx protocol",
@@ -296,16 +251,9 @@
         "service inspection execution",
         "summary or approval packet generation"
       ],
-      "contract_layers": [
-        "task_session",
-        "organization_work_loop",
-        "approval_store"
-      ],
+      "contract_layers": ["task_session", "organization_work_loop", "approval_store"],
       "primary_outcome_ids": ["service_summary", "approval_request"],
-      "evidence": [
-        "service summary artifact or reply",
-        "approval record when gated"
-      ],
+      "evidence": ["service summary artifact or reply", "approval record when gated"],
       "completion_criteria": [
         "service target resolves",
         "summary or approval request is returned",
@@ -331,19 +279,13 @@
         "governance report"
       ],
       "primary_outcome_ids": ["capability_lifecycle_report"],
-      "evidence": [
-        "scan output",
-        "registry reconciliation summary",
-        "governed report"
-      ],
+      "evidence": ["scan output", "registry reconciliation summary", "governed report"],
       "completion_criteria": [
         "available capabilities are discovered",
         "registry and adapter state are reconciled",
         "the report is returned through the governed outcome"
       ],
-      "follow_up": [
-        "report can seed a repair or refresh mission"
-      ]
+      "follow_up": ["report can seed a repair or refresh mission"]
     },
     {
       "intent_id": "open-site",
@@ -352,21 +294,14 @@
         "browser destination resolution",
         "browser actuator navigation"
       ],
-      "contract_layers": [
-        "browser routing packet",
-        "browser session state"
-      ],
+      "contract_layers": ["browser routing packet", "browser session state"],
       "primary_outcome_ids": ["browser_navigation"],
-      "evidence": [
-        "browser session state"
-      ],
+      "evidence": ["browser session state"],
       "completion_criteria": [
         "destination resolves",
         "active browser navigates or focuses the page"
       ],
-      "follow_up": [
-        "browser-step can continue from the active session"
-      ]
+      "follow_up": ["browser-step can continue from the active session"]
     },
     {
       "intent_id": "browser-step",
@@ -375,21 +310,14 @@
         "active browser session resolution",
         "browser actuator step execution"
       ],
-      "contract_layers": [
-        "browser routing packet",
-        "browser session state"
-      ],
+      "contract_layers": ["browser routing packet", "browser session state"],
       "primary_outcome_ids": ["browser_step"],
-      "evidence": [
-        "browser session state"
-      ],
+      "evidence": ["browser session state"],
       "completion_criteria": [
         "active browser session exists",
         "step command is executed or queued for confirmation"
       ],
-      "follow_up": [
-        "subsequent browser steps can continue from the same session"
-      ]
+      "follow_up": ["subsequent browser steps can continue from the same session"]
     },
     {
       "intent_id": "schedule-read-agenda",
@@ -431,16 +359,9 @@
         "schedule proposal or application",
         "follow-up or meeting handoff recording"
       ],
-      "contract_layers": [
-        "task_session",
-        "organization_work_loop",
-        "calendar_snapshot"
-      ],
+      "contract_layers": ["task_session", "organization_work_loop", "calendar_snapshot"],
       "primary_outcome_ids": ["schedule_coordination_summary"],
-      "evidence": [
-        "calendar snapshot",
-        "schedule coordination summary"
-      ],
+      "evidence": ["calendar snapshot", "schedule coordination summary"],
       "completion_criteria": [
         "schedule scope is explicit",
         "date range and fixed constraints are captured",
@@ -459,21 +380,11 @@
         "governed knowledge lookup",
         "direct reply synthesis"
       ],
-      "contract_layers": [
-        "direct reply answer",
-        "knowledge refs"
-      ],
+      "contract_layers": ["direct reply answer", "knowledge refs"],
       "primary_outcome_ids": ["knowledge_answer"],
-      "evidence": [
-        "governed knowledge refs in the answer"
-      ],
-      "completion_criteria": [
-        "question topic resolves",
-        "answer is grounded in governed refs"
-      ],
-      "follow_up": [
-        "query can be escalated into task session when physical work is needed"
-      ]
+      "evidence": ["governed knowledge refs in the answer"],
+      "completion_criteria": ["question topic resolves", "answer is grounded in governed refs"],
+      "follow_up": ["query can be escalated into task session when physical work is needed"]
     },
     {
       "intent_id": "cross-project-remediation",
@@ -589,23 +500,15 @@
         "clarification question synthesis",
         "direct reply return"
       ],
-      "contract_layers": [
-        "direct reply answer",
-        "conversation context"
-      ],
+      "contract_layers": ["direct reply answer", "conversation context"],
       "primary_outcome_ids": ["clarification_packet"],
-      "evidence": [
-        "clarification packet content",
-        "preserved conversation context"
-      ],
+      "evidence": ["clarification packet content", "preserved conversation context"],
       "completion_criteria": [
         "missing inputs are identified",
         "questions are narrow and actionable",
         "the response preserves the current thread"
       ],
-      "follow_up": [
-        "the clarified thread can continue without losing context"
-      ]
+      "follow_up": ["the clarified thread can continue without losing context"]
     },
     {
       "intent_id": "continue-conversation",
@@ -615,23 +518,15 @@
         "follow-up response synthesis",
         "direct reply return"
       ],
-      "contract_layers": [
-        "direct reply answer",
-        "conversation context"
-      ],
+      "contract_layers": ["direct reply answer", "conversation context"],
       "primary_outcome_ids": ["conversation_reply"],
-      "evidence": [
-        "conversation reply content",
-        "thread continuity"
-      ],
+      "evidence": ["conversation reply content", "thread continuity"],
       "completion_criteria": [
         "the current thread remains coherent",
         "the next answer stays scoped to the existing exchange",
         "the reply does not reset the conversation"
       ],
-      "follow_up": [
-        "the same thread can be summarized or escalated later"
-      ]
+      "follow_up": ["the same thread can be summarized or escalated later"]
     },
     {
       "intent_id": "summarize-conversation",
@@ -641,23 +536,15 @@
         "decision and open-question extraction",
         "summary return"
       ],
-      "contract_layers": [
-        "direct reply answer",
-        "conversation transcript"
-      ],
+      "contract_layers": ["direct reply answer", "conversation transcript"],
       "primary_outcome_ids": ["conversation_summary"],
-      "evidence": [
-        "conversation summary content",
-        "preserved decision list"
-      ],
+      "evidence": ["conversation summary content", "preserved decision list"],
       "completion_criteria": [
         "the exchange is reduced to a reusable summary",
         "decisions and open questions are called out",
         "the summary can be reused in follow-up work"
       ],
-      "follow_up": [
-        "the summary can seed a mission brief"
-      ]
+      "follow_up": ["the summary can seed a mission brief"]
     },
     {
       "intent_id": "conversation-to-mission",
@@ -668,23 +555,15 @@
         "mission brief synthesis",
         "escalation-ready return"
       ],
-      "contract_layers": [
-        "direct reply answer",
-        "mission brief"
-      ],
+      "contract_layers": ["direct reply answer", "mission brief"],
       "primary_outcome_ids": ["mission_brief"],
-      "evidence": [
-        "mission brief content",
-        "scope boundary declaration"
-      ],
+      "evidence": ["mission brief content", "scope boundary declaration"],
       "completion_criteria": [
         "the durable goal is extracted from the thread",
         "scope and constraints are explicit",
         "the result is promotable into governed mission work"
       ],
-      "follow_up": [
-        "the brief can be promoted into a governed mission"
-      ]
+      "follow_up": ["the brief can be promoted into a governed mission"]
     },
     {
       "intent_id": "live-query",
@@ -694,20 +573,11 @@
         "current information fetch",
         "direct reply synthesis"
       ],
-      "contract_layers": [
-        "direct reply answer"
-      ],
+      "contract_layers": ["direct reply answer"],
       "primary_outcome_ids": ["live_answer"],
-      "evidence": [
-        "live answer content"
-      ],
-      "completion_criteria": [
-        "live target resolves",
-        "current answer is returned"
-      ],
-      "follow_up": [
-        "query can be escalated into task session when sustained work is needed"
-      ]
+      "evidence": ["live answer content"],
+      "completion_criteria": ["live target resolves", "current answer is returned"],
+      "follow_up": ["query can be escalated into task session when sustained work is needed"]
     },
     {
       "intent_id": "executive-strategy-brief",
@@ -737,10 +607,7 @@
       "contract_layers": ["direct reply answer", "priority roadmap"],
       "primary_outcome_ids": ["priority_roadmap"],
       "evidence": ["priority list", "deprioritized work list"],
-      "completion_criteria": [
-        "priorities are ranked",
-        "deferred or stopped work is explicit"
-      ],
+      "completion_criteria": ["priorities are ranked", "deferred or stopped work is explicit"],
       "follow_up": ["roadmap can become mission or project planning input"]
     },
     {
@@ -788,10 +655,7 @@
       "contract_layers": ["direct reply answer", "account plan"],
       "primary_outcome_ids": ["account_strategy_plan"],
       "evidence": ["account strategy plan", "next-action list"],
-      "completion_criteria": [
-        "customer context is captured",
-        "next sales actions are explicit"
-      ],
+      "completion_criteria": ["customer context is captured", "next sales actions are explicit"],
       "follow_up": ["plan can seed customer engagement mission work"]
     },
     {

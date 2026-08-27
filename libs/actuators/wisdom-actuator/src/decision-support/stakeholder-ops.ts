@@ -1,18 +1,15 @@
-import { safeExistsSync, safeReadFile, safeWriteFile, pathResolver } from '@agent/core';
+import { loadJson, safeExistsSync, safeWriteFile, pathResolver } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { nowIso } from '@agent/core/foundation';
 
 type StakeholderNode = Record<string, unknown>;
 
 function readJson(path: string): unknown {
-  return JSON.parse(safeReadFile(pathResolver.rootResolve(path), { encoding: 'utf8' }) as string);
+  return loadJson<unknown>(pathResolver.rootResolve(path));
 }
 
 function writeJson(path: string, value: unknown): void {
   safeWriteFile(pathResolver.rootResolve(path), JSON.stringify(value, null, 2));
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function rank(node: StakeholderNode): number {
@@ -45,7 +42,7 @@ export function computeReadinessMatrix(input: {
   const visits = files
     .map((file) => {
       try {
-        const value: unknown = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+        const value: unknown = loadJson<unknown>(file);
         return value && typeof value === 'object' ? (value as StakeholderNode) : null;
       } catch {
         return null;

@@ -2,13 +2,14 @@ import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import {
   safeExistsSync,
+  loadJson,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
@@ -505,9 +506,7 @@ export function getSurfaceAsyncRequest(
 ): SurfaceAsyncRequestRecord | null {
   const resolved = findRecordPath(asyncRequestBase(surface), requestId, { scope }, 'requests');
   if (!resolved) return null;
-  const request = JSON.parse(
-    safeReadFile(resolved, { encoding: 'utf8' }) as string
-  ) as SurfaceAsyncRequestRecord;
+  const request = readJson<SurfaceAsyncRequestRecord>(resolved);
   return recordMatchesScope(request, scopeFilter(scope)) ? request : null;
 }
 
@@ -543,7 +542,7 @@ export function listSurfaceAsyncRequests(
   return recordFiles(asyncRequestBase(surface), options, 'requests')
     .flatMap((filePath) => {
       try {
-        const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+        const parsed = loadJson<unknown>(filePath);
         if (!isSurfaceAsyncRequestRecord(parsed, surface)) {
           throw new Error('surface async-request schema violation');
         }
@@ -604,7 +603,7 @@ export function listSurfaceNotifications(
   return recordFiles(notificationBase(surface), options, 'notifications')
     .flatMap((filePath) => {
       try {
-        const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+        const parsed = loadJson<unknown>(filePath);
         if (!isSurfaceNotificationRecord(parsed, surface)) {
           throw new Error('surface notification schema violation');
         }
@@ -698,7 +697,7 @@ export function getSurfaceDeadTarget(
   );
   if (!safeExistsSync(resolved)) return null;
   try {
-    const parsed = JSON.parse(safeReadFile(resolved, { encoding: 'utf8' }) as string);
+    const parsed = loadJson<unknown>(resolved);
     if (!isSurfaceDeadTargetRecord(parsed, surface)) {
       throw new Error('surface dead-target schema violation');
     }
@@ -760,7 +759,7 @@ export function listSurfaceDeadTargets(
       const dir = path.dirname(filePath);
       const name = path.basename(filePath);
       try {
-        const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+        const parsed = loadJson<unknown>(filePath);
         if (!isSurfaceDeadTargetRecord(parsed, surface)) {
           throw new Error('surface dead-target schema violation');
         }
@@ -782,7 +781,7 @@ export function listSurfaceOutboxMessages(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<unknown>(filePath);
       if (!isSurfaceOutboxMessage(parsed, surface)) {
         throw new Error('surface outbox schema violation');
       }
@@ -872,7 +871,7 @@ export function listSurfaceDeadLetters(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<unknown>(filePath);
       if (!isSurfaceDeadLetterRecord(parsed, surface)) {
         throw new Error('surface dead-letter schema violation');
       }

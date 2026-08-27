@@ -342,7 +342,7 @@ describe('enforceApprovalGate', () => {
     addFormats(ajv);
     const schemaPath = path.join(
       pathResolver.rootDir(),
-      'schemas/secret-mutation-approval.schema.json'
+      'knowledge/product/schemas/secret-mutation-approval.schema.json'
     );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const request = {

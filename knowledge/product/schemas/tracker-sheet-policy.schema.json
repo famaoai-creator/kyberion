@@ -2,6 +2,7 @@
   "type": "object",
   "required": ["version", "sheet_titles", "summary_empty_message"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "sheet_titles": {
       "type": "object",

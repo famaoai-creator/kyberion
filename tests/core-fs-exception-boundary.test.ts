@@ -14,6 +14,9 @@ const allowedCoreFsImports = [
   'libs/core/reconcile-ops.test.ts',
   'libs/core/review-reentry.test.ts',
   'libs/core/audit-chain-tenant.test.ts',
+  // Mock-loader fixtures that read tmp-dir JSON outside the project root (secure-io denies it).
+  'libs/core/policy-engine.test.ts',
+  'libs/core/recovery-policy.test.ts',
   'libs/core/browser-extension-bridge.test.ts',
   'libs/core/chrome-extension-meeting-driver.test.ts',
   'libs/core/cli-subagent-team.e2e.test.ts',

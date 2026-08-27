@@ -8,7 +8,7 @@
  */
 
 import { logger } from './core.js';
-import { coreSeamCatalog, defineSeam } from './seam.js';
+import { coreSeamCatalog, createSeam } from './seam.js';
 import type { IntentBody } from './intent-delta.js';
 import {
   listDemotedProviders,
@@ -89,7 +89,7 @@ export function buildFailoverIntentExtractor(
   return new FailoverIntentExtractor(candidates);
 }
 
-const intentExtractorSeam = defineSeam<IntentExtractor>({
+const intentExtractorSeam = createSeam<IntentExtractor>({
   key: 'intent-extractor',
   multiplicity: 'sole',
   catalog: coreSeamCatalog,

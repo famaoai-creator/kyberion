@@ -13,7 +13,7 @@ describe('approval-actuator', () => {
     addFormats(ajv);
     const validate = compileSchemaFromPath(
       ajv,
-      path.join(pathResolver.rootDir(), 'schemas/approval-action.schema.json')
+      path.join(pathResolver.rootDir(), 'knowledge/product/schemas/approval-action.schema.json')
     );
     const action = {
       action: 'create',

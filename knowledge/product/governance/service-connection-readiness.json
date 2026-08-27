@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/service-connection-readiness.schema.json",
   "version": "1.0.0",
   "tenant_guard": {
     "require_zero_drift": true

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const safeExec = vi.fn(() => '');
 const safeReadFile = vi.fn(() => '{}');
+const loadJson = vi.fn((filePath: string) => JSON.parse(String(safeReadFile(filePath))));
 const DEFAULT_MAX_PIPELINE_STEPS = 1000;
 const DEFAULT_PIPELINE_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_LOOP_ITERATIONS = 100;
@@ -918,9 +919,11 @@ const executeAdfSteps = async (
   return run(steps, initialCtx);
 };
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core')),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   safeReadFile,
+  loadJson,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
@@ -998,6 +1001,14 @@ vi.mock('@agent/core', () => ({
   pathResolver,
 }));
 
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    readJson: loadJson,
+  };
+});
+
 vi.mock('@agent/core/os-automation', () => ({
   activateApplication,
   detectFocusedInput,
@@ -1041,7 +1052,8 @@ vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),
 }));
 
-vi.mock('@agent/core/secure-io', () => ({
+vi.mock('@agent/core/secure-io', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/secure-io')),
   safeStat,
 }));
 

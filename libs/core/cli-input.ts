@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { safeReadFile } from './secure-io.js';
 
 export function resolveCliInputPath(inputPath: string): string {
@@ -11,7 +12,7 @@ export function readTextFile(filePath: string): string {
 }
 
 export function readJsonFile<T = any>(filePath: string): T {
-  return JSON.parse(readTextFile(filePath)) as T;
+  return readJson<T>(filePath);
 }
 
 export function readJsonCliInput<T = any>(inputPath: string): T {

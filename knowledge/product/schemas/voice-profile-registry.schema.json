@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "default_profile_id": { "type": "string", "minLength": 1 },
     "profiles": {
@@ -30,7 +31,14 @@
           "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
           "notes": { "type": "string" }
         },
-        "required": ["profile_id", "display_name", "tier", "languages", "default_engine_id", "status"]
+        "required": [
+          "profile_id",
+          "display_name",
+          "tier",
+          "languages",
+          "default_engine_id",
+          "status"
+        ]
       }
     }
   },

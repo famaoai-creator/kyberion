@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kyberion://schemas/intent-routing-map",
+  "title": "Intent Routing Map",
+  "type": "object",
+  "required": ["pipeline_intent_map", "mission_intent_action_map", "direct_intent_commands"],
+  "properties": {
+    "version": { "type": ["string", "number"] },
+    "description": { "type": "string" },
+    "pipeline_intent_map": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "mission_intent_action_map": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "create",
+          "classify",
+          "workflow",
+          "compose_team",
+          "prewarm_team",
+          "delegate_task",
+          "review_output",
+          "handoff",
+          "distill",
+          "close",
+          "inspect_state"
+        ]
+      }
+    },
+    "direct_intent_commands": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["command", "args"],
+        "properties": {
+          "command": { "type": "string", "minLength": 1 },
+          "args": { "type": "array", "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": true
+}

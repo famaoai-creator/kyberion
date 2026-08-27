@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { safeReadFile } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';

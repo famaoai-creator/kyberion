@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/work-policy.schema.json",
   "version": "1.0.0",
   "specialist_routing": {
     "rules": [
@@ -97,7 +98,11 @@
       {
         "id": "analysis-runtime",
         "match": {
-          "intent_ids": ["cross-project-remediation", "incident-informed-review", "evolve-agent-harness"],
+          "intent_ids": [
+            "cross-project-remediation",
+            "incident-informed-review",
+            "evolve-agent-harness"
+          ],
           "task_types": ["analysis"]
         },
         "profile_id": "collaborative_analysis"
@@ -168,20 +173,14 @@
         "match": {
           "task_types": ["*"]
         },
-        "items": [
-          "confirm the governed output path",
-          "capture evidence and reusable findings"
-        ]
+        "items": ["confirm the governed output path", "capture evidence and reusable findings"]
       },
       {
         "id": "project-bootstrap-checklist",
         "match": {
           "shapes": ["project_bootstrap"]
         },
-        "items": [
-          "confirm project root and default track",
-          "prepare the first governed work items"
-        ]
+        "items": ["confirm project root and default track", "prepare the first governed work items"]
       }
     ],
     "execution_shape_rules": [

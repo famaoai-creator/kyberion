@@ -5,12 +5,11 @@ import {
   safeLstat,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import {} from '../libs/actuators/system-actuator/src/op-catalog.js';
-import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
   actuator_id: string;
@@ -97,9 +96,7 @@ function listOps(manifest: CapabilityManifest): string[] {
 }
 
 function loadManifest(manifestPath: string): CapabilityManifest {
-  return JSON.parse(
-    safeReadFile(manifestPath, { encoding: 'utf8' }) as string
-  ) as CapabilityManifest;
+  return readJson<CapabilityManifest>(manifestPath);
 }
 
 function collectComponentInventory() {
@@ -203,9 +200,9 @@ interface DiscoveryOpsRecord {
 function loadDiscoveryOps(): DiscoveryOpsRecord[] {
   const discoveryPath = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
   try {
-    const parsed = JSON.parse(safeReadFile(discoveryPath, { encoding: 'utf8' }) as string) as {
+    const parsed = readJson<{
       actuators?: DiscoveryOpsRecord[];
-    };
+    }>(discoveryPath);
     return parsed.actuators ?? [];
   } catch {
     return [];

@@ -1,10 +1,11 @@
 import { classifyError } from './error-classifier.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 
@@ -34,7 +35,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
   const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
   if (connectionPath) {
     try {
-      const primary = JSON.parse(safeReadFile(connectionPath, { encoding: 'utf8' }) as string);
+      const primary = loadJson<Record<string, unknown>>(connectionPath);
       if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
     } catch (err) {
       logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
@@ -45,7 +46,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
   // The mediated secret-guard read below is the only permitted recovery path.
   const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
   try {
-    const fallback = JSON.parse(safeReadFile(fallbackPath, { encoding: 'utf8' }) as string);
+    const fallback = loadJson<Record<string, unknown>>(fallbackPath);
     if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
       return fallback;
   } catch (err) {
@@ -369,7 +370,7 @@ export function isCliAllowedForOperation(
   preset: Record<string, any>,
   operation: Record<string, any>
 ): boolean {
-  if (process.env.KYBERION_ALLOW_UNSAFE_CLI === 'true') return true;
+  if (['true', '1'].includes(getRegisteredEnvText('KYBERION_ALLOW_UNSAFE_CLI') || '')) return true;
   return (
     Boolean(operation.allow_unsafe_cli) ||
     Boolean(preset.allow_unsafe_cli) ||

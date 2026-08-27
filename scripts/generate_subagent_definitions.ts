@@ -41,11 +41,9 @@ import {
   pathResolver,
   resolveCapabilityProfileForTeamRole,
   safeExistsSync,
-  safeMkdir,
   safeReadFile,
-  safeWriteFile,
 } from '@agent/core';
-import { withExecutionContext } from '@agent/core/governance';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 import {
   buildAgyAgentDefinitionSource,
   extractAgentDefinitionBody,
@@ -251,61 +249,22 @@ export async function buildGeneratedAgyFiles(): Promise<Map<string, string>> {
   return built;
 }
 
-function readIfExists(filePath: string): string | null {
-  return safeExistsSync(filePath)
-    ? String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    : null;
-}
+export const main = defineGenerator({
+  id: 'subagent-definitions',
+  outputs: GENERATED_ROLES.flatMap((role) => [targetPath(role), agyTargetPath(role)]),
+  executionContext: 'generate_subagent_definitions',
+  async render() {
+    const built = await buildGeneratedFiles();
+    const agyBuilt = await buildGeneratedAgyFiles();
+    return [
+      ...Array.from(built, ([role, content]) => ({ path: targetPath(role), content })),
+      ...Array.from(agyBuilt, ([role, content]) => ({ path: agyTargetPath(role), content })),
+    ];
+  },
+});
 
-export async function main(argv = process.argv.slice(2)): Promise<void> {
-  const shouldCheck = argv.includes('--check');
-  const built = await buildGeneratedFiles();
-  const agyBuilt = await buildGeneratedAgyFiles();
-  const rootDir = pathResolver.rootDir();
-
-  if (shouldCheck) {
-    const drifted: string[] = [];
-    for (const [role, content] of built) {
-      const filePath = targetPath(role);
-      if (readIfExists(filePath) !== content) {
-        drifted.push(path.relative(rootDir, filePath));
-      }
-    }
-    for (const [role, content] of agyBuilt) {
-      const filePath = agyTargetPath(role);
-      if (readIfExists(filePath) !== content) {
-        drifted.push(path.relative(rootDir, filePath));
-      }
-    }
-    if (drifted.length === 0) {
-      console.log('subagent definitions are up to date');
-      return;
-    }
-    console.error('subagent definition drift detected — run pnpm agents:generate');
-    for (const rel of drifted) console.error(`- ${rel} differs`);
-    process.exitCode = 1;
-    return;
-  }
-
-  return withExecutionContext('generate_subagent_definitions', () => {
-    safeMkdir(AGY_AGENTS_DIR);
-    for (const [role, content] of built) {
-      const filePath = targetPath(role);
-      safeWriteFile(filePath, content);
-      console.log(`wrote ${path.relative(rootDir, filePath)}`);
-    }
-    for (const [role, content] of agyBuilt) {
-      const filePath = agyTargetPath(role);
-      safeMkdir(path.dirname(filePath));
-      safeWriteFile(filePath, content);
-      console.log(`wrote ${path.relative(rootDir, filePath)}`);
-    }
-  });
-}
-
-if (process.argv[1] && /generate_subagent_definitions\.(ts|js)$/.test(process.argv[1])) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'generate_subagent_definitions.ts') ||
+  isDirectScript(import.meta.url, 'generate_subagent_definitions.js')
+)
+  void main();

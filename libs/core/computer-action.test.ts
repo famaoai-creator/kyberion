@@ -11,7 +11,10 @@ describe('computer-action schema', () => {
   it('accepts deprecated KUCA actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/computer-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/computer-action.schema.json')
+    );
 
     expect(
       validate({
@@ -30,14 +33,17 @@ describe('computer-action schema', () => {
           },
         ],
       }),
-      JSON.stringify(validate.errors || []),
+      JSON.stringify(validate.errors || [])
     ).toBe(true);
   });
 
   it('rejects invalid KUCA actions', () => {
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(process.cwd(), 'schemas/computer-action.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/computer-action.schema.json')
+    );
 
     expect(
       validate({
@@ -46,7 +52,7 @@ describe('computer-action schema', () => {
             type: 'unsupported',
           },
         ],
-      }),
+      })
     ).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
+  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -237,9 +238,9 @@ function contractReviewApproved(tenantSlug: string, dealId: string, version: num
   const filePath = path.join(dealDocsDir(tenantSlug, dealId), `contract-review-v${version}.json`);
   try {
     if (!safeExistsSync(filePath)) return false;
-    const record = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as {
+    const record = loadJson<{
       verdict?: string;
-    };
+    }>(filePath);
     return record.verdict === 'approve';
   } catch {
     return false;
@@ -247,8 +248,7 @@ function contractReviewApproved(tenantSlug: string, dealId: string, version: num
 }
 
 export type SendDealDocumentResult =
-  | SendToCustomerResult
-  | { sent: false; status: 'blocked'; reason: string };
+  SendToCustomerResult | { sent: false; status: 'blocked'; reason: string };
 
 /**
  * The only path for sending quote/contract documents. Contracts additionally

@@ -18,6 +18,8 @@
  * variable so the user's command can do the right routing.
  */
 
+import { getRegisteredEnvText } from './foundation/env.js';
+
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { logger } from './core.js';
 import { buildSafeExecEnv } from './secure-io.js';
@@ -159,9 +161,9 @@ export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): 
 }
 
 export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; reason?: string } {
-  const command = process.env.KYBERION_TTS_COMMAND;
+  const command = getRegisteredEnvText('KYBERION_TTS_COMMAND');
   if (!command) return { installed: false, reason: 'KYBERION_TTS_COMMAND not set' };
-  const args = (process.env.KYBERION_TTS_ARGS ?? '')
+  const args = (getRegisteredEnvText('KYBERION_TTS_ARGS') ?? '')
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean);

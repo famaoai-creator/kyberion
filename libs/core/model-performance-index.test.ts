@@ -8,6 +8,7 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: (filePath: string) => mockFiles.has(filePath),
   safeMkdir: () => {},
   safeReadFile: (filePath: string) => mockFiles.get(filePath) || '',
+  loadJson: (filePath: string) => JSON.parse(mockFiles.get(filePath) || 'null'),
   safeWriteFile: (filePath: string, data: string) => mockFiles.set(filePath, data),
 }));
 
@@ -17,6 +18,24 @@ describe('model performance index', () => {
   beforeEach(async () => {
     mockFiles.clear();
     vi.resetModules();
+    const { registerFoundationIo } = await import('./foundation/io.js');
+    registerFoundationIo({
+      loadJson: <T>(filePath: string): T => JSON.parse(mockFiles.get(filePath) || 'null') as T,
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        const value = mockFiles.get(filePath);
+        return value === undefined ? null : (JSON.parse(value) as T);
+      },
+      appendFile: (filePath: string, content: string) =>
+        mockFiles.set(filePath, `${mockFiles.get(filePath) || ''}${content}`),
+      exists: (filePath: string) => mockFiles.has(filePath),
+      readFile: (filePath: string) => mockFiles.get(filePath) || '',
+      stat: (filePath: string) => {
+        const value = mockFiles.get(filePath);
+        if (value === undefined) throw new Error(`missing mock file: ${filePath}`);
+        return { mtimeMs: 0, size: value.length };
+      },
+      writeFile: (filePath: string, content: string) => mockFiles.set(filePath, content),
+    });
     mod = await import('./model-performance-index.js');
   });
 

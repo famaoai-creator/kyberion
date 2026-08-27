@@ -20,6 +20,7 @@ import {
   resolveProjectLedgerPath,
 } from './mission-project-ledger.js';
 import type { MissionRelationships } from './mission-types.js';
+import { currentProcessArgv } from '../lib/harness.js';
 
 export interface ResolvedMissionCliInput {
   tier?: 'personal' | 'confidential' | 'public';
@@ -43,7 +44,7 @@ export interface ResolvedMissionCliInput {
 }
 
 export function resolveMissionStartCreateInputFromArgv(
-  argv: string[] = process.argv
+  argv: string[] = currentProcessArgv()
 ): ResolvedMissionCliInput {
   const positionalArgs = extractMissionControllerPositionalArgs(argv);
   const arg2 = positionalArgs[2];
@@ -101,7 +102,7 @@ export function resolveMissionStartCreateInputFromArgv(
 export function validateMissionStartCreateInput(
   actionName: 'create' | 'start',
   missionId?: string,
-  argv: string[] = process.argv
+  argv: string[] = currentProcessArgv()
 ): ResolvedMissionCliInput {
   const input = resolveMissionStartCreateInputFromArgv(argv);
   if (!missionId) return input;
@@ -169,7 +170,9 @@ export function validateMissionStartCreateInput(
   return input;
 }
 
-export function resolveMissionTicketDispatchOptionsFromArgv(argv: string[] = process.argv): {
+export function resolveMissionTicketDispatchOptionsFromArgv(
+  argv: string[] = currentProcessArgv()
+): {
   targets: Array<'workitem' | 'github' | 'jira'>;
   liveTargets: Array<'workitem' | 'github' | 'jira'>;
   github?: { owner?: string; repo?: string };
@@ -191,7 +194,9 @@ export function resolveMissionTicketDispatchOptionsFromArgv(argv: string[] = pro
   };
 }
 
-export function resolveMissionWorkItemDispatchOptionsFromArgv(argv: string[] = process.argv): {
+export function resolveMissionWorkItemDispatchOptionsFromArgv(
+  argv: string[] = currentProcessArgv()
+): {
   mode: 'auto' | 'agent' | 'subagent';
   executionSurface?: MissionExecutionSurface;
   reviewExecutionSurface?: MissionExecutionSurface;

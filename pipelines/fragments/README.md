@@ -136,7 +136,7 @@
 ### 26. `software-qa-lifecycle.json`
 
 - **目的**: 品質契約、テスト台帳、実行記録から、欠陥候補と証跡付き品質報告を決定論的に生成する。
-- **主要操作**: `system:exec`, `system:log`
+- **主要操作**: `core:run_software_quality_report`, `system:log`
 - **責任境界**: AI は `go / conditional_go / no_go / insufficient_evidence` を推奨するが、最終判断は品質報告の `accountable_human_id` が行う。
 
 ### 27. `browser-session-with-intra-login.json`

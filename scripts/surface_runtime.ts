@@ -15,7 +15,6 @@ import {
   probeSurfaceHealth,
   runtimeSupervisor,
   saveSurfaceState,
-  safeExistsSync,
   safeOpenAppendFile,
   spawnManagedProcess,
   inspectServiceAuth,
@@ -32,6 +31,8 @@ import {
   recordProtocolServiceLifecycle,
 } from '@agent/core';
 import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type SurfaceAction =
   | 'reconcile'
@@ -179,7 +180,9 @@ function recordProtocolSurfaceLifecycle(
     return;
   }
   if (registryEntry.lifecycle_owner === 'service') return;
-  const tenant = String(process.env.KYBERION_TENANT || process.env.KYBERION_TENANT_ID || '').trim();
+  const tenant = String(
+    getRegisteredEnvText('KYBERION_TENANT') || getRegisteredEnvText('KYBERION_TENANT_ID') || ''
+  ).trim();
   try {
     recordProtocolServiceLifecycle({
       serviceId: surfaceId,
@@ -458,7 +461,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
 async function statusSurfaces() {
   const state = loadSurfaceState();
   const manifest = loadSurfaceManifest();
-  for (const [surfaceId, record] of Object.entries(state.surfaces)) {
+  for (const [_surfaceId, record] of Object.entries(state.surfaces)) {
     if (isRunning(record.pid)) {
       registerRunningSurfaceFromState(record);
     }
@@ -739,7 +742,7 @@ async function enableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = true;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'surface.enable',
       operation: surfaceId,
       result: 'completed',
@@ -762,7 +765,7 @@ async function disableSurfaceById(surfaceId: string, manifestPath: string) {
     definition.enabled = false;
     saveSurfaceManifest(manifest, manifestPath);
     auditChain.record({
-      agentId: process.env.KYBERION_PERSONA || 'worker',
+      agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
       action: 'surface.disable',
       operation: surfaceId,
       result: 'completed',
@@ -805,7 +808,7 @@ async function registerSurface(params: {
   saveSurfaceManifest(manifest, params.manifestPath);
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'surface.register',
     operation: params.id,
     result: 'completed',
@@ -827,7 +830,7 @@ async function unregisterSurfaceById(surfaceId: string, manifestPath: string) {
   await stopSurfaceById(surfaceId);
 
   auditChain.record({
-    agentId: process.env.KYBERION_PERSONA || 'worker',
+    agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'worker',
     action: 'surface.unregister',
     operation: surfaceId,
     result: 'completed',
@@ -860,7 +863,7 @@ async function reconcileHealth(manifestPath: string) {
   return restarted;
 }
 
-const main = async () => {
+const main = async (args: string[] = []) => {
   const argv = await createStandardYargs()
     .option('action', {
       type: 'string',
@@ -887,7 +890,7 @@ const main = async () => {
     .option('args', { type: 'string' })
     .option('port', { type: 'number' })
     .option('description', { type: 'string' })
-    .parseSync();
+    .parseSync(args);
 
   const action = argv.action as SurfaceAction;
   const manifestPath = path.isAbsolute(argv.manifest as string)
@@ -963,15 +966,15 @@ const main = async () => {
   }
 };
 
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith('surface_runtime.ts') ||
-    process.argv[1].endsWith('surface_runtime.js') ||
-    process.argv[1].endsWith('surface_runtime.mts'));
+export const runSurfaceRuntime = defineScript({
+  name: 'surfaces:runtime',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
 
-if (isMain) {
-  main().catch((err: any) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'surface_runtime.ts') ||
+  isDirectScript(import.meta.url, 'surface_runtime.js') ||
+  isDirectScript(import.meta.url, 'surface_runtime.mts')
+)
+  void runSurfaceRuntime();

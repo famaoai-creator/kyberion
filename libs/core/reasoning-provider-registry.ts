@@ -13,8 +13,10 @@ import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
 import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 import { assertModuleInvariant } from './invariants.js';
+import { isRecord } from './foundation/text.js';
 
 export interface ReasoningProviderCapabilities {
   reasoning: boolean;
@@ -125,10 +127,6 @@ const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFacto
 const CONFORMANCE_CHECK_NAMES = ['prompt', 'structured_output', 'abort', 'usage'] as const;
 const CONFORMANCE_STATUSES = ['verified', 'declared', 'unavailable', 'failed'] as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function parseBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
@@ -235,9 +233,7 @@ function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
   let parsed: RegistryFile;
   try {
-    parsed = JSON.parse(
-      safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string
-    ) as RegistryFile;
+    parsed = readJson<RegistryFile>(REGISTRY_PATH);
   } catch (error) {
     throw new Error(
       `Invalid reasoning provider registry at ${REGISTRY_PATH}: ${

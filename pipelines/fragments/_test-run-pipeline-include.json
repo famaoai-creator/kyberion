@@ -1,5 +1,6 @@
 {
   "description": "Test-only fixture for scripts/run_pipeline.test.ts core:include coverage. Not a production fragment.",
+  "context": { "fragment_default": "fragment default" },
   "steps": [
     {
       "op": "core:transform",

@@ -4,6 +4,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const DEFAULT_PORT = 3317;
 const DEFAULT_URL = `http://127.0.0.1:${DEFAULT_PORT}`;
@@ -52,9 +53,9 @@ function contrastRatio(foreground: Rgba, background: Rgba): number {
   );
 }
 
-function argument(name: string): string | undefined {
-  const index = process.argv.indexOf(name);
-  return index >= 0 ? process.argv[index + 1] : undefined;
+function argument(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
 }
 
 function parsePort(url: string): number {
@@ -96,6 +97,7 @@ function startChronos(port: number): { child: ChildProcess; getStartupOutput: ()
     cwd: chronosRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1' },
+    detached: process.platform !== 'win32',
   });
   const capture = (chunk: Buffer) => {
     startupOutput = `${startupOutput}${chunk.toString()}`.slice(-4000);
@@ -103,6 +105,34 @@ function startChronos(port: number): { child: ChildProcess; getStartupOutput: ()
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
   return { child, getStartupOutput: () => startupOutput };
+}
+
+async function stopChronos(server: ChildProcess): Promise<void> {
+  if (server.exitCode !== null) return;
+  await new Promise<void>((resolve) => {
+    const kill = (signal: NodeJS.Signals) => {
+      if (process.platform !== 'win32' && server.pid) {
+        try {
+          process.kill(-server.pid, signal);
+        } catch {
+          // The process group may already have exited.
+        }
+      }
+      if (server.exitCode === null) server.kill(signal);
+    };
+    const timeout = setTimeout(() => {
+      kill('SIGKILL');
+      server.stdout?.destroy();
+      server.stderr?.destroy();
+      server.unref();
+      resolve();
+    }, 5_000);
+    server.once('close', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    kill('SIGTERM');
+  });
 }
 
 async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> {
@@ -114,6 +144,30 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
       window.localStorage.setItem('chronos.theme-mode', theme);
     }, mode);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    // Chronos resolves the system preference and applies the requested theme
+    // in a client effect. A fixed delay was too short on slower CI runners,
+    // so the contrast sample could capture the light background during the
+    // dark-token first render (or vice versa).
+    await page.waitForFunction(
+      (expectedMode) => document.documentElement.dataset.theme === expectedMode,
+      mode,
+      { timeout: 10_000 }
+    );
+    await page.waitForFunction(
+      (expectedMode) => {
+        const main = document.querySelector('main');
+        const secondary = main
+          ? getComputedStyle(main).getPropertyValue('--kb-text-secondary')
+          : '';
+        return expectedMode === 'light'
+          ? secondary.includes('15, 23, 42')
+          : secondary.includes('248, 250, 252');
+      },
+      mode,
+      { timeout: 10_000 }
+    );
+    // Let the first operator-home projection settle before sampling its
+    // asynchronously rendered status copy.
     await page.waitForTimeout(1_000);
     await page.evaluate((theme) => {
       document.documentElement.dataset.theme = theme;
@@ -198,39 +252,41 @@ async function inspect(url: string, mode: 'light' | 'dark'): Promise<Finding[]> 
   }
 }
 
-async function main(): Promise<void> {
-  const url = argument('--url') ?? DEFAULT_URL;
-  const shouldStart = process.argv.includes('--start');
-  let server: ChildProcess | undefined;
-  try {
-    if (shouldStart) {
-      const started = startChronos(parsePort(url));
-      server = started.child;
-      await waitForServer(url, server, started.getStartupOutput);
-    }
-    const requestedMode = argument('--mode');
-    const modes: Array<'light' | 'dark'> =
-      requestedMode === 'light' || requestedMode === 'dark' ? [requestedMode] : ['light', 'dark'];
-    const findings = (await Promise.all(modes.map((mode) => inspect(url, mode)))).flat();
-    if (findings.length > 0) {
-      console.error(`[check:chronos-dom-contrast] ${findings.length} violation(s)`);
-      for (const finding of findings.slice(0, 20)) {
-        console.error(
-          `- ${finding.tag} ${finding.ratio}:1 < ${finding.threshold}:1 ${finding.color} on ${finding.background} ${finding.text}`
-        );
+export const runCheckChronosDomContrast = defineScript({
+  name: 'check:chronos-dom-contrast',
+  flags: [],
+  async run(context) {
+    const url = argument(context.argv, '--url') ?? DEFAULT_URL;
+    const shouldStart = context.argv.includes('--start');
+    let server: ChildProcess | undefined;
+    try {
+      if (shouldStart) {
+        const started = startChronos(parsePort(url));
+        server = started.child;
+        await waitForServer(url, server, started.getStartupOutput);
       }
-      process.exitCode = 1;
-      return;
+      const requestedMode = argument(context.argv, '--mode');
+      const modes: Array<'light' | 'dark'> =
+        requestedMode === 'light' || requestedMode === 'dark' ? [requestedMode] : ['light', 'dark'];
+      const findings = (await Promise.all(modes.map((mode) => inspect(url, mode)))).flat();
+      if (findings.length > 0) {
+        console.error(`[check:chronos-dom-contrast] ${findings.length} violation(s)`);
+        for (const finding of findings.slice(0, 20)) {
+          console.error(
+            `- ${finding.tag} ${finding.ratio}:1 < ${finding.threshold}:1 ${finding.color} on ${finding.background} ${finding.text}`
+          );
+        }
+        throw new Error(`${findings.length} Chronos contrast violation(s)`);
+      }
+      context.print(`[check:chronos-dom-contrast] OK (${modes.join(' + ')}, reduced-motion)`);
+    } finally {
+      if (server) await stopChronos(server);
     }
-    console.log(`[check:chronos-dom-contrast] OK (${modes.join(' + ')}, reduced-motion)`);
-  } finally {
-    if (server && !server.killed) server.kill('SIGTERM');
-  }
-}
-
-void main().catch((error) => {
-  console.error(
-    `[check:chronos-dom-contrast] ${error instanceof Error ? error.message : String(error)}`
-  );
-  process.exitCode = 1;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'check_chronos_dom_contrast.ts') ||
+  isDirectScript(import.meta.url, 'check_chronos_dom_contrast.js')
+)
+  void runCheckChronosDomContrast();

@@ -8,4 +8,4 @@ This ledger records design decisions that affect Kyberion's runtime or governanc
 
 Every note starts with frontmatter containing `title`, `status`, `decision_date`, `scope`, and
 `decision`. Implemented notes also require `evidence`; rejected notes require `rationale`.
-Run `pnpm run check:design-ledger` before delivery.
+Run `pnpm check -- --scope full --only design-ledger` before delivery.

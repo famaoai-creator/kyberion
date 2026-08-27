@@ -1,4 +1,5 @@
 import {
+  loadJson,
   logger,
   safeReadFile,
   safeWriteFile,
@@ -6,14 +7,12 @@ import {
   safeExistsSync,
   executeAdfSteps,
   pathResolver,
-  resolveVars,
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
   retry,
   buildGovernedRetryOptions,
   runGovernedCommand,
-  classifyError,
   analyzeSourceTree,
   buildAgenticSourceReviewParticipants,
   compileEngineeringArtifacts,
@@ -23,9 +22,9 @@ import {
   validateAgenticSourceReviewVerification,
   writeEngineeringArtifactBundle,
 } from '@agent/core';
+import { createAjv } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
-import * as AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { terraformToArchitectureAdf } from './terraform-architecture.js';
 import { terraformToTopologyIr } from './terraform-topology.js';
@@ -60,9 +59,8 @@ export function buildRetryOptions() {
   });
 }
 
-const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = new AjvCtor({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
   'product/orchestration/browser-execution-presets.json'
@@ -72,6 +70,10 @@ export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
+}
+
+interface StrategyConfig {
+  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
 }
 
 export interface ModelingAction {
@@ -101,12 +103,7 @@ export async function executePipeline(
 
   if (initialCtx.context_path && safeExistsSync(path.resolve(rootDir, initialCtx.context_path))) {
     const saved = await retry(
-      async () =>
-        JSON.parse(
-          safeReadFile(path.resolve(rootDir, initialCtx.context_path), {
-            encoding: 'utf8',
-          }) as string
-        ),
+      async () => loadJson<Record<string, unknown>>(path.resolve(rootDir, initialCtx.context_path)),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -185,12 +182,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       return {
         ...ctx,
         [params.export_as || 'last_capture_data']: await retry(
-          async () =>
-            JSON.parse(
-              safeReadFile(path.resolve(rootDir, resolve(params.path)), {
-                encoding: 'utf8',
-              }) as string
-            ),
+          async () => loadJson<unknown>(path.resolve(rootDir, resolve(params.path))),
           buildRetryOptions()
         ),
       };
@@ -733,10 +725,15 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
     try {
       const parsed = await retry(
         async () =>
-          JSON.parse(safeReadFile(BROWSER_EXECUTION_PRESETS_PATH, { encoding: 'utf8' }) as string),
+          loadJson<{
+            default_preset?: string;
+            presets?: Record<string, unknown>;
+          }>(BROWSER_EXECUTION_PRESETS_PATH),
         buildRetryOptions()
       );
-      if (parsed && typeof parsed === 'object' && parsed.presets) return parsed;
+      if (parsed.presets) {
+        return { default_preset: parsed.default_preset, presets: parsed.presets };
+      }
     } catch (err) {
       logger.warn(
         `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
@@ -936,9 +933,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         params.contract ??
         ctx[params.contract_from || 'quality_contract'] ??
         (contractPath && safeExistsSync(pathResolver.rootResolve(contractPath))
-          ? JSON.parse(
-              safeReadFile(pathResolver.rootResolve(contractPath), { encoding: 'utf8' }) as string
-            )
+          ? loadJson<SoftwareQualityContract>(pathResolver.rootResolve(contractPath))
           : null);
       if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
@@ -1008,7 +1003,7 @@ export async function performReconcile(input: ModelingAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => JSON.parse(safeReadFile(strategyPath, { encoding: 'utf8' }) as string),
+    async () => loadJson<StrategyConfig>(strategyPath),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {

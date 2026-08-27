@@ -1,9 +1,10 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
+import { isRecord } from './foundation/text.js';
 
 /**
  * MP-02: motion vocabulary as governed tokens.
@@ -145,7 +146,7 @@ export function loadVideoMotionCatalog(): VideoMotionCatalog {
       'public/design-patterns/media-templates/video-motion-patterns.json'
     );
     if (safeExistsSync(catalogPath)) {
-      const parsed = JSON.parse(safeReadFile(catalogPath, { encoding: 'utf8' }) as string);
+      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
       const catalog = coerceCatalog(parsed);
       if (catalog) {
         cachedCatalog = catalog;
@@ -191,12 +192,8 @@ function coerceCatalog(parsed: any): VideoMotionCatalog | null {
   };
 }
 
-function clamp(value: number, min: number, max: number): number {
+function clampMotionDirectionValue(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-function isRecord(value: unknown): value is Record<string, any> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 /** Read a pattern id from either a bare string or a normalized `{pattern_id}`. */
@@ -325,7 +322,7 @@ export function normalizeVideoMotionDirection(
         ease,
         // A looping layer must not outrun the scene it lives in.
         duration_sec: roundTo2(
-          clamp(
+          clampMotionDirectionValue(
             scene.duration_sec
               ? Math.min(pattern.duration_sec, scene.duration_sec * 2)
               : pattern.duration_sec,
@@ -342,14 +339,14 @@ export function normalizeVideoMotionDirection(
         pattern_id: entranceId,
         ease: entranceEase,
         duration_sec: roundTo2(
-          clamp(
+          clampMotionDirectionValue(
             Number(draft?.entrance_duration_sec) || entrancePattern.duration_sec,
             ENTRANCE_DURATION_RANGE[0],
             ENTRANCE_DURATION_RANGE[1]
           )
         ),
         offset_sec: roundTo2(
-          clamp(
+          clampMotionDirectionValue(
             Number(draft?.entrance_offset_sec) || entrancePattern.offset_sec,
             OFFSET_RANGE[0],
             OFFSET_RANGE[1]
@@ -375,7 +372,7 @@ export function normalizeVideoMotionDirection(
       after_scene_id: String(entry.after_scene_id),
       kind: String(entry.kind || 'crossfade'),
       duration_sec: roundTo2(
-        clamp(
+        clampMotionDirectionValue(
           Number(entry.duration_sec) || catalog.transitions.preferred_duration_sec,
           catalog.transitions.min_duration_sec,
           1.5

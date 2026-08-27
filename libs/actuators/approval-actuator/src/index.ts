@@ -1,10 +1,17 @@
-import { createStandardYargs, logger, safeReadFile } from '@agent/core';
+import { logger } from '@agent/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver } from '@agent/core';
 import { handleApprovalAction } from './approval-actuator-helpers.js';
+import { defineCatalogBackedActuator } from '@agent/core';
+import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core';
 export { handleApprovalAction as handleAction } from './approval-actuator-helpers.js';
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'approval-actuator',
+  describeOps,
+  handleAction: handleApprovalAction,
+});
 export { describeOps } from './op-catalog.js';
 export { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 
@@ -21,6 +28,6 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }

@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
 import {
   isInstanceDemoted,
@@ -57,7 +58,9 @@ interface PinFile {
 const PIN_FILE_VERSION = '1.0';
 
 function actorId(): string {
-  return process.env.KYBERION_PERSONA || process.env.MISSION_ROLE || 'capability-broker';
+  return (
+    getRegisteredEnvText('KYBERION_PERSONA') || process.env.MISSION_ROLE || 'capability-broker'
+  );
 }
 
 /**
@@ -73,7 +76,9 @@ function pinFilePath(): string {
         return path.join(missionDir, 'provider-pins.json');
       }
     }
-    return pathResolver.rootResolve(path.join('active/shared/runtime/provider-pins', `${missionId}.json`));
+    return pathResolver.rootResolve(
+      path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
+    );
   }
   return pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
 }
@@ -82,9 +87,11 @@ function readPinFile(): PinFile {
   try {
     const filePath = pinFilePath();
     if (!safeExistsSync(filePath)) return { version: PIN_FILE_VERSION, pins: {} };
-    const parsed = JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string) as PinFile;
+    const parsed = loadJson<PinFile>(filePath);
     if (parsed && typeof parsed.pins === 'object' && parsed.pins !== null) return parsed;
-  } catch { /* treat as empty */ }
+  } catch {
+    /* treat as empty */
+  }
   return { version: PIN_FILE_VERSION, pins: {} };
 }
 
@@ -152,7 +159,7 @@ function recordDecision(decision: ProviderDecision): void {
  */
 export function resolveProviderDecision(
   options: ResolveProviderDecisionOptions,
-  discoveredProviders: ProviderInfo[] = discoverProviders(),
+  discoveredProviders: ProviderInfo[] = discoverProviders()
 ): ProviderDecision {
   const now = options.now ?? Date.now();
   const shouldRecord = options.record !== false;
@@ -161,20 +168,25 @@ export function resolveProviderDecision(
     const pin = loadPinnedDecision(options.decisionKey);
     if (pin) {
       const stillInstalled = discoveredProviders.some(
-        (entry) => entry.provider === pin.provider && entry.installed && entry.healthy,
+        (entry) => entry.provider === pin.provider && entry.installed && entry.healthy
       );
       if (stillInstalled) {
-        const instance = pin.instance && !isInstanceDemoted(pin.provider, pin.instance, now)
-          ? pin.instance
-          : selectHealthyInstance(pin.provider, now);
+        const instance =
+          pin.instance && !isInstanceDemoted(pin.provider, pin.instance, now)
+            ? pin.instance
+            : selectHealthyInstance(pin.provider, now);
         const decision: ProviderDecision = {
           provider: pin.provider,
           modelId: pin.modelId,
           instance,
           strategy: 'preferred',
           orchestration: pin.orchestration,
-          availableProviders: discoveredProviders.filter((e) => e.installed && e.healthy).map((e) => e.provider),
-          requiredCapabilities: (options.requiredCapabilities || []).map((c) => c.trim().toLowerCase()).filter(Boolean),
+          availableProviders: discoveredProviders
+            .filter((e) => e.installed && e.healthy)
+            .map((e) => e.provider),
+          requiredCapabilities: (options.requiredCapabilities || [])
+            .map((c) => c.trim().toLowerCase())
+            .filter(Boolean),
           unmetCapabilities: [],
           rationale: `pinned decision for '${options.decisionKey}' (pinned ${pin.pinnedAt} by ${pin.by})`,
           pinned: true,

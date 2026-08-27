@@ -11,9 +11,12 @@ import {
   safeExistsSync,
   safeMkdir,
 } from '@agent/core';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isDirectScript } from './lib/harness.js';
 
 const TOOL_ID = 'agy_sdk';
-const MANAGED_PYTHON_VERSION = process.env.KYBERION_MANAGED_PYTHON_VERSION?.trim() || '3.11';
+const MANAGED_PYTHON_VERSION =
+  getRegisteredEnvText('KYBERION_MANAGED_PYTHON_VERSION')?.trim() || '3.11';
 
 type SetupStatus = 'ready' | 'needs_install' | 'unsupported';
 
@@ -156,11 +159,13 @@ async function main(): Promise<void> {
   if (report.status === 'needs_install') process.exitCode = argv.apply ? 1 : 0;
 }
 
-const isDirect = process.argv[1] && /agy_sdk_setup\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
+if (
+  isDirectScript(import.meta.url, 'agy_sdk_setup.ts') ||
+  isDirectScript(import.meta.url, 'agy_sdk_setup.js')
+) {
   main().catch((error: unknown) => {
     console.error(error instanceof Error ? error.message : String(error));
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 

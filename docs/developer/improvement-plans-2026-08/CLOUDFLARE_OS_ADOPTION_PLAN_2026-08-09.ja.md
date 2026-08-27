@@ -1,3 +1,10 @@
+---
+title: CLOUDFLARE OS ADOPTION PLAN 2026 08 09
+tags: [improvement-plan, 2026-08]
+last_updated: 2026-08-25
+status: active
+---
+
 # cloudflare-os 分析・採択計画(OS-01〜15)
 
 > **作成日**: 2026-08-09

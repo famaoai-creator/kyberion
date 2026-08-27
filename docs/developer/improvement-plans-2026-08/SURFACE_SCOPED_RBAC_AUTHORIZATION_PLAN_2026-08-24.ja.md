@@ -3,6 +3,7 @@ title: Surface / Tenant Scoped RBAC Authorization Plan
 category: Planning
 tags: [authorization, rbac, surface, tenant, a2ui, headless, self-hosted]
 last_updated: 2026-08-24
+status: active
 ---
 
 # Surface / Tenant Scoped RBAC 認可計画

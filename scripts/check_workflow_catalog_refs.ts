@@ -20,8 +20,9 @@ import {
   normalizeWorkflowPhases,
   pathResolver,
   safeExistsSync,
-  safeReadFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/mission-workflow-catalog.json');
 
@@ -31,9 +32,9 @@ type CatalogTemplate = {
 };
 
 function main(): number {
-  const catalog = JSON.parse(safeReadFile(CATALOG_PATH, { encoding: 'utf8' }) as string) as {
+  const catalog = readJson<{
     templates: CatalogTemplate[];
-  };
+  }>(CATALOG_PATH);
   const violations: string[] = [];
 
   for (const template of catalog.templates) {
@@ -52,9 +53,7 @@ function main(): number {
       // Every task-bearing phase needs an exit gate — otherwise gate-pass
       // can never mark its tasks completed (SR-01 finding #2).
       if ((spec.default_tasks?.length ?? 0) > 0 && !spec.exit_gate) {
-        violations.push(
-          `${template.id}: phase ${spec.id} has default_tasks but no exit_gate`
-        );
+        violations.push(`${template.id}: phase ${spec.id} has default_tasks but no exit_gate`);
       }
       for (const task of spec.default_tasks ?? []) {
         if (typeof task.pipeline_ref === 'string' && task.pipeline_ref.trim()) {
@@ -89,4 +88,18 @@ function main(): number {
   return 0;
 }
 
-process.exit(main());
+export const runCheckWorkflowCatalogRefs = defineScript({
+  name: 'check:workflow-catalog-refs',
+  flags: [],
+  run() {
+    const status = main();
+    if (status !== 0)
+      throw new Error(`workflow catalog reference check failed with exit code ${status}`);
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_workflow_catalog_refs.ts') ||
+  isDirectScript(import.meta.url, 'check_workflow_catalog_refs.js')
+)
+  void runCheckWorkflowCatalogRefs();

@@ -1,4 +1,5 @@
 import { validateNextActionContract } from './next-action-contract.js';
+import { getRegisteredEnvText } from './foundation/env.js';
 
 export type ControlPlaneSurface = 'presence' | 'chronos';
 
@@ -118,10 +119,7 @@ export interface ChronosOverviewRecord {
     risk: 'low' | 'medium' | 'high';
     suggested_command?: string;
     suggested_surface_action?:
-      | 'approvals'
-      | 'mission-seeds'
-      | 'memory-promotion-queue'
-      | 'next-actions';
+      'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
     approval_required: boolean;
   }>;
 }
@@ -184,7 +182,11 @@ export function getControlPlaneBaseUrl(surface: ControlPlaneSurface, override?: 
 function resolveToken(surface: ControlPlaneSurface, override?: string): string {
   if (override) return override;
   if (surface === 'chronos') {
-    return String(process.env.KYBERION_LOCALADMIN_TOKEN || process.env.KYBERION_API_TOKEN || '');
+    return String(
+      getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN') ||
+        getRegisteredEnvText('KYBERION_API_TOKEN') ||
+        ''
+    );
   }
   return '';
 }

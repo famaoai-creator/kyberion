@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
 import {
   assertTenantOperational,
@@ -34,6 +34,8 @@ import { bootstrapManagedProject, type ProjectBootstrapResult } from './project-
 import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { createAjv } from './foundation/ajv.js';
+import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import {
   safeExistsSync,
@@ -41,17 +43,14 @@ import {
   safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
+  loadJson,
 } from './secure-io.js';
 
-type AjvConstructor = typeof import('ajv').default;
 type AddFormatsPlugin = typeof import('ajv-formats').default;
-const AjvClass =
-  (AjvModule as unknown as { default?: AjvConstructor }).default ||
-  (AjvModule as unknown as AjvConstructor);
 const addFormats =
   (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
   (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = new AjvClass({ allErrors: true });
+const ajv = createAjv();
 addFormats(ajv);
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-context-binding.schema.json'
@@ -261,13 +260,12 @@ function archiveOnboardingWorkItem(item: WorkItem | undefined, rootDir: string):
 }
 
 function withCustomer<T>(customerSlug: string, fn: () => T): T {
-  const previous = process.env.KYBERION_CUSTOMER;
-  process.env.KYBERION_CUSTOMER = customerSlug;
+  const previous = getRegisteredEnvText('KYBERION_CUSTOMER');
+  setRegisteredEnv('KYBERION_CUSTOMER', customerSlug);
   try {
     return fn();
   } finally {
-    if (previous === undefined) delete process.env.KYBERION_CUSTOMER;
-    else process.env.KYBERION_CUSTOMER = previous;
+    setRegisteredEnv('KYBERION_CUSTOMER', previous);
   }
 }
 
@@ -292,9 +290,7 @@ export function loadOnboardingFirstWorkRecord(
 ): OnboardingFirstWorkRecord | null {
   const filePath = firstWorkPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateFirstWorkRecord(
-    JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string)
-  );
+  return validateFirstWorkRecord(loadJson<unknown>(filePath));
 }
 
 function saveOnboardingFirstWorkRecord(record: OnboardingFirstWorkRecord, rootDir: string): string {
@@ -542,7 +538,7 @@ export function loadOnboardingContextBinding(
 ): OnboardingContextBinding | null {
   const filePath = contextPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateBinding(JSON.parse(safeReadFile(filePath, { encoding: 'utf8' }) as string));
+  return validateBinding(loadJson<unknown>(filePath));
 }
 
 export function resolveOnboardingContext(

@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import AjvModule, { type ValidateFunction } from 'ajv';
+import type { ValidateFunction } from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
+import { createAjv } from './foundation/ajv.js';
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true, allowUnionTypes: true });
+const ajv = createAjv();
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 addFormats(ajv);
 
@@ -65,7 +65,7 @@ export interface ServiceRecording {
 let validator: ValidateFunction | null = null;
 function getValidator(): ValidateFunction {
   if (!validator) {
-    validator = ajv.compile(JSON.parse(safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string));
+    validator = ajv.compile(loadJson<Record<string, unknown>>(SCHEMA_PATH));
   }
   return validator;
 }
@@ -82,7 +82,6 @@ export function serviceRecordingContentHash(recording: ServiceRecording): string
 }
 
 const INPUT_PLACEHOLDER = /\{\{input\.([a-z][a-z0-9_]{0,63})\}\}/g;
-const CHANNEL_PLACEHOLDER = /\{\{channel\.([a-zA-Z0-9_]+)\}\}/g;
 const SECRET_PLACEHOLDER = /^\{\{secret\.([a-zA-Z0-9_.-]+)\}\}$/u;
 const SENSITIVE_KEY =
   /(token|secret|password|authorization|api[_-]?key|credential|cookie|private[_-]?key|otp|one[_-]?time|passphrase)/iu;

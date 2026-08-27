@@ -1,4 +1,4 @@
-import { ensureAgentRuntime } from './agent-runtime-supervisor.js';
+import { ensureAgentRuntime } from './agent-runtime-port.js';
 import { ensureAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
 import { agentRegistry } from './agent-registry.js';
 import {

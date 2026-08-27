@@ -16,6 +16,7 @@ import {
 } from './software-quality.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeReadFile } from './secure-io.js';
+import { withoutSchemaMetadata } from './test-governance-payload.js';
 
 function contract(): SoftwareQualityContract {
   return {
@@ -140,10 +141,12 @@ describe('software quality lifecycle', () => {
       expect(validate(value), JSON.stringify(validate.errors)).toBe(true);
     }
 
-    const viewpoints = JSON.parse(
-      safeReadFile('knowledge/product/governance/software-test-viewpoints.json', {
-        encoding: 'utf8',
-      }) as string
+    const viewpoints = withoutSchemaMetadata(
+      JSON.parse(
+        safeReadFile('knowledge/product/governance/software-test-viewpoints.json', {
+          encoding: 'utf8',
+        }) as string
+      )
     );
     const validateViewpoints = compileSchemaFromPath(
       ajv,

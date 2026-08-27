@@ -1,6 +1,7 @@
+import * as path from 'node:path';
 import {
-  logger,
   safeExistsSync,
+  pathResolver,
   registerGenerationSchedule,
   runGenerationScheduleAction as runGovernedGenerationScheduleAction,
   GENERATION_SCHEDULER_AUTHORITY,
@@ -11,7 +12,7 @@ import {
 } from '@agent/core';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { resolveCliInputPath } from './refactor/cli-input.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
  * EV-01: this script used to carry a full second copy of the tick logic
@@ -49,7 +50,10 @@ export async function runGenerationScheduleAction(argv: {
       if (!argv.input) throw new Error('register requires --input');
       Object.assign(process.env, buildExecutionEnv(process.env, 'surface_runtime'));
       return withExecutionContext('surface_runtime', () => {
-        const logicalPath = resolveCliInputPath(String(argv.input));
+        const inputPath = String(argv.input);
+        const logicalPath = path.isAbsolute(inputPath)
+          ? inputPath
+          : pathResolver.rootResolve(inputPath);
         if (!safeExistsSync(logicalPath))
           throw new Error(`schedule file not found: ${logicalPath}`);
         const result = registerGenerationSchedule(logicalPath);
@@ -115,14 +119,14 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-const isMain =
-  process.argv[1] &&
-  (process.argv[1].endsWith('scripts/run_generation_schedule.ts') ||
-    process.argv[1].endsWith('dist/scripts/run_generation_schedule.js'));
-
-if (isMain) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exit(1);
-  });
-}
+if (
+  isDirectScript(import.meta.url, 'run_generation_schedule.ts') ||
+  isDirectScript(import.meta.url, 'run_generation_schedule.js')
+)
+  void defineScript({
+    name: 'generation-schedule',
+    flags: [],
+    run() {
+      return main();
+    },
+  })();

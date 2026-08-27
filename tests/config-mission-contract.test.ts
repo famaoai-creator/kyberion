@@ -13,7 +13,7 @@ const PIPELINE_CONFIG_DIR = 'pipelines/config';
 
 describe('Config mission contract', () => {
   it('preset schema is valid JSON Schema', () => {
-    const schema = JSON.parse(read('schemas/config-mission-preset.schema.json'));
+    const schema = JSON.parse(read('knowledge/product/schemas/config-mission-preset.schema.json'));
     expect(schema.$schema).toContain('json-schema.org');
     expect(schema.required).toContain('preset_id');
     expect(schema.required).toContain('inputs');
@@ -22,7 +22,7 @@ describe('Config mission contract', () => {
   });
 
   it('all presets conform to the schema', () => {
-    const schema = JSON.parse(read('schemas/config-mission-preset.schema.json'));
+    const schema = JSON.parse(read('knowledge/product/schemas/config-mission-preset.schema.json'));
     const ajv = new Ajv({ strict: false });
     const validate = ajv.compile(schema);
 

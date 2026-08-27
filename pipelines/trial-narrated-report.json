@@ -3,6 +3,13 @@
   "name": "Trial Narrated Report",
   "version": "1.0.0",
   "description": "End-to-end narrated executive report: voice narration + video composition with strict ADF preflight.",
+  "context": {
+    "audio_path": "active/shared/tmp/narration.aiff",
+    "video_output_path": "active/shared/tmp/narrated-report.mp4",
+    "video_bundle_dir": "active/shared/tmp/video-composition/executive-summary",
+    "mission_evidence_dir": "active/shared/tmp/video-composition",
+    "video_slug": "executive-summary"
+  },
   "steps": [
     {
       "id": "check_voice_actuator_build",
@@ -51,11 +58,28 @@
     {
       "id": "generate_audio",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "audio_gen_result", "type": "ShellResult" },
+      "op": "voice:generate_voice",
+      "produces": { "channel": "audio_gen_result", "type": "VoiceGenerationResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{voice_action_path}} --output {{audio_path}}",
-        "audio_path": "active/shared/tmp/narration.aiff"
+        "request_id": "trial-narrated-report-audio",
+        "text": "{{input.narration_text}}",
+        "profile_ref": { "profile_id": "operator-ja-default" },
+        "engine": { "engine_id": "local_say" },
+        "rendering": {
+          "language": "ja",
+          "chunking": {
+            "max_chunk_chars": 4000,
+            "crossfade_ms": 50,
+            "preserve_paralinguistic_tags": true
+          }
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "aiff",
+          "artifact_path": "{{audio_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": { "personal_voice_mode": "allow_fallback" }
       }
     },
     {
@@ -70,20 +94,36 @@
     {
       "id": "generate_video",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "video_gen_result", "type": "ShellResult" },
+      "op": "video-composition:create_narrated_intro_movie",
+      "produces": { "channel": "video_gen_result", "type": "VideoCompositionResult" },
       "params": {
-        "cmd": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH={{video_render_policy_json}} node dist/libs/actuators/video-composition-actuator/src/index.js --audio {{audio_path}} --output {{video_output_path}}",
-        "video_output_path": "active/shared/tmp/narrated-report.mp4"
+        "narrated_video_brief": {
+          "title": "Trial Narrated Report",
+          "story": "{{input.narration_text}}",
+          "language": "ja",
+          "narration_artifact_ref": "{{audio_path}}",
+          "output": {
+            "format": "mp4",
+            "target_path": "{{video_output_path}}",
+            "bundle_dir": "{{video_bundle_dir}}",
+            "await_completion": true,
+            "duration_sec": 10,
+            "fps": 15
+          }
+        }
       }
     },
     {
       "id": "validate_video_output",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "video_check", "type": "ShellResult" },
+      "op": "video-composition:validate_narrated_video_artifact",
+      "produces": { "channel": "video_check", "type": "VideoValidationResult" },
       "params": {
-        "cmd": "test -f {{video_output_path}} && test -f active/shared/tmp/video-composition/executive-summary/index.html && test -f active/shared/tmp/video-composition/executive-summary/render-plan.json"
+        "narration_path": "{{audio_path}}",
+        "video_output_path": "{{video_output_path}}",
+        "video_bundle_dir": "{{video_bundle_dir}}",
+        "mission_evidence_dir": "{{mission_evidence_dir}}",
+        "video_slug": "{{video_slug}}"
       }
     },
     {

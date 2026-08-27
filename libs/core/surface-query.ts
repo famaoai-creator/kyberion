@@ -1,8 +1,9 @@
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { getRegisteredEnvText } from './foundation/env.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import AjvModule, { type ValidateFunction } from 'ajv';
-import { compileSchemaFromPath } from './schema-loader.js';
+import type { ValidateFunction } from 'ajv';
+import { compileSchema } from './foundation/ajv.js';
 import {
   listSurfaceQueryOverlayCatalogEntries,
   loadSurfaceQueryOverlayCatalog,
@@ -58,16 +59,13 @@ const CONFIG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-query-providers.schema.json'
 );
 
-const Ajv = (AjvModule as any).default ?? AjvModule;
-const ajv = new Ajv({ allErrors: true });
-
 let cachedConfig: SurfaceQueryProviderConfig | null = null;
 let cachedConfigPath: string | null = null;
 let validateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (validateFn) return validateFn;
-  validateFn = compileSchemaFromPath(ajv, CONFIG_SCHEMA_PATH);
+  validateFn = compileSchema(CONFIG_SCHEMA_PATH);
   return validateFn;
 }
 
@@ -138,7 +136,7 @@ function getPhaseOverlayPathForPhase(phase?: string): string | null {
 function getPersonalOverlayPath(): string | null {
   const catalog = loadSurfaceQueryOverlayCatalog();
   return (
-    process.env.KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH')?.trim() ||
     (catalog?.personal_overlay_path
       ? pathResolver.knowledge(catalog.personal_overlay_path)
       : DEFAULT_PERSONAL_OVERLAY_PATH)
@@ -182,17 +180,24 @@ function getEntityOverlayPath(scope?: ScopeContext): string[] {
 }
 
 function getRequestedRole(context: SurfaceQueryProviderContext): string | undefined {
-  return context.role?.trim() || process.env.KYBERION_SURFACE_QUERY_ROLE?.trim() || undefined;
+  return (
+    context.role?.trim() || getRegisteredEnvText('KYBERION_SURFACE_QUERY_ROLE')?.trim() || undefined
+  );
 }
 
 function getRequestedPhase(context: SurfaceQueryProviderContext): string | undefined {
-  return context.phase?.trim() || process.env.KYBERION_SURFACE_QUERY_PHASE?.trim() || undefined;
+  return (
+    context.phase?.trim() ||
+    getRegisteredEnvText('KYBERION_SURFACE_QUERY_PHASE')?.trim() ||
+    undefined
+  );
 }
 
 export function getSurfaceQueryProviderConfig(
   context: SurfaceQueryProviderContext = {}
 ): SurfaceQueryProviderConfig {
-  const configPath = process.env.KYBERION_SURFACE_QUERY_CONFIG_PATH || DEFAULT_CONFIG_PATH;
+  const configPath =
+    getRegisteredEnvText('KYBERION_SURFACE_QUERY_CONFIG_PATH') || DEFAULT_CONFIG_PATH;
   loadSurfaceQueryOverlayCatalog();
   const overlayPaths = [
     getTenantOverlayPath(context.scope),
@@ -217,16 +222,10 @@ export function getSurfaceQueryProviderConfig(
   }
 
   try {
-    let config = validateConfig(
-      JSON.parse(safeReadFile(configPath, { encoding: 'utf8' }) as string),
-      configPath
-    );
+    let config = validateConfig(loadJson(configPath), configPath);
     for (const overlayPath of overlayPaths) {
       if (!safeExistsSync(overlayPath)) continue;
-      const overlay = validateConfig(
-        JSON.parse(safeReadFile(overlayPath, { encoding: 'utf8' }) as string),
-        overlayPath
-      );
+      const overlay = validateConfig(loadJson(overlayPath), overlayPath);
       config = mergeConfigs(config, overlay);
     }
     cachedConfig = config;

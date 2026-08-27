@@ -25,12 +25,14 @@ import {
   type EnvironmentManifest,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
+import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const MANIFEST_DIR = 'knowledge/product/governance/environment-manifests';
 
-export async function main(argv = process.argv.slice(2)): Promise<number> {
+export async function main(argv: string[] = []): Promise<number> {
   const checkOnly = argv.includes('--check');
-  const signingKey = process.env.KYBERION_MANIFEST_SIGNING_KEY;
+  const signingKey = getRegisteredEnvText('KYBERION_MANIFEST_SIGNING_KEY');
   if (!signingKey) {
     logger.error(
       '[manifests:sign] KYBERION_MANIFEST_SIGNING_KEY is not set — refusing to sign/verify.'
@@ -69,13 +71,25 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   return failures > 0 ? 1 : 0;
 }
 
-const isDirect = process.argv[1] && /sign_environment_manifests\.(ts|js)$/.test(process.argv[1]);
-if (isDirect) {
-  main().then(
-    (code) => process.exit(code),
-    (error) => {
-      logger.error(`[manifests:sign] failed: ${(error as Error).message || error}`);
-      process.exit(1);
+export const runSignEnvironmentManifests = defineScript({
+  name: 'manifests:sign',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      const code = await main(argv);
+      if (code !== 0) throw new ScriptExitError(code, '', true);
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      throw new ScriptExitError(
+        1,
+        `[manifests:sign] failed: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-  );
-}
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'sign_environment_manifests.ts') ||
+  isDirectScript(import.meta.url, 'sign_environment_manifests.js')
+)
+  void runSignEnvironmentManifests();
