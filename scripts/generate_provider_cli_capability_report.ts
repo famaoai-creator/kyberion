@@ -9,7 +9,7 @@ import {
 import { readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import type { CapabilityRegistryEntry } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type AdapterEntry = {
   adapter_id: string;
@@ -177,8 +177,14 @@ function main(args: string[]): void {
   console.log(`[generate:provider-cli-capability-report] wrote report to ${outPath}`);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'generate:provider-cli-capability-report',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'generate_provider_cli_capability_report.ts') ||
+  isDirectScript(import.meta.url, 'generate_provider_cli_capability_report.js')
+) {
+  void script();
+}

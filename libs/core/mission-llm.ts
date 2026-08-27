@@ -3,7 +3,7 @@
  * LLM resolution and invocation layer for mission distillation.
  */
 
-import { z, type ZodType } from 'zod';
+import { type ZodType } from 'zod';
 import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';

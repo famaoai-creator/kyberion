@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';

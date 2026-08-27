@@ -919,7 +919,8 @@ const executeAdfSteps = async (
   return run(steps, initialCtx);
 };
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core')),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   safeReadFile,
   loadJson,
@@ -1051,7 +1052,8 @@ vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),
 }));
 
-vi.mock('@agent/core/secure-io', () => ({
+vi.mock('@agent/core/secure-io', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('@agent/core/secure-io')),
   safeStat,
 }));
 

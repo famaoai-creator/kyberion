@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { loadJson, safeExistsSync } from './secure-io.js';
 import { validateReasoningEgress, type ContextSecurityScope } from './context-security-scope.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import {

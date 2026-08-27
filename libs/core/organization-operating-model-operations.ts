@@ -1,27 +1,7 @@
 import * as path from 'node:path';
-import type { ValidateFunction } from 'ajv';
 import addFormatsModule from 'ajv-formats';
-import { loadOrganizationProfile, type OrganizationProfile } from './organization-profile.js';
-import { resolveIntentResolutionPacket } from './intent-resolution.js';
-import { listProjectRecords, loadProjectRecord } from './project-registry.js';
-import { loadState } from './mission-state.js';
-import { t } from './t.js';
-import type { SupportedLocale } from './locale.js';
 import { pathResolver } from './path-resolver.js';
-import { isValidTenantSlug } from './entity-scope.js';
-import { auditChain } from './audit-chain.js';
-import { resolveTenant } from './tenant-registry.js';
-import { getRegisteredEnvText } from './foundation/env.js';
 import { createAjv } from './foundation/ajv.js';
-import {
-  safeExistsSync,
-  loadJson,
-  safeMkdir,
-  safeReaddir,
-  safeRmSync,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
 
 type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
 const addFormats =
@@ -34,91 +14,50 @@ import {
   validatorFor,
   validationErrors,
   assertOrganizationId,
-  assertTenantSlug,
   recordTenant,
   assertRecordIdentity,
-  statePath,
-  purposePath,
   recordPath,
   recordQueryTiers,
   recordQueryTenant,
   readJsonRecord,
   saveValidated,
-  loadOrganizationOperatingModelCatalog,
   validateOrganizationPurpose,
   validateOrganizationOperationalState,
   validateOrganizationDomain,
-  validateOrganizationCapability,
   validateOrganizationService,
   validateOrganizationServiceState,
   validateOrganizationOperation,
   validateOrganizationOperationState,
   validateOrganizationOperationRun,
-  validateOrganizationWorkResolution,
   validateOrganizationIncident,
   validateOrganizationCadence,
-  validateOrganizationDecision,
   validateOrganizationLearningCandidate,
-  classifyOrganizationWork,
-  resolveOrganizationWork,
-  organizationPurposePath,
-  organizationOperationalStatePath,
-  saveOrganizationPurpose,
   loadOrganizationPurpose,
-  saveOrganizationOperationalState,
-  transitionOrganizationLifecycle,
   loadOrganizationOperationalState,
-  saveOrganizationDomain,
-  saveOrganizationCapability,
-  saveOrganizationService,
-  saveOrganizationServiceState,
   loadOrganizationDomain,
-  loadOrganizationCapability,
   loadOrganizationService,
-  loadOrganizationServiceState,
   operationDirectory,
   listOrganizationRecordFiles,
 } from './organization-operating-model-persistence.js';
 import type {
   OrganizationTier,
-  OrganizationWorkShape,
-  OrganizationRelationshipType,
-  OrganizationOperatingModelCatalog,
   OrganizationPurposeObjective,
   OrganizationPurposeRecord,
-  OrganizationServiceHealthSummary,
   OrganizationOperationalState,
   OrganizationDomainRecord,
-  OrganizationCapabilityRecord,
   OrganizationServiceRecord,
   OrganizationServiceState,
   OrganizationOperationType,
   OrganizationOperationRecord,
   OrganizationOperationState,
   OrganizationOperationRun,
-  OrganizationManagementUnit,
-  OrganizationWorkResolution,
   OrganizationIncidentRecord,
   OrganizationCadenceRecord,
   OrganizationDecisionRecord,
-  OrganizationLearningSourceType,
   OrganizationLearningCandidate,
   QueueOrganizationLearningCandidateInput,
-  OrganizationCatalog,
-  OrganizationCatalogReconciliation,
-  OrganizationProjectLineage,
-  OrganizationLineage,
-  OrganizationReconciliationResult,
-  OrganizationManagementView,
 } from './organization-operating-model.js';
 
-const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
-const CATALOG_PATH = pathResolver.knowledge(
-  'product/orchestration/organization-operating-model.json'
-);
-const CATALOG_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-operating-model.schema.json'
-);
 const PURPOSE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-purpose.schema.json'
 );
@@ -127,9 +66,6 @@ const STATE_SCHEMA_PATH = pathResolver.knowledge(
 );
 const DOMAIN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-domain.schema.json'
-);
-const CAPABILITY_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-capability.schema.json'
 );
 const SERVICE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-service.schema.json'
@@ -146,9 +82,6 @@ const OPERATION_STATE_SCHEMA_PATH = pathResolver.knowledge(
 const OPERATION_RUN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-operation-run.schema.json'
 );
-const WORK_RESOLUTION_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/organization-work-resolution.schema.json'
-);
 const INCIDENT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-incident.schema.json'
 );
@@ -161,12 +94,6 @@ const DECISION_SCHEMA_PATH = pathResolver.knowledge(
 const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-learning-candidate.schema.json'
 );
-const PURPOSE_FILE_NAME = 'purpose.json';
-const STATE_FILE_NAME = 'organization-state.json';
-const DOMAIN_FILE_NAME = 'domain.json';
-const CAPABILITY_FILE_NAME = 'capability.json';
-const SERVICE_FILE_NAME = 'service.json';
-const SERVICE_STATE_FILE_NAME = 'service-state.json';
 const OPERATION_FILE_NAME = 'operation.json';
 const OPERATION_STATE_FILE_NAME = 'operation-state.json';
 const OPERATION_RUN_FILE_NAME = 'run.json';
@@ -174,7 +101,6 @@ const INCIDENT_FILE_NAME = 'incident.json';
 const CADENCE_FILE_NAME = 'cadence.json';
 const DECISION_FILE_NAME = 'decision.json';
 const LEARNING_FILE_NAME = 'candidate.json';
-const validatorCache = new Map<string, ValidateFunction>();
 
 export function saveOrganizationOperation(
   record: OrganizationOperationRecord,

@@ -11,7 +11,6 @@ import {
   assertValidMobileAppProfile,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';

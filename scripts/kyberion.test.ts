@@ -93,6 +93,20 @@ describe('kyberion command router', () => {
     expect(() => validateKyberionStartupEnvironment({})).not.toThrow();
   });
 
+  it('names the escape hatch and the registry when startup validation fails', () => {
+    let message = '';
+    try {
+      assertRequiredEnvironment({
+        errors: [{ name: 'KYBERION_MYSTERY', issue: 'variable is not registered' }],
+      });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('knowledge/product/governance/env-registry.json');
+    expect(message).toContain('pnpm generate:env-registry');
+    expect(message).toContain('KYBERION_ENV_REGISTRY_STRICT=0');
+  });
+
   it('fails closed on unknown environment variables when strict registry mode is enabled', () => {
     expect(() =>
       validateKyberionStartupEnvironment({

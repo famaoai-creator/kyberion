@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 import {
-  logger,
   pathResolver,
   resolveOperatorDisplayName,
   resolveLocale as resolveUnifiedLocale,
   safeExistsSync,
   safeExec,
-  safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeReaddir,
   safeStat,
@@ -18,22 +15,6 @@ import {
 import { t as coreT } from '@agent/core/t';
 import type { SupportedLocale, VocabularyKey } from '@agent/core';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import {
-  executeEmailDelivery,
-  generateEmailReplyDraft,
-  organizeEmailInbox,
-  listEmailAccountProviders,
-  readEmailDraftArtifact,
-  readGwsAuthStatus,
-  resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
-import {
-  createCalendarEvent,
-  listCalendarAgenda,
-  listCalendars,
-  queryCalendarFreeBusy,
-  readM365AuthStatus,
-} from '@agent/core/calendar-workflow';
 import {
   assertValidMobileAppProfileIndex,
   assertValidWebAppProfileIndex,
@@ -50,7 +31,6 @@ import {
   handleEmailWorkflowCommand,
   handleOffboardCommand,
   handleTaskCommand,
-  parseOffboardArgs,
 } from './cli-workflow-handlers.js';
 export { parseOffboardArgs } from './cli-workflow-handlers.js';
 import { printBranchBanner, printHeader, printHelp } from './cli-presentation.js';
@@ -193,14 +173,6 @@ function stripLocaleArg(args: string[]): string[] {
   }
   nextArgs.splice(localeArgIndex, nextArgs[localeArgIndex + 1] ? 2 : 1);
   return nextArgs;
-}
-
-function getCalendarProvider(
-  options: Record<string, string | boolean>
-): 'google-workspace' | 'm365' {
-  const provider =
-    typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
-  return provider === 'm365' ? 'm365' : 'google-workspace';
 }
 
 export function stripNpmSeparatorArg(args: string[]): string[] {

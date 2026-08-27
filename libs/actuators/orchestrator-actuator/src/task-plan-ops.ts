@@ -8,7 +8,6 @@ import {
   readRequirementsDraft,
   readTaskPlan,
   safeExistsSync,
-  safeReadFile,
   safeWriteFile,
   saveTaskPlan,
 } from '@agent/core';

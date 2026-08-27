@@ -2,7 +2,7 @@ import { appendJsonLine } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 export interface ArtifactOwnershipRecord {
   artifact_id: string;

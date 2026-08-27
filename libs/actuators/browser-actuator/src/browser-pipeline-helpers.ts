@@ -1,7 +1,5 @@
 import {
-  loadJson,
   logger,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
@@ -10,12 +8,9 @@ import {
   TraceContext,
   persistTrace,
   pathResolver,
-  resolveVars,
-  evaluateCondition,
   getPathValue,
   retry,
   buildGovernedRetryOptions,
-  classifyError,
   processUntrustedContent,
   decideFromObservation,
   executeLlmDecideOp,
@@ -24,7 +19,7 @@ import {
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
-import { chromium, type CDPSession, type Page } from '@playwright/test';
+import { type CDPSession, type Page } from '@playwright/test';
 import * as path from 'node:path';
 import {
   registerPasskey,
@@ -39,38 +34,6 @@ interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
-}
-
-interface BrowserAction {
-  action: 'pipeline';
-  steps: PipelineStep[];
-  session_id?: string;
-  options?: {
-    headless?: boolean;
-    viewport?: { width: number; height: number };
-    max_steps?: number;
-    timeout_ms?: number;
-    record_trace?: boolean;
-    record_video?: boolean;
-    locale?: string;
-    lease_ms?: number;
-    keep_alive?: boolean;
-    user_data_dir?: string;
-    browser_channel?: 'chromium' | 'chrome';
-    profile_directory?: string;
-    launch_args?: string[];
-    connect_over_cdp?: boolean;
-    cdp_url?: string;
-    cdp_port?: number;
-    video_artifact_dir?: string;
-    action_trail_max?: number;
-    navigation_policy?: {
-      allowed_origins?: string[];
-      allow_private_network?: boolean;
-      allow_data_url?: boolean;
-    };
-  };
-  context?: Record<string, any>;
 }
 
 export interface BrowserRuntime {
@@ -104,33 +67,6 @@ export interface BrowserRuntime {
       ts: string;
     }>;
   };
-}
-
-interface BrowserRecordedAction {
-  kind: 'control' | 'capture' | 'apply';
-  op: string;
-  tab_id?: string;
-  url?: string;
-  title?: string;
-  ref?: string;
-  selector?: string;
-  text?: string;
-  key?: string;
-  element_name?: string;
-  element_role?: string | null;
-  content_excerpt?: string;
-  ts: string;
-}
-
-interface BrowserSessionMetadata {
-  recent_actions: Array<{
-    op: string;
-    kind: 'control' | 'capture' | 'apply';
-    tab_id?: string;
-    ref?: string;
-    selector?: string;
-    ts: string;
-  }>;
 }
 
 interface BrowserRuntimeLeaseLike {

@@ -29,7 +29,7 @@ import { createLogger } from './logger.js';
 import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
 import { scrubContent } from './pii-scrubber.js';
-import { safeAppendFileSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MeetingJoinDriver } from './meeting-join-driver.js';
 import { registerMeetingJoinDriver } from './meeting-join-driver.js';
 import type {

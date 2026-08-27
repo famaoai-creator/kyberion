@@ -10,8 +10,6 @@ import {
   claimWorkItem,
   handoffWorkItem,
   updateWorkItem,
-  WorkItem,
-  WorkLease,
   WorkItemStatus,
 } from './work-coordination.js';
 

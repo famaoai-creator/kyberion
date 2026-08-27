@@ -1,16 +1,12 @@
-import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { queryKnowledge, queryKnowledgeHybrid } from './src/knowledge-index.js';
 import { deriveSurfaceSessionId } from './orchestrator-session.js';
 import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
 import { pathResolver } from './path-resolver.js';
-import { secureFetch } from './network.js';
-import { safeExec, safeWriteFile } from './secure-io.js';
+import { safeExec } from './secure-io.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale, type SupportedLocale } from './locale-normalize.js';
-import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import type { A2AMessage } from './a2a-bridge.js';
 import { getAgentManifest, resolveAgentSelectionHints } from './agent-manifest.js';
@@ -22,7 +18,6 @@ import {
 } from './agent-runtime-supervisor-client.js';
 import {
   compileUserIntentFlow,
-  formatClarificationPacket,
   formatClarificationPacketConcise,
   isSimpleGreetingText,
 } from './intent-contract.js';
@@ -32,46 +27,20 @@ import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
 import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
 import {
-  resolveFallbackLocationCoordinates,
-  resolveFallbackLocationSummary,
-} from './location-fallback.js';
-import {
   buildMissionTeamView,
   loadMissionTeamPlan,
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
-import {
-  classifyTaskSessionIntent,
-  createTaskSession,
-  getLatestCompletedTaskSession,
-  reopenTaskSession,
-  saveTaskSession,
-  updateTaskSession,
-  getActiveTaskSession,
-} from './task-session.js';
-import type { TaskSession } from './task-session.js';
+import { classifyTaskSessionIntent, getActiveTaskSession } from './task-session.js';
 import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
-import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
-import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
-import { truncateTextWithCount } from './text-truncation.js';
-import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
-import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
 import {
   deriveSlackExecutionModeFromProviderPolicy,
   deriveSurfaceIntentLabelFromProviderPolicy,
   shouldForceSurfaceDelegationFromProviderPolicy,
 } from './surface-provider-policy.js';
-import { extractSurfaceBlocks, sanitizeSurfaceReplyText } from './surface-response-blocks.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
-import { assessContextualClarification } from './contextual-intent-clarification-policy.js';
-import { isCorrectionUtterance } from './correction-detection.js';
-import {
-  recordSchedulePreference,
-  resolveDefaultScheduleSource,
-} from './contextual-intent-memory.js';
-import { recordContextualIntentLearning } from './contextual-intent-learning.js';
+import { extractSurfaceBlocks } from './surface-response-blocks.js';
 import {
   buildDelegationFallbackText,
   deriveSurfaceDelegationReceiver,
@@ -84,44 +53,21 @@ import {
   type SurfaceDelegationReceiver,
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
-import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
+import { resolveSurfaceIntent } from './router-contract.js';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
-import {
-  recordIntentContractOutcome,
-  selectContractCandidates,
-  type ContractCandidate,
-} from './intent-contract-learning.js';
-import type { WorkScopeDecision } from './work-scope-decision.js';
-import {
-  findServiceById,
-  registerService,
-  updateServiceStats,
-  extractProviderFromUtterance,
-  resolveProviderUrl,
-} from './external-service-registry.js';
+import { selectContractCandidates } from './intent-contract-learning.js';
 import {
   attachRoutingDecision,
   buildDelegatedSurfaceConversationResult,
   buildDelegationSummaryContext,
   buildDelegationSummaryInstruction,
-  buildKnowledgeQueryReply,
-  buildTaskSessionReply,
-  deriveSurfaceQueryRole,
   emptySurfaceResult,
-  fetchWeatherSummary,
-  formatCalendarAgendaReply,
   formatExecutionReceipt,
-  getScheduleDateRange,
-  extractFollowUpRequests,
-  loadKnowledgeHintIndex,
-  readScheduleAgenda,
   resolvedSurfaceIntent,
-  runWebSearch,
   structuredSurfaceQueryText,
-  summarizeUserFacingText,
 } from './surface-runtime-helpers.js';
 
 export {
@@ -141,11 +87,7 @@ import type {
   SurfaceConversationResult,
 } from './channel-surface-types.js';
 import type { UserIntentFlow } from './intent-contract.js';
-import {
-  parseExecutionFeedbackText,
-  recordExecutionFeedback,
-  type ExecutionFeedbackRecord,
-} from './execution-feedback.js';
+import { parseExecutionFeedbackText, recordExecutionFeedback } from './execution-feedback.js';
 import * as surfaceRuntimeData from './surface-runtime-conversation-data.js';
 
 export {
@@ -586,6 +528,24 @@ function recordSurfaceReasoningTierDeclaration(input: {
 }
 
 /**
+ * Single derivation of "this turn needs approval" shared by both surface UX
+ * contract call sites (the in-conversation escalation check and the outbound
+ * chokepoint), so an approval turn is held to the same consequence/unblock
+ * rule wherever it is validated.
+ */
+function deriveSurfaceApprovalRequired(input: {
+  intentResolution?: { authority_level?: string } | null;
+  approvalRequests?: readonly unknown[];
+  missionProposals?: readonly unknown[];
+}): boolean {
+  return (
+    input.intentResolution?.authority_level === 'approval_required' ||
+    (input.approvalRequests?.length ?? 0) > 0 ||
+    (input.missionProposals?.length ?? 0) > 0
+  );
+}
+
+/**
  * SO-05 Task 3: one-shot fast→standard escalation for the *text* of a surface
  * agent response that is about to become the user-visible reply. Runs INSIDE
  * runSurfaceConversation (not the outer runSurfaceMessageConversation
@@ -605,7 +565,8 @@ async function escalateSurfaceTextIfNeeded(
   handle: AgentHandle,
   prompt: string,
   text: string,
-  callSite: SurfaceReasoningTierCallSite
+  callSite: SurfaceReasoningTierCallSite,
+  approvalRequired = false
 ): Promise<string> {
   // Empty text (e.g. a2a-only agent turns) keeps its pre-escalation handling:
   // the outer chokepoint's deterministic repair is responsible for shaping it.
@@ -615,6 +576,7 @@ async function escalateSurfaceTextIfNeeded(
   const verdict = validateSurfaceUxContract({
     text,
     allow_conversational_reply: allowConversationalReply,
+    approval_required: approvalRequired,
   });
   if (verdict.valid) return text;
 
@@ -624,6 +586,7 @@ async function escalateSurfaceTextIfNeeded(
     validateSurfaceUxContract({
       text: repairedText,
       allow_conversational_reply: allowConversationalReply,
+      approval_required: approvalRequired,
     }).valid
   ) {
     return repairedText;
@@ -1254,7 +1217,12 @@ export async function runSurfaceConversation(
       handle,
       structuredQuery,
       firstBlocks.text,
-      'surface_main_ask'
+      'surface_main_ask',
+      deriveSurfaceApprovalRequired({
+        intentResolution,
+        approvalRequests: firstBlocks.approvalRequests,
+        missionProposals: firstBlocks.missionProposals,
+      })
     );
     return withIntentResolution(
       surfaceRuntimeData.attachExecutionFeedbackPrompt(
@@ -1281,7 +1249,12 @@ export async function runSurfaceConversation(
       handle,
       structuredQuery,
       firstBlocks.text,
-      'surface_main_ask'
+      'surface_main_ask',
+      deriveSurfaceApprovalRequired({
+        intentResolution,
+        approvalRequests: firstBlocks.approvalRequests,
+        missionProposals: firstBlocks.missionProposals,
+      })
     );
     return withIntentResolution(
       surfaceRuntimeData.attachExecutionFeedbackPrompt(
@@ -1328,7 +1301,15 @@ export async function runSurfaceConversation(
     handle,
     summaryPrompt,
     followUpBlocksRaw.text,
-    'surface_summary_ask'
+    'surface_summary_ask',
+    deriveSurfaceApprovalRequired({
+      intentResolution,
+      approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocksRaw.approvalRequests],
+      missionProposals: [
+        ...(firstBlocks.missionProposals || []),
+        ...(followUpBlocksRaw.missionProposals || []),
+      ],
+    })
   );
   const followUpBlocks = { ...followUpBlocksRaw, text: followUpText };
 
@@ -1427,10 +1408,7 @@ export async function runSurfaceMessageConversation(
     const text = (result as { text?: unknown })?.text;
     if (typeof text === 'string' && text.trim()) {
       const allowConversationalReply = isSimpleGreetingText(input.text);
-      const approvalRequired =
-        result.intentResolution?.authority_level === 'approval_required' ||
-        (result.approvalRequests?.length ?? 0) > 0 ||
-        (result.missionProposals?.length ?? 0) > 0;
+      const approvalRequired = deriveSurfaceApprovalRequired(result);
       const verdict = validateSurfaceUxContract({
         text,
         allow_conversational_reply: allowConversationalReply,

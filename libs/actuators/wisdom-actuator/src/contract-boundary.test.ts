@@ -213,7 +213,7 @@ describe('wisdom public contract boundaries', () => {
   it('documents the ownership rationale for every published Wisdom operation', () => {
     const ownershipDoc = safeReadFile(
       pathResolver.rootResolve(
-        'docs/developer/improvement-plans-2026-07/WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md'
+        'docs/developer/improvement-plans-archive/2026-07/WISDOM_AGENT_OWNERSHIP_2026-07-20.ja.md'
       ),
       { encoding: 'utf8' }
     ) as string;

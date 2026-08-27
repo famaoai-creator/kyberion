@@ -4,7 +4,6 @@ import {
   loadJson,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeWriteFile,

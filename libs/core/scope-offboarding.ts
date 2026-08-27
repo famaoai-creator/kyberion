@@ -316,7 +316,6 @@ export const INGEST_CURSORS_REPO_SUBPATH = 'active/shared/runtime/ingest-cursors
 export const INGEST_DEDUP_REGISTRY_REPO_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
 const INGEST_QUOTA_REPO_SUBPATH = 'active/shared/runtime/ingest/quota';
-const DATA_VAULT_REPO_SUBPATH = 'active/shared/data-vault';
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
 

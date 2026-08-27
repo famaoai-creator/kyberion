@@ -34,9 +34,7 @@ import {
 } from './provider-health-registry.js';
 import { enforceSpendGuardForReasoning } from './spend-guard.js';
 import { metrics } from './metrics.js';
-import * as path from 'node:path';
-import { findMissionPath, pathResolver } from './path-resolver.js';
-import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
+import { findMissionPath } from './path-resolver.js';
 import { z } from 'zod';
 import {
   assertReasoningEgressAllowed,
@@ -51,11 +49,7 @@ import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import { AdvisoryPolicyViolation } from './ce-adoption.js';
 import { assertDistillationTextEgress } from './frame-redaction.js';
 import { appendPromptVisibilityRecord } from './prompt-visibility-ledger.js';
-import {
-  resolveConstrainedSampling,
-  type BackendCapabilityProfile,
-  type ConstrainedSampling,
-} from './backend-capability-profile.js';
+import { resolveConstrainedSampling } from './backend-capability-profile.js';
 import {
   appendDeferredToolAnnouncement,
   planDeferredToolLoading,
@@ -74,27 +68,14 @@ export {
   buildDelegationSummaryContinuationPrompt,
 } from './reasoning-delegation-policy.js';
 import {
-  AUTH_FAILURE_PATTERN,
-  AUTH_FAILURE_DEMOTION_MS,
   DEFAULT_IN_PLACE_RETRIES,
-  DEFAULT_RETRY_BASE_MS,
   resolveDemotionRetryAfterMs,
-  readRetryAfterMs,
   resolveInPlaceRetryCount,
-  resolveRetryBaseMs,
   resolveInPlaceRetryDelayMs,
   sleep,
   throwIfReasoningAborted,
 } from './reasoning-retry-policy.js';
-import {
-  backendSupportsVision,
-  MAX_REASONING_IMAGE_BYTES,
-  MAX_REASONING_IMAGES,
-  MAX_REASONING_IMAGE_BYTES_TOTAL,
-  validateReasoningImageAttachmentPaths,
-} from './reasoning-backend-contracts.js';
 import type {
-  PersonaLabel,
   DivergeHypothesisInput,
   HypothesisSketch,
   CritiqueInput,
@@ -105,32 +86,16 @@ import type {
   ForkedBranch,
   SimulationInput,
   SimulationResult,
-  RequirementPriority,
-  RequirementSourceRef,
-  FunctionalRequirement,
-  NonFunctionalRequirement,
-  RequirementConstraint,
-  RequirementAssumption,
-  OpenQuestion,
   ExtractRequirementsInput,
   ExtractedRequirements,
-  DesignSpecComponent,
-  DesignSpecDataFlow,
-  DesignSpecTradeOff,
-  DesignSpecRisk,
-  DesignSpecOpenDecision,
   ExtractDesignSpecInput,
   ExtractedDesignSpec,
-  TestCase,
   ExtractTestPlanInput,
   ExtractedTestPlan,
-  TaskPlanItem,
   DecomposeIntoTasksInput,
   DecomposedTaskPlan,
   ToolDefinition,
-  ToolCall,
   GenerateWithToolsResult,
-  ReasoningCallBudget,
   ReasoningPromptVisibilityContext,
   ReasoningCallOptions,
   ReasoningTextStream,

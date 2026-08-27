@@ -1,9 +1,7 @@
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDocumentContentsLabel,
-  resolveDocumentContentsSubtitle,
   resolveReportSectionTitle,
-  resolveReportSummaryTitle,
   resolveThemeColorRole as resolveThemeColorRolePolicy,
 } from '@agent/core';
 import {
@@ -60,25 +58,6 @@ function hexToPdfRgb(
   const b = Number.parseInt(normalized.slice(4, 6), 16);
   if ([r, g, b].some((value) => Number.isNaN(value))) return fallback;
   return [r / 255, g / 255, b / 255];
-}
-
-function formatJpy(value: number): string {
-  return new Intl.NumberFormat('ja-JP', {
-    style: 'currency',
-    currency: 'JPY',
-    maximumFractionDigits: 0,
-  }).format(Math.round(value));
-}
-
-function applyRounding(value: number, mode: string): number {
-  switch (mode) {
-    case 'floor':
-      return Math.floor(value);
-    case 'ceil':
-      return Math.ceil(value);
-    default:
-      return Math.round(value);
-  }
 }
 
 export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) {

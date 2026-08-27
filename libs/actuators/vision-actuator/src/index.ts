@@ -4,14 +4,12 @@ import {
   executeServicePreset,
   pathResolver,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   ocrImage as coreOcrImage,
   describeImage as coreDescribeImage,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core';

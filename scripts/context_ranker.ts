@@ -35,7 +35,7 @@ import {
   loadKnowledgeUsageAggregate,
   loadKnowledgeRankingWeights,
 } from '@agent/core';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core';
 import { readJson } from '@agent/core/foundation';
 
@@ -565,8 +565,14 @@ async function main(args: string[] = []) {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'knowledge:context-ranker',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'context_ranker.ts') ||
+  isDirectScript(import.meta.url, 'context_ranker.js')
+) {
+  void script();
+}

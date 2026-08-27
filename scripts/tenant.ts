@@ -4,7 +4,7 @@ import {
   readTenantProfile,
   type TenantLifecycleVerb,
 } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Args = {
   command: 'create' | 'update' | 'suspend' | 'resume' | 'archive' | 'list' | 'show' | 'help';
@@ -77,8 +77,11 @@ export function main(argv: string[] = []): void {
   console.log(JSON.stringify(result, null, 2));
 }
 
-void defineScript({
+const script = defineScript({
   name: 'tenant',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (isDirectScript(import.meta.url, 'tenant.ts') || isDirectScript(import.meta.url, 'tenant.js')) {
+  void script();
+}

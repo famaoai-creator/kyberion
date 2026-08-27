@@ -1,6 +1,5 @@
-import { logger, safeReadFile, pathResolver } from '@agent/core';
+import { logger } from '@agent/core';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
-import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleAction } from './terminal-actuator-helpers.js';

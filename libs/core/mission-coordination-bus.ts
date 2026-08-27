@@ -1,14 +1,7 @@
 import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import { withExecutionContext } from './authority.js';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeMoveSync,
-  safeReadFile,
-  safeRmSync,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeRmSync } from './secure-io.js';
 import { missionDir } from './path-resolver.js';
 
 export type MissionCoordinationChannel = 'task_contract' | 'handoff' | 'review' | 'runtime_notice';

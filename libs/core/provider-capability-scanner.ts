@@ -1,4 +1,4 @@
-import { safeExec, safeReadFile } from './secure-io.js';
+import { safeExec } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 

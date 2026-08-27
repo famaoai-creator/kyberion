@@ -2,7 +2,7 @@
 import * as path from 'node:path';
 import { pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
   id: string;
@@ -205,8 +205,14 @@ export async function main(argv: string[] = []): Promise<void> {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'task:run',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'task_run.ts') ||
+  isDirectScript(import.meta.url, 'task_run.js')
+) {
+  void script();
+}

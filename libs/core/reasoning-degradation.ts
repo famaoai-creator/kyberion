@@ -1,13 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  loadJson,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeUnlink,
-  safeWriteFile,
-} from './secure-io.js';
+import { loadJson, safeExistsSync, safeMkdir, safeUnlink, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**

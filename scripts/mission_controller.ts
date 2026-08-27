@@ -24,22 +24,16 @@ import {
   getRegisteredEnv,
   getReasoningBackend,
   installReasoningBackends,
-  loadProjectRecord,
-  loadProjectTrackRecord,
   logger,
   pathResolver,
   resolveMissionClassification,
   resolveMissionWorkflowDesign,
   safeExec,
-  safeReadFile,
-  safeWriteFile,
   safeExistsSync,
   TraceContext,
   persistTrace,
   safeReaddir,
-  findMissionPath,
   missionEvidenceDir,
-  validateWritePermission,
   killSwitch,
   renderStatus,
   buildHandoffPacket,
@@ -59,13 +53,11 @@ let activeMissionControllerArgs: string[] = [];
 
 // --- Sub-module imports ---
 import {
-  type ResolvedMissionCliInput,
   resolveMissionStartCreateInputFromArgv,
   resolveMissionTicketDispatchOptionsFromArgv,
   resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
 } from './refactor/mission-controller-args.js';
-import { type MissionRelationships } from './refactor/mission-types.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import {
   extractMissionControllerPositionalArgs,
@@ -76,7 +68,6 @@ import {
 } from './refactor/mission-cli-args.js';
 import { withOrganizationContext } from './refactor/organization-context.js';
 import {
-  buildOrganizationDiscoveryReport,
   listOrganizationCatalogs,
   listOrganizationProfiles,
   showOrganizationDiscovery,
@@ -93,17 +84,11 @@ import {
 } from './refactor/mission-memory-commands.js';
 import {
   assertCanGrantMissionAuthority,
-  normalizeRelationships,
-  readFocusedMissionId as _readFocusedMissionId,
   writeFocusedMissionId as _writeFocusedMissionId,
   loadState,
   saveState,
   checkDependencies,
 } from './refactor/mission-state.js';
-import {
-  resolveProjectLedgerJsonPath,
-  resolveProjectLedgerPath,
-} from './refactor/mission-project-ledger.js';
 import {
   dispatchNextQueuedMission,
   enqueueMission as _enqueueMission,
@@ -143,10 +128,6 @@ const QUEUE_PATH = pathResolver.shared('runtime/mission_queue.jsonl');
 const MISSION_FOCUS_PATH = pathResolver.shared('runtime/current_mission_focus.json');
 
 // ─── Focus helpers (thin wrappers binding MISSION_FOCUS_PATH) ────────────────
-function readFocusedMissionId(): string | null {
-  return _readFocusedMissionId(MISSION_FOCUS_PATH);
-}
-
 function writeFocusedMissionId(missionId: string): void {
   _writeFocusedMissionId(MISSION_FOCUS_PATH, missionId);
 }
@@ -265,16 +246,6 @@ async function createMission(
       { ...options, organizationId }
     )
   );
-}
-
-function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return { raw };
-  }
 }
 
 function formatRoutingDecisionSummary(

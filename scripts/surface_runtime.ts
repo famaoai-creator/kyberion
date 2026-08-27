@@ -15,7 +15,6 @@ import {
   probeSurfaceHealth,
   runtimeSupervisor,
   saveSurfaceState,
-  safeExistsSync,
   safeOpenAppendFile,
   spawnManagedProcess,
   inspectServiceAuth,
@@ -462,7 +461,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
 async function statusSurfaces() {
   const state = loadSurfaceState();
   const manifest = loadSurfaceManifest();
-  for (const [surfaceId, record] of Object.entries(state.surfaces)) {
+  for (const [_surfaceId, record] of Object.entries(state.surfaces)) {
     if (isRunning(record.pid)) {
       registerRunningSurfaceFromState(record);
     }

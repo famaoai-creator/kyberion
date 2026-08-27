@@ -30,7 +30,6 @@ import {
   pathResolver,
   auditChain,
   buildGovernedRetryOptions,
-  classifyError,
   retry,
   createActuatorTrace,
   finalizeActuatorTrace,

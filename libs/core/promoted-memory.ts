@@ -8,7 +8,6 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
-import { physicalScopedPath } from './physical-namespace.js';
 import { logger } from './core.js';
 import {
   resolvePromotedReportAudience,

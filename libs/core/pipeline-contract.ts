@@ -1,5 +1,5 @@
 import type { ValidateFunction } from 'ajv';
-import { loadJson, safeReadFile } from './secure-io.js';
+import { loadJson } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { createAjv } from './foundation/ajv.js';
 

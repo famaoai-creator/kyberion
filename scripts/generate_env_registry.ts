@@ -18,7 +18,7 @@
  *   pnpm generate:env-registry          — rewrite the three artifacts
  *   pnpm run check -- --scope full --only env-registry
  *                                      — fail if any artifact drifted
- *   KYBERION_ENV_REGISTRY_STRICT=1 pnpm run check -- --scope full --only env-registry
+ *   KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm run check -- --scope full --only env-registry
  *                                      — also fail while entries remain undocumented
  */
 
@@ -245,7 +245,8 @@ export const main = defineGenerator({
   outputs: [REGISTRY_PATH, ENV_EXAMPLE_PATH, CONFIGURATION_DOC_PATH],
   async render(context) {
     const strictDocumentation =
-      getRegisteredEnv<boolean>('KYBERION_ENV_REGISTRY_STRICT', { defaultValue: false }) === true;
+      getRegisteredEnv<boolean>('KYBERION_ENV_REGISTRY_STRICT_DOCS', { defaultValue: false }) ===
+      true;
     const rootDir = pathResolver.rootDir();
     const discovered = discoverEnvNames(rootDir);
     const existing = safeExistsSync(REGISTRY_PATH)
