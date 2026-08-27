@@ -1,13 +1,10 @@
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core';
+import { defineCatalog } from '@agent/core/foundation';
 import {
   buildContextualIntentFrame,
   compileUserIntentFlow,
   resolveIntentResolutionPacket,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
-
-const ajv = createAjv();
 
 type CorpusItem = {
   id: string;
@@ -67,17 +64,17 @@ async function main(): Promise<void> {
   const schemaPath = pathResolver.knowledge(
     'product/schemas/japanese-contextual-intent-corpus.schema.json'
   );
-  const corpus = readJsonFile<CorpusFile>(corpusPath);
-  const validate = compileSchemaFromPath(ajv, schemaPath);
-
-  if (!validate(corpus)) {
-    console.error('[eval:japanese-contextual-intent] invalid corpus schema');
-    console.error(
-      (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-        .join('\n')
-    );
+  let corpus: CorpusFile;
+  try {
+    corpus = defineCatalog<CorpusFile>({
+      id: 'japanese-contextual-intent-corpus',
+      path: corpusPath,
+      schema: schemaPath,
+    }).load();
+  } catch (error) {
+    console.error(`[eval:japanese-contextual-intent] invalid corpus schema: ${String(error)}`);
     process.exitCode = 1;
+    return;
   }
 
   const failures: string[] = [];

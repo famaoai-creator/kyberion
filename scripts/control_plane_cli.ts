@@ -15,8 +15,8 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { readJsonFile } from './refactor/cli-input.js';
 
 export { summarizeMissionSeedAssessment };
 
@@ -45,19 +45,19 @@ const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
 );
 
 function loadArtifactLibraryIndex(): any {
-  return readJsonFile(ARTIFACT_LIBRARY_INDEX_PATH);
+  return readJson(ARTIFACT_LIBRARY_INDEX_PATH);
 }
 
 function loadDesignMdIndex(): any {
-  return readJsonFile(DESIGN_MD_INDEX_PATH);
+  return readJson(DESIGN_MD_INDEX_PATH);
 }
 
 function loadDesignMdThemes(): any {
-  return readJsonFile(DESIGN_MD_THEME_PATH);
+  return readJson(DESIGN_MD_THEME_PATH);
 }
 
 function loadDesignMdSystems(): any {
-  return readJsonFile(DESIGN_MD_SYSTEM_PATH);
+  return readJson(DESIGN_MD_SYSTEM_PATH);
 }
 
 function normalizeCatalogQuery(input: unknown): string {
@@ -91,7 +91,7 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
     const fullPath = path.resolve(ARTIFACT_LIBRARY_DIR, String(pack.file));
-    const doc = readJsonFile<any>(fullPath);
+    const doc = readJson<any>(fullPath);
     return {
       profile_id: normalizedProfileId,
       domain: pack.domain,

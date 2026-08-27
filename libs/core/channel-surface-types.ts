@@ -369,12 +369,22 @@ export type SurfaceConversationMetadata =
   | DiscordSurfaceMetadata
   | BaseSurfaceMetadata;
 
+export interface SurfaceConversationAttachment {
+  id?: string;
+  filename?: string;
+  mimeType?: string;
+  uti?: string;
+  path?: string;
+  size?: number;
+}
+
 interface SurfaceConversationInputBase {
   agentId: string;
   query: string;
   senderAgentId: string;
   correlationId?: string;
   surfaceText?: string;
+  attachments?: SurfaceConversationAttachment[];
   threadContext?: string;
   cwd?: string;
   delegationSummaryInstruction?: string;
@@ -393,6 +403,7 @@ export type SurfaceConversationInput = SurfaceConversationInputBase & {
 interface SurfaceConversationMessageInputBase {
   text: string;
   surfaceText?: string;
+  attachments?: SurfaceConversationAttachment[];
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;

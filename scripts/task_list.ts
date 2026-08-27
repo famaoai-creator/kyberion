@@ -2,12 +2,12 @@
 import * as path from 'node:path';
 import {
   getRegisteredEnv,
-  loadJson,
   pathResolver,
   safeExistsSync,
   safeLstat,
   safeReaddir,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskTrigger =
@@ -66,7 +66,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return loadJson<TaskScenario>(filePath);
+  return readJson<TaskScenario>(filePath);
 }
 
 function resolveProfilePath(scenario: TaskScenario): string {

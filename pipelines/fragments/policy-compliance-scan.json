@@ -12,18 +12,9 @@
     {
       "id": "run_scan",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_compliance_scan",
       "produces": { "channel": "scan_result", "type": "ComplianceResult" },
-      "params": {
-        "command": "node",
-        "args": [
-          "dist/scripts/compliance_checker.js",
-          "--dir", "{{target_dir}}",
-          "--tier", "{{target_tier}}"
-        ],
-        "env": { "KYBERION_PERSONA": "sovereign" },
-        "allow_error": true
-      }
+      "params": { "target_dir": "{{target_dir}}", "target_tier": "{{target_tier}}" }
     },
     {
       "id": "check_violations",
@@ -33,10 +24,20 @@
       "params": {
         "condition": { "from": "scan_result.status", "operator": "equals", "value": "passed" },
         "then": [
-          { "role": "sink", "op": "system:log", "params": { "message": "Compliance scan passed for {{target_dir}}." } }
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "Compliance scan passed for {{target_dir}}." }
+          }
         ],
         "else": [
-          { "role": "sink", "op": "system:log", "params": { "message": "Compliance scan FAILED for {{target_dir}}. Violations: {{scan_result.violations}}" } }
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "Compliance scan FAILED for {{target_dir}}. Violations: {{scan_result.violations}}"
+            }
+          }
         ]
       }
     }

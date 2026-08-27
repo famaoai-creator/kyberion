@@ -12,6 +12,35 @@ vi.mock('./secure-io.js', () => ({
   loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
 }));
 
+// Explicit test fixture for the foundation JSON boundary; production code
+// must obtain this implementation through secure-io, never a global raw-fs
+// adapter.
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.appendFileSync(p, data);
+    },
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+    writeFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, data);
+    },
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));

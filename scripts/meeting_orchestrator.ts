@@ -39,7 +39,7 @@ import {
 } from '@agent/core';
 import { isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { readTextFile } from './refactor/cli-input.js';
+import { readTextFile } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;

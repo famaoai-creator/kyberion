@@ -35,13 +35,13 @@ import {
   pathResolver,
   resolveTenant,
   safeExistsSync,
-  loadJson,
   safeReaddir,
   safeStat,
   listProjectRecords,
   isValidTenantSlug,
   TENANT_SLUG_PATTERN,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 export const EXCEPTIONS_RELATIVE_PATH =
   'knowledge/product/governance/tenant-registry-exceptions.json';
@@ -87,7 +87,7 @@ export interface CheckOptions {
 
 function readJsonIfExists<T>(filePath: string): T | null {
   if (!safeExistsSync(filePath)) return null;
-  return loadJson<T>(filePath);
+  return readJson<T>(filePath);
 }
 
 export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsSnapshot {

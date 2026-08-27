@@ -1,9 +1,10 @@
 import * as path from 'node:path';
-import { loadJson, safeWriteFile, safeExistsSync, safeMkdir, pathResolver } from '@agent/core';
+import { safeWriteFile, safeExistsSync, safeMkdir, pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import yargs from 'yargs';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main(args: string[]) {
+export async function main(args: string[] = []) {
   const argv = await yargs(args)
     .option('adapter', {
       type: 'string',
@@ -29,7 +30,7 @@ async function main(args: string[]) {
     throw new Error(`Input file not found: ${adapterPath}`);
   }
 
-  const payload = loadJson<Record<string, unknown>>(adapterPath);
+  const payload = readJson<Record<string, unknown>>(adapterPath);
   const capabilityId = payload.capability_id || payload.id;
   if (!capabilityId) {
     throw new Error('Payload missing capability_id');
@@ -48,7 +49,7 @@ async function main(args: string[]) {
 
   let registry: any = { version: '1.0.0', capabilities: [] };
   if (safeExistsSync(absRegistryPath)) {
-    registry = loadJson<Record<string, unknown>>(absRegistryPath);
+    registry = readJson<Record<string, unknown>>(absRegistryPath);
   }
 
   const existingIndex = registry.capabilities.findIndex(
@@ -96,8 +97,13 @@ async function main(args: string[]) {
   );
 }
 
-void defineScript({
-  name: 'registry:manage',
-  flags: [],
-  run: ({ argv }) => main(argv),
-})();
+if (
+  isDirectScript(import.meta.url, 'registry_manager.ts') ||
+  isDirectScript(import.meta.url, 'registry_manager.js')
+) {
+  void defineScript({
+    name: 'registry:manage',
+    flags: [],
+    run: ({ argv }) => main(argv),
+  })();
+}

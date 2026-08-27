@@ -12,9 +12,17 @@
     {
       "id": "start_presence_studio",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "studio_pid", "type": "ShellResult" },
-      "params": { "cmd": "node presence/displays/presence-studio/server.ts &" }
+      "op": "process:spawn",
+      "produces": { "channel": "studio_pid", "type": "ManagedProcessResult" },
+      "params": {
+        "resourceId": "surface:presence-studio",
+        "command": "node",
+        "args": ["presence/displays/presence-studio/server.ts"],
+        "kind": "service",
+        "ownerId": "ui-voice-browser-smoke",
+        "ownerType": "pipeline",
+        "shutdownPolicy": "process"
+      }
     },
     {
       "id": "run_voice_hello",
@@ -33,12 +41,9 @@
     {
       "id": "check_meeting_consent",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "consent_result", "type": "ShellResult" },
-      "params": {
-        "cmd": "node dist/libs/actuators/meeting-actuator/src/index.js --check-consent",
-        "gate": "meeting consent gate"
-      }
+      "op": "meeting:check_consent",
+      "produces": { "channel": "consent_result", "type": "VoiceConsentCheckResult" },
+      "params": {}
     },
     {
       "id": "final_log",

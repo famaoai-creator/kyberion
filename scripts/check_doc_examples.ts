@@ -121,7 +121,30 @@ function evaluate(block: CodeBlock): BlockResult {
 }
 
 function printUsage(): void {
-  console.log('Usage: pnpm check:doc-examples [--list]');
+  console.log('Usage: pnpm check -- --scope full --only doc-examples [--list]');
+}
+
+export function runDocExamplesCheck(): {
+  files_scanned: number;
+  code_blocks: number;
+  passed: number;
+  skipped: number;
+  untagged: number;
+} {
+  const files = listMarkdownFiles(DOCS_DIRS);
+  const allBlocks = files.flatMap(parseCodeBlocks);
+  const results = allBlocks.map(evaluate);
+  const failed = results.filter((r) => r.status === 'failed');
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} documentation example(s) failed`);
+  }
+  return {
+    files_scanned: files.length,
+    code_blocks: allBlocks.length,
+    passed: results.filter((r) => r.status === 'ok').length,
+    skipped: results.filter((r) => r.status === 'skipped').length,
+    untagged: results.filter((r) => r.status === 'not-tagged').length,
+  };
 }
 
 export const runCheckDocExamples = defineScript({

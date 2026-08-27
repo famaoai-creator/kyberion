@@ -119,7 +119,9 @@ export function loadMediaSemanticMapCatalog(): MediaSemanticMapCatalog {
     cachedCatalogPath = CATALOG_PATH;
     return cachedCatalog;
   }
-  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
+  const source = loadJson<Record<string, unknown>>(CATALOG_PATH);
+  const { $schema: _schema, ...catalog } = source;
+  const parsed = validateCatalog(catalog, CATALOG_PATH);
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   return parsed;

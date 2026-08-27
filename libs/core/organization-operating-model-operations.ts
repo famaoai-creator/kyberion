@@ -79,64 +79,38 @@ import {
   operationDirectory,
   listOrganizationRecordFiles,
 } from './organization-operating-model-persistence.js';
-type OrganizationTier = import('./organization-operating-model.js').OrganizationTier;
-type OrganizationWorkShape = import('./organization-operating-model.js').OrganizationWorkShape;
-type OrganizationRelationshipType =
-  import('./organization-operating-model.js').OrganizationRelationshipType;
-type OrganizationOperatingModelCatalog =
-  import('./organization-operating-model.js').OrganizationOperatingModelCatalog;
-type OrganizationPurposeObjective =
-  import('./organization-operating-model.js').OrganizationPurposeObjective;
-type OrganizationPurposeRecord =
-  import('./organization-operating-model.js').OrganizationPurposeRecord;
-type OrganizationServiceHealthSummary =
-  import('./organization-operating-model.js').OrganizationServiceHealthSummary;
-type OrganizationOperationalState =
-  import('./organization-operating-model.js').OrganizationOperationalState;
-type OrganizationDomainRecord =
-  import('./organization-operating-model.js').OrganizationDomainRecord;
-type OrganizationCapabilityRecord =
-  import('./organization-operating-model.js').OrganizationCapabilityRecord;
-type OrganizationServiceRecord =
-  import('./organization-operating-model.js').OrganizationServiceRecord;
-type OrganizationServiceState =
-  import('./organization-operating-model.js').OrganizationServiceState;
-type OrganizationOperationType =
-  import('./organization-operating-model.js').OrganizationOperationType;
-type OrganizationOperationRecord =
-  import('./organization-operating-model.js').OrganizationOperationRecord;
-type OrganizationOperationState =
-  import('./organization-operating-model.js').OrganizationOperationState;
-type OrganizationOperationRun =
-  import('./organization-operating-model.js').OrganizationOperationRun;
-type OrganizationManagementUnit =
-  import('./organization-operating-model.js').OrganizationManagementUnit;
-type OrganizationWorkResolution =
-  import('./organization-operating-model.js').OrganizationWorkResolution;
-type OrganizationIncidentRecord =
-  import('./organization-operating-model.js').OrganizationIncidentRecord;
-type OrganizationCadenceRecord =
-  import('./organization-operating-model.js').OrganizationCadenceRecord;
-type OrganizationDecisionRecord =
-  import('./organization-operating-model.js').OrganizationDecisionRecord;
-type OrganizationLearningSourceType =
-  import('./organization-operating-model.js').OrganizationLearningSourceType;
-type OrganizationLearningCandidate =
-  import('./organization-operating-model.js').OrganizationLearningCandidate;
-type QueueOrganizationLearningCandidateInput =
-  import('./organization-operating-model.js').QueueOrganizationLearningCandidateInput;
-type OrganizationCatalog = import('./organization-operating-model.js').OrganizationCatalog;
-type OrganizationCatalogReconciliation =
-  import('./organization-operating-model.js').OrganizationCatalogReconciliation;
-type OrganizationProjectLineage =
-  import('./organization-operating-model.js').OrganizationProjectLineage;
-type OrganizationLineage = import('./organization-operating-model.js').OrganizationLineage;
-type OrganizationReconciliationResult =
-  import('./organization-operating-model.js').OrganizationReconciliationResult;
-type OrganizationManagementView =
-  import('./organization-operating-model.js').OrganizationManagementView;
-type ResolveOrganizationWorkInput =
-  import('./organization-operating-model.js').ResolveOrganizationWorkInput;
+import type {
+  OrganizationTier,
+  OrganizationWorkShape,
+  OrganizationRelationshipType,
+  OrganizationOperatingModelCatalog,
+  OrganizationPurposeObjective,
+  OrganizationPurposeRecord,
+  OrganizationServiceHealthSummary,
+  OrganizationOperationalState,
+  OrganizationDomainRecord,
+  OrganizationCapabilityRecord,
+  OrganizationServiceRecord,
+  OrganizationServiceState,
+  OrganizationOperationType,
+  OrganizationOperationRecord,
+  OrganizationOperationState,
+  OrganizationOperationRun,
+  OrganizationManagementUnit,
+  OrganizationWorkResolution,
+  OrganizationIncidentRecord,
+  OrganizationCadenceRecord,
+  OrganizationDecisionRecord,
+  OrganizationLearningSourceType,
+  OrganizationLearningCandidate,
+  QueueOrganizationLearningCandidateInput,
+  OrganizationCatalog,
+  OrganizationCatalogReconciliation,
+  OrganizationProjectLineage,
+  OrganizationLineage,
+  OrganizationReconciliationResult,
+  OrganizationManagementView,
+} from './organization-operating-model.js';
 
 const ORGANIZATION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const CATALOG_PATH = pathResolver.knowledge(

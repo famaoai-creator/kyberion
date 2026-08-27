@@ -6,7 +6,7 @@
   "required": ["action", "params"],
   "properties": {
     "action": {
-      "enum": ["join", "leave", "speak", "listen", "chat", "status"]
+      "enum": ["check_consent", "join", "leave", "speak", "listen", "chat", "status"]
     },
     "params": {
       "type": "object",

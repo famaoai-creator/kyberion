@@ -23,7 +23,7 @@ import {
 } from '@agent/core';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
-import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -80,7 +80,7 @@ function collectRuntimeDoctorFindings(): DashboardDoctorFinding[] {
     for (const item of safeListDir(dir)) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (!safeExistsSync(statePath)) continue;
-      const state = readJsonFile<any>(statePath);
+      const state = readJson<any>(statePath);
       if (state.status === 'active' && typeof state.mission_id === 'string') {
         missions.add(state.mission_id);
       }
@@ -238,7 +238,7 @@ function drawCompanyOverview() {
 function readJsonIfExists<T>(logicalPath: string): T | null {
   try {
     if (!safeExistsSync(logicalPath)) return null;
-    return readJsonFile<T>(logicalPath);
+    return readJson<T>(logicalPath);
   } catch {
     return null;
   }
@@ -686,7 +686,7 @@ function drawMissions() {
     for (const item of safeListDir(dir)) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
-        const state = readJsonFile<any>(statePath);
+        const state = readJson<any>(statePath);
         if (state.status === 'active') {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
           const missionPath = path.join(dir, item);
@@ -894,7 +894,7 @@ function drawRuntimeSurfaces() {
   }
   const manifest = loadSurfaceManifest();
   const state = safeExistsSync(statePath)
-    ? readJsonFile<{ surfaces: Record<string, { pid: number }> }>(statePath)
+    ? readJson<{ surfaces: Record<string, { pid: number }> }>(statePath)
     : { surfaces: {} };
 
   for (const surface of manifest.surfaces) {

@@ -6,6 +6,8 @@ import type {
 import {
   clearSurfaceDeadTarget,
   deadLetterSurfaceOutboxMessage,
+  listSurfaceOutboxMessages,
+  clearSurfaceOutboxMessage,
   markSurfaceDeadTarget,
   updateSurfaceOutboxMessage,
 } from './surface-coordination-store.js';
@@ -92,6 +94,34 @@ export function createSurfaceOutboxDrainGuard(
       running = false;
     }
   };
+}
+
+/**
+ * Shared durable outbox drain. Providers only supply the external send
+ * operation; due checks, tenant authorization, success cleanup, retry
+ * bookkeeping, and dead-letter classification stay in one governed path.
+ */
+export async function drainSurfaceOutbox(
+  surface: SurfaceAsyncChannel,
+  deliver: (message: SurfaceOutboxMessage) => Promise<void>,
+  options: { includeTenantNamespaces?: boolean } = {}
+): Promise<{ delivered: number; failed: number }> {
+  let delivered = 0;
+  let failed = 0;
+  for (const message of listSurfaceOutboxMessages(surface, options)) {
+    if (!isSurfaceOutboxDue(message)) continue;
+    try {
+      assertSurfaceOutboxDeliveryAuthorized(message);
+      await deliver(message);
+      recordSurfaceDeliverySuccess(surface, message.channel, message.scope);
+      clearSurfaceOutboxMessage(surface, message.message_id, message.scope);
+      delivered += 1;
+    } catch (error) {
+      settleSurfaceOutboxFailure(surface, message, error);
+      failed += 1;
+    }
+  }
+  return { delivered, failed };
 }
 
 const DEFAULT_MAX_ATTEMPTS = 5;

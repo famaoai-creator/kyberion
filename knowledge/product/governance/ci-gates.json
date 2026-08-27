@@ -43,6 +43,14 @@
       "rationale": "Prevents shared JSON and schema construction helpers from regressing into local implementations."
     },
     {
+      "id": "config-fallbacks",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_config_fallbacks.ts"],
+      "owner": "governance",
+      "rationale": "Fails closed when a governed catalog silently falls back instead of loading its validated source."
+    },
+    {
       "id": "type-ratchet",
       "scope": "pr",
       "executable": "node",
@@ -57,6 +65,14 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_boundaries.ts"],
       "owner": "architecture",
       "rationale": "Prevents import cycles and layer direction debt from increasing."
+    },
+    {
+      "id": "max-file-lines",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_max_file_lines.ts"],
+      "owner": "architecture",
+      "rationale": "Prevents new production modules from exceeding the 1,500-line simplicity boundary."
     },
     {
       "id": "first-win-docs",
@@ -99,6 +115,14 @@
       "rationale": "Keeps status, concept, and onboarding documentation anchored to one explicit source map."
     },
     {
+      "id": "documentation-links",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_documentation_links.ts"],
+      "owner": "documentation",
+      "rationale": "Rejects broken relative Markdown links before they become unreachable documentation."
+    },
+    {
       "id": "channel-adapter-adoption",
       "scope": "pr",
       "executable": "node",
@@ -121,6 +145,31 @@
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_op_preflight_coverage.ts"],
       "owner": "quality",
       "rationale": "Keeps actuator operations covered by preflight contracts."
+    },
+    {
+      "id": "op-input-contract-coverage",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_op_input_contract_coverage.ts"
+      ],
+      "baseline": "scripts/check_op_input_contract_coverage.baseline.json",
+      "owner": "quality",
+      "rationale": "Requires every discovered actuator operation to publish an input schema and example."
+    },
+    {
+      "id": "pipeline-op-schemas",
+      "scope": "pr",
+      "executable": "node",
+      "args": [
+        "--import",
+        "./scripts/ts-loader.mjs",
+        "scripts/check_pipeline_op_schema_coverage.ts"
+      ],
+      "owner": "quality",
+      "rationale": "Checks every schema-bound pipeline invocation after template resolution and keeps inferred legacy operations open during migration."
     },
     {
       "id": "extension-order",
@@ -189,11 +238,11 @@
     },
     {
       "id": "script-integrity",
-      "scope": "full",
+      "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_script_integrity.js"],
       "owner": "operations",
-      "rationale": "Ensures declared script and pipeline references resolve."
+      "rationale": "Ensures declared script and pipeline references resolve on every built PR and full validation run."
     },
     {
       "id": "esm",
@@ -556,6 +605,38 @@
       "args": ["dist/scripts/check_production_evidence.js", "--require-complete"],
       "owner": "release",
       "rationale": "Prevents release promotion until external production evidence is complete."
+    }
+  ],
+  "workflow_exceptions": [
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "script": "check:commit-subject",
+      "reason": "Push-only commit policy runs after the shared full gate."
+    },
+    {
+      "workflow": ".github/workflows/pr-validation.yml",
+      "script": "check:pr-title",
+      "reason": "Pull-request metadata is evaluated before repository gates."
+    },
+    {
+      "workflow": ".github/workflows/cross-os.yml",
+      "script": "check:contract-schemas",
+      "reason": "Cross-platform contract smoke runs on every supported runner."
+    },
+    {
+      "workflow": ".github/workflows/cross-os.yml",
+      "script": "check:contract-semver",
+      "reason": "Cross-platform contract compatibility smoke runs on every supported runner."
+    },
+    {
+      "workflow": ".github/workflows/cross-os.yml",
+      "script": "check:pipeline-shell-independence",
+      "reason": "Cross-platform shell-independence smoke runs on Unix runners."
+    },
+    {
+      "workflow": ".github/workflows/ci.yml",
+      "script": "check:first-win-smoke",
+      "reason": "Clean-clone first-win job validates the documented entry path."
     }
   ]
 }

@@ -39,7 +39,7 @@ jobs:
         run: pnpm run check -- --scope release
 
       - name: Run full test suite
-        run: pnpm run test:all
+        run: pnpm exec vitest run
 
       - name: Extract release notes from changelog
         run: pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md

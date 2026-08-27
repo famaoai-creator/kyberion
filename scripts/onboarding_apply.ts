@@ -3,7 +3,6 @@ import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
 import {
   compileSchemaFromPath,
-  loadJson,
   pathResolver,
   resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
@@ -18,6 +17,7 @@ import {
   resolveOperatorLocale,
   isValidTenantSlug,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createAjv, setRegisteredEnv } from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
@@ -119,7 +119,7 @@ export async function readInput(file?: string): Promise<ApplyInput> {
         `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
       );
     }
-    return loadJson<ApplyInput>(file);
+    return readJson<ApplyInput>(file);
   }
   // stdin fallback
   if (process.stdin.isTTY) {
@@ -399,6 +399,64 @@ export function buildApplySummary(
   return lines.join('\n');
 }
 
+/** Library entry used by governed pipelines; the CLI below remains a facade. */
+export async function applyOnboardingInput(input: ApplyInput) {
+  validateInput(input);
+  const ajv = createAjv();
+  addFormats(ajv);
+  const validateState = compileSchemaFromPath(
+    ajv,
+    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
+  );
+
+  process.env.MISSION_ROLE = 'sovereign_concierge';
+  setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
+  const now = new Date().toISOString();
+  const persona = resolveInputPersona(input);
+  const personaEnvPath = persistPersona(persona);
+  setRegisteredEnv('KYBERION_PERSONA', persona);
+  console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
+  await applyIdentity(input, now);
+  const tenantEntries = await applyTenants(input, now);
+  const tutorial = await applyTutorial(input, now);
+  if (input.reasoning_backend !== undefined) {
+    const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
+    if (backend) {
+      const envLocal = persistReasoningBackend(backend);
+      setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
+      console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
+    }
+  }
+  const reasoning = await evaluateReasoningBackend(new Date(now));
+  const runbookSkill = generateOnboardingRunbookSkill({
+    profileRoot: profileRoot(),
+    identityName: input.identity.name,
+    agentId: input.identity.agent_id,
+    generatedAt: now,
+  });
+  const state = buildState(input, now, tenantEntries, tutorial, reasoning);
+  if (!validateState(state)) {
+    throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
+  }
+  await writeJson(statePath(), state, 'onboarding-state');
+  await writeText(
+    summaryPath(),
+    buildSummary(input, tenantEntries, tutorial, reasoning),
+    'onboarding-summary'
+  );
+  return {
+    status: 'complete' as const,
+    identity_name: input.identity.name,
+    agent_id: input.identity.agent_id,
+    tenants: tenantEntries.length,
+    reasoning,
+    state_path: statePath(),
+    summary_path: summaryPath(),
+    runbook_skill_path: runbookSkill.skillPath,
+    tutorial,
+  };
+}
+
 export async function main(argv: string[] = []) {
   const parsed = await yargs(argv)
     .option('identity', {
@@ -425,69 +483,22 @@ export async function main(argv: string[] = []) {
     return;
   }
 
-  const ajv = createAjv();
-  addFormats(ajv);
-  const validateState = compileSchemaFromPath(
-    ajv,
-    pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
-  );
-
-  const now = new Date().toISOString();
-  const persona = resolveInputPersona(input);
-  const personaEnvPath = persistPersona(persona);
-  setRegisteredEnv('KYBERION_PERSONA', persona);
-  console.log(`Persisted KYBERION_PERSONA=${persona} to ${personaEnvPath}`);
-  await applyIdentity(input, now);
-  const tenantEntries = await applyTenants(input, now);
-  const tutorial = await applyTutorial(input, now);
-  // LC-05: an explicitly supplied backend is persisted before evaluation so
-  // the recorded choice (not auto-discovery) drives the reasoning check and
-  // every later run. Non-interactive input is explicit consent to overwrite.
-  if (input.reasoning_backend !== undefined) {
-    const backend = normalizeReasoningBackendChoice(input.reasoning_backend);
-    if (backend) {
-      const envLocal = persistReasoningBackend(backend);
-      setRegisteredEnv('KYBERION_REASONING_BACKEND', backend);
-      console.log(`Persisted KYBERION_REASONING_BACKEND=${backend} to ${envLocal}`);
-    }
-  }
-  const reasoning = await evaluateReasoningBackend(new Date(now));
-  const runbookSkill = generateOnboardingRunbookSkill({
-    profileRoot: profileRoot(),
-    identityName: input.identity.name,
-    agentId: input.identity.agent_id,
-    generatedAt: now,
-  });
-  const state = buildState(input, now, tenantEntries, tutorial, reasoning);
-  if (!validateState(state)) {
-    throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
-  }
-  await writeJson(statePath(), state, 'onboarding-state');
-  await writeText(
-    summaryPath(),
-    buildSummary(input, tenantEntries, tutorial, reasoning),
-    'onboarding-summary'
-  );
-
-  const result = {
-    status: 'complete',
-    identity_name: input.identity.name,
-    agent_id: input.identity.agent_id,
-    tenants: tenantEntries.length,
-    reasoning,
-    state_path: statePath(),
-    summary_path: summaryPath(),
-    runbook_skill_path: runbookSkill.skillPath,
-  };
+  const result = await applyOnboardingInput(input);
   if (parsed.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
   console.log(
-    buildApplySummary(input, tenantEntries, tutorial, reasoning, {
-      statePath: statePath(),
-      summaryPath: summaryPath(),
-    })
+    buildApplySummary(
+      input,
+      Array.from({ length: result.tenants }),
+      result.tutorial,
+      result.reasoning,
+      {
+        statePath: statePath(),
+        summaryPath: summaryPath(),
+      }
+    )
   );
 }
 

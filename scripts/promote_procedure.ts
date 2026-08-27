@@ -23,12 +23,12 @@ import {
   auditChain,
   compileBrowserRecording,
   invalidateProcedureCache,
-  loadJson,
   resolveAllowlistedRecordingRef,
   safeWriteFile,
   validateBrowserExtensionRecording,
   pathResolver,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import type { ProcedureCatalog, ProcedureEntry } from '@agent/core';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -118,7 +118,7 @@ export function main(argv: string[] = []): void {
   // Load + schema-validate the recording (data, never code).
   let rawRecording: unknown;
   try {
-    rawRecording = loadJson<unknown>(recordingAbs);
+    rawRecording = readJson<unknown>(recordingAbs);
   } catch (err) {
     return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -139,7 +139,7 @@ export function main(argv: string[] = []): void {
   const catalogAbs = pathResolver.rootResolve(CATALOG_PATH);
   let catalog: ProcedureCatalog;
   try {
-    catalog = loadJson<ProcedureCatalog>(catalogAbs);
+    catalog = readJson<ProcedureCatalog>(catalogAbs);
   } catch {
     catalog = { schema_version: 'procedures.v1', procedures: [] };
   }

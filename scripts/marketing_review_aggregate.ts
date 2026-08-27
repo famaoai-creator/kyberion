@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import {
   aggregateMarketingReviews,
-  loadJson,
   logger,
   pathResolver,
   requiredMarketingControls,
@@ -13,6 +12,7 @@ import {
   type MarketingReview,
   type MarketingRiskLevel,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { isDirectScript } from './lib/harness.js';
 
@@ -27,7 +27,7 @@ export function runMarketingReviewAggregation(input: {
   reviewPaths: string[];
   outputPath: string;
 }): { ready_for_approval: boolean; output_path: string } {
-  const reviewPackage = loadJson<ReviewPackage>(pathResolver.rootResolve(input.reviewPackagePath));
+  const reviewPackage = readJson<ReviewPackage>(pathResolver.rootResolve(input.reviewPackagePath));
   const artifacts: Record<string, ArtifactBinding> = Object.fromEntries(
     reviewPackage.artifacts
       .filter((artifact) => artifact.name !== 'completion-evidence.json')
@@ -42,7 +42,7 @@ export function runMarketingReviewAggregation(input: {
       })
   );
   const reviews = input.reviewPaths.map((reviewPath) =>
-    loadJson<MarketingReview>(pathResolver.rootResolve(reviewPath))
+    readJson<MarketingReview>(pathResolver.rootResolve(reviewPath))
   );
   const controls = requiredMarketingControls(reviewPackage.risk_level);
   const gate = aggregateMarketingReviews({

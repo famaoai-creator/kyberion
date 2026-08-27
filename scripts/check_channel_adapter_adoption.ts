@@ -8,14 +8,37 @@ const BRIDGES = [
   'satellites/imessage-bridge/src/index.ts',
 ] as const;
 
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, '');
+}
+
 export function checkChannelAdapterAdoption(): string[] {
   const failures: string[] = [];
   for (const relative of BRIDGES) {
-    const source = String(
-      safeReadFile(pathResolver.rootResolve(relative), { encoding: 'utf8' }) || ''
+    const source = stripComments(
+      String(safeReadFile(pathResolver.rootResolve(relative), { encoding: 'utf8' }) || '')
     );
-    if (!/\brunChannelTurn\b/u.test(source)) failures.push(`${relative}: missing runChannelTurn`);
+    if (!/\brunChannelTurn\s*\(/u.test(source)) {
+      failures.push(`${relative}: missing executable runChannelTurn call`);
+    }
     if (!/\bChannelAdapter\b/u.test(source)) failures.push(`${relative}: missing ChannelAdapter`);
+    if (/send\s*:\s*async\s*\(\)\s*=>\s*undefined/u.test(source)) {
+      failures.push(`${relative}: send must deliver or explicitly defer a turn`);
+    }
+    if (!/shouldSend\s*:/u.test(source)) {
+      failures.push(`${relative}: missing explicit proposal/approval delivery gate`);
+    }
+    if (
+      (relative.includes('discord') || relative.includes('telegram')) &&
+      !/\bformatChannelThreadContext\b/u.test(source)
+    ) {
+      failures.push(`${relative}: missing shared formatChannelThreadContext import`);
+    }
+    const deliveryEvidence =
+      /sendTelegramMessage|replyDiscordText|postSlackText|sendIMessageText/u.test(source);
+    if (!deliveryEvidence) {
+      failures.push(`${relative}: adapter send lacks provider delivery evidence`);
+    }
   }
   return failures;
 }

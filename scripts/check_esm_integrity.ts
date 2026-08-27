@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core';
 import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { readJson, readTextFile } from '@agent/core/foundation';
 
 const ROOT = pathResolver.rootDir();
 const ALLOWED_CJS_FILES = new Set([
@@ -76,7 +76,7 @@ function checkPackageJson(filePath: string, violations: string[]) {
   const relativePath = toPosix(path.relative(ROOT, filePath));
   if (ALLOWED_NON_MODULE_PACKAGES.has(relativePath)) return;
 
-  const pkg = readJsonFile<{
+  const pkg = readJson<{
     type?: string;
   }>(filePath);
   if (pkg.type !== 'module') {

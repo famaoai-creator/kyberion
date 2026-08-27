@@ -22,7 +22,8 @@
 
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { loadJson, pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -66,13 +67,13 @@ const DEFAULT_IGNORE_PATHS = [
 
 function loadRegistry(): GoldenRegistryEntry[] {
   if (!safeExistsSync(REGISTRY_PATH)) return [];
-  return loadJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
+  return readJson<GoldenRegistryEntry[]>(REGISTRY_PATH);
 }
 
 function loadSnapshot(id: string): GoldenSnapshot | null {
   const p = path.join(SNAPSHOTS_DIR, `${id}.json`);
   if (!safeExistsSync(p)) return null;
-  return loadJson<GoldenSnapshot>(p);
+  return readJson<GoldenSnapshot>(p);
 }
 
 function writeSnapshot(snapshot: GoldenSnapshot): void {
@@ -124,7 +125,7 @@ async function runPipeline(
   // Lazy-import to keep CLI startup fast and to allow the script to load without a
   // built dist/ when only the registry is being inspected.
   const mod = await import('./run_pipeline.js' as string);
-  const adf = loadJson<unknown>(path.join(ROOT, pipelinePath));
+  const adf = readJson<unknown>(path.join(ROOT, pipelinePath));
   const steps = (adf as { steps?: unknown[] }).steps ?? [];
   const runStepsFn = (mod as Record<string, unknown>).runSteps;
   if (typeof runStepsFn !== 'function') {

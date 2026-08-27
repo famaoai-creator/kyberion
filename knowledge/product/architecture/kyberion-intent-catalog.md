@@ -318,15 +318,15 @@ adapter wiring for the current environment.
 
 ### 5.3 Contract and tier validation
 
-| Command                           | Purpose                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------ |
-| `pnpm run check:contract-schemas` | All declared contracts validate against their JSON Schemas (CI-required) |
-| `pnpm run check:tier-hygiene`     | No org-specific names / URLs leaked into the public tier                 |
-| `pnpm run check:governance-rules` | Governance JSONs satisfy their schemas                                   |
-| `pnpm run check:catalogs`         | Capability catalogs are well-formed                                      |
-| `pnpm run check:esm`              | ESM import integrity                                                     |
-| `pnpm run typecheck`              | TypeScript correctness                                                   |
-| `pnpm run validate`               | All of the above                                                         |
+| Command                                 | Purpose                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `pnpm run check:contract-schemas`       | All declared contracts validate against their JSON Schemas (CI-required) |
+| `pnpm check -- --only tier-hygiene`     | No org-specific names / URLs leaked into the public tier                 |
+| `pnpm check -- --only governance-rules` | Governance JSONs satisfy their schemas                                   |
+| `pnpm check -- --only catalogs`         | Capability catalogs are well-formed                                      |
+| `pnpm run check:esm`                    | ESM import integrity                                                     |
+| `pnpm run typecheck`                    | TypeScript correctness                                                   |
+| `pnpm run validate`                     | All of the above                                                         |
 
 ### 5.4 Memory and learning
 
@@ -374,7 +374,7 @@ Review gates per class are in
 | Hand off web session state              | `web-session-handoff-runner`            |
 
 The handoff envelope is canonicalized in
-[`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json)
+[`schemas/cross-device-handoff.schema.json`](../schemas/cross-device-handoff.schema.json)
 (`envelope_version: "1.0.0"` — handoff_id, expires_at, source/target
 surface, surface_state.contract_ref, secret_refs, replay-bounded policy,
 audit-chain anchors).
@@ -450,12 +450,12 @@ Use the canonical two-dimensional gate in [`work-scope-policy.json`](../governan
 
 ## 11. Known Gaps (and how they are now addressed)
 
-| Gap                                                     | Status                                                                                                                                                                                                                              | Reference                                                                                                                                                                                                                  |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cross-device UX (mobile / browser handoff)              | **Documented** — handoff envelope schema + operations runbook published                                                                                                                                                             | [`schemas/cross-device-handoff.schema.json`](schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](knowledge/public/procedures/system/cross-device-handoff-operations.md) |
-| Multi-tenant operations                                 | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant                                                                                                      | [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)                                                                                                                                  |
-| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](libs/actuators/wisdom-actuator/src/decision-ops.ts)                                                                                                                 |
-| GUI / Web UI for operators                              | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria                                                                                           | [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md)                                                                                                                              |
+| Gap                                                     | Status                                                                                                                                                                                                                              | Reference                                                                                                                                                                                                                              |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cross-device UX (mobile / browser handoff)              | **Documented** — handoff envelope schema + operations runbook published                                                                                                                                                             | [`schemas/cross-device-handoff.schema.json`](../schemas/cross-device-handoff.schema.json), [`../procedures/system/cross-device-handoff-operations.md`](../../../knowledge/public/procedures/system/cross-device-handoff-operations.md) |
+| Multi-tenant operations                                 | **Playbook published** — directory conventions, tenant scope policy, per-tenant adapter guidance, migration from single-tenant                                                                                                      | [`multi-tenant-operations.md`](knowledge/product/architecture/multi-tenant-operations.md)                                                                                                                                              |
+| Counterfactual simulation quality (LLM non-determinism) | **Hardened** — deterministic 6-check rubric (`evaluateSimulationQuality`) runs after every `simulate_all`; severity `ok / warn / poor` written next to summary; standalone `wisdom:evaluate_simulation_quality` op for retro-checks | [`libs/actuators/wisdom-actuator/src/decision-ops.ts`](libs/actuators/wisdom-actuator/src/decision-ops.ts)                                                                                                                             |
+| GUI / Web UI for operators                              | **Strategy fixed** — CLI-first, read-only Web second, no mutating GUI; Minimum Operator Surface (MOS) MVP spec'd with acceptance criteria                                                                                           | [`operator-surface-strategy.md`](knowledge/product/architecture/operator-surface-strategy.md)                                                                                                                                          |
 
 Remaining genuine gaps:
 

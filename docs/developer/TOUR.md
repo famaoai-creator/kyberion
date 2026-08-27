@@ -47,7 +47,7 @@ A piece of work with its own state, evidence, and lifecycle. Lives in `active/mi
 
 - States: `planned → active → validating → distilling → completed/paused/failed/archived`.
 - Each mission has `mission-state.json` (the state machine), an evidence directory, and a history log.
-- Created by `pnpm mission:create` or `mission_controller start`. Worked on by checkpoints. Closed by `finish`.
+- Created by `pnpm mission create` or `mission_controller start`. Worked on by checkpoints. Closed by `finish`.
 
 Code: `scripts/mission_controller.ts`, `scripts/refactor/mission-*.ts`, `libs/core/mission-*.ts`.
 

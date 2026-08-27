@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
     return validator;
   }),
   safeExec: vi.fn(() => '1'),
+  safeExecResult: vi.fn(() => ({ stdout: '', stderr: '', status: 0 })),
   safeExistsSync: vi.fn(() => true),
   safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
@@ -144,6 +145,7 @@ vi.mock('@agent/core', async () => {
     ...actual,
     compileSchemaFromPath: mocks.compileSchemaFromPath,
     safeExec: mocks.safeExec,
+    safeExecResult: mocks.safeExecResult,
     safeExistsSync: mocks.safeExistsSync,
     safeStat: mocks.safeStat,
     safeMkdir: mocks.safeMkdir,
@@ -453,6 +455,34 @@ describe('video-composition-actuator', () => {
         has_audio: true,
         has_video: true,
       })
+    );
+  });
+
+  it('validates narrated video artifacts through the typed actuator contract', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'validate_narrated_video_artifact',
+      params: {
+        narration_path: 'active/shared/tmp/narration.aiff',
+        video_output_path: 'active/shared/tmp/render.mp4',
+        video_bundle_dir: 'active/shared/tmp/render-bundle',
+        mission_evidence_dir: 'active/shared/tmp/evidence',
+        video_slug: 'demo',
+      },
+    } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        status: 'succeeded',
+        kind: 'narrated_video_artifact_validation',
+        black_frame_check: 'passed',
+        duration_delta_sec: 0,
+      })
+    );
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'ffmpeg',
+      expect.arrayContaining(['blackdetect=d=0.5:pic_th=0.98:pix_th=0.10']),
+      expect.objectContaining({ timeoutMs: 120000 })
     );
   });
 

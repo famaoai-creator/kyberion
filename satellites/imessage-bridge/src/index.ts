@@ -19,13 +19,8 @@ import {
   sendBlueBubblesText,
   sendIMessage,
   buildIMessageReplyRequest,
-  listSurfaceOutboxMessages,
-  clearSurfaceOutboxMessage,
   createSurfaceOutboxDrainGuard,
-  isSurfaceOutboxDue,
-  recordSurfaceDeliverySuccess,
-  settleSurfaceOutboxFailure,
-  assertSurfaceOutboxDeliveryAuthorized,
+  drainSurfaceOutbox,
   getRecentIMessages,
   getIMessageHistory,
   formatIMessageAttachmentSummary,
@@ -148,23 +143,15 @@ async function hydrateBlueBubblesAttachments(
 }
 
 async function drainIMessageOutbox(): Promise<void> {
-  for (const message of listSurfaceOutboxMessages('imessage', { includeTenantNamespaces: true })) {
-    if (!isSurfaceOutboxDue(message)) continue;
-    try {
-      assertSurfaceOutboxDeliveryAuthorized(message);
+  await drainSurfaceOutbox(
+    'imessage',
+    async (message) => {
       // Surface outbox channels are iMessage chat identifiers. Preserve the
       // chat target so a group completion never becomes a sender DM.
       await sendIMessageText({ recipient: '', chatId: message.channel, text: message.text });
-      recordSurfaceDeliverySuccess('imessage', message.channel, message.scope);
-      clearSurfaceOutboxMessage('imessage', message.message_id, message.scope);
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      const decision = settleSurfaceOutboxFailure('imessage', message, error);
-      logger.error(
-        `❌ [iMessageBridge] Outbox delivery failed for ${message.message_id}: ${detail} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
-      );
-    }
-  }
+    },
+    { includeTenantNamespaces: true }
+  );
 }
 
 const runIMessageOutbox = createSurfaceOutboxDrainGuard('imessage');
@@ -329,9 +316,11 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
         text: stripLeadingIMessageWakeWord(msg.text),
       }) || undefined,
     typing: () => ({ stop: () => processingNote.cancel() }),
-    // Proposal/approval replies have channel-specific envelopes and are
-    // delivered below; the adapter still owns the common turn lifecycle.
-    send: async () => undefined,
+    shouldSend: ({ result }) =>
+      !result.missionProposals?.length && result.approvalRequests.length === 0,
+    send: async ({ text }) => {
+      await sendIMessageText(buildIMessageReplyRequest(msg, text));
+    },
   };
   try {
     const conversation = await runChannelTurn(
@@ -340,6 +329,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
         text: incomingText,
         channel: msg.chatId,
         threadTs: msg.id,
+        attachments: msg.attachments,
       },
       ({ threadContext }) =>
         runSurfaceMessageConversation({
@@ -350,6 +340,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
           correlationId: `imsg-${msg.id}`,
           receivedAt: msg.date,
           actorId: msg.sender,
+          attachments: msg.attachments,
           senderAgentId: 'kyberion:imessage-bridge',
           agentId: IMESSAGE_SURFACE_AGENT_ID,
           threadContext,
@@ -392,10 +383,7 @@ async function processIncomingIMessage(msg: IMessageStimulus): Promise<IMessageP
       return 'processed';
     }
 
-    if (conversation.text) {
-      logger.info(`📤 [iMessageBridge] Replying to ${msg.sender}: ${conversation.text}`);
-      await sendIMessageText(buildIMessageReplyRequest(msg, conversation.text));
-    } else {
+    if (!conversation.text) {
       // UX-01: an empty agent reply must not read as silence.
       await sendIMessageText(
         buildIMessageReplyRequest(

@@ -31,8 +31,8 @@ import {
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface DriftFinding {
   path: string;
@@ -83,7 +83,7 @@ function readMissionState(
   const statePath = pathResolver.rootResolve(`${missionDirRel}/mission-state.json`);
   if (!safeExistsSync(statePath)) return null;
   try {
-    return readJsonFile(statePath);
+    return readJson(statePath);
   } catch {
     return null;
   }
@@ -153,11 +153,39 @@ export function recordTenantDriftAudit(report: DriftReport): void {
   });
 }
 
+export interface TenantDriftWatchOptions {
+  alert?: boolean;
+  failOnDrift?: boolean;
+}
+
+export function runTenantDriftWatch(options: TenantDriftWatchOptions = {}): {
+  report: DriftReport;
+  status: number;
+  alert: ReturnType<typeof sendOpsAlert> | null;
+} {
+  const report = scan();
+  let alertReceipt: ReturnType<typeof sendOpsAlert> | null = null;
+  if (report.findings.length > 0) {
+    try {
+      recordTenantDriftAudit(report);
+    } catch (err) {
+      logger.warn(`[tenant-drift] failed to append audit entry: ${(err as Error).message ?? err}`);
+    }
+    if (options.alert) alertReceipt = sendOpsAlert(buildTenantDriftAlert(report));
+  }
+  return {
+    report,
+    status: report.findings.length > 0 && options.failOnDrift !== false ? 1 : 0,
+    alert: alertReceipt,
+  };
+}
+
 function main(args: string[] = []): number {
   const json = args.includes('--json');
   const quiet = args.includes('--quiet');
   const alert = args.includes('--alert');
-  const report = scan();
+  const result = runTenantDriftWatch({ alert });
+  const report = result.report;
 
   if (json) {
     console.log(JSON.stringify(report, null, 2));
@@ -174,33 +202,27 @@ function main(args: string[] = []): number {
     }
   }
 
-  if (report.findings.length > 0) {
-    try {
-      recordTenantDriftAudit(report);
-    } catch (err) {
-      logger.warn(`[tenant-drift] failed to append audit entry: ${(err as Error).message ?? err}`);
-    }
-    if (alert) {
-      const receipt = sendOpsAlert(buildTenantDriftAlert(report));
-      if (!quiet) {
-        logger.warn(
-          `[tenant-drift] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
-        );
-      }
-    }
-    return 1;
+  if (report.findings.length > 0 && alert && !quiet && result.alert) {
+    logger.warn(
+      `[tenant-drift] ops alert recorded at ${result.alert.recorded_path}; webhook=${result.alert.webhook_delivered ? 'delivered' : 'not-delivered'}`
+    );
   }
-  return 0;
+  return result.status;
 }
 
-void defineScript({
-  name: 'watch:tenant-drift',
-  flags: [],
-  run: ({ argv }) => {
-    const status = main(argv);
-    if (status !== 0) throw new ScriptExitError(status, 'tenant drift detected');
-  },
-})();
+if (
+  isDirectScript(import.meta.url, 'watch_tenant_drift.ts') ||
+  isDirectScript(import.meta.url, 'watch_tenant_drift.js')
+) {
+  void defineScript({
+    name: 'watch:tenant-drift',
+    flags: [],
+    run: ({ argv }) => {
+      const status = main(argv);
+      if (status !== 0) throw new ScriptExitError(status, 'tenant drift detected');
+    },
+  })();
+}
 
 export { buildTenantDriftAlert, scan as scanTenantDrift };
 export type { DriftFinding, DriftReport };

@@ -1,4 +1,7 @@
-import { logger, platform, secureFetch, safeExec } from './index.js';
+import { createLogger } from './logger.js';
+import { platform } from './platform.js';
+import { secureFetch } from './network.js';
+import { safeExec } from './secure-io.js';
 import { retry } from './async-utils.js';
 import { tryRepairJson } from './json-repair.js';
 import type { ServicePresetRecord } from './service-preset-registry.js';
@@ -16,6 +19,8 @@ import {
   stripUnresolvedTemplateValues,
 } from './service-engine-helpers.js';
 import { resolveServiceBinding } from './service-binding.js';
+
+const logger = createLogger('service-engine-execution');
 
 function buildChildEnv(env?: Record<string, unknown>): Record<string, string> | undefined {
   if (!env || typeof env !== 'object') return undefined;

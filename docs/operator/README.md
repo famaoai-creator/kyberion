@@ -4,15 +4,15 @@ For people **deploying / running** Kyberion in service. If you're using it, see 
 
 ## Start here
 
-| Doc | When to read |
-|---|---|
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Deploy on macOS / Linux / Docker. |
-| [PRODUCTION_EVIDENCE_COLLECTION.md](./PRODUCTION_EVIDENCE_COLLECTION.md) | Collect and review non-local production evidence before release promotion. |
-| [templates/](./templates/) | Evidence templates for 30-day operations, external contribution, and FDE deployment proof. |
-| [INITIALIZATION.md](../INITIALIZATION.md) | First-time setup walkthrough. |
-| [OPERATOR_UX_GUIDE.md](../OPERATOR_UX_GUIDE.md) | Daily operations: Slack, Chronos, terminal, directories. |
-| [PRIVACY.md](../PRIVACY.md) / [PRIVACY.ja.md](../PRIVACY.ja.md) | Data flow + telemetry policy you should explain to your users. |
-| [PERFORMANCE_DASHBOARD.md](../PERFORMANCE_DASHBOARD.md) | (Historical snapshot) skill telemetry trends. |
+| Doc                                                                      | When to read                                                                               |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| [DEPLOYMENT.md](./DEPLOYMENT.md)                                         | Deploy on macOS / Linux / Docker.                                                          |
+| [PRODUCTION_EVIDENCE_COLLECTION.md](./PRODUCTION_EVIDENCE_COLLECTION.md) | Collect and review non-local production evidence before release promotion.                 |
+| [templates/](./templates/)                                               | Evidence templates for 30-day operations, external contribution, and FDE deployment proof. |
+| [INITIALIZATION.md](../INITIALIZATION.md)                                | First-time setup walkthrough.                                                              |
+| [OPERATOR_UX_GUIDE.md](../OPERATOR_UX_GUIDE.md)                          | Daily operations: Slack, Chronos, terminal, directories.                                   |
+| [PRIVACY.md](../PRIVACY.md) / [PRIVACY.ja.md](../PRIVACY.ja.md)          | Data flow + telemetry policy you should explain to your users.                             |
+| [PERFORMANCE_DASHBOARD.md](../archive/PERFORMANCE_DASHBOARD.md)          | (Historical snapshot) skill telemetry trends.                                              |
 
 ## Scope
 

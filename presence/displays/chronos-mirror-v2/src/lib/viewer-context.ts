@@ -14,7 +14,7 @@ import {
   type SurfaceViewerScope,
 } from '@agent/core';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import {
   isChronosLoopbackRequest,
   resolveChronosAccessRole,
@@ -59,6 +59,10 @@ function resolveRegisteredEntry(token: string): ChronosTokenRegistration | null 
   return findChronosTokenRegistration(token, registry);
 }
 
+function resolveServerTenant(): string {
+  return (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
+}
+
 export function resolveViewerContext(req: NextRequest): ViewerContext {
   const token = resolveChronosToken(req);
   if (token) {
@@ -76,9 +80,16 @@ export function resolveViewerContext(req: NextRequest): ViewerContext {
     }
     const role = resolveChronosAccessRole(req);
     if (role) {
+      const tenant = resolveServerTenant();
+      if (!tenant && !isChronosLoopbackRequest(req)) {
+        throw new ViewerContextError(
+          403,
+          'Remote Chronos access requires server-side KYBERION_TENANT scope.'
+        );
+      }
       return {
         role,
-        tenantSlugs: 'all',
+        tenantSlugs: tenant ? [tenant] : 'all',
         organizationIds: 'all',
         projectIds: 'all',
         tierAccess: defaultTierAccess(role),
@@ -202,7 +213,10 @@ export function authorizeViewerTenant(
       // Observability must not turn warn-mode compatibility into a 500.
     }
   }
-  return requested;
+  // Warn mode is telemetry-only, never an authorization grant. Returning the
+  // requested tenant here would let a client expand a token's server-side
+  // scope during the migration window. Keep the audit, then fail closed.
+  throw new ViewerContextError(403, reason);
 }
 
 export function viewerScopeTenantSlugs(

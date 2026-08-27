@@ -189,7 +189,7 @@ features.
   the repository ceremony and verification checklist.
 - [Kyberion Extension Points](../../../docs/developer/EXTENSION_POINTS.md)
   defines public stability tiers and semver obligations.
-- [Layered Execution Plan](../../../docs/developer/improvement-plans-2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)
+- [Layered Execution Plan](../../../docs/developer/improvement-plans-archive/2026-07/LAYERED_EXECUTION_PLAN_2026-07-15.ja.md)
   defines where declarative wiring, typed logic, and design decisions belong.
 - [Voice backend selection procedure](../../public/procedures/media/select-voice-backends.md)
   applies this policy to TTS/STT selection.

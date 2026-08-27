@@ -30,7 +30,7 @@ describe('check_mission_gate_docs', () => {
       'docs/developer/improvement-plans-2026-08/CLOUDFLARE_OS_ADOPTION_PLAN_2026-08-09.ja.md'
     );
     expect(paths).not.toContain(
-      'docs/developer/improvement-plans-2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md'
+      'docs/developer/improvement-plans-archive/2026-08/MISSION_GATE_COHERENCE_PLAN_2026-08-10.ja.md'
     );
     expect(
       MISSION_GATE_DOCUMENT_EXCLUSIONS.has(

@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
 
 interface SurfaceCoordinationRoleMap {
@@ -24,30 +22,26 @@ const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-coordination-role-map.schema.json'
 );
 
-let validateFn: ValidateFunction | null = null;
 let cachedMap: SurfaceCoordinationRoleMap | null = null;
 let cachedMapKey: string | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
+const publicMapCatalog = defineCatalog<SurfaceCoordinationRoleMap>({
+  id: 'surface-coordination-role-map',
+  path: PUBLIC_MAP_PATH,
+  schema: SCHEMA_PATH,
+});
+const personalMapCatalog = defineCatalog<SurfaceCoordinationRoleMap>({
+  id: 'surface-coordination-role-map.personal',
+  path: PERSONAL_MAP_PATH,
+  schema: SCHEMA_PATH,
+});
 
-function validateMap(value: unknown, label: string): SurfaceCoordinationRoleMap {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) =>
-      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-    );
-    throw new Error(`Invalid surface coordination role map at ${label}: ${errors.join('; ')}`);
-  }
-  return value as SurfaceCoordinationRoleMap;
-}
-
-function loadMapFile(mapPath: string): SurfaceCoordinationRoleMap | null {
+function loadMapFile(
+  mapPath: string,
+  catalog: typeof publicMapCatalog
+): SurfaceCoordinationRoleMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(loadJson(mapPath), mapPath);
+  return catalog.load();
 }
 
 function mergeMaps(
@@ -71,8 +65,14 @@ export function getSurfaceCoordinationRole(surface: string): GovernedArtifactRol
   if (!normalized) return 'surface_runtime';
   const mapKey = `${PUBLIC_MAP_PATH}::${PERSONAL_MAP_PATH}`;
   if (!cachedMap || cachedMapKey !== mapKey) {
-    const base = loadMapFile(PUBLIC_MAP_PATH) ?? { version: '1.0.0', entries: [] };
-    const personal = loadMapFile(PERSONAL_MAP_PATH) ?? { version: base.version, entries: [] };
+    const base = loadMapFile(PUBLIC_MAP_PATH, publicMapCatalog) ?? {
+      version: '1.0.0',
+      entries: [],
+    };
+    const personal = loadMapFile(PERSONAL_MAP_PATH, personalMapCatalog) ?? {
+      version: base.version,
+      entries: [],
+    };
     cachedMap = mergeMaps(base, personal);
     cachedMapKey = mapKey;
   }

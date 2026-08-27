@@ -43,6 +43,8 @@ import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import type { GovernedArtifactRole } from './artifact-store.js';
+// Existing approval/steering cycle is tracked by check:module-boundaries baseline.
+// eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
 import {
   createApprovalRequest,
   type ApprovalRequestRecord,

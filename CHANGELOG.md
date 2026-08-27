@@ -1,5 +1,7 @@
 # Changelog
 
+> **Status source**: this file is a release history, not the current improvement-plan status. Use [`docs/developer/improvement-plans-2026-08/README.ja.md`](docs/developer/improvement-plans-2026-08/README.ja.md) and each plan's implementation-status section for current state.
+
 All notable changes to Kyberion are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -54,3 +56,5 @@ When a release is tagged, `scripts/generate_changelog.ts` populates a new sectio
 ## Past releases
 
 _None yet — pre-1.0 development. The first tagged release will be v0.1.0._
+
+> **状態の扱い**: CHANGELOG はリリース履歴であり、改善計画の現在状態を管理しません。現在の計画状態は [`docs/developer/improvement-plans-2026-08/README.ja.md`](docs/developer/improvement-plans-2026-08/README.ja.md) と各計画文書の「実装状況」節を参照してください。

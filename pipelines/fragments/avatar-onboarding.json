@@ -24,32 +24,36 @@
     {
       "id": "capture_photo",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "capture_result", "type": "ShellResult" },
-      "params": {
-        "cmd": "npx tsx scripts/capture_photo.ts \"{{capture_output_path}}\"",
-        "timeout_ms": 60000
-      }
+      "op": "core:capture_avatar_photo",
+      "produces": { "channel": "capture_result", "type": "Json" },
+      "params": { "output_path": "{{capture_output_path}}" }
     },
     {
       "id": "generate_avatar",
       "role": "source",
-      "op": "system:shell",
+      "op": "core:generate_avatar",
       "consumes": "capture_result",
-      "produces": { "channel": "generation_result", "type": "ShellResult" },
+      "produces": { "channel": "generation_result", "type": "Json" },
       "params": {
-        "cmd": "npx tsx scripts/generate_avatar.ts --input-photo \"{{capture_output_path}}\" --output-path \"{{avatar_output_path}}\" --prompt \"{{avatar_prompt}}\" --bridge-preference \"{{bridge_preference}}\"",
-        "timeout_ms": 120000
+        "input_photo": "{{capture_output_path}}",
+        "output_path": "{{avatar_output_path}}",
+        "prompt": "{{avatar_prompt}}",
+        "bridge_preference": "{{bridge_preference}}"
       }
     },
     {
       "id": "register_avatar",
       "role": "sink",
-      "op": "system:shell",
+      "op": "core:register_avatar",
       "consumes": "generation_result",
       "params": {
-        "cmd": "npx tsx scripts/register_avatar.ts --src-avatar \"{{avatar_output_path}}\" --dest-avatar \"knowledge/personal/avatar.png\" --identity-path \"{{identity_path}}\" --avatar-path \"knowledge/personal/avatar.png\" --profile-name \"{{profile_name}}\" --language \"{{profile_language}}\" --interaction-style \"{{interaction_style}}\"",
-        "timeout_ms": 30000
+        "src_avatar": "{{avatar_output_path}}",
+        "dest_avatar": "knowledge/personal/avatar.png",
+        "identity_path": "{{identity_path}}",
+        "avatar_path": "knowledge/personal/avatar.png",
+        "profile_name": "{{profile_name}}",
+        "language": "{{profile_language}}",
+        "interaction_style": "{{interaction_style}}"
       }
     },
     {

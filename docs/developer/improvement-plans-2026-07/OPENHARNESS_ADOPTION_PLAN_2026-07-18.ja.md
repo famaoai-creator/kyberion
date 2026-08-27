@@ -3,7 +3,9 @@ title: OpenHarness 概念取り込み計画(OH-01〜08)
 kind: improvement-plan
 scope: core / reasoning-backend / secure-io / mcp / channels
 authority: planning
-status: proposed
+status: active
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
 ---
 
 # OpenHarness 概念取り込み計画(OH-01〜08): コンテキスト経済・ガバナンス硬化・実行前判定

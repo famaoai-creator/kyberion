@@ -37,7 +37,7 @@ import {
 } from '@agent/core';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -139,7 +139,7 @@ function loadTaxonomy(): TaxonomyManifest {
   }
 
   try {
-    cachedTaxonomy = readJsonFile<TaxonomyManifest>(taxonomyPath);
+    cachedTaxonomy = readJson<TaxonomyManifest>(taxonomyPath);
   } catch (_) {
     cachedTaxonomy = {};
   }
@@ -422,7 +422,7 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   };
   if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
-    const config = readJsonFile<any>(configPath);
+    const config = readJson<any>(configPath);
     return {
       ...defaults,
       ...config.algorithms?.ranking?.weights,

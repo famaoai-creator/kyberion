@@ -222,56 +222,56 @@
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow explicitly opted-in development flows to reach local or private network addresses; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_STUB_FALLBACK",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Keep the reasoning stub fallback when the configured provider chain is unavailable; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_TEST_NOTIFICATIONS",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow operator notification delivery during tests; test-only opt-in.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNAUTH_REMOTE",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow unauthenticated remote Chronos readonly access only when no API or localadmin token is configured; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_CLI",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow the service actuator to execute CLI commands; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_JS",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow code or system actuators to evaluate JavaScript; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ALLOW_UNSAFE_SHELL",
       "category": "flag",
       "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Allow shell execution by code, system, or network actuators; disabled by default.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTHROPIC_FAST_MODEL",
@@ -409,6 +409,15 @@
       "required": false,
       "description": "",
       "documented": false
+    },
+    {
+      "name": "KYBERION_AUTO_SEAL",
+      "category": "runtime",
+      "type": "boolean",
+      "required": false,
+      "description": "Automatically seal completed personal-tier missions.",
+      "documented": true,
+      "subsystem": "mission"
     },
     {
       "name": "KYBERION_AUTONOMOUS_OPS_POLICY_PATH",
@@ -820,14 +829,6 @@
       "description": "Active customer profile slug used to resolve the profile root.",
       "documented": true,
       "subsystem": "tenancy"
-    },
-    {
-      "name": "KYBERION_DEFAULT_LOCALE",
-      "category": "runtime",
-      "type": "string",
-      "required": false,
-      "description": "",
-      "documented": false
     },
     {
       "name": "KYBERION_DELEGATION_DEPTH",
@@ -3037,6 +3038,15 @@
       "documented": false
     },
     {
+      "name": "KYBERION_TRUST_PROXY",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Trust x-forwarded-for and x-real-ip as the client peer for local-surface detection. Keep disabled unless a trusted reverse proxy overwrites these headers.",
+      "documented": true,
+      "subsystem": "surfaces"
+    },
+    {
       "name": "KYBERION_TTS_ARGS",
       "category": "runtime",
       "type": "string",
@@ -3121,7 +3131,7 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "Chronos viewer tenant enforcement mode: off, warn, or enforce. Defaults to warn.",
+      "description": "Chronos viewer tenant audit mode: off, warn, or enforce. Unregistered tenant expansion is denied in every mode; warn records the attempt first. Defaults to warn.",
       "documented": true,
       "subsystem": "surfaces"
     },

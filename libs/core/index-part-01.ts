@@ -8,6 +8,7 @@
 
 // Core Foundation (logger, ui, sre, Cache, fileUtils, errorHandler)
 export * from './core.js';
+export * from './governance-action-recorder.js';
 
 // Specific Wrappers & Metrics
 
@@ -68,6 +69,7 @@ export {
   safeExistsSync,
   safeExec,
   safeExecResult,
+  safeExecResultAsync,
   safeSpawn,
   buildSafeExecEnv,
   safeReaddir,
@@ -293,6 +295,8 @@ export * from './adf-lifecycle.js';
 export * from './channel-adapter.js';
 
 export * from './actuator-sdk.js';
+export * from './pipeline-input-contract.js';
+export * from './super-nerve-execution-port.js';
 
 export * from './tool-call-scheduler.js';
 

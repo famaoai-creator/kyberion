@@ -6,6 +6,7 @@ import {
   validateEnvAgainstRegistry,
   type EnvRegistryValidationEntry,
 } from './env-validator.js';
+import { getRegisteredEnvBool } from './foundation/env.js';
 
 const ENTRIES: EnvRegistryValidationEntry[] = [
   { name: 'KYBERION_FLAG', type: 'boolean', required: false },
@@ -99,6 +100,23 @@ describe('validateEnvAgainstRegistry', () => {
 });
 
 describe('registry-backed validation', () => {
+  it.each([
+    ['1', true],
+    ['true', true],
+    ['yes', true],
+    ['on', true],
+    ['0', false],
+    ['false', false],
+    ['no', false],
+    ['off', false],
+  ])('normalizes boolean env %s to %s', (raw, expected) => {
+    expect(
+      getRegisteredEnvBool('KYBERION_ALLOW_LOCAL_NETWORK', {
+        env: { KYBERION_ALLOW_LOCAL_NETWORK: raw },
+      })
+    ).toBe(expected);
+  });
+
   it('loads the committed registry and validates the current env without errors', () => {
     const entries = loadEnvRegistryEntries();
     expect(entries.length).toBeGreaterThan(100);

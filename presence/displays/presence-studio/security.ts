@@ -188,6 +188,16 @@ export interface PresenceStudioViewerContext {
   source: 'loopback' | 'token';
 }
 
+/** Held-action mutations are human operator actions, never readonly token actions. */
+export function requirePresenceStudioLocalAdmin(viewer: PresenceStudioViewerContext): void {
+  if (viewer.source !== 'loopback') {
+    throw new PresenceStudioViewerError(
+      403,
+      'Held-action mutations require a server-derived localadmin Presence Studio session.'
+    );
+  }
+}
+
 export function presenceStudioHeadlessScope(viewer: PresenceStudioViewerContext) {
   return {
     role: viewer.source === 'loopback' ? ('localadmin' as const) : ('readonly' as const),

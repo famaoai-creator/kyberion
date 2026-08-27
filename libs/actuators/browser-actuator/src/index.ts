@@ -21,6 +21,7 @@ import {
   preflightBrowserExtensionSession,
   ensureDefaultOpPreflight,
   runOpPreflight,
+  defineCatalogBackedActuator,
 } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
@@ -33,6 +34,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
 import { runActuatorCli } from '@agent/core';
+import { describeOps } from './op-catalog.js';
 
 /**
  * Browser-Actuator v2.2.0 [TRACE & RECORD ENABLED]
@@ -348,6 +350,12 @@ async function handleAction(input: BrowserAction) {
   );
 }
 
+export const actuator = defineCatalogBackedActuator({
+  id: 'browser-actuator',
+  describeOps,
+  handleAction,
+});
+
 function handleExtensionSessionPreflight(
   params: Record<string, unknown>,
   context: Record<string, unknown>
@@ -436,7 +444,7 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
 
@@ -459,4 +467,4 @@ export type {
   PipelineStep as BrowserPipelineStep,
 } from './browser-interaction-helpers.js';
 
-export { describeOps } from './op-catalog.js';
+export { describeOps };

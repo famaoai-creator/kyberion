@@ -85,7 +85,6 @@ describe('check_type_ratchet', () => {
       'src.any_keywords increased from 0 to 2',
       'src.as_any increased from 0 to 1',
       'src.ts_ignore increased from 0 to 1',
-      'src.files increased from 0 to 1',
     ]);
   });
 

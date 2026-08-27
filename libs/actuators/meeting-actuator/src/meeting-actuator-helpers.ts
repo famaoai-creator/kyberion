@@ -57,7 +57,7 @@ import {
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
 export interface MeetingAction {
-  action: 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
+  action: 'check_consent' | 'join' | 'leave' | 'speak' | 'listen' | 'chat' | 'status';
   params: {
     platform: 'zoom' | 'teams' | 'meet' | 'auto';
     provider?: 'google_meet' | 'teams_pipeline' | 'zoom' | 'auto';
@@ -529,6 +529,15 @@ export async function handleAction(
   if (input.action === 'pipeline') {
     return await executeMeetingPipeline(input.steps || [], input.context || {}, input.options);
   }
+  if (input.action === 'check_consent') {
+    const consent = checkSpeakConsent();
+    return {
+      status: consent.allowed ? 'success' : 'denied',
+      kind: 'voice_consent_check',
+      allowed: consent.allowed,
+      ...(consent.reason ? { message: consent.reason } : {}),
+    };
+  }
   const providerAdapter = resolveMeetingProvider(input.params.provider, input.params.url);
   if (providerAdapter && input.params.provider === 'auto') {
     input = {
@@ -628,6 +637,6 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1); // eslint-disable-line no-restricted-properties -- CLI entry guard
+    process.exitCode = 1;
   });
 }

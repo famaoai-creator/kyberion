@@ -9,7 +9,7 @@ import {
   type EgressPayloadContext,
 } from './egress-policy.js';
 import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { assertOperationPolicy } from './operation-policy-gate.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 

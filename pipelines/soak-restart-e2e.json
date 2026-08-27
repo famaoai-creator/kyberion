@@ -11,16 +11,12 @@
     {
       "id": "run_soak_restart_e2e",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_soak_restart_e2e",
       "produces": {
         "channel": "soak_restart_e2e_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": ["--import", "./scripts/ts-loader.mjs", "scripts/soak_restart_e2e.ts"],
-        "timeout_ms": 120000
-      }
+      "params": {}
     }
   ]
 }

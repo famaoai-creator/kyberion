@@ -47,17 +47,19 @@ const KNOWN_DATA_FILES = new Set([
 // independent shell scanner. New wrappers still fail that scanner; this
 // catalog test must not reclassify the approved migration backlog as a fresh
 // ADF regression.
-const SHELL_INDEPENDENCE_BASELINE = new Set(
+const SHELL_INDEPENDENCE_BASELINE =
   (
     JSON.parse(
       safeReadFile('scripts/pipeline-shell-independence.baseline.json', {
         encoding: 'utf8',
       }) as string
-    ) as { violations?: Array<{ file?: string }> }
-  ).violations
-    ?.map((violation) => violation.file)
-    .filter((file): file is string => Boolean(file)) ?? []
-);
+    ) as { violations?: Array<{ file?: string; pattern?: string; match?: string }> }
+  ).violations?.filter(
+    (violation): violation is { file: string; pattern: string; match: string } =>
+      typeof violation.file === 'string' &&
+      typeof violation.pattern === 'string' &&
+      typeof violation.match === 'string'
+  ) ?? [];
 
 function listPipelineJsonFiles(): string[] {
   const files: string[] = [];
@@ -93,12 +95,10 @@ describe('Pipeline catalog static validation (LE-05)', () => {
     }
 
     const pipeline = validatePipelineAdf(raw);
-    const report = validatePipelineGuardrails(pipeline, relative);
-    const errors = report.findings.filter((finding) => {
-      if (finding.severity !== 'error') return false;
-      if (finding.code !== 'script-wrapper-forbidden') return true;
-      return !SHELL_INDEPENDENCE_BASELINE.has(relative);
+    const report = validatePipelineGuardrails(pipeline, relative, {
+      scriptWrapperBaseline: SHELL_INDEPENDENCE_BASELINE,
     });
+    const errors = report.findings.filter((finding) => finding.severity === 'error');
     expect(errors, JSON.stringify(errors, null, 2)).toHaveLength(0);
   });
 });

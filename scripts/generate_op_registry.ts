@@ -1,10 +1,12 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { loadActuatorManifestCatalog, loadJson } from '@agent/core';
+import { loadActuatorManifestCatalog } from '@agent/core';
 import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { getAllFiles } from '@agent/core/fs-utils';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
-import { describeOps as describeSystemOps } from '@actuator/system';
+import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
 import { describeOps as describeBrowserOps } from '../libs/actuators/browser-actuator/src/op-catalog.js';
 import { describeOps as describeCodeOps } from '../libs/actuators/code-actuator/src/op-catalog.js';
 import { describeOps as describeFileOps } from '../libs/actuators/file-actuator/src/op-catalog.js';
@@ -31,6 +33,7 @@ import { describeOps as describeVisionOps } from '../libs/actuators/vision-actua
 import { describeOps as describeVoiceOps } from '../libs/actuators/voice-actuator/src/op-catalog.js';
 import { describeOps as describeMeetingOps } from '../libs/actuators/meeting-actuator/src/op-catalog.js';
 import { describeOps as describeMediaGenerationOps } from '../libs/actuators/media-generation-actuator/src/op-catalog.js';
+import { describeOps as describeMediaOps } from '../libs/actuators/media-actuator/src/op-catalog.js';
 import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
 import { describeOps as describeDeploymentOps } from '../libs/actuators/deployment-actuator/src/op-catalog.js';
 
@@ -73,6 +76,7 @@ const DESCRIBE_OPS_SOURCES: Record<
   'voice-actuator': describeVoiceOps,
   'meeting-actuator': describeMeetingOps,
   'media-generation-actuator': describeMediaGenerationOps,
+  'media-actuator': describeMediaOps,
   'video-composition-actuator': describeVideoCompositionOps,
   'deployment-actuator': describeDeploymentOps,
 };
@@ -125,6 +129,15 @@ interface OpDiscoveryReport {
   actuators: OpDiscoveryRecord[];
 }
 
+function enrichDescribedOp(item: {
+  op: string;
+  kind: PipelineOpKind;
+  input_schema?: Record<string, unknown>;
+  examples?: Array<Record<string, unknown>>;
+}) {
+  return { ...item };
+}
+
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/actuator-op-registry.json');
 const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
@@ -157,7 +170,7 @@ function loadMediaManifest(): MediaManifestFile | null {
   if (!safeExistsSync(MEDIA_MANIFEST_PATH)) {
     return null;
   }
-  return loadJson<MediaManifestFile>(MEDIA_MANIFEST_PATH);
+  return readJson<MediaManifestFile>(MEDIA_MANIFEST_PATH);
 }
 
 function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOpRegistry {
@@ -170,7 +183,7 @@ function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOp
 }
 
 function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
-  const registry = loadJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
+  const registry = readJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
   return {
     $schema: '../schemas/actuator-op-registry.schema.json',
     version: registry.version || '1.0.0',
@@ -202,12 +215,7 @@ function buildOpDiscoveryReport(
         n: actuatorId,
         path: entry.path,
         source: 'describeOps',
-        ops: ops.map((item) => ({
-          op: item.op,
-          kind: item.kind,
-          input_schema: (item as { input_schema?: Record<string, unknown> }).input_schema,
-          examples: (item as { examples?: Array<Record<string, unknown>> }).examples,
-        })),
+        ops: ops.map((item) => enrichDescribedOp(item)),
       });
       continue;
     }
@@ -219,9 +227,9 @@ function buildOpDiscoveryReport(
         path: entry.path,
         source: 'manifest',
         ops: [
-          ...mediaOps.capture.map((op) => ({ op, kind: 'capture' as const })),
-          ...mediaOps.transform.map((op) => ({ op, kind: 'transform' as const })),
-          ...mediaOps.apply.map((op) => ({ op, kind: 'apply' as const })),
+          ...mediaOps.capture.map((op) => enrichDescribedOp({ op, kind: 'capture' as const })),
+          ...mediaOps.transform.map((op) => enrichDescribedOp({ op, kind: 'transform' as const })),
+          ...mediaOps.apply.map((op) => enrichDescribedOp({ op, kind: 'apply' as const })),
         ],
       });
       continue;
@@ -296,4 +304,8 @@ export const main = defineGenerator({
   },
 });
 
-if (isDirectScript(import.meta.url, 'generate_op_registry.ts')) void main();
+if (
+  isDirectScript(import.meta.url, 'generate_op_registry.ts') ||
+  isDirectScript(import.meta.url, 'generate_op_registry.js')
+)
+  void main();

@@ -91,41 +91,9 @@
       "audience": "user"
     },
     {
-      "id": "operator-home.mission",
-      "command": "mission",
-      "noun": "mission",
-      "verb": "default",
-      "entry": "operator-home",
-      "audience": "operator"
-    },
-    {
-      "id": "operator-home.app-preflight",
-      "command": "app:preflight",
-      "noun": "app:preflight",
-      "verb": "default",
-      "entry": "operator-home",
-      "audience": "operator"
-    },
-    {
       "id": "operator-home.doctor",
       "command": "doctor",
       "noun": "doctor",
-      "verb": "default",
-      "entry": "operator-home",
-      "audience": "user"
-    },
-    {
-      "id": "operator-home.dashboard",
-      "command": "dashboard",
-      "noun": "dashboard",
-      "verb": "default",
-      "entry": "operator-home",
-      "audience": "user"
-    },
-    {
-      "id": "operator-home.office",
-      "command": "office",
-      "noun": "office",
       "verb": "default",
       "entry": "operator-home",
       "audience": "user"
@@ -297,6 +265,30 @@
       "verb": "default",
       "entry": "operator-cli",
       "audience": "user"
+    },
+    {
+      "id": "organization-model.default",
+      "command": "organization",
+      "noun": "organization",
+      "verb": "default",
+      "entry": "organization-model",
+      "audience": "operator"
+    },
+    {
+      "id": "organization-roles.default",
+      "command": "org",
+      "noun": "org",
+      "verb": "default",
+      "entry": "organization-roles",
+      "audience": "operator"
+    },
+    {
+      "id": "project-controller.default",
+      "command": "project",
+      "noun": "project",
+      "verb": "default",
+      "entry": "project-controller",
+      "audience": "operator"
     }
   ],
   "entrypoints": [
@@ -315,11 +307,7 @@
         "approvals",
         "notify",
         "deals",
-        "mission",
-        "app:preflight",
-        "doctor",
-        "dashboard",
-        "office"
+        "doctor"
       ]
     },
     {
@@ -348,6 +336,21 @@
         "intent",
         "schedule"
       ]
+    },
+    {
+      "id": "organization-model",
+      "module": "scripts/organization_operating_model.ts",
+      "commands": ["organization"]
+    },
+    {
+      "id": "organization-roles",
+      "module": "scripts/org.ts",
+      "commands": ["org"]
+    },
+    {
+      "id": "project-controller",
+      "module": "scripts/project_controller.ts",
+      "commands": ["project"]
     }
   ]
 }

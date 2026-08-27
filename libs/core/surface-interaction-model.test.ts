@@ -271,6 +271,9 @@ describe('surface-interaction-model', () => {
       channel: 'chat-42',
       threadTs: 'thread-42',
       actorId: 'alice@example.com',
+      attachments: [
+        { id: 'att-1', filename: 'photo.jpg', mimeType: 'image/jpeg', path: '/tmp/photo.jpg' },
+      ],
     });
     const imessageInput = buildSurfaceConversationInputFromMessage(imessageMessage, {
       agentId: 'imessage-surface-agent',
@@ -281,6 +284,9 @@ describe('surface-interaction-model', () => {
     expect(imessageInput.query).toBe('iMessageで会話して');
     expect(imessageInput.threadContext).toBe('Previous context line');
     expect(imessageInput.surfaceMetadata?.surface).toBe('imessage');
+    expect(imessageInput.attachments).toEqual([
+      { id: 'att-1', filename: 'photo.jpg', mimeType: 'image/jpeg', path: '/tmp/photo.jpg' },
+    ]);
 
     const unifiedIMessageInput = buildSurfaceConversationInput({
       surface: 'imessage',

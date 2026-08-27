@@ -14,9 +14,13 @@
     {
       "id": "generate_local_video_package",
       "role": "sink",
-      "op": "system:shell",
+      "op": "core:run_marketing_video_dry_run",
       "params": {
-        "cmd": "MISSION_ROLE=mission_controller node --import ./scripts/ts-loader.mjs scripts/marketing_video_dry_run.ts --campaign-brief {{campaign_brief}} --brand-profile {{brand_profile}} --output-root {{mission_artifact_root}} --channel {{channel}} --risk-level {{risk_level}}"
+        "campaign_brief": "{{campaign_brief}}",
+        "brand_profile": "{{brand_profile}}",
+        "output_root": "{{mission_artifact_root}}",
+        "channel": "{{channel}}",
+        "risk_level": "{{risk_level}}"
       }
     }
   ]

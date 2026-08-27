@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "integer", "minimum": 1 },
     "presets": {
       "type": "object",

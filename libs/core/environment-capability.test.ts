@@ -483,6 +483,27 @@ describe('loadEnvironmentManifest', () => {
     expect(ids).toContain('ffmpeg');
   });
 
+  it('routes governed checks through the unified check entrypoint', () => {
+    for (const [id, expected] of [
+      ['schema-integrity', ['contract-schemas', 'catalogs', 'governance-rules']],
+      ['knowledge-tier-hygiene', ['tier-hygiene']],
+    ] as const) {
+      const manifest = loadEnvironmentManifest(id);
+      const commands = manifest.capabilities
+        .map((capability) => capability.probe)
+        .filter((probe) => probe?.kind === 'command')
+        .map((probe) => [probe?.command, ...(probe?.args || [])].join(' '));
+      for (const gate of expected) {
+        expect(commands).toContain(`pnpm -s check -- --only ${gate}`);
+      }
+      expect(
+        commands.some((command) =>
+          /run check:(contract-schemas|catalogs|governance-rules|tier-hygiene)/u.test(command)
+        )
+      ).toBe(false);
+    }
+  });
+
   it('throws on unknown manifest id', () => {
     expect(() => loadEnvironmentManifest('does-not-exist-anywhere')).toThrow();
   });

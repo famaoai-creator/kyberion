@@ -1,5 +1,8 @@
 import * as os from 'node:os';
-import { logger, safeExec } from './index.js';
+import { safeExec } from './secure-io.js';
+import { createLogger } from './logger.js';
+
+const logger = createLogger('platform');
 
 /**
  * Platform Abstraction Layer

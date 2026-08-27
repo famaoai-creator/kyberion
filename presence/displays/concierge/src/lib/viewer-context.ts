@@ -11,7 +11,7 @@ import {
   type ChronosTokenRegistration,
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/authority';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import type { HeadlessViewerScope } from '@agent/core/headless-surface-contract';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
@@ -36,16 +36,14 @@ export class ConciergeViewerError extends Error {
 }
 
 function isLoopbackRequest(req: NextRequest): boolean {
-  const hostname = req.nextUrl.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const loopbackHost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-  if (!loopbackHost) return false;
-  return (
-    !forwarded ||
-    forwarded === '127.0.0.1' ||
-    forwarded === '::1' ||
-    forwarded === '::ffff:127.0.0.1'
-  );
+  const directIp = (req as NextRequest & { ip?: string }).ip;
+  const peerIp =
+    directIp ||
+    (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true
+      ? req.headers.get('x-real-ip')?.trim() ||
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      : undefined);
+  return peerIp === '127.0.0.1' || peerIp === '::1' || peerIp === '::ffff:127.0.0.1';
 }
 
 function bearerToken(req: NextRequest): string | null {
@@ -66,7 +64,10 @@ function defaultTierAccess(role: ChronosAccessRole): ConciergeViewerContext['tie
 
 function serverTenant(): string {
   try {
-    return String(currentScope({}, { ...process.env }).tenant_slug || '').trim();
+    return (
+      getRegisteredEnvText('KYBERION_TENANT')?.trim() ||
+      String(currentScope().tenant_slug || '').trim()
+    );
   } catch {
     return '';
   }

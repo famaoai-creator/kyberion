@@ -1,8 +1,10 @@
+import * as path from 'node:path';
 import { logger } from '@agent/core';
+import { pathResolver } from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
-import { readJsonCliInput } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main() {
@@ -15,7 +17,11 @@ async function main() {
     })
     .parseSync();
 
-  const a2aMsg = readJsonCliInput<A2AMessage>(argv.input as string);
+  const inputPath = String(argv.input);
+  const resolvedInput = path.isAbsolute(inputPath)
+    ? inputPath
+    : pathResolver.rootResolve(inputPath);
+  const a2aMsg = readJson<A2AMessage>(resolvedInput);
 
   if (!a2aMsg.header || !a2aMsg.payload) {
     throw new Error('Invalid A2A Message: Missing header or payload.');

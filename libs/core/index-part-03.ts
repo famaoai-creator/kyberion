@@ -349,10 +349,6 @@ export * from './egress-policy.js';
 
 export * from './governance-status.js';
 
-// Orchestration
-
-export * as orchestrator from './orchestrator.js';
-
 export { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 
 // Domain Engines (excel distiller moved to @agent/shared-media)

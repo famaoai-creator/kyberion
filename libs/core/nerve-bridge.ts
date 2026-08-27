@@ -9,9 +9,13 @@ import { appendJsonLine } from './foundation/json.js';
  */
 
 import * as os from 'node:os';
-import { logger, pathResolver, safeAppendFileSync } from './index.js';
+import { createLogger } from './logger.js';
+import { pathResolver } from './path-resolver.js';
+import { safeAppendFileSync } from './secure-io.js';
 import { subscribeJsonl } from './jsonl-tail.js';
 import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
+
+const logger = createLogger('nerve-bridge');
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 const NODE_ID = `${os.hostname()}-${process.pid}`;

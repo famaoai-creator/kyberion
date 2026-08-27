@@ -1,4 +1,4 @@
-import { logger } from './core.js';
+import { createLogger } from './logger.js';
 import { agentRegistry } from './agent-registry.js';
 import { stopAgentRuntime } from './agent-runtime-supervisor.js';
 import { shutdownAgentRuntimeViaDaemon } from './agent-runtime-supervisor-client.js';
@@ -7,6 +7,12 @@ import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeReadFile } from './secure-io.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
+import {
+  recordGovernanceAction,
+  registerGovernanceActionSink,
+} from './governance-action-recorder.js';
+
+const logger = createLogger('kill-switch');
 
 export interface AnomalyIndicator {
   type:
@@ -208,6 +214,8 @@ class KillSwitchImpl {
     if (severity >= 3) {
       // 承認/オペレータ確認必須、自動 kill は既定オフ
       logger.error(`[KILL_SWITCH] Anomaly critical for ${agentId}. Requesting kill approval.`);
+      // Existing kill-switch/approval cycle is tracked by the module-boundary baseline.
+      // eslint-disable-next-line import/no-cycle -- baseline until the governance seam is split
       const { enforceApprovalGate } = await import('./approval-gate.js');
       const approval = enforceApprovalGate({
         operationId: 'agent:kill',
@@ -292,14 +300,11 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
 }
 export const killSwitch: KillSwitchImpl = (globalThis as any)[GLOBAL_KEY];
 
+registerGovernanceActionSink(({ agentId, operation, reason, policyViolation }) => {
+  killSwitch.logAction(agentId, `${operation}:${reason}`, policyViolation);
+});
+
 /**
  * Common governance hook for logging actions to the kill switch.
  */
-export function recordGovernanceAction(
-  agentId: string,
-  operation: string,
-  reason: string,
-  policyViolation = false
-): void {
-  killSwitch.logAction(agentId, `${operation}:${reason}`, policyViolation);
-}
+export { recordGovernanceAction } from './governance-action-recorder.js';

@@ -148,6 +148,19 @@ describe('readValidatedPipelineAdf', () => {
     );
   });
 
+  it.each([
+    'pipelines/full-health-report.json',
+    'pipelines/voice-onboarding.json',
+    'pipelines/launch-first-run-onboarding.json',
+    'pipelines/system-upgrade-check.json',
+  ])('loads representative checked-in pipeline %s with the wrapper baseline', async (relative) => {
+    await expect(readValidatedWorkflowAdf(pathResolver.rootResolve(relative))).resolves.toEqual(
+      expect.objectContaining({
+        steps: expect.any(Array),
+      })
+    );
+  });
+
   it('expands static includes before guardrail validation and rejects include cycles', async () => {
     const cyclePath = path.resolve(
       pathResolver.rootDir(),

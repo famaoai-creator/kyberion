@@ -21,27 +21,12 @@
     {
       "id": "restore_latest_backup",
       "role": "source",
-      "op": "system:exec",
+      "op": "core:run_backup_restore_drill",
       "produces": {
         "channel": "restore_drill_result",
-        "type": "CommandResult"
+        "type": "Json"
       },
-      "params": {
-        "command": "node",
-        "args": [
-          "--import",
-          "./scripts/ts-loader.mjs",
-          "scripts/backup.ts",
-          "drill",
-          "--dir",
-          "{{backup_dir}}",
-          "--target",
-          "{{restore_target}}",
-          "--prepare-checkout",
-          "--force"
-        ],
-        "timeout_ms": 120000
-      }
+      "params": { "backup_dir": "{{backup_dir}}", "restore_target": "{{restore_target}}" }
     },
     {
       "role": "sink",

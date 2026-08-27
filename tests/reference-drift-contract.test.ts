@@ -39,7 +39,7 @@ describe('reference drift contract', () => {
     }
     expect(contents).toContain('vital_check.js');
     expect(contents).toContain('onboard:apply');
-    expect(contents).toContain('check:doc-examples');
+    expect(contents).toContain('doc-examples');
   });
 
   it('runs as part of the validation chain', () => {

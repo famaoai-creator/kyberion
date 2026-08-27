@@ -381,14 +381,18 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   return result;
 }
 
-export async function runScan(): Promise<number> {
+export async function runDependencyVulnerabilityScanOnce(): Promise<DependencyVulnerabilityScanResult> {
   const audit = safeExecResult('pnpm', ['audit', '--json'], { maxOutputMB: 20 });
   const outdated = safeExecResult('pnpm', ['outdated', '--json'], { maxOutputMB: 20 });
 
-  const result = scanDependencyVulnerabilitiesFromInputs({
+  return scanDependencyVulnerabilitiesFromInputs({
     auditJson: audit.stdout || '{}',
     outdatedJson: outdated.stdout || '{}',
   });
+}
+
+export async function runScan(): Promise<number> {
+  const result = await runDependencyVulnerabilityScanOnce();
 
   logger.info(
     `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`

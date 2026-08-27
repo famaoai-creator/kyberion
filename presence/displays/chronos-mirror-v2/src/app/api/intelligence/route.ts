@@ -111,1690 +111,8 @@ import {
 import { listWorkItems } from '@agent/core/work-coordination';
 import { getProjectManagementView } from '@agent/core';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
-
-interface RuntimeTopologySurfaceInput {
-  id: string;
-  kind: string;
-  running: boolean;
-  startupMode?: string;
-  pid?: number;
-}
-
-interface MissionSummary {
-  missionId: string;
-  tenantSlug?: string;
-  status: string;
-  tier: string;
-  missionType?: string;
-  projectId?: string;
-  projectPath?: string;
-  trackId?: string;
-  trackName?: string;
-  planReady: boolean;
-  nextTaskCount: number;
-  controlSummary: string;
-  controlTone: 'planning' | 'ready' | 'attention' | 'pending';
-  controlRequestedBy?: string;
-}
-
-interface MissionProgressSummary {
-  missionId: string;
-  boardStatus: string;
-  boardStepsTotal: number;
-  boardStepsDone: number;
-  boardStepsActive: number;
-  boardStepsPending: number;
-  nextTasksTotal: number;
-  nextTasksPending: number;
-  nextTasksCompleted: number;
-  dependencies: string[];
-  generatedAssets: Array<{
-    path: string;
-    category: 'deliverables' | 'artifacts' | 'outputs' | 'evidence';
-    sizeBytes: number;
-    updatedAt: string;
-  }>;
-}
-
-interface RuntimeLeaseSummary {
-  agent_id: string;
-  owner_id: string;
-  owner_type: string;
-  metadata?: Record<string, unknown>;
-}
-
-interface RuntimeDoctorFinding {
-  severity: 'warning' | 'critical';
-  agentId: string;
-  ownerId: string;
-  reason: string;
-  recommendedAction: 'stop_runtime' | 'restart_runtime';
-}
-
-interface OwnerSummary {
-  ts: string;
-  mission_id: string;
-  accepted_count: number;
-  reviewed_count: number;
-  completed_count: number;
-  requested_count: number;
-}
-
-interface CompanySnapshot {
-  companyId: string;
-  tenantSlug: string;
-  name: string;
-  sovereign: string | null;
-  visionRef: string;
-  vision: {
-    sourceKind: CompanyAggregate['vision_ref']['source_kind'];
-    sourcePath: string;
-    title: string | null;
-    soul: string[];
-    steering: string[];
-    destination: string[];
-  };
-  organizationProfile: {
-    exists: boolean;
-    path: string;
-    name: string | null;
-  };
-  orgChart: {
-    exists: boolean;
-    path: string;
-    domainCount: number;
-    positionCount: number;
-    topLevelRoles: string[];
-  };
-  financial: {
-    exists: boolean;
-    path: string;
-    sourceKind: string | null;
-    periodCount: number;
-    latestPeriodId: string | null;
-    latestRevenueJpy: number | null;
-    latestOperatingCostJpy: number | null;
-    latestGrossProfitJpy: number | null;
-  };
-  financeController: FinanceControllerDecision;
-  okr: {
-    exists: boolean;
-    path: string;
-    sourceKind: string | null;
-    objectiveCount: number;
-    keyResultCount: number;
-    progressPercent: number;
-    latestObjective: string | null;
-  };
-  approvalAudit: {
-    total: number;
-    allowed: number;
-    denied: number;
-    pending: number;
-    recentCount: number;
-    latestCorrelationId: string | null;
-  };
-  approvalAuditDrilldown: ApprovalAuditDrilldownSummary;
-  decisionRights: {
-    exists: boolean;
-    path: string;
-    sourceKind: string | null;
-    ruleCount: number;
-    decisionTypes: string[];
-  };
-}
-
-interface SurfaceOutboxMessage {
-  message_id: string;
-  surface: string;
-  correlation_id: string;
-  channel: string;
-  thread_ts: string;
-  text: string;
-  source: 'surface' | 'nerve' | 'system';
-  created_at: string;
-}
-
-interface SurfaceSummary {
-  id: string;
-  kind: string;
-  startupMode?: string;
-  enabled: boolean;
-  running: boolean;
-  pid?: number;
-  health: string;
-  detail?: string;
-  controlSummary: string;
-  controlTone: 'stable' | 'attention' | 'offline' | 'pending';
-  controlRequestedBy?: string;
-}
-
-interface SecretApprovalSummary {
-  id: string;
-  title: string;
-  summary: string;
-  storageChannel: string;
-  requestedAt: string;
-  requestedBy: string;
-  serviceId: string;
-  secretKey: string;
-  mutation: string;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  requiresStrongAuth: boolean;
-  pendingRoles: string[];
-  kind?: 'secret_mutation' | 'computer_action';
-}
-
-interface PendingApprovalSummary {
-  id: string;
-  kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
-  channel: string;
-  storageChannel: string;
-  requestedAt: string;
-  requestedBy: string;
-  title: string;
-  summary: string;
-  riskLevel: 'low' | 'medium' | 'high' | 'critical';
-  pendingRoles: string[];
-  missionId?: string;
-  tenantSlug?: string;
-  serviceId?: string;
-  work_loop?: OrganizationWorkLoopSummary;
-}
-
-interface BrowserSessionView extends BrowserSessionSummary {}
-interface BrowserConversationSessionView extends BrowserConversationSessionSummary {}
-interface ComputerSessionView extends ComputerSessionSummary {}
-
-interface A2AHandoffView extends A2AHandoffSummary {}
-
-interface ControlActionSummary {
-  event_id?: string;
-  ts: string;
-  kind: 'mission' | 'surface';
-  target: string;
-  operation: string;
-  status: 'queued' | 'completed' | 'failed';
-  requested_by: string;
-  error?: string;
-}
-
-interface ControlActionDetail {
-  ts: string;
-  decision: string;
-  event_type?: string;
-  mission_id?: string;
-  resource_id?: string;
-  operation?: string;
-  action_id?: string;
-  outcome?: string;
-  why?: string;
-  error?: string;
-}
-
-type TenantScope = string[] | 'all';
-
-function missionTenantSlug(missionId: string): string | undefined {
-  const normalized = String(missionId || '').trim();
-  if (!normalized) return undefined;
-  try {
-    const matches = listMissionsInSearchDirs().filter((entry) => entry.missionId === normalized);
-    if (matches.length !== 1) return undefined;
-    const directory = path.dirname(matches[0].missionPath);
-    const state = loadState(normalized, { directories: [directory] });
-    return state?.tenant_slug || state?.tenant_id;
-  } catch {
-    return undefined;
-  }
-}
-
-function missionVisibleToTenant(missionId: string | undefined, tenantSlugs: TenantScope): boolean {
-  if (!missionId) return false;
-  const tenant = missionTenantSlug(missionId);
-  if (!tenant) return false;
-  if (tenantSlugs === 'all') return true;
-  return Boolean(tenant && tenantSlugs.includes(tenant));
-}
-
-function projectVisibleToTenant(
-  project: { tier: 'personal' | 'confidential' | 'public'; tenant_slug?: string },
-  tenantSlugs: TenantScope
-): boolean {
-  if (tenantSlugs === 'all') return true;
-  return Boolean(project.tenant_slug && tenantSlugs.includes(project.tenant_slug));
-}
-
-function distillCandidateVisibleToTenant(
-  candidate: { project_id?: string; mission_id?: string },
-  tenantSlugs: TenantScope
-): boolean {
-  if (tenantSlugs === 'all') return true;
-  if (candidate.project_id) {
-    const project = loadProjectRecord(candidate.project_id);
-    return Boolean(project && projectVisibleToTenant(project, tenantSlugs));
-  }
-  return missionVisibleToTenant(candidate.mission_id, tenantSlugs);
-}
-
-function filterServiceBindingsToTenant(
-  bindings: Array<{
-    binding_id: string;
-    scope: string;
-    tenant_slug?: string;
-    project_id?: string;
-  }>,
-  projects: Array<{ service_bindings?: string[] }>,
-  tenantSlugs: TenantScope
-) {
-  if (tenantSlugs === 'all') return bindings;
-  const projectBindingIds = new Set(projects.flatMap((project) => project.service_bindings || []));
-  return bindings.filter((binding) => {
-    if (binding.scope === 'project') return projectBindingIds.has(binding.binding_id);
-    return Boolean(binding.tenant_slug && tenantSlugs.includes(binding.tenant_slug));
-  });
-}
-
-function surfaceOutboxVisibleToTenant(
-  message: { correlation_id?: string },
-  tenantSlugs: TenantScope
-): boolean {
-  if (tenantSlugs === 'all') return true;
-  const correlationId = String(message.correlation_id || '')
-    .trim()
-    .toUpperCase();
-  return correlationId.startsWith('MSN-') && missionVisibleToTenant(correlationId, tenantSlugs);
-}
-
-function missionScopeError(
-  viewer: ViewerContext,
-  missionId: string,
-  requestedTenant?: string
-): NextResponse | null {
-  const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  if (missionVisibleToTenant(missionId, allowedTenants)) return null;
-  return NextResponse.json(
-    { error: 'Mission is outside the viewer tenant scope' },
-    { status: 403 }
-  );
-}
-
-function projectScopeError(
-  viewer: ViewerContext,
-  project: { tier: 'personal' | 'confidential' | 'public'; tenant_slug?: string },
-  requestedTenant?: string
-): NextResponse | null {
-  const allowedTenants = strictViewerScopeTenantSlugs(viewer, requestedTenant);
-  if (projectVisibleToTenant(project, allowedTenants)) return null;
-  return NextResponse.json(
-    { error: 'Project is outside the viewer tenant scope' },
-    { status: 403 }
-  );
-}
-
-function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
-  try {
-    return collect();
-  } catch (err) {
-    console.warn(`[chronos-mirror-v2] ${label} failed`, err);
-    return fallback;
-  }
-}
-
-interface ControlActionDefinition {
-  operation: string;
-  label: string;
-  risk: 'safe' | 'risky';
-  approvalRequired: boolean;
-  enabled: boolean;
-  disabledReason?: string;
-}
-
-interface ControlActionCatalog {
-  mission: ControlActionDefinition[];
-  surface: ControlActionDefinition[];
-  globalSurface: ControlActionDefinition[];
-}
-
-interface ControlActionAvailability {
-  mission: Record<string, ControlActionDefinition[]>;
-  surface: Record<string, ControlActionDefinition[]>;
-  globalSurface: ControlActionDefinition[];
-}
-
-interface NextActionSummary {
-  action_id: string;
-  next_action_type:
-    | 'request_clarification'
-    | 'approve'
-    | 'inspect_evidence'
-    | 'retry_delivery'
-    | 'promote_mission_seed'
-    | 'resume_mission';
-  reason: string;
-  risk: 'low' | 'medium' | 'high';
-  suggested_command?: string;
-  suggested_surface_action?:
-    'approvals' | 'mission-seeds' | 'memory-promotion-queue' | 'next-actions';
-  approval_required: boolean;
-}
-
-interface WorkCoordinationItemSummary {
-  item_id: string;
-  title: string;
-  status: string;
-  priority: string;
-  project_id: string;
-  source_ref: string;
-  updated_at: string;
-  attempt_count: number;
-  current_attempt_id?: string;
-  current_attempt_status?: string;
-  current_attempt_started_at?: string;
-  current_attempt_summary?: string;
-  blocked_reason?: string;
-  failure_reason?: string;
-  claimed_by_peer_id?: string;
-  claimed_by_user_id?: string;
-}
-
-interface WorkCoordinationSummary {
-  total: number;
-  backlog: number;
-  ready: number;
-  inProgress: number;
-  blocked: number;
-  review: number;
-  done: number;
-  archived: number;
-  runningAttempts: number;
-  recentItems: WorkCoordinationItemSummary[];
-}
-
-function buildChronosNextActions(input: {
-  pendingApprovals: number;
-  missionSeeds: Array<{ promoted_mission_id?: string }>;
-  memoryCandidates: Array<{ status?: string }>;
-}): NextActionSummary[] {
-  const actions: NextActionSummary[] = [];
-
-  if (input.pendingApprovals > 0) {
-    actions.push(
-      createNextActionContract({
-        actionId: 'chronos-approve-pending',
-        type: 'approve',
-        reason: `${input.pendingApprovals} pending approval request(s) require a decision.`,
-        risk: 'medium',
-        suggestedCommand: 'pnpm control chronos approvals',
-        suggestedSurfaceAction: 'approvals',
-        approvalRequired: true,
-      })
-    );
-  }
-
-  const approvedMemoryCount = input.memoryCandidates.filter(
-    (item) => item.status === 'approved'
-  ).length;
-  if (approvedMemoryCount > 0) {
-    actions.push(
-      createNextActionContract({
-        actionId: 'chronos-promote-memory',
-        type: 'inspect_evidence',
-        reason: `${approvedMemoryCount} approved memory candidate(s) are ready for governed promotion.`,
-        risk: 'low',
-        suggestedCommand: 'pnpm control chronos promote-memory --dry-run',
-        suggestedSurfaceAction: 'memory-promotion-queue',
-        approvalRequired: false,
-      })
-    );
-  }
-
-  const promotableSeedCount = input.missionSeeds.filter((seed) => !seed.promoted_mission_id).length;
-  if (promotableSeedCount > 0) {
-    actions.push(
-      createNextActionContract({
-        actionId: 'chronos-promote-seed',
-        type: 'promote_mission_seed',
-        reason: `${promotableSeedCount} mission seed(s) can be promoted into active missions.`,
-        risk: 'low',
-        suggestedCommand: 'pnpm control chronos mission-seeds',
-        suggestedSurfaceAction: 'mission-seeds',
-        approvalRequired: false,
-      })
-    );
-  }
-
-  return actions;
-}
-
-function collectWorkCoordinationSummary(
-  tenantSlugs: string[] | 'all' = 'all'
-): WorkCoordinationSummary {
-  const items = listWorkItems({ tenantSlugs: tenantSlugs === 'all' ? undefined : tenantSlugs });
-  const summary: WorkCoordinationSummary = {
-    total: items.length,
-    backlog: 0,
-    ready: 0,
-    inProgress: 0,
-    blocked: 0,
-    review: 0,
-    done: 0,
-    archived: 0,
-    runningAttempts: 0,
-    recentItems: [],
-  };
-
-  for (const item of items) {
-    switch (item.status) {
-      case 'backlog':
-        summary.backlog += 1;
-        break;
-      case 'ready':
-        summary.ready += 1;
-        break;
-      case 'in_progress':
-        summary.inProgress += 1;
-        break;
-      case 'blocked':
-        summary.blocked += 1;
-        break;
-      case 'review':
-        summary.review += 1;
-        break;
-      case 'done':
-        summary.done += 1;
-        break;
-      case 'archived':
-        summary.archived += 1;
-        break;
-    }
-    const attempts = Array.isArray(item.attempts) ? item.attempts : [];
-    summary.runningAttempts += attempts.filter((attempt) => attempt.status === 'running').length;
-  }
-
-  summary.recentItems = items.slice(0, 6).map((item) => {
-    const attempts = Array.isArray(item.attempts) ? item.attempts : [];
-    const currentAttempt =
-      attempts.find((attempt) => attempt.run_id === item.current_attempt_id) ||
-      attempts[attempts.length - 1] ||
-      null;
-    return {
-      item_id: item.item_id,
-      title: item.title,
-      status: item.status,
-      priority: item.priority,
-      project_id: item.project_id,
-      source_ref: item.source_ref,
-      updated_at: item.updated_at,
-      attempt_count: attempts.length,
-      ...(item.current_attempt_id ? { current_attempt_id: item.current_attempt_id } : {}),
-      ...(currentAttempt?.status ? { current_attempt_status: currentAttempt.status } : {}),
-      ...(currentAttempt?.started_at
-        ? { current_attempt_started_at: currentAttempt.started_at }
-        : {}),
-      ...(currentAttempt?.summary ? { current_attempt_summary: currentAttempt.summary } : {}),
-      ...(currentAttempt?.blocked_reason ? { blocked_reason: currentAttempt.blocked_reason } : {}),
-      ...(currentAttempt?.failure_reason ? { failure_reason: currentAttempt.failure_reason } : {}),
-      ...(currentAttempt?.actor_peer_id
-        ? { claimed_by_peer_id: currentAttempt.actor_peer_id }
-        : {}),
-      ...(currentAttempt?.actor_user_id
-        ? { claimed_by_user_id: currentAttempt.actor_user_id }
-        : {}),
-    };
-  });
-
-  return summary;
-}
-
-function inferMissionSeedPromotionTargetKind(seed: {
-  mission_type_hint?: string;
-  specialist_id?: string;
-}): 'pattern' | 'sop_candidate' | 'knowledge_hint' {
-  const hint = String(seed.mission_type_hint || '').toLowerCase();
-  if (hint === 'verification' || seed.specialist_id === 'service-operator') {
-    return 'sop_candidate';
-  }
-  if (hint === 'architecture' || hint === 'implementation') {
-    return 'pattern';
-  }
-  return 'knowledge_hint';
-}
-
-function buildMissionSeedPromotionMetadata(
-  seed: {
-    seed_id: string;
-    title: string;
-    summary: string;
-    specialist_id: string;
-    mission_type_hint?: string;
-    source_task_session_id?: string;
-  },
-  project: {
-    project_id: string;
-    name: string;
-    kickoff_brief?: string;
-  }
-): Record<string, unknown> {
-  const targetKind = inferMissionSeedPromotionTargetKind(seed);
-  if (targetKind === 'pattern') {
-    return {
-      promotion_source: 'mission_seed',
-      applicability: [
-        'durable mission promotion',
-        project.name,
-        seed.mission_type_hint || 'general',
-      ],
-      reusable_steps: [
-        'Review the project kickoff and current durable work candidates.',
-        'Select the mission seed with the clearest specialist and outcome fit.',
-        'Promote the seed into a governed mission and capture the resulting mission id.',
-      ],
-      expected_outcome: `${seed.title} is promoted into a durable mission with explicit project ownership.`,
-      recommended_refs: [`project:${project.project_id}`, `mission_seed:${seed.seed_id}`],
-    };
-  }
-  if (targetKind === 'sop_candidate') {
-    return {
-      promotion_source: 'mission_seed',
-      procedure_steps: [
-        'Review the seed and confirm the project context is ready for durable execution.',
-        'Start the governed mission with the appropriate mission type and project relationship.',
-        'Record the promoted mission id and notify the surface.',
-      ],
-      safety_notes: [
-        'Promote durable work only from an approved control plane action.',
-        'Keep the project relationship and evidence trail attached to the promoted mission.',
-      ],
-      escalation_conditions: [
-        'The parent project record is missing.',
-        'mission_controller fails to start the durable mission.',
-        'The promoted mission id cannot be written back to the seed or project.',
-      ],
-    };
-  }
-  return {
-    promotion_source: 'mission_seed',
-    hint_scope: 'mission promotion',
-    hint_triggers: [seed.title, project.name, seed.mission_type_hint || 'durable work'],
-    recommended_refs: [
-      `project:${project.project_id}`,
-      `mission_seed:${seed.seed_id}`,
-      ...(seed.source_task_session_id ? [`task_session:${seed.source_task_session_id}`] : []),
-    ],
-    kickoff_brief: project.kickoff_brief || '',
-  };
-}
-
-function buildLearnedNotificationText(input: {
-  projectId?: string;
-  language?: SupportedLocale;
-}): string {
-  if (!input.projectId) return '';
-  const titles = listDistillCandidateRecords()
-    .filter((candidate) => candidate.project_id === input.projectId && candidate.promoted_ref)
-    .map((candidate) => candidate.title)
-    .filter(Boolean)
-    .filter((value, index, array) => array.indexOf(value) === index)
-    .slice(0, 2);
-  if (titles.length === 0) return '';
-  if (input.language === 'ja') {
-    return ` 過去の learned pattern（${titles.join('、')}）も参照できます。`;
-  }
-  return ` Learned patterns such as ${titles.join(', ')} are also available.`;
-}
-
-function inferProjectIdForApproval(input: {
-  missionId?: string;
-  serviceId?: string;
-}): string | undefined {
-  const projects = listProjectRecords();
-  if (input.missionId) {
-    const byMission = projects.find((project) =>
-      (project.active_missions || []).includes(input.missionId || '')
-    );
-    if (byMission) return byMission.project_id;
-  }
-  if (input.serviceId) {
-    const byService = projects.find((project) =>
-      (project.service_bindings || []).some((bindingId) =>
-        bindingId.includes(input.serviceId || '')
-      )
-    );
-    if (byService) return byService.project_id;
-  }
-  return undefined;
-}
-
-function buildApprovalDecisionText(input: {
-  title: string;
-  decision: 'approved' | 'rejected';
-  missionId?: string;
-  serviceId?: string;
-}): string {
-  const projectId = inferProjectIdForApproval({
-    missionId: input.missionId,
-    serviceId: input.serviceId,
-  });
-  const learnedText = buildLearnedNotificationText({ projectId, language: 'en' });
-  if (input.decision === 'approved') {
-    return `${input.title} was approved. The requested work can proceed now.${learnedText}`;
-  }
-  return `${input.title} was rejected. The requested work will stay blocked until it is revised.`;
-}
-
-function resolveProjectRootPath(project: ReturnType<typeof loadProjectRecord>): string | null {
-  if (!project) return null;
-  const repoRoot = project.repositories?.find(
-    (repo) => typeof repo.root_path === 'string' && repo.root_path.trim()
-  );
-  if (repoRoot?.root_path) return repoRoot.root_path;
-  const metadataRoot =
-    typeof project.metadata?.root_path === 'string' ? project.metadata.root_path : null;
-  return metadataRoot || null;
-}
-
-function readJson<T = any>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  return loadJson<T>(filePath);
-}
-
-function collectActiveMissions(): MissionSummary[] {
-  const missionRoots = [
-    { dir: pathResolver.active('missions/public'), tier: 'public' },
-    { dir: pathResolver.active('missions/confidential'), tier: 'confidential' },
-  ];
-  const missions: MissionSummary[] = [];
-
-  for (const root of missionRoots) {
-    try {
-      if (!safeExistsSync(root.dir)) continue;
-      for (const item of safeReaddir(root.dir)) {
-        const missionPath = path.join(root.dir, item);
-        const state = readJson<any>(path.join(missionPath, 'mission-state.json'));
-        if (!state || !['active', 'planned', 'paused', 'failed'].includes(state.status)) continue;
-        const nextTasks = readJson<any[]>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
-        const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
-        const nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
-        const controlSummary =
-          state.status === 'paused' || state.status === 'failed'
-            ? `${state.status} mission`
-            : planReady
-              ? nextTaskCount > 0
-                ? 'execution ready'
-                : 'plan ready'
-              : 'planning pending';
-        const controlTone: MissionSummary['controlTone'] =
-          state.status === 'paused' || state.status === 'failed'
-            ? 'attention'
-            : planReady
-              ? nextTaskCount > 0
-                ? 'ready'
-                : 'planning'
-              : 'attention';
-        missions.push({
-          missionId: state.mission_id || item,
-          tenantSlug: state.tenant_slug || state.tenant_id,
-          status: state.status,
-          tier: state.tier || root.tier,
-          missionType: state.mission_type,
-          projectId: state.relationships?.project?.project_id,
-          projectPath: state.relationships?.project?.project_path,
-          trackId: state.relationships?.track?.track_id,
-          trackName: state.relationships?.track?.track_name,
-          planReady,
-          nextTaskCount,
-          controlSummary,
-          controlTone,
-        });
-      }
-    } catch {
-      // Skip roots that are unavailable to the current authority role.
-    }
-  }
-
-  return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
-}
-
-function collectMissionProgress(activeMissions: MissionSummary[]): MissionProgressSummary[] {
-  const missionRoots = [
-    pathResolver.active('missions/public'),
-    pathResolver.active('missions/confidential'),
-  ];
-  const summaries: MissionProgressSummary[] = [];
-
-  for (const mission of activeMissions) {
-    const missionPath = missionRoots
-      .map((root) => path.join(root, mission.missionId))
-      .find((candidate) => safeExistsSync(candidate));
-    if (!missionPath) continue;
-
-    const taskBoardPath = path.join(missionPath, 'TASK_BOARD.md');
-    const nextTasksPath = path.join(missionPath, 'NEXT_TASKS.json');
-    const statePath = path.join(missionPath, 'mission-state.json');
-    const taskBoard = safeExistsSync(taskBoardPath)
-      ? String(safeReadFile(taskBoardPath, { encoding: 'utf8' }) || '')
-      : '';
-    const nextTasks = readJson<Array<{ status?: string }>>(nextTasksPath) || [];
-    const missionState = readJson<Record<string, unknown>>(statePath) || {};
-    const board = parseTaskBoard(taskBoard);
-    const nextTaskSummary = summarizeNextTasks(nextTasks);
-    const generatedAssets: MissionProgressSummary['generatedAssets'] = [];
-    for (const dirName of ['deliverables', 'artifacts', 'outputs', 'evidence'] as const) {
-      const dirPath = path.join(missionPath, dirName);
-      if (!safeExistsSync(dirPath)) continue;
-      for (const entry of safeReaddir(dirPath)) {
-        const fullPath = path.join(dirPath, entry);
-        try {
-          const stats = safeStat(fullPath);
-          if (stats.isFile()) {
-            generatedAssets.push({
-              path: `${dirName}/${entry}`,
-              category: dirName,
-              sizeBytes: stats.size,
-              updatedAt: stats.mtime.toISOString(),
-            });
-          }
-        } catch {
-          // Ignore unreadable entries.
-        }
-      }
-    }
-
-    summaries.push({
-      missionId: mission.missionId,
-      ...board,
-      ...nextTaskSummary,
-      dependencies: extractMissionDependencies(
-        missionState.relationships as Record<string, unknown> | undefined
-      ),
-      generatedAssets: normalizeMissionAssets(generatedAssets),
-    });
-  }
-
-  return summaries.sort((a, b) => a.missionId.localeCompare(b.missionId));
-}
-
-function collectRecentEvents(tenantSlugs: TenantScope = 'all') {
-  const files = [
-    pathResolver.shared('observability/channels/slack/missions.jsonl'),
-    pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
-  ];
-  const lines: Array<{ ts: string; decision: string; mission_id?: string; why?: string }> = [];
-  for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line) as any;
-        lines.push({
-          ts: event.ts || new Date().toISOString(),
-          decision: event.decision || event.event_type || 'event',
-          mission_id: event.mission_id || event.resource_id,
-          why: event.why,
-        });
-      } catch {
-        // Ignore malformed lines.
-      }
-    }
-  }
-  return lines
-    .filter((event) => missionVisibleToTenant(event.mission_id, tenantSlugs))
-    .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 8);
-}
-
-function collectControlActions(tenantSlugs: TenantScope = 'all'): ControlActionSummary[] {
-  const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  if (!safeExistsSync(file)) return [];
-
-  const lifecycle = new Map<string, ControlActionSummary>();
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const event = JSON.parse(line) as any;
-      const decision = event.decision || event.event_type;
-      const eventId = typeof event.event_id === 'string' ? event.event_id : undefined;
-
-      if (
-        decision === 'mission_orchestration_event_enqueued' &&
-        (event.event_type === 'mission_control_requested' ||
-          event.event_type === 'surface_control_requested') &&
-        eventId
-      ) {
-        const queuedTarget =
-          event.event_type === 'surface_control_requested'
-            ? event.payload?.surfaceId || 'surface-runtime'
-            : event.mission_id || 'system';
-        lifecycle.set(eventId, {
-          event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === 'mission_control_requested' ? 'mission' : 'surface',
-          target: queuedTarget,
-          operation:
-            typeof event.payload?.operation === 'string'
-              ? event.payload.operation
-              : event.event_type,
-          status: 'queued',
-          requested_by: event.requested_by || 'unknown',
-        });
-        continue;
-      }
-
-      if (
-        (decision === 'mission_control_action_applied' ||
-          decision === 'surface_control_action_applied') &&
-        typeof event.operation === 'string'
-      ) {
-        const syntheticId = `${decision}:${event.mission_id || event.resource_id || 'system'}:${event.operation}:${event.ts || ''}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
-          target: event.mission_id || event.resource_id || 'system',
-          operation: event.operation,
-          status: 'completed',
-          requested_by: event.requested_by || 'unknown',
-        });
-        continue;
-      }
-
-      if (decision === 'memory_promote_pending_applied') {
-        const syntheticId = `${decision}:${event.resource_id || 'memory-promotion-queue'}:${event.ts || ''}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: 'surface',
-          target: event.resource_id || 'memory-promotion-queue',
-          operation: 'memory_promote_pending',
-          status: 'completed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
-        });
-        continue;
-      }
-
-      if (decision === 'next_action_executed') {
-        const syntheticId = `${decision}:${event.resource_id || 'next-actions'}:${event.operation || 'next_action_execute'}:${event.ts || ''}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: 'surface',
-          target: event.resource_id || 'next-actions',
-          operation: typeof event.operation === 'string' ? event.operation : 'next_action_execute',
-          status: event.outcome === 'failed' ? 'failed' : 'completed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
-        });
-        continue;
-      }
-
-      if (
-        decision === 'mission_orchestration_event_failed' &&
-        (event.event_type === 'mission_control_requested' ||
-          event.event_type === 'surface_control_requested') &&
-        eventId
-      ) {
-        const failedTarget =
-          event.event_type === 'surface_control_requested'
-            ? event.payload?.surfaceId || 'surface-runtime'
-            : event.mission_id || 'system';
-        lifecycle.set(eventId, {
-          event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === 'mission_control_requested' ? 'mission' : 'surface',
-          target: failedTarget,
-          operation:
-            typeof event.payload?.operation === 'string'
-              ? event.payload.operation
-              : event.event_type,
-          status: 'failed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
-        });
-      }
-    } catch {
-      // Ignore malformed lines.
-    }
-  }
-
-  return Array.from(lifecycle.values())
-    .filter(
-      (action) =>
-        (action.kind === 'mission' && missionVisibleToTenant(action.target, tenantSlugs)) ||
-        (action.kind === 'surface' && tenantSlugs === 'all')
-    )
-    .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 10);
-}
-
-function applyPendingActionSummaries(
-  activeMissions: MissionSummary[],
-  surfaces: SurfaceSummary[],
-  controlActions: ControlActionSummary[]
-): {
-  activeMissions: MissionSummary[];
-  surfaces: SurfaceSummary[];
-} {
-  const pendingMissionTargets = new Map(
-    controlActions
-      .filter((action) => action.kind === 'mission' && action.status === 'queued')
-      .map((action) => [
-        action.target,
-        { operation: action.operation, requestedBy: action.requested_by },
-      ])
-  );
-  const pendingSurfaceTargets = new Map(
-    controlActions
-      .filter((action) => action.kind === 'surface' && action.status === 'queued')
-      .map((action) => [
-        action.target,
-        { operation: action.operation, requestedBy: action.requested_by },
-      ])
-  );
-
-  return {
-    activeMissions: activeMissions.map((mission) =>
-      pendingMissionTargets.has(mission.missionId)
-        ? {
-            ...mission,
-            controlSummary: `${pendingMissionTargets.get(mission.missionId)?.operation} pending`,
-            controlTone: 'pending',
-            controlRequestedBy: pendingMissionTargets.get(mission.missionId)?.requestedBy,
-          }
-        : mission
-    ),
-    surfaces: surfaces.map((surface) =>
-      pendingSurfaceTargets.has(surface.id) || pendingSurfaceTargets.has('surface-runtime')
-        ? {
-            ...surface,
-            controlSummary: `${pendingSurfaceTargets.get(surface.id)?.operation || pendingSurfaceTargets.get('surface-runtime')?.operation} pending`,
-            controlTone: 'pending',
-            controlRequestedBy:
-              pendingSurfaceTargets.get(surface.id)?.requestedBy ||
-              pendingSurfaceTargets.get('surface-runtime')?.requestedBy,
-          }
-        : surface
-    ),
-  };
-}
-
-function createControlActionDefinition(input: {
-  operation: string;
-  label: string;
-  risk: 'safe' | 'risky';
-  enabled: boolean;
-  disabledReason?: string;
-  approvalRequired?: boolean;
-}): ControlActionDefinition {
-  return {
-    operation: input.operation,
-    label: input.label,
-    risk: input.risk,
-    approvalRequired: input.approvalRequired === true,
-    enabled: input.enabled,
-    disabledReason: input.disabledReason,
-  };
-}
-
-function collectControlActionCatalog(accessRole: 'readonly' | 'localadmin'): ControlActionCatalog {
-  const controlEnabled = accessRole === 'localadmin';
-  const disabledReason = controlEnabled
-    ? undefined
-    : 'Requires localadmin access. Readonly mode can observe but cannot execute control actions.';
-  return {
-    mission: [
-      createControlActionDefinition({
-        operation: 'refresh_team',
-        label: 'refresh team',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'prewarm_team',
-        label: 'prewarm',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'staff_team',
-        label: 'staff',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'resume',
-        label: 'resume',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'pause',
-        label: 'pause',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'finish',
-        label: 'finish',
-        risk: 'risky',
-        approvalRequired: true,
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'cancel',
-        label: 'cancel',
-        risk: 'risky',
-        approvalRequired: true,
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-    ],
-    surface: [
-      createControlActionDefinition({
-        operation: 'start',
-        label: 'start',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'stop',
-        label: 'stop',
-        risk: 'risky',
-        approvalRequired: true,
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-    ],
-    globalSurface: [
-      createControlActionDefinition({
-        operation: 'reconcile',
-        label: 'reconcile surfaces',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-      createControlActionDefinition({
-        operation: 'status',
-        label: 'status refresh',
-        risk: 'safe',
-        enabled: controlEnabled,
-        disabledReason,
-      }),
-    ],
-  };
-}
-
-function collectControlActionAvailability(
-  accessRole: 'readonly' | 'localadmin',
-  activeMissions: MissionSummary[],
-  surfaces: SurfaceSummary[]
-): ControlActionAvailability {
-  const baseCatalog = collectControlActionCatalog(accessRole);
-  const mission: Record<string, ControlActionDefinition[]> = {};
-  const surface: Record<string, ControlActionDefinition[]> = {};
-
-  for (const item of activeMissions) {
-    mission[item.missionId] = baseCatalog.mission.map((action) => {
-      if (accessRole !== 'localadmin') return action;
-      if (action.operation === 'resume') {
-        if (item.status === 'active') {
-          return createControlActionDefinition({
-            ...action,
-            enabled: false,
-            disabledReason: 'Mission is already active.',
-          });
-        }
-        return createControlActionDefinition({
-          ...action,
-          enabled: item.status === 'paused' || item.status === 'failed',
-          disabledReason:
-            item.status === 'paused' || item.status === 'failed'
-              ? undefined
-              : `Mission status is ${item.status}; resume is only available after a pause or failure.`,
-        });
-      }
-      if (action.operation === 'pause') {
-        return createControlActionDefinition({
-          ...action,
-          enabled: item.status === 'active',
-          disabledReason:
-            item.status === 'active'
-              ? undefined
-              : `Mission status is ${item.status}; pause is only available for active missions.`,
-        });
-      }
-      if (action.operation === 'cancel') {
-        return createControlActionDefinition({
-          ...action,
-          enabled: item.status !== 'completed' && item.status !== 'archived',
-          disabledReason:
-            item.status === 'completed' || item.status === 'archived'
-              ? 'Completed missions cannot be cancelled from the control plane.'
-              : undefined,
-        });
-      }
-      return action;
-    });
-  }
-
-  for (const item of surfaces) {
-    surface[item.id] = baseCatalog.surface.map((action) => {
-      if (accessRole !== 'localadmin') return action;
-      if (action.operation === 'start' && item.running) {
-        return createControlActionDefinition({
-          ...action,
-          enabled: false,
-          disabledReason: 'Surface is already running.',
-        });
-      }
-      if (action.operation === 'stop' && !item.running) {
-        return createControlActionDefinition({
-          ...action,
-          enabled: false,
-          disabledReason: 'Surface is already stopped.',
-        });
-      }
-      return action;
-    });
-  }
-
-  const globalSurface = baseCatalog.globalSurface.map((action) => {
-    if (accessRole !== 'localadmin') return action;
-    if (surfaces.length === 0) {
-      return createControlActionDefinition({
-        ...action,
-        enabled: false,
-        disabledReason: 'No managed surfaces are registered.',
-      });
-    }
-    return action;
-  });
-
-  return { mission, surface, globalSurface };
-}
-
-function collectControlActionDetails(
-  tenantSlugs: TenantScope = 'all'
-): Record<string, ControlActionDetail[]> {
-  const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  if (!safeExistsSync(file)) return {};
-
-  const details: Record<string, ControlActionDetail[]> = {};
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const event = JSON.parse(line) as any;
-      const eventId = typeof event.event_id === 'string' ? event.event_id : undefined;
-      if (!eventId) continue;
-      if (
-        event.event_type !== 'mission_control_requested' &&
-        event.event_type !== 'surface_control_requested' &&
-        event.decision !== 'mission_control_action_applied' &&
-        event.decision !== 'surface_control_action_applied' &&
-        event.decision !== 'next_action_executed' &&
-        event.decision !== 'memory_promote_pending_applied' &&
-        event.decision !== 'mission_orchestration_event_started' &&
-        event.decision !== 'mission_orchestration_event_completed' &&
-        event.decision !== 'mission_orchestration_event_failed'
-      ) {
-        continue;
-      }
-
-      if (!details[eventId]) {
-        details[eventId] = [];
-      }
-      details[eventId].push({
-        ts: event.ts || new Date().toISOString(),
-        decision: event.decision || 'event',
-        event_type: event.event_type,
-        mission_id: event.mission_id,
-        resource_id: event.resource_id,
-        operation: event.operation,
-        action_id: event.action_id,
-        outcome: event.outcome,
-        why: event.why,
-        error: event.error,
-      });
-    } catch {
-      // Ignore malformed lines.
-    }
-  }
-
-  for (const key of Object.keys(details)) {
-    details[key] = details[key].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
-  }
-
-  if (tenantSlugs !== 'all') {
-    for (const key of Object.keys(details)) {
-      const scoped = details[key].filter((detail) =>
-        missionVisibleToTenant(detail.mission_id, tenantSlugs)
-      );
-      if (scoped.length > 0) details[key] = scoped;
-      else delete details[key];
-    }
-  }
-
-  return details;
-}
-
-function collectOwnerSummaries(tenantSlugs: TenantScope = 'all'): OwnerSummary[] {
-  const summaries: OwnerSummary[] = [];
-  const files = [
-    pathResolver.shared('observability/channels/slack/missions.jsonl'),
-    pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
-  ];
-
-  for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-    for (const line of raw.trim().split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line) as any;
-        if ((event.decision || event.event_type) !== 'mission_owner_notified') continue;
-        if (!missionVisibleToTenant(event.mission_id, tenantSlugs)) continue;
-        summaries.push({
-          ts: event.ts || new Date().toISOString(),
-          mission_id: event.mission_id || 'unknown',
-          accepted_count: Number(event.accepted_count || 0),
-          reviewed_count: Number(event.reviewed_count || 0),
-          completed_count: Number(event.completed_count || 0),
-          requested_count: Number(event.requested_count || 0),
-        });
-      } catch {
-        // Ignore malformed lines.
-      }
-    }
-  }
-  return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
-}
-
-function resolveChronosTenantSlug(): string | null {
-  try {
-    return activeCustomer();
-  } catch {
-    return null;
-  }
-}
-
-function summarizeCompany(company: CompanyAggregate): CompanySnapshot {
-  const approvalAudit = summarizeApprovalAuditTrail(6);
-  const financeController = resolveFinanceControllerDecision({ tenantSlug: company.tenant_slug });
-  const approvalAuditDrilldown = summarizeApprovalAuditDrilldown(6);
-  return {
-    companyId: company.company_id,
-    tenantSlug: company.tenant_slug,
-    name: company.name,
-    sovereign: company.sovereign,
-    visionRef: buildCompanyVisionRef(company.tenant_slug),
-    vision: {
-      sourceKind: company.vision_ref.source_kind,
-      sourcePath: company.vision_ref.source_path,
-      title: company.vision_ref.title,
-      soul: company.vision_ref.sections.soul,
-      steering: company.vision_ref.sections.steering,
-      destination: company.vision_ref.sections.destination,
-    },
-    organizationProfile: {
-      exists: company.organization_profile_ref.exists,
-      path: company.organization_profile_ref.path,
-      name:
-        typeof company.organization_profile_ref.data?.name === 'string'
-          ? company.organization_profile_ref.data.name
-          : null,
-    },
-    orgChart: {
-      exists: company.org_chart_ref.exists,
-      path: company.org_chart_ref.path,
-      domainCount: company.org_chart_ref.data?.domains.length || 0,
-      positionCount: company.org_chart_ref.data?.positions.length || 0,
-      topLevelRoles:
-        company.org_chart_ref.data?.positions
-          ?.filter((position) => position.reports_to == null)
-          .map((position) => position.role_id)
-          .sort() || [],
-    },
-    financial: {
-      exists: company.financial_ref.exists,
-      path: company.financial_ref.path,
-      sourceKind: company.financial_ref.data?.source_kind || null,
-      periodCount: company.financial_ref.data?.periods.length || 0,
-      latestPeriodId: company.financial_ref.data?.periods.at(-1)?.period_id || null,
-      latestRevenueJpy: company.financial_ref.data?.periods.at(-1)?.revenue_jpy ?? null,
-      latestOperatingCostJpy:
-        company.financial_ref.data?.periods.at(-1)?.operating_cost_jpy ?? null,
-      latestGrossProfitJpy: company.financial_ref.data?.periods.at(-1)?.gross_profit_jpy ?? null,
-    },
-    financeController,
-    okr: {
-      exists: company.okr_ref.exists,
-      path: company.okr_ref.path,
-      sourceKind: company.okr_ref.data?.source_kind || null,
-      objectiveCount: company.okr_ref.data?.objectives.length || 0,
-      keyResultCount:
-        company.okr_ref.data?.objectives.reduce(
-          (count, objective) => count + objective.key_results.length,
-          0
-        ) || 0,
-      progressPercent: (() => {
-        const keyResults =
-          company.okr_ref.data?.objectives.flatMap((objective) => objective.key_results) || [];
-        const completeCount = keyResults.filter((keyResult) => {
-          if (typeof keyResult.current === 'number' && typeof keyResult.target === 'number') {
-            return keyResult.current >= keyResult.target;
-          }
-          if (typeof keyResult.current === 'string' && typeof keyResult.target === 'string') {
-            return keyResult.current === keyResult.target;
-          }
-          return false;
-        }).length;
-        return keyResults.length > 0 ? Math.round((completeCount / keyResults.length) * 100) : 0;
-      })(),
-      latestObjective: company.okr_ref.data?.objectives.at(-1)?.objective || null,
-    },
-    approvalAudit: {
-      total: approvalAudit.total,
-      allowed: approvalAudit.allowed,
-      denied: approvalAudit.denied,
-      pending: approvalAudit.pending,
-      recentCount: approvalAudit.recent.length,
-      latestCorrelationId: approvalAudit.recent[0]?.correlationId || null,
-    },
-    approvalAuditDrilldown,
-    decisionRights: {
-      exists: company.decision_rights_ref.exists,
-      path: company.decision_rights_ref.path,
-      sourceKind: company.decision_rights_ref.data?.source_kind || null,
-      ruleCount: company.decision_rights_ref.data?.decisions.length || 0,
-      decisionTypes:
-        company.decision_rights_ref.data?.decisions
-          .map((decision) => decision.decision_type)
-          .sort() || [],
-    },
-  };
-}
-
-function collectRecentSurfaceOutbox(): SurfaceOutboxMessage[] {
-  return [
-    ...listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }),
-    ...listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }),
-  ]
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, 8);
-}
-
-function collectPendingSecretApprovals(tenantSlugs: string[] | 'all'): SecretApprovalSummary[] {
-  const secretApprovals = listApprovalRequests({
-    kind: 'secret_mutation',
-    status: 'pending',
-  })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
-    )
-    .map((request) => ({
-      id: request.id,
-      title: request.title,
-      summary: request.summary,
-      storageChannel: request.storageChannel,
-      requestedAt: request.requestedAt,
-      requestedBy: request.requestedBy,
-      serviceId: request.target?.serviceId || 'unknown',
-      secretKey: request.target?.secretKey || 'unknown',
-      mutation: request.target?.mutation || 'set',
-      riskLevel: request.risk?.level || 'medium',
-      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-      pendingRoles:
-        request.workflow?.approvals
-          .filter((approval) => approval.status === 'pending')
-          .map((approval) => approval.role) || [],
-      kind: 'secret_mutation' as const,
-    }));
-
-  const computerApprovals = listApprovalRequests({
-    storageChannels: ['computer'],
-    kind: 'channel-approval',
-    status: 'pending',
-  })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
-    )
-    .map((request) => ({
-      id: request.id,
-      title: request.title,
-      summary: request.summary,
-      storageChannel: request.storageChannel,
-      requestedAt: request.requestedAt,
-      requestedBy: request.requestedBy,
-      serviceId: 'computer',
-      secretKey: 'n/a',
-      mutation: request.justification?.requestedEffects?.[0] || 'computer_action',
-      riskLevel: request.risk?.level || 'medium',
-      requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-      pendingRoles:
-        request.workflow?.approvals
-          .filter((approval) => approval.status === 'pending')
-          .map((approval) => approval.role) || [],
-      kind: 'computer_action' as const,
-    }));
-
-  return [...secretApprovals, ...computerApprovals]
-    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
-    .slice(0, 20);
-}
-
-function collectPendingApprovals(tenantSlugs: string[] | 'all'): PendingApprovalSummary[] {
-  return listApprovalRequests({ status: 'pending' })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
-    )
-    .map((request) => ({
-      id: request.id,
-      kind: request.kind,
-      channel: request.channel,
-      storageChannel: request.storageChannel,
-      requestedAt: request.requestedAt,
-      requestedBy: request.requestedBy,
-      title: request.title,
-      summary: request.summary,
-      riskLevel: request.risk?.level || 'medium',
-      pendingRoles:
-        request.workflow?.approvals
-          .filter((approval) => approval.status === 'pending')
-          .map((approval) => approval.role) || [],
-      missionId: request.requestedByContext?.missionId,
-      tenantSlug: resolveApprovalTenant(request),
-      trackId: request.track_id,
-      serviceId: request.target?.serviceId,
-      work_loop: request.work_loop,
-    }))
-    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
-    .slice(0, 24);
-}
-
-function isPidAlive(pid: number | undefined): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function collectSurfaceSummaries(): Promise<SurfaceSummary[]> {
-  const manifest = loadSurfaceManifest();
-  const state = loadSurfaceState();
-  const summaries: SurfaceSummary[] = [];
-
-  for (const entry of manifest.surfaces.map(normalizeSurfaceDefinition)) {
-    const record = state.surfaces[entry.id];
-    const pidAlive = record ? isPidAlive(record.pid) : false;
-    const health = await probeSurfaceHealth(entry);
-    const trulyRunning = pidAlive || health.status === 'healthy';
-    const controlSummary = !trulyRunning
-      ? 'stopped'
-      : health.status === 'healthy'
-        ? 'stable'
-        : health.status === 'unhealthy'
-          ? 'needs attention'
-          : 'needs restart';
-    const controlTone: SurfaceSummary['controlTone'] = !trulyRunning
-      ? 'offline'
-      : health.status === 'healthy'
-        ? 'stable'
-        : 'attention';
-    summaries.push({
-      id: entry.id,
-      kind: entry.kind,
-      startupMode: entry.startupMode,
-      enabled: entry.enabled !== false,
-      running: trulyRunning,
-      pid: pidAlive ? record?.pid : undefined,
-      health: health.status,
-      detail: health.detail,
-      controlSummary,
-      controlTone,
-    });
-  }
-
-  return summaries;
-}
-
-function collectRuntimeTopologySurfaces(surfaces: SurfaceSummary[]): RuntimeTopologySurfaceInput[] {
-  return surfaces
-    .filter((surface) => surface.enabled)
-    .map((surface) => ({
-      id: surface.id,
-      kind: surface.kind,
-      running: surface.running,
-      startupMode: surface.startupMode,
-      pid: surface.pid,
-    }));
-}
-
-function buildRuntimeDoctor(
-  runtimeLeases: RuntimeLeaseSummary[],
-  activeMissions: MissionSummary[],
-  runtimeSnapshots: ReturnType<typeof listAgentRuntimeSnapshots>
-): RuntimeDoctorFinding[] {
-  const activeMissionIds = new Set(activeMissions.map((mission) => mission.missionId));
-  const runtimeByAgent = new Map(
-    runtimeSnapshots.map((snapshot) => [snapshot.agent.agentId, snapshot])
-  );
-  const findings: RuntimeDoctorFinding[] = [];
-
-  for (const lease of runtimeLeases) {
-    const runtime = runtimeByAgent.get(lease.agent_id);
-    if (!runtime) continue;
-
-    if (lease.owner_type === 'mission' && !activeMissionIds.has(lease.owner_id)) {
-      findings.push({
-        severity: 'critical',
-        agentId: lease.agent_id,
-        ownerId: lease.owner_id,
-        reason: 'Mission-scoped runtime lease without an active mission owner.',
-        recommendedAction: 'stop_runtime',
-      });
-      continue;
-    }
-
-    if (runtime.agent.status === 'error') {
-      findings.push({
-        severity: 'warning',
-        agentId: lease.agent_id,
-        ownerId: lease.owner_id,
-        reason: 'Runtime lease is attached to an agent in error state.',
-        recommendedAction: 'restart_runtime',
-      });
-      continue;
-    }
-
-    const executionMode =
-      typeof lease.metadata?.execution_mode === 'string'
-        ? lease.metadata.execution_mode
-        : undefined;
-    const channel =
-      typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined;
-    if (
-      executionMode === 'conversation' &&
-      channel === 'slack' &&
-      runtime.runtime?.idleForMs &&
-      runtime.runtime.idleForMs > 5 * 60 * 1000
-    ) {
-      findings.push({
-        severity: 'warning',
-        agentId: lease.agent_id,
-        ownerId: lease.owner_id,
-        reason: 'Conversation-scoped lease appears stale (>5m idle).',
-        recommendedAction: 'stop_runtime',
-      });
-    }
-  }
-
-  return findings.slice(0, 12);
-}
-
-function recordRuntimeRemediationArtifacts(input: {
-  action: 'cleanup_runtime_lease' | 'restart_runtime_lease';
-  agentId: string;
-  lease?: RuntimeLeaseSummary;
-}) {
-  const lease = input.lease;
-  if (!lease) return;
-
-  if (lease.owner_type === 'mission') {
-    ledger.record('MISSION_RUNTIME_REMEDIATION', {
-      mission_id: lease.owner_id,
-      role: 'chronos_localadmin',
-      agent_id: input.agentId,
-      remediation_action: input.action,
-      owner_type: lease.owner_type,
-      metadata: lease.metadata || {},
-    });
-  }
-
-  const channel = typeof lease.metadata?.channel === 'string' ? lease.metadata.channel : undefined;
-  if (channel) {
-    emitChannelSurfaceEvent('chronos_gateway', channel, 'runtime-remediation', {
-      correlation_id:
-        typeof lease.metadata?.thread === 'string' ? lease.metadata.thread : input.agentId,
-      decision: 'runtime_lease_remediation_applied',
-      why: 'Chronos operator applied runtime remediation to a leased agent runtime.',
-      policy_used: 'mission_orchestration_control_plane_v1',
-      mission_id: lease.owner_type === 'mission' ? lease.owner_id : undefined,
-      agent_id: input.agentId,
-      resource_id: input.agentId,
-      action: input.action,
-      owner_type: lease.owner_type,
-      owner_id: lease.owner_id,
-      thread: typeof lease.metadata?.thread === 'string' ? lease.metadata.thread : undefined,
-    });
-  }
-}
+import * as intelligenceData from './intelligence-observation-data';
+import * as intelligenceControlData from './intelligence-control-data';
 
 export async function GET(req: NextRequest) {
   try {
@@ -1811,16 +129,18 @@ export async function GET(req: NextRequest) {
     const accessRole = getChronosAccessRoleOrThrow(req);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
-    const rawActiveMissions = collectActiveMissions().filter(
-      (mission) =>
-        tenantSlugs === 'all' ||
-        Boolean(mission.tenantSlug && tenantSlugs.includes(mission.tenantSlug))
-    );
+    const rawActiveMissions = intelligenceData
+      .collectActiveMissions()
+      .filter(
+        (mission) =>
+          tenantSlugs === 'all' ||
+          Boolean(mission.tenantSlug && tenantSlugs.includes(mission.tenantSlug))
+      );
     const runtimeLeases = listAgentRuntimeLeaseSummaries()
       .filter((lease) =>
         tenantSlugs === 'all'
           ? true
-          : missionVisibleToTenant(
+          : intelligenceData.missionVisibleToTenant(
               lease.owner_type === 'mission'
                 ? lease.owner_id
                 : typeof lease.metadata?.mission_id === 'string'
@@ -1830,19 +150,19 @@ export async function GET(req: NextRequest) {
             )
       )
       .slice(0, 12);
-    const rawSurfaces = await collectSurfaceSummaries();
-    const controlActions = collectControlActions(tenantSlugs);
-    const { activeMissions, surfaces } = applyPendingActionSummaries(
+    const rawSurfaces = await intelligenceControlData.collectSurfaceSummaries();
+    const controlActions = intelligenceControlData.collectControlActions(tenantSlugs);
+    const { activeMissions, surfaces } = intelligenceControlData.applyPendingActionSummaries(
       rawActiveMissions,
       rawSurfaces,
       controlActions
     );
-    const missionProgress = collectMissionProgress(activeMissions);
+    const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
     const agentMessages = collectAgentMessages().filter((message) =>
-      missionVisibleToTenant(message.missionId, tenantSlugs)
+      intelligenceData.missionVisibleToTenant(message.missionId, tenantSlugs)
     );
     const a2aHandoffs = collectA2AHandoffs().filter((handoff) =>
-      missionVisibleToTenant(handoff.missionId, tenantSlugs)
+      intelligenceData.missionVisibleToTenant(handoff.missionId, tenantSlugs)
     );
     let managedRuntimes: Array<{
       agentId: string;
@@ -1910,16 +230,16 @@ export async function GET(req: NextRequest) {
         scopedAgentIds.has(runtimeEntry.agentId)
       );
     }
-    const controlActionCatalog = collectControlActionCatalog(accessRole);
-    const controlActionAvailability = collectControlActionAvailability(
+    const controlActionCatalog = intelligenceControlData.collectControlActionCatalog(accessRole);
+    const controlActionAvailability = intelligenceControlData.collectControlActionAvailability(
       accessRole,
       activeMissions,
       surfaces
     );
-    const secretApprovals = collectPendingSecretApprovals(tenantSlugs);
-    const pendingApprovals = collectPendingApprovals(tenantSlugs);
-    const workCoordination = safeCollect(
-      'collectWorkCoordinationSummary',
+    const secretApprovals = intelligenceControlData.collectPendingSecretApprovals(tenantSlugs);
+    const pendingApprovals = intelligenceControlData.collectPendingApprovals(tenantSlugs);
+    const workCoordination = intelligenceData.safeCollect(
+      'intelligenceData.collectWorkCoordinationSummary',
       {
         total: 0,
         backlog: 0,
@@ -1932,7 +252,7 @@ export async function GET(req: NextRequest) {
         runningAttempts: 0,
         recentItems: [],
       },
-      () => collectWorkCoordinationSummary(tenantSlugs)
+      () => intelligenceData.collectWorkCoordinationSummary(tenantSlugs)
     );
     const projects = listProjectRecords().filter(
       (project) =>
@@ -1940,7 +260,7 @@ export async function GET(req: NextRequest) {
         Boolean(project.tenant_slug) &&
         (tenantSlugs === 'all' || tenantSlugs.includes(project.tenant_slug as string))
     );
-    const projectManagement = safeCollect('collectProjectManagement', [], () =>
+    const projectManagement = intelligenceData.safeCollect('collectProjectManagement', [], () =>
       projects.map((project) => {
         const view = getProjectManagementView(project.project_id);
         return { project: view.project, lineage: view.lineage };
@@ -1970,22 +290,22 @@ export async function GET(req: NextRequest) {
         req.nextUrl.searchParams.get('tenant') || undefined
       )
     );
-    const nextActions = buildChronosNextActions({
+    const nextActions = intelligenceData.buildChronosNextActions({
       pendingApprovals: pendingApprovals.length,
       missionSeeds,
       memoryCandidates,
     });
-    const serviceBindings = filterServiceBindingsToTenant(
+    const serviceBindings = intelligenceData.filterServiceBindingsToTenant(
       listServiceBindingRecords(),
       projects,
       tenantSlugs
     );
     const scopedSurfaceOutbox = {
       slack: listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }).filter(
-        (message) => surfaceOutboxVisibleToTenant(message, tenantSlugs)
+        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
       ),
       chronos: listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }).filter(
-        (message) => surfaceOutboxVisibleToTenant(message, tenantSlugs)
+        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
       ),
     };
     const scopedBrowserSessions = tenantSlugs === 'all' ? collectBrowserSessions() : [];
@@ -2002,11 +322,11 @@ export async function GET(req: NextRequest) {
       tracks: projectTracks,
       artifacts: allArtifacts,
     });
-    const company = summarizeCompany(
+    const company = intelligenceControlData.summarizeCompany(
       resolveCompany(
         tenantSlugs !== 'all' && tenantSlugs.length === 1
           ? tenantSlugs[0]
-          : resolveChronosTenantSlug()
+          : intelligenceControlData.resolveChronosTenantSlug()
       )
     );
     return NextResponse.json({
@@ -2030,17 +350,25 @@ export async function GET(req: NextRequest) {
       secretApprovals,
       surfaces,
       accessRole,
-      recentEvents: safeCollect('collectRecentEvents', [], () => collectRecentEvents(tenantSlugs)),
+      recentEvents: intelligenceData.safeCollect(
+        'intelligenceControlData.collectRecentEvents',
+        [],
+        () => intelligenceControlData.collectRecentEvents(tenantSlugs)
+      ),
       agentMessages,
       a2aHandoffs,
       controlActionCatalog,
       controlActionAvailability,
       controlActions,
-      controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
-        collectControlActionDetails(tenantSlugs)
+      controlActionDetails: intelligenceData.safeCollect(
+        'intelligenceControlData.collectControlActionDetails',
+        {},
+        () => intelligenceControlData.collectControlActionDetails(tenantSlugs)
       ),
-      ownerSummaries: safeCollect('collectOwnerSummaries', [], () =>
-        collectOwnerSummaries(tenantSlugs)
+      ownerSummaries: intelligenceData.safeCollect(
+        'intelligenceControlData.collectOwnerSummaries',
+        [],
+        () => intelligenceControlData.collectOwnerSummaries(tenantSlugs)
       ),
       browserSessions: scopedBrowserSessions,
       browserConversationSessions: scopedBrowserConversationSessions,
@@ -2049,10 +377,15 @@ export async function GET(req: NextRequest) {
         slack: scopedSurfaceOutbox.slack.length,
         chronos: scopedSurfaceOutbox.chronos.length,
       },
-      recentSurfaceOutbox: safeCollect('collectRecentSurfaceOutbox', [], () =>
-        collectRecentSurfaceOutbox().filter((message) =>
-          surfaceOutboxVisibleToTenant(message, tenantSlugs)
-        )
+      recentSurfaceOutbox: intelligenceData.safeCollect(
+        'intelligenceControlData.collectRecentSurfaceOutbox',
+        [],
+        () =>
+          intelligenceControlData
+            .collectRecentSurfaceOutbox()
+            .filter((message) =>
+              intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
+            )
       ),
       runtime: {
         total: scopedRuntime.length,
@@ -2061,9 +394,13 @@ export async function GET(req: NextRequest) {
         error: scopedRuntime.filter((entry) => entry.agent.status === 'error').length,
       },
       runtimeLeases,
-      runtimeDoctor: buildRuntimeDoctor(runtimeLeases, activeMissions, scopedRuntime),
+      runtimeDoctor: intelligenceControlData.buildRuntimeDoctor(
+        runtimeLeases,
+        activeMissions,
+        scopedRuntime
+      ),
       runtimeTopology: buildRuntimeTopology({
-        surfaces: collectRuntimeTopologySurfaces(surfaces),
+        surfaces: intelligenceControlData.collectRuntimeTopologySurfaces(surfaces),
         runtimes: managedRuntimes,
         handoffs: a2aHandoffs,
         messages: agentMessages,
@@ -2161,7 +498,7 @@ export async function POST(req: NextRequest) {
         channel: 'chronos',
         threadTs: updated.correlationId || updated.id,
         sourceAgentId: 'chronos_gateway',
-        text: buildApprovalDecisionText({
+        text: intelligenceData.buildApprovalDecisionText({
           title: updated.title,
           decision,
           missionId: updated.requestedByContext?.missionId,
@@ -2296,7 +633,7 @@ export async function POST(req: NextRequest) {
       }
       const requestedTenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
       const allowedTenants = strictViewerScopeTenantSlugs(resolvedViewer.context, requestedTenant);
-      if (!distillCandidateVisibleToTenant(candidate, allowedTenants)) {
+      if (!intelligenceData.distillCandidateVisibleToTenant(candidate, allowedTenants)) {
         return NextResponse.json(
           { error: 'Distill candidate is outside the viewer tenant scope' },
           { status: 403 }
@@ -2322,7 +659,7 @@ export async function POST(req: NextRequest) {
         sourceAgentId: 'chronos_gateway',
         text:
           decision === 'promote'
-            ? `${updated.title} was promoted for reuse.${buildLearnedNotificationText({ projectId: updated.project_id, language: 'en' })}`
+            ? `${updated.title} was promoted for reuse.${intelligenceData.buildLearnedNotificationText({ projectId: updated.project_id, language: 'en' })}`
             : `${updated.title} was archived from the memory queue.`,
         status: 'success',
       });
@@ -2485,13 +822,13 @@ export async function POST(req: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: 'Parent project not found' }, { status: 404 });
       }
-      const projectError = projectScopeError(
+      const projectError = intelligenceData.projectScopeError(
         resolvedViewer.context,
         project,
         typeof body?.tenant === 'string' ? body.tenant : undefined
       );
       if (projectError) return projectError;
-      const projectPath = resolveProjectRootPath(project);
+      const projectPath = intelligenceData.resolveProjectRootPath(project);
       if (!projectPath) {
         return NextResponse.json(
           { error: 'Parent project has no governed root_path' },
@@ -2579,7 +916,7 @@ export async function POST(req: NextRequest) {
           title: `Promote durable mission orchestration for ${seed.title}`,
           summary: `${seed.title} was promoted from a project mission seed into durable mission ${missionId}. This transition may be reusable as governed organizational memory.`,
           status: 'proposed',
-          target_kind: inferMissionSeedPromotionTargetKind(seed),
+          target_kind: intelligenceData.inferMissionSeedPromotionTargetKind(seed),
           specialist_id: seed.specialist_id,
           locale: seed.locale || project.primary_locale,
           work_loop: seed.work_loop,
@@ -2589,7 +926,7 @@ export async function POST(req: NextRequest) {
             `mission:${missionId}`,
             ...(seed.source_task_session_id ? [`task_session:${seed.source_task_session_id}`] : []),
           ],
-          metadata: buildMissionSeedPromotionMetadata(seed, project),
+          metadata: intelligenceData.buildMissionSeedPromotionMetadata(seed, project),
         })
       );
       emitMissionOrchestrationObservation({
@@ -2606,7 +943,7 @@ export async function POST(req: NextRequest) {
         threadTs: seed.source_task_session_id || seed.seed_id,
         sourceAgentId: 'chronos_localadmin',
         title: `Mission promoted: ${seed.title}`,
-        text: `${project.name} の mission seed 「${seed.title}」を durable mission ${missionId} として開始しました。${buildLearnedNotificationText({ projectId: project.project_id, language: 'ja' })}`,
+        text: `${project.name} の mission seed 「${seed.title}」を durable mission ${missionId} として開始しました。${intelligenceData.buildLearnedNotificationText({ projectId: project.project_id, language: 'ja' })}`,
       });
       return NextResponse.json({
         status: 'ok',
@@ -2631,7 +968,7 @@ export async function POST(req: NextRequest) {
       if (!project) {
         return NextResponse.json({ error: 'Parent project not found' }, { status: 404 });
       }
-      const projectError = projectScopeError(
+      const projectError = intelligenceData.projectScopeError(
         resolvedViewer.context,
         project,
         typeof body?.tenant === 'string' ? body.tenant : undefined
@@ -2648,7 +985,7 @@ export async function POST(req: NextRequest) {
       if (!proposal) {
         return NextResponse.json({ error: 'No pending gate artifact to propose' }, { status: 400 });
       }
-      const projectPath = resolveProjectRootPath(project);
+      const projectPath = intelligenceData.resolveProjectRootPath(project);
       if (!projectPath) {
         return NextResponse.json(
           { error: 'Parent project has no governed root_path' },
@@ -2723,7 +1060,7 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json({ error: 'Unsupported mission operation' }, { status: 400 });
       }
-      const missionError = missionScopeError(
+      const missionError = intelligenceData.missionScopeError(
         resolvedViewer.context,
         missionId,
         typeof body?.tenant === 'string' ? body.tenant : undefined
@@ -2758,7 +1095,7 @@ export async function POST(req: NextRequest) {
       if (!missionId || !response) {
         return NextResponse.json({ error: 'Missing missionId or response' }, { status: 400 });
       }
-      const missionError = missionScopeError(
+      const missionError = intelligenceData.missionScopeError(
         resolvedViewer.context,
         missionId,
         typeof body?.tenant === 'string' ? body.tenant : undefined
@@ -2833,7 +1170,7 @@ export async function POST(req: NextRequest) {
         resolvedViewer.context,
         typeof body?.tenant === 'string' ? body.tenant : undefined
       );
-      if (!message || !surfaceOutboxVisibleToTenant(message, allowedTenants)) {
+      if (!message || !intelligenceData.surfaceOutboxVisibleToTenant(message, allowedTenants)) {
         return NextResponse.json(
           { error: 'Surface outbox message is outside the viewer tenant scope' },
           { status: 403 }
@@ -2885,7 +1222,7 @@ export async function POST(req: NextRequest) {
         : typeof lease.metadata?.mission_id === 'string'
           ? lease.metadata.mission_id
           : undefined;
-    const leaseError = missionScopeError(
+    const leaseError = intelligenceData.missionScopeError(
       resolvedViewer.context,
       leaseMissionId || '',
       typeof body?.tenant === 'string' ? body.tenant : undefined
@@ -2905,7 +1242,7 @@ export async function POST(req: NextRequest) {
       action,
       why: 'Chronos operator applied runtime lease remediation from the doctor view.',
     });
-    recordRuntimeRemediationArtifacts({ action, agentId, lease });
+    intelligenceControlData.recordRuntimeRemediationArtifacts({ action, agentId, lease });
     return NextResponse.json({
       status: 'ok',
       action,

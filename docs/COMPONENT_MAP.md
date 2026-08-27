@@ -197,7 +197,7 @@ Chronos access modes:
 - `localadmin`
   - operator mode for deterministic mission/runtime/surface control actions
 
-Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. Enforcement is staged via `KYBERION_VIEWER_SCOPE=off|warn|enforce`; see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
+Every route except `/api/healthz` resolves a `ViewerContext` fail-closed (viewer role + allowed tenant set; `src/lib/viewer-context.ts` + `src/middleware.ts`). Headless operation manifests also declare `required_permissions` and are evaluated through the shared `SurfaceAuthorizationContext`; client-supplied `tenant` parameters can only narrow the viewer's allowed set. `KYBERION_VIEWER_SCOPE=off|warn|enforce` is retained for migration telemetry, but unregistered tenant expansion is denied in every mode(`warn` audits before denial); see `docs/developer/CHRONOS_VIEWER_SCOPE_OPERATIONS.ja.md`, including how to set `KYBERION_LOCALHOST_AUTOADMIN=false` to require tokens even on loopback. This is a self-hosted/FDE internal authorization boundary, not hosted SaaS account management.
 
 Local Chronos boot:
 
@@ -285,7 +285,7 @@ Actuators are the execution layer. Current major groups include:
 - `process-actuator`: managed long-lived process ownership
 - `presence-actuator`: channel delivery and in-session message dispatch
 
-This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (kept drift-free by `pnpm check:op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface_runtime.ts`.
+This list is the major groups only — the full, generated catalog of all actuators and their ops is [`CAPABILITIES_GUIDE.md`](../CAPABILITIES_GUIDE.md) (kept drift-free by `pnpm check -- --only op-registry`). Specialist personas live in `knowledge/product/orchestration/specialists/` (snapshot: `specialist-catalog.json`); surface lifecycle control is `scripts/surface_runtime.ts`.
 
 ### `libs/shared-*`
 

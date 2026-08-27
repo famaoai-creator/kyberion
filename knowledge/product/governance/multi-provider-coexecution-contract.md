@@ -17,9 +17,9 @@ read, write, and touch Git, concurrent providers can race on the same files
 or silently escalate a worker into a Git-writing role. This document is the
 canonical read/write matrix referenced from `AGENTS.md` §1 Invariants and
 projected into provider-specific instruction surfaces (see
-[CT-01](../../../docs/developer/improvement-plans-2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)'s
+[CT-01](../../../docs/developer/improvement-plans-archive/2026-07/CLI_SUBAGENT_TEAM_PLAN_2026-07-25.ja.md)'s
 generation ceremony). It formalizes §2 hard constraint 1 of
-[XP-04](../../../docs/developer/improvement-plans-2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md).
+[XP-04](../../../docs/developer/improvement-plans-archive/2026-07/CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md).
 
 ## Startup cwd contract
 

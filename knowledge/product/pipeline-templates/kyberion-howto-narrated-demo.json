@@ -74,10 +74,28 @@
     {
       "id": "generate_voice",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "voice_result", "type": "ShellResult" },
+      "op": "voice:generate_voice",
+      "produces": { "channel": "voice_result", "type": "VoiceGenerationResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/voice-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-voice.json"
+        "request_id": "kyberion-howto-video-audio",
+        "text": "{{voice_script}}",
+        "profile_ref": { "profile_id": "{{profile_id}}" },
+        "engine": { "engine_id": "local_say" },
+        "rendering": {
+          "language": "ja",
+          "chunking": {
+            "max_chunk_chars": 4000,
+            "crossfade_ms": 50,
+            "preserve_paralinguistic_tags": true
+          }
+        },
+        "delivery": {
+          "mode": "artifact",
+          "format": "aiff",
+          "artifact_path": "{{narration_path}}",
+          "emit_progress_packets": true
+        },
+        "routing": { "personal_voice_mode": "allow_fallback" }
       }
     },
     {
@@ -93,8 +111,8 @@
           "audience": "operators and decision makers who already know the target use case and need a reliable way to turn approved messaging into a video asset",
           "objective": "convert a fixed strategic brief into a renderable narrated video package",
           "distribution_channel": "docs-demo",
-              "content_type": "howto",
-              "presentation_mode": "howto",
+          "content_type": "howto",
+          "presentation_mode": "howto",
           "promise": "Kyberion turns operational intent into governed execution and artifact-backed outputs",
           "desired_takeaway": "brief, storyboard, and render bundle are all traceable outputs",
           "constraints": [
@@ -132,6 +150,13 @@
         },
         "format": "json"
       }
+    },
+    {
+      "id": "load_content_brief",
+      "role": "source",
+      "op": "system:read_json",
+      "produces": { "channel": "video_content_brief", "type": "VideoContentBrief" },
+      "params": { "path": "{{content_brief_path}}" }
     },
     {
       "id": "write_video_action",
@@ -203,11 +228,20 @@
     {
       "id": "generate_video",
       "role": "source",
-      "op": "system:shell",
+      "op": "video-composition:create_narrated_video_from_content_brief",
       "consumes": "voice_result",
-      "produces": { "channel": "video_result", "type": "ShellResult" },
+      "produces": { "channel": "video_result", "type": "VideoCompositionResult" },
       "params": {
-        "cmd": "node dist/libs/actuators/video-composition-actuator/src/index.js --input {{mission_evidence_dir}}/kyberion-howto-video.json"
+        "video_content_brief": "{{video_content_brief}}",
+        "narration_artifact_ref": "{{narration_path}}",
+        "output": {
+          "format": "mp4",
+          "target_path": "{{video_output_path}}",
+          "bundle_dir": "{{video_bundle_dir}}",
+          "await_completion": true,
+          "duration_sec": 14,
+          "fps": 30
+        }
       }
     },
     {
@@ -229,10 +263,10 @@
       "id": "write_completion_note",
       "role": "sink",
       "op": "system:write_file",
-      "consumes": ["preflight_result", "voice_result", "video_result", "verify_result", "frame_extract_result", "blackframe_result", "duration_alignment_result"],
+      "consumes": ["voice_result", "video_result"],
       "params": {
         "path": "{{mission_evidence_dir}}/kyberion-howto-summary.md",
-        "content": "# Kyberion How-To Narrated Demo\n\n## Scenario flow\n1. Receive a fixed brief with audience, use case, and message already decided.\n2. Convert the brief into a content outline and a renderable video brief.\n3. Generate narration and compose the scene bundle.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-howto-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json`\n",
+        "content": "# Kyberion How-To Narrated Demo\n\n## Scenario flow\n1. Receive a fixed brief with audience, use case, and message already decided.\n2. Convert the brief into a content outline and a renderable video brief.\n3. Generate narration and compose the scene bundle.\n4. Render and run the governed artifact validation gate.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-howto-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{video_preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-howto-narrated-demo.json`\n",
         "format": "text"
       }
     },
@@ -240,7 +274,7 @@
       "id": "log_done",
       "role": "sink",
       "op": "system:log",
-      "consumes": ["voice_result", "video_result", "verify_result"],
+      "consumes": ["voice_result", "video_result"],
       "params": {
         "message": "🏁 [KYBERION-HOWTO] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}"
       }

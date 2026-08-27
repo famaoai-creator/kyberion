@@ -44,7 +44,7 @@ orthogonal axis to tenancy and no value of one may satisfy the other. This is
 executable, not advisory: `RESERVED_SCOPE_NAMES` in `entity-scope.ts` lists
 `public` / `confidential` / `personal` / `shared`, and `assertTenantSlug()` /
 `resolveCurrentTenantSlug()` reject them — see
-[EG-14](../../../docs/developer/improvement-plans-2026-08/EG-14_TIER_NAME_AS_TENANT_SLUG.ja.md)
+[EG-14](../../../docs/developer/improvement-plans-archive/2026-08/EG-14_TIER_NAME_AS_TENANT_SLUG.ja.md)
 for the drift that motivated it, in both directions (a partition name taking a
 tenant's seat, and a tenant's state falling into a partition's place).
 

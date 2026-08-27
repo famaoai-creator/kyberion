@@ -4,10 +4,10 @@
  */
 
 import * as path from 'node:path';
-import { getRegisteredEnvText } from './foundation/env.js';
+import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
-import { resolveIdentityContext } from './authority.js';
+import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { createLogger } from './logger.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
@@ -201,7 +201,7 @@ function tenantScopeConfig(policy: any): {
     // the existing tier/persona checks until their storage migration lands.
     requireTenantBinding:
       cfg.require_tenant_binding === true ||
-      getRegisteredEnvText('KYBERION_TENANT_SCOPE_REQUIRED') === 'true',
+      getRegisteredEnvBool('KYBERION_TENANT_SCOPE_REQUIRED') === true,
     slugPattern,
     brokerRequirements: {
       requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
@@ -568,7 +568,7 @@ export function validateWritePermission(filePath: string): { allowed: boolean; r
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-  } = resolveIdentityContext();
+  } = resolvePolicyIdentityContext();
 
   const loaded = loadPolicy();
   if (loaded.status === 'missing') return { allowed: true };
@@ -696,7 +696,7 @@ export function validateReadPermission(filePath: string): { allowed: boolean; re
     tenantSlug,
     brokeredTenants,
     brokerApproval,
-  } = resolveIdentityContext();
+  } = resolvePolicyIdentityContext();
 
   // Tenant scope — deny cross-tenant reads from confidential.
   const tenantDenial = checkTenantScope(

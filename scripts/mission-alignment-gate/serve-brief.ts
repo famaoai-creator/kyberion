@@ -24,13 +24,13 @@ import { randomBytes } from 'node:crypto';
 
 import { safeExistsSync } from '@agent/core/secure-io';
 import {
-  loadJson,
   applySurfaceApprovalDecision,
   findMissionPath,
   listApprovalRequests,
   normalizeRejectionReasonCategory,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
@@ -65,7 +65,7 @@ async function main(args: string[] = []): Promise<void> {
   const TOKEN = randomBytes(16).toString('hex');
 
   function readBrief(): MissionBrief {
-    return loadJson<MissionBrief>(briefPath);
+    return readJson<MissionBrief>(briefPath);
   }
 
   /**

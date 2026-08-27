@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  formatChannelTurnText,
   formatChannelThreadContext,
   runChannelTurn,
   type ChannelAdapter,
@@ -32,6 +33,83 @@ describe('formatChannelThreadContext', () => {
 });
 
 describe('runChannelTurn', () => {
+  it('does not append contract labels to autonomous replies', () => {
+    expect(
+      formatChannelTurnText({
+        text: '了解しました。',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        intentResolution: {
+          request_id: 'ir_auto',
+          normalized_intent: 'answer_question',
+          missing_inputs: [],
+          resolution_shape: 'direct_answer',
+          outcome_kind: 'answer',
+          authority_level: 'autonomous',
+          next_action: { kind: 'continue', label: 'continue', consequence: 'none' },
+          rationale: 'autonomous',
+        },
+      })
+    ).toBe('了解しました。');
+  });
+
+  it('can suppress contract labels for spoken delivery', () => {
+    expect(
+      formatChannelTurnText(
+        {
+          text: '承認待ちです。',
+          a2uiMessages: [],
+          a2aMessages: [],
+          delegationResults: [],
+          approvalRequests: [],
+          intentResolution: {
+            request_id: 'ir_voice',
+            normalized_intent: 'send_message',
+            missing_inputs: [],
+            resolution_shape: 'task_session',
+            outcome_kind: 'service_change',
+            authority_level: 'approval_required',
+            next_action: {
+              kind: 'request_approval',
+              label: '承認してください',
+              consequence: '実行待ち',
+            },
+            rationale: 'approval',
+          },
+        },
+        { includeContract: false }
+      )
+    ).toBe('承認待ちです。');
+  });
+
+  it('localizes contract labels to the spoken reply language', () => {
+    const formatted = formatChannelTurnText({
+      text: '承認が必要です。',
+      a2uiMessages: [],
+      a2aMessages: [],
+      delegationResults: [],
+      approvalRequests: [],
+      intentResolution: {
+        request_id: 'ir_ja',
+        normalized_intent: 'send_message',
+        missing_inputs: [],
+        resolution_shape: 'task_session',
+        outcome_kind: 'service_change',
+        authority_level: 'approval_required',
+        next_action: {
+          kind: 'request_approval',
+          label: '承認してください',
+          consequence: '実行待ち',
+        },
+        rationale: 'approval',
+      },
+    });
+    expect(formatted).toContain('理解: send_message');
+    expect(formatted).not.toContain('Understanding:');
+  });
+
   it('keeps thread context, typing, conversation, delivery, and cleanup ordered', async () => {
     const calls: string[] = [];
     const adapter: ChannelAdapter = {
@@ -87,6 +165,28 @@ describe('runChannelTurn', () => {
       )
     ).rejects.toThrow('failed');
     expect(calls).toEqual(['stop']);
+  });
+
+  it('lets a bridge defer delivery for proposal and approval envelopes', async () => {
+    const sent: string[] = [];
+    await runChannelTurn(
+      {
+        channel: 'slack',
+        actorId: 'operator-1',
+        shouldSend: ({ result }) => !result.missionProposals?.length,
+        send: (message) => sent.push(message.text),
+      },
+      { text: 'make it a mission', channel: 'c', threadTs: 't' },
+      () => ({
+        text: 'proposal',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+        missionProposals: [{ mission_id: 'm1' } as never],
+      })
+    );
+    expect(sent).toEqual([]);
   });
 
   it('surfaces approval next action and consequence on text-only channels', async () => {

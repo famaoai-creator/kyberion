@@ -4,8 +4,8 @@
  */
 
 import { safeExistsSync } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
-import { readJsonFile } from './cli-input.js';
 import { currentProcessArgv } from '../lib/harness.js';
 
 export interface MissionStartCreateOptions {
@@ -199,7 +199,7 @@ export function extractFileRelationshipsOption(
   if (!safeExistsSync(filePath)) {
     throw new Error(`Relationships file not found: ${filePath}`);
   }
-  return readJsonFile<Partial<MissionRelationships>>(filePath);
+  return readJson<Partial<MissionRelationships>>(filePath);
 }
 
 export function extractMissionStartCreateOptionsFromArgv(

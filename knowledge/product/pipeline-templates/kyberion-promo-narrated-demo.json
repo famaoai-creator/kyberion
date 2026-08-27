@@ -293,18 +293,10 @@
       "id": "write_completion_note",
       "role": "sink",
       "op": "system:write_file",
-      "consumes": [
-        "preflight_result",
-        "voice_result",
-        "video_result",
-        "verify_result",
-        "frame_extract_result",
-        "blackframe_result",
-        "duration_alignment_result"
-      ],
+      "consumes": ["voice_result", "video_result"],
       "params": {
         "path": "{{mission_evidence_dir}}/kyberion-promo-summary.md",
-        "content": "# Kyberion Promo Narrated Demo\n\n## Scenario flow\n1. Receive a fixed launch brief with audience, value, proof, and CTA already decided.\n2. Convert the brief into a promo-oriented content brief and storyboard.\n3. Generate narration and compose the scene bundle.\n4. Render, verify, extract key frames, and reject black-frame output.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-promo-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n- `{{frame_extract_result}}`\n- `{{blackframe_result}}`\n- `{{duration_alignment_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-promo-narrated-demo.json`\n",
+        "content": "# Kyberion Promo Narrated Demo\n\n## Scenario flow\n1. Receive a fixed launch brief with audience, value, proof, and CTA already decided.\n2. Convert the brief into a promo-oriented content brief and storyboard.\n3. Generate narration and compose the scene bundle.\n4. Render and run the governed artifact validation gate.\n\n## Output artifacts\n- Content brief: `{{content_brief_path}}`\n- Narration: `{{narration_path}}`\n- Video: `{{video_output_path}}`\n- Bundle: `{{video_bundle_dir}}`\n- Key frames: `{{mission_evidence_dir}}/kyberion-promo-frames/`\n\n## Validation\n- `{{preflight_result}}`\n- `{{video_preflight_result}}`\n- `{{voice_result}}`\n- `{{video_result}}`\n- `{{verify_result}}`\n\n## Next command\n- `pnpm pipeline --input pipelines/kyberion-promo-narrated-demo.json`\n",
         "format": "text"
       }
     },
@@ -312,7 +304,7 @@
       "id": "log_done",
       "role": "sink",
       "op": "system:log",
-      "consumes": ["voice_result", "video_result", "verify_result"],
+      "consumes": ["voice_result", "video_result"],
       "params": {
         "message": "🏁 [KYBERION-PROMO] Narrated demo complete. Voice: {{voice_result}} Video: {{video_result}} Verify: {{verify_result}}"
       }

@@ -115,7 +115,7 @@
       "type": "apply",
       "op": "system:log",
       "params": {
-        "message": "Project {{project_name}} kickstarted at {{project_root}}. Next: pnpm mission:start --project-id {{project_name}} --track-id kickstart-01 --task-id task_plan.tasks[0].id"
+        "message": "Project {{project_name}} kickstarted at {{project_root}}. Next: pnpm mission start --project-id {{project_name}} --track-id kickstart-01 --task-id task_plan.tasks[0].id"
       }
     }
   ]

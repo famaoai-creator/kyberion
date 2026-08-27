@@ -1,5 +1,7 @@
 # Roadmap Completion Ledger
 
+> **位置づけ**: 本書は完了項目を探すための補助索引であり、現在の計画状態の正本ではありません。現在の状態は [`docs/developer/improvement-plans-2026-08/README.ja.md`](./developer/improvement-plans-2026-08/README.ja.md) と各計画文書の「実装状況」節を参照してください。
+
 > 目的: 散在している roadmap のうち、**実装完了済みの項目だけ** を横断で見える化する。
 > 原文の roadmap が権威であり、この台帳は「完了済みのものを探しやすくするための索引」である。
 > 完了表記が変わったら、まず原文を更新し、その後この台帳を追従させる。

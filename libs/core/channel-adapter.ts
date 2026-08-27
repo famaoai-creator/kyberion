@@ -1,11 +1,16 @@
 import type { EventScopeInput } from './event-scope.js';
-import type { SurfaceAsyncChannel, SurfaceConversationResult } from './channel-surface-types.js';
+import type {
+  SurfaceAsyncChannel,
+  SurfaceConversationAttachment,
+  SurfaceConversationResult,
+} from './channel-surface-types.js';
 
 export interface ChannelTurnInput {
   text: string;
   channel: string;
   threadTs: string;
   metadata?: Record<string, unknown>;
+  attachments?: SurfaceConversationAttachment[];
   scope?: EventScopeInput;
 }
 
@@ -52,6 +57,8 @@ export interface ChannelAdapter {
   typing?(
     input: ChannelTurnInput
   ): ChannelTypingHandle | undefined | Promise<ChannelTypingHandle | undefined>;
+  /** Gate common delivery when a bridge needs a proposal/approval envelope. */
+  shouldSend?(message: ChannelTurnMessage): boolean | Promise<boolean>;
   send(message: ChannelTurnMessage): void | Promise<void>;
 }
 
@@ -68,22 +75,55 @@ export type ChannelTurnConversation = (
  * Autonomous replies remain untouched; the structured contract is already
  * sufficient for surfaces that render cards.
  */
-export function formatChannelTurnText(result: SurfaceConversationResult): string {
+export function formatChannelTurnText(
+  result: SurfaceConversationResult,
+  options: { includeContract?: boolean } = {}
+): string {
   const text = result.text.trim();
   const contract = result.intentResolution;
-  if (!text || !contract || text.includes('Intent:') || text.includes('Understanding:')) {
+  const includeContract = options.includeContract ?? true;
+  const contractNeedsOperatorAttention =
+    contract?.authority_level === 'approval_required' ||
+    contract?.authority_level === 'human_clarification_required' ||
+    contract?.outcome_kind === 'approval_ready_plan';
+  if (
+    !text ||
+    !contract ||
+    !includeContract ||
+    !contractNeedsOperatorAttention ||
+    text.includes('Intent:') ||
+    text.includes('Understanding:')
+  ) {
     return result.text;
   }
+  const japanese = /[ぁ-んァ-ン一-龯]/u.test(text);
+  const labels = japanese
+    ? {
+        understanding: '理解',
+        missingInput: '不足入力',
+        nextAction: '次の操作',
+        consequence: '帰結',
+        outcome: '結果',
+        none: 'なし',
+      }
+    : {
+        understanding: 'Understanding',
+        missingInput: 'Missing input',
+        nextAction: 'Next action',
+        consequence: 'Consequence',
+        outcome: 'Outcome',
+        none: 'none',
+      };
   return [
     text,
     '',
-    `Understanding: ${contract.normalized_intent}`,
-    `Missing input: ${
-      contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'none'
+    `${labels.understanding}: ${contract.normalized_intent}`,
+    `${labels.missingInput}: ${
+      contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : labels.none
     }`,
-    `Next action: ${contract.next_action.label}`,
-    `Consequence: ${contract.next_action.consequence}`,
-    `Outcome: ${contract.outcome_kind}`,
+    `${labels.nextAction}: ${contract.next_action.label}`,
+    `${labels.consequence}: ${contract.next_action.consequence}`,
+    `${labels.outcome}: ${contract.outcome_kind}`,
   ].join('\n');
 }
 
@@ -93,9 +133,10 @@ export async function runChannelTurn(
   input: ChannelTurnInput,
   conversation: ChannelTurnConversation
 ): Promise<SurfaceConversationResult> {
-  const threadContext = adapter.threadContext ? await adapter.threadContext(input) : undefined;
-  const typing = adapter.typing ? await adapter.typing(input) : undefined;
+  let typing: ChannelTypingHandle | undefined;
   try {
+    const threadContext = adapter.threadContext ? await adapter.threadContext(input) : undefined;
+    typing = adapter.typing ? await adapter.typing(input) : undefined;
     const result = await conversation({
       ...input,
       ...(threadContext ? { threadContext } : {}),
@@ -106,13 +147,17 @@ export async function runChannelTurn(
       ...result,
       text: formatChannelTurnText(result),
     };
-    if (deliveredResult.text.trim()) {
-      await adapter.send({
-        text: deliveredResult.text,
-        channel: input.channel,
-        threadTs: input.threadTs,
-        result: deliveredResult,
-      });
+    const deliveryMessage = {
+      text: deliveredResult.text,
+      channel: input.channel,
+      threadTs: input.threadTs,
+      result: deliveredResult,
+    };
+    if (
+      deliveredResult.text.trim() &&
+      (adapter.shouldSend ? await adapter.shouldSend(deliveryMessage) : true)
+    ) {
+      await adapter.send(deliveryMessage);
     }
     return deliveredResult;
   } finally {

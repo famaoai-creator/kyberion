@@ -2,10 +2,10 @@ import AjvModule, { type ValidateFunction } from 'ajv';
 import Ajv2020Module from 'ajv/dist/2020.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { safeReadFile } from '../secure-io.js';
+import { readJson } from './json.js';
 
 function readSchema<T>(schemaPath: string): T {
-  return JSON.parse(String(safeReadFile(schemaPath, { encoding: 'utf8' }) || '')) as T;
+  return readJson<T>(schemaPath);
 }
 
 type AjvLike = {
@@ -22,12 +22,23 @@ function resolveConstructor(moduleValue: unknown): AjvConstructor {
 
 export function createAjv(options: Record<string, unknown> = {}): AjvInstance {
   const AjvConstructor = resolveConstructor(AjvModule);
-  return new AjvConstructor({ allErrors: true, strict: false, allowUnionTypes: true, ...options });
+  return new AjvConstructor({
+    allErrors: true,
+    strict: true,
+    strictRequired: false,
+    allowUnionTypes: true,
+    ...options,
+  });
 }
 
 export function createAjv2020(options: Record<string, unknown> = {}): AjvInstance {
   const Ajv2020Constructor = resolveConstructor(Ajv2020Module);
-  return new Ajv2020Constructor({ allErrors: true, strict: false, ...options });
+  return new Ajv2020Constructor({
+    allErrors: true,
+    strict: true,
+    strictRequired: false,
+    ...options,
+  });
 }
 
 function collectExternalRefs(value: unknown, refs: Set<string>): void {

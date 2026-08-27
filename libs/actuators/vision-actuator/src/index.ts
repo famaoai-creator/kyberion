@@ -51,6 +51,12 @@ function buildRetryOptions(override?: Record<string, any>) {
   });
 }
 
+export const actuator = defineCatalogBackedActuator({
+  id: 'vision-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+
 async function inspectImage(params: any) {
   const logicalPath = String(params.path || '');
   if (!logicalPath) throw new Error('inspect_image requires params.path');
@@ -167,6 +173,8 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

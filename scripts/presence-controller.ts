@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { logger, safeWriteFile, safeAppendFile, safeExistsSync } from '@agent/core';
 import { safeExec } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { readJsonFile, readTextFile } from './refactor/cli-input.js';
+import { readJson, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -44,7 +44,7 @@ export function perceive(): Stimulus[] {
       .map((line) => JSON.parse(line))
       .filter((s) => s.status === 'PENDING' || s.status === 'INJECTED');
 
-    const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
+    const registry: ChannelRegistry = readJson(REGISTRY_PATH);
     const priorityMap = new Map(registry.channels.map((c) => [c.id, c.priority]));
 
     return stimuli.sort((a, b) => {
@@ -64,7 +64,7 @@ export function getSensoryContext(): string | null {
   const pending = perceive();
   if (pending.length === 0) return null;
 
-  const registry: ChannelRegistry = readJsonFile(REGISTRY_PATH);
+  const registry: ChannelRegistry = readJson(REGISTRY_PATH);
 
   const formatted = pending.map((s) => {
     const channel = registry.channels.find((c) => c.id === s.source_channel) || {

@@ -1,8 +1,10 @@
 import * as yaml from 'js-yaml';
-import { logger } from './core.js';
-import { safeReadFile, safeExistsSync } from './secure-io.js';
+import { createLogger } from './logger.js';
+import { getFoundationIo } from './foundation/io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+
+const logger = createLogger('policy-engine');
 
 /**
  * Declarative Policy Engine v1.0
@@ -65,12 +67,12 @@ class PolicyEngineImpl {
     const policyPath =
       filePath || path.join(root, 'knowledge', 'product', 'governance', 'agent-policies.yaml');
 
-    if (!safeExistsSync(policyPath)) {
+    if (!getFoundationIo().exists(policyPath)) {
       logger.warn(`[POLICY_ENGINE] Policy file not found: ${policyPath}`);
       return;
     }
 
-    const content = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
+    const content = getFoundationIo().readFile(policyPath);
     // SA-05: a hand-rolled "simple YAML" parser silently produced empty
     // rules arrays for every policy (nested lists were unsupported), so the
     // engine never enforced anything. Parse with js-yaml; a parse failure

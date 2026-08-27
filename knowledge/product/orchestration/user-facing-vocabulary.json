@@ -4676,6 +4676,36 @@
         "ja": "本日の秘書室からのご報告です。",
         "qps-ploc": "⟦Ħėřė ïş ŧőḓȧẏ'ş ƈőñƈïėřɠė ƀřïėƒïñɠ. ŀőřėɱ ïṗşůɱ⟧"
       },
+      "home.briefing_summary": {
+        "en": "Today: {details}.",
+        "ja": "本日は{details}。",
+        "qps-ploc": "⟦Ŧőḓȧẏ: {details}. ŀőřėɱ⟧"
+      },
+      "home.briefing_clear": {
+        "en": "There are no items requiring your attention today.",
+        "ja": "本日は特にご対応いただく案件はございません。",
+        "qps-ploc": "⟦Ŧħėřė ȧřė ñő ïŧėɱş řėɋůïřïñɠ ẏőůř ȧŧŧėñŧïőñ ŧőḓȧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "home.briefing_approval": {
+        "en": "{count} approval(s) are awaiting your decision",
+        "ja": "ご承認待ちが{count}件ございます",
+        "qps-ploc": "⟦{count} ȧṗṗřőṽȧŀ(ş) ȧřė ȧẇȧïŧïñɠ ẏőůř ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "home.briefing_missions": {
+        "en": "{count} active request(s) are in progress",
+        "ja": "進行中のご依頼が{count}件ございます",
+        "qps-ploc": "⟦{count} ȧƈŧïṽė řėɋůėşŧ(ş) ȧřė ïñ ṗřőɠřėşş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "home.briefing_outcomes": {
+        "en": "{count} unread outcome(s) have arrived",
+        "ja": "未確認の成果物が{count}件届いております",
+        "qps-ploc": "⟦{count} ůñřėȧḓ őůŧƈőɱė(ş) ħȧṽė ȧřřïṽėḓ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "home.briefing_exceptions": {
+        "en": "{count} exception(s) require your review",
+        "ja": "ご確認いただきたい例外が{count}件ございます",
+        "qps-ploc": "⟦{count} ėẋƈėṗŧïőñ(ş) řėɋůïřė ẏőůř řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "home.approvals_count": {
         "en": "awaiting approval",
         "ja": "ご承認待ち",

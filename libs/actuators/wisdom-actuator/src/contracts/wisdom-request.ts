@@ -1,4 +1,5 @@
 import type { WisdomAction, WisdomDirectAction, PipelineStep } from '../wisdom-pipeline-helpers.js';
+import { isRecord } from '@agent/core/foundation';
 
 const DIRECT_ACTIONS = new Set<WisdomAction['action']>([
   'knowledge_search',
@@ -8,10 +9,6 @@ const DIRECT_ACTIONS = new Set<WisdomAction['action']>([
   'knowledge_export',
   'knowledge_import',
 ]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function assertRequiredString(params: Record<string, unknown>, action: string, key: string): void {
   if (typeof params[key] !== 'string' || !params[key].trim()) {

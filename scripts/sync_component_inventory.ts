@@ -10,7 +10,6 @@ import {
 import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import {} from '../libs/actuators/system-actuator/src/op-catalog.js';
-import { readJsonFile } from './refactor/cli-input.js';
 
 interface CapabilityManifest {
   actuator_id: string;

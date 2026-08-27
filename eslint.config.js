@@ -1,5 +1,6 @@
 import globals from 'globals';
 import nextPlugin from '@next/eslint-plugin-next';
+import importPlugin from 'eslint-plugin-import';
 import tseslint from 'typescript-eslint';
 
 export default [
@@ -102,6 +103,15 @@ export default [
   })),
   {
     files: ['**/*.ts', '**/*.tsx'],
+    plugins: {
+      import: importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: true,
+      },
+      'import/extensions': ['.js', '.mjs', '.cjs', '.ts', '.tsx'],
+    },
     languageOptions: {
       globals: {
         ...globals.node,
@@ -109,6 +119,8 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      // The ratchet is enabled for the maintained boundary files below. The
+      // legacy barrel/facade set is tracked separately until it is decomposed.
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       // IP-11 Task 3: @ts-ignore silently suppresses real type errors with no
@@ -129,6 +141,73 @@ export default [
       // IP-08: an empty catch must carry a reason comment (no-empty ignores
       // blocks that contain a comment).
       'no-empty': ['error', { allowEmptyCatch: false }],
+    },
+  },
+  {
+    files: [
+      'libs/core/foundation/io.ts',
+      'libs/core/foundation/json.ts',
+      'libs/core/foundation/governed-catalog.ts',
+      'libs/core/actuator-sdk.ts',
+      'libs/core/provider-config.ts',
+      'scripts/check_config_fallbacks.ts',
+      'scripts/check_documentation_links.ts',
+      'scripts/check_max_file_lines.ts',
+      'scripts/check_pipeline_op_schema_coverage.ts',
+      'scripts/check_script_integrity.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          args: 'none',
+          caughtErrors: 'none',
+          ignoreRestSiblings: true,
+          varsIgnorePattern: '^_',
+        },
+      ],
+    },
+  },
+  {
+    // Keep the editor rule on the maintained production trees. The module
+    // boundary checker remains the authoritative full-graph ratchet.
+    files: ['libs/**/*.ts', 'scripts/**/*.ts'],
+    plugins: {
+      import: importPlugin,
+    },
+    settings: {
+      'import/resolver': {
+        typescript: true,
+      },
+      'import/extensions': ['.js', '.mjs', '.cjs', '.ts', '.tsx'],
+    },
+    rules: {
+      'import/no-cycle': ['error', { maxDepth: 1 }],
+    },
+  },
+  {
+    files: [
+      'libs/**/*.ts',
+      'scripts/**/*.ts',
+      'satellites/**/*.ts',
+      'presence/**/*.ts',
+      'presence/**/*.tsx',
+    ],
+    ignores: [
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      'libs/core/secure-io.ts',
+      'libs/core/fs-primitives.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "CallExpression[callee.object.name='fs'][callee.property.name=/^(read|write|append|rm|unlink|mkdir|stat|lstat|readdir)Sync$/]",
+          message: 'Use the governed secure-io boundary instead of direct filesystem calls.',
+        },
+      ],
     },
   },
   {

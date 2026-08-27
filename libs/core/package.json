@@ -260,8 +260,8 @@
       "default": "./dist/mission-orchestration-events.js"
     },
     "./mission-team-composer": {
-      "types": "./dist/mission-team-composer.d.ts",
-      "default": "./dist/mission-team-composer.js"
+      "types": "./dist/mission-team-plan-composer.d.ts",
+      "default": "./dist/mission-team-plan-composer.js"
     },
     "./mission-team-plan-composer": {
       "types": "./dist/mission-team-plan-composer.d.ts",

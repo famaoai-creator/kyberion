@@ -9,3 +9,6 @@ status: archived
 
 完了済み計画の本文を保存する月別アーカイブです。現行の状態判断は
 [`docs/documentation-source-map.json`](../../../documentation-source-map.json) と現行の計画索引を参照してください。
+
+2026-07 の完了済み計画はこのディレクトリへ移管済みです。未完の計画と凍結台帳は
+[`../improvement-plans-2026-07/`](../../improvement-plans-2026-07/) に残しています。

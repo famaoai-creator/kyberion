@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { loadJson, pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
 import { defineScript } from './lib/harness.js';
 
@@ -45,7 +46,7 @@ function loadScenario(scenarioId: string): TaskScenario {
   if (!safeExistsSync(filePath)) {
     throw new Error(`Unknown TaskScenario: ${scenarioId}`);
   }
-  return loadJson<TaskScenario>(filePath);
+  return readJson<TaskScenario>(filePath);
 }
 
 function buildSmokeProfile(

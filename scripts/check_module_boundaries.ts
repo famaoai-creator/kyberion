@@ -14,13 +14,22 @@ type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
   layers: Layer[];
   patterns: Array<{ layer: Layer; pattern: string }>;
+  facade_patterns?: string[];
   default_layer: Layer;
 };
-type BoundaryBaseline = { version: 1; cycles: number; direction_violations: number };
+type BoundaryBaseline = {
+  version: 1;
+  cycles: number;
+  runtime_cycles?: number;
+  max_runtime_scc_size?: number;
+  direction_violations: number;
+};
+type DynamicImportEdge = { source: string; target: string };
 
 const ROOT = pathResolver.rootDir();
 const CONFIG_PATH = pathResolver.knowledge('product/governance/module-layer-boundaries.json');
 const BASELINE_PATH = pathResolver.rootResolve('scripts/check_module_boundaries.baseline.json');
+const SOURCE_ROOTS = ['libs', 'presence', 'satellites', 'scripts'];
 
 function relative(filePath: string): string {
   return path.relative(ROOT, filePath).split(path.sep).join('/');
@@ -50,9 +59,19 @@ function classify(filePath: string, manifest: BoundaryConfig): Layer {
   );
 }
 
+function isFacade(filePath: string, manifest: BoundaryConfig): boolean {
+  const repoPath = relative(filePath);
+  return (manifest.facade_patterns || []).some((pattern) => matchesPattern(repoPath, pattern));
+}
+
 function sourceFiles(): string[] {
-  return getAllFiles(pathResolver.rootResolve('libs/core')).filter(
-    (filePath) => /\.[cm]?tsx?$/.test(filePath) && !filePath.endsWith('.d.ts')
+  return SOURCE_ROOTS.flatMap((root) => getAllFiles(pathResolver.rootResolve(root))).filter(
+    (filePath) =>
+      /\.[cm]?tsx?$/.test(filePath) &&
+      !filePath.endsWith('.d.ts') &&
+      !/(?:\.test|\.spec)\.[cm]?[jt]sx?$/.test(filePath) &&
+      !filePath.includes(`${path.sep}dist${path.sep}`) &&
+      !filePath.includes(`${path.sep}.next${path.sep}`)
   );
 }
 
@@ -76,18 +95,97 @@ function resolveImport(importer: string, specifier: string): string | undefined 
   return candidates.find((candidate) => safeExistsSync(candidate));
 }
 
-function importsFor(filePath: string): string[] {
-  const text = String(safeReadFile(filePath, { encoding: 'utf8' }));
-  const imports: string[] = [];
-  const pattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
-  for (const match of text.matchAll(pattern)) imports.push(match[1]);
-  return imports;
+/** Keep source offsets stable while removing comment text from import scans. */
+export function maskComments(source: string): string {
+  const chars = [...source];
+  let state: 'code' | 'line' | 'block' | 'single' | 'double' | 'template' = 'code';
+  let escaped = false;
+  for (let index = 0; index < chars.length; index += 1) {
+    const current = chars[index];
+    const next = chars[index + 1];
+    if (state === 'line') {
+      if (current === '\n' || current === '\r') state = 'code';
+      else chars[index] = ' ';
+      continue;
+    }
+    if (state === 'block') {
+      if (current === '*' && next === '/') {
+        chars[index] = ' ';
+        chars[index + 1] = ' ';
+        index += 1;
+        state = 'code';
+      } else if (current !== '\n' && current !== '\r') {
+        chars[index] = ' ';
+      }
+      continue;
+    }
+    if (state === 'single' || state === 'double' || state === 'template') {
+      if (escaped) {
+        escaped = false;
+      } else if (current === '\\') {
+        escaped = true;
+      } else if (
+        (state === 'single' && current === "'") ||
+        (state === 'double' && current === '"') ||
+        (state === 'template' && current === '`')
+      ) {
+        state = 'code';
+      }
+      continue;
+    }
+    if (current === '/' && next === '/') {
+      chars[index] = ' ';
+      chars[index + 1] = ' ';
+      index += 1;
+      state = 'line';
+    } else if (current === '/' && next === '*') {
+      chars[index] = ' ';
+      chars[index + 1] = ' ';
+      index += 1;
+      state = 'block';
+    } else if (current === "'") {
+      state = 'single';
+    } else if (current === '"') {
+      state = 'double';
+    } else if (current === '`') {
+      state = 'template';
+    }
+  }
+  return chars.join('');
 }
 
-function buildGraph(files: string[]): Map<string, string[]> {
+function importsFor(filePath: string, includeDynamic = false, includeTypeOnly = false): string[] {
+  const text = maskComments(String(safeReadFile(filePath, { encoding: 'utf8' })));
+  const imports: string[] = [];
+  const staticPattern = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
+  const dynamicPattern = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  for (const match of text.matchAll(staticPattern)) {
+    // Type-only imports do not create runtime module edges or initialization
+    // cycles. Keep mixed `export { type X, value }` statements as runtime
+    // edges, but exclude the dedicated `import type` form.
+    if (!includeTypeOnly && /\bimport\s+type\b/u.test(match[0])) continue;
+    imports.push(match[1]);
+  }
+  // Test-only lazy imports exercise fixtures and optional dependencies rather
+  // than production module boundaries; keep the ratchet focused on runtime
+  // edges while still accounting for lazy imports in production code.
+  if (includeDynamic && !filePath.endsWith('.test.ts') && !filePath.endsWith('.test.tsx')) {
+    for (const match of text.matchAll(dynamicPattern)) {
+      // `typeof import('...')` is a type query, not a runtime dependency. It
+      // must not manufacture a runtime cycle (or a dynamic edge) for the
+      // module that owns the type.
+      const prefix = text.slice(0, match.index ?? 0);
+      if (/typeof\s*$/u.test(prefix.slice(-12))) continue;
+      imports.push(match[1]);
+    }
+  }
+  return [...new Set(imports)];
+}
+
+function buildGraph(files: string[], includeDynamic = false): Map<string, string[]> {
   const graph = new Map<string, string[]>();
   for (const file of files) {
-    const targets = importsFor(file)
+    const targets = importsFor(file, includeDynamic)
       .map((specifier) => resolveImport(file, specifier))
       .filter((target): target is string => Boolean(target));
     graph.set(file, targets);
@@ -95,38 +193,91 @@ function buildGraph(files: string[]): Map<string, string[]> {
   return graph;
 }
 
-function findCycles(graph: Map<string, string[]>): string[][] {
-  const cycles = new Set<string>();
-  const stack: string[] = [];
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-  const visit = (node: string): void => {
-    if (visiting.has(node)) {
-      const start = stack.indexOf(node);
-      const cycle = stack.slice(start).concat(node).map(relative);
-      const rotations = cycle
-        .slice(0, -1)
-        .map((_, index) => cycle.slice(index, -1).concat(cycle.slice(0, index)));
-      const key = rotations.sort().at(0)?.join(' -> ');
-      if (key) cycles.add(key);
-      return;
+function collectDynamicImportEdges(files: string[]): DynamicImportEdge[] {
+  const staticGraph = buildGraph(files);
+  const allGraph = buildGraph(files, true);
+  const edges: DynamicImportEdge[] = [];
+  for (const [source, targets] of allGraph) {
+    // Compare against every static import, including type-only imports. The
+    // runtime graph intentionally excludes type-only edges, but they are not
+    // dynamic edges and must not be reported as such here.
+    const staticTargets = new Set(
+      importsFor(source, false, true)
+        .map((specifier) => resolveImport(source, specifier))
+        .filter((target): target is string => Boolean(target))
+    );
+    for (const target of targets) {
+      if (!staticTargets.has(target)) {
+        edges.push({ source: relative(source), target: relative(target) });
+      }
     }
-    if (visited.has(node)) return;
-    visiting.add(node);
+  }
+  return edges.sort((left, right) =>
+    `${left.source}->${left.target}`.localeCompare(`${right.source}->${right.target}`)
+  );
+}
+
+function findCycles(graph: Map<string, string[]>): string[][] {
+  // Tarjan's algorithm reports strongly connected components instead of
+  // depending on whichever DFS path happened to encounter a cycle first.
+  // This keeps static and dynamic graphs comparable and catches multi-node
+  // cycles without enumerating exponentially many simple paths.
+  let nextIndex = 0;
+  const indices = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const components: string[][] = [];
+
+  const visit = (node: string): void => {
+    indices.set(node, nextIndex);
+    lowLinks.set(node, nextIndex);
+    nextIndex += 1;
     stack.push(node);
-    for (const target of graph.get(node) || []) visit(target);
-    stack.pop();
-    visiting.delete(node);
-    visited.add(node);
+    onStack.add(node);
+
+    for (const target of graph.get(node) || []) {
+      if (!indices.has(target)) {
+        visit(target);
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, lowLinks.get(target)!));
+      } else if (onStack.has(target)) {
+        lowLinks.set(node, Math.min(lowLinks.get(node)!, indices.get(target)!));
+      }
+    }
+
+    if (lowLinks.get(node) !== indices.get(node)) return;
+    const component: string[] = [];
+    let member: string | undefined;
+    do {
+      member = stack.pop();
+      if (!member) break;
+      onStack.delete(member);
+      component.push(relative(member));
+    } while (member !== node);
+
+    const isSelfLoop = component.length === 1 && (graph.get(node) || []).includes(node);
+    if (component.length > 1 || isSelfLoop) components.push(component.sort());
   };
-  for (const file of graph.keys()) visit(file);
-  return Array.from(cycles).map((cycle) => cycle.split(' -> '));
+
+  for (const file of graph.keys()) {
+    if (!indices.has(file)) visit(file);
+  }
+  return components.sort((left, right) => left.join('|').localeCompare(right.join('|')));
+}
+
+function maxComponentSize(components: string[][]): number {
+  return components.reduce((maximum, component) => Math.max(maximum, component.length), 0);
 }
 
 function findDirectionViolations(graph: Map<string, string[]>, manifest: BoundaryConfig): string[] {
   const rank = new Map(manifest.layers.map((layer, index) => [layer, index]));
   const violations: string[] = [];
   for (const [source, targets] of graph) {
+    // Public API barrels intentionally compose every lower layer. Treating
+    // those re-exports as implementation dependencies makes the boundary
+    // checker report the facade itself as an inversion; consumers still get
+    // checked at their actual implementation edges.
+    if (isFacade(source, manifest)) continue;
     const sourceLayer = classify(source, manifest);
     for (const target of targets) {
       const targetLayer = classify(target, manifest);
@@ -143,29 +294,62 @@ function findDirectionViolations(graph: Map<string, string[]>, manifest: Boundar
 export function checkModuleBoundaries(): {
   cycles: string[][];
   directionViolations: string[];
+  dynamicImportEdges: DynamicImportEdge[];
+  maxRuntimeSccSize: number;
   baseline: BoundaryBaseline;
   violations: string[];
 } {
   const manifest = config();
-  const graph = buildGraph(sourceFiles());
+  const files = sourceFiles();
+  const graph = buildGraph(files);
+  // Dynamic imports are runtime dependency edges too. Excluding them lets a
+  // module hide a cycle behind `await import()` while the static graph stays
+  // green. Test-only fixtures remain excluded by `buildGraph`'s production
+  // edge policy.
+  const runtimeGraph = buildGraph(files, true);
   const cycles = findCycles(graph);
-  const directionViolations = findDirectionViolations(graph, manifest);
+  const runtimeCycles = findCycles(runtimeGraph);
+  const maxRuntimeSccSize = maxComponentSize(runtimeCycles);
+  const directionViolations = findDirectionViolations(runtimeGraph, manifest);
+  const dynamicImportEdges = collectDynamicImportEdges(files);
   const baseline = safeExistsSync(BASELINE_PATH)
     ? readJson<BoundaryBaseline>(BASELINE_PATH)
     : {
         version: 1 as const,
         cycles: cycles.length,
+        runtime_cycles: runtimeCycles.length,
+        max_runtime_scc_size: maxRuntimeSccSize,
         direction_violations: directionViolations.length,
       };
   const violations: string[] = [];
   if (cycles.length > baseline.cycles)
     violations.push(`cycles increased from ${baseline.cycles} to ${cycles.length}`);
+  if (baseline.runtime_cycles !== undefined && runtimeCycles.length > baseline.runtime_cycles) {
+    violations.push(
+      `runtime cycles increased from ${baseline.runtime_cycles} to ${runtimeCycles.length}`
+    );
+  }
+  if (
+    baseline.max_runtime_scc_size !== undefined &&
+    maxRuntimeSccSize > baseline.max_runtime_scc_size
+  ) {
+    violations.push(
+      `max runtime SCC size increased from ${baseline.max_runtime_scc_size} to ${maxRuntimeSccSize}`
+    );
+  }
   if (directionViolations.length > baseline.direction_violations) {
     violations.push(
       `direction violations increased from ${baseline.direction_violations} to ${directionViolations.length}`
     );
   }
-  return { cycles, directionViolations, baseline, violations };
+  return {
+    cycles,
+    directionViolations,
+    dynamicImportEdges,
+    maxRuntimeSccSize,
+    baseline,
+    violations,
+  };
 }
 
 export const runCheckModuleBoundaries = defineScript({
@@ -182,6 +366,8 @@ export const runCheckModuleBoundaries = defineScript({
             {
               version: 1,
               cycles: report.cycles.length,
+              runtime_cycles: findCycles(buildGraph(sourceFiles(), true)).length,
+              max_runtime_scc_size: report.maxRuntimeSccSize,
               direction_violations: report.directionViolations.length,
             },
             null,
@@ -190,7 +376,7 @@ export const runCheckModuleBoundaries = defineScript({
         )
       );
       context.print(
-        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
+        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize})`
       );
       return;
     }
@@ -200,7 +386,7 @@ export const runCheckModuleBoundaries = defineScript({
       throw new Error(`${report.violations.length} module boundary violation(s)`);
     }
     context.print(
-      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations)`
+      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
     );
   },
 });

@@ -229,7 +229,7 @@ Use this when you want to register a new operator voice profile before meeting w
 pnpm meeting:preflight
 ```
 
-失敗したら `pnpm doctor:meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
+失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を先に実行し、表示された `fix` を直してからやり直す。
 
 2. 初回だけ voice profile と consent をまとめて作る。
 
@@ -257,7 +257,7 @@ pnpm meeting:participate \
   --display-name "Kyberion (operator delegate)"
 ```
 
-失敗したら `pnpm doctor:meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
+失敗したら `pnpm doctor -- --runtime meeting --mission MSN-...` を再実行し、ブラウザ・音声・consent の欠落を先に解消する。
 
 5. 会議後フォローアップで議事録と action items を作る。
 

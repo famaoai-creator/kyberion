@@ -2,7 +2,6 @@
 import * as path from 'node:path';
 import {
   getRegisteredEnv,
-  loadJson,
   pathResolver,
   safeExistsSync,
   safeLstat,
@@ -10,6 +9,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type TaskScenario = {
@@ -98,7 +98,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return loadJson<TaskScenario>(filePath);
+  return readJson<TaskScenario>(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
@@ -109,7 +109,7 @@ function loadScenarioById(scenarioId: string): TaskScenario | undefined {
 
 function loadAnswers(args: TaskInitArgs): Record<string, unknown> {
   if (args.answersFile) {
-    return loadJson<Record<string, unknown>>(pathResolver.rootResolve(args.answersFile));
+    return readJson<Record<string, unknown>>(pathResolver.rootResolve(args.answersFile));
   }
   if (args.answersJson) {
     return JSON.parse(args.answersJson) as Record<string, unknown>;

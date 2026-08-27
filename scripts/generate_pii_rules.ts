@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { loadJson, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 type SourceRule = { id?: string; name?: string; regex?: string };
@@ -14,7 +15,7 @@ const outputPaths = [
 ];
 
 function loadRules(): Array<{ id: string; regex: string }> {
-  const source = loadJson<{
+  const source = readJson<{
     security?: { pii_patterns?: SourceRule[] };
   }>(sourcePath);
   const rules = source.security?.pii_patterns;

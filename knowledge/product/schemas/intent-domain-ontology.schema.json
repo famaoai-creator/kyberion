@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": ["version", "intents"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "notes": {
       "type": "array",

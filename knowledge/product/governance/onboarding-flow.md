@@ -102,7 +102,7 @@ pnpm tenant create <tenant-slug> \
   --assigned-role owner \
   --apply
 pnpm tenant show <tenant-slug> --json
-pnpm run check:tenant-registry
+pnpm check -- --only tenant-registry
 ```
 
 registry が `active` でない tenant、未登録 tenant、tier 名と衝突する tenant は後続の

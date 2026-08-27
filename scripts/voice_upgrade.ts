@@ -25,7 +25,6 @@
 import * as path from 'node:path';
 import {
   pathResolver,
-  loadJson,
   customerResolver,
   probeNativeTts,
   classifyError,
@@ -35,6 +34,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Tier = 0 | 1 | 2;
@@ -148,7 +148,7 @@ function writeTier(tier: Tier): string {
   let existing: Record<string, unknown> = {};
   if (safeExistsSync(out)) {
     try {
-      existing = loadJson<Record<string, unknown>>(out);
+      existing = readJson<Record<string, unknown>>(out);
     } catch {
       existing = {};
     }

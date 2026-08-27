@@ -4,6 +4,7 @@ import addFormatsModule from 'ajv-formats';
 import { logger } from './core.js';
 import { createAjv as createFoundationAjv } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -256,7 +257,6 @@ export interface OperatorLearningDispatchResult {
 
 let operatorProfileValidateFn: ValidateFunction | null = null;
 let operatorRequestLogValidateFn: ValidateFunction | null = null;
-let operatorLearningDispatchRegistryValidateFn: ValidateFunction | null = null;
 let operatorLearningDispatchRegistryCachePath: string | null = null;
 let operatorLearningDispatchRegistryCache: OperatorLearningDispatchRegistry | null = null;
 
@@ -288,15 +288,6 @@ function ensureOperatorRequestLogValidator(): ValidateFunction {
     pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
   );
   return operatorRequestLogValidateFn;
-}
-
-function ensureOperatorLearningDispatchRegistryValidator(): ValidateFunction {
-  if (operatorLearningDispatchRegistryValidateFn) return operatorLearningDispatchRegistryValidateFn;
-  operatorLearningDispatchRegistryValidateFn = compileSchemaFromPath(
-    createAjv(),
-    pathResolver.knowledge('product/schemas/operator-learning-dispatch-registry.schema.json')
-  );
-  return operatorLearningDispatchRegistryValidateFn;
 }
 
 const DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
@@ -496,6 +487,27 @@ const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegi
   ],
 };
 
+const dispatchRegistryCatalogs = new Map<
+  string,
+  GovernedCatalog<OperatorLearningDispatchRegistry>
+>();
+
+function getDispatchRegistryCatalog(
+  registryPath: string
+): GovernedCatalog<OperatorLearningDispatchRegistry> {
+  const existing = dispatchRegistryCatalogs.get(registryPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<OperatorLearningDispatchRegistry>({
+    id: 'operator-learning-dispatch-registry',
+    path: registryPath,
+    schema: pathResolver.knowledge(
+      'product/schemas/operator-learning-dispatch-registry.schema.json'
+    ),
+  });
+  dispatchRegistryCatalogs.set(registryPath, catalog);
+  return catalog;
+}
+
 function getOperatorLearningDispatchRegistryPath(): string {
   return (
     getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
@@ -523,15 +535,7 @@ function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
 }
 
 function loadDispatchRegistryFromPath(registryPath: string): OperatorLearningDispatchRegistry {
-  const parsed = loadJson<OperatorLearningDispatchRegistry>(registryPath);
-  const validate = ensureOperatorLearningDispatchRegistryValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid operator learning dispatch registry: ${errors}`);
-  }
-  return parsed;
+  return getDispatchRegistryCatalog(registryPath).load();
 }
 
 function mergeDispatchRegistries(

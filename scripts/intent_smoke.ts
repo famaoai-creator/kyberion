@@ -3,7 +3,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger, safeExec } from '@agent/core';
-import { readTextFile } from './refactor/cli-input.js';
+import { readTextFile } from '@agent/core/foundation';
 
 const DEFAULT_INTENTS = [
   'verify-actuator-capability',

@@ -1,7 +1,5 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
 
 export type ProviderConfigRuntimeRole =
@@ -66,51 +64,21 @@ const FALLBACK: ProviderConfigFile = {
   },
 };
 
-let cachedProviderConfig: ProviderConfigFile | null = null;
-let validateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(PROVIDER_CONFIG_SCHEMA_PATH);
-  return validateFn;
-}
-
-function validateProviderConfig(value: unknown, label = PROVIDER_CONFIG_PATH): ProviderConfigFile {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
-    );
-    throw new Error(`Invalid provider config at ${label}: ${errors.join('; ')}`);
-  }
-  return value as ProviderConfigFile;
-}
-
-export function loadProviderConfig(): ProviderConfigFile {
-  if (cachedProviderConfig) return cachedProviderConfig;
-  try {
-    if (!safeExistsSync(PROVIDER_CONFIG_PATH)) {
-      cachedProviderConfig = FALLBACK;
-      return cachedProviderConfig;
-    }
-    const parsed = loadJson<unknown>(PROVIDER_CONFIG_PATH);
-    const validated = validateProviderConfig(parsed, PROVIDER_CONFIG_PATH);
-    cachedProviderConfig = {
-      default_priority: validated.default_priority,
-      obsolete_agent_runtime_providers: validated.obsolete_agent_runtime_providers || [],
-      default_models: validated.default_models,
-      runtime_defaults: validated.runtime_defaults,
-      lifecycle: validated.lifecycle,
-    };
-  } catch (error) {
+const providerConfigCatalog: GovernedCatalog<ProviderConfigFile> = defineCatalog({
+  id: 'provider-config',
+  path: PROVIDER_CONFIG_PATH,
+  schema: PROVIDER_CONFIG_SCHEMA_PATH,
+  fallback: FALLBACK,
+  onFallback: (error, fallback) =>
     recordConfigFallback({
       knowledgePath: 'product/governance/provider-config.json',
       error,
-      defaults: FALLBACK,
-    });
-    cachedProviderConfig = FALLBACK;
-  }
-  return cachedProviderConfig;
+      defaults: fallback,
+    }),
+});
+
+export function loadProviderConfig(): ProviderConfigFile {
+  return providerConfigCatalog.load();
 }
 
 export function isObsoleteAgentRuntimeProvider(provider: string | undefined): boolean {

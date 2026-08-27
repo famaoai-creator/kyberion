@@ -20,13 +20,13 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
   pathResolver,
-  loadJson,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -73,7 +73,7 @@ function listActuatorManifests(): string[] {
 }
 
 function readManifest(p: string): Manifest {
-  return loadJson<Manifest>(p);
+  return readJson<Manifest>(p);
 }
 
 function sha256(content: string): string {
@@ -233,7 +233,7 @@ function check(prev: BaselineFile, current: ActuatorFingerprint[]): Diagnostic[]
 
 function loadBaseline(): BaselineFile | null {
   if (!safeExistsSync(BASELINE_PATH)) return null;
-  return loadJson<BaselineFile>(BASELINE_PATH);
+  return readJson<BaselineFile>(BASELINE_PATH);
 }
 
 function writeBaseline(file: BaselineFile): void {

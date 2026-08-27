@@ -18,6 +18,12 @@ describe('kyberion command router', () => {
     expect(selectEntrypoint('schedule').id).toBe('operator-cli');
   });
 
+  it('routes organization and project controllers through the governed registry', () => {
+    expect(selectEntrypoint('organization').id).toBe('organization-model');
+    expect(selectEntrypoint('org').id).toBe('organization-roles');
+    expect(selectEntrypoint('project').id).toBe('project-controller');
+  });
+
   it('rejects unknown commands instead of falling back to an executable surface', () => {
     expect(() => selectEntrypoint('unknown-command')).toThrow('Unknown kyberion command');
   });
@@ -94,5 +100,20 @@ describe('kyberion command router', () => {
         KYBERION_MYSTERY: '1',
       })
     ).toThrow('KYBERION_MYSTERY');
+  });
+
+  it('uses strict environment validation by default', () => {
+    expect(() => validateKyberionStartupEnvironment({ KYBERION_MYSTERY: '1' })).toThrow(
+      'KYBERION_MYSTERY'
+    );
+  });
+
+  it('allows an explicit false opt-out for local compatibility', () => {
+    expect(() =>
+      validateKyberionStartupEnvironment({
+        KYBERION_ENV_REGISTRY_STRICT: 'false',
+        KYBERION_MYSTERY: '1',
+      })
+    ).not.toThrow();
   });
 });

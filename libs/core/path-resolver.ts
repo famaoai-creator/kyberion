@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
-import { isValidTenantSlug } from './entity-scope.js';
+import { isValidTenantSlug } from './foundation/scope.js';
 import { getProcessEnv } from './foundation/process-env.js';
 
 /**

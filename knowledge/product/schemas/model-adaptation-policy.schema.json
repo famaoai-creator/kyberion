@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "lifecycle": { "$ref": "#/$defs/lifecyclePolicy" },
     "triggers": { "$ref": "#/$defs/triggerPolicy" },
@@ -147,7 +148,12 @@
           "properties": {
             "capability_kind": {
               "type": "string",
-              "enum": ["reasoning", "interactive_tooling", "delegated_execution", "deterministic_utility"]
+              "enum": [
+                "reasoning",
+                "interactive_tooling",
+                "delegated_execution",
+                "deterministic_utility"
+              ]
             },
             "workflow_shape": {
               "type": "string",

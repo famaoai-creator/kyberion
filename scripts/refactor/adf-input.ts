@@ -3,13 +3,41 @@ import path from 'node:path';
 import { rootResolve } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
-import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
+import {
+  validatePipelineGuardrails,
+  type AdfScriptWrapperBaselineEntry,
+} from '@agent/core/adf-guardrails';
 import { tryRepairJson } from '@agent/core/json-repair';
 import { requiresProjectTrust } from '@agent/core/trust-requiring-resources';
 
 export interface AdfInputOptions {
   /** Set false for pre-trust callers; project-local pipeline resources are not read. */
   trustResolved?: boolean;
+}
+
+const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
+  'scripts/pipeline-shell-independence.baseline.json'
+);
+
+function loadScriptWrapperBaseline(): AdfScriptWrapperBaselineEntry[] {
+  if (!safeExistsSync(SCRIPT_WRAPPER_BASELINE_PATH)) return [];
+  try {
+    const parsed = JSON.parse(
+      String(safeReadFile(SCRIPT_WRAPPER_BASELINE_PATH, { encoding: 'utf8' }))
+    ) as { violations?: unknown };
+    return Array.isArray(parsed.violations)
+      ? parsed.violations.filter(
+          (entry): entry is AdfScriptWrapperBaselineEntry =>
+            Boolean(entry) &&
+            typeof entry === 'object' &&
+            typeof (entry as Record<string, unknown>).file === 'string' &&
+            typeof (entry as Record<string, unknown>).pattern === 'string' &&
+            typeof (entry as Record<string, unknown>).match === 'string'
+        )
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 export function resolveAdfInputPath(inputPath: string): string {
@@ -148,7 +176,9 @@ export function readValidatedPipelineAdf<T = any>(
   assertPipelineResourceTrust(inputPath, options);
   const pipeline = validatePipelineAdf(readJsonInput(inputPath));
   const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
-  const guardrails = validatePipelineGuardrails(expanded as any, inputPath);
+  const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
+    scriptWrapperBaseline: loadScriptWrapperBaseline(),
+  });
   if (!guardrails.ok) {
     const details = guardrails.findings
       .filter((finding) => finding.severity === 'error')
@@ -169,7 +199,9 @@ export async function readValidatedWorkflowAdf<T = any>(
     : readJsonInput<T>(inputPath);
   const pipeline = validatePipelineAdf(raw);
   const expanded = expandPipelineIncludesForGuardrails(pipeline, options);
-  const guardrails = validatePipelineGuardrails(expanded as any, inputPath);
+  const guardrails = validatePipelineGuardrails(expanded as any, inputPath, {
+    scriptWrapperBaseline: loadScriptWrapperBaseline(),
+  });
   if (!guardrails.ok) {
     const details = guardrails.findings
       .filter((finding) => finding.severity === 'error')

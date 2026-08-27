@@ -50,6 +50,22 @@ export function checkFirstWinDocs(): string[] {
   const extracted = new Map<string, string[]>();
   for (const relativePath of FIRST_WIN_DOCS) {
     const markdown = read(relativePath);
+    if (relativePath === 'docs/INITIALIZATION.md') {
+      const stageOrder = [
+        '### Stage 1: 物理的基盤の確立',
+        '### Stage 2: システムの具現化',
+        '### Stage 3: 事前ツール確認',
+      ].map((heading) => markdown.indexOf(heading));
+      if (
+        stageOrder.some((index) => index < 0) ||
+        stageOrder[0]! > stageOrder[1]! ||
+        stageOrder[1]! > stageOrder[2]!
+      ) {
+        failures.push(
+          `${relativePath}: detailed first-win stages must be install -> build -> prereq`
+        );
+      }
+    }
     if (!fenceIsBalanced(markdown)) failures.push(`${relativePath}: unbalanced markdown fence`);
     const commands = extractFirstWinCommands(markdown);
     extracted.set(relativePath, commands);

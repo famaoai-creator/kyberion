@@ -12,7 +12,7 @@ After changing an item or `index.json`, run:
 
 ```sh
 pnpm sync:model-registry
-pnpm run check:governance-rules
+pnpm check -- --only governance-rules
 ```
 
 The governance check fails when the directory and snapshot diverge.

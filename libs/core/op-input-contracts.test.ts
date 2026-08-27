@@ -65,6 +65,24 @@ describe('op-input-contracts', () => {
     }
   });
 
+  it('keeps legacy operation envelopes open until their typed migration', () => {
+    expect(validateOpInput('file', 'read', { path: 'a.txt', export_as: 'content' })).toEqual({
+      valid: true,
+    });
+    expect(validateOpInput('file', 'read', { path: 'a.txt', typo: true })).toEqual({ valid: true });
+  });
+
+  it('accepts governed pipeline metadata without reopening the operation envelope', () => {
+    expect(
+      validateOpInput('system', 'probe_active_profile', {
+        path: 'my-identity.json',
+        _facets: { audience: 'operator' },
+        _reasoning_policy: { mode: 'deterministic' },
+        _step_id: 'probe-profile',
+      })
+    ).toEqual({ valid: true });
+  });
+
   describe('resolveOpAccessClaims (KD-07)', () => {
     it('resolves a declared read-only op to a file read claim from its path param', () => {
       expect(

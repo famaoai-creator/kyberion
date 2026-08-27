@@ -1,10 +1,7 @@
-import type { ValidateFunction } from 'ajv';
 import { logger } from './core.js';
-import { createAjv } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import { type PresentationPreferenceProfile } from './src/types/presentation-preference-profile.js';
 
@@ -14,7 +11,6 @@ export interface PresentationPreferenceRegistry {
   profiles: PresentationPreferenceProfile[];
 }
 
-const ajv = createAjv();
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/presentation-preference-registry.schema.json'
 );
@@ -66,29 +62,12 @@ const FALLBACK_REGISTRY: PresentationPreferenceRegistry = {
 
 let registryCacheKey: string | null = null;
 let registryCache: PresentationPreferenceRegistry | null = null;
-let registryValidateFn: ValidateFunction | null = null;
-
-function ensureRegistryValidator(): ValidateFunction {
-  if (registryValidateFn) return registryValidateFn;
-  registryValidateFn = compileSchemaFromPath(ajv, REGISTRY_SCHEMA_PATH);
-  return registryValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
 function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegistry {
-  const parsed = readJson<PresentationPreferenceRegistry>(registryPath);
-  const validate = ensureRegistryValidator();
-  if (!validate(parsed)) {
-    throw new Error(
-      `Invalid presentation preference registry at ${registryPath}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return parsed;
+  return defineCatalog<PresentationPreferenceRegistry>({
+    id: 'presentation-preference-registry',
+    path: registryPath,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).load();
 }
 
 function getRegistryPath(): string {

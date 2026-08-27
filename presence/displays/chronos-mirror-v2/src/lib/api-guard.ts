@@ -9,7 +9,7 @@ import {
   type ChronosAccessRole,
   type ChronosTokenRegistration,
 } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 
 /**
  * API Guard: Authentication + Rate Limiting for Chronos Mirror API routes.
@@ -20,8 +20,11 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 
 const API_TOKEN = getRegisteredEnvText('KYBERION_API_TOKEN');
 const LOCALADMIN_TOKEN = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
-const ALLOW_UNAUTH_REMOTE = getRegisteredEnvText('KYBERION_ALLOW_UNAUTH_REMOTE') === '1';
-const ALLOW_LOCALHOST_AUTOADMIN = getRegisteredEnvText('KYBERION_LOCALHOST_AUTOADMIN') !== 'false';
+const ALLOW_UNAUTH_REMOTE = getRegisteredEnvBool('KYBERION_ALLOW_UNAUTH_REMOTE') === true;
+const ALLOW_LOCALHOST_AUTOADMIN =
+  getRegisteredEnvBool('KYBERION_LOCALHOST_AUTOADMIN', {
+    defaultValue: true,
+  }) === true;
 
 export type { ChronosAccessRole, ChronosTokenRegistration } from '@agent/core';
 export { matchesChronosToken } from '@agent/core';
@@ -46,8 +49,9 @@ const RATE_LIMIT_WINDOW = 60000; // 1 minute
 function getClientIP(req: NextRequest): string {
   return (
     (req as NextRequest & { ip?: string }).ip ||
-    req.headers.get('x-real-ip') ||
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true
+      ? req.headers.get('x-real-ip') || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      : undefined) ||
     'unknown'
   );
 }
@@ -56,19 +60,18 @@ function isLoopback(ip: string): boolean {
   return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
 }
 
-function isLoopbackHostname(hostname: string | undefined): boolean {
-  if (!hostname) return false;
-  const normalized = hostname.replace(/^\[/, '').replace(/\]$/, '').toLowerCase();
-  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1';
-}
-
 export function isChronosLoopbackRequest(req: NextRequest): boolean {
   const directIp = (req as NextRequest & { ip?: string }).ip;
-  const forwardedFor = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  if (directIp !== undefined) {
-    return isLoopback(directIp) && (!forwardedFor || isLoopback(forwardedFor));
-  }
-  return isLoopbackHostname(req.nextUrl?.hostname) && (!forwardedFor || isLoopback(forwardedFor));
+  const peerIp =
+    directIp ||
+    (getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true
+      ? req.headers.get('x-real-ip')?.trim() ||
+        req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      : undefined);
+  // Host is routing metadata, not caller identity. When Next does not expose
+  // the socket peer, only an explicit loopback peer header is accepted; a
+  // remote client cannot obtain localadmin by sending `Host: localhost`.
+  return Boolean(peerIp && isLoopback(peerIp));
 }
 
 function checkRateLimit(ip: string): boolean {

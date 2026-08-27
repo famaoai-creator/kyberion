@@ -10,7 +10,7 @@ import {
 } from '@agent/core';
 import { createAjv } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ajv = createAjv();
@@ -36,7 +36,7 @@ type MemoryFile = {
 };
 
 function readJson<T>(absPath: string): T {
-  return readJsonFile(absPath);
+  return readFoundationJson<T>(absPath);
 }
 
 function validateMemory(value: unknown): asserts value is MemoryFile {

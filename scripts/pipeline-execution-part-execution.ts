@@ -118,6 +118,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
+import { buildPipelinePromptVisibilityContext } from './pipeline-reasoning-visibility.js';
 
 import {
   registeredEnv,
@@ -177,21 +178,11 @@ import {
   parseFragmentJson,
   isSkip,
   dispatchReasoningLeaf,
-  buildPipelinePromptVisibilityContext,
   dispatchProgrammaticToolCall,
   hasBoundApproval,
   dispatchLeafOp,
   findStepByIdRecursive,
 } from './pipeline-execution-part-control.js';
-import {
-  TypedFlowValidationError,
-  runValidatedSteps,
-  executePipelineFile,
-  main,
-  isDirectRun,
-} from './pipeline-execution-part-results.js';
-import type { ExecutePipelineFileOptions } from './pipeline-execution-part-results.js';
-
 /**
  * AR-01 Phase B: retry + autonomous-repair extracted into a higher-order
  * function that wraps a single step-execution attempt, instead of being

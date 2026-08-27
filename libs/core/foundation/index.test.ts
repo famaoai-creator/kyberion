@@ -10,6 +10,8 @@ import {
   getRegisteredEnv,
   normalizeText,
   parseIso,
+  readTextFile,
+  safeChildEnv,
   setRegisteredEnv,
   slugify,
   truncateNormalizedText,
@@ -22,6 +24,13 @@ describe('foundation helpers', () => {
     expect(slugify('Hello, World!')).toBe('hello-world');
     expect(clamp(12, 0, 10)).toBe(10);
     expect(parseIso('2026-08-25T00:00:00.000Z').toISOString()).toBe('2026-08-25T00:00:00.000Z');
+  });
+
+  it('reads text through the registered foundation I/O boundary', () => {
+    const filePath = pathResolver.sharedTmp('foundation-text-test.txt');
+    safeWriteFile(filePath, 'foundation text');
+    expect(readTextFile(filePath)).toBe('foundation text');
+    safeRmSync(filePath, { force: true });
   });
 
   it('rejects invalid ranges and timestamps', () => {
@@ -74,5 +83,19 @@ describe('foundation helpers', () => {
     expect(environment.KYBERION_FOUNDATION_TEST).toBe('enabled');
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', undefined, environment);
     expect(environment.KYBERION_FOUNDATION_TEST).toBeUndefined();
+  });
+
+  it('builds a least-privilege child environment from the shared allowlist', () => {
+    expect(
+      safeChildEnv({ PATH: '/bin', KYBERION_TENANT: 'tenant-a', OPENAI_API_KEY: 'secret' })
+    ).toEqual({ FORCE_COLOR: '0', TERM: 'dumb', PATH: '/bin', OPENAI_API_KEY: 'secret' });
+  });
+
+  it('loads registry coercion through the secure-io-installed reader without an import cycle', () => {
+    expect(
+      getRegisteredEnv('KYBERION_PROVIDER_DEMOTION_TTL_MS', {
+        env: { KYBERION_PROVIDER_DEMOTION_TTL_MS: '2500' },
+      })
+    ).toBe(2500);
   });
 });

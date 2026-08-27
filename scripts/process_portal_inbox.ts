@@ -1,7 +1,7 @@
 import chalk from 'chalk';
 // chalk imported dynamically
 import { pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
-import { readTextFile } from './refactor/cli-input.js';
+import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const inboxPath = pathResolver.shared('portal/inbox.json');

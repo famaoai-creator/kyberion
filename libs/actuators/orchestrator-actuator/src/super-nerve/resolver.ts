@@ -1,5 +1,4 @@
-import { compileIntent, logger } from '@agent/core';
-import { executeSuperPipeline } from './index.js';
+import { compileIntent, logger, executeRegisteredSuperPipeline } from '@agent/core';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
@@ -32,7 +31,10 @@ function buildStartServiceShellCommand(serviceName?: string): string {
   return `${base}start --service-name ${serviceName}`;
 }
 
-export async function resolveIntentToSteps(intentId: string, initialContext: any = {}): Promise<any[]> {
+export async function resolveIntentToSteps(
+  intentId: string,
+  initialContext: any = {}
+): Promise<any[]> {
   const result = compileIntent(intentId);
   if (!result || result.steps.length === 0) {
     throw new Error(`Intent not resolved: ${intentId}`);
@@ -81,7 +83,11 @@ export async function resolveIntentToSteps(intentId: string, initialContext: any
   return result.steps;
 }
 
-export async function resolveAndExecuteIntent(intentId: string, initialContext: any = {}, options: any = {}) {
+export async function resolveAndExecuteIntent(
+  intentId: string,
+  initialContext: any = {},
+  options: any = {}
+) {
   const steps = await resolveIntentToSteps(intentId, initialContext);
-  return await executeSuperPipeline(steps, initialContext, options);
+  return await executeRegisteredSuperPipeline(steps, initialContext, options);
 }

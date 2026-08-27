@@ -9,6 +9,8 @@ export interface ScriptFlags {
   check: boolean;
   quiet: boolean;
   positional: string[];
+  /** Flags not owned by the shared harness; callers must opt into handling them. */
+  unknownFlags: string[];
 }
 
 export interface ScriptContext extends ScriptFlags {
@@ -37,6 +39,11 @@ export function currentProcessArgv(): string[] {
   return [...process.argv];
 }
 
+/** Terminate a CLI process through the single governed process boundary. */
+export function exitProcess(code: number): never {
+  process.exit(code);
+}
+
 /** Replace process argv for legacy child-entry modules that inspect it directly. */
 export function setCurrentProcessArgv(argv: string[]): void {
   process.argv = [...argv];
@@ -48,6 +55,7 @@ export function parseScriptFlags(
 ): ScriptFlags {
   const enabled = new Set(enabledFlags);
   const positional: string[] = [];
+  const unknownFlags: string[] = [];
   let json = false;
   let dryRun = false;
   let check = false;
@@ -57,9 +65,12 @@ export function parseScriptFlags(
     else if (arg === '--dry-run' && enabled.has('dry-run')) dryRun = true;
     else if (arg === '--check' && enabled.has('check')) check = true;
     else if (arg === '--quiet' && enabled.has('quiet')) quiet = true;
-    else positional.push(arg);
+    else {
+      positional.push(arg);
+      if (arg.startsWith('-')) unknownFlags.push(arg);
+    }
   }
-  return { json, dryRun, check, quiet, positional };
+  return { json, dryRun, check, quiet, positional, unknownFlags };
 }
 
 export function defineScript<T>(options: {
@@ -72,9 +83,11 @@ export function defineScript<T>(options: {
     const output = (value: unknown): void => {
       if (!flags.quiet) {
         const rendered =
-          flags.json || (typeof value === 'object' && value !== null)
-            ? JSON.stringify(value, null, 2)
-            : String(value);
+          flags.json && typeof value === 'string'
+            ? value
+            : flags.json || (typeof value === 'object' && value !== null)
+              ? JSON.stringify(value, null, 2)
+              : String(value);
         console.log(rendered);
       }
     };
@@ -84,7 +97,12 @@ export function defineScript<T>(options: {
       const exitCode = error instanceof ScriptExitError ? error.code : 1;
       const silent = error instanceof ScriptExitError && error.silent;
       if (!silent) {
-        const message = error instanceof ScriptExitError ? error.message : String(error);
+        const message =
+          error instanceof ScriptExitError
+            ? error.message
+            : error instanceof Error
+              ? error.stack || error.message
+              : String(error);
         if (!flags.json) console.error(`[${options.name}] ${message}`);
         else console.error(JSON.stringify({ ok: false, error: message }));
       }
@@ -142,8 +160,9 @@ export function defineGenerator(options: {
 }
 
 export function isDirectScript(importMetaUrl: string, expectedFile: string): boolean {
-  return (
-    path.resolve(process.argv[1] || '') === path.resolve(fileURLToPath(importMetaUrl)) &&
-    process.argv[1]?.endsWith(expectedFile) === true
-  );
+  const actual = path.resolve(process.argv[1] || '');
+  const modulePath = path.resolve(fileURLToPath(importMetaUrl));
+  const expected = expectedFile.replaceAll('\\', '/').replace(/^\.\//u, '');
+  const candidates = [expected, expected.replace(/\.ts$/u, '.js')];
+  return actual === modulePath && candidates.some((candidate) => actual.endsWith(candidate));
 }

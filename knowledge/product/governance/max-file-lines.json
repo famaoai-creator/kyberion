@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/max-file-lines.schema.json",
+  "max_lines": 1500,
+  "roots": ["libs", "presence", "satellites", "scripts"],
+  "exceptions": []
+}

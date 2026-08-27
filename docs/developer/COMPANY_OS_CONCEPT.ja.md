@@ -2,7 +2,7 @@
 
 > **作成日**: 2026-07-03
 > **問い**: 「私 + Kyberion」で AIスタートアップ企業を回せるか。組織構成の作り方・業務の進め方のコンセプトをどう表現するか。
-> **位置づけ**: コンセプトの参照文書 + 表現方法の見本。思想の土台は [FABLE5_AGENT_MODEL](./FABLE5_AGENT_MODEL.ja.md) / [ORCHESTRATION_HARNESS_MODEL](./ORCHESTRATION_HARNESS_MODEL.ja.md) / [AUTONOMOUS_MAINTENANCE_JUDGMENT](./AUTONOMOUS_MAINTENANCE_JUDGMENT.ja.md)。既存の概念スパインは `knowledge/product/architecture/enterprise-operating-kernel.md` と `organization-work-loop.md`。Company OS 完成のための実装は [improvement-plans-2026-07](./improvement-plans-2026-07/README.ja.md) の CO 系。
+> **位置づけ**: コンセプトの参照文書 + 表現方法の見本。思想の土台は [FABLE5_AGENT_MODEL](./FABLE5_AGENT_MODEL.ja.md) / [ORCHESTRATION_HARNESS_MODEL](./ORCHESTRATION_HARNESS_MODEL.ja.md) / [AUTONOMOUS_MAINTENANCE_JUDGMENT](./AUTONOMOUS_MAINTENANCE_JUDGMENT.ja.md)。既存の概念スパインは `knowledge/product/architecture/enterprise-operating-kernel.md` と `organization-work-loop.md`。Company OS 完成のための実装は [improvement-plans-2026-07](./improvement-plans-archive/2026-07/README.ja.md) の CO 系。
 
 ---
 
@@ -83,13 +83,13 @@
 
 現状は「業務の遂行」は表現・実行できるが、「会社そのものの経営」を束ねる層が未完。gap を改善計画にした:
 
-| gap                                                   | 内容                                                                                                           | 計画                                                                      |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 会社の集約エンティティが無い                          | vision+org+role+KPI+process が5ファイルに散在、束ねる `company` オブジェクトが無い。per-tenant vision も未配線 | [CO-01](./improvement-plans-2026-07/CO-01_COMPANY_ENTITY.ja.md)           |
-| 組織図がデータでない + カスタムロール作成フローが無い | 組織図は非構造化 tenant 知識のみ、"CFO agent" を作るには SYSTEM tier の config 手編集                          | [CO-02](./improvement-plans-2026-07/CO-02_ORG_CHART_ROLES.ja.md)          |
-| 財務/KPI/OKR がモデル化されていない                   | 財務は文字列、KPI/OKR はレポート生成パターンのみ、P&L/予算/予測の primitive が無い                             | [CO-03](./improvement-plans-2026-07/CO-03_FINANCIAL_KPI_MODEL.ja.md)      |
-| 意思決定権限がデータでない                            | 決裁権限は散文(vision/PROCEDURE)、閾値ベースの decision-rights マトリクスが無い                                | [CO-04](./improvement-plans-2026-07/CO-04_DECISION_RIGHTS.ja.md)          |
-| 事業プロセスライブラリが機能不完全                    | 99 テンプレは eng/ops 寄り、hiring/payroll/procurement/fundraising/board/財務決算が無い                        | [CO-05](./improvement-plans-2026-07/CO-05_BUSINESS_PROCESS_LIBRARY.ja.md) |
+| gap                                                   | 内容                                                                                                           | 計画                                                                              |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 会社の集約エンティティが無い                          | vision+org+role+KPI+process が5ファイルに散在、束ねる `company` オブジェクトが無い。per-tenant vision も未配線 | [CO-01](./improvement-plans-archive/2026-07/CO-01_COMPANY_ENTITY.ja.md)           |
+| 組織図がデータでない + カスタムロール作成フローが無い | 組織図は非構造化 tenant 知識のみ、"CFO agent" を作るには SYSTEM tier の config 手編集                          | [CO-02](./improvement-plans-archive/2026-07/CO-02_ORG_CHART_ROLES.ja.md)          |
+| 財務/KPI/OKR がモデル化されていない                   | 財務は文字列、KPI/OKR はレポート生成パターンのみ、P&L/予算/予測の primitive が無い                             | [CO-03](./improvement-plans-archive/2026-07/CO-03_FINANCIAL_KPI_MODEL.ja.md)      |
+| 意思決定権限がデータでない                            | 決裁権限は散文(vision/PROCEDURE)、閾値ベースの decision-rights マトリクスが無い                                | [CO-04](./improvement-plans-archive/2026-07/CO-04_DECISION_RIGHTS.ja.md)          |
+| 事業プロセスライブラリが機能不完全                    | 99 テンプレは eng/ops 寄り、hiring/payroll/procurement/fundraising/board/財務決算が無い                        | [CO-05](./improvement-plans-archive/2026-07/CO-05_BUSINESS_PROCESS_LIBRARY.ja.md) |
 
 これらを足すと、Kyberion は「業務を回すツール」から「会社を経営する OS」になる。
 
@@ -99,4 +99,4 @@
 
 **「私 + Kyberion で AIスタートアップを回す」は、Kyberion の設計思想そのもの — sovereign が intent を与え mission がエージェント群を統べる。今日でも組織(vision/role/agent/tenant)と業務(mission/pipeline)は表現・実行でき、CEO の日常業務は実証済み。残るのは「会社を1つのエンティティとして束ね、財務・KPI・意思決定権限をデータ化する Company OS 層」の実装(CO 系)であり、それが完成すれば1人+AI での本格的な会社経営が Kyberion 上で完結する。**
 
-→ Company OS 完成の実装計画: [CO-01〜05](./improvement-plans-2026-07/README.ja.md#company-os会社を経営するos層)。既存の概念スパイン: `knowledge/product/architecture/enterprise-operating-kernel.md`。
+→ Company OS 完成の実装計画: [CO-01〜05](./improvement-plans-archive/2026-07/README.ja.md#company-os会社を経営するos層)。既存の概念スパイン: `knowledge/product/architecture/enterprise-operating-kernel.md`。

@@ -570,6 +570,7 @@ export function collectOperatorHomeSummary(
     blockedMissions.length > 0
       ? buildNextAction({
           title: 'Inspect blocked missions',
+          next_action_key: 'chronos:chronos_home_action_blocked',
           reason: `${blockedMissions.length} mission(s) need recovery before the surface should be treated as clear.`,
           next_action_type: 'inspect_artifact',
           suggested_command: 'pnpm mission list --active',
@@ -577,6 +578,7 @@ export function collectOperatorHomeSummary(
       : pendingApprovals.length > 0
         ? buildNextAction({
             title: 'Review the approval queue',
+            next_action_key: 'chronos:chronos_home_action_approvals',
             reason: `${pendingApprovals.length} approval request(s) are waiting for operator review.`,
             next_action_type: 'run_command',
             suggested_command: 'pnpm kyberion approvals',
@@ -591,6 +593,7 @@ export function collectOperatorHomeSummary(
           : unreadInbox > 0
             ? buildNextAction({
                 title: 'Acknowledge new deliverables',
+                next_action_key: 'chronos:chronos_home_action_inbox',
                 reason: `${unreadInbox} inbox item(s) were delivered and are still unread.`,
                 next_action_type: 'inspect_artifact',
                 suggested_command: 'pnpm kyberion inbox',

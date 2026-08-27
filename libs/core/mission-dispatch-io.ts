@@ -1,13 +1,7 @@
 import { appendJsonLine as appendFoundationJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
-import {
-  safeAppendFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  loadJson,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeAppendFileSync, safeMkdir, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 
 export function countWords(value: string): number {
@@ -28,12 +22,7 @@ export function ensureDirectory(dirPath: string): void {
 }
 
 export function readJsonFile<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return loadJson<T>(filePath);
-  } catch (_) {
-    return null;
-  }
+  return readJsonIfPresent<T>(filePath);
 }
 
 export function writeJsonFile(filePath: string, payload: unknown): void {

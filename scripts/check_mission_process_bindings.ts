@@ -1,12 +1,6 @@
 import * as yaml from 'js-yaml';
-import {
-  loadJson,
-  pathResolver,
-  safeExistsSync,
-  safeLstat,
-  safeReadFile,
-  safeReaddir,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type JsonRecord = Record<string, any>;
@@ -15,7 +9,7 @@ const ROOT = pathResolver.rootDir();
 const rel = (value: string) => pathResolver.rootResolve(value);
 
 function readJson(path: string): JsonRecord {
-  return loadJson<JsonRecord>(rel(path));
+  return readFoundationJson<JsonRecord>(rel(path));
 }
 
 function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {

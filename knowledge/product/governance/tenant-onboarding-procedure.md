@@ -38,7 +38,7 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 2. **突合スクリプトで検証する。**
 
    ```bash
-   pnpm run check:tenant-registry
+   pnpm check -- --only tenant-registry
    # ビルド前なら: node --import ./scripts/ts-loader.mjs scripts/check_tenant_registry_consistency.ts
    ```
 
@@ -64,4 +64,4 @@ first-work の開始までを含む標準順序は [オンボーディング標�
 - facade を経由しない profile JSON の直接編集。
 - 例外ファイルの理由なしエントリ。
 
-関連: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../../../docs/developer/improvement-plans-2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) DA-01
+関連: [TENANT_DATA_ACTIVATION_PLAN_2026-07-28](../../../docs/developer/improvement-plans-archive/2026-07/TENANT_DATA_ACTIVATION_PLAN_2026-07-28.ja.md) DA-01

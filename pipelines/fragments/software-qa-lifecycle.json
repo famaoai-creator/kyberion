@@ -24,26 +24,15 @@
     {
       "id": "generate_quality_report",
       "role": "transform",
-      "op": "system:exec",
+      "op": "core:run_software_quality_report",
       "params": {
-        "command": "node",
-        "args": [
-          "dist/scripts/software_quality_report.js",
-          "--contract",
-          "{{contract_path}}",
-          "--inventory",
-          "{{inventory_path}}",
-          "--execution",
-          "{{execution_path}}",
-          "--output",
-          "{{report_path}}",
-          "--defects",
-          "{{defects_path}}",
-          "--publish-summary",
-          "{{operator_summary_path}}",
-          "--required-risks",
-          "{{required_risk_refs}}"
-        ]
+        "contract_path": "{{contract_path}}",
+        "inventory_path": "{{inventory_path}}",
+        "execution_path": "{{execution_path}}",
+        "report_path": "{{report_path}}",
+        "defects_path": "{{defects_path}}",
+        "operator_summary_path": "{{operator_summary_path}}",
+        "required_risk_refs": "{{required_risk_refs}}"
       }
     },
     {

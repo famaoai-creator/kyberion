@@ -8,9 +8,9 @@
  */
 
 import { pathResolver, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import { readJsonFile } from './refactor/cli-input.js';
 
 interface DeniedPattern {
   name: string;
@@ -40,7 +40,7 @@ const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
 
 async function loadPolicy(): Promise<Policy> {
   const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return readJsonFile<Policy>(absolute);
+  return readJson<Policy>(absolute);
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {

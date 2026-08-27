@@ -1,4 +1,3 @@
-import { readJsonIfPresent } from './json.js';
 import { pathResolver } from '../path-resolver.js';
 
 export interface FoundationEnvEntry {
@@ -9,26 +8,39 @@ export interface FoundationEnvEntry {
 
 const REGISTRY_PATH = pathResolver.rootResolve('knowledge/product/governance/env-registry.json');
 let cachedEntries: FoundationEnvEntry[] | null = null;
-let loadingEntries = false;
+let registryReader: (() => { entries?: FoundationEnvEntry[] } | null) | undefined;
+let loadingRegistry = false;
+
+/**
+ * Install the governed registry reader from the secure-io boundary.
+ *
+ * Keeping this callback in the foundation module avoids the former
+ * `secure-io -> foundation/env -> foundation/json -> secure-io` import cycle:
+ * the foundation accessor owns coercion, while secure-io owns the actual file
+ * read. Direct foundation consumers remain deterministic until the boundary
+ * is installed, and no raw file I/O is introduced here.
+ */
+export function registerEnvironmentRegistryReader(
+  reader: () => { entries?: FoundationEnvEntry[] } | null
+): void {
+  registryReader = reader;
+  cachedEntries = null;
+}
 
 function entries(): FoundationEnvEntry[] {
   if (cachedEntries) return cachedEntries;
-  // The registry is read through secure-io. secure-io itself consults the
-  // registered environment while evaluating sensitive-path policy, so the
-  // first lookup must fail open to raw values until the registry is loaded.
-  if (loadingEntries) return [];
-  loadingEntries = true;
+  // secure-io installs the reader, and its path policy itself consults this
+  // accessor. During that first guarded read, return the uncached empty view
+  // to break the bootstrap recursion; the outer read then fills the cache.
+  if (loadingRegistry) return [];
+  loadingRegistry = true;
   try {
-    const parsed = readJsonIfPresent<{ entries?: FoundationEnvEntry[] }>(REGISTRY_PATH);
-    // A secure-io import cycle may transiently make the registry unreadable
-    // during module bootstrap. Do not permanently cache that provisional
-    // miss; the next governed read can retry after initialization completes.
-    if (parsed === null) return [];
+    const parsed = registryReader?.() ?? null;
     cachedEntries = Array.isArray(parsed?.entries) ? parsed.entries : [];
-    return cachedEntries;
   } finally {
-    loadingEntries = false;
+    loadingRegistry = false;
   }
+  return cachedEntries;
 }
 
 export function getRegisteredEnv<T = string>(
@@ -63,6 +75,24 @@ export function getRegisteredEnvText(name: string): string | undefined {
   return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
 }
 
+/** Read a registered boolean without converting it to the legacy text form. */
+export function getRegisteredEnvBool(
+  name: string,
+  options: {
+    env?: Record<string, string | undefined>;
+    defaultValue?: boolean;
+    strict?: boolean;
+  } = {}
+): boolean | undefined {
+  const value = getRegisteredEnv<boolean | string>(name, options);
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    if (/^(1|true|yes|on)$/i.test(value)) return true;
+    if (/^(0|false|no|off)$/i.test(value)) return false;
+  }
+  return options.defaultValue;
+}
+
 /**
  * Set or clear a registered environment value at an explicit boundary.
  * Runtime callers use this for scoped setup/restore; reads stay on the
@@ -75,4 +105,47 @@ export function setRegisteredEnv(
 ): void {
   if (value === undefined) delete env[name];
   else env[name] = value;
+}
+
+const CHILD_PROCESS_ENV_KEYS = [
+  'PATH',
+  'HOME',
+  'USER',
+  'SHELL',
+  'LANG',
+  'TERM',
+  'NODE_ENV',
+  'NVM_DIR',
+  'NVM_BIN',
+  'GOOGLE_API_KEY',
+  'GEMINI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'XAI_API_KEY',
+  'KYBERION_GROK_API_KEY',
+  'MISSION_ID',
+  'MISSION_ROLE',
+  'KYBERION_PERSONA',
+  'CODEX_HOME',
+  'NODE_EXTRA_CA_CERTS',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+] as const;
+
+/** Build the least-privilege environment passed to provider child processes. */
+export function safeChildEnv(
+  env: Record<string, string | undefined> = process.env
+): Record<string, string> {
+  const childEnv: Record<string, string> = { FORCE_COLOR: '0', TERM: 'dumb' };
+  for (const key of CHILD_PROCESS_ENV_KEYS) {
+    const value = env[key];
+    if (value) childEnv[key] = value;
+  }
+  return childEnv;
 }

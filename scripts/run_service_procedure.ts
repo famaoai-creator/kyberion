@@ -17,12 +17,12 @@
 
 import {
   dispatchProcedure,
-  loadJson,
   validateServiceRecording,
   withExecutionContext,
   loadProcedures,
   resolveAllowlistedRecordingRef,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
@@ -68,7 +68,7 @@ export const main = defineScript({
 
     let raw: unknown;
     try {
-      raw = loadJson<unknown>(recordingAbs!);
+      raw = readJson<unknown>(recordingAbs!);
     } catch (err) {
       throw new ScriptExitError(
         1,

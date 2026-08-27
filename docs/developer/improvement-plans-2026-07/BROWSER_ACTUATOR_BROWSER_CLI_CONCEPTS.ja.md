@@ -3,7 +3,9 @@ title: Browser Actuator browser-cli 概念昇華計画
 kind: improvement-plan
 scope: browser-actuator
 authority: execution
-status: phase-3-complete
+status: active
+tags: [improvement-plan, 2026-07]
+last_updated: 2026-07-31
 ---
 
 # Browser Actuator browser-cli 概念昇華計画

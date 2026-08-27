@@ -33,10 +33,10 @@ import { safeExistsSync } from '@agent/core/secure-io';
 import {
   computeApprovalPayloadHash,
   findMissionPath,
-  loadJson,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
@@ -71,7 +71,7 @@ export interface AlignmentDecisionReport {
 function readBriefHash(briefPath: string): string | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
   try {
-    const parsed = loadJson<unknown>(briefPath);
+    const parsed = readJson<unknown>(briefPath);
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
     return computeApprovalPayloadHash(parsed as Record<string, unknown>);
   } catch {

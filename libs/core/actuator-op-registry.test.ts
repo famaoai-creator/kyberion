@@ -32,9 +32,7 @@ describe('actuator-op-registry', () => {
   it('classifies media transform and apply ops through the shared registry', () => {
     expect(determineActuatorStepType('media', 'apply_theme')).toBe('transform');
     expect(determineActuatorStepType('media', 'merge_content')).toBe('transform');
-    expect(determineActuatorStepType('media', 'document_diagram_render_from_brief')).toBe(
-      'transform'
-    );
+    expect(determineActuatorStepType('media', 'document_diagram_render_from_brief')).toBe('apply');
     expect(determineActuatorStepType('media', 'pptx_layout_preflight')).toBe('transform');
     expect(determineActuatorStepType('media', 'pptx_render')).toBe('apply');
   });

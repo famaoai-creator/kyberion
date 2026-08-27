@@ -1,6 +1,6 @@
 import { compileSchema } from './ajv.js';
 import { readJson } from './json.js';
-import { safeExistsSync, safeStat } from '../secure-io.js';
+import { getFoundationIo } from './io.js';
 import type { ValidateFunction } from 'ajv';
 
 export interface GovernedCatalogOptions<T> {
@@ -62,8 +62,8 @@ export function defineCatalog<T>(options: GovernedCatalogOptions<T>): GovernedCa
     },
     load(): T {
       const catalogPath = resolvePath();
-      if (safeExistsSync(catalogPath)) {
-        const stat = safeStat(catalogPath);
+      if (getFoundationIo().exists(catalogPath)) {
+        const stat = getFoundationIo().stat(catalogPath);
         const signature = `${stat.mtimeMs}:${stat.size}`;
         if (cached !== undefined && cachedPath === catalogPath && cachedSignature === signature) {
           return cached;

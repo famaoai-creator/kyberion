@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { validateEnv } from '@agent/core';
+import { getRegisteredEnvBool } from '@agent/core/foundation';
 import { loadCliManifest, type CliCommand } from './check_cli_manifest.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -64,7 +65,11 @@ export function assertRequiredEnvironment(report: {
 export function validateKyberionStartupEnvironment(
   env: Record<string, string | undefined> = process.env
 ): void {
-  const strict = /^(1|true|yes|on)$/i.test(env.KYBERION_ENV_REGISTRY_STRICT || '');
+  const strict =
+    getRegisteredEnvBool('KYBERION_ENV_REGISTRY_STRICT', {
+      env,
+      defaultValue: true,
+    }) === true;
   assertRequiredEnvironment(validateEnv(env, { strict }));
 }
 
@@ -78,6 +83,16 @@ export async function main(args: string[] = []): Promise<void> {
   if (entrypoint.id === 'operator-cli') {
     const { main: operatorCliMain } = await import('./cli.js');
     await operatorCliMain(args);
+    return;
+  }
+
+  if (
+    entrypoint.id === 'organization-model' ||
+    entrypoint.id === 'organization-roles' ||
+    entrypoint.id === 'project-controller'
+  ) {
+    const { runGovernedController } = await import('./kyberion-governed-controllers.js');
+    await runGovernedController(entrypoint.id, args.slice(1));
     return;
   }
 

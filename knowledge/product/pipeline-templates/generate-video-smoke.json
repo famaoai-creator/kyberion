@@ -6,11 +6,29 @@
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "steps": [
     {
-      "id": "run_video_generation_cli",
-      "role": "sink",
-      "op": "system:shell",
+      "id": "submit_video_generation",
+      "role": "source",
+      "op": "media-generation:submit_generation",
+      "produces": { "channel": "generation_job", "type": "GenerationJob" },
       "params": {
-        "cmd": "node dist/libs/actuators/media-generation-actuator/src/index.js --input libs/actuators/media-generation-actuator/examples/submit-video-generation-job.json"
+        "action": "generate_video",
+        "params": {
+          "video_adf": {
+            "kind": "video-generation-adf",
+            "version": "1.0.0",
+            "intent": "country_drive_clip",
+            "prompt": "cinematic driving shot on a country road at sunset",
+            "negative_prompt": "glitch, blurry, distorted",
+            "composition": { "duration_sec": 5, "fps": 24, "aspect_ratio": "16:9" },
+            "engine": { "provider": "comfyui", "workflow_template": "basic_text_clip" },
+            "output": {
+              "format": "mp4",
+              "filename_prefix": "KyberionDriveClip",
+              "target_path": "active/shared/exports/KyberionDriveClip.mp4"
+            }
+          }
+        },
+        "retry_policy": { "max_attempts": 2, "backoff_seconds": 30 }
       }
     }
   ]

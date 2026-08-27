@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import {
   logger,
-  loadJson,
   spawnManagedProcess,
   pathResolver,
   safeExistsSync,
@@ -10,6 +9,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { appendJsonLine } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -62,7 +62,7 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
   const journalPath = path.join(root, 'mission-journal.json');
   const statePath = path.join(root, 'provider-health.json');
   const existing = safeExistsSync(statePath)
-    ? loadJson<{ phase?: string; resumed?: boolean; restored_from?: string }>(statePath)
+    ? readJson<{ phase?: string; resumed?: boolean; restored_from?: string }>(statePath)
     : {};
   safeWriteFile(
     heartbeatPath,
@@ -222,7 +222,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   });
   await resumeExit;
 
-  const restored = loadJson<{ resumed?: boolean; restored_from?: string }>(statePath);
+  const restored = readJson<{ resumed?: boolean; restored_from?: string }>(statePath);
   return {
     timestamp: new Date().toISOString(),
     root,

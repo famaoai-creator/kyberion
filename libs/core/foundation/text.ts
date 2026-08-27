@@ -1,3 +1,10 @@
+import { getFoundationIo } from './io.js';
+
+/** Read UTF-8 text through the registered secure foundation I/O boundary. */
+export function readTextFile(filePath: string): string {
+  return getFoundationIo().readFile(filePath);
+}
+
 export function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : value == null ? fallback : String(value);
 }

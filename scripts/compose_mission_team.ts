@@ -10,8 +10,7 @@ import {
   missionDir,
   writeMissionTeamPlan,
 } from '@agent/core';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
-import { readJsonFile } from './refactor/cli-input.js';
+import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
 import { withOrganizationContext } from './refactor/organization-context.js';
 
 function withMissionWriteContext<T>(assignedPersona: string | undefined, fn: () => T): T {
@@ -84,7 +83,7 @@ async function main() {
   let missionTenantSlug: string | undefined;
 
   if (missionPath) {
-    const state = readJsonFile<{
+    const state = readJson<{
       tier?: typeof tier;
       tenant_slug?: string;
       assigned_persona?: string;

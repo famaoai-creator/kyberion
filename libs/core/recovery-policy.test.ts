@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
 
 const loadJsonMock = vi.fn();
 const manifestMock = vi.fn();
@@ -26,10 +27,40 @@ vi.mock('./foundation/json.js', async () => {
     await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
   return {
     ...actual,
-    readJson: <T>(filePath: string): T => loadJsonMock(filePath) as T,
-    readJsonIfPresent: <T>(filePath: string): T | null => loadJsonMock(filePath) as T | null,
+    readJson: <T>(filePath: string): T => {
+      if (filePath.endsWith('knowledge/product/schemas/actuator-manifest.schema.json')) {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+      }
+      return manifestMock() as T;
+    },
+    readJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        return filePath.endsWith('knowledge/product/schemas/actuator-manifest.schema.json')
+          ? (JSON.parse(fs.readFileSync(filePath, 'utf8')) as T)
+          : (manifestMock() as T);
+      } catch {
+        return null;
+      }
+    },
   };
 });
+
+// recovery-policy now loads manifests through governed-catalog, whose
+// existence/stat checks are intentionally mediated by FoundationIo. Keep the
+// fixture seam at that boundary instead of intercepting the old secure-io
+// loader only.
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: <T>(filePath: string): T => loadJsonMock(filePath) as T,
+    loadJsonIfPresent: <T>(filePath: string): T | null => loadJsonMock(filePath) as T | null,
+    appendFile: vi.fn(),
+    exists: () => true,
+    readFile: () => '',
+    stat: () => ({ mtimeMs: 1, size: 1 }),
+    writeFile: vi.fn(),
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 
 vi.mock('./error-classifier.js', () => ({
   classifyError: (error: Error) => ({

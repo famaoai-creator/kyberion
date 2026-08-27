@@ -4,13 +4,13 @@ import * as path from 'node:path';
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
-  loadJson,
   safeMkdir,
   safeWriteFile,
   type SoftwareQualityContract,
   type TestExecutionRecord,
   type TestInventory,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface SoftwareQualityReportInput {
@@ -35,9 +35,9 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   recommendation: string;
   defectCount: number;
 } {
-  const contract = loadJson<SoftwareQualityContract>(input.contractPath);
-  const inventory = loadJson<TestInventory>(input.inventoryPath);
-  const execution = loadJson<TestExecutionRecord>(input.executionPath);
+  const contract = readJson<SoftwareQualityContract>(input.contractPath);
+  const inventory = readJson<TestInventory>(input.inventoryPath);
+  const execution = readJson<TestExecutionRecord>(input.executionPath);
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,

@@ -1,12 +1,6 @@
 import * as path from 'node:path';
-import {
-  loadJson,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 
 type TeamRoleRecord = {
@@ -30,7 +24,7 @@ const DIRECTORY = pathResolver.knowledge('product/orchestration/team-roles');
 const SNAPSHOT = pathResolver.knowledge('product/orchestration/team-role-index.json');
 
 function loadSnapshotRoles(): Record<string, TeamRoleRecord> {
-  const snapshot = loadJson<{ team_roles?: Record<string, TeamRoleRecord> }>(SNAPSHOT);
+  const snapshot = readJson<{ team_roles?: Record<string, TeamRoleRecord> }>(SNAPSHOT);
   return snapshot.team_roles || {};
 }
 
@@ -49,7 +43,7 @@ function loadDirectoryRoles(): Record<string, TeamRoleRecord> | null {
   const roles: Record<string, TeamRoleRecord> = {};
   for (const file of files) {
     const filePath = path.join(DIRECTORY, file);
-    const payload = loadJson<TeamRoleFile>(filePath);
+    const payload = readJson<TeamRoleFile>(filePath);
     const role = String(payload.role || '').trim();
     if (!role) {
       throw new Error(`Team role file ${file} must declare a role id`);

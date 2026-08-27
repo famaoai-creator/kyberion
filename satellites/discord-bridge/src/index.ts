@@ -17,17 +17,13 @@ import {
   safeReadFile,
   runSurfaceMessageConversation,
   runChannelTurn,
+  formatChannelThreadContext,
   type ChannelAdapter,
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
   postBridgeError,
-  listSurfaceOutboxMessages,
-  clearSurfaceOutboxMessage,
   createSurfaceOutboxDrainGuard,
-  isSurfaceOutboxDue,
-  recordSurfaceDeliverySuccess,
-  settleSurfaceOutboxFailure,
-  assertSurfaceOutboxDeliveryAuthorized,
+  drainSurfaceOutbox,
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
   evaluateSurfaceActorAccess,
@@ -120,18 +116,7 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
 export function buildDiscordThreadContextFromEntries(
   entries: DiscordThreadHistoryEntry[]
 ): string | undefined {
-  const recent = entries.filter((entry) => entry.text.trim().length > 0).slice(-6);
-
-  if (!recent.length) return undefined;
-
-  return [
-    'Recent Discord thread context:',
-    ...recent.map((entry) =>
-      entry.role === 'assistant'
-        ? `Assistant: ${entry.text}`
-        : `User (${entry.authorLabel}): ${entry.text}`
-    ),
-  ].join('\n');
+  return formatChannelThreadContext('Discord', entries);
 }
 
 async function collectDiscordThreadContext(message: Message): Promise<string | undefined> {
@@ -232,7 +217,20 @@ async function handleDiscordMessage(message: Message) {
         () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
         8000
       ),
-    send: async () => undefined,
+    shouldSend: ({ result }) =>
+      !result.missionProposals?.length && result.approvalRequests.length === 0,
+    send: async ({ text }) => {
+      await replyDiscordText(message, text);
+      appendDiscordThreadHistory({
+        role: 'assistant',
+        authorLabel: DISCORD_SURFACE_AGENT_ID,
+        text,
+        messageId: `reply-${message.id}`,
+        threadTs,
+        channelId: message.channelId,
+        receivedAt: new Date().toISOString(),
+      });
+    },
   };
   try {
     const result = await runChannelTurn(
@@ -297,21 +295,7 @@ async function handleDiscordMessage(message: Message) {
       return;
     }
 
-    if (result.text) {
-      logger.info(`📤 [DiscordBridge] Replying to ${message.author.tag}`);
-      // Discord rejects messages over 2,000 chars — long replies used to
-      // throw here and vanish into the catch below (UX-01).
-      await replyDiscordText(message, result.text);
-      appendDiscordThreadHistory({
-        role: 'assistant',
-        authorLabel: DISCORD_SURFACE_AGENT_ID,
-        text: result.text,
-        messageId: `reply-${message.id}`,
-        threadTs,
-        channelId: message.channelId,
-        receivedAt: new Date().toISOString(),
-      });
-    } else {
+    if (!result.text) {
       // UX-01: an empty agent reply must not read as silence.
       await replyDiscordText(
         message,
@@ -355,24 +339,17 @@ export async function handleDiscordInteraction(interaction: any): Promise<void> 
 }
 
 async function drainDiscordOutbox(client: Client): Promise<void> {
-  for (const message of listSurfaceOutboxMessages('discord', { includeTenantNamespaces: true })) {
-    if (!isSurfaceOutboxDue(message)) continue;
-    try {
-      assertSurfaceOutboxDeliveryAuthorized(message);
+  await drainSurfaceOutbox(
+    'discord',
+    async (message) => {
       const channel = await (client as any).channels.fetch(message.channel);
       if (!channel || typeof channel.send !== 'function') {
         throw Object.assign(new Error('channel_not_found'), { status: 404 });
       }
       await channel.send(message.text);
-      recordSurfaceDeliverySuccess('discord', message.channel, message.scope);
-      clearSurfaceOutboxMessage('discord', message.message_id, message.scope);
-    } catch (error) {
-      const decision = settleSurfaceOutboxFailure('discord', message, error);
-      logger.error(
-        `❌ [DiscordBridge] Outbox delivery failed for ${message.message_id}: ${error instanceof Error ? error.message : String(error)} (${decision.failure.kind}${decision.dead_letter ? ', dead-lettered' : `, retry at ${decision.next_attempt_at}`})`
-      );
-    }
-  }
+    },
+    { includeTenantNamespaces: true }
+  );
 }
 
 const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');

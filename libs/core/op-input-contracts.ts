@@ -1145,7 +1145,13 @@ function formatErrors(validate: ValidateFunction): string[] {
 }
 
 export function getOpInputContract(domain: OpInputDomain, op: string): OpInputContract | null {
-  return INPUT_CONTRACTS[domain]?.[op] || null;
+  const contract = INPUT_CONTRACTS[domain]?.[op];
+  if (!contract) return null;
+  const schema =
+    contract.schema.type === 'object' && contract.schema.additionalProperties === true
+      ? { ...contract.schema, 'x-kyberion-contract': 'inferred-legacy' }
+      : contract.schema;
+  return { ...contract, schema };
 }
 
 export function validateOpInput(
@@ -1162,7 +1168,9 @@ export function validateOpInput(
 }
 
 export function listOpInputContracts(domain: OpInputDomain): Record<string, OpInputContract> {
-  return { ...INPUT_CONTRACTS[domain] };
+  return Object.fromEntries(
+    Object.keys(INPUT_CONTRACTS[domain]).map((op) => [op, getOpInputContract(domain, op)!])
+  );
 }
 
 /**

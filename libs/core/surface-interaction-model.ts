@@ -90,6 +90,7 @@ export interface SurfaceMessageContext {
   threadTs: string;
   correlationId: string;
   text: string;
+  attachments?: import('./channel-surface-types.js').SurfaceConversationAttachment[];
   receivedAt: string;
   actorId?: string;
   capabilities: SurfaceCapabilityContract;
@@ -558,6 +559,7 @@ export function createIMessageSurfaceMessage(input: {
   channel: string;
   threadTs: string;
   actorId?: string;
+  attachments?: import('./channel-surface-types.js').SurfaceConversationAttachment[];
   correlationId?: string;
   messageId?: string;
   receivedAt?: string;
@@ -571,6 +573,7 @@ export function createIMessageSurfaceMessage(input: {
     text: input.text,
     receivedAt: input.receivedAt || new Date().toISOString(),
     actorId: input.actorId,
+    attachments: input.attachments,
   });
 }
 
@@ -624,6 +627,7 @@ export function buildSurfaceConversationInputFromMessage(
     correlationId: message.correlationId,
     surface: message.surface,
     surfaceText: message.text,
+    attachments: message.attachments,
     threadContext: options.threadContext,
     surfaceMetadata:
       message.surface === 'slack'
@@ -696,6 +700,7 @@ export function createSurfaceMessageFromConversationInput(
       correlationId,
       messageId,
       receivedAt,
+      attachments: input.attachments,
       scope: ingressScope,
     });
   }
@@ -740,5 +745,6 @@ export function buildSurfaceConversationInput(
   if (typeof input.surfaceText === 'string') {
     baseInput.surfaceText = input.surfaceText;
   }
+  if (input.attachments) baseInput.attachments = input.attachments;
   return baseInput;
 }

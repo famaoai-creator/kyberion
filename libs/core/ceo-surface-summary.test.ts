@@ -138,6 +138,7 @@ describe('ceo-surface-summary', () => {
     });
     expect(summary.briefing.sentence_ja).toContain('ご承認待ちが1件');
     expect(summary.briefing.sentence_ja).toContain('ございます');
+    expect(summary.briefing.next_action_ja).toBe('承認キューを確認してください');
   });
 
   it('produces a calm briefing when nothing needs attention', () => {
@@ -149,6 +150,20 @@ describe('ceo-surface-summary', () => {
 
     const summary = composeCeoSurfaceSummary({ home, notifications: [] });
     expect(summary.briefing.sentence_ja).toBe('本日は特にご対応いただく案件はございません。');
+  });
+
+  it('keeps an unknown operator action title visible instead of mapping it to clear', () => {
+    const home = makeHomeSummary();
+    for (const title of [
+      'Review the software quality recommendation',
+      'Keep monitoring the surface',
+      'A newly added operator action',
+    ]) {
+      home.nextAction = { title, reason: 'fixture', next_action_type: 'surface_action' } as never;
+      expect(composeCeoSurfaceSummary({ home, notifications: [] }).briefing.next_action_ja).toBe(
+        title
+      );
+    }
   });
 
   it('never leaks internal machinery vocabulary into the briefing', () => {

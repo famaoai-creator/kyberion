@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import {
   pathResolver,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -23,6 +22,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -74,6 +74,7 @@ export type I18nHardcodingReport = {
 
 type I18nBaseline = {
   version: 1;
+  $schema?: string;
   generated_at: string;
   scan_roots: string[];
   files: Record<string, number>;
@@ -212,7 +213,7 @@ function scanTree(scanRoots: string[]): {
 
 function loadBaseline(baselinePath: string): I18nBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return loadJson<I18nBaseline>(baselinePath);
+  return readJson<I18nBaseline>(baselinePath);
 }
 
 function writeBaselineFile(
@@ -224,7 +225,15 @@ function writeBaselineFile(
     safeMkdir(path.dirname(baselinePath), { recursive: true });
     safeWriteFile(
       baselinePath,
-      JSON.stringify({ ...baseline, scan_roots: relativeScanRootsForNote }, null, 2)
+      JSON.stringify(
+        {
+          $schema: baseline.$schema || '../schemas/governance-catalog.schema.json',
+          ...baseline,
+          scan_roots: relativeScanRootsForNote,
+        },
+        null,
+        2
+      )
     );
   });
 }

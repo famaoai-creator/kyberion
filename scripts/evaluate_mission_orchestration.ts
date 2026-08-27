@@ -5,8 +5,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
-import { readJsonFile } from './refactor/cli-input.js';
+import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ajv = createAjv();
@@ -26,7 +25,7 @@ interface ScenarioRunRecord {
 }
 
 function readJson<T>(filePath: string): T {
-  return readJsonFile(filePath);
+  return readFoundationJson<T>(filePath);
 }
 
 function compileSchema(schemaPath: string) {

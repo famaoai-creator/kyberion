@@ -2,17 +2,10 @@
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import ts from 'typescript';
-import {
-  loadJson,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
@@ -27,6 +20,7 @@ type RatchetBucket = {
   as_any: number;
   ts_ignore: number;
   files: number;
+  max_lines: number;
 };
 
 type RatchetBaseline = {
@@ -67,6 +61,7 @@ function emptyBucket(): RatchetBucket {
     as_any: 0,
     ts_ignore: 0,
     files: 0,
+    max_lines: 0,
   };
 }
 
@@ -75,11 +70,13 @@ function incrementBucket(target: RatchetBucket, source: RatchetBucket): void {
   target.as_any += source.as_any;
   target.ts_ignore += source.ts_ignore;
   target.files += source.files;
+  target.max_lines = Math.max(target.max_lines, source.max_lines);
 }
 
 function countFile(filePath: string, repoRelativePath: string): RatchetBucket {
   const bucket = emptyBucket();
   const text = String(safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  bucket.max_lines = text.split(/\r?\n/u).length;
   const source = ts.createSourceFile(
     repoRelativePath,
     text,
@@ -136,12 +133,15 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
 function loadBaseline(baselinePath: string): RatchetBaseline | null {
   if (!safeExistsSync(baselinePath)) return null;
-  return loadJson<RatchetBaseline>(baselinePath);
+  return readJson<RatchetBaseline>(baselinePath);
 }
 
 function compareBuckets(current: RatchetBucket, baseline: RatchetBucket, label: string): string[] {
   const violations: string[] = [];
-  for (const key of ['any_keywords', 'as_any', 'ts_ignore', 'files'] as const) {
+  // File count is descriptive, not a type-safety regression: a real
+  // responsibility split necessarily adds modules. New-module size is
+  // enforced independently by check:max-file-lines.
+  for (const key of ['any_keywords', 'as_any', 'ts_ignore', 'max_lines'] as const) {
     if (current[key] > baseline[key]) {
       violations.push(`${label}.${key} increased from ${baseline[key]} to ${current[key]}`);
     }

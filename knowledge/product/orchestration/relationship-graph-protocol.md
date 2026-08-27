@@ -32,11 +32,12 @@ knowledge/confidential/relationships/
 - **outstanding_asks**: 本人から出ているが未解決の要望
 - **ng_topics**: 地雷リスト (e.g. 過去の失敗、個人情報)
 
-詳細: [schemas/relationship-node.schema.json](schemas/relationship-node.schema.json)
+詳細: [schemas/relationship-node.schema.json](../schemas/relationship-node.schema.json)
 
 ## 3. 更新プロトコル
 
 ### 3.1 自動更新
+
 - **`presence-actuator`** が会議終了を検知したタイミングで、音声ログと画面共有から以下を抽出し、ノードに追記:
   - 面談概要 (3 文)
   - 相手が言及した懸念 / 要望
@@ -44,10 +45,12 @@ knowledge/confidential/relationships/
 - **`voice-actuator`** が 1on1 中のキーワードと沈黙パターンから「今日は触れない方が良い話題」を暫定タグ付け。
 
 ### 3.2 手動更新
+
 - 主権者が `memory:update-relationship {person_slug}` で直接編集可能。
 - 自動更新と手動更新の衝突時は **手動を優先** し、自動側は `pending_suggestions` に退避。
 
 ### 3.3 減衰 (Decay)
+
 - `history` は 90 日経過で自動的に summarize され、`long_term_summary` に圧縮される。
 - `trust_level` は半年更新がない場合に UI 上で「要再確認」表示。
 
@@ -64,4 +67,5 @@ knowledge/confidential/relationships/
 - 外部 API への relationship 情報送信は、approval-actuator の dual-key policy 下でのみ。
 
 ---
+
 _Created: 2026-04-17 | Ecosystem Architect_

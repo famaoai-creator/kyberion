@@ -1,4 +1,6 @@
-import { logger, loadServiceEndpointsCatalog, fetchWithVaultCache } from './index.js';
+import { createLogger } from './logger.js';
+import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
+import { fetchWithVaultCache } from './data-vault.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
 import {
@@ -7,9 +9,9 @@ import {
   isPlainObject,
   resolveRequestEnvelope,
 } from './service-engine-helpers.js';
-import {
-  executeServicePresetAlternative,
-} from './service-engine-execution.js';
+import { executeServicePresetAlternative } from './service-engine-execution.js';
+
+const logger = createLogger('service-engine');
 
 export { executeMcp } from './service-engine-execution.js';
 
@@ -27,7 +29,7 @@ export async function executeServicePreset(
   action: string,
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
-  cacheOpts?: ServicePresetCacheOptions,
+  cacheOpts?: ServicePresetCacheOptions
 ): Promise<any> {
   const endpoints = loadServiceEndpointsCatalog();
   const serviceConfig = endpoints.services[serviceId];
@@ -51,12 +53,12 @@ export async function executeServicePreset(
         ...(serviceConfig && typeof serviceConfig === 'object' ? serviceConfig : {}),
         ...(connection && typeof connection === 'object' ? connection : {}),
       },
-      isPlainObject(params) ? params : {},
+      isPlainObject(params) ? params : {}
     ),
     [`${serviceId}_connection`]: connection,
     ...envelope.templateVars,
   };
-  
+
   // Auth resolution
   const binding = resolveServiceBinding(serviceId, auth);
   for (const alt of alternatives) {
@@ -90,10 +92,13 @@ export async function executeServicePresetCached(
   action: string,
   params: any,
   auth: 'none' | 'secret-guard' = 'none',
-  cacheOpts: Required<Pick<ServicePresetCacheOptions, 'cache_ttl_ms'>> & ServicePresetCacheOptions,
+  cacheOpts: Required<Pick<ServicePresetCacheOptions, 'cache_ttl_ms'>> & ServicePresetCacheOptions
 ): Promise<{ result: any; fromCache: boolean }> {
   const { createHash } = await import('node:crypto');
-  const cacheKey = `${action}:${createHash('sha256').update(JSON.stringify(params ?? {})).digest('hex').slice(0, 16)}`;
+  const cacheKey = `${action}:${createHash('sha256')
+    .update(JSON.stringify(params ?? {}))
+    .digest('hex')
+    .slice(0, 16)}`;
   const { data: result, fromCache } = await fetchWithVaultCache(
     serviceId,
     cacheKey,
@@ -102,7 +107,7 @@ export async function executeServicePresetCached(
       ttlMs: cacheOpts.cache_ttl_ms,
       projectId: cacheOpts.project_id,
       tier: cacheOpts.tier ?? 'confidential',
-    },
+    }
   );
   if (fromCache) logger.info(`[ENGINE:VAULT] cache hit for ${serviceId}:${action}`);
   return { result, fromCache };
