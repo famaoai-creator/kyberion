@@ -157,7 +157,7 @@ export function collectReferencedNames(sourceFile: ts.SourceFile): Set<string> {
   const used = new Set<string>();
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isImportEqualsDeclaration(node)) return;
-    // `export { x } from './y'` is a re-export: it never references a local binding.
+    // `export { x } from './y.js'` is a re-export: it never references a local binding.
     if (ts.isExportDeclaration(node) && node.moduleSpecifier) return;
     if (ts.isIdentifier(node)) {
       if (isReferencePosition(node)) used.add(node.text);
