@@ -1,4 +1,8 @@
 import { compileIntent, logger, executeRegisteredSuperPipeline } from '@agent/core';
+// Registers the Super-Nerve executor on the core execution port at module
+// load; without it callers that import only the resolver (run_intent) fall
+// back to the conversational path and stall where no reasoning backend exists.
+import './index.js';
 
 /**
  * Intent Resolver: Resolves high-level semantic intents into Super-Nerve pipeline steps.
