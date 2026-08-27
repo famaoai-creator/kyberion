@@ -24,6 +24,23 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.safeExistsSync,
 }));
 
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: <T>(filePath: string): T =>
+      JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
+    readJsonIfPresent: <T>(filePath: string): T | null => {
+      try {
+        return JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T;
+      } catch {
+        return null;
+      }
+    },
+  };
+});
+
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

@@ -5,7 +5,11 @@
   "description": "Checks for updates on GitHub and self-manages the upgrade mission through validation and merge.",
   "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used export_as without roles.",
   "steps": [
-    { "role": "sink", "op": "system:log", "params": { "message": "🔍 Step 1: Checking for remote updates on GitHub..." } },
+    {
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "🔍 Step 1: Checking for remote updates on GitHub..." }
+    },
     {
       "role": "source",
       "op": "system:shell",
@@ -35,20 +39,44 @@
           "value": "{{remote_hash}}"
         },
         "then": [
-          { "role": "sink", "op": "system:log", "params": { "message": "🚀 Update detected! Initializing upgrade mission..." } },
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "🚀 Update detected! Initializing upgrade mission..." }
+          },
           {
             "role": "source",
-            "op": "system:shell",
-            "produces": { "channel": "create_result", "type": "ShellResult" },
+            "op": "core:run_mission_create",
+            "produces": { "channel": "create_result", "type": "Json" },
             "params": {
-              "cmd": "node dist/scripts/mission_controller.js create MSN-SYS-UPGRADE-{{remote_hash}} confidential default development knowledge/personal/my-vision.md 'Ecosystem Architect' '{\"prerequisites\":[\"MSN-SYS-SELF-UPDATE\"]}'"
+              "tier": "confidential",
+              "tenant_id": "default",
+              "mission_type": "development",
+              "vision_ref": "knowledge/personal/my-vision.md",
+              "persona": "Ecosystem Architect",
+              "prerequisites": ["MSN-SYS-SELF-UPDATE"],
+              "mission_id": "MSN-SYS-UPGRADE-{{remote_hash}}"
             }
           },
-          { "role": "sink", "op": "system:log", "params": { "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}" } },
-          { "role": "sink", "op": "system:log", "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" } }
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": {
+              "message": "✅ Upgrade mission created. Execute with: node dist/scripts/mission_controller.js start MSN-SYS-UPGRADE-{{remote_hash}}"
+            }
+          },
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "💡 Next recommended action: pnpm system:upgrade:execute" }
+          }
         ],
         "else": [
-          { "role": "sink", "op": "system:log", "params": { "message": "✅ System is already up to date. No action needed." } }
+          {
+            "role": "sink",
+            "op": "system:log",
+            "params": { "message": "✅ System is already up to date. No action needed." }
+          }
         ]
       }
     }

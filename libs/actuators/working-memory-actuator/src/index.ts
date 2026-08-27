@@ -62,6 +62,12 @@ export interface VolatileSidecar {
   pinned: boolean;
 }
 
+export const actuator = defineCatalogBackedActuator({
+  id: 'working-memory-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -818,3 +824,5 @@ export async function handleAction(input: HandleActionInput): Promise<Record<str
   const exportAs = (params.export_as as string) ?? 'working_memory_result';
   return { ...(input.context ?? {}), [exportAs]: result };
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

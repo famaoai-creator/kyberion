@@ -834,7 +834,9 @@ export async function resumeDelegatedTask(
   const activationId = record.continuable ? record.activation_id : undefined;
   let trace: DelegatedTaskTrace | undefined;
   try {
+    // Existing reasoning/delegation cycle is tracked by the module-boundary baseline.
     const backend =
+      // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
       options.backend ?? (await import('./reasoning-backend.js')).getReasoningBackend();
     const inboxEntries = record.continuable
       ? await (async () => {

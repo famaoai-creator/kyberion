@@ -1,5 +1,5 @@
 import { auditChain } from './audit-chain.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { policyEngine, type PolicyDecision } from './policy-engine.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 

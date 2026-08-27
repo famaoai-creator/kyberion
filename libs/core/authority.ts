@@ -12,6 +12,7 @@ import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
+import { registerIdentityContextResolver } from './identity-context-bridge.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -569,6 +570,8 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
     ...(brokerApproval ? { brokerApproval } : {}),
   };
 }
+
+registerIdentityContextResolver(resolveIdentityContext);
 
 /**
  * Checks if the current context has a specific authority.

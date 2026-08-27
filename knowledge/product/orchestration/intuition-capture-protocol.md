@@ -36,14 +36,17 @@ CEO / 主権者の判断は多くの場合、明示的な論理よりも累積�
 ## 4. 蓄積と昇華
 
 ### 4.1 Entry 粒度
+
 - 1 判断 = 1 エントリ。
 - 粒度は粗くて良い (無理な分類はしない)。
 
 ### 4.2 Distillation
+
 - 週次で `wisdom-actuator` が heuristic 群を走査し、**3 件以上の類似エントリ** がある場合に `heuristic-pattern` を生成。
 - 生成物は `knowledge/confidential/heuristics/patterns/` に格納され、以降の hypothesis-tree 発散フェーズで参考資料として供給される。
 
 ### 4.3 可視化
+
 - 半年ごとに `famao-judgment-model.md` を自動生成し、主権者に提示する (受け入れ / 修正 / 却下 を明示)。
 
 ## 5. プライバシー
@@ -53,10 +56,11 @@ CEO / 主権者の判断は多くの場合、明示的な論理よりも累積�
 
 ## 6. 関連
 
-- スキーマ: [schemas/heuristic-entry.schema.json](schemas/heuristic-entry.schema.json)
+- スキーマ: [schemas/heuristic-entry.schema.json](../schemas/heuristic-entry.schema.json)
 - 格納先: [knowledge/confidential/heuristics/](knowledge/confidential/heuristics)
 - スコープ定義: [path-scope-policy.json#confidential_heuristics](knowledge/product/governance/path-scope-policy.json)
 - 上位概念: Distillation (mission-execution-protocol.md)
 
 ---
+
 _Created: 2026-04-17 | Ecosystem Architect_

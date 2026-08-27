@@ -1,7 +1,6 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   logger,
-  loadJson,
   pathResolver,
   safeExistsSync,
   safeWriteFile,
@@ -9,6 +8,7 @@ import {
   loadSurfaceManifest,
   loadSurfaceState,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 
@@ -35,7 +35,7 @@ function isRunningPid(pid: unknown): pid is number {
 function loadPidMap(): Record<string, number> {
   if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const parsed = loadJson<Record<string, unknown>>(PID_FILE);
+    const parsed = readJson<Record<string, unknown>>(PID_FILE);
     return Object.fromEntries(
       Object.entries(parsed)
         .filter(([, pid]) => isRunningPid(pid))

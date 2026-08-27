@@ -117,6 +117,7 @@ export type {
   SlackSurfaceArtifact,
   ChronosSurfaceRequest,
   SurfaceConversationInput,
+  SurfaceConversationAttachment,
   NerveRoutingProposal,
   MissionProposal,
   PlanningPacketTask,

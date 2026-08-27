@@ -10,6 +10,9 @@ import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { getRegisteredEnv } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { listDemotedProviders, registerHealthyInstancesResolver } from './provider-health-view.js';
+
+export { listDemotedProviders } from './provider-health-view.js';
 
 /**
  * Provider Health Registry v1.0
@@ -213,6 +216,8 @@ export function healthyInstances(provider: string, now: number = Date.now()): st
   );
 }
 
+registerHealthyInstancesResolver((provider, now) => healthyInstances(provider, now));
+
 /**
  * Pick a healthy instance for a provider, or null when the whole pool is demoted.
  */
@@ -223,16 +228,6 @@ export function selectHealthyInstance(provider: string, now: number = Date.now()
 /**
  * Providers whose *every* instance is currently demoted — these should be excluded from resolution.
  */
-export function listDemotedProviders(
-  providers: ProviderInfo[] = discoverProviders(),
-  now: number = Date.now()
-): string[] {
-  return providers
-    .filter((entry) => entry.installed)
-    .filter((entry) => healthyInstances(entry.provider, now).length === 0)
-    .map((entry) => entry.provider);
-}
-
 /**
  * Reset all health state, including the persisted file. Intended for tests
  * and process re-init.

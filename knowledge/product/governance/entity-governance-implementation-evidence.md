@@ -34,7 +34,7 @@ Date: 2026-08-09
 - `pnpm pipeline --input pipelines/baseline-check.json`: passed.
 - `pnpm run validate`: `check:entity-governance` fails only for violations by default;
   observed workspace findings remain visible as warnings. Use
-  `pnpm run check:entity-governance -- --strict-warnings` when warning-free
+  `pnpm check -- --only entity-governance` when warning-free
   enforcement is required.
 - `git diff --check`: passed.
 

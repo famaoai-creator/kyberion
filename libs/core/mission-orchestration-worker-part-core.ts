@@ -243,8 +243,8 @@ import type {
 import {
   buildTaskDispatchContext,
   attachDeliveredKnowledgeRefs,
-} from './mission-orchestration-worker-part-dispatch.js';
-import type { DispatchPlannedMissionTaskInput } from './mission-orchestration-worker-part-dispatch.js';
+} from './mission-orchestration-worker-part-dispatch-context.js';
+import type { DispatchPlannedMissionTaskInput } from './mission-orchestration-worker-part-dispatch-context.js';
 import {
   obtainTaskResultResponse,
   isDraftRefineCandidate,
@@ -254,6 +254,7 @@ import {
   publishTaskPrArtifacts,
   loadAllNextTasks,
 } from './mission-orchestration-worker-part-results.js';
+import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -1103,3 +1104,5 @@ export async function dispatchPlannedMissionTaskCore(
     ...taskResultObservability,
   };
 }
+
+registerMissionWorkerCoreDispatcher(dispatchPlannedMissionTaskCore as any);

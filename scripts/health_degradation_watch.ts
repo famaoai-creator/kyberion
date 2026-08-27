@@ -14,10 +14,14 @@
 import { logger, resolveFinanceControllerDecision, runDegradationWatch } from '@agent/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-function main(): number {
-  const { report, alert } = runDegradationWatch({
+export function runHealthDegradationWatch(): ReturnType<typeof runDegradationWatch> {
+  return runDegradationWatch({
     financeDecision: resolveFinanceControllerDecision(),
   });
+}
+
+function main(): number {
+  const { report, alert } = runHealthDegradationWatch();
   console.log(JSON.stringify({ ...report, alert_id: alert?.id ?? null }, null, 2));
   if (report.verdict === 'green') {
     logger.info('[health-degradation] green — no findings');

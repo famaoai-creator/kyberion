@@ -18,17 +18,17 @@ production-readiness evidence を追跡する。機械判定の canonical source
 - Code gate は `pnpm run validate`、targeted tests、actual first-win pipeline execution で判定する。
 - Operational gate はこの register に evidence を追加し、対応する reviewer が確認してから `status` を更新する。
 - `status` が `pending_external_evidence` の項目が 1 つでも残る間は、Kyberion を「production-ready」と呼ばない。
-- 通常検証は `pnpm run check:production-evidence-status` で pending 項目を報告しつつ成功する。
+- 通常検証は `pnpm check -- --scope full --only production-evidence-status` で pending 項目を報告しつつ成功する。
 - Release promotion 時は `pnpm run check:production-evidence-complete` を実行し、全項目が `verified` でなければ失敗させる。
 - `evidence_refs` に repo-local path を使う場合は、レビュー時点で実在する file または directory だけを採用する。
 
 ## Evidence Items
 
-| ID | Gate | Required evidence | Current status | Owner | Template | Verification command / artifact |
-|---|---|---|---|---|---|---|
-| EV-30DAY-OPS | Roadmap D2 / Phase B acceptance | 30 日連続稼働の run log。主要シナリオの成功率、human intervention 件数、unknown error 率を含む。 | `pending_external_evidence` | operator | `docs/operator/templates/production-evidence-30day-ops.md` | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, `active/shared/logs/traces/`, incident summary |
-| EV-EXT-CONTRIB | Roadmap D5 / Phase C' acceptance | 外部 contributor が good-first-issue を 1 週間以内に merge した PR。issue、PR、review、merge date を含む。 | `pending_external_evidence` | maintainer | `docs/operator/templates/production-evidence-external-contribution.md` | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, GitHub issue / PR URL, `docs/developer/GOOD_FIRST_ISSUES.md` slice |
-| EV-FDE-DEPLOY | Roadmap Phase D' acceptance | 外部 FDE / SI が fork なしで 1 件の顧客導入を完了した evidence。customer overlay、migration note、deployment runbook、postmortem を含む。 | `pending_external_evidence` | operator + maintainer | `docs/operator/templates/production-evidence-fde-deployment.md` | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, `migration/`, customer overlay evidence |
+| ID             | Gate                             | Required evidence                                                                                                                         | Current status              | Owner                 | Template                                                               | Verification command / artifact                                                                                       |
+| -------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| EV-30DAY-OPS   | Roadmap D2 / Phase B acceptance  | 30 日連続稼働の run log。主要シナリオの成功率、human intervention 件数、unknown error 率を含む。                                          | `pending_external_evidence` | operator              | `docs/operator/templates/production-evidence-30day-ops.md`             | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, `active/shared/logs/traces/`, incident summary                     |
+| EV-EXT-CONTRIB | Roadmap D5 / Phase C' acceptance | 外部 contributor が good-first-issue を 1 週間以内に merge した PR。issue、PR、review、merge date を含む。                                | `pending_external_evidence` | maintainer            | `docs/operator/templates/production-evidence-external-contribution.md` | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, GitHub issue / PR URL, `docs/developer/GOOD_FIRST_ISSUES.md` slice |
+| EV-FDE-DEPLOY  | Roadmap Phase D' acceptance      | 外部 FDE / SI が fork なしで 1 件の顧客導入を完了した evidence。customer overlay、migration note、deployment runbook、postmortem を含む。 | `pending_external_evidence` | operator + maintainer | `docs/operator/templates/production-evidence-fde-deployment.md`        | `docs/operator/PRODUCTION_EVIDENCE_COLLECTION.md`, `migration/`, customer overlay evidence                            |
 
 ## Update protocol
 

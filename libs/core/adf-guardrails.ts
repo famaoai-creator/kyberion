@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, validateUrl } from './secure-io.js';
 import { readJson } from './foundation/json.js';
@@ -21,6 +22,38 @@ export interface AdfGuardrailFinding {
 export interface AdfGuardrailReport {
   ok: boolean;
   findings: AdfGuardrailFinding[];
+}
+
+export interface AdfScriptWrapperBaselineEntry {
+  file: string;
+  pattern: string;
+  match: string;
+}
+
+export interface AdfGuardrailOptions {
+  /** Explicit, exact migration exceptions. New wrappers remain blocking. */
+  scriptWrapperBaseline?: readonly AdfScriptWrapperBaselineEntry[];
+}
+
+function normalizeGuardrailSourcePath(sourcePath: string): string {
+  const relative = path.relative(pathResolver.rootDir(), sourcePath).replaceAll('\\', '/');
+  return relative.startsWith('../') || path.isAbsolute(relative)
+    ? sourcePath.replaceAll('\\', '/')
+    : relative;
+}
+
+export function isBaselinedScriptWrapper(
+  sourcePath: string,
+  command: string,
+  baseline: readonly AdfScriptWrapperBaselineEntry[] = []
+): boolean {
+  const normalizedSource = normalizeGuardrailSourcePath(sourcePath);
+  return baseline.some(
+    (entry) =>
+      entry.file === normalizedSource &&
+      entry.pattern === 'script-wrapper' &&
+      entry.match === command
+  );
 }
 
 interface AdfExecutionPolicy {
@@ -142,7 +175,8 @@ function isScriptWrapperCommand(command: string, args: readonly string[]): boole
 
 export function validatePipelineGuardrails(
   pipeline: PipelineAdf,
-  sourcePath = 'pipeline'
+  sourcePath = 'pipeline',
+  options: AdfGuardrailOptions = {}
 ): AdfGuardrailReport {
   const findings: AdfGuardrailFinding[] = [];
   const policy = loadAdfExecutionPolicy();
@@ -263,7 +297,10 @@ export function validatePipelineGuardrails(
               path: `${stepPath}.params.cmd`,
             });
           }
-          if (isScriptWrapperCommand(command, commandArgs)) {
+          if (
+            isScriptWrapperCommand(command, commandArgs) &&
+            !isBaselinedScriptWrapper(sourcePath, normalizedCommand, options.scriptWrapperBaseline)
+          ) {
             findings.push({
               code: 'script-wrapper-forbidden',
               severity: 'error',

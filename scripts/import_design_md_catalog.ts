@@ -6,7 +6,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
-import { readTextFile } from './refactor/cli-input.js';
+import { readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 type CollectionEntry = {

@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": ["version", "runtime_adapters", "profiles", "roles", "fallback"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "runtime_adapters": {
       "type": "object",

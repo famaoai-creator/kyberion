@@ -4,6 +4,32 @@ import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const IMPROVEMENT_PLAN_ROOT = 'docs/developer/improvement-plans-2026-08';
+export const IMPROVEMENT_PLAN_ROOTS = [
+  {
+    root: 'docs/developer/improvement-plans-2026-07',
+    tag: '2026-07',
+    last_updated: '2026-07-31',
+    default_status: 'archived' as const,
+  },
+  {
+    root: 'docs/developer/improvement-plans-archive/2026-07',
+    tag: 'archived',
+    last_updated: '2026-08-26',
+    default_status: 'archived' as const,
+  },
+  {
+    root: 'docs/developer/improvement-plans-2026-08',
+    tag: '2026-08',
+    last_updated: '2026-08-26',
+    default_status: 'active' as const,
+  },
+  {
+    root: 'docs/developer/improvement-plans-archive',
+    tag: 'archived',
+    last_updated: '2026-08-26',
+    default_status: 'archived' as const,
+  },
+] as const;
 const REQUIRED_KEYS = ['title', 'tags', 'last_updated', 'status'] as const;
 
 export interface PlanMetadata {
@@ -11,6 +37,12 @@ export interface PlanMetadata {
   tags: string[];
   last_updated: string;
   status: 'planned' | 'active' | 'partial' | 'completed' | 'archived';
+}
+
+export interface PlanFrontmatterDefaults {
+  tag?: string;
+  last_updated?: string;
+  status?: PlanMetadata['status'];
 }
 
 function read(filePath: string): string {
@@ -39,7 +71,8 @@ export function parseFrontmatter(markdown: string): Record<string, string> | nul
 export function addPlanFrontmatter(
   markdown: string,
   title: string,
-  lastUpdated = '2026-08-25'
+  lastUpdated = '2026-08-25',
+  defaults: PlanFrontmatterDefaults = {}
 ): string {
   if (parseFrontmatter(markdown)) return markdown;
   const cleanTitle = title
@@ -49,9 +82,9 @@ export function addPlanFrontmatter(
   const header = [
     '---',
     `title: ${cleanTitle}`,
-    'tags: [improvement-plan, 2026-08]',
-    `last_updated: ${lastUpdated}`,
-    'status: active',
+    `tags: [improvement-plan, ${defaults.tag || '2026-08'}]`,
+    `last_updated: ${defaults.last_updated || lastUpdated}`,
+    `status: ${defaults.status || 'active'}`,
     '---',
     '',
   ].join('\n');
@@ -78,9 +111,11 @@ function normalizeStatus(value: string | undefined): PlanMetadata['status'] {
 export function normalizePlanFrontmatter(
   markdown: string,
   title: string,
-  lastUpdated = '2026-08-25'
+  lastUpdated = '2026-08-25',
+  defaults: PlanFrontmatterDefaults = {}
 ): string {
-  if (!parseFrontmatter(markdown)) return addPlanFrontmatter(markdown, title, lastUpdated);
+  if (!parseFrontmatter(markdown))
+    return addPlanFrontmatter(markdown, title, lastUpdated, defaults);
   const end = markdown.indexOf('\n---\n', 4);
   const header = markdown.slice(0, end);
   const fields = parseFrontmatter(markdown) || {};
@@ -92,21 +127,33 @@ export function normalizePlanFrontmatter(
         .replace(/[_-]+/gu, ' ')
         .trim()}`
     );
-  if (!fields.tags) additions.push('tags: [improvement-plan, 2026-08]');
-  if (!fields.last_updated) additions.push(`last_updated: ${lastUpdated}`);
-  const normalizedStatus = normalizeStatus(fields.status);
+  if (!fields.tags) additions.push(`tags: [improvement-plan, ${defaults.tag || '2026-08'}]`);
+  if (!fields.last_updated) additions.push(`last_updated: ${defaults.last_updated || lastUpdated}`);
+  const normalizedStatus = normalizeStatus(fields.status || defaults.status);
   let normalizedHeader = header.replace(/^status:\s*.*$/mu, `status: ${normalizedStatus}`);
   if (!fields.status) additions.push(`status: ${normalizedStatus}`);
   if (additions.length) normalizedHeader = `${normalizedHeader}\n${additions.join('\n')}`;
   return `${normalizedHeader}\n---${markdown.slice(end + '\n---'.length)}`;
 }
 
-export function listImprovementPlans(
-  rootDir = pathResolver.rootResolve(IMPROVEMENT_PLAN_ROOT)
-): string[] {
-  return getAllFiles(rootDir)
+export function listImprovementPlans(rootDir?: string): string[] {
+  const roots = rootDir
+    ? [rootDir]
+    : IMPROVEMENT_PLAN_ROOTS.map((entry) => pathResolver.rootResolve(entry.root));
+  return roots
+    .flatMap((root) => getAllFiles(root))
     .filter((filePath) => filePath.endsWith('.md'))
     .sort((a, b) => a.localeCompare(b));
+}
+
+function defaultsForPlan(filePath: string): PlanFrontmatterDefaults {
+  const relative = path.relative(pathResolver.rootDir(), filePath).replace(/\\/g, '/');
+  const entry = IMPROVEMENT_PLAN_ROOTS.find((candidate) =>
+    relative.startsWith(`${candidate.root}/`)
+  );
+  return entry
+    ? { tag: entry.tag, last_updated: entry.last_updated, status: entry.default_status }
+    : {};
 }
 
 export function checkImprovementPlanMetadata(): string[] {
@@ -139,7 +186,12 @@ export const runCheckImprovementPlanMetadata = defineScript({
     if (context.argv.includes('--fix')) {
       for (const filePath of files) {
         const current = read(filePath);
-        const next = normalizePlanFrontmatter(current, path.basename(filePath));
+        const next = normalizePlanFrontmatter(
+          current,
+          path.basename(filePath),
+          undefined,
+          defaultsForPlan(filePath)
+        );
         if (next !== current) {
           withExecutionContext(
             'ecosystem_architect',

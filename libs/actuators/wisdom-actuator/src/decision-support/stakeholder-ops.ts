@@ -1,5 +1,6 @@
 import { loadJson, safeExistsSync, safeReadFile, safeWriteFile, pathResolver } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { nowIso } from '@agent/core/foundation';
 
 type StakeholderNode = Record<string, unknown>;
 
@@ -9,10 +10,6 @@ function readJson(path: string): unknown {
 
 function writeJson(path: string, value: unknown): void {
   safeWriteFile(pathResolver.rootResolve(path), JSON.stringify(value, null, 2));
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function rank(node: StakeholderNode): number {

@@ -5,6 +5,7 @@
   "additionalProperties": false,
   "required": ["version", "queue", "progress", "bundle", "render"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string", "minLength": 1 },
     "queue": {
       "type": "object",
@@ -37,7 +38,13 @@
     "render": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["allowed_output_formats", "enable_backend_rendering", "backend", "quality", "command_timeout_ms"],
+      "required": [
+        "allowed_output_formats",
+        "enable_backend_rendering",
+        "backend",
+        "quality",
+        "command_timeout_ms"
+      ],
       "properties": {
         "allowed_output_formats": {
           "type": "array",

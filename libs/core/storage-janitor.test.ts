@@ -32,6 +32,32 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, 'utf8'));
+      } catch {
+        return null;
+      }
+    },
+    appendFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.appendFileSync(p, data);
+    },
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+    writeFile: (p: string, data: string) => {
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, data);
+    },
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
 // Override path-resolver to point at our temp dirs
 let tmpDir: string;
 let logsDir: string;

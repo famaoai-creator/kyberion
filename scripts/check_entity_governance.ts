@@ -10,7 +10,7 @@ import {
   listProjectRecords,
   withExecutionContext,
 } from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvBool, getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -293,7 +293,7 @@ export const runCheckEntityGovernance = defineScript({
     context.print(report);
     const strictWarnings =
       context.argv.includes('--strict-warnings') ||
-      getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === 'true';
+      getRegisteredEnvBool('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === true;
     if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
   },
 });

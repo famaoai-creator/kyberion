@@ -10,7 +10,7 @@ import {
   safeReaddir,
 } from '@agent/core';
 import chalk from 'chalk';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 import { defineScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
@@ -52,7 +52,7 @@ function scanMissions(tenantSlug?: string) {
       const statePath = path.join(dir, item, 'mission-state.json');
       if (safeExistsSync(statePath)) {
         try {
-          const mission = readJsonFile<Mission>(statePath);
+          const mission = readJson<Mission>(statePath);
           if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
             continue;
           }
@@ -134,7 +134,7 @@ function renderJournal(tenantSlug?: string) {
   // Trust Scores Summary
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
   if (safeExistsSync(ledgerPath)) {
-    const raw = readJsonFile<any>(ledgerPath);
+    const raw = readJson<any>(ledgerPath);
     const ledger = raw?.agents ?? raw ?? {};
     console.log(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
     Object.keys(ledger).forEach((a) => {

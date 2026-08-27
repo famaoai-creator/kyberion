@@ -12,6 +12,7 @@ import {
   buildGovernedRetryOptions,
   pathResolver,
   normalizeBrowserPipelineOp,
+  getOpInputContract,
   validateOpInput,
 } from '@agent/core';
 import {
@@ -921,9 +922,23 @@ function renderPlaywrightSkeleton(
     assertionLines.push(rendered);
   };
 
+  const validateRecordedAction = (op: string, action: BrowserRecordedAction) => {
+    const contract = getOpInputContract('browser', op);
+    const properties = contract?.schema?.properties;
+    const input =
+      properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? Object.fromEntries(
+            Object.keys(action)
+              .filter((key) => key in (properties as Record<string, unknown>))
+              .map((key) => [key, (action as unknown as Record<string, unknown>)[key]])
+          )
+        : action;
+    return validateOpInput('browser', op, input);
+  };
+
   for (const action of trail) {
     const op = normalizeBrowserPipelineOp(action.op);
-    const validation = validateOpInput('browser', op, action);
+    const validation = validateRecordedAction(op, action);
     if (!validation.valid) {
       throw new Error(
         `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`
@@ -1061,7 +1076,17 @@ function renderBrowserAdf(trail: BrowserRecordedAction[], sessionId: string): Br
   const steps: PipelineStep[] = [];
   for (const action of trail) {
     const op = normalizeBrowserPipelineOp(action.op);
-    const validation = validateOpInput('browser', op, action);
+    const contract = getOpInputContract('browser', op);
+    const properties = contract?.schema?.properties;
+    const input =
+      properties && typeof properties === 'object' && !Array.isArray(properties)
+        ? Object.fromEntries(
+            Object.keys(action)
+              .filter((key) => key in (properties as Record<string, unknown>))
+              .map((key) => [key, (action as unknown as Record<string, unknown>)[key]])
+          )
+        : action;
+    const validation = validateOpInput('browser', op, input);
     if (!validation.valid) {
       throw new Error(
         `[INVALID_OP_INPUT] browser:${op}: ${'errors' in validation ? validation.errors.join('; ') : ''}`

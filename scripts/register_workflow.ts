@@ -24,8 +24,8 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadJson, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
-import { createAjv } from '@agent/core/foundation';
+import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 
@@ -96,7 +96,7 @@ function abs(rel: string): string {
 }
 
 function readJson(rel: string): Json {
-  return loadJson<Json>(abs(rel));
+  return readFoundationJson<Json>(abs(rel));
 }
 
 function writeJson(rel: string, obj: unknown): void {
@@ -115,8 +115,8 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
 }
 
 function validateRequest(req: unknown): void {
-  const schema = loadJson<unknown>(abs(SCHEMA_REL));
-  const ajv = createAjv({ strict: false });
+  const schema = readFoundationJson<unknown>(abs(SCHEMA_REL));
+  const ajv = createAjv();
   const validate = ajv.compile(schema);
   const ok = validate(req);
   if (!ok) {
@@ -399,7 +399,7 @@ function main(argv: string[]): void {
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
-  const req = loadJson<RegistrationRequest>(requestPath);
+  const req = readFoundationJson<RegistrationRequest>(requestPath);
   validateRequest(req);
 
   if (args.mode === 'apply') {

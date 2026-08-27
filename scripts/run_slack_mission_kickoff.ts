@@ -3,7 +3,7 @@ import {
   logger,
   startMissionOrchestrationWorker,
 } from '@agent/core';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface LegacySlackKickoffInput {
@@ -25,7 +25,7 @@ async function main(argv: string[]) {
     throw new ScriptExitError(jobPath ? 0 : 2);
   }
 
-  const input = readJsonFile<LegacySlackKickoffInput>(jobPath);
+  const input = readJson<LegacySlackKickoffInput>(jobPath);
   const event = enqueueMissionOrchestrationEvent({
     eventType: 'mission_team_prewarm_requested',
     missionId: input.missionId,

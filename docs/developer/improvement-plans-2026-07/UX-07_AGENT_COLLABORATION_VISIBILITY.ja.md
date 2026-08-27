@@ -2,7 +2,7 @@
 title: エージェント協調可視化計画
 tags: [ux, agent-collaboration, mission-control, observability, chronos, trace]
 last_updated: 2026-07-26
-status: in_progress
+status: active
 mission_id: MSN-AGENT-COLLAB-OBSERVABILITY-20260726
 ---
 

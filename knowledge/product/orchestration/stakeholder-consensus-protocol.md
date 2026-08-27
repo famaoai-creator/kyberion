@@ -21,12 +21,12 @@ last_updated: 2026-04-20
 
 汎用骨格（Power/Interest 順序 × 1on1 × dissent 吸収 × readiness 数値化）は不変。以下は配布経路と擦り合わせスタイルの違い。
 
-| Variant | 典型的な文化圏 | 配布経路 | 擦り合わせの主形式 |
-|---|---|---|---|
-| `nemawashi` | 日本企業 | 非公式 1on1（廊下・会食） | honne/tatemae の聞き分け、口頭での確約 |
-| `round_table` | 欧米企業 | 公式会議（事前レビュー付き） | 文書と議事での反論吸収 |
-| `pre_read_memo` | Amazon 系 | 6-pager / 1-pager 事前配布 | silent reading → 論点別議論 |
-| `bilateral_memo` | 外交・政府 | 2 者間文書往復 | 文言交渉、合意事項の逐次確定 |
+| Variant          | 典型的な文化圏 | 配布経路                     | 擦り合わせの主形式                     |
+| ---------------- | -------------- | ---------------------------- | -------------------------------------- |
+| `nemawashi`      | 日本企業       | 非公式 1on1（廊下・会食）    | honne/tatemae の聞き分け、口頭での確約 |
+| `round_table`    | 欧米企業       | 公式会議（事前レビュー付き） | 文書と議事での反論吸収                 |
+| `pre_read_memo`  | Amazon 系      | 6-pager / 1-pager 事前配布   | silent reading → 論点別議論            |
+| `bilateral_memo` | 外交・政府     | 2 者間文書往復               | 文言交渉、合意事項の逐次確定           |
 
 - variant の選択は「組織の意思決定文化」と「提案の重量級」で決まる。
 - 同一ミッションで複数 variant を混用してよい（例：役員には nemawashi、現場責任者には pre_read_memo）。
@@ -57,12 +57,12 @@ Power/Interest Grid に基づく：
 
 ### 5.2 variant 別の時間配分例
 
-| Variant | Context | Listening | Soft ask | 備考 |
-|---|---:|---:|---:|---|
-| `nemawashi` | 3 分 | 10 分 | 2 分 | 会食・立ち話での短時間版 |
-| `round_table` | 5 分 | 15 分 | 5 分 | 事前 1on1 としての公式版 |
-| `pre_read_memo` | 0 分（文書配布） | 20 分 | 10 分 | silent reading + Q&A |
-| `bilateral_memo` | 非同期 | 非同期 | 文書往復 | 時間ではなく反復回数 |
+| Variant          |          Context | Listening | Soft ask | 備考                     |
+| ---------------- | ---------------: | --------: | -------: | ------------------------ |
+| `nemawashi`      |             3 分 |     10 分 |     2 分 | 会食・立ち話での短時間版 |
+| `round_table`    |             5 分 |     15 分 |     5 分 | 事前 1on1 としての公式版 |
+| `pre_read_memo`  | 0 分（文書配布） |     20 分 |    10 分 | silent reading + Q&A     |
+| `bilateral_memo` |           非同期 |    非同期 | 文書往復 | 時間ではなく反復回数     |
 
 ### 5.3 Dissent Signal Extraction
 
@@ -109,13 +109,14 @@ Power/Interest Grid に基づく：
 - 本プロトコルは **情報操作** ではなく **情報整理** である。
 - 反対意見を意図的に隠蔽する目的で使ってはならない。
 - 反対が多数派になった場合は `recommendation: "redesign"` を返し、提案自体を再検討する。
-- 文化 variant は *実装形式* の差であり、倫理原則は全 variant で同一。
+- 文化 variant は _実装形式_ の差であり、倫理原則は全 variant で同一。
 
 ## 9. 関連
 
 - 依存: [relationship-graph-protocol.md](knowledge/product/orchestration/relationship-graph-protocol.md)
 - 土台: [pmo/standard/stakeholder_management.md](knowledge/public/pmo/standard/stakeholder_management.md)
-- パイプライン: [pipelines/stakeholder-consensus-orchestrator.json](pipelines/stakeholder-consensus-orchestrator.json)
+- パイプライン: [pipelines/stakeholder-consensus-orchestrator.json](../pipeline-templates/stakeholder-consensus-orchestrator.json)
 
 ---
+
 _Created: 2026-04-17 as nemawashi-protocol.md | Generalized: 2026-04-20 per CONCEPT_INTEGRATION_BACKLOG P1-2b_

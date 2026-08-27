@@ -7,7 +7,6 @@ import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   getVoiceProfileRecord,
-  getVoiceProfileRegistry,
   getWritableVoiceProfileRegistryForTier,
   materializeVoiceProfileSampleRefs,
   getVoiceRuntimePolicy,
@@ -23,10 +22,8 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeUnlink,
-  safeRmSync,
   validateVoiceProfileRegistration,
   verifyVoiceTranscript,
   resolveVoicePath,
@@ -38,21 +35,10 @@ import {
   resolveVoiceEngineForPlatform,
   resolveVoiceBackend,
   createVoiceCapabilityBridge,
-  BlackHoleAudioBus,
-  StubAudioBus,
-  createCoreAudioDeviceInventoryBridge,
-  getStreamingSttBridge,
-  installShellStreamingSttBridgeFromEnv,
-  TtsLoopbackVerifier,
-  type TtsLoopbackVerificationRequest,
-  type TtsSource,
-  type AudioChunk,
-  type AudioFormat,
-  checkMeetingParticipationConsent,
   ensureDefaultOpPreflight,
   runOpPreflight,
 } from '@agent/core';
-import { compileSchema, getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
@@ -66,10 +52,28 @@ import {
 } from './voice-runtime-helpers.js';
 import { registerVoiceLoopbackSttAdapter } from './voice-stt-backend-adapters.js';
 import { runActuatorCli } from '@agent/core';
-
-const voiceActionValidate = compileSchema(
-  pathResolver.rootResolve('knowledge/product/schemas/voice-action.schema.json')
-);
+import {
+  booleanParam,
+  buildLoopbackRequest,
+  createDeterministicLoopbackStt,
+  createDeterministicLoopbackTts,
+  createNativeArtifactTtsSource,
+  extractActionParams,
+  isRecord,
+  numberParam,
+  numericRecord,
+  recordParam,
+  stringParam,
+} from './voice-loopback-helpers.js';
+import {
+  buildAudioRouteViewModel,
+  listAudioRoutes,
+  listVoices,
+  probeAudioRoute,
+  speakLocal,
+  validateVoiceAction,
+  verifyTtsLoopback,
+} from './voice-action-helpers.js';
 
 type VoiceAction =
   | { action: 'health'; params?: Record<string, unknown> }
@@ -257,6 +261,12 @@ export async function handleSingleAction(input: VoiceAction) {
   }
   throw new Error(`Unsupported voice action: ${String((input as any)?.action)}`);
 }
+
+export const actuator = defineCatalogBackedActuator({
+  id: 'voice-actuator',
+  describeOps,
+  handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
+});
 
 async function voiceHealth(input: {
   action: 'health';
@@ -906,514 +916,6 @@ export async function handleAction(input: VoiceAction) {
   }
 }
 
-function validateVoiceAction(input: unknown): void {
-  const ok = voiceActionValidate(input);
-  if (ok) return;
-  const detail = (voiceActionValidate.errors || [])
-    .map((error: any) => `${error.instancePath || '/'} ${error.message}`)
-    .join('; ');
-  throw new Error(`Invalid voice action: ${detail}`);
-}
-
-async function listVoices(): Promise<any> {
-  const engine = resolveVoiceEngineForPlatform();
-  if (!engine.supports.list_voices) {
-    return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
-  }
-
-  if (process.platform === 'darwin') {
-    const output = safeExec('say', ['-v', '?']);
-    const voices = output
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const voice = line.split(/\s+/)[0];
-        return { id: voice, display_name: voice, provider: 'say' };
-      });
-    return { status: 'succeeded', voices, engine_id: engine.engine_id };
-  }
-
-  if (process.platform === 'linux') {
-    return {
-      status: 'succeeded',
-      voices: [{ id: 'espeak-default', display_name: 'espeak default', provider: 'espeak' }],
-      engine_id: engine.engine_id,
-    };
-  }
-
-  if (process.platform === 'win32') {
-    return {
-      status: 'succeeded',
-      voices: [
-        { id: 'windows-default', display_name: 'Windows Speech Synthesizer', provider: 'sapi' },
-      ],
-      engine_id: engine.engine_id,
-    };
-  }
-
-  return { status: 'succeeded', voices: [], engine_id: engine.engine_id };
-}
-
-async function listAudioRoutes(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const requestedBus = stringParam(params, 'bus') || 'blackhole';
-  if (requestedBus === 'stub') {
-    return {
-      status: 'succeeded',
-      action: 'list_audio_routes',
-      platform: process.platform,
-      routes: [{ bus_id: 'stub', available: true }],
-    };
-  }
-  if (requestedBus !== 'blackhole')
-    throw new Error(`unsupported audio route bus '${requestedBus}'`);
-  const inventory = await createCoreAudioDeviceInventoryBridge().probe();
-  const viewModel = buildAudioRouteViewModel(
-    inventory.devices,
-    inventory.available,
-    inventory.reason
-  );
-  return {
-    status: 'succeeded',
-    action: 'list_audio_routes',
-    platform: process.platform,
-    routes: [
-      {
-        bus_id: 'blackhole',
-        available: inventory.available,
-        ...(inventory.reason ? { reason: inventory.reason } : {}),
-        devices: inventory.devices,
-      },
-    ],
-    view_model: viewModel,
-  };
-}
-
-async function probeAudioRoute(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const busId = stringParam(params, 'bus') || 'blackhole';
-  if (busId === 'stub')
-    return {
-      status: 'succeeded',
-      action: 'probe_audio_route',
-      probe: await new StubAudioBus().probe(),
-      view_model: buildAudioRouteViewModel([], true, 'stub route'),
-    };
-  if (busId !== 'blackhole') throw new Error(`unsupported audio route bus '${busId}'`);
-  const bus = new BlackHoleAudioBus({
-    ...(stringParam(params, 'input_device_uid')
-      ? { input_device_uid: stringParam(params, 'input_device_uid') }
-      : {}),
-    ...(stringParam(params, 'output_device_uid')
-      ? { output_device_uid: stringParam(params, 'output_device_uid') }
-      : {}),
-    ...(stringParam(params, 'expected_device_label')
-      ? { expected_device_label: stringParam(params, 'expected_device_label') }
-      : {}),
-  });
-  const probe = await bus.probe();
-  return {
-    status: 'succeeded',
-    action: 'probe_audio_route',
-    probe,
-    view_model: buildAudioRouteViewModel(
-      probe.device_descriptors ?? [],
-      probe.available,
-      probe.reason
-    ),
-  };
-}
-
-function buildAudioRouteViewModel(
-  devices: readonly { uid: string; display_name: string; direction: string; is_virtual: boolean }[],
-  available: boolean,
-  reason?: string
-): Record<string, unknown> {
-  return {
-    screen: 'audio-route-setup',
-    status: available ? 'ready' : 'blocked',
-    status_text: available ? '経路を検証できます' : '経路を確認してください',
-    steps: [
-      {
-        id: 'driver',
-        label: 'BlackHole 2ch インストール状態',
-        status: available ? 'pass' : 'action_required',
-      },
-      {
-        id: 'input',
-        label: '入力device（UID優先）',
-        status: devices.some(
-          (device) => device.direction === 'input' || device.direction === 'duplex'
-        )
-          ? 'pass'
-          : 'action_required',
-      },
-      {
-        id: 'output',
-        label: '出力device（UID優先）',
-        status: devices.some(
-          (device) => device.direction === 'output' || device.direction === 'duplex'
-        )
-          ? 'pass'
-          : 'action_required',
-      },
-      { id: 'consent', label: '音声出力consent', status: 'operator_confirmation_required' },
-      { id: 'test', label: 'テスト文言を確認して開始', status: available ? 'ready' : 'blocked' },
-    ],
-    devices: devices.map((device) => ({
-      uid: device.uid,
-      uid_suffix: device.uid.slice(-8),
-      display_name: device.display_name,
-      direction: device.direction,
-      virtual: device.is_virtual,
-    })),
-    physical_output_default: false,
-    emergency_stop_available: true,
-    ...(reason ? { reason } : {}),
-  };
-}
-
-async function verifyTtsLoopback(
-  params: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  const requestId = stringParam(params, 'request_id') || '';
-  const text = stringParam(params, 'text') || '';
-  const language = stringParam(params, 'language') || 'ja';
-  const profileId =
-    stringParam(params, 'voice_profile_id') || getVoiceProfileRegistry().default_profile_id;
-  const route = recordParam(params, 'audio_route');
-  const busId = stringParam(route, 'bus') || 'blackhole';
-  if (busId !== 'blackhole' && busId !== 'stub')
-    throw new Error(`unsupported audio route bus '${busId}'`);
-  const dryRun = booleanParam(params, 'dry_run');
-  const bus =
-    busId === 'stub'
-      ? new StubAudioBus()
-      : new BlackHoleAudioBus({
-          ...(stringParam(route, 'input_device_uid')
-            ? { input_device_uid: stringParam(route, 'input_device_uid') }
-            : {}),
-          ...(stringParam(route, 'output_device_uid')
-            ? { output_device_uid: stringParam(route, 'output_device_uid') }
-            : {}),
-          ...(stringParam(route, 'expected_device_label')
-            ? { expected_device_label: stringParam(route, 'expected_device_label') }
-            : {}),
-          session_id: requestId,
-        });
-  const request = buildLoopbackRequest(
-    params,
-    requestId,
-    text,
-    language,
-    profileId,
-    busId as 'blackhole' | 'stub',
-    dryRun
-  );
-  const configuredSttBridge = stringParam(params, 'stt_bridge_id');
-  const sttBridgeId =
-    configuredSttBridge ||
-    (process.platform === 'win32' &&
-    getRegisteredEnvText('KYBERION_WINDOWS_STT_BACKEND') === 'faster_whisper'
-      ? 'faster_whisper'
-      : undefined);
-  registerVoiceLoopbackSttAdapter(sttBridgeId, { request_id: requestId, language });
-  if (
-    sttBridgeId === 'shell' ||
-    getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') === 'shell'
-  ) {
-    const installation = installShellStreamingSttBridgeFromEnv();
-    if (!installation.installed) {
-      throw new Error(`streaming STT shell bridge unavailable: ${installation.reason}`);
-    }
-  }
-  const stt =
-    busId === 'stub' && !sttBridgeId
-      ? createDeterministicLoopbackStt(text)
-      : getStreamingSttBridge(sttBridgeId);
-  const consent = (): { allowed: boolean; reason?: string } => {
-    if (dryRun) return { allowed: true };
-    const missionId = stringParam(params, 'mission_id');
-    if (missionId) {
-      const consentResult = checkMeetingParticipationConsent({
-        mission_id: missionId,
-        tenant_slug: stringParam(params, 'tenant_slug'),
-        purpose: 'voice',
-      });
-      return consentResult;
-    }
-    return booleanParam(params, 'operator_confirmed')
-      ? { allowed: true }
-      : {
-          allowed: false,
-          reason: 'operator_confirmed=true or mission-scoped voice consent is required',
-        };
-  };
-  const verifier = new TtsLoopbackVerifier({
-    bus,
-    tts:
-      busId === 'stub'
-        ? createDeterministicLoopbackTts()
-        : createNativeArtifactTtsSource({ requestId, language, profileId }),
-    stt,
-    checkConsent: consent,
-  });
-  const receipt = await verifier.verify(request);
-  return { ...receipt, action: 'verify_tts_loopback' };
-}
-
-function createDeterministicLoopbackTts(): TtsSource {
-  const format: AudioFormat = { encoding: 'pcm_s16le', sample_rate_hz: 16_000, channels: 1 };
-  return {
-    bridge_id: 'deterministic-loopback-tts',
-    async *synthesize(_text: string) {
-      const payload = new Uint8Array((format.sample_rate_hz / 10) * 2);
-      const view = new DataView(payload.buffer);
-      for (let index = 0; index < payload.byteLength; index += 2) {
-        view.setInt16(index, Math.round(Math.sin(index / 7) * 2_000), true);
-      }
-      yield { format, payload, ts_ms: 0 };
-    },
-  };
-}
-
-function createDeterministicLoopbackStt(expectedText: string): {
-  readonly bridge_id: string;
-  transcribeStream(audio: AsyncIterable<AudioChunk>): AsyncIterable<{
-    utterance_id: string;
-    is_final: boolean;
-    text: string;
-    confidence: number;
-    emitted_at: string;
-  }>;
-} {
-  return {
-    bridge_id: 'deterministic-loopback-stt',
-    async *transcribeStream(audio) {
-      let chunks = 0;
-      for await (const _chunk of audio) chunks += 1;
-      if (chunks > 0) {
-        yield {
-          utterance_id: 'deterministic-loopback-utterance',
-          is_final: true,
-          text: expectedText,
-          confidence: 1,
-          emitted_at: new Date().toISOString(),
-        };
-      }
-    },
-  };
-}
-
-function buildLoopbackRequest(
-  params: Record<string, unknown>,
-  requestId: string,
-  text: string,
-  language: string,
-  profileId: string,
-  bus: 'blackhole' | 'stub',
-  dryRun: boolean
-): TtsLoopbackVerificationRequest {
-  const route = recordParam(params, 'audio_route');
-  const format = recordParam(params, 'format');
-  const timing = recordParam(params, 'timing');
-  const quality = recordParam(params, 'quality');
-  const persistence = recordParam(params, 'persistence');
-  return {
-    request_id: requestId,
-    ...(stringParam(params, 'mission_id') ? { mission_id: stringParam(params, 'mission_id') } : {}),
-    ...(stringParam(params, 'tenant_slug')
-      ? { tenant_slug: stringParam(params, 'tenant_slug') }
-      : {}),
-    text,
-    ...(stringParam(params, 'expected_text')
-      ? { expected_text: stringParam(params, 'expected_text') }
-      : {}),
-    language,
-    voice_profile_id: profileId,
-    audio_route: {
-      bus,
-      ...(stringParam(route, 'input_device_uid')
-        ? { input_device_uid: stringParam(route, 'input_device_uid') }
-        : {}),
-      ...(stringParam(route, 'output_device_uid')
-        ? { output_device_uid: stringParam(route, 'output_device_uid') }
-        : {}),
-      ...(stringParam(route, 'expected_device_label')
-        ? { expected_device_label: stringParam(route, 'expected_device_label') }
-        : {}),
-    },
-    ...(format
-      ? {
-          format: {
-            encoding: 'pcm_s16le',
-            sample_rate_hz: numberParam(format, 'sample_rate_hz', 16_000) as
-              16_000 | 24_000 | 48_000,
-            channels: numberParam(format, 'channels', 1) as 1 | 2,
-          },
-        }
-      : {}),
-    ...(timing ? { timing: numericRecord(timing) } : {}),
-    ...(quality ? { quality: numericRecord(quality) } : {}),
-    ...(persistence
-      ? {
-          persistence: {
-            retain_audio: booleanParam(persistence, 'retain_audio'),
-            retain_transcript: booleanParam(persistence, 'retain_transcript'),
-            ...(stringParam(persistence, 'output_dir')
-              ? { output_dir: stringParam(persistence, 'output_dir') }
-              : {}),
-          },
-        }
-      : {}),
-    dry_run: dryRun,
-  };
-}
-
-function createNativeArtifactTtsSource(options: {
-  requestId: string;
-  language: string;
-  profileId: string;
-}): TtsSource {
-  return {
-    bridge_id: 'voice-engine-artifact-to-pcm',
-    async *synthesize(text, voiceProfileId) {
-      const profile = getVoiceProfileRecord(voiceProfileId || options.profileId);
-      const defaults = getVoiceTtsLanguageConfig(options.language);
-      const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
-      const artifactFormats = engine.supports.artifact_formats;
-      const artifactFormat =
-        process.platform === 'darwin' &&
-        engine.engine_id === 'local_say' &&
-        artifactFormats.includes('aiff')
-          ? 'aiff'
-          : artifactFormats.includes('wav')
-            ? 'wav'
-            : (artifactFormats[0] ?? 'wav');
-      const artifact = await renderNativeArtifact(text, {
-        requestId: options.requestId,
-        voice: defaults.voice,
-        rate: defaults.rate,
-        language: options.language,
-        format: artifactFormat,
-        engineId: engine.engine_id,
-        supportsFormats: engine.supports.artifact_formats,
-        profile,
-      });
-      const rawPath = pathResolver.sharedTmp(`voice-loopback/${options.requestId}.pcm`);
-      safeMkdir(path.dirname(rawPath), { recursive: true });
-      try {
-        safeExec('ffmpeg', [
-          '-y',
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-i',
-          artifact,
-          '-f',
-          's16le',
-          '-ac',
-          '1',
-          '-ar',
-          '16000',
-          rawPath,
-        ]);
-        const raw = Buffer.from(safeReadFile(rawPath, { encoding: null }) as Buffer);
-        const chunkBytes = 640;
-        for (let offset = 0; offset < raw.byteLength; offset += chunkBytes) {
-          const payload = new Uint8Array(
-            raw.subarray(offset, Math.min(raw.byteLength, offset + chunkBytes))
-          );
-          if (payload.byteLength % 2 !== 0) continue;
-          yield {
-            format: { encoding: 'pcm_s16le', sample_rate_hz: 16000, channels: 1 },
-            payload,
-            ts_ms: offset / 32,
-          };
-        }
-      } finally {
-        safeRmSync(rawPath, { force: true });
-        safeRmSync(artifact, { force: true });
-      }
-    },
-  };
-}
-
-function stringParam(params: Record<string, unknown>, key: string): string | undefined {
-  const value = params[key];
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function booleanParam(params: Record<string, unknown>, key: string): boolean {
-  return params[key] === true;
-}
-
-function numberParam(params: Record<string, unknown>, key: string, fallback: number): number {
-  return typeof params[key] === 'number' && Number.isFinite(params[key])
-    ? (params[key] as number)
-    : fallback;
-}
-
-function recordParam(params: Record<string, unknown>, key: string): Record<string, unknown> {
-  return isRecord(params[key]) ? params[key] : {};
-}
-
-function numericRecord(params: Record<string, unknown>): Record<string, number> {
-  return Object.fromEntries(
-    Object.entries(params).filter(
-      ([, value]) => typeof value === 'number' && Number.isFinite(value)
-    )
-  ) as Record<string, number>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
-function extractActionParams(input: VoiceAction): Record<string, unknown> {
-  const value = input as unknown as Record<string, unknown>;
-  if (isRecord(value.params)) return value.params;
-  const { action: _action, ...params } = value;
-  return params;
-}
-
-async function speakLocal(params: Record<string, unknown>): Promise<any> {
-  const text = String(params.text || '').trim();
-  if (!text) throw new Error('speak_local requires params.text');
-
-  const language =
-    String(params.language || '')
-      .trim()
-      .toLowerCase() || 'en';
-  const defaults = getVoiceTtsLanguageConfig(language);
-  const voice =
-    typeof params.voice === 'string' && params.voice.trim() ? params.voice.trim() : defaults.voice;
-  const rate = Number.isFinite(params.rate) ? Number(params.rate) : defaults.rate;
-  const requestedEngineId = String(params.engine_id || 'local_say').trim() || 'local_say';
-  const engine = resolveVoiceEngineForPlatform(requestedEngineId);
-  const backend = resolveVoiceBackend(requestedEngineId);
-
-  const playback = await performPlayback(text, {
-    language,
-    voice,
-    rate,
-    engineId: engine.engine_id,
-  });
-  return {
-    status: 'succeeded',
-    mode: 'speaker_verification',
-    engine: engine.kind,
-    engine_id: requestedEngineId,
-    resolved_engine_id: engine.engine_id,
-    backend_id: backend.backend_id,
-    backend_kind: backend.kind,
-    backend_provider: backend.provider,
-    language,
-    voice,
-    rate,
-    speaker_verification: playback,
-  };
-}
-
 async function generateVoice(input: Record<string, any>): Promise<any> {
   if (input.dry_run) {
     const jobId = String(input.request_id || randomUUID());
@@ -1910,36 +1412,6 @@ async function transcribeVoiceSample(input: {
   };
 }
 
-function deepResolve(val: any, ctx: any): any {
-  if (typeof val === 'string') return resolveVars(val, ctx);
-  if (Array.isArray(val)) return val.map((item) => deepResolve(item, ctx));
-  if (val !== null && typeof val === 'object') {
-    const result: Record<string, any> = {};
-    for (const [k, v] of Object.entries(val)) result[k] = deepResolve(v, ctx);
-    return result;
-  }
-  return val;
-}
-
-export async function dispatchDecisionOp(
-  op: string,
-  params: Record<string, any>,
-  ctx: Record<string, any>
-): Promise<{ handled: boolean; ctx: any }> {
-  const resolvedParams = deepResolve(params, ctx);
-  const payload = { action: op, ...resolvedParams };
-  try {
-    const result = await handleSingleAction(payload as any);
-    const exportAs = resolvedParams.export_as;
-    return {
-      handled: true,
-      ctx: exportAs ? { ...ctx, [exportAs]: result } : { ...ctx, last_voice_result: result },
-    };
-  } catch (err: any) {
-    throw err;
-  }
-}
-
 const main = async () => {
   await runActuatorCli({
     name: 'voice-actuator',
@@ -1953,6 +1425,8 @@ const modulePath = fileURLToPath(import.meta.url);
 if (entrypoint && modulePath === entrypoint) {
   main().catch((err) => {
     logger.error(err.message);
-    process.exit(1);
+    process.exitCode = 1;
   });
 }
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';

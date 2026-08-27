@@ -16,6 +16,7 @@ import {
   suggestClosestStrings,
   ensureDefaultOpPreflight,
   runOpPreflight,
+  registerSuperNerveExecutor,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathToFileURL } from 'node:url';
@@ -135,6 +136,8 @@ export async function executeSuperPipeline(
 
   throw new Error(`[SUPER_NERVE] Exhausted repair attempts`);
 }
+
+registerSuperNerveExecutor(executeSuperPipeline as any);
 
 function normalizeStep(step: SuperPipelineStep) {
   const [domain, action] = step.op.split(':');

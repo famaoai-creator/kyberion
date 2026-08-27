@@ -40,6 +40,27 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  const read = <T>(filePath: string): T =>
+    JSON.parse(String(mocks.safeReadFile(filePath, { encoding: 'utf8' }))) as T;
+  const readIfPresent = <T>(filePath: string): T | null => {
+    try {
+      return read<T>(filePath);
+    } catch {
+      return null;
+    }
+  };
+  return {
+    ...actual,
+    loadJson: read,
+    loadJsonIfPresent: readIfPresent,
+    readJson: read,
+    readJsonIfPresent: readIfPresent,
+  };
+});
+
 vi.mock('./service-binding.js', () => ({
   resolveServiceBinding: mocks.resolveServiceBinding,
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,

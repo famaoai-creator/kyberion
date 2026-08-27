@@ -1,6 +1,6 @@
 import * as pathResolver from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson } from '@agent/core/foundation';
 
 export type ContractCheck = {
   id: string;
@@ -10,7 +10,7 @@ export type ContractCheck = {
 };
 
 export function readGovernanceJson(relativePath: string): unknown {
-  const payload = readJsonFile<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
+  const payload = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
   if (payload && typeof payload === 'object' && !Array.isArray(payload) && '$schema' in payload) {
     const { $schema: _schema, ...contract } = payload;
     return contract;

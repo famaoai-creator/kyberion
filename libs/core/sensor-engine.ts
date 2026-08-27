@@ -8,7 +8,11 @@ import { appendJsonLine } from './foundation/json.js';
  * Proactive (Polling) sensory organs.
  */
 
-import { logger, safeAppendFileSync, pathResolver } from './index.js';
+import { createLogger } from './logger.js';
+import { safeAppendFileSync } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+
+const logger = createLogger('sensor-engine');
 
 export type SensorType = 'streaming' | 'polling' | 'event-driven';
 

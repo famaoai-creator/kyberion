@@ -17,10 +17,14 @@
     {
       "id": "core-contract-tests",
       "role": "source",
-      "op": "system:shell",
-      "produces": { "channel": "core_contract_tests", "type": "ShellResult" },
+      "op": "core:run_vitest",
+      "produces": { "channel": "core_contract_tests", "type": "VitestResult" },
       "params": {
-        "cmd": "pnpm exec vitest run libs/core/ce-adoption.test.ts libs/core/worker-event-stream.test.ts libs/core/work-coordination.test.ts"
+        "files": [
+          "libs/core/ce-adoption.test.ts",
+          "libs/core/worker-event-stream.test.ts",
+          "libs/core/work-coordination.test.ts"
+        ]
       }
     },
     {
@@ -37,7 +41,7 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "contrast", "type": "ShellResult" },
-      "params": { "cmd": "pnpm run check:chronos-dom-contrast" }
+      "params": { "cmd": "pnpm check -- --scope full --only chronos-dom-contrast" }
     },
     {
       "id": "report",

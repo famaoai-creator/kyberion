@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { loadJson, pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver, safeExistsSync, safeReadFile, safeStat } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -92,6 +93,76 @@ function collectCommandReferences(value: string): string[] {
   return [...refs];
 }
 
+function collectPackageScriptReferences(value: string, scripts: Set<string>): string[] {
+  const refs = new Set<string>();
+  const runPattern = /\bpnpm\s+run\s+([A-Za-z0-9][A-Za-z0-9:_-]*)\b/g;
+  for (const match of value.matchAll(runPattern)) refs.add(match[1]);
+  const barePattern = /\bpnpm\s+([A-Za-z0-9][A-Za-z0-9:_-]*)\b/g;
+  for (const match of value.matchAll(barePattern)) {
+    // A colon is the package-script namespace. Bare words such as `pnpm
+    // doctor` are also supported by pnpm, but are commonly embedded in prose
+    // and are validated by the explicit `pnpm run` form above. Do not consult
+    // the current script set here: deleted script references must remain
+    // observable to this checker.
+    if (match[1].includes(':')) refs.add(match[1]);
+  }
+  return [...refs];
+}
+
+const PNPM_BUILT_INS = new Set([
+  'add',
+  'config',
+  'create',
+  'dlx',
+  'exec',
+  'help',
+  'import',
+  'init',
+  'install',
+  'link',
+  'list',
+  'outdated',
+  'publish',
+  'remove',
+  'root',
+  'store',
+  'uninstall',
+  'update',
+  'why',
+  'run',
+]);
+
+function validatePackageScriptReferences(
+  value: string,
+  owner: string,
+  scripts: Set<string>,
+  violations: string[]
+): void {
+  for (const script of collectPackageScriptReferences(value, scripts)) {
+    if (PNPM_BUILT_INS.has(script) || scripts.has(script)) continue;
+    violations.push(`${owner}: pnpm script not found (${script})`);
+  }
+}
+
+/**
+ * Compiled scripts must retain an explicit direct-entry guard.  The shared
+ * helper accepts a `.ts` expectation for a compiled `.js` module, but keeping
+ * both spellings at each entrypoint makes the source/dist contract reviewable
+ * and prevents a generator from silently becoming an import-only no-op.
+ */
+export function findDirectScriptGuardViolations(relative: string, source: string): string[] {
+  const violations: string[] = [];
+  const expectedTs = /isDirectScript\(import\.meta\.url,\s*'([^']+\.ts)'\)/gu;
+  for (const match of source.matchAll(expectedTs)) {
+    const expected = match[1];
+    const expectedJs = expected.replace(/\.ts$/u, '.js');
+    if (!source.includes(`isDirectScript(import.meta.url, '${expectedJs}')`)) {
+      violations.push(`${relative}: direct-script guard is missing compiled entry ${expectedJs}`);
+    }
+  }
+  return violations;
+}
+
 const COMMAND_REFERENCE_KEYS = new Set([
   'cmd',
   'command',
@@ -108,9 +179,11 @@ function scanValue(
   value: unknown,
   violations: string[],
   pathExists: (repoRelativePath: string) => boolean,
+  packageScripts: Set<string>,
   keyHint = ''
 ): void {
   if (typeof value === 'string') {
+    validatePackageScriptReferences(value, owner, packageScripts, violations);
     if (COMMAND_REFERENCE_KEYS.has(keyHint)) {
       for (const reference of collectCommandReferences(value)) {
         validateRepoPath(reference, owner, violations, pathExists);
@@ -119,12 +192,13 @@ function scanValue(
     return;
   }
   if (Array.isArray(value)) {
-    for (const item of value) scanValue(owner, item, violations, pathExists, keyHint);
+    for (const item of value)
+      scanValue(owner, item, violations, pathExists, packageScripts, keyHint);
     return;
   }
   if (value && typeof value === 'object') {
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      scanValue(owner, nested, violations, pathExists, key);
+      scanValue(owner, nested, violations, pathExists, packageScripts, key);
     }
   }
 }
@@ -139,6 +213,14 @@ function listPipelineFiles(roots: string[]): string[] {
     }
   }
   return files.sort((a, b) => a.localeCompare(b));
+}
+
+function listPipelineDocumentationFiles(): string[] {
+  return ['pipelines', 'knowledge']
+    .map((root) => pathResolver.rootResolve(root))
+    .filter((root) => safeExistsSync(root))
+    .flatMap((root) => getAllFiles(root).filter((file) => file.endsWith('.md')))
+    .sort((a, b) => a.localeCompare(b));
 }
 
 function checkProductionScriptBoundaries(): string[] {
@@ -171,6 +253,7 @@ function checkProductionScriptBoundaries(): string[] {
         `${relative}: direct ${processExitLabel}() call; use the script error boundary`
       );
     }
+    violations.push(...findDirectScriptGuardViolations(relative, source));
   }
   return violations;
 }
@@ -181,12 +264,15 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
     options.pathExists ||
     ((repoRelativePath: string) => safeExistsSync(pathResolver.rootResolve(repoRelativePath)));
   const packageJsonPath = options.packageJsonPath || pathResolver.rootResolve('package.json');
-  const packageJson = loadJson<{
+  const scanRepositoryDocs = options.packageJsonPath === undefined;
+  const packageJson = readJson<{
     scripts?: Record<string, string>;
   }>(packageJsonPath);
+  const packageScripts = new Set(Object.keys(packageJson.scripts || {}));
 
   for (const [scriptName, command] of Object.entries(packageJson.scripts || {})) {
     const owner = `package.json scripts.${scriptName}`;
+    validatePackageScriptReferences(command, owner, packageScripts, violations);
     for (const reference of collectCommandReferences(command)) {
       validateRepoPath(reference, owner, violations, pathExists);
       validateScriptBuildTarget(reference, owner, violations, pathExists);
@@ -196,8 +282,47 @@ export function checkScriptIntegrity(options: ScriptIntegrityOptions = {}): stri
   const pipelineRoots = options.pipelineRoots || DEFAULT_PIPELINE_ROOTS;
   for (const file of listPipelineFiles(pipelineRoots)) {
     const owner = toRepoRelative(file);
-    const payload = loadJson<unknown>(file);
-    scanValue(owner, payload, violations, pathExists);
+    const payload = readJson<unknown>(file);
+    scanValue(owner, payload, violations, pathExists, packageScripts);
+  }
+
+  for (const root of scanRepositoryDocs
+    ? [
+        'README.md',
+        'docs',
+        '.github',
+        'knowledge/product/governance/ci-gates.json',
+        'knowledge/product/governance/environment-manifests',
+      ]
+    : []) {
+    const absolute = pathResolver.rootResolve(root);
+    if (!safeExistsSync(absolute)) continue;
+    const files = safeStat(absolute).isDirectory() ? getAllFiles(absolute) : [absolute];
+    for (const file of files) {
+      if (
+        !/\.(?:md|yml|yaml|json)$/u.test(file) ||
+        file.includes('/improvement-plans-2026-08/reviews/') ||
+        file.includes('/improvement-plans-archive/')
+      )
+        continue;
+      validatePackageScriptReferences(
+        String(safeReadFile(file, { encoding: 'utf8' })),
+        toRepoRelative(file),
+        packageScripts,
+        violations
+      );
+    }
+  }
+
+  if (scanRepositoryDocs) {
+    for (const file of listPipelineDocumentationFiles()) {
+      validatePackageScriptReferences(
+        String(safeReadFile(file, { encoding: 'utf8' })),
+        toRepoRelative(file),
+        packageScripts,
+        violations
+      );
+    }
   }
 
   return violations;

@@ -10,9 +10,9 @@ import {
   safeRmSync,
   safeStat,
   safeWriteFile,
-  platform,
-  pathResolver,
-} from './index.js';
+} from './secure-io.js';
+import { platform } from './platform.js';
+import { pathResolver } from './path-resolver.js';
 import { createLogger } from './logger.js';
 import { resolveVideoBackend, type MediaBackendRecord } from './media-backend-registry.js';
 

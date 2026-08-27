@@ -74,7 +74,7 @@ function compileReportSchema(schemaRef: string): CompiledReportSchema {
   }
 
   const schemaPath = schemaPathFromRef(schemaRef);
-  const ajv = createAjv({ strict: false });
+  const ajv = createAjv();
   const validate: ValidateFunction = compileSchemaFromPath(ajv, schemaPath);
   return {
     validate: (value) => Boolean(validate(value)),

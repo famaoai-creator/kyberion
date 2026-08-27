@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { loadJson, pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { defineScript } from './lib/harness.js';
 
 type TaskScenario = {
@@ -54,7 +54,7 @@ function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return loadJson<TaskScenario>(filePath);
+  return readJson<TaskScenario>(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
@@ -116,7 +116,7 @@ function resolveProfilePath(
 }
 
 function loadProfile(profilePath: string): Record<string, unknown> {
-  return loadJson<Record<string, unknown>>(profilePath);
+  return readJson<Record<string, unknown>>(profilePath);
 }
 
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {

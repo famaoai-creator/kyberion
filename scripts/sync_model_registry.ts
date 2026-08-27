@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import {
-  loadJson,
   modelRegistryFileName,
   modelRegistrySnapshotFromDirectory,
   readModelRegistryDirectory,
@@ -16,6 +15,7 @@ import {
   safeWriteFile,
   validateModelRegistrySnapshot,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -33,7 +33,7 @@ function readDirectorySnapshot(): ModelRegistrySnapshot {
 
 export function bootstrapModelRegistryDirectory(): void {
   const snapshot = validateModelRegistrySnapshot(
-    loadJson<ModelRegistrySnapshot>(SNAPSHOT_PATH),
+    readJson<ModelRegistrySnapshot>(SNAPSHOT_PATH),
     SNAPSHOT_PATH
   );
   safeMkdir(DIRECTORY, { recursive: true });

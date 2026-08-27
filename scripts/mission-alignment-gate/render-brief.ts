@@ -15,7 +15,7 @@
  * スキーマは README.md 参照。
  */
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
-import { loadJson } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { reviewLayerMarkup } from '../report-review/review-layer.js';
@@ -357,7 +357,7 @@ export const runRenderBrief = defineScript({
     if (!safeExistsSync(src)) {
       throw new ScriptExitError(1, `brief not found: ${src}`);
     }
-    const brief = loadJson<MissionBrief>(src);
+    const brief = readJson<MissionBrief>(src);
     const rendered = renderMissionBriefHtml(brief);
     safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
     print(`rendered mission brief → ${out}`);

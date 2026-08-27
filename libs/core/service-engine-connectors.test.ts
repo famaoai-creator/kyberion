@@ -37,6 +37,21 @@ vi.mock('./async-utils.js', () => ({
   retry: mocks.retry,
 }));
 
+vi.mock('./network.js', async () => {
+  const actual = await vi.importActual<typeof import('./network.js')>('./network.js');
+  return { ...actual, secureFetch: mocks.secureFetch };
+});
+
+vi.mock('./platform.js', async () => {
+  const actual = await vi.importActual<typeof import('./platform.js')>('./platform.js');
+  return { ...actual, checkBinary: mocks.checkBinary };
+});
+
+vi.mock('./secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return { ...actual, safeExec: mocks.safeExec };
+});
+
 vi.mock('./customer-resolver.js', () => ({
   resolveOverlay: mocks.resolveOverlay,
 }));

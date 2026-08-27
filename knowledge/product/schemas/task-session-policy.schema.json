@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "intents": {
       "type": "array",
@@ -61,18 +62,11 @@
         "when": {
           "type": "array",
           "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "$ref": "#/$defs/textRule" }
-            ]
+            "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }]
           }
         },
         "value": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "number" },
-            { "type": "boolean" }
-          ]
+          "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }]
         }
       },
       "required": ["when", "value"]
@@ -83,11 +77,7 @@
       "properties": {
         "field": { "type": "string", "minLength": 1 },
         "default": {
-          "oneOf": [
-            { "type": "string" },
-            { "type": "number" },
-            { "type": "boolean" }
-          ]
+          "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }]
         },
         "rules": {
           "type": "array",
@@ -104,10 +94,7 @@
         "omit_when": {
           "type": "array",
           "items": {
-            "oneOf": [
-              { "type": "string" },
-              { "$ref": "#/$defs/textRule" }
-            ]
+            "oneOf": [{ "type": "string" }, { "$ref": "#/$defs/textRule" }]
           }
         }
       },
@@ -149,11 +136,7 @@
             "static": {
               "type": "object",
               "additionalProperties": {
-                "oneOf": [
-                  { "type": "string" },
-                  { "type": "number" },
-                  { "type": "boolean" }
-                ]
+                "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }]
               }
             },
             "fields": {

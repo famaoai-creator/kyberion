@@ -1,4 +1,11 @@
-import { draftDeckSectionBodies, loadJson, selectDeckTheme } from '@agent/core';
+import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core';
+import {
+  loadJsonCatalog,
+  loadMediaDesignSystemsCatalog,
+  loadJsonValue,
+  loadTenantEntries,
+  resolveConfidentialTenantOverride,
+} from './media-catalog-loaders.js';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import {
   logger,
@@ -164,56 +171,6 @@ import * as excelUtils from '@agent/shared-media';
 import { PDFParse } from 'pdf-parse';
 import { runActuatorCli } from '@agent/core';
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '@agent/core/design-fonts';
-import {
-  ensureParentDir,
-  deepMergeCatalog,
-  readJsonFilesRecursively,
-  loadJsonCatalog,
-  loadArtifactLibraryCatalog,
-  loadDocumentCompositionCatalog,
-  loadThemeCatalog,
-  loadConfidentialThemePackEntries,
-  resolveConfidentialThemePack,
-  loadMediaDesignSystemsCatalog,
-  loadImportedDesignMdIndex,
-  normalizeDesignLookupKey,
-  resolveDesignBindingHints,
-  resolveImportedDesignReference,
-  recommendImportedDesignReferences,
-  resolveMediaDesignSystem,
-  loadSemanticRenderTokenCatalog,
-  resolveSemanticRenderTokens,
-  resolveSemanticComponentRule,
-  resolveNamedTheme,
-  resolveDocumentCompositionPresetCore,
-  resolveDocumentCompositionPreset,
-  buildOutlineDrivenPptxProtocol,
-  buildPresentationPptxProtocol,
-  buildOutlineFromNormalizedBrief,
-  buildCompiledBriefContext,
-  resolveObjectInput,
-  compileBriefToDesignProtocol,
-  themeToPptxPalette,
-  themeToDocxStyleHints,
-  resolveThemeColorRole,
-  resolveThemeHexColor,
-  applyCompositionTemplate,
-  normalizeProposalText,
-  isPlaceholderProposalText,
-  sanitizeProposalText,
-  normalizeProposalList,
-  normalizeAudienceList,
-  buildCanonicalProposalEvidence,
-  buildCanonicalProposalSlides,
-  buildProposalNarrativeOutline,
-  normalizeProposalBrief,
-  buildReportDocxProtocol,
-  buildReportPdfProtocol,
-  buildTrackerSpreadsheetProtocol,
-  resolveDocumentLayoutTemplate,
-  buildDocumentPdfProtocol,
-} from './media-design-protocol.js';
-
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
   maxRetries: 2,
@@ -288,10 +245,6 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
     null;
   if (!preset && !override) return null;
   return mergePptxShape(preset || {}, override || {});
-}
-
-function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
-  return loadJson(filePath);
 }
 
 let _cachedBzl: ReturnType<typeof loadJsonValue> | null = null;
@@ -402,82 +355,6 @@ function loadLayoutTemplateCatalog(rootDir: string): any {
     _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
   }
   return _cachedLayoutTemplates;
-}
-
-let _cachedTenantRegistry: any = null;
-
-/** Build entry list from index.json, or fall back to directory-scanning knowledge/confidential/. */
-function loadTenantEntries(rootDir: string): { override_path: string }[] {
-  const entries: { override_path: string }[] = [];
-  const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
-  try {
-    const registry = loadJsonValue(indexPath);
-    if (Array.isArray(registry.tenants)) {
-      entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
-    }
-  } catch {
-    /* index.json absent or unreadable — fall through to directory scan */
-  }
-  // Fallback: scan knowledge/confidential/*/design/tenant-override.json
-  try {
-    const confidentialDir = path.join(rootDir, 'knowledge/confidential');
-    const names = safeReaddir(confidentialDir);
-    const slugs = names.filter((name) => {
-      try {
-        return safeStat(path.join(confidentialDir, name)).isDirectory();
-      } catch {
-        return false;
-      }
-    });
-    entries.push(
-      ...slugs.map((s: string) => ({
-        override_path: `knowledge/confidential/${s}/design/tenant-override.json`,
-      }))
-    );
-  } catch {
-    /* confidential directory absent or unreadable */
-  }
-  const seen = new Set<string>();
-  return entries.filter((entry) => {
-    if (!entry.override_path || seen.has(entry.override_path)) return false;
-    seen.add(entry.override_path);
-    return true;
-  });
-}
-
-function resolveConfidentialTenantOverride(
-  rootDir: string,
-  brandName: string,
-  designSystemId?: string
-): any {
-  if (!brandName) return null;
-  try {
-    if (!_cachedTenantRegistry) {
-      _cachedTenantRegistry = { entries: loadTenantEntries(rootDir) };
-    }
-    const key = brandName.toLowerCase();
-    for (const entry of _cachedTenantRegistry.entries || []) {
-      const overridePath = path.resolve(rootDir, entry.override_path);
-      try {
-        const override = loadJsonValue(overridePath);
-        if (
-          designSystemId &&
-          override.design_system_id &&
-          override.design_system_id !== designSystemId
-        )
-          continue;
-        const matched =
-          Array.isArray(override.matchers) &&
-          override.matchers.some((m: string) => key.includes(m.toLowerCase()));
-        if (matched) return override;
-      } catch {
-        /* skip unreadable override */
-      }
-    }
-  } catch {
-    /* unexpected failure */
-  }
-  return null;
 }
 
 function resolveLayoutTemplate(

@@ -1,7 +1,7 @@
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from './provider-config.js';
-import { listDemotedProviders } from './provider-health-registry.js';
+import { listDemotedProviders } from './provider-health-view.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { loadOperatorProviderPreferences } from './browser-onboarding.js';
 

@@ -11,7 +11,7 @@
  *   node_modules/.bin/tsx scripts/mission-alignment-gate/read-decision.ts <reviewed.html> <mission-brief.json>
  */
 import { safeReadFile, safeExistsSync } from '@agent/core/secure-io';
-import { loadJson } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 
@@ -34,7 +34,7 @@ export function main(argv: string[] = []): void {
   while ((mm = reNote.exec(html)))
     comments.push(mm[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
 
-  const b = safeExistsSync(jsonPath) ? loadJson<Record<string, unknown>>(jsonPath) : {};
+  const b = safeExistsSync(jsonPath) ? readJson<Record<string, unknown>>(jsonPath) : {};
 
   console.log(
     JSON.stringify(

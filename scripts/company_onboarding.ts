@@ -6,7 +6,6 @@
 import * as path from 'node:path';
 import {
   pathResolver,
-  loadJson,
   readTenantProfile,
   safeExistsSync,
   safeReadFile,
@@ -16,6 +15,7 @@ import {
   safeWriteFile,
   tenantProfilePath,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { applyOnboardingContextBinding, writeTenantProfile } from '@agent/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
@@ -148,7 +148,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       rootDir,
       force: normalized.force,
     });
-    const profile = loadJson<Record<string, unknown>>(profilePath);
+    const profile = readJson<Record<string, unknown>>(profilePath);
     profile.accountable_human_resource_id = normalized.accountableHumanId;
     profile.workforce = {
       mode: 'solo_founder_ai_workforce',

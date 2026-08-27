@@ -3,11 +3,13 @@
   "description": "E2E-02 Task 6: generate deck/doc/video/web/mv deliverables from one campaign brief under a single resolved design. Context: brief_path (required), output_root / dry_run (optional).",
   "steps": [
     {
-      "op": "system:exec",
+      "op": "core:run_campaign_suite",
+      "role": "source",
+      "produces": { "channel": "campaign_suite_result", "type": "CampaignManifest" },
       "params": {
-        "command": "node",
-        "args": ["dist/scripts/campaign_suite.js", "--brief", "{{brief_path}}"],
-        "export_as": "campaign_suite_result"
+        "brief_path": "{{brief_path}}",
+        "output_root": "{{output_root}}",
+        "dry_run": "{{dry_run}}"
       }
     }
   ]

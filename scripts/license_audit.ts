@@ -22,7 +22,6 @@
 import * as path from 'node:path';
 import {
   pathResolver,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -30,6 +29,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -72,7 +72,7 @@ const REPORT_PATH = path.join(ROOT, 'docs', 'legal', 'third-party-licenses.json'
 
 function readPackageJson(p: string): Record<string, unknown> | null {
   try {
-    return loadJson<Record<string, unknown>>(p);
+    return readJson<Record<string, unknown>>(p);
   } catch {
     return null;
   }

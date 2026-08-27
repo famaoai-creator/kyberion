@@ -22,7 +22,7 @@ operator's behalf, take action items, execute the operator's slice, and
 remind others of theirs."
 
 This file is intentionally generic. Per-operator instances live under
-[`knowledge/personal/agents/`](../personal/agents/) (or
+[`knowledge/personal/agents/`](../../personal/agents/) (or
 `knowledge/confidential/{tenant}/agents/` for tenant-bound instances)
 and override `agentId`, the identity profile path, and the voice
 profile reference.
@@ -42,13 +42,13 @@ profile reference.
 
 A concrete instance must declare:
 
-| Field | Where it lives |
-|---|---|
-| `agentId` (instance) | This file's frontmatter (override per operator) |
-| `identity_profile_path` | `knowledge/personal/{user}/identity.json` |
-| `voice_profile_id` | Slug registered in `knowledge/product/governance/voice-profile-registry.json` (or per-tenant override) |
-| `language_default` | `ja` / `en` etc. |
-| Allowed meeting platforms | Set via `meeting-actuator` action `params.platform` |
+| Field                     | Where it lives                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `agentId` (instance)      | This file's frontmatter (override per operator)                                                        |
+| `identity_profile_path`   | `knowledge/personal/{user}/identity.json`                                                              |
+| `voice_profile_id`        | Slug registered in `knowledge/product/governance/voice-profile-registry.json` (or per-tenant override) |
+| `language_default`        | `ja` / `en` etc.                                                                                       |
+| Allowed meeting platforms | Set via `meeting-actuator` action `params.platform`                                                    |
 
 ## Tier placement
 
@@ -76,9 +76,9 @@ operator's voice and identity are personal data.
 
 ## Reference
 
-- [`libs/actuators/meeting-actuator/`](../../libs/actuators/meeting-actuator/)
-- [`pipelines/meeting-proxy-workflow.json`](../../pipelines/meeting-proxy-workflow.json)
-- [`pipelines/voice-recording-session.json`](../../pipelines/voice-recording-session.json)
-- [`pipelines/voice-learning-setup.json`](../../pipelines/voice-learning-setup.json)
-- [`pipelines/voice-instant-clone.json`](../../pipelines/voice-instant-clone.json)
+- [`libs/actuators/meeting-actuator/`](../../../libs/actuators/meeting-actuator/)
+- [`pipelines/meeting-proxy-workflow.json`](../../../pipelines/meeting-proxy-workflow.json)
+- [`pipelines/voice-recording-session.json`](../../../knowledge/product/pipeline-templates/voice-recording-session.json)
+- [`pipelines/voice-learning-setup.json`](../../../knowledge/product/pipeline-templates/voice-learning-setup.json)
+- [`pipelines/voice-instant-clone.json`](../../../knowledge/product/pipeline-templates/voice-instant-clone.json)
 - [`knowledge/product/governance/voice-profile-registry.json`](../governance/voice-profile-registry.json)

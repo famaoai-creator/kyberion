@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import {
   extractPlaceholderNames,
   loadActuatorManifestCatalog,
-  loadJson,
   pathResolver,
   resolveVocabularyEntry,
   safeExistsSync,
@@ -12,7 +11,7 @@ import {
   safeStat,
 } from '@agent/core';
 import { createAjv } from '@agent/core/foundation';
-import { readJsonFile } from './refactor/cli-input.js';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
@@ -31,6 +30,11 @@ type CatalogCheck = {
   id: string;
   schemaPath: string;
   dataPath: string;
+};
+
+type GovernanceCatalogContracts = {
+  version: number;
+  catalogs: Record<string, string[]>;
 };
 
 const CHECKS: CatalogCheck[] = [
@@ -98,7 +102,7 @@ const CHECKS: CatalogCheck[] = [
 
 function readJson<T>(relativePath: string): T {
   const fullPath = pathResolver.rootResolve(relativePath);
-  return readJsonFile(fullPath);
+  return readFoundationJson<T>(fullPath);
 }
 
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
@@ -155,7 +159,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryServiceIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = loadJson<typeof typed>(filePath) as {
+      const payload = readFoundationJson<typeof typed>(filePath) as {
         default_pattern?: string;
         services?: Record<string, unknown>;
       };
@@ -258,7 +262,7 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
     const directoryIds: string[] = [];
     for (const fileName of fileNames) {
       const filePath = pathResolver.rootResolve(path.join(directory, fileName));
-      const payload = loadJson<typeof typed>(filePath) as {
+      const payload = readFoundationJson<typeof typed>(filePath) as {
         version?: string;
         specialists?: Record<string, unknown>;
       };
@@ -629,7 +633,7 @@ function validateDesignTokenCatalog(violations: string[]) {
       );
       continue;
     }
-    const raw = loadJson<ThemeCatalogShape>(filePath);
+    const raw = readFoundationJson<ThemeCatalogShape>(filePath);
     violations.push(
       ...collectThemeCatalogViolations({
         label: path.relative(pathResolver.rootDir(), filePath),
@@ -645,8 +649,8 @@ function validateDesignTokenCatalog(violations: string[]) {
   // E2E-02: the flat catalog and the decomposed directory copy are a generated
   // pair; their theme maps must stay identical so neither drifts silently.
   try {
-    const flat = loadJson<{ themes?: Record<string, unknown> }>(themeFiles[0]);
-    const nested = loadJson<{ themes?: Record<string, unknown> }>(themeFiles[1]);
+    const flat = readFoundationJson<{ themes?: Record<string, unknown> }>(themeFiles[0]);
+    const nested = readFoundationJson<{ themes?: Record<string, unknown> }>(themeFiles[1]);
     if (JSON.stringify(flat.themes || {}) !== JSON.stringify(nested.themes || {})) {
       violations.push(
         'design-tokens: themes.json and themes/themes.json theme maps diverged. Run pnpm tsx scripts/generate_design_tokens.ts and align manual edits.'
@@ -694,6 +698,12 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
 function validateGovernanceCatalogMetadata(violations: string[]) {
   const relativeRoot = 'knowledge/product/governance';
   const root = pathResolver.rootResolve(relativeRoot);
+  const contractsPath = pathResolver.rootResolve(
+    'knowledge/product/governance/governance-catalog-contracts.json'
+  );
+  const contracts = readFoundationJson<GovernanceCatalogContracts>(contractsPath);
+  const genericSchemaRef = '../schemas/governance-catalog.schema.json';
+  const genericCatalogs = new Set<string>();
   for (const fileName of safeReaddir(root)
     .filter((entry) => entry.endsWith('.json'))
     .sort()) {
@@ -701,7 +711,7 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     const filePath = pathResolver.rootResolve(relativePath);
     let payload: Record<string, unknown>;
     try {
-      payload = readJsonFile<Record<string, unknown>>(filePath);
+      payload = readFoundationJson<Record<string, unknown>>(filePath);
     } catch (error) {
       violations.push(
         `governance-catalog: ${relativePath} is not valid JSON (${error instanceof Error ? error.message : String(error)})`
@@ -720,9 +730,34 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     }
 
     if (/^https?:\/\//u.test(schemaRef)) continue;
+    if (schemaRef === genericSchemaRef) {
+      genericCatalogs.add(fileName);
+      const requiredKeys = contracts.catalogs[fileName];
+      if (!requiredKeys) {
+        violations.push(
+          `governance-catalog: ${relativePath} uses the envelope schema without a domain contract`
+        );
+        continue;
+      }
+      for (const key of requiredKeys) {
+        if (!(key in payload)) {
+          violations.push(
+            `governance-catalog: ${relativePath} is missing contracted top-level key ${key}`
+          );
+        }
+      }
+      continue;
+    }
     const schemaPath = pathResolver.rootResolve(path.join(relativeRoot, schemaRef));
     if (!safeExistsSync(schemaPath)) {
       violations.push(`governance-catalog: ${relativePath} references missing schema ${schemaRef}`);
+    }
+  }
+  for (const fileName of Object.keys(contracts.catalogs)) {
+    if (!genericCatalogs.has(fileName)) {
+      violations.push(
+        `governance-catalog: contract entry ${fileName} is not backed by the envelope schema`
+      );
     }
   }
 }
@@ -731,40 +766,45 @@ export const runCheckCatalogIntegrity = defineScript({
   name: 'check:catalogs',
   flags: [],
   run(context) {
-    const violations: string[] = [];
-    const warnings: string[] = [];
-    for (const check of CHECKS) {
-      validateCatalog(check, violations, warnings);
-    }
-    validateGovernanceCatalogMetadata(violations);
-    validateDesignTokenCatalog(violations);
-    validateCapabilitiesGuideDrift(violations);
-
-    const indexUpToDate = generateIndex(true);
-    if (!indexUpToDate) {
-      violations.push(
-        'knowledge: _index.md or _integrity-manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
-      );
-    }
-
-    if (warnings.length > 0) {
-      console.warn('[check:catalogs] warnings (non-fatal):');
-      for (const warning of warnings.sort()) {
-        console.warn(`- ${warning}`);
-      }
-    }
-
-    if (violations.length > 0) {
-      console.error('[check:catalogs] violations detected:');
-      for (const violation of violations.sort()) {
-        console.error(`- ${violation}`);
-      }
-      throw new Error(`${violations.length} catalog integrity violation(s)`);
-    }
-
-    context.print('[check:catalogs] OK');
+    const result = runCatalogIntegrityCheck();
+    context.print(result);
   },
 });
+
+export function runCatalogIntegrityCheck(): { status: 'passed'; warnings: string[] } {
+  const violations: string[] = [];
+  const warnings: string[] = [];
+  for (const check of CHECKS) {
+    validateCatalog(check, violations, warnings);
+  }
+  validateGovernanceCatalogMetadata(violations);
+  validateDesignTokenCatalog(violations);
+  validateCapabilitiesGuideDrift(violations);
+
+  const indexUpToDate = generateIndex(true);
+  if (!indexUpToDate) {
+    violations.push(
+      'knowledge: _index.md or _integrity-manifest.json is out of date. Run pnpm generate:knowledge-index to update.'
+    );
+  }
+
+  if (warnings.length > 0) {
+    console.warn('[check:catalogs] warnings (non-fatal):');
+    for (const warning of warnings.sort()) {
+      console.warn(`- ${warning}`);
+    }
+  }
+
+  if (violations.length > 0) {
+    console.error('[check:catalogs] violations detected:');
+    for (const violation of violations.sort()) {
+      console.error(`- ${violation}`);
+    }
+    throw new Error(`${violations.length} catalog integrity violation(s)`);
+  }
+
+  return { status: 'passed', warnings };
+}
 
 // Guarded so importing the pure collectors above does not run the whole
 // repository check as a side effect.

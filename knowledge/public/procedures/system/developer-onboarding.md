@@ -127,14 +127,14 @@ work you actually do.
 
 ### Anti-patterns to recognize and avoid
 
-| Anti-pattern                                       | Why it bites                          | What to do instead                                                                                                       |
-| -------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Direct `node:fs` write in a new module             | tier-guard / audit-chain bypassed     | Use `safeWriteFile` from `@agent/core/secure-io`                                                                         |
-| `auditChain.record` in MOS source                  | violates §9.1; CI fails               | Route through `presence/displays/operator-surface/src/lib/audit-mos.ts`                                                  |
-| Hardcoding org names in `knowledge/public/`        | `pnpm run check:tier-hygiene` fails   | Move to `knowledge/confidential/{tenant}/` and use placeholders                                                          |
-| Skipping the mission gate for a substantive change | The two-dimensional work-scope policy | Check mandatory triggers first, then accumulation triggers; use the lowest suitable execution shape when neither applies |
-| Writing pipelines that bypass `wisdom:*` ops       | inconsistent reasoning backend usage  | Add the new op to `decision-ops.ts` and wire it through `dispatchDecisionOp`                                             |
-| Creating a new tier without updating policies      | governance / hygiene checks miss it   | Update `path-scope-policy.json`, `tier-hygiene-policy.json`, and `mission-classification-policy.json` together           |
+| Anti-pattern                                       | Why it bites                              | What to do instead                                                                                                       |
+| -------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Direct `node:fs` write in a new module             | tier-guard / audit-chain bypassed         | Use `safeWriteFile` from `@agent/core/secure-io`                                                                         |
+| `auditChain.record` in MOS source                  | violates §9.1; CI fails                   | Route through `presence/displays/operator-surface/src/lib/audit-mos.ts`                                                  |
+| Hardcoding org names in `knowledge/public/`        | `pnpm check -- --only tier-hygiene` fails | Move to `knowledge/confidential/{tenant}/` and use placeholders                                                          |
+| Skipping the mission gate for a substantive change | The two-dimensional work-scope policy     | Check mandatory triggers first, then accumulation triggers; use the lowest suitable execution shape when neither applies |
+| Writing pipelines that bypass `wisdom:*` ops       | inconsistent reasoning backend usage      | Add the new op to `decision-ops.ts` and wire it through `dispatchDecisionOp`                                             |
+| Creating a new tier without updating policies      | governance / hygiene checks miss it       | Update `path-scope-policy.json`, `tier-hygiene-policy.json`, and `mission-classification-policy.json` together           |
 
 ## When you get stuck
 
@@ -159,7 +159,7 @@ wasn't, the rule of thumb: **add the test before fixing the bug.**
 - Edit the mission-gate policy summary in `AGENTS.md` without a documented rationale and dog-food
   evidence.
 - Push secrets — even test secrets — to public-tier files.
-  `pnpm run check:tier-hygiene` will catch this, but the rule comes
+  `pnpm check -- --only tier-hygiene` will catch this, but the rule comes
   first.
 
 ## Reference

@@ -20,7 +20,27 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
-import { ProcessLogger, createProcessLogger, resetProcessLoggerRegistry } from './process-logger.js';
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
+    loadJsonIfPresent: (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      return JSON.parse(fs.readFileSync(p, 'utf8'));
+    },
+    appendFile: (p: string, data: string) => fs.appendFileSync(p, data),
+    exists: (p: string) => fs.existsSync(p),
+    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    stat: (p: string) => fs.statSync(p),
+    writeFile: (p: string, data: string) => fs.writeFileSync(p, data),
+  }),
+  registerFoundationIo: vi.fn(),
+}));
+
+import {
+  ProcessLogger,
+  createProcessLogger,
+  resetProcessLoggerRegistry,
+} from './process-logger.js';
 
 describe('ProcessLogger', () => {
   beforeEach(() => {
@@ -53,7 +73,10 @@ describe('ProcessLogger', () => {
     const log = new ProcessLogger('meta-daemon');
     log.error('crash', { code: 137, reason: 'OOM' });
 
-    const lines = fs.readFileSync(path.join(logsProcessDir, 'meta-daemon.log'), 'utf8').trim().split('\n');
+    const lines = fs
+      .readFileSync(path.join(logsProcessDir, 'meta-daemon.log'), 'utf8')
+      .trim()
+      .split('\n');
     const entry = JSON.parse(lines[0]);
     expect(entry.meta).toEqual({ code: 137, reason: 'OOM' });
   });

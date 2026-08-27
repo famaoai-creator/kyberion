@@ -115,9 +115,10 @@ import {
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isDirectScript } from './lib/harness.js';
+import { exitProcess, isDirectScript } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runStepHooks } from './refactor/step-hooks.js';
+import { runSteps } from './pipeline-execution-part-execution.js';
 
 import {
   registeredEnv,
@@ -171,20 +172,6 @@ import type {
   DispatchFunc,
   RunStepsOptions,
 } from './pipeline-execution-part-bootstrap.js';
-import {
-  resolveEngineStepType,
-  prepareEngineSteps,
-  parseFragmentJson,
-  isSkip,
-  dispatchReasoningLeaf,
-  buildPipelinePromptVisibilityContext,
-  dispatchProgrammaticToolCall,
-  hasBoundApproval,
-  dispatchLeafOp,
-  findStepByIdRecursive,
-} from './pipeline-execution-part-control.js';
-import { runWithRepair, runSteps, runStepsInternal } from './pipeline-execution-part-execution.js';
-
 /** Validate Typed Flow channel integrity before allowing any step side effects. */
 export class TypedFlowValidationError extends Error {
   constructor(readonly flowErrors: ReturnType<typeof validateFlow>) {
@@ -212,8 +199,16 @@ export async function runValidatedSteps(
         // guard prevents an unchanged repair from becoming a retry loop.
         autoRepair:
           opts.pipelinePath && !opts._adfRepairAttempted
-            ? async (draft) => {
-                const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf');
+            ? async (draft, failure) => {
+                opts._adfRepairAttempted = true;
+                const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf', {
+                  failure: {
+                    category:
+                      failure instanceof TypedFlowValidationError ? 'typed_flow' : 'preflight',
+                    detail: failure instanceof Error ? failure.message : String(failure),
+                    repairAction: 'repair the typed pipeline flow and re-run preflight',
+                  },
+                });
                 if (!repair.repaired) {
                   throw new TypedFlowValidationError(validateFlow(draft, initialCtx));
                 }
@@ -301,12 +296,44 @@ export async function executePipelineFile(
     });
   trace.addArtifact('file', inputPath, 'Pipeline ADF input');
   const steps = (pipeline.steps || []).map((step) => ({ ...step, params: step.params || {} }));
+  installReasoningBackends();
+  const sessionStart = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_start', {
+    matcher_value: pipelineId,
+    pipeline_id: pipelineId,
+    ...(missionId ? { mission_id: missionId } : {}),
+  });
+  if (sessionStart.blocked) {
+    throw new Error(
+      `[SAFETY_LIMIT][HOOK_BLOCKED] session_start blocked: ${sessionStart.reasons.join('; ')}`
+    );
+  }
+  const beforeAgentStart = await fireLifecycleHooks(
+    getDefaultLifecycleHookEngine(),
+    'before_agent_start',
+    {
+      matcher_value: pipelineId,
+      pipeline_id: pipelineId,
+      ...(missionId ? { mission_id: missionId } : {}),
+      systemPromptOptions: {
+        pipelineId,
+        ...(missionId ? { missionId } : {}),
+        promptVisibility: 'ledgered',
+        stepCount: steps.length,
+      },
+    }
+  );
+  if (beforeAgentStart.blocked) {
+    throw new Error(
+      `[HOOK_BLOCKED] before_agent_start blocked pipeline ${pipelineId}: ${beforeAgentStart.reasons.join('; ')}`
+    );
+  }
   const run = () =>
     runValidatedSteps(steps, mergedContext, {
       trace,
       pipelinePath: inputPath,
       quiet: options.quiet,
       hasHuman: options.hasHuman,
+      runPipelineFile: executePipelineFile,
     });
   const missionTier = String(autoContext.mission_tier || '');
   const payloadTier: 'public' | 'confidential' | 'personal' =
@@ -327,6 +354,17 @@ export async function executePipelineFile(
           run
         );
   const failed = result.results.some((entry) => entry.status === 'failed');
+  const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+    matcher_value: pipelineId,
+    pipeline_id: pipelineId,
+    status: failed ? 'failed' : 'succeeded',
+    recovered: false,
+  });
+  if (settled.blocked) {
+    logger.warn(
+      `[PI-08] task_settled observer blocked after library pipeline completion: ${settled.reasons.join('; ')}`
+    );
+  }
   const persisted = finalizePipelineTrace(trace, !failed);
   result.context.trace_summary = persisted.trace.rootSpan.status;
   result.context.trace_persisted_path =
@@ -428,7 +466,7 @@ export async function main() {
   // leave their system microphone locked to BlackHole.
   const cleanupAndExit = (code: number) => {
     resetRouterSync();
-    process.exitCode = code;
+    exitProcess(code);
   };
   process.once('SIGINT', () => cleanupAndExit(130));
   process.once('SIGTERM', () => cleanupAndExit(143));
@@ -605,6 +643,7 @@ export async function main() {
         runJournal: activeRunJournal,
         resumeState,
         runId,
+        runPipelineFile: executePipelineFile,
       });
     const result =
       payloadTier === 'public'

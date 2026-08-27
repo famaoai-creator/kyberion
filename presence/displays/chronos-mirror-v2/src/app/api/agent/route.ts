@@ -10,6 +10,12 @@ import { guardRequest } from '../../../lib/api-guard';
 import { resolveViewerContextForRequest } from '../../../lib/viewer-context';
 import { buildUserFacingError } from '../../../lib/user-facing-error';
 import {
+  buildSurfaceMissionId,
+  intentResolutionA2ui,
+  sanitizeMissionSlug,
+  withMissionRole,
+} from './agent-route-helpers';
+import {
   normalizeChronosLocale,
   uxMessage,
   uxTextOr,
@@ -121,37 +127,6 @@ function scheduleChronosShutdown() {
   g.__kyberionChronosIdleTimer.unref?.();
 }
 
-function intentResolutionA2ui(contract: {
-  normalized_intent: string;
-  missing_inputs: string[];
-  authority_level: string;
-  outcome_kind: string;
-  next_action: { kind: string; label: string; consequence: string };
-}) {
-  return [
-    {
-      type: 'display:section',
-      props: {
-        title: 'Intent resolution',
-        items: [
-          { label: 'Understanding', value: contract.normalized_intent },
-          {
-            label: 'Missing input',
-            value: contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'none',
-          },
-          {
-            label: 'Next action',
-            value: contract.next_action.label,
-            consequence: contract.next_action.consequence,
-            action: contract.next_action.kind,
-          },
-          { label: 'Outcome', value: contract.outcome_kind },
-        ],
-      },
-    },
-  ];
-}
-
 async function ensureChronosAgent(context?: {
   missionId?: string;
   teamRole?: string;
@@ -240,20 +215,6 @@ type ChronosMissionProposalState = {
   createdAt: string;
 };
 
-function withMissionRole<T>(role: string, fn: () => T): T {
-  const previousRole = process.env.MISSION_ROLE;
-  process.env.MISSION_ROLE = role;
-  try {
-    return fn();
-  } finally {
-    if (previousRole === undefined) {
-      delete process.env.MISSION_ROLE;
-    } else {
-      process.env.MISSION_ROLE = previousRole;
-    }
-  }
-}
-
 function chronosMissionProposalStatePath(
   sessionId: string,
   pathResolver: Awaited<ReturnType<typeof loadChronosCore>>['pathResolver']
@@ -262,28 +223,6 @@ function chronosMissionProposalStatePath(
   return pathResolver.resolve(
     `active/shared/coordination/channels/chronos/mission-proposals/chronos-${safeSession}.json`
   );
-}
-
-function sanitizeMissionSlug(value: string): string {
-  return (
-    value
-      .toUpperCase()
-      .replace(/[^A-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 24) || 'REQUEST'
-  );
-}
-
-function buildSurfaceMissionId(
-  prefix: string,
-  threadTs: string,
-  proposal: MissionProposal,
-  sourceText?: string
-): string {
-  const base = proposal.summary || sourceText || proposal.why || proposal.mission_type || 'request';
-  const slug = sanitizeMissionSlug(base);
-  const numericThread = threadTs.replace(/\D+/g, '').slice(-8) || Date.now().toString().slice(-8);
-  return `MSN-${prefix}-${slug}-${numericThread}`;
 }
 
 function getChronosMissionProposalState(
@@ -512,7 +451,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
         const missionDir = path.join(root.dir, item);
         const statePath = path.join(missionDir, 'mission-state.json');
         if (!core.safeExistsSync(statePath)) continue;
-        const state = JSON.parse(core.safeReadFile(statePath, { encoding: 'utf8' }) as string);
+        const state = core.loadJson<Record<string, any>>(statePath);
         missions.push({
           missionId: state.mission_id || item,
           status: state.status,
@@ -520,13 +459,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
           missionType: state.mission_type,
           checkpoints: state.git?.checkpoints?.length || 0,
           nextTaskCount: core.safeExistsSync(path.join(missionDir, 'NEXT_TASKS.json'))
-            ? (
-                JSON.parse(
-                  core.safeReadFile(path.join(missionDir, 'NEXT_TASKS.json'), {
-                    encoding: 'utf8',
-                  }) as string
-                ) as any[]
-              )?.length || 0
+            ? core.loadJson<any[]>(path.join(missionDir, 'NEXT_TASKS.json'))?.length || 0
             : 0,
           planReady: core.safeExistsSync(path.join(missionDir, 'PLAN.md')),
         });
@@ -536,8 +469,7 @@ async function tryHandleChronosQuickAction(query: string, locale: SupportedLocal
     return missions.sort((a, b) => a.missionId.localeCompare(b.missionId));
   };
 
-  const readJson = (filePath: string) =>
-    JSON.parse(core.safeReadFile(filePath, { encoding: 'utf8' }) as string);
+  const readJson = <T = unknown>(filePath: string) => core.loadJson<T>(filePath);
 
   const runCommandQuickAction = (title: string, command: string[], description: string) => {
     const result = core.safeExecResult('pnpm', command, { cwd: PROJECT_ROOT, maxOutputMB: 4 });

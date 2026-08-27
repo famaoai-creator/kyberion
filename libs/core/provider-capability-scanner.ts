@@ -1,4 +1,5 @@
-import { loadJson, safeExec, safeReadFile } from './secure-io.js';
+import { safeExec, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 
 type CapabilitySource = {
@@ -76,20 +77,16 @@ export type DiscoveredCapability = CapabilityRegistryEntry & {
   evidence?: string;
 };
 
-function readJson<T>(relativePath: string): T {
-  return loadJson<T>(pathResolver.rootResolve(relativePath));
-}
-
 export function loadCapabilityRegistry(
   relativePath = 'knowledge/product/governance/harness-capability-registry.json'
 ): CapabilityRegistry {
-  return readJson<CapabilityRegistry>(relativePath);
+  return readJson<CapabilityRegistry>(pathResolver.rootResolve(relativePath));
 }
 
 export function loadProviderCapabilityScanPolicy(
   relativePath = 'knowledge/product/governance/provider-capability-scan-policy.json'
 ): ProviderScanPolicy {
-  return readJson<ProviderScanPolicy>(relativePath);
+  return readJson<ProviderScanPolicy>(pathResolver.rootResolve(relativePath));
 }
 
 function runProbe(provider: string, probe: ProbeDefinition): ProbeResult {

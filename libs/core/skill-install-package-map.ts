@@ -1,8 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 
 export interface SkillInstallPackageMapEntry {
   id: string;
@@ -23,30 +21,26 @@ const PERSONAL_MAP_PATH = pathResolver.knowledge(
 );
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/skill-install-package-map.schema.json');
 
-let validateFn: ValidateFunction | null = null;
 let cachedMap: SkillInstallPackageMap | null = null;
 let cachedKey: string | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
+const publicMapCatalog = defineCatalog<SkillInstallPackageMap>({
+  id: 'skill-install-package-map',
+  path: MAP_PATH,
+  schema: SCHEMA_PATH,
+});
+const personalMapCatalog = defineCatalog<SkillInstallPackageMap>({
+  id: 'skill-install-package-map.personal',
+  path: PERSONAL_MAP_PATH,
+  schema: SCHEMA_PATH,
+});
 
-function validateMap(value: unknown, label: string): SkillInstallPackageMap {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || []).map((error) =>
-      `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-    );
-    throw new Error(`Invalid skill install package map at ${label}: ${errors.join('; ')}`);
-  }
-  return value as SkillInstallPackageMap;
-}
-
-function loadMapFile(mapPath: string): SkillInstallPackageMap | null {
+function loadMapFile(
+  mapPath: string,
+  catalog: typeof publicMapCatalog
+): SkillInstallPackageMap | null {
   if (!safeExistsSync(mapPath)) return null;
-  return validateMap(loadJson(mapPath), mapPath);
+  return catalog.load();
 }
 
 function mergeMaps(
@@ -66,8 +60,11 @@ export function loadSkillInstallPackageMap(): SkillInstallPackageMap {
   const key = `${MAP_PATH}::${PERSONAL_MAP_PATH}`;
   if (cachedMap && cachedKey === key) return cachedMap;
 
-  const base = loadMapFile(MAP_PATH) ?? { version: '1.0.0', entries: [] };
-  const personal = loadMapFile(PERSONAL_MAP_PATH) ?? { version: base.version, entries: [] };
+  const base = loadMapFile(MAP_PATH, publicMapCatalog) ?? { version: '1.0.0', entries: [] };
+  const personal = loadMapFile(PERSONAL_MAP_PATH, personalMapCatalog) ?? {
+    version: base.version,
+    entries: [],
+  };
   const merged = mergeMaps(base, personal);
 
   cachedMap = merged;

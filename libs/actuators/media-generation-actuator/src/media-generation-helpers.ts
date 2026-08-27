@@ -17,7 +17,7 @@ import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
 } from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { GenerationJob } from '@agent/core';
@@ -109,10 +109,6 @@ function resolveGenerationBackend(
     kind: 'service_preset',
     provider: 'comfyui',
   };
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {

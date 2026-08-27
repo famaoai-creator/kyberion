@@ -10,6 +10,7 @@ import {
   withExecutionContext,
 } from '@agent/core';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ManifestEntry {
@@ -25,6 +26,48 @@ interface IndexEntry {
   author: string;
   dir: string;
   tier: string;
+}
+
+interface FrontmatterExclusionManifest {
+  manifest_version: number;
+  excluded_paths: string[];
+}
+
+const FRONTMATTER_EXCLUSIONS_PATH = pathResolver.knowledge(
+  'product/governance/frontmatter-exclusions.json'
+);
+
+function matchesExclusion(relativePath: string, pattern: string): boolean {
+  const expression = new RegExp(
+    `^${pattern
+      .split('**')
+      .map((part) =>
+        part
+          .split('*')
+          .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('[^/]*')
+      )
+      .join('.*')}$`
+  );
+  return expression.test(relativePath);
+}
+
+export function validateFrontmatterExclusions(files: readonly string[]): string[] {
+  const manifest = readJson<FrontmatterExclusionManifest>(FRONTMATTER_EXCLUSIONS_PATH);
+  const failures: string[] = [];
+  if (manifest.manifest_version !== 1 || !Array.isArray(manifest.excluded_paths)) {
+    return ['frontmatter exclusion manifest has an unsupported shape'];
+  }
+  for (const pattern of manifest.excluded_paths) {
+    // These roots are intentionally omitted by `walk` for tier isolation and
+    // runtime volatility, so their exclusion is validated by the walker
+    // policy rather than by a visible index entry.
+    if (pattern === 'personal/**' || pattern.startsWith('product/evolution/')) continue;
+    if (!files.some((file) => matchesExclusion(file, pattern))) {
+      failures.push(`frontmatter exclusion does not match any knowledge path: ${pattern}`);
+    }
+  }
+  return failures;
 }
 
 function getTier(relPath: string): string {
@@ -136,6 +179,11 @@ export function generateIndex(checkOnly = false): boolean {
 function generateIndexInner(checkOnly: boolean): boolean {
   const kbRoot = pathResolver.knowledge('');
   const allFiles = walk(kbRoot, kbRoot);
+  const exclusionFailures = validateFrontmatterExclusions(allFiles);
+  if (exclusionFailures.length > 0) {
+    for (const failure of exclusionFailures) console.error(`[generate_knowledge_index] ${failure}`);
+    return false;
+  }
 
   const manifestEntries: ManifestEntry[] = [];
   const indexEntries: IndexEntry[] = [];

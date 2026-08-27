@@ -17,43 +17,14 @@
  *   - `revoke` is idempotent.
  */
 
-import { logger, MissionEvidenceDoc, resolveIdentityContext } from '@agent/core';
+import {
+  grantVoiceConsent as grantVoiceConsentRecord,
+  logger,
+  readVoiceConsent,
+  revokeVoiceConsent as revokeVoiceConsentRecord,
+} from '@agent/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { isDirectScript } from './lib/harness.js';
-
-interface VoiceConsentRecord {
-  consent: 'granted' | 'revoked';
-  mission_id: string;
-  operator_handle: string;
-  scope?: string;
-  note?: string;
-  tenant_slug?: string;
-  granted_at?: string;
-  revoked_at?: string;
-  expires_at?: string;
-  audit_event_id?: string;
-}
-
-function isVoiceConsentRecord(doc: unknown): doc is VoiceConsentRecord {
-  if (!doc || typeof doc !== 'object') return false;
-  const r = doc as Partial<VoiceConsentRecord>;
-  return (
-    (r.consent === 'granted' || r.consent === 'revoked') &&
-    typeof r.mission_id === 'string' &&
-    typeof r.operator_handle === 'string' &&
-    (r.tenant_slug === undefined || typeof r.tenant_slug === 'string') &&
-    (r.expires_at === undefined || typeof r.expires_at === 'string')
-  );
-}
-
-function consentDoc(missionId: string): MissionEvidenceDoc<VoiceConsentRecord> {
-  return new MissionEvidenceDoc<VoiceConsentRecord>({
-    mission_id: missionId,
-    filename: 'voice-consent.json',
-    agent_id: 'voice-consent-cli',
-    validate: isVoiceConsentRecord,
-  });
-}
 
 function grant(
   missionId: string,
@@ -63,66 +34,30 @@ function grant(
   force?: boolean,
   expiresAt?: string
 ): void {
-  const doc = consentDoc(missionId);
-  const existing = doc.read();
-  if (existing && existing.consent === 'granted' && !force) {
-    throw new Error(
-      `voice-consent.json already declares consent=granted for mission ${missionId}. Use --force to overwrite.`
-    );
-  }
-  if (expiresAt && !Number.isFinite(Date.parse(expiresAt))) {
-    throw new Error(`expires_at must be an ISO-compatible datetime (got '${expiresAt}')`);
-  }
-  const tenantSlug = resolveIdentityContext().tenantSlug;
-  const record: VoiceConsentRecord = {
-    consent: 'granted',
-    mission_id: missionId,
-    operator_handle: operator,
-    granted_at: new Date().toISOString(),
-    ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
-    ...(expiresAt ? { expires_at: expiresAt } : {}),
-    ...(scope ? { scope } : {}),
-    ...(note ? { note } : {}),
-  };
-  const { audit_event_id } = doc.write(record, {
-    action: 'voice_consent.grant',
-    reason: `operator=${operator}${scope ? ` scope="${scope}"` : ''}`,
-    metadata: scope ? { scope } : undefined,
+  grantVoiceConsentRecord({
+    missionId,
+    operator,
+    scope,
+    note,
+    force,
+    expiresAt,
   });
-  if (audit_event_id) {
-    record.audit_event_id = audit_event_id;
-    doc.write(record);
-  }
   logger.info(`✅ voice consent granted for mission ${missionId} (operator=${operator})`);
 }
 
 function revoke(missionId: string, note?: string): void {
-  const doc = consentDoc(missionId);
-  const existing = doc.read();
+  const existing = readVoiceConsent(missionId);
   if (!existing || existing.consent === 'revoked') {
     logger.info(`ℹ️ voice consent already revoked / never granted for mission ${missionId}`);
     return;
   }
-  const record: VoiceConsentRecord = {
-    ...existing,
-    consent: 'revoked',
-    revoked_at: new Date().toISOString(),
-    ...(note ? { note } : {}),
-  };
-  const { audit_event_id } = doc.write(record, {
-    action: 'voice_consent.revoke',
-    reason: note,
-  });
-  if (audit_event_id) {
-    record.audit_event_id = audit_event_id;
-    doc.write(record);
-  }
+  const record = revokeVoiceConsentRecord(missionId, note);
+  if (!record) return;
   logger.info(`🔒 voice consent revoked for mission ${missionId}`);
 }
 
 function status(missionId: string): void {
-  const doc = consentDoc(missionId);
-  const existing = doc.read();
+  const existing = readVoiceConsent(missionId);
   if (!existing) {
     logger.info(`(no voice-consent.json yet for mission ${missionId})`);
     return;

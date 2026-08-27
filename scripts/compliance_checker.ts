@@ -8,9 +8,12 @@ import {
 } from '@agent/core';
 import { getAllFiles } from '@agent/core/fs-utils';
 import yargs from 'yargs';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-async function main(args: string[] = []) {
+export async function runComplianceScan(args: string[] = []): Promise<{
+  status: 'passed' | 'failed';
+  violations: string[];
+}> {
   const argv = await yargs(args)
     .option('dir', {
       type: 'string',
@@ -51,15 +54,23 @@ async function main(args: string[] = []) {
   }
 
   if (violations.length > 0) {
-    console.log(JSON.stringify({ status: 'failed', violations }, null, 2));
-    throw new ScriptExitError(1, 'Compliance violations detected');
-  } else {
-    console.log(JSON.stringify({ status: 'passed' }, null, 2));
+    return { status: 'failed', violations };
   }
+  return { status: 'passed', violations: [] };
 }
 
-void defineScript({
-  name: 'compliance:check',
-  flags: [],
-  run: ({ argv }) => main(argv),
-})();
+if (
+  isDirectScript(import.meta.url, 'compliance_checker.ts') ||
+  isDirectScript(import.meta.url, 'compliance_checker.js')
+) {
+  void defineScript({
+    name: 'compliance:check',
+    flags: [],
+    async run({ argv, print }) {
+      const result = await runComplianceScan(argv);
+      print(result);
+      if (result.status === 'failed')
+        throw new ScriptExitError(1, 'Compliance violations detected');
+    },
+  })();
+}

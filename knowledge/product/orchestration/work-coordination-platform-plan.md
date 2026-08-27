@@ -256,7 +256,7 @@ Acceptance:
 
 - Schemas parse as JSON.
 - Required fields match this plan.
-- `pnpm run check:catalogs` passes.
+- `pnpm check -- --only catalogs` passes.
 
 ### Step 2: Implement Local Store
 
@@ -465,7 +465,7 @@ Run after each milestone:
 
 ```bash
 pnpm exec vitest run libs/core/work-coordination.test.ts
-pnpm run check:catalogs
+pnpm check -- --only catalogs
 pnpm build
 ```
 

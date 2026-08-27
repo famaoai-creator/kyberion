@@ -6,7 +6,6 @@ import {
   isValidTenantSlug,
   knowledgeWritePathFor,
   type KnowledgeRankingWeightProposal,
-  loadJson,
   proposeKnowledgeRankingWeightRecalculation,
   pathResolver,
   recordHumanKnowledgeFeedback,
@@ -15,6 +14,7 @@ import {
   safeWriteFile,
   withExecutionContext,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -58,7 +58,7 @@ export const main = defineScript({
       if (!safeExistsSync(proposalPath)) {
         throw new Error(`[KNOWLEDGE_WEIGHT_INVALID] proposal not found: ${proposalPathArg}`);
       }
-      const proposal = loadJson<KnowledgeRankingWeightProposal>(proposalPath);
+      const proposal = readJson<KnowledgeRankingWeightProposal>(proposalPath);
       if (!proposal?.scope?.tenant_slug || !isValidTenantSlug(proposal.scope.tenant_slug)) {
         throw new Error('[SCOPE_CONTEXT_INVALID] proposal must contain a registered tenant slug');
       }

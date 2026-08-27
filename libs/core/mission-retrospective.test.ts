@@ -29,6 +29,18 @@ const realFsSecureIo = vi.hoisted(() => ({
   },
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: realFsSecureIo.loadJson,
+    loadJsonIfPresent: realFsSecureIo.loadJsonIfPresent,
+    appendFile: realFsSecureIo.safeAppendFileSync,
+    exists: realFsSecureIo.safeExistsSync,
+    readFile: (filePath: string) => String(realFsSecureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: realFsSecureIo.safeWriteFile,
+  }),
+  registerFoundationIo: vi.fn(),
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));

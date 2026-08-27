@@ -1,14 +1,37 @@
 import * as path from 'node:path';
-import { logger } from '../core.js';
+import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import {
-  safeCreateExclusiveFileSync,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeUnlinkSync,
-} from '../secure-io.js';
-import { loadJson } from '../secure-io.js';
+
+const logger = createLogger('lock-utils');
+
+export interface LockIo {
+  exists(filePath: string): boolean;
+  mkdir(dirPath: string): void;
+  createExclusive(filePath: string, content: string): void;
+  unlink(filePath: string): void;
+  loadJson<T>(filePath: string): T;
+}
+
+let lockIo: LockIo | undefined;
+
+function testLockIo(): LockIo | undefined {
+  if (!process.env.VITEST) return undefined;
+  return (
+    globalThis as typeof globalThis & {
+      __kyberionVitestIo?: { lockIo?: LockIo };
+    }
+  ).__kyberionVitestIo?.lockIo;
+}
+
+export function registerLockIo(io: LockIo): void {
+  lockIo = io;
+}
+
+function requireLockIo(): LockIo {
+  lockIo ||= testLockIo();
+  if (!lockIo) throw new Error('secure_lock_io_not_registered');
+  return lockIo;
+}
 
 /**
  * Lock Utilities for Autonomous Resource Arbitration.
@@ -27,7 +50,8 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
   const startTime = Date.now();
 
-  if (!safeExistsSync(LOCK_ROOT)) safeMkdir(LOCK_ROOT, { recursive: true });
+  const io = requireLockIo();
+  if (!io.exists(LOCK_ROOT)) io.mkdir(LOCK_ROOT);
 
   // EV-02: always attempt acquisition at least once.
   //
@@ -43,7 +67,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
   const MAX_STALE_PURGES = 3;
   for (;;) {
     try {
-      safeCreateExclusiveFileSync(
+      io.createExclusive(
         lockFile,
         JSON.stringify({
           pid: process.pid,
@@ -59,7 +83,7 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
       if (_isLockStale(lockFile) && stalePurges < MAX_STALE_PURGES) {
         stalePurges++;
         logger.warn(`⚠️ [LockUtils] Found stale lock for ${resourceId}. Purging...`);
-        safeUnlinkSync(lockFile);
+        io.unlink(lockFile);
         continue; // Retry immediately
       }
       // The lock is really held: honour the caller's waiting budget.
@@ -75,15 +99,16 @@ export async function acquireLock(resourceId: string, timeoutMs = 5000): Promise
  */
 export function releaseLock(resourceId: string): void {
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
-  if (safeExistsSync(lockFile)) {
+  const io = requireLockIo();
+  if (io.exists(lockFile)) {
     try {
-      const content = loadJson<{ pid?: number }>(lockFile);
+      const content = io.loadJson<{ pid?: number }>(lockFile);
       if (content.pid === process.pid) {
-        safeUnlinkSync(lockFile);
+        io.unlink(lockFile);
       }
     } catch (_) {
       // Force release if corrupted
-      safeUnlinkSync(lockFile);
+      io.unlink(lockFile);
     }
   }
 }
@@ -93,7 +118,7 @@ export function releaseLock(resourceId: string): void {
  */
 function _isLockStale(lockFile: string): boolean {
   try {
-    const content = loadJson<{ pid?: number }>(lockFile);
+    const content = requireLockIo().loadJson<{ pid?: number }>(lockFile);
     const pid = Number(content?.pid);
     // A partially-written or hand-edited lock must never become a permanent
     // delivery fence. Only a positive integer PID is meaningful ownership
@@ -146,18 +171,19 @@ export async function withLock<T>(
 export function withLockSync<T>(resourceId: string, fn: () => T, timeoutMs = 5000): T {
   const lockFile = path.join(LOCK_ROOT, `${resourceId}.lock`);
   const startTime = Date.now();
-  if (!safeExistsSync(LOCK_ROOT)) safeMkdir(LOCK_ROOT, { recursive: true });
+  const io = requireLockIo();
+  if (!io.exists(LOCK_ROOT)) io.mkdir(LOCK_ROOT);
 
   while (Date.now() - startTime < timeoutMs) {
     try {
-      safeCreateExclusiveFileSync(
+      io.createExclusive(
         lockFile,
         JSON.stringify({ pid: process.pid, ts: new Date().toISOString(), id: resourceId })
       );
     } catch (err: any) {
       if (err?.code !== 'EEXIST') throw err;
       if (_isLockStale(lockFile)) {
-        safeUnlinkSync(lockFile);
+        io.unlink(lockFile);
         continue;
       }
       const waitBuffer = new Int32Array(new SharedArrayBuffer(4));

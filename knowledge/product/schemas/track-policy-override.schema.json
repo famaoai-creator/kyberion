@@ -4,6 +4,7 @@
   "title": "Track Policy Override",
   "type": "object",
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "description": { "type": "string" },
     "track_types": {

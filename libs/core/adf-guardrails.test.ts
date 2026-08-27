@@ -52,6 +52,27 @@ describe('validatePipelineGuardrails', () => {
     ).toHaveLength(3);
   });
 
+  it('applies only exact file-and-command wrapper migration baselines', () => {
+    const command = 'node dist/scripts/task.js';
+    const pipeline = {
+      steps: [{ op: 'system:exec', params: { command } }],
+    };
+    const baseline = [
+      { file: 'pipelines/example.json', pattern: 'script-wrapper', match: command },
+    ];
+
+    expect(
+      validatePipelineGuardrails(pipeline, 'pipelines/example.json', {
+        scriptWrapperBaseline: baseline,
+      }).findings
+    ).not.toContainEqual(expect.objectContaining({ code: 'script-wrapper-forbidden' }));
+    expect(
+      validatePipelineGuardrails(pipeline, 'pipelines/other.json', {
+        scriptWrapperBaseline: baseline,
+      }).findings
+    ).toContainEqual(expect.objectContaining({ code: 'script-wrapper-forbidden' }));
+  });
+
   it('warns when a dynamic include cannot be expanded during preflight', () => {
     const report = validatePipelineGuardrails({
       steps: [{ op: 'core:include', params: { fragment: '{{fragment_ref}}' } }],

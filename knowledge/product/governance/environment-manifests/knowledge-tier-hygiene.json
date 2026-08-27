@@ -56,16 +56,16 @@
     {
       "capability_id": "tier-hygiene.script",
       "kind": "binary",
-      "description": "`pnpm run check:tier-hygiene` exits 0; the canonical tier policy is satisfied.",
+      "description": "`pnpm check -- --only tier-hygiene` exits 0; the canonical tier policy is satisfied.",
       "required_for": ["validate"],
       "probe": {
         "kind": "command",
         "command": "pnpm",
-        "args": ["-s", "run", "check:tier-hygiene"]
+        "args": ["-s", "check", "--", "--only", "tier-hygiene"]
       },
       "install": {
         "operator_confirmed": true,
-        "instruction": "Re-run the hygiene script to see the violation list, fix the offending paths, and re-bootstrap. Operator-confirmed because the fixes touch tracked tiers."
+        "instruction": "Re-run `pnpm check -- --only tier-hygiene` to see the violation list, fix the offending paths, and re-bootstrap. Operator-confirmed because the fixes touch tracked tiers."
       }
     }
   ]

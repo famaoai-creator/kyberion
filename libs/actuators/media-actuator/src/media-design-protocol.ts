@@ -157,8 +157,7 @@ import {
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
-import { loadJsonValue } from './media-layout-catalog.js';
-import { resolveConfidentialTenantOverride } from './media-layout-catalog.js';
+import { loadJsonValue, resolveConfidentialTenantOverride } from './media-catalog-loaders.js';
 import * as path from 'node:path';
 import { findSlidesByOwner, pptxDiff, type MediaSlideText } from './media-slide-ops.js';
 import { fileURLToPath } from 'node:url';
@@ -167,77 +166,19 @@ import * as excelUtils from '@agent/shared-media';
 import { PDFParse } from 'pdf-parse';
 import { runActuatorCli } from '@agent/core';
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '@agent/core/design-fonts';
-
-function cloneJsonValue<T>(value: T): T {
-  return value === undefined ? value : JSON.parse(JSON.stringify(value));
-}
+import {
+  cloneJsonValue,
+  deepMergeCatalog,
+  readJsonFilesRecursively,
+  loadJsonCatalog,
+  loadMediaDesignSystemsCatalog,
+} from './media-catalog-loaders.js';
 
 function ensureParentDir(targetPath: string): void {
   const parentDir = path.dirname(targetPath);
   if (!safeExistsSync(parentDir)) {
     safeMkdir(parentDir, { recursive: true });
   }
-}
-
-function deepMergeCatalog(base: any, next: any): any {
-  if (Array.isArray(base) || Array.isArray(next)) {
-    return cloneJsonValue(next);
-  }
-  if (!base || typeof base !== 'object') return cloneJsonValue(next);
-  if (!next || typeof next !== 'object') return cloneJsonValue(next);
-  const merged: Record<string, any> = { ...base };
-  for (const [key, value] of Object.entries(next)) {
-    if (
-      value &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      merged[key] &&
-      typeof merged[key] === 'object' &&
-      !Array.isArray(merged[key])
-    ) {
-      merged[key] = deepMergeCatalog(merged[key], value);
-    } else {
-      merged[key] = cloneJsonValue(value);
-    }
-  }
-  return merged;
-}
-
-function readJsonFilesRecursively(dirPath: string): any[] {
-  if (!safeExistsSync(dirPath)) return [];
-  const entries = safeReaddir(dirPath).sort();
-  const docs: any[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry);
-    const stat = safeLstat(fullPath);
-    if (stat.isDirectory()) {
-      docs.push(...readJsonFilesRecursively(fullPath));
-      continue;
-    }
-    if (!entry.endsWith('.json')) continue;
-    docs.push(loadJsonValue(fullPath));
-  }
-  return docs;
-}
-
-function loadJsonCatalog(
-  rootDir: string,
-  input: {
-    directoryPath: string;
-    filePath: string;
-    fallback: any;
-  }
-): any {
-  const dirPath = path.resolve(rootDir, input.directoryPath);
-  const filePath = path.resolve(rootDir, input.filePath);
-  const docs = readJsonFilesRecursively(dirPath);
-  if (docs.length > 0) {
-    return docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(input.fallback));
-  }
-  if (safeExistsSync(filePath)) {
-    return loadJsonValue(filePath);
-  }
-  return cloneJsonValue(input.fallback);
 }
 
 function loadArtifactLibraryCatalog(rootDir: string): any {
@@ -385,14 +326,6 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     }
   }
   return null;
-}
-
-function loadMediaDesignSystemsCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/media-design-systems',
-    filePath: 'knowledge/public/design-patterns/media-templates/media-design-systems.json',
-    fallback: { default_system: 'executive-standard', systems: {} },
-  });
 }
 
 function loadImportedDesignMdIndex(rootDir: string): any {

@@ -22,7 +22,7 @@ import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { isDirectScript } from './lib/harness.js';
-import { loadJson } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
@@ -92,7 +92,7 @@ export function openAlignmentApproval(
 
   let brief: MissionBriefShape & Record<string, unknown>;
   try {
-    brief = loadJson<MissionBriefShape & Record<string, unknown>>(briefPath);
+    brief = readJson<MissionBriefShape & Record<string, unknown>>(briefPath);
   } catch (error) {
     return {
       missionId,

@@ -3,7 +3,6 @@ import * as path from 'node:path';
 import {
   classifyError,
   formatClassification,
-  loadJson,
   pathResolver,
   safeCopyFileSync,
   safeExistsSync,
@@ -12,6 +11,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core';
+import { readJson } from '@agent/core/foundation';
 import { createCustomer } from './customer_create.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -40,7 +40,7 @@ export function migratePersonalCustomer(slug: string): string {
   const customerRoot = created.root;
 
   const customerJsonPath = path.join(customerRoot, 'customer.json');
-  const customerJson = loadJson<Record<string, unknown>>(customerJsonPath);
+  const customerJson = readJson<Record<string, unknown>>(customerJsonPath);
   safeWriteFile(
     customerJsonPath,
     JSON.stringify(
