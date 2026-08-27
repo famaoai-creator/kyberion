@@ -16,6 +16,11 @@ import {
 } from '@agent/core';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runInlineProductivityScore } from './pipeline-domain-ops.js';
+import {
+  DEFAULT_CORE_WAIT_MS,
+  resolveReasoningContextParam,
+  resolveWaitDurationMs,
+} from './pipeline-execution-part-bootstrap.js';
 
 const {
   normalizePipelineOp,
@@ -1360,5 +1365,108 @@ describe('Typed Flow role resolution', () => {
     });
     expect(result.context.parallel_items).toHaveLength(2);
     expect(result.context.accumulated_items.collected).toHaveLength(2);
+  });
+});
+
+describe('falsy resolved params in inline core handlers', () => {
+  // Regression guard for the class fixed in runInlineCoreTransform: params are
+  // template-resolved before dispatch, so a `||` default silently discards a
+  // legitimately falsy value (0 / false / '').
+
+  describe('resolveWaitDurationMs', () => {
+    it('honours an explicit zero-length wait', () => {
+      expect(resolveWaitDurationMs(0)).toBe(0);
+      expect(resolveWaitDurationMs('0')).toBe(0);
+    });
+
+    it('accepts finite numeric durations from either a number or a numeric string', () => {
+      expect(resolveWaitDurationMs(120)).toBe(120);
+      expect(resolveWaitDurationMs('250')).toBe(250);
+    });
+
+    it('treats non-durations as "not supplied" so the next alias still applies', () => {
+      // '' is what resolveVars yields for an unresolved single-var template —
+      // it must keep falling through to the default rather than waiting 0ms.
+      expect(resolveWaitDurationMs('')).toBeUndefined();
+      expect(resolveWaitDurationMs('   ')).toBeUndefined();
+      expect(resolveWaitDurationMs(undefined)).toBeUndefined();
+      expect(resolveWaitDurationMs(null)).toBeUndefined();
+      expect(resolveWaitDurationMs(false)).toBeUndefined();
+      expect(resolveWaitDurationMs('soon')).toBeUndefined();
+      expect(resolveWaitDurationMs(Number.NaN)).toBeUndefined();
+      expect(resolveWaitDurationMs(-1)).toBeUndefined();
+    });
+  });
+
+  it('waits 0ms for core:wait with duration_ms: 0 instead of the 1000ms default', async () => {
+    const startedAt = Date.now();
+    const result = await runSteps([{ op: 'core:wait', params: { duration_ms: 0 } }]);
+    const elapsed = Date.now() - startedAt;
+
+    expect(result.status).toBe('succeeded');
+    expect(DEFAULT_CORE_WAIT_MS).toBe(1000);
+    expect(elapsed).toBeLessThan(DEFAULT_CORE_WAIT_MS / 2);
+  });
+
+  it('resolves core:wait duration_ms from a template that evaluates to 0', async () => {
+    const startedAt = Date.now();
+    const result = await runSteps(
+      [{ op: 'core:wait', params: { duration_ms: '{{backoff_ms}}' } }],
+      { backoff_ms: 0 }
+    );
+    const elapsed = Date.now() - startedAt;
+
+    expect(result.status).toBe('succeeded');
+    expect(elapsed).toBeLessThan(DEFAULT_CORE_WAIT_MS / 2);
+  });
+
+  describe('resolveReasoningContextParam', () => {
+    const ctx = { loop: { count: 0 }, flag: false, note: 'hi' };
+
+    it('honours a declared context that resolves to a falsy value', () => {
+      expect(resolveReasoningContextParam({ context: 0 }, ctx)).toBe(0);
+      expect(resolveReasoningContextParam({ context: false }, ctx)).toBe(false);
+      expect(resolveReasoningContextParam({ context: '{{loop.count}}' }, ctx)).toBe(0);
+      expect(resolveReasoningContextParam({ context: '{{flag}}' }, ctx)).toBe(false);
+    });
+
+    it('falls back to the whole pipeline context only when context is absent', () => {
+      expect(resolveReasoningContextParam({}, ctx)).toBe(ctx);
+      expect(resolveReasoningContextParam({ context: undefined }, ctx)).toBe(ctx);
+      expect(resolveReasoningContextParam({ context: null }, ctx)).toBe(ctx);
+    });
+
+    it('still resolves string and array contexts element-wise', () => {
+      expect(resolveReasoningContextParam({ context: '{{note}}' }, ctx)).toBe('hi');
+      expect(resolveReasoningContextParam({ context: ['{{note}}', 7] }, ctx)).toEqual(['hi', 7]);
+    });
+  });
+
+  it('passes a falsy core:transform input through instead of the whole context', async () => {
+    const result = await runSteps(
+      [
+        {
+          op: 'core:transform',
+          params: {
+            input: '{{loop_count}}',
+            script: 'return { type: typeof input, value: input };',
+            export_as: 'zero_probe',
+          },
+        },
+        {
+          op: 'core:transform',
+          params: {
+            input: false,
+            script: 'return { type: typeof input, value: input };',
+            export_as: 'false_probe',
+          },
+        },
+      ],
+      { loop_count: 0 }
+    );
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.zero_probe).toEqual({ type: 'number', value: 0 });
+    expect(result.context.false_probe).toEqual({ type: 'boolean', value: false });
   });
 });
