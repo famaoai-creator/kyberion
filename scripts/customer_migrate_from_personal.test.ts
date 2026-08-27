@@ -39,7 +39,13 @@ vi.mock('@agent/core', () => ({
   safeReadFile: mocks.safeReadFile,
   safeReaddir: mocks.safeReaddir,
   safeWriteFile: mocks.safeWriteFile,
-  loadJson: mocks.loadJson,
+}));
+
+// customer.json is read through the foundation JSON facade, which dispatches
+// through its own registered IO bridge to the real secure-io — so it has to be
+// stubbed here, or the tmpdir fixture trips the project-root read policy.
+vi.mock('@agent/core/foundation', () => ({
+  readJson: mocks.loadJson,
 }));
 
 vi.mock('./customer_create.js', () => ({
