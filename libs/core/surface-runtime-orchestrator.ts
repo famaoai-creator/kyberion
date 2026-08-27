@@ -528,6 +528,24 @@ function recordSurfaceReasoningTierDeclaration(input: {
 }
 
 /**
+ * Single derivation of "this turn needs approval" shared by both surface UX
+ * contract call sites (the in-conversation escalation check and the outbound
+ * chokepoint), so an approval turn is held to the same consequence/unblock
+ * rule wherever it is validated.
+ */
+function deriveSurfaceApprovalRequired(input: {
+  intentResolution?: { authority_level?: string } | null;
+  approvalRequests?: readonly unknown[];
+  missionProposals?: readonly unknown[];
+}): boolean {
+  return (
+    input.intentResolution?.authority_level === 'approval_required' ||
+    (input.approvalRequests?.length ?? 0) > 0 ||
+    (input.missionProposals?.length ?? 0) > 0
+  );
+}
+
+/**
  * SO-05 Task 3: one-shot fast→standard escalation for the *text* of a surface
  * agent response that is about to become the user-visible reply. Runs INSIDE
  * runSurfaceConversation (not the outer runSurfaceMessageConversation
@@ -547,7 +565,8 @@ async function escalateSurfaceTextIfNeeded(
   handle: AgentHandle,
   prompt: string,
   text: string,
-  callSite: SurfaceReasoningTierCallSite
+  callSite: SurfaceReasoningTierCallSite,
+  approvalRequired = false
 ): Promise<string> {
   // Empty text (e.g. a2a-only agent turns) keeps its pre-escalation handling:
   // the outer chokepoint's deterministic repair is responsible for shaping it.
@@ -557,6 +576,7 @@ async function escalateSurfaceTextIfNeeded(
   const verdict = validateSurfaceUxContract({
     text,
     allow_conversational_reply: allowConversationalReply,
+    approval_required: approvalRequired,
   });
   if (verdict.valid) return text;
 
@@ -566,6 +586,7 @@ async function escalateSurfaceTextIfNeeded(
     validateSurfaceUxContract({
       text: repairedText,
       allow_conversational_reply: allowConversationalReply,
+      approval_required: approvalRequired,
     }).valid
   ) {
     return repairedText;
@@ -1196,7 +1217,12 @@ export async function runSurfaceConversation(
       handle,
       structuredQuery,
       firstBlocks.text,
-      'surface_main_ask'
+      'surface_main_ask',
+      deriveSurfaceApprovalRequired({
+        intentResolution,
+        approvalRequests: firstBlocks.approvalRequests,
+        missionProposals: firstBlocks.missionProposals,
+      })
     );
     return withIntentResolution(
       surfaceRuntimeData.attachExecutionFeedbackPrompt(
@@ -1223,7 +1249,12 @@ export async function runSurfaceConversation(
       handle,
       structuredQuery,
       firstBlocks.text,
-      'surface_main_ask'
+      'surface_main_ask',
+      deriveSurfaceApprovalRequired({
+        intentResolution,
+        approvalRequests: firstBlocks.approvalRequests,
+        missionProposals: firstBlocks.missionProposals,
+      })
     );
     return withIntentResolution(
       surfaceRuntimeData.attachExecutionFeedbackPrompt(
@@ -1270,7 +1301,15 @@ export async function runSurfaceConversation(
     handle,
     summaryPrompt,
     followUpBlocksRaw.text,
-    'surface_summary_ask'
+    'surface_summary_ask',
+    deriveSurfaceApprovalRequired({
+      intentResolution,
+      approvalRequests: [...firstBlocks.approvalRequests, ...followUpBlocksRaw.approvalRequests],
+      missionProposals: [
+        ...(firstBlocks.missionProposals || []),
+        ...(followUpBlocksRaw.missionProposals || []),
+      ],
+    })
   );
   const followUpBlocks = { ...followUpBlocksRaw, text: followUpText };
 
@@ -1369,10 +1408,7 @@ export async function runSurfaceMessageConversation(
     const text = (result as { text?: unknown })?.text;
     if (typeof text === 'string' && text.trim()) {
       const allowConversationalReply = isSimpleGreetingText(input.text);
-      const approvalRequired =
-        result.intentResolution?.authority_level === 'approval_required' ||
-        (result.approvalRequests?.length ?? 0) > 0 ||
-        (result.missionProposals?.length ?? 0) > 0;
+      const approvalRequired = deriveSurfaceApprovalRequired(result);
       const verdict = validateSurfaceUxContract({
         text,
         allow_conversational_reply: allowConversationalReply,
