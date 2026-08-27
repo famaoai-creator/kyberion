@@ -297,7 +297,18 @@ export async function executePipeline(
     }
     ctx.browser_tabs = await browserRuntimeHelpers.summarizeTabs(runtime);
     ctx.active_tab_id = runtime.activeTabId;
-    const keepAlive = options.keep_alive === true || Number(options.lease_ms || 0) > 0;
+    // A single-op sub-pipeline dispatched by the actuator SDK carries the
+    // outer pipeline's options on ctx.__pipeline_options; honour its
+    // keep_alive/lease so leased sessions survive between outer steps.
+    const outerOptions =
+      ctx.__pipeline_options && typeof ctx.__pipeline_options === 'object'
+        ? (ctx.__pipeline_options as { keep_alive?: unknown; lease_ms?: unknown })
+        : undefined;
+    const keepAlive =
+      options.keep_alive === true ||
+      Number(options.lease_ms || 0) > 0 ||
+      outerOptions?.keep_alive === true ||
+      Number(outerOptions?.lease_ms || 0) > 0;
     const shouldClose = ctx.__close_browser_session === true || !keepAlive;
     const leaseExpiresAt = shouldClose
       ? undefined

@@ -38,7 +38,8 @@
       "properties": {
         "capture": { "$ref": "#/$defs/operationNames" },
         "transform": { "$ref": "#/$defs/operationNames" },
-        "apply": { "$ref": "#/$defs/operationNames" }
+        "apply": { "$ref": "#/$defs/operationNames" },
+        "control": { "$ref": "#/$defs/operationNames" }
       }
     }
   }

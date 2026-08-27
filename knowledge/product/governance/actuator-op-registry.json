@@ -226,6 +226,18 @@
         "set_passkey_user_verified",
         "wait",
         "wait_ref"
+      ],
+      "control": [
+        "close_session",
+        "if",
+        "open_tab",
+        "pause_for_operator",
+        "ref",
+        "remove_passkey_authenticator",
+        "select_tab",
+        "select_tab_matching",
+        "setup_passkey_authenticator",
+        "while"
       ]
     },
     "build": {
@@ -257,7 +269,8 @@
         "shell"
       ],
       "transform": ["impact_analysis", "json_update", "regex_replace", "run_js"],
-      "apply": ["log", "write_artifact", "write_file"]
+      "apply": ["log", "write_artifact", "write_file"],
+      "control": ["if", "while"]
     },
     "codex": {
       "capture": ["app-server", "cloud", "features", "mcp", "review"],
@@ -286,7 +299,8 @@
         "write",
         "write_artifact",
         "write_file"
-      ]
+      ],
+      "control": ["if", "while"]
     },
     "gemini": {
       "capture": ["extensions", "hooks", "mcp", "skills"],
@@ -400,7 +414,8 @@
         "run_workflow",
         "submit_generation",
         "wait_generation_job"
-      ]
+      ],
+      "control": ["pipeline"]
     },
     "meeting": {
       "capture": ["check_consent", "listen", "status"],
@@ -453,12 +468,14 @@
         "write_artifact",
         "write_engineering_artifacts",
         "write_file"
-      ]
+      ],
+      "control": ["if", "while"]
     },
     "network": {
       "capture": ["a2a_poll", "fetch", "shell"],
       "transform": ["distill_response", "json_query", "llm_decide", "regex_extract"],
-      "apply": ["a2a_send", "log", "write_artifact", "write_file"]
+      "apply": ["a2a_send", "log", "write_artifact", "write_file"],
+      "control": ["if", "while"]
     },
     "orchestrator": {
       "capture": ["discover_capabilities", "discover_skills"],
@@ -579,7 +596,8 @@
         "write_artifact",
         "write_file",
         "write_json"
-      ]
+      ],
+      "control": ["if", "while"]
     },
     "terminal": {
       "capture": ["list", "list_terminal_sessions", "poll", "poll_terminal"],
@@ -722,7 +740,8 @@
         "uncertainty_gate",
         "write_artifact",
         "write_file"
-      ]
+      ],
+      "control": ["if", "while"]
     }
   }
 }

@@ -33,6 +33,7 @@ interface DomainOpRegistry {
   capture?: string[];
   transform?: string[];
   apply?: string[];
+  control?: string[];
 }
 
 interface ActuatorOpRegistryFile {
@@ -207,6 +208,7 @@ export function determineActuatorStepType(domain: string, action: string): Pipel
   if (registry?.apply?.includes(action)) return 'apply';
   if (registry?.capture?.includes(action)) return 'capture';
   if (registry?.transform?.includes(action)) return 'transform';
+  if (registry?.control?.includes(action)) return 'control';
 
   if (shared_capture_ops.includes(action)) return 'capture';
   if (shared_transform_ops.includes(action)) return 'transform';
