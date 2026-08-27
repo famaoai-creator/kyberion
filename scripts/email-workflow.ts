@@ -7,7 +7,7 @@ import {
   resolveEmailTriagePath,
 } from '@agent/core/email-workflow';
 import { safeExistsSync, safeReadFile } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -141,8 +141,14 @@ async function main(argv: string[]) {
   throw new Error(`Unknown email workflow command: ${command}`);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'email:workflow',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'email-workflow.ts') ||
+  isDirectScript(import.meta.url, 'email-workflow.js')
+) {
+  void script();
+}

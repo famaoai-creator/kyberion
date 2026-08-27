@@ -35,7 +35,7 @@ import {
   scanContent,
 } from '@agent/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   commitIngest,
   dedupContent,
@@ -375,8 +375,11 @@ export async function main(argv: string[] = []): Promise<void> {
   console.log(JSON.stringify(result.asset, null, 2));
 }
 
-void defineScript({
+const script = defineScript({
   name: 'ingest',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (isDirectScript(import.meta.url, 'ingest.ts') || isDirectScript(import.meta.url, 'ingest.js')) {
+  void script();
+}

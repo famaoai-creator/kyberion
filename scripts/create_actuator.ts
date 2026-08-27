@@ -20,7 +20,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createStandardYargs, logger, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -308,8 +308,14 @@ async function main(args: string[]): Promise<void> {
   );
 }
 
-void defineScript({
+const script = defineScript({
   name: 'create:actuator',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'create_actuator.ts') ||
+  isDirectScript(import.meta.url, 'create_actuator.js')
+) {
+  void script();
+}

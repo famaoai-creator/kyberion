@@ -6,7 +6,7 @@ import {
   readGwsAuthStatus,
   readM365AuthStatus,
 } from '@agent/core/calendar-workflow';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -169,8 +169,14 @@ async function main(argv: string[]) {
   throw new Error(`Unknown calendar workflow command: ${command}`);
 }
 
-void defineScript({
+const script = defineScript({
   name: 'calendar:workflow',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'calendar-workflow.ts') ||
+  isDirectScript(import.meta.url, 'calendar-workflow.js')
+) {
+  void script();
+}

@@ -11,7 +11,7 @@ import {
   scanProviderCapabilities,
   type ProbedProviderCapabilities,
 } from '@agent/core';
-import { defineScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function main(args: string[]): void {
   const outPathArgIndex = args.indexOf('--out');
@@ -76,8 +76,14 @@ function main(args: string[]): void {
   console.log(JSON.stringify(summary, null, 2));
 }
 
-void defineScript({
+const script = defineScript({
   name: 'scan:provider-cli-capabilities',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'scan_provider_cli_capabilities.ts') ||
+  isDirectScript(import.meta.url, 'scan_provider_cli_capabilities.js')
+) {
+  void script();
+}

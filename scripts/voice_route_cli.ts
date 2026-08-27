@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { handleAction } from '../libs/actuators/voice-actuator/src/index.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, ScriptExitError } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Command = 'list' | 'probe' | 'test' | 'help';
 
@@ -163,8 +163,14 @@ async function main(argv: string[]): Promise<void> {
   }
 }
 
-void defineScript({
+const script = defineScript({
   name: 'voice:route',
   flags: [],
   run: ({ argv }) => main(argv),
-})();
+});
+if (
+  isDirectScript(import.meta.url, 'voice_route_cli.ts') ||
+  isDirectScript(import.meta.url, 'voice_route_cli.js')
+) {
+  void script();
+}
