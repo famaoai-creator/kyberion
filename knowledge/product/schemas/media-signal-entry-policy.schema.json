@@ -2,6 +2,7 @@
   "type": "object",
   "required": ["version", "sheet_title", "columns", "empty_message", "elevated_tones", "elevated_status_keywords", "entry_types"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "sheet_title": { "type": "string" },
     "columns": {
