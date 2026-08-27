@@ -4,6 +4,7 @@
   "type": "object",
   "required": ["version", "title", "summary_title", "capability_inventory_title", "provider_title_prefix", "missing_adapter_title", "missing_adapter_message"],
   "properties": {
+    "$schema": { "type": "string" },
     "version": { "type": "string" },
     "title": { "type": "string", "minLength": 1 },
     "summary_title": { "type": "string", "minLength": 1 },
