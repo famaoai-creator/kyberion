@@ -31,6 +31,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import {
   buildProviderChildEnv,
   type ProviderPermissionProfileName,
@@ -83,10 +84,6 @@ interface ContentBlock {
   is_error?: boolean;
   content?: unknown;
   input?: { subagent_type?: string; run_in_background?: unknown };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function normalizeContentBlock(value: unknown): ContentBlock | undefined {

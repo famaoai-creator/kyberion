@@ -16,6 +16,7 @@ import * as path from 'node:path';
 
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -42,10 +43,6 @@ interface NativeSttPayload {
   text?: string;
   error?: string;
   locale?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Normalize the small JSON envelope emitted by native-stt.swift. */
