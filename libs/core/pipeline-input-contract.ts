@@ -1,3 +1,5 @@
+import { clamp } from './foundation/text.js';
+
 export type PipelineInputSchema = Record<string, unknown>;
 
 function schemaPlaceholder(schema: PipelineInputSchema | undefined): unknown {
@@ -30,7 +32,7 @@ function schemaPlaceholder(schema: PipelineInputSchema | undefined): unknown {
     default:
       return typeof schema.minLength === 'number'
         ? 'p'.repeat(
-            Math.max(1, Math.min(schema.minLength, Number(schema.maxLength) || schema.minLength))
+            clamp(Number(schema.maxLength) || (schema.minLength as number), 1, schema.minLength as number)
           )
         : 'pipeline-placeholder';
   }
