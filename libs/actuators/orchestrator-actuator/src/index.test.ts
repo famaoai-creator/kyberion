@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/foundation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/foundation')>()),
   loadJson: mocks.loadJson,
+  readJson: mocks.loadJson,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({

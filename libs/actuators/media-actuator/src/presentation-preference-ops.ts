@@ -1,9 +1,5 @@
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { registerPresentationPreferenceProfile } from '@agent/core/presentation-preference-registry';
 import type { PresentationPreferenceProfile } from '@agent/core/types';
@@ -43,7 +39,7 @@ export function registerPresentationPreferenceProfileOp(
     (input.profile_path
       ? (() => {
           const profilePath = resolveProfilePath(input.profile_path);
-          return profilePath ? loadJson<PresentationPreferenceProfile>(profilePath) : null;
+          return profilePath ? readJson<PresentationPreferenceProfile>(profilePath) : null;
         })()
       : null);
   if (!profile || typeof profile !== 'object') {

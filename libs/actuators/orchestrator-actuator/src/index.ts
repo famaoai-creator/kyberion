@@ -1,6 +1,6 @@
 import { logger } from '@agent/core/core';
-import { loadJson } from '@agent/core/secure-io';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
 import {
@@ -119,7 +119,7 @@ async function performReconcile(input: OrchestratorAction) {
   assertStrategyTrust(input, resolved.relative);
   if (!safeExistsSync(resolved.absolute))
     throw new Error(`Strategy not found: ${resolved.absolute}`);
-  const config = loadJson<StrategyConfig>(resolved.absolute);
+  const config = readJson<StrategyConfig>(resolved.absolute);
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

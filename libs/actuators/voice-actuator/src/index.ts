@@ -22,9 +22,8 @@ import {
 import { getVoiceRuntimePolicy } from '@agent/core/voice-runtime-policy';
 import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
-  loadJson,
   safeExec,
   safeExecResult,
   safeExistsSync,
@@ -391,7 +390,7 @@ async function recordVerifyRepairVoiceSample(input: {
   if (input.resume_session_path) {
     let session: NonNullable<ReturnType<typeof parseVoiceRepairSession>>;
     try {
-      const parsedSession = parseVoiceRepairSession(loadJson<unknown>(sessionPath));
+      const parsedSession = parseVoiceRepairSession(readJson<unknown>(sessionPath));
       if (!parsedSession) throw new Error('voice repair session has an invalid shape');
       session = parsedSession;
     } catch (error: any) {

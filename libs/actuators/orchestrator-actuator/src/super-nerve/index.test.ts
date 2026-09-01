@@ -1,8 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { actuatorModuleLoader, executeSuperPipeline } from './index.js';
 
-const { attemptAutonomousRepairMock } = vi.hoisted(() => ({
+const { attemptAutonomousRepairMock, readJsonMock } = vi.hoisted(() => ({
   attemptAutonomousRepairMock: vi.fn(),
+  readJsonMock: (filePath: string) =>
+    JSON.parse(
+      String(
+        String(filePath).includes('retryable')
+          ? JSON.stringify({
+              steps: [
+                {
+                  op: 'network:fetch',
+                  params: { url: 'https://repaired.example.com' },
+                },
+              ],
+            })
+          : String(filePath).includes('macro')
+            ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
+            : ''
+      )
+    ),
 }));
 
 vi.mock('@agent/core/autonomous-repair', () => ({
@@ -22,30 +39,17 @@ vi.mock('@agent/core/core', async (importOriginal) => {
   };
 });
 
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  readJson: vi.fn(readJsonMock),
+}));
+
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
   safeReadFile: vi.fn((filePath: string) =>
     String(filePath).includes('macro')
       ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
       : ''
-  ),
-  loadJson: vi.fn((filePath: string) =>
-    JSON.parse(
-      String(
-        String(filePath).includes('retryable')
-          ? JSON.stringify({
-              steps: [
-                {
-                  op: 'network:fetch',
-                  params: { url: 'https://repaired.example.com' },
-                },
-              ],
-            })
-          : String(filePath).includes('macro')
-            ? JSON.stringify({ steps: [{ op: 'system:log', params: { message: 'from macro' } }] })
-            : ''
-      )
-    )
   ),
   safeExistsSync: vi.fn().mockReturnValue(true),
   safeWriteFile: vi.fn(),

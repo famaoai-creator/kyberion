@@ -1,10 +1,10 @@
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
 import { designDefaultsFromMediaTheme } from '@agent/core/src/native-pptx-engine/design-cascade';
@@ -380,7 +380,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);
     }
-    const catalog = loadJson<{
+    const catalog = readJson<{
       documents: Record<
         string,
         {
