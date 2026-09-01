@@ -5,6 +5,7 @@ import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { clamp } from './foundation/text.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
   assertSafeRepositoryPath,
@@ -391,7 +392,7 @@ async function listUnreadInboxMessages(limit: number): Promise<GmailMessageListI
     const page = await gwsJson('gmail_messages_list', {
       userId: 'me',
       q: GMAIL_INBOX_ARCHIVE_QUERY,
-      maxResults: Math.max(1, Math.min(limit, 500)),
+      maxResults: clamp(limit, 1, 500),
       ...(pageToken ? { pageToken } : {}),
     });
     const pageMessages = extractMessageList(page);
@@ -1142,7 +1143,7 @@ export async function executeOutlookDelivery(request: EmailDeliveryRequest) {
 export async function listOutlookInbox(
   input: OutlookInboxListInput = {}
 ): Promise<OutlookInboxMessage[]> {
-  const maxMessages = Math.min(Math.max(Math.floor(input.max_messages || 50), 1), 100);
+  const maxMessages = clamp(Math.floor(input.max_messages || 50), 1, 100);
   const result: any = await executeServicePreset('m365', 'outlook_messages_list', {
     max_results: maxMessages,
   });

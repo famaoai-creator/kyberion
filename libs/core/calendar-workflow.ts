@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { executeServicePreset } from './service-engine.js';
+import { clamp } from './foundation/text.js';
 
 export { readGwsAuthStatus } from './email-workflow.js';
 
@@ -261,7 +262,7 @@ export async function listCalendarAgenda(input: CalendarAgendaInput = {}): Promi
   const calendarId = input.calendar_id?.trim() || 'primary';
   const timeMin = input.time_min?.trim() || new Date().toISOString();
   const timeMax = input.time_max?.trim() || new Date(Date.now() + (Math.max(1, Number(input.days) || 7) * 24 * 60 * 60 * 1000)).toISOString();
-  const maxResults = Math.max(1, Math.min(Number(input.max_results) || 20, 250));
+  const maxResults = clamp(Number(input.max_results) || 20, 1, 250);
   const query = input.query?.trim() || '';
   const timeZone = input.time_zone?.trim() || '';
   const encodedTimeMin = encodeURIComponent(timeMin);
