@@ -33,20 +33,23 @@ export interface ArtifactOwnershipQuery {
   includeTmp?: boolean;
 }
 
-const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
-  'knowledge/product/schemas/artifact-ownership-record.schema.json'
-);
-const ARTIFACT_REGISTRY_PATH = pathResolver.shared('runtime/artifacts/registry.jsonl');
+function artifactOwnershipSchemaPath(): string {
+  return pathResolver.rootResolve(
+    'knowledge/product/schemas/artifact-ownership-record.schema.json'
+  );
+}
 
 function artifactRegistryPath(): string {
-  return assertSafeRepositoryPath(ARTIFACT_REGISTRY_PATH, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(pathResolver.shared('runtime/artifacts/registry.jsonl'), {
+    allowMissingLeaf: true,
+  });
 }
 
 let artifactOwnershipValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
   if (artifactOwnershipValidateFn) return artifactOwnershipValidateFn;
-  artifactOwnershipValidateFn = compileSchema(ARTIFACT_OWNERSHIP_SCHEMA_PATH);
+  artifactOwnershipValidateFn = compileSchema(artifactOwnershipSchemaPath());
   return artifactOwnershipValidateFn;
 }
 

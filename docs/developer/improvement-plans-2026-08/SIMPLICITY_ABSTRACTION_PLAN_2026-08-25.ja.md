@@ -10945,6 +10945,12 @@ Pipeline previewのテンプレート解決後paramsとcognitive routing schema�
 
 検証: pipeline preview／cognitive routing **2 files / 18 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 202
+
+Scope offboardingのJSONL ledger／dedup registryを再監査し、直接 `JSON.parse` の結果をtenant residueのprune／verificationへ渡していた境界をfoundation safe parserへ移行した。malformed／nested dangerous keyはunreadable recordとして削除対象から除外し、artifact registryのrepo root／schema pathも呼出時解決へ変更して一時root・runtime再利用時の別checkout参照を防止した。offboardingのdiscover → export → soft-delete、dedup prune、post-offboard verification semanticsは維持した。
+
+検証: scope offboarding／artifact registry **2 files / 25 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

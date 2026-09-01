@@ -740,6 +740,20 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(verification.leftovers.length).toBeGreaterThan(0);
   });
 
+  it('keeps a dedup line with a dangerous JSON key as an unreadable record', () => {
+    seedIngestResidue();
+    fs.appendFileSync(
+      abs(INGEST_DEDUP_REGISTRY_REPO_PATH),
+      `{"content_sha256":"${ALPHA_HASH}","target_path":"${KNOWLEDGE_ROOT}","meta":{"__proto__":{}}}\n`
+    );
+
+    const result = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+
+    expect(result.status).toBe('dry_run');
+    expect(result.dedup_registry).toEqual({ matched: 2, removed: 0 });
+    expect(registryLines()).toHaveLength(5);
+  });
+
   it('execute leaves zero trace — knowledge, ledger, cursors, quota, dedup lines, vault — all audited', () => {
     seedIngestResidue();
     const result = offboardScope({
