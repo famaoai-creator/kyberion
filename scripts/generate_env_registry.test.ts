@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
 import {
   classifyEnvName,
+  describeDiscoveredEnv,
   discoverEnvNames,
   mergeRegistry,
   validateEnvRegistryQuality,
@@ -108,10 +109,42 @@ describe('mergeRegistry', () => {
     expect(added.documented).toBe(false);
   });
 
+  it('promotes an existing undocumented discovery entry with a safe explanation', () => {
+    const merged = mergeRegistry(['KYBERION_EXISTING_TIMEOUT_MS'], {
+      version: '1.0.0',
+      description: 'test registry',
+      entries: [
+        {
+          name: 'KYBERION_EXISTING_TIMEOUT_MS',
+          category: 'runtime',
+          type: 'string',
+          required: false,
+          description: '',
+          documented: false,
+        },
+      ],
+    });
+    expect(merged.entries[0].documented).toBe(true);
+    expect(merged.entries[0].description).toContain('numeric tuning value');
+  });
+
   it('bootstraps a registry when none exists', () => {
     const merged = mergeRegistry(['KYBERION_A'], null);
     expect(merged.version).toBe('1.0.0');
     expect(merged.entries).toHaveLength(1);
+  });
+});
+
+describe('describeDiscoveredEnv', () => {
+  it('provides operator guidance for every registry category', () => {
+    expect(describeDiscoveredEnv('KYBERION_EXAMPLE_PATH', 'path')).toContain('path override');
+    expect(describeDiscoveredEnv('KYBERION_EXAMPLE_LIMIT', 'tuning')).toContain(
+      'numeric tuning value'
+    );
+    expect(describeDiscoveredEnv('KYBERION_EXAMPLE', 'runtime')).toContain('runtime setting');
+    expect(describeDiscoveredEnv('KYBERION_EXAMPLE_URL', 'provider')).toContain('provider setting');
+    expect(describeDiscoveredEnv('KYBERION_ENABLE_EXAMPLE', 'flag')).toContain('feature flag');
+    expect(describeDiscoveredEnv('KYBERION_EXAMPLE_TOKEN', 'secret')).toContain('Secret value');
   });
 });
 
