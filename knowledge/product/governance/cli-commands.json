@@ -860,28 +860,12 @@
       "audience": "dev"
     },
     {
-      "id": "script.check.first-win-docs",
-      "script": "check:first-win-docs",
-      "command": "check first-win-docs",
-      "noun": "check",
-      "verb": "first-win-docs",
-      "audience": "dev"
-    },
-    {
       "id": "script.knowledge.sync",
       "script": "knowledge:sync",
       "command": "knowledge sync",
       "noun": "knowledge",
       "verb": "sync",
       "audience": "operator"
-    },
-    {
-      "id": "script.check.wire-error-boundary",
-      "script": "check:wire-error-boundary",
-      "command": "check wire-error-boundary",
-      "noun": "check",
-      "verb": "wire-error-boundary",
-      "audience": "dev"
     },
     {
       "id": "script.check.contract-semver",

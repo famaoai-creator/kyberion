@@ -91,6 +91,14 @@
       "rationale": "Keeps the first-win command contract and documentation fences aligned."
     },
     {
+      "id": "wire-error-boundary",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_wire_error_boundary.ts"],
+      "owner": "security",
+      "rationale": "Prevents internal exception details from being projected onto network-facing responses."
+    },
+    {
       "id": "cli-manifest",
       "scope": "pr",
       "executable": "node",
