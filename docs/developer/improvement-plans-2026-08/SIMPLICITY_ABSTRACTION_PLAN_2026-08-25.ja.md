@@ -11113,6 +11113,12 @@ SX-03 のworkflow入力上限を継続監査し、calendar agendaの結果数、
 
 検証: calendar／email／mission dispatch **4 files / 49 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は direct clampを含む追加domain境界、およびSX-04〜SX-14の未完了項目、voice provider実機依存、provider CLIの実OS-level enforcement probeである。
 
+## 2026-09-02 再レビュー修正 229
+
+SX-03 の明示的な数値境界を継続監査し、visual review／draft refine の反復回数、knowledge weight の丸め後範囲、media backend の probe TTL、CE pressure／palette の値域を `foundation/text` の canonical `clamp`へ移行した。finite判定、既存の上下限、丸め順序、レビュー・提案・provider probe・表示色のdomain semanticsは維持した。
+
+検証: draft refine／knowledge weight／media backend／CE adoption **4 files / 24 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は追加のdomain-specific clamp／時刻 helper、およびSX-04〜SX-14の未完了項目、voice provider実機依存、provider CLIの実OS-level enforcement probeである。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

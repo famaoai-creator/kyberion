@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { auditChain } from './audit-chain.js';
 import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
@@ -53,7 +54,7 @@ export interface KnowledgeRankingWeightApplyResult {
 }
 
 function bounded(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, Math.round(value * 100) / 100));
+  return clamp(Math.round(value * 100) / 100, min, max);
 }
 
 function proposalPath(scope: ScopeContext): string {

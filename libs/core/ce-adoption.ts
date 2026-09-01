@@ -6,6 +6,8 @@
  * second set of thresholds or retention rules.
  */
 
+import { clamp } from './foundation/text.js';
+
 export const CE_STREAM_LIMITS = Object.freeze({
   maxTailBytes: 16 * 1024,
   maxLiveMessages: 600,
@@ -40,7 +42,7 @@ export interface ProviderPressure {
 
 function finiteRatio(value: unknown): number | null {
   const numeric = typeof value === 'number' ? value : Number(value);
-  return Number.isFinite(numeric) ? Math.max(0, Math.min(1, numeric)) : null;
+  return Number.isFinite(numeric) ? clamp(numeric, 0, 1) : null;
 }
 
 /** Normalize quota/concurrency signals into the one UI-facing pressure value. */
@@ -59,7 +61,7 @@ export function deriveProviderPressure(input: ProviderPressureInput): ProviderPr
     (input.concurrentLimit as number) > 0
       ? (input.concurrentUsed as number) / (input.concurrentLimit as number)
       : 0;
-  const value = Math.max(0, Math.min(1, Math.max(quota, concurrency, input.demoted ? 1 : 0)));
+  const value = clamp(Math.max(quota, concurrency, input.demoted ? 1 : 0), 0, 1);
   const severity: CePressureSeverity =
     value >= CE_PRESSURE_THRESHOLDS.saturated
       ? 'saturated'
@@ -369,11 +371,7 @@ function hexToRgb(value: string): [number, number, number] {
 
 function rgbToHex(rgb: [number, number, number]): string {
   return `#${rgb
-    .map((value) =>
-      Math.max(0, Math.min(255, Math.round(value)))
-        .toString(16)
-        .padStart(2, '0')
-    )
+    .map((value) => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0'))
     .join('')}`;
 }
 
@@ -414,7 +412,7 @@ export interface CeAccentPalette {
 
 /** CE-09: two inputs produce a bounded, readable palette for every surface. */
 export function deriveAccentPalette(accent: string, tone = 0.5): CeAccentPalette {
-  const clampedTone = Math.max(0, Math.min(1, tone));
+  const clampedTone = clamp(tone, 0, 1);
   const base = hexToRgb(accent);
   const surface = rgbToHex(blend(base, [255, 255, 255], 0.9 - clampedTone * 0.45));
   const surfaceRaised = rgbToHex(blend(base, [255, 255, 255], 0.78 - clampedTone * 0.3));
