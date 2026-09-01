@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -267,7 +268,7 @@ function readGrantRecords(): Map<string, TaskScopedGrant> {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const parsed = taskScopedGrantSchema.parse(JSON.parse(trimmed));
+      const parsed = taskScopedGrantSchema.parse(parseSafeJsonInput(trimmed, 'task-scoped grant'));
       latest.set(parsed.grant_id, parsed);
     } catch {
       // A torn/corrupt line must not poison replay of the rest.

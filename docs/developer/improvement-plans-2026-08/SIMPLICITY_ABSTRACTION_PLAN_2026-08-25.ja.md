@@ -10475,6 +10475,12 @@ core の CLI／IPC／provider response を再監査し、actuator serve request�
 
 検証: core CLI／IPC／provider response **7 files / 63 tests passed**（peer HTTP socket テストを含む）、typecheck、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-01 再レビュー修正 124
+
+persisted scope／registry state を再監査し、tenant rate-limit lock、delegation provider caps、ingest sync cursor、worker compaction carryover、history search の SQL response、deliverable inbox lock、task-scoped grant、tenant profile、authority grant が直接 `JSON.parse` されていた残存を safe parser 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の stale-lock／fallback／cursor corruption／replay skip／authority fail-closed path へ閉じ、tenant scope、grant audience、rate-limit、cursor at-least-once、history projection semantics は変更していない。safe parser の `unknown` 境界に合わせ delegation provider cap の許可値も明示的に number／positive integer として収束させた。
+
+検証: persisted scope／registry **11 files / 132 tests passed**、typecheck、module-boundaries、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
