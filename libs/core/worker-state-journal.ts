@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Event-sourced worker state restore contract (KD-03).
  *
@@ -119,7 +120,7 @@ export function appendValidatedJournalEvent<TEnvelope>(
   const validated = options.kernel.validatePayload(options.opName, options.payload);
   const envelope = options.buildEnvelope({
     seq: options.seq,
-    ts: (options.now ?? (() => new Date().toISOString()))(),
+    ts: (options.now ?? nowIso)(),
     payload: validated,
   });
   const leasePath = assertSafeRepositoryPath(
@@ -624,7 +625,7 @@ export class WorkerStateJournal {
         : `${this.journalPath}.index.json`,
       { allowMissingLeaf: true }
     );
-    this.now = options.now ?? (() => new Date().toISOString());
+    this.now = options.now ?? nowIso;
   }
 
   /** Register an ordered post-restore hook (lower `order` runs first). */

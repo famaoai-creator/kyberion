@@ -30,6 +30,7 @@ import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import {
   assertSafeRepositoryPath,
@@ -1039,9 +1040,9 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       return result;
     }
 
-    const nowIso = input.nowIso ?? new Date().toISOString();
-    const approvedAt = input.approval?.approved_at ?? nowIso;
-    const exportDirName = `${scopeType}-${scopeId}-${nowIso.replace(/[:.]/g, '-')}`;
+    const currentIso = input.nowIso ?? nowIso();
+    const approvedAt = input.approval?.approved_at ?? currentIso;
+    const exportDirName = `${scopeType}-${scopeId}-${currentIso.replace(/[:.]/g, '-')}`;
     const exportDirAbs = assertSafeRepositoryPath(
       pathResolver.sharedExports(path.join(OFFBOARDING_EXPORT_SUBDIR, exportDirName)),
       { allowMissingLeaf: true }
@@ -1084,7 +1085,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           scope_id: scopeId,
           ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
           ...(organizationId ? { organization_id: organizationId } : {}),
-          exported_at: nowIso,
+          exported_at: currentIso,
           approval: { approved_by: approvedBy, approved_at: approvedAt, purpose },
           targets: result.targets,
           ...(result.dedup_registry ? { dedup_registry: result.dedup_registry } : {}),

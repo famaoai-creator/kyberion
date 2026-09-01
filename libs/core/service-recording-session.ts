@@ -11,6 +11,7 @@ import {
   type ServiceRecordingStep,
 } from './service-recording.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export type ServiceRecordedParameterKind = 'fixed' | 'input' | 'template' | 'secret';
@@ -138,7 +139,7 @@ export class ServiceRecordingSession {
         'recording_id must contain only letters, numbers, dot, underscore, or hyphen'
       );
     }
-    this.now = options.now || (() => new Date().toISOString());
+    this.now = options.now || nowIso;
     this.targetName = options.target_name.trim();
     for (const service of options.services || []) this.services.add(service);
   }
