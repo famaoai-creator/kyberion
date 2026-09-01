@@ -1,4 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
+import { validateBrowserConversationSession } from '@agent/core/browser-conversation-session';
 import path from 'node:path';
 import {
   assertSafeRepositoryPath,
@@ -92,6 +93,118 @@ export interface BrowserObservationCollectionOptions {
 
 export interface IntelligenceObservationCollectionOptions {
   observationFiles?: readonly string[];
+}
+
+const BROWSER_SESSION_LEASE_STATUSES = new Set(['active', 'released', 'expired']);
+const BROWSER_ACTION_KINDS = new Set(['control', 'capture', 'apply']);
+const BROWSER_SESSION_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeObservationRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.keys(value).every((key) => !BROWSER_SESSION_DANGEROUS_KEYS.has(key));
+}
+
+function requiredObservationString(record: Record<string, unknown>, key: string): string | null {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function optionalObservationString(
+  record: Record<string, unknown>,
+  key: string
+): string | undefined | null {
+  if (!(key in record)) return undefined;
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function nonNegativeObservationCount(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function parseBrowserRecentAction(
+  value: unknown
+): BrowserSessionSummary['recent_actions'][number] | null {
+  if (!isSafeObservationRecord(value)) return null;
+  const op = requiredObservationString(value, 'op');
+  const kind = requiredObservationString(value, 'kind');
+  const ts = requiredObservationString(value, 'ts');
+  if (!op || !ts || !kind || !BROWSER_ACTION_KINDS.has(kind)) return null;
+  const tabId = optionalObservationString(value, 'tab_id');
+  const ref = optionalObservationString(value, 'ref');
+  const selector = optionalObservationString(value, 'selector');
+  if (tabId === null || ref === null || selector === null) return null;
+  return {
+    op,
+    kind: kind as BrowserSessionSummary['recent_actions'][number]['kind'],
+    ...(tabId === undefined ? {} : { tab_id: tabId }),
+    ...(ref === undefined ? {} : { ref }),
+    ...(selector === undefined ? {} : { selector }),
+    ts,
+  };
+}
+
+function parseBrowserSessionSummary(value: unknown): BrowserSessionSummary | null {
+  if (!isSafeObservationRecord(value)) return null;
+  const sessionId = requiredObservationString(value, 'session_id');
+  const activeTabId = requiredObservationString(value, 'active_tab_id');
+  const updatedAt = requiredObservationString(value, 'updated_at');
+  const leaseStatus = requiredObservationString(value, 'lease_status');
+  const tabCount = nonNegativeObservationCount(value, 'tab_count');
+  const actionTrailCount = nonNegativeObservationCount(value, 'action_trail_count');
+  const retained = value.retained;
+  const recentActions = value.recent_actions;
+  if (
+    !sessionId ||
+    !activeTabId ||
+    !updatedAt ||
+    !leaseStatus ||
+    !BROWSER_SESSION_LEASE_STATUSES.has(leaseStatus) ||
+    tabCount === null ||
+    actionTrailCount === null ||
+    typeof retained !== 'boolean' ||
+    !Array.isArray(recentActions)
+  ) {
+    return null;
+  }
+  const parsedActions = recentActions.map(parseBrowserRecentAction);
+  if (parsedActions.some((action) => action === null)) return null;
+
+  const lastTracePath = optionalObservationString(value, 'last_trace_path');
+  const leaseExpiresAt = optionalObservationString(value, 'lease_expires_at');
+  if (lastTracePath === null || leaseExpiresAt === null) return null;
+  return {
+    session_id: sessionId,
+    active_tab_id: activeTabId,
+    tab_count: tabCount,
+    updated_at: updatedAt,
+    lease_status: leaseStatus as BrowserSessionSummary['lease_status'],
+    retained,
+    action_trail_count: actionTrailCount,
+    recent_actions: parsedActions as BrowserSessionSummary['recent_actions'],
+    ...(lastTracePath === undefined ? {} : { last_trace_path: lastTracePath }),
+    ...(leaseExpiresAt === undefined ? {} : { lease_expires_at: leaseExpiresAt }),
+  };
+}
+
+function parseBrowserConversationSessionSummary(
+  value: unknown
+): BrowserConversationSessionSummary | null {
+  const validation = validateBrowserConversationSession(value);
+  if (!validation.valid || !validation.value) return null;
+  const session = validation.value;
+  return {
+    session_id: session.session_id,
+    surface: session.surface,
+    status: session.status,
+    mode: session.mode,
+    updated_at: session.updated_at,
+    goal_summary: session.goal.summary,
+    active_step: session.active_step?.description,
+    pending_confirmation: session.conversation_context.pending_confirmation,
+    candidate_target_count: session.candidate_targets.length,
+  };
 }
 
 function safeObservationDirectory(directory: string): string | null {
@@ -357,9 +470,9 @@ export function collectBrowserSessions(
       if (!filePath) continue;
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const parsed = parseJsonRecord(raw);
-      const sessionId = parsed ? optionalStringField(parsed, 'session_id') : undefined;
-      if (!parsed || !sessionId) continue;
-      sessions.push(parsed as unknown as BrowserSessionSummary);
+      const session = parseBrowserSessionSummary(parsed);
+      if (!session) continue;
+      sessions.push(session);
     } catch {
       // Ignore malformed session files.
     }
@@ -385,25 +498,9 @@ export function collectBrowserConversationSessions(
       if (!filePath) continue;
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const parsed = parseJsonRecord(raw);
-      if (!parsed) continue;
-      const sessionId = optionalStringField(parsed, 'session_id');
-      if (!sessionId) continue;
-      const goal = recordField(parsed.goal);
-      const activeStep = recordField(parsed.active_step);
-      const conversationContext = recordField(parsed.conversation_context);
-      sessions.push({
-        session_id: sessionId,
-        surface: stringField(parsed, 'surface', 'unknown'),
-        status: stringField(parsed, 'status', 'unknown'),
-        mode: stringField(parsed, 'mode', 'interactive'),
-        updated_at: stringField(parsed, 'updated_at', new Date(0).toISOString()),
-        goal_summary: stringField(goal, 'summary'),
-        active_step: optionalStringField(activeStep, 'description'),
-        pending_confirmation: conversationContext.pending_confirmation === true,
-        candidate_target_count: Array.isArray(parsed.candidate_targets)
-          ? parsed.candidate_targets.length
-          : 0,
-      });
+      const session = parseBrowserConversationSessionSummary(parsed);
+      if (!session) continue;
+      sessions.push(session);
     } catch {
       // Ignore malformed session files.
     }

@@ -24,8 +24,13 @@ describe('intelligence observation resource boundary', () => {
       path.join(browserDir, 'safe.json'),
       JSON.stringify({
         session_id: 'safe-browser-session',
+        active_tab_id: 'tab-1',
+        tab_count: 1,
         updated_at: '2099-01-01T00:00:00.000Z',
         lease_status: 'active',
+        retained: true,
+        action_trail_count: 0,
+        recent_actions: [],
       })
     );
     safeWriteFile(
