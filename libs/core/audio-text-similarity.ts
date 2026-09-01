@@ -1,3 +1,5 @@
+import { clamp } from './foundation/text.js';
+
 export interface AudioTextComparison {
   expected_normalized: string;
   actual_normalized: string;
@@ -86,7 +88,7 @@ export function compareAudioText(expected: string, actual: string): AudioTextCom
         ? 1
         : 0
       : levenshtein(expectedTokens, actualTokens) / expectedTokens.length;
-  const similarity = Math.max(0, Math.min(1, 1 - (characterErrorRate * 0.7 + wordErrorRate * 0.3)));
+  const similarity = clamp(1 - (characterErrorRate * 0.7 + wordErrorRate * 0.3), 0, 1);
   const differences = spans(expectedTokens, actualTokens);
   return {
     expected_normalized: expectedNormalized,

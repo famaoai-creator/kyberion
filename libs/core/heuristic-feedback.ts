@@ -13,6 +13,7 @@
 import * as path from 'node:path';
 import { pathResolver, rootResolve } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -96,7 +97,7 @@ function heuristicCatalog(filePath: string) {
 export function scoreValidity(outcome: MissionOutcome): number {
   const base = outcome.result === 'success' ? 1 : outcome.result === 'partial' ? 0.5 : 0;
   if (typeof outcome.metric_score === 'number' && !Number.isNaN(outcome.metric_score)) {
-    const bounded = Math.max(0, Math.min(1, outcome.metric_score));
+    const bounded = clamp(outcome.metric_score, 0, 1);
     return round((base + bounded) / 2);
   }
   return round(base);
