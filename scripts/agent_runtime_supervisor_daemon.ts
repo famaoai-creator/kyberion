@@ -31,6 +31,7 @@ import {
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
 } from '@agent/core/agent-runtime-supervisor-client';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { isRecord } from '@agent/core/foundation/text';
 import { logger } from '@agent/core/core';
@@ -750,7 +751,9 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
       const line = String(chunk).trim();
       if (!line) return done(false);
       try {
-        const response = normalizeSupervisorResponse<unknown>(JSON.parse(line) as unknown);
+        const response = normalizeSupervisorResponse<unknown>(
+          parseSafeJsonInput(line, 'agent runtime supervisor response')
+        );
         if (!response.ok) return done(false);
         normalizeSupervisorResult('health', response.result);
         done(true);
@@ -887,7 +890,9 @@ export async function startAgentRuntimeSupervisorDaemon(
         return writeResponse(socket, { id: 'invalid', ok: false, error: 'empty_request' });
       }
       try {
-        const request = normalizeSupervisorRequest(JSON.parse(line) as unknown);
+        const request = normalizeSupervisorRequest(
+          parseSafeJsonInput(line, 'agent runtime supervisor request')
+        );
         if (
           (transport === 'tcp' && !socketIsLoopback(socket)) ||
           !supervisorTokenValid(request.auth_token)
