@@ -28,7 +28,7 @@ import {
 import { runJanitor } from '@agent/core/storage-janitor';
 import { checkActuatorCapabilities } from '@agent/core/src/actuator-capability';
 import { validateOpInput } from '@agent/core/op-input-contracts';
-import { getRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnv, parseSafeJsonInput } from '@agent/core/foundation';
 import { resolveIdentityContext } from '@agent/core/authority';
 import { defineLegacyPipelineActuator } from '@agent/core/actuator-sdk';
 import type {
@@ -718,11 +718,11 @@ export async function loadActuatorDispatch(
         payload: params.payload || params.instruction || params.prompt,
         context: ctx,
       });
-      let parsed = result;
+      let parsed: unknown = result;
       try {
-        parsed = JSON.parse(result);
+        parsed = parseSafeJsonInput(result, 'pipeline provider output');
       } catch (err) {
-        logger.warn(`[run_pipeline] suppressed error in reasoningPolicy: ${err}`);
+        logger.warn(`[run_pipeline] provider output was not safe JSON; preserving text: ${err}`);
       }
       return {
         handled: true,
@@ -1056,7 +1056,7 @@ export async function runInlineSystemShell(
   let parsedOutput: unknown = output;
   if (output) {
     try {
-      parsedOutput = JSON.parse(output);
+      parsedOutput = parseSafeJsonInput(output, 'pipeline shell output');
     } catch {
       parsedOutput = output;
     }

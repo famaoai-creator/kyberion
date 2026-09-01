@@ -573,6 +573,21 @@ describe('run_pipeline compatibility', () => {
     });
   });
 
+  it('preserves shell output as text when JSON contains a dangerous key', async () => {
+    const result = await runSteps([
+      {
+        op: 'shell',
+        params: {
+          cmd: 'printf %s \'{"constructor":{}}\'',
+          export_as: 'shell_result',
+        },
+      },
+    ]);
+
+    expect(result.status).toBe('succeeded');
+    expect(result.context.shell_result).toBe('{"constructor":{}}');
+  });
+
   it('resolves shell env values from context before execution', async () => {
     const result = await runSteps(
       [
