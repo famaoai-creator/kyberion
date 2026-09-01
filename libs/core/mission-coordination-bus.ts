@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
@@ -40,10 +41,6 @@ type MissionCoordinationEvent =
       agent_id: string;
       created_at: string;
     };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 const COORDINATION_CHANNELS: readonly MissionCoordinationChannel[] = [
   'task_contract',

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -34,10 +35,6 @@ function isSafeJsonTree(value: unknown): boolean {
   return Object.entries(value).every(
     ([key, nested]) => !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonTree(nested)
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseConversationTurn(value: unknown): ConversationTurn | undefined {

@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -191,10 +192,6 @@ function payloadHash(payload: unknown): string {
 
 function provisionedEntryHash(content: unknown): string {
   return payloadHash(content);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function normalizeProvisionedEntryRecord(value: unknown): ProvisionedEntryRecord | undefined {
