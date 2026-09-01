@@ -8,9 +8,9 @@ import {
 } from '../../../lib/api-guard';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
+import { readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeReadFile,
@@ -111,7 +111,7 @@ function missionTier(missionId: string): AssetTier | undefined {
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) {
       return tierFromPath(missionPath);
     }
-    const state = loadJson<{ tier?: unknown }>(statePath);
+    const state = readJson<{ tier?: unknown }>(statePath);
     if (state.tier === 'personal' || state.tier === 'confidential' || state.tier === 'public') {
       return state.tier;
     }
@@ -134,7 +134,7 @@ function artifactTenant(artifact: {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
-    const state = loadJson<{
+    const state = readJson<{
       tenant_slug?: string;
       tenant_id?: string;
     }>(statePath);

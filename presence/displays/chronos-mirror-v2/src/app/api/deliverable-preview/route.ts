@@ -2,13 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
 import { listProjectRecords } from '@agent/core/project-registry';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { readJson } from '@agent/core/foundation';
 import { findMissionPath } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -32,7 +28,7 @@ function artifactTenant(artifact: {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
-    const state = loadJson<{
+    const state = readJson<{
       tenant_slug?: string;
       tenant_id?: string;
     }>(statePath);
@@ -51,7 +47,7 @@ function missionTier(missionId?: string): OsKnowledgeTier | undefined {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
-    const state = loadJson<{ tier?: unknown }>(statePath);
+    const state = readJson<{ tier?: unknown }>(statePath);
     return state.tier === 'personal' || state.tier === 'confidential' || state.tier === 'public'
       ? state.tier
       : undefined;

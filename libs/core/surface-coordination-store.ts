@@ -4,10 +4,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
-  loadJson,
   safeMkdir,
   safeMoveSync,
   safeReaddir,
@@ -214,7 +214,7 @@ function collectJsonFiles(root: string, recursive: boolean): string[] {
 }
 
 function loadSurfaceRecordJson<T>(filePath: string): T {
-  return loadJson<T>(assertSafeRepositoryPath(filePath));
+  return readJson<T>(assertSafeRepositoryPath(filePath));
 }
 
 function hasPathSegments(filePath: string, parts: string[]): boolean {
