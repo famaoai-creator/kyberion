@@ -6,6 +6,7 @@ import type { GovernedCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
+import { clamp } from './foundation/text.js';
 
 // DS-04 / agy short-video quality: scene layout and visual composition used
 // to be a single hardcoded dark-navy dashboard skin baked into
@@ -57,9 +58,8 @@ export const DEFAULT_VISUAL_DIRECTION: VideoVisualDirection = {
   typography: { headline_px: 68, body_px: 23 },
 };
 
-function clampVideoDirectionValue(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+const clampVideoDirectionValue = (value: number, min: number, max: number): number =>
+  clamp(value, min, max);
 
 /**
  * Validate an LLM-drafted direction. Anything malformed degrades to the
