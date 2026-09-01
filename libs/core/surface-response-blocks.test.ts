@@ -97,6 +97,14 @@ describe('surface-response-blocks', () => {
     ]);
   });
 
+  it('rejects surface blocks containing dangerous JSON keys', () => {
+    const parsed = extractSurfaceBlocks(
+      ['```a2a', '{"header":{"__proto__":{}}}', '```'].join('\n')
+    );
+    expect(parsed.a2aMessages).toHaveLength(0);
+    expect(parsed.surfaceParseErrors.join(' ')).toContain('dangerous JSON key');
+  });
+
   it('does not promote malformed structured blocks into executable proposals', () => {
     const raw = [
       '```a2ui',

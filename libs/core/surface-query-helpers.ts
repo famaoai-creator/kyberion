@@ -23,6 +23,7 @@ import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -199,7 +200,7 @@ async function listCalendarEvents(params: {
   const output = await safeExec('osascript', ['-l', 'JavaScript', '-e', script]);
   const trimmed = String(output).trim();
   if (!trimmed) return [];
-  const parsed = JSON.parse(trimmed);
+  const parsed = parseSafeJsonInput(trimmed, 'Calendar query response');
   return Array.isArray(parsed) ? parsed : [];
 }
 

@@ -8,6 +8,7 @@ import type {
 } from './channel-surface-types.js';
 import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import { extractTaskResultBlocks } from './task-result-contract.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 const REASONING_TAG_NAMES = [
   'think',
@@ -392,7 +393,7 @@ function parseBlock<T>(
   label: string
 ): T | null {
   try {
-    const parsed: unknown = JSON.parse(json.trim());
+    const parsed: unknown = parseSafeJsonInput(json.trim(), `${label} JSON`);
     const normalized = normalize(parsed);
     if (normalized === null) throw new Error('invalid block shape');
     return normalized;
