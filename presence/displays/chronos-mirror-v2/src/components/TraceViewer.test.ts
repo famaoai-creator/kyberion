@@ -55,6 +55,12 @@ describe('TraceViewer helpers', () => {
     expect(focusTraceRecord(raw, 'trace-z')).toBe(raw);
   });
 
+  it('ignores dangerous JSON in raw trace focus and persisted preferences', () => {
+    const dangerous = '{"__proto__":{"traceId":"poisoned"}}';
+    expect(focusTraceRecord(dangerous, 'poisoned')).toBe(dangerous);
+    expect(loadTraceViewerPrefs(dangerous)).toBeNull();
+  });
+
   it('keeps a short most-recent-first trace focus history', () => {
     expect(buildTraceFocusHistory(['trace-a', 'trace-b'], 'trace-c', 3)).toEqual([
       'trace-c',

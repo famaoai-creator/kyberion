@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -103,7 +104,9 @@ function readEvents(
       }
       lastSeenId = id;
       try {
-        const event = workerEventEnvelopeSchema.parse(JSON.parse(line)) as WorkerEventEnvelope;
+        const event = workerEventEnvelopeSchema.parse(
+          parseSafeJsonInput(line, 'collaboration event')
+        ) as WorkerEventEnvelope;
         if (missionId && event.source?.mission_id !== missionId) continue;
         const normalized = normalizeWorkerEvent(event, id);
         const scopeResult = parseEventScopeFromRecord(normalized.payload);

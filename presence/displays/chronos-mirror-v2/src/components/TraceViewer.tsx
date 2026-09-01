@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import {
   isJsonRecord,
   optionalStringField,
+  parseJsonValue,
   parseJsonRecord,
   recordField,
 } from '../lib/json-record';
@@ -73,7 +74,7 @@ function gapPhaseBreakdown(span: TraceSpanDetail): Array<{ phase: string; ms: nu
   const raw = event?.attributes?.gap_phases;
   if (typeof raw !== 'string') return [];
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed = parseJsonValue(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((entry): entry is { phase: string; ms: number } => {
       const record = recordField(entry);

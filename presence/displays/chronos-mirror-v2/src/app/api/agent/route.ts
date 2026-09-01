@@ -4,7 +4,7 @@ import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { resolveViewerContextForRequest, type ViewerContext } from '../../../lib/viewer-context';
@@ -242,7 +242,7 @@ function getChronosMissionProposalState(
     const raw = readSafeChronosFile(core, statePath);
     if (raw === null) return null;
     try {
-      return parseChronosMissionProposalState(JSON.parse(raw) as unknown);
+      return parseChronosMissionProposalState(parseSafeJsonInput(raw, 'mission proposal state'));
     } catch {
       return null;
     }
@@ -895,7 +895,7 @@ async function tryHandleChronosQuickAction(
         for (const line of lines.slice(-12)) {
           let parsed: unknown;
           try {
-            parsed = JSON.parse(line) as unknown;
+            parsed = parseSafeJsonInput(line, 'Chronos audit event');
           } catch {
             continue;
           }
