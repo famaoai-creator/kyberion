@@ -146,6 +146,17 @@ describe('ingest:dedup (DA-04 acceptance 3)', () => {
     expect(parseIngestRegistryRecord({ content_sha256: 'bad', first_seen: NOW })).toBeUndefined();
   });
 
+  it('ignores registry rows containing dangerous keys', () => {
+    safeWriteFile(
+      registryPath,
+      `{"content_sha256":"${HASH_A}","first_seen":"${NOW}","__proto__":{"polluted":true}}\n`,
+      { encoding: 'utf8' }
+    );
+    expect(
+      dedupContent({ content_sha256: HASH_A, registry_path: registryPath, register: false })
+    ).toEqual({ duplicate: false, registered: false });
+  });
+
   it('rejects registry paths outside the repository and through symlinks', () => {
     expect(() =>
       dedupContent({

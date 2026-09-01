@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import mammoth from 'mammoth';
 import ExcelJS from 'exceljs';
 import { pathResolver } from '@agent/core/path-resolver';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -214,7 +215,7 @@ async function parseXlsx(raw: Buffer): Promise<{ markdown: string; tables: Inges
 function parseSlackThread(raw: Buffer): string {
   let messages: SlackMessage[];
   try {
-    const parsed = JSON.parse(raw.toString('utf8'));
+    const parsed = parseSafeJsonInput(raw.toString('utf8'), 'ingest slack thread');
     if (!Array.isArray(parsed)) throw new Error('not an array');
     messages = parsed as SlackMessage[];
   } catch (error) {
