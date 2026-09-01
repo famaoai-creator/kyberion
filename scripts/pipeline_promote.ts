@@ -29,7 +29,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson, slugify } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
   validatePipelineAdf,
@@ -155,9 +155,13 @@ async function requestPromotionAdvice(pipeline: PipelineAdf): Promise<PromotionA
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: unknown;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'pipeline promotion advice');
     } catch {
-      parsed = tryRepairJson(jsonText);
+      const repaired = tryRepairJson(jsonText);
+      parsed =
+        repaired === null
+          ? null
+          : parseSafeJsonInput(JSON.stringify(repaired), 'pipeline promotion advice');
     }
     return normalizePromotionAdvice(parsed);
   } catch (err: unknown) {
