@@ -1,4 +1,5 @@
 import { safeExecResult } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export const VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID =
   'virtual-input-device-inventory-bridge' as const;
@@ -370,7 +371,7 @@ function collectWindowsInputDevices(
   ]);
   let payload: unknown;
   try {
-    payload = JSON.parse(result.stdout);
+    payload = parseSafeJsonInput(result.stdout, 'virtual input device inventory response');
   } catch {
     return [];
   }
