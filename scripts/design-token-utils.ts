@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 export interface KyberionDesignTokens {
   version: string;
@@ -240,7 +240,7 @@ export function updateThemesJson(
   tokens: KyberionDesignTokens,
   options?: { includeDefaultTheme?: boolean }
 ): string {
-  const parsed = JSON.parse(rawText) as unknown;
+  const parsed = parseSafeJsonInput(rawText, 'themes.json');
   if (!isRecord(parsed)) throw new Error('themes.json root must be a JSON object');
   const data = parsed;
   const themes = buildKyberionThemeEntries(tokens);

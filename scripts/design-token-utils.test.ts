@@ -58,4 +58,10 @@ describe('canonical design-token generation', () => {
     expect(JSON.parse(output).themes['0']).toBeUndefined();
     expect(JSON.parse(output).themes['kyberion-standard']).toBeDefined();
   });
+
+  it('rejects dangerous JSON keys before updating themes', () => {
+    expect(() =>
+      updateThemesJson('{"themes":{"constructor":{"polluted":true}}}', readKyberionDesignTokens())
+    ).toThrow('contains a dangerous JSON key');
+  });
 });
