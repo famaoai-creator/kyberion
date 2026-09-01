@@ -1,6 +1,7 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
@@ -16,7 +17,6 @@ export {
   type ScopeContextValidationOptions,
 } from './scope-context-validation.js';
 import {
-  loadJson,
   safeExistsSync,
   safeReadFile,
   safeExec,
@@ -102,7 +102,7 @@ function readMissionScope(missionId: string): ScopeContextInput {
     const statePath = assertSafeRepositoryPath(
       pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`)
     );
-    const state = loadJson<{
+    const state = readJson<{
       tier?: unknown;
       tenant_slug?: unknown;
       tenant_id?: unknown;

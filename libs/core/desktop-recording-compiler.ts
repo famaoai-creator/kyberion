@@ -7,9 +7,9 @@ import {
   validateProcedureCatalog,
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -163,7 +163,7 @@ export function promoteDesktopProcedure(options: {
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
   let raw: unknown;
   try {
-    raw = loadJson<unknown>(recordingAbs);
+    raw = readJson<unknown>(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`
@@ -191,7 +191,7 @@ export function promoteDesktopProcedure(options: {
   if (!intentCandidate) throw new Error('intent_ref is outside the allowlisted recording stores');
   let intent: ReturnType<typeof validateDesktopIntentDraft>;
   try {
-    intent = validateDesktopIntentDraft(loadJson<unknown>(intentCandidate));
+    intent = validateDesktopIntentDraft(readJson<unknown>(intentCandidate));
   } catch (error) {
     throw new Error(
       `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`

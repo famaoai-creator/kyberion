@@ -1,9 +1,9 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
-  loadJson,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -56,7 +56,7 @@ function listReflexTerminalSessions() {
     }
     if (!safeExistsSync(stateFile)) continue;
     try {
-      const state = loadJson<{ pid: number; status?: string }>(stateFile);
+      const state = readJson<{ pid: number; status?: string }>(stateFile);
       process.kill(state.pid, 0);
       sessions.push({
         winId: 'rt-main',
@@ -87,7 +87,7 @@ const STRATEGIES: Record<string, any> = {
         }
         if (safeExistsSync(stateFile)) {
           try {
-            const state = loadJson<{ pid: number; status?: string }>(stateFile);
+            const state = readJson<{ pid: number; status?: string }>(stateFile);
             // Simple check if the process is still alive
             process.kill(state.pid, 0);
             return { winId: 'rt-main', sessionId: id, type: 'ReflexTerminal' };
@@ -261,7 +261,7 @@ export const terminalBridge = {
       }
       if (safeExistsSync(latestPath)) {
         try {
-          const content = loadJson<{ data?: { message?: string } }>(latestPath);
+          const content = readJson<{ data?: { message?: string } }>(latestPath);
           return content.data.message || '';
         } catch (_) {
           return '';

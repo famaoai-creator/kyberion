@@ -35,6 +35,7 @@ import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -42,7 +43,6 @@ import {
   safeReadFile,
   safeUnlinkSync,
   safeWriteFile,
-  loadJson,
 } from './secure-io.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
@@ -289,7 +289,7 @@ export function loadOnboardingFirstWorkRecord(
 ): OnboardingFirstWorkRecord | null {
   const filePath = firstWorkPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateFirstWorkRecord(loadJson<unknown>(filePath));
+  return validateFirstWorkRecord(readJson<unknown>(filePath));
 }
 
 function saveOnboardingFirstWorkRecord(record: OnboardingFirstWorkRecord, rootDir: string): string {
@@ -537,7 +537,7 @@ export function loadOnboardingContextBinding(
 ): OnboardingContextBinding | null {
   const filePath = contextPath(assertCustomerSlug(customerSlug), rootDir);
   if (!safeExistsSync(filePath)) return null;
-  return validateBinding(loadJson<unknown>(filePath));
+  return validateBinding(readJson<unknown>(filePath));
 }
 
 export function resolveOnboardingContext(
