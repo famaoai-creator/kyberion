@@ -19,6 +19,7 @@
 
 import { startMicCapture, type MicCaptureOptions } from './mic-capture.js';
 import { pcmToWav } from './pcm-wav.js';
+import { clamp } from './foundation/text.js';
 import { safeWriteFile } from './secure-io.js';
 import {
   computeChunkDurationMs,
@@ -35,7 +36,7 @@ const MAX_CALIBRATED_THRESHOLD = 8000;
 
 export function calibrateRmsThreshold(noiseFloorRms: number, multiplier: number): number {
   const scaled = noiseFloorRms * multiplier;
-  return Math.min(MAX_CALIBRATED_THRESHOLD, Math.max(MIN_CALIBRATED_THRESHOLD, Math.round(scaled)));
+  return clamp(Math.round(scaled), MIN_CALIBRATED_THRESHOLD, MAX_CALIBRATED_THRESHOLD);
 }
 
 export interface VadTurnSegmenterOptions {
