@@ -172,4 +172,13 @@ describe('service_preflight', () => {
       reason: 'unrecognized_status',
     });
   });
+
+  it('rejects bridge responses containing dangerous JSON keys', async () => {
+    const { parseJsonProbeOutput } = await import('./service_preflight.js');
+
+    expect(parseJsonProbeOutput('{"status":"ok","meta":{"constructor":{}}}')).toEqual({
+      ok: false,
+      reason: 'invalid_json_output',
+    });
+  });
 });
