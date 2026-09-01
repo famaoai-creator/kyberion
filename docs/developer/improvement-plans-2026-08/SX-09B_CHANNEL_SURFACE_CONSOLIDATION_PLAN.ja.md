@@ -279,3 +279,9 @@ Presence Studio の議事録開始／voice停止 request を再監査し、`miss
 Presence Studio の demo frame request を再監査し、surface／agent／表示状態／字幕／transcript の各値を個別に既定値化し、未知 field と不正な transcript item が A2UI frame 生成へ到達し得る残存を修正した。strict な demo frame schema を追加し、配列・オブジェクト・空文字・未知 field を frame 生成前に 400 で拒否するようにした。body 未指定時の既存デモ既定値と A2UI dispatch semantics は維持している。
 
 検証: Presence Studio request schema **1 file / 8 tests passed**、対象 typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 21
+
+Concierge の文書取込 multipart 境界を再監査し、`tenant`／`format`／`dry_run` を `String(FormData)` で暗黙変換していたため、File・未知フィールド・重複値・未定義の真偽値が tenant lookup／ファイル staging 前に曖昧化する残存を検出した。strict な `parseIngestForm` を追加し、対応フィールド、単一値、文字列型、format enum、dry-run enum、File 型を正規化してから既存の tenant registry 検証と ingest ceremony へ渡すようにした。未指定 `dry_run` は従来どおり false とし、既存の preview／commit semantics は変更していない。
+
+検証: Concierge ingest input **1 file / 10 tests passed**、変更対象 Prettier、root typecheck、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
