@@ -266,6 +266,9 @@ describe('mission work item dispatch', () => {
       refuted: false,
       findings: ['ok'],
     });
+    expect(
+      parseIndependentReviewerVerdict('{"approved":true,"meta":{"__proto__":{}}}')
+    ).toMatchObject({ approved: false, refuted: false, findings: [] });
   });
 
   it('binds a canonical reviewer dispatch to the reconciled artifact hash', async () => {

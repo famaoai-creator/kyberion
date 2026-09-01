@@ -9,6 +9,7 @@ import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
@@ -273,8 +274,8 @@ export function parseBestOfJudgeVerdict(
   if (start < 0 || end <= start) return null;
   if (text.slice(0, start).trimEnd().endsWith('[')) return null;
   try {
-    const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
-    if (!isRecord(parsed)) return null;
+    const parsed = parseSafeJsonObjectInput(text.slice(start, end + 1), 'best-of judge verdict');
+    if (!parsed || !isRecord(parsed)) return null;
     const winner = typeof parsed.winner === 'string' ? parsed.winner.toUpperCase() : '';
     if (winner !== 'A' && winner !== 'B') return null;
     const mergeHints = Array.isArray(parsed.merge_hints)
