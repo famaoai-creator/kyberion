@@ -1,10 +1,6 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 
 import { collectTraceFeed } from './trace-feed';
 
@@ -51,7 +47,7 @@ export function collectProviderDemotions(
   try {
     const safePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
-    const parsed = loadJson<{ demotions?: ProviderDemotionStatus[] }>(safePath);
+    const parsed = readJson<{ demotions?: ProviderDemotionStatus[] }>(safePath);
     return (parsed.demotions || []).filter(
       (entry) => entry?.provider && Number.isFinite(entry.until) && entry.until > now
     );

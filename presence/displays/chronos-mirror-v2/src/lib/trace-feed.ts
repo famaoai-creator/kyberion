@@ -1,11 +1,10 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeReadFile,
@@ -358,7 +357,7 @@ function resolveMissionScope(missionId?: string): {
   const statePath = path.join(missionPath, 'mission-state.json');
   try {
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return {};
-    const state = loadJson<{
+    const state = readJson<{
       tenant_slug?: string;
       tier?: unknown;
       organization_id?: string;
