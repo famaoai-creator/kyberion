@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
@@ -7,11 +8,7 @@ type HarnessAction = 'describe' | 'plan' | 'verify' | 'receipt';
 
 function parseObject(value: string, name: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(value);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('must be a JSON object');
-    }
-    return parsed as Record<string, unknown>;
+    return parseSafeJsonObjectValue(parseSafeJsonInput(value, `--${name}`), `--${name}`);
   } catch (error) {
     throw new Error(`--${name} ${error instanceof Error ? error.message : String(error)}`);
   }
