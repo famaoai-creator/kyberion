@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import type { PresentationDeckPurpose } from './presentation-preference-profile.js';
-import { loadJson } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 
 export interface SlidePatternSlot {
   slot_id: string;
@@ -119,7 +119,7 @@ function isGenericLayoutKey(layoutKey?: string | null): boolean {
 }
 
 function loadPackFromPath(packPath: string): SlidePatternPack {
-  return loadJson<SlidePatternPack>(packPath);
+  return readJson<SlidePatternPack>(packPath);
 }
 
 export function _resetSlidePatternPackCacheForTests(): void {

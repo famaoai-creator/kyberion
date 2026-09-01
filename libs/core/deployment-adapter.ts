@@ -22,8 +22,9 @@ import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -155,7 +156,7 @@ function loadShellDeploymentAdapterConfig(
   return withExecutionContext('ecosystem_architect', () => {
     const configPath = resolveDeploymentConfigPath(env);
     if (!configPath || !safeExistsSync(configPath)) return null;
-    const parsed = loadJson<unknown>(configPath);
+    const parsed = readJson<unknown>(configPath);
     const validate = ensureDeploymentConfigValidator();
     if (!validate(parsed)) {
       const errors = (validate.errors || [])

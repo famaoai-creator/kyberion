@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
 import {
   invalidateProcedureCache,
@@ -7,13 +8,7 @@ import {
   validateProcedureCatalog,
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { validateBrowserExtensionRecording } from './browser-extension-bridge.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
@@ -54,7 +49,7 @@ export function promoteBrowserProcedure(
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
   let raw: unknown;
   try {
-    raw = loadJson<unknown>(recordingAbs);
+    raw = readJson<unknown>(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`

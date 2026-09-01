@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -122,7 +123,7 @@ function loadMissionTenantSlug(missionId: string): string | undefined {
   }
   if (!safeExistsSync(statePath)) return undefined;
   try {
-    const state = loadJson<{ tenant_slug?: unknown }>(statePath);
+    const state = readJson<{ tenant_slug?: unknown }>(statePath);
     return typeof state?.tenant_slug === 'string' && state.tenant_slug.trim()
       ? state.tenant_slug.trim()
       : undefined;
@@ -559,7 +560,7 @@ export function getMissionTeamPlanPath(missionId: string): string | null {
 export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   const planPath = getMissionTeamPlanPath(missionId);
   if (!planPath || !safeExistsSync(planPath)) return null;
-  const plan = loadJson<MissionTeamPlan>(planPath);
+  const plan = readJson<MissionTeamPlan>(planPath);
   const expectedTenant = loadMissionTenantSlug(missionId);
   if (
     expectedTenant &&

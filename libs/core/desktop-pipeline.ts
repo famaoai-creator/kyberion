@@ -1,8 +1,9 @@
 import type { ValidateFunction } from 'ajv';
 import path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeLstat } from './secure-io.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
@@ -107,7 +108,7 @@ export function loadDesktopPipeline(
   }
   try {
     assertDesktopPipelineResourcePath(absolute);
-    const raw = loadJson<unknown>(absolute);
+    const raw = readJson<unknown>(absolute);
     return validateDesktopPipeline(raw);
   } catch (error) {
     return {

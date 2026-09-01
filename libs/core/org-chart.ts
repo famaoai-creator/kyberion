@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { readJsonIfPresent as loadOptionalJson } from './foundation/json.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { loadAuthorityRoleIndex, loadTeamRoleIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -100,10 +101,6 @@ function normalizeRoleId(label: string): string {
   return aliases[cleaned] || cleaned;
 }
 
-function loadJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
-}
-
 function loadTeamRoleIndexFromRoot(baseDir: string): Record<string, TeamRoleRecord> {
   try {
     return loadTeamRoleIndex(baseDir);
@@ -123,7 +120,7 @@ function loadAuthorityRoleIndexFromRoot(
 }
 
 function loadDomainCatalog(baseDir: string): OrganizationOrgChartDomain[] {
-  const catalog = loadJsonIfPresent<{
+  const catalog = loadOptionalJson<{
     domains?: Record<string, { name?: string; roles?: Record<string, string> }>;
   }>(path.join(baseDir, 'knowledge', 'product', 'personalities', 'roles.json'));
 
