@@ -30,6 +30,7 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import type { AuditEntry } from '@agent/core/audit-chain';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
@@ -104,7 +105,9 @@ function parseMirrorFile(filePath: string, rootDir = pathResolver.rootDir()): Au
   for (const [index, line] of raw.split(/\r?\n/).entries()) {
     if (!line.trim()) continue;
     try {
-      entries.push(normalizePersistedAuditEntry(JSON.parse(line) as unknown));
+      entries.push(
+        normalizePersistedAuditEntry(parseSafeJsonInput(line, `${safePath}:${index + 1}`))
+      );
     } catch (error) {
       throw new Error(
         `[AUDIT_MIRROR_INVALID] ${safePath}:${index + 1} is not valid JSON: ${String(error)}`
