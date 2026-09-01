@@ -20,6 +20,7 @@ import { listMemoryPromotionCandidates, type MemoryCandidate } from './memory-pr
 import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { isRecord } from './foundation/text.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
@@ -514,7 +515,7 @@ function parseJsonl(raw: string): unknown[] {
     .filter(Boolean)
     .flatMap((line) => {
       try {
-        return [JSON.parse(line)];
+        return [parseSafeJsonInput(line, 'report JSONL entry')];
       } catch {
         return [];
       }
