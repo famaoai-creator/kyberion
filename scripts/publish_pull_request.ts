@@ -7,6 +7,7 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { safeExec } from '@agent/core/secure-io';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -31,8 +32,19 @@ function readDefaultBranch(): string {
   const raw = safeExec('gh', ['repo', 'view', '--json', 'defaultBranchRef'], {
     cwd: pathResolver.rootDir(),
   }).trim();
-  const parsed = JSON.parse(raw);
-  return parsed?.defaultBranchRef?.name || 'main';
+  return parseDefaultBranchResponse(raw);
+}
+
+export function parseDefaultBranchResponse(raw: string): string {
+  const parsed = parseSafeJsonObjectValue(
+    parseSafeJsonInput(raw, 'gh repository response'),
+    'gh repository response'
+  );
+  const ref = parsed.defaultBranchRef;
+  const refRecord = ref && typeof ref === 'object' && !Array.isArray(ref) ? ref : null;
+  return refRecord && typeof (refRecord as Record<string, unknown>).name === 'string'
+    ? String((refRecord as Record<string, unknown>).name)
+    : 'main';
 }
 
 export function parsePublishArgs(argv: string[]): PublishOptions {
