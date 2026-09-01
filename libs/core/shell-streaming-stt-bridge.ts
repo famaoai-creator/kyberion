@@ -26,6 +26,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
@@ -38,6 +39,20 @@ export interface ShellStreamingSttOptions {
   args?: readonly string[];
   /** Optional env additions for the subprocess. */
   env?: Record<string, string>;
+}
+
+/** Parse one untrusted NDJSON transcript emitted by the configured STT process. */
+export function parseShellStreamingSttTranscript(line: string): TranscriptChunk | undefined {
+  const parsed = parseSafeJsonObjectInput(line, 'shell STT transcript');
+  if (!parsed) return undefined;
+  return {
+    utterance_id: String(parsed.utterance_id ?? `${Date.now()}`),
+    is_final: Boolean(parsed.is_final ?? true),
+    text: String(parsed.text ?? ''),
+    ...(typeof parsed.confidence === 'number' ? { confidence: parsed.confidence } : {}),
+    ...(typeof parsed.speaker_label === 'string' ? { speaker_label: parsed.speaker_label } : {}),
+    emitted_at: new Date().toISOString(),
+  };
 }
 
 function validateShellCommand(command: string): string {
@@ -85,17 +100,8 @@ export class ShellStreamingSpeechToTextBridge implements StreamingSpeechToTextBr
         stdoutBuffer = stdoutBuffer.slice(nl + 1);
         if (!line) continue;
         try {
-          const parsed = JSON.parse(line);
-          const chunk: TranscriptChunk = {
-            utterance_id: String(parsed.utterance_id ?? `${Date.now()}`),
-            is_final: Boolean(parsed.is_final ?? true),
-            text: String(parsed.text ?? ''),
-            ...(typeof parsed.confidence === 'number' ? { confidence: parsed.confidence } : {}),
-            ...(typeof parsed.speaker_label === 'string'
-              ? { speaker_label: parsed.speaker_label }
-              : {}),
-            emitted_at: new Date().toISOString(),
-          };
+          const chunk = parseShellStreamingSttTranscript(line);
+          if (!chunk) continue;
           if (resolvers.length) resolvers.shift()!(chunk);
           else queue.push(chunk);
         } catch (err: any) {
