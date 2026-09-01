@@ -19,6 +19,7 @@ import {
 } from './distill-candidate-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { applyConsolidationActions, type ConsolidationAction } from './memory-notebook.js';
@@ -471,7 +472,7 @@ export function applyBackgroundReviewPipelinePatch(
 
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(before) as Record<string, unknown>;
+    parsed = parseSafeJsonInput(before, 'pipeline target') as Record<string, unknown>;
   } catch (error) {
     throw new Error(
       `Pipeline target is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
