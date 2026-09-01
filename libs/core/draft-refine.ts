@@ -4,6 +4,7 @@ import {
 } from './deliverable-quality.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { logger } from './core.js';
+import { clamp } from './foundation/text.js';
 
 /**
  * MO-07 Task 4.2: draft → rubric critique → refine for long-form
@@ -72,7 +73,7 @@ function defaultRefine(kind: 'doc' | 'deck', goalSummary?: string) {
 }
 
 export async function draftRefine(input: DraftRefineInput): Promise<DraftRefineOutcome> {
-  const maxPasses = Math.min(Math.max(input.maxPasses ?? 1, 0), 2);
+  const maxPasses = clamp(input.maxPasses ?? 1, 0, 2);
   const refine = input.refine ?? defaultRefine(input.kind, input.goalSummary);
 
   let current = input.content;

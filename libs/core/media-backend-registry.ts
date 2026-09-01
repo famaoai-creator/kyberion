@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { clamp } from './foundation/text.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
@@ -92,7 +93,7 @@ export function _resetMediaBackendAvailabilityCacheForTests(): void {
 
 function defaultMediaBackendProbeTtlMs(): number {
   const configured = Number(getRegisteredEnvText('KYBERION_MEDIA_BACKEND_PROBE_TTL_MS') || 30_000);
-  return Number.isFinite(configured) ? Math.min(300_000, Math.max(1_000, configured)) : 30_000;
+  return Number.isFinite(configured) ? clamp(configured, 1_000, 300_000) : 30_000;
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
@@ -460,7 +461,7 @@ export async function probeMediaBackendAvailability(
   }
 
   const ttlMs = Number.isFinite(options.ttl_ms)
-    ? Math.min(300_000, Math.max(1_000, Number(options.ttl_ms)))
+    ? clamp(Number(options.ttl_ms), 1_000, 300_000)
     : defaultMediaBackendProbeTtlMs();
   const probedAt = new Date(now).toISOString();
   const expiresAt = new Date(now + ttlMs).toISOString();

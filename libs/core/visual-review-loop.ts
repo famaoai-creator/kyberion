@@ -1,4 +1,5 @@
 import { createLogger } from './logger.js';
+import { clamp } from './foundation/text.js';
 import {
   formatVisualReviewReport,
   loadVisualReviewRubric,
@@ -78,7 +79,7 @@ export async function runVisualReviewLoop(
   input: VisualReviewLoopInput
 ): Promise<VisualReviewLoopResult> {
   const rubric = input.review.rubric ?? loadVisualReviewRubric();
-  const maxRounds = Math.max(1, Math.min(10, input.maxRounds ?? rubric.iteration.max_rounds));
+  const maxRounds = clamp(input.maxRounds ?? rubric.iteration.max_rounds, 1, 10);
   const rounds: VisualReviewRound[] = [];
   let lastReport: VisualReviewReport | undefined;
 
