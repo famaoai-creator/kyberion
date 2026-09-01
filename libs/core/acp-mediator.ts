@@ -16,6 +16,7 @@ import { pathResolver } from './path-resolver.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
@@ -450,7 +451,8 @@ export class ACPMediator {
               if (this.processedA2UIOffsets.has(match.index)) continue;
               try {
                 const jsonStr = match[1] || match[2];
-                const a2uiPacket = JSON.parse(jsonStr);
+                const a2uiPacket = parseSafeJsonObjectInput(jsonStr, 'ACP A2UI packet');
+                if (!a2uiPacket) throw new Error('ACP A2UI packet must be an object');
                 logger.info(
                   `[A2UI_EXTRACTED] Detected UI Surface: ${a2uiPacket.surfaceId || 'unknown'}`
                 );
