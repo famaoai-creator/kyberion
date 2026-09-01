@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from json_boundary import parse_json_object
 
 
 # Kyberion Voice Recorder Bridge (macOS focused)
@@ -159,7 +160,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     try:
-        input_data = json.loads(sys.argv[1])
+        input_data = parse_json_object(sys.argv[1], "voice recording input")
         action = input_data.get("action")
         params = input_data.get("params", {})
 

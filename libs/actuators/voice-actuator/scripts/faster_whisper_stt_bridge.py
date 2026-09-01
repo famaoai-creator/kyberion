@@ -7,6 +7,7 @@ download the configured model on first use.
 import json
 import os
 import sys
+from json_boundary import parse_json_object
 
 
 def transcribe(params: dict) -> dict:
@@ -49,7 +50,7 @@ def transcribe(params: dict) -> dict:
 
 def main() -> int:
     try:
-        payload = json.loads(sys.stdin.read())
+        payload = parse_json_object(sys.stdin.read(), "faster-whisper STT input")
         result = transcribe(payload.get("params") or {}) if payload.get("action") == "transcribe" else {"status": "error", "error": "Unknown action"}
     except Exception as exc:
         result = {"status": "error", "error": str(exc)}

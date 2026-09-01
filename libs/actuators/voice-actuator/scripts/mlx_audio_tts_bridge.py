@@ -15,6 +15,7 @@ import sys
 import json
 import os
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 
 DEFAULT_MODEL = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
@@ -128,8 +129,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "mlx TTS input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

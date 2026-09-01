@@ -9,6 +9,7 @@ import sys
 import json
 import contextlib
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 # Suppress stdout print leaks from raw libraries (preventing JSON parse errors in TypeScript caller)
 @contextlib.contextmanager
@@ -111,8 +112,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "kokoro TTS input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 

@@ -13,6 +13,7 @@ import sys
 import json
 import os
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 
 DEFAULT_MODEL = "mlx-community/whisper-large-v3-turbo"
@@ -112,8 +113,8 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "mlx STT input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         sys.exit(1)
 
