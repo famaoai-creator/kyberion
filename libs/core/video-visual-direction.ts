@@ -58,9 +58,6 @@ export const DEFAULT_VISUAL_DIRECTION: VideoVisualDirection = {
   typography: { headline_px: 68, body_px: 23 },
 };
 
-const clampVideoDirectionValue = (value: number, min: number, max: number): number =>
-  clamp(value, min, max);
-
 /**
  * Validate an LLM-drafted direction. Anything malformed degrades to the
  * historical default (never fails a render); typography is clamped to
@@ -103,10 +100,10 @@ export function normalizeVideoVisualDirection(
     palette: colors as VideoVisualDirection['palette'],
     typography: {
       headline_px: Number.isFinite(headline)
-        ? clampVideoDirectionValue(headline, headlineRange[0], headlineRange[1])
+        ? clamp(headline, headlineRange[0], headlineRange[1])
         : fallback.typography.headline_px,
       body_px: Number.isFinite(body)
-        ? clampVideoDirectionValue(body, bodyRange[0], bodyRange[1])
+        ? clamp(body, bodyRange[0], bodyRange[1])
         : fallback.typography.body_px,
     },
     ...(perScene && perScene.length > 0 ? { per_scene: perScene } : {}),

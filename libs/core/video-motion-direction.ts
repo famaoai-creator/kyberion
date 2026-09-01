@@ -204,9 +204,6 @@ function coerceCatalog(parsed: any): VideoMotionCatalog | null {
   };
 }
 
-const clampMotionDirectionValue = (value: number, min: number, max: number): number =>
-  clamp(value, min, max);
-
 /** Read a pattern id from either a bare string or a normalized `{pattern_id}`. */
 function patternIdOf(value: unknown): string | undefined {
   if (typeof value === 'string') return value.trim() || undefined;
@@ -333,7 +330,7 @@ export function normalizeVideoMotionDirection(
         ease,
         // A looping layer must not outrun the scene it lives in.
         duration_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             scene.duration_sec
               ? Math.min(pattern.duration_sec, scene.duration_sec * 2)
               : pattern.duration_sec,
@@ -350,14 +347,14 @@ export function normalizeVideoMotionDirection(
         pattern_id: entranceId,
         ease: entranceEase,
         duration_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             Number(draft?.entrance_duration_sec) || entrancePattern.duration_sec,
             ENTRANCE_DURATION_RANGE[0],
             ENTRANCE_DURATION_RANGE[1]
           )
         ),
         offset_sec: roundTo2(
-          clampMotionDirectionValue(
+          clamp(
             Number(draft?.entrance_offset_sec) || entrancePattern.offset_sec,
             OFFSET_RANGE[0],
             OFFSET_RANGE[1]
@@ -383,7 +380,7 @@ export function normalizeVideoMotionDirection(
       after_scene_id: String(entry.after_scene_id),
       kind: String(entry.kind || 'crossfade'),
       duration_sec: roundTo2(
-        clampMotionDirectionValue(
+        clamp(
           Number(entry.duration_sec) || catalog.transitions.preferred_duration_sec,
           catalog.transitions.min_duration_sec,
           1.5
