@@ -15,5 +15,8 @@ describe('code catalog resource boundary', () => {
     expect(source).toContain(
       "pathResolver.knowledge('product/orchestration/global_skill_index.json')"
     );
+    expect(source).toContain("parseSafeJsonInput(raw, 'global skill index')");
+    expect(source).toContain("parseSafeJsonInput(stdout, 'semgrep response')");
+    expect(source).not.toContain('const parsed = JSON.parse(raw) as GlobalSkillIndex');
   });
 });
