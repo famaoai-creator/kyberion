@@ -20,7 +20,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJsonLines } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, readJsonLines } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 export interface EgressHostSummary {
@@ -44,10 +44,6 @@ type EgressAuditRecord = {
   result: 'allowed' | 'denied' | 'error' | 'completed' | 'failed';
   metadata: { hostname: string };
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function parseEgressAuditValue(value: unknown): EgressAuditRecord | undefined {
   if (!isRecord(value)) return undefined;

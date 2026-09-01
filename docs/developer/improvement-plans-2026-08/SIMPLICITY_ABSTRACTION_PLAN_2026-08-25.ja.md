@@ -10993,6 +10993,12 @@ SX-03 の private helper 残差を再監査し、voice-hub の request／provide
 
 検証: voice-hub request boundary／foundation adoption **2 files / 9 tests passed**。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 209
+
+SX-03 の private helper 残差を続けて整理し、egress audit report と OCR provider response の汎用 `isRecord` を `@agent/core/foundation` の canonical helperへ移行した。malformed／primitive／配列の reject semantics、egress の安全な集計、各 OCR provider の fail-closed response parsing は変更していない。egress entrypoint には旧 helper の再導入を防ぐ契約テストを追加した。
+
+検証: egress report／OCR／voice-hub／foundation adoption **5 files / 37 tests passed**、root typecheck、catalog integrity、PR scope check、`git diff --check`。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

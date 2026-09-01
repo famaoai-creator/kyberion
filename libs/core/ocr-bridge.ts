@@ -6,6 +6,7 @@ import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
@@ -56,10 +57,6 @@ function resolveOcrImagePath(requestPath: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(requestPath), {
     allowMissingLeaf: true,
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function nonEmptyString(value: unknown): string | undefined {
