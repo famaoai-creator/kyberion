@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -86,10 +87,6 @@ export interface PackImportRecord {
   archived: string[];
   skipped: Array<{ plugin_id: string; reason: string }>;
   error?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isStringArray(value: unknown): value is string[] {

@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -27,10 +28,6 @@ function safeStimuliPath(): string {
 export const STIMULI_MAX_BYTES = 5 * 1024 * 1024;
 /** After rotation, retain this share of the tail so live context survives. */
 const STIMULI_RETAIN_BYTES = Math.floor(STIMULI_MAX_BYTES / 2);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function requiredString(record: Record<string, unknown>, key: string): string {
   const value = record[key];
