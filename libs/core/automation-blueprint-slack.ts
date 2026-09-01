@@ -1,4 +1,5 @@
 import type { AutomationBlueprint, AutomationFormSchema } from './automation-blueprint.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 export interface AutomationSlackModalMetadata {
   blueprint_id: string;
@@ -112,22 +113,30 @@ export function buildAutomationSlackModal(
 }
 
 export function parseAutomationSlackModalMetadata(value: string): AutomationSlackModalMetadata {
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(String(value || ''));
-  } catch {
-    throw new Error('[POLICY_VIOLATION] Invalid Slack automation modal metadata.');
-  }
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error('[POLICY_VIOLATION] Invalid Slack automation modal metadata.');
-  }
-  const metadata = parsed as Partial<AutomationSlackModalMetadata>;
-  for (const key of ['blueprint_id', 'pipeline_ref', 'channel', 'thread_ts', 'actor_id'] as const) {
-    if (!metadata[key] || typeof metadata[key] !== 'string' || metadata[key]!.length > 500) {
-      throw new Error(`[POLICY_VIOLATION] Missing Slack automation metadata: ${key}`);
+    const metadata = parseSafeJsonObjectInput(
+      String(value || ''),
+      'Slack automation modal metadata'
+    );
+    if (!metadata) throw new Error('metadata must be an object');
+    for (const key of [
+      'blueprint_id',
+      'pipeline_ref',
+      'channel',
+      'thread_ts',
+      'actor_id',
+    ] as const) {
+      if (!metadata[key] || typeof metadata[key] !== 'string' || metadata[key].length > 500) {
+        throw new Error(`Missing Slack automation metadata: ${key}`);
+      }
     }
+    return metadata as unknown as AutomationSlackModalMetadata;
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Missing Slack automation metadata:')) {
+      throw new Error(`[POLICY_VIOLATION] ${error.message}`);
+    }
+    throw new Error('[POLICY_VIOLATION] Invalid Slack automation modal metadata.');
   }
-  return metadata as AutomationSlackModalMetadata;
 }
 
 export function extractAutomationSlackFormValues(

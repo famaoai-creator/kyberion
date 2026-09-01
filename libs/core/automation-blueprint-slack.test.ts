@@ -53,5 +53,10 @@ describe('automation-blueprint-slack', () => {
     expect(() => parseAutomationSlackModalMetadata('{"blueprint_id":"only"}')).toThrow(
       /Missing Slack automation metadata/
     );
+    expect(() =>
+      parseAutomationSlackModalMetadata(
+        '{"blueprint_id":"b","pipeline_ref":"p","channel":"c","thread_ts":"t","actor_id":"a","meta":{"__proto__":{}}}'
+      )
+    ).toThrow(/Invalid Slack automation modal metadata/);
   });
 });
