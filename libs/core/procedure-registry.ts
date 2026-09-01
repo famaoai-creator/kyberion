@@ -13,6 +13,7 @@ import {
   type ProcedureResolution,
 } from './procedure-types.js';
 import { isDesktopPromotionPending } from './desktop-promotion-transaction.js';
+import { clamp } from './foundation/text.js';
 
 const PROCEDURES_PATH = 'knowledge/product/orchestration/procedures.json';
 /** User-local substrate-neutral overlay. This path is intentionally ignored by git. */
@@ -235,7 +236,7 @@ function scoreEntry(
   // binding authoritatively before any execution) — bias, don't gate.
   if (origin && best < 1 && entry.target.origins && entry.target.origins.length > 0) {
     const matched = entry.target.origins.some((o) => matchesAllowedOrigin(o, origin));
-    best = matched ? Math.min(1.0, best + 0.1) : Math.max(0, best - 0.15);
+    best = clamp(matched ? best + 0.1 : best - 0.15, 0, 1);
   }
 
   return best;
