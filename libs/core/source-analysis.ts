@@ -12,6 +12,7 @@ import {
 import * as pathResolver from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJsonIfPresent } from './foundation/json.js';
+import { clamp } from './foundation/text.js';
 
 const SOURCE_EXTENSIONS = new Set([
   '.c',
@@ -402,7 +403,7 @@ function assertWorkspacePath(sourceRoot: string): { absolute: string; relative: 
 
 export function analyzeSourceTree(options: AnalyzeSourceTreeOptions = {}): SourceAnalysisIr {
   const resolved = assertWorkspacePath(options.sourceRoot || '.');
-  const maxFiles = Math.max(1, Math.min(10000, Number(options.maxFiles || 2000)));
+  const maxFiles = clamp(Number(options.maxFiles || 2000), 1, 10000);
   const files: SourceAnalysisFile[] = [];
   const dependencies = new Set<string>();
   const routes: SourceAnalysisIr['routes'] = [];
