@@ -16,7 +16,7 @@ import {
 import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
-import { parseIngestForm } from './ingest-input';
+import { parseIngestForm } from '../ingest-input';
 import { parseIngestCliVerdict } from '../ingest-output-parser';
 
 export const dynamic = 'force-dynamic';
