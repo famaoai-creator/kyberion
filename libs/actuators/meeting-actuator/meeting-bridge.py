@@ -143,6 +143,10 @@ def _err(message, **extra):
     return payload
 
 
+def _host_matches(host, allowed):
+    return host == allowed or host.endswith(f".{allowed}")
+
+
 def _validate_url(platform, url):
     if not url:
         return False, "url is required"
@@ -152,8 +156,14 @@ def _validate_url(platform, url):
         return False, f"invalid url: {exc}"
     if parsed.scheme not in ("http", "https"):
         return False, f"url scheme must be http(s); got '{parsed.scheme}'"
+    if parsed.username or parsed.password:
+        return False, "url userinfo is not allowed"
+    try:
+        host = (parsed.hostname or "").rstrip(".").lower()
+    except ValueError as exc:
+        return False, f"invalid url host: {exc}"
     allow = ALLOWED_HOSTS.get(platform, ())
-    if allow and not any(parsed.netloc.endswith(h) for h in allow):
+    if allow and not any(_host_matches(host, allowed) for allowed in allow):
         return False, f"url host '{parsed.netloc}' not in allow-list for {platform}"
     return True, None
 
@@ -161,15 +171,15 @@ def _validate_url(platform, url):
 def _detect_platform(url):
     try:
         parsed = urlparse(url)
-        host = parsed.netloc
+        host = (parsed.hostname or "").rstrip(".").lower()
         pathname = parsed.path.lower()
     except Exception:
         return "meet"
-    if host.endswith("zoom.us") or host.endswith("zoom.com"):
+    if _host_matches(host, "zoom.us") or _host_matches(host, "zoom.com"):
         return "zoom"
-    if host.endswith("teams.microsoft.com") or host.endswith("teams.live.com"):
+    if _host_matches(host, "teams.microsoft.com") or _host_matches(host, "teams.live.com"):
         return "teams"
-    if host.endswith("microsoft.com") and "/microsoft-teams/join-a-meeting" in pathname:
+    if _host_matches(host, "microsoft.com") and "/microsoft-teams/join-a-meeting" in pathname:
         return "teams"
     return "meet"
 
