@@ -6,6 +6,7 @@ import { createVirtualAudioInputRecordingBridge } from './virtual-audio-input-re
 import { createVirtualDeviceInventoryBridge } from './virtual-device-inventory-bridge.js';
 import { assertSafeRepositoryPath, safeExec, safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveVoicePath } from './voice-path-policy.js';
+import { clamp } from './foundation/text.js';
 
 export interface RecordVoiceSampleRequest {
   action: 'record_voice_sample';
@@ -144,7 +145,7 @@ function writeWavFromAudioChunks(outputPath: string, chunks: AudioChunk[]): Audi
 
 function renderProgress(elapsedSec: number, durationSec: number): string {
   const width = 28;
-  const ratio = Math.min(1, Math.max(0, elapsedSec / Math.max(durationSec, 0.1)));
+  const ratio = clamp(elapsedSec / Math.max(durationSec, 0.1), 0, 1);
   const filled = Math.round(width * ratio);
   return `[${'█'.repeat(filled)}${'░'.repeat(width - filled)}] ${elapsedSec.toFixed(1)}/${durationSec.toFixed(1)}s`;
 }

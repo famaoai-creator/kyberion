@@ -3,6 +3,7 @@ import * as path from 'path';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
 import type { PptxDesignProtocol, PptxElement, PptxLayoutRaw, PptxMasterMedia, PptxMasterRaw, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
 import { generateNativePptx } from './native-pptx-engine/engine.js';
+import { clamp } from '../foundation/text.js';
 
 /**
  * PPTX Utilities v3.0.0 [Native Engine]
@@ -35,9 +36,9 @@ function applyLuminance(hex: string, lumMod?: number, lumOff?: number): string {
   }
   if (lumOff !== undefined) {
     const offset = Math.round((lumOff / 100000) * 255);
-    r = Math.min(255, Math.max(0, r + offset));
-    g = Math.min(255, Math.max(0, g + offset));
-    b = Math.min(255, Math.max(0, b + offset));
+    r = clamp(r + offset, 0, 255);
+    g = clamp(g + offset, 0, 255);
+    b = clamp(b + offset, 0, 255);
   }
 
   return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();

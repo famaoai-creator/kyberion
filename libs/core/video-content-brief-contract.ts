@@ -925,7 +925,7 @@ function distributeDurations(total: number, weights: number[], readingSec?: numb
   const budgets = weights.map((weight, index) => {
     const reading = readingSec?.[index] ?? 0;
     if (reading <= 0) return weight;
-    return Math.min(READING_CEILING_SEC, Math.max(READING_FLOOR_SEC, reading));
+    return clamp(reading, READING_FLOOR_SEC, READING_CEILING_SEC);
   });
   const totalBudget = budgets.reduce((sum, value) => sum + value, 0) || 1;
   const durations = budgets.map((budget) => roundTo2((total * budget) / totalBudget));
