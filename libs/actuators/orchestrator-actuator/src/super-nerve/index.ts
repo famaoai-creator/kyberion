@@ -12,12 +12,12 @@ import {
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
-import { safeExistsSync, safeExec, loadJson } from '@agent/core/secure-io';
+import { safeExistsSync, safeExec } from '@agent/core/secure-io';
 import { suggestClosestStrings } from '@agent/core/op-suggestions';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -140,7 +140,7 @@ export async function executeSuperPipeline(
       if (repaired) {
         logger.success(`  [NERVE] Repair successful. Retrying pipeline...`);
         try {
-          const repairedPipeline = loadJson<{ steps?: unknown }>(
+          const repairedPipeline = readJson<{ steps?: unknown }>(
             path.resolve(pathResolver.rootResolve(pipelinePath))
           );
           if (!Array.isArray(repairedPipeline.steps)) {
@@ -260,7 +260,7 @@ async function handleCoreAction(
           `[TRUST_REQUIRED] super pipeline include requires an explicit project-trust decision: ${relativePath}`
         );
       }
-      const macroDef = loadJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
+      const macroDef = readJson<{ steps?: Array<Record<string, unknown>> }>(macroPath);
       const nested = await runSteps(normalizeNestedSteps(macroDef.steps || []), ctx);
       if (nested.status === 'failed') {
         throw new Error(

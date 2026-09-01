@@ -1,5 +1,4 @@
 import {
-  loadJson,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -35,7 +34,7 @@ import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
 } from '@agent/core/agentic-source-review-verification';
-import { createAjv } from '@agent/core/foundation';
+import { createAjv, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -129,7 +128,7 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(contextPath),
+      async () => readJson<Record<string, unknown>>(contextPath),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -210,7 +209,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         ...ctx,
         [params.export_as || 'last_capture_data']: await retry(
           async () =>
-            loadJson<unknown>(
+            readJson<unknown>(
               resolveModelingRepositoryPath(rootDir, resolve(params.path), 'read_json')
             ),
           buildRetryOptions()
@@ -772,7 +771,7 @@ async function loadBrowserExecutionPresetCatalog(): Promise<{
     try {
       const parsed = await retry(
         async () =>
-          loadJson<{
+          readJson<{
             default_preset?: string;
             presets?: Record<string, unknown>;
           }>(safePresetPath),
@@ -994,7 +993,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
         params.contract ??
         ctx[params.contract_from || 'quality_contract'] ??
         (contractFilePath && safeExistsSync(contractFilePath)
-          ? loadJson<SoftwareQualityContract>(contractFilePath)
+          ? readJson<SoftwareQualityContract>(contractFilePath)
           : null);
       if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
@@ -1065,7 +1064,7 @@ export async function performReconcile(input: ModelingAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => loadJson<StrategyConfig>(strategyPath),
+    async () => readJson<StrategyConfig>(strategyPath),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {

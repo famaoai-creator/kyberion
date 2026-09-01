@@ -1,6 +1,6 @@
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
-import { isRecord } from '@agent/core/foundation';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync } from '@agent/core/secure-io';
+import { isRecord, readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 export interface DiagramGraphNode extends Record<string, unknown> {
@@ -170,7 +170,7 @@ export function resolveGraphDefinition(
       resolve(params.input_path),
       'drawio_from_graph'
     );
-    const graph = parseDiagramGraph(loadJson<unknown>(inputPath));
+    const graph = parseDiagramGraph(readJson<unknown>(inputPath));
     if (!graph) throw new Error(`drawio_from_graph received an invalid graph: ${inputPath}`);
     return graph;
   }
@@ -195,7 +195,7 @@ export function resolveDrawioIconMap(
     return { resources: {} };
   }
 
-  const iconMap = parseDrawioIconMap(loadJson<unknown>(mapPath));
+  const iconMap = parseDrawioIconMap(readJson<unknown>(mapPath));
   if (!iconMap) throw new Error(`drawio icon map is malformed: ${mapPath}`);
   return iconMap;
 }

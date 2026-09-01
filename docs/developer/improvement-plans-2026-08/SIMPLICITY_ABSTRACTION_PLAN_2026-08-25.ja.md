@@ -11398,6 +11398,19 @@ Prettier、ESLint、`git diff --check`。残る改善計画は secure-io reader 
 helper、全surfaceの実ブラウザ・外部provider実機確認、SX-04〜SX-14 の未完了項目、および voice
 provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 257
+
+SX-03 の JSON reader adoption を actuator 側へ継続し、media の diagram／catalog／document／preference、
+voice repair session、orchestrator の strategy／super-nerve、modeling pipeline、system action の 10
+source files に残っていた `secure-io.loadJson` を `foundation/json` の `readJson` へ移行した。既存の
+repository path guard、trust／repair、retry、provider 境界は変更していない。移行に伴い orchestrator
+のテスト差し替えも canonical reader 境界へ合わせ、secure-io の互換 export に依存しない検証へ更新した。
+
+検証: 対象 actuator **8 test files / 160 tests passed**、root typecheck、foundation adoption、PR gate
+33/33、Prettier、ESLint、`git diff --check`。残る改善計画は追加の secure-io reader caller／domain-specific
+helper、全surfaceの実ブラウザ・外部provider実機確認、SX-04〜SX-14 の未完了項目、および voice
+provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
