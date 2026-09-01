@@ -6,7 +6,7 @@ import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeReaddir, safeRmSync } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
-import { parseMeetingActionResult } from './meeting-actuator-helpers.js';
+import { parseMeetingActionInput, parseMeetingActionResult } from './meeting-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -37,6 +37,31 @@ describe('meeting-actuator', () => {
     ).toBeUndefined();
     expect(parseMeetingActionResult({ status: 'success', partial_state: 'true' })).toBeUndefined();
     expect(parseMeetingActionResult({ status: 'success', elapsed: Number.NaN })).toBeUndefined();
+  });
+
+  it('uses the safe parser at the action and bridge JSON boundaries', () => {
+    const source = safeReadFile(
+      path.join(
+        pathResolver.rootDir(),
+        'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts'
+      ),
+      { encoding: 'utf8' }
+    ) as string;
+    expect(source).toContain("parseSafeJsonInput(normalized, 'meeting bridge result')");
+    expect(source).toContain("parseSafeJsonInput(inputContent, 'meeting action input')");
+    expect(source).not.toContain('handleAction(JSON.parse(inputContent))');
+  });
+
+  it('rejects malformed typed action input after safe JSON parsing', () => {
+    expect(() => parseMeetingActionInput([])).toThrow(/must be an object/);
+    expect(() => parseMeetingActionInput({ action: 'explode', params: {} })).toThrow(
+      /unknown action/
+    );
+    expect(() => parseMeetingActionInput({ action: 'join' })).toThrow(/params must be an object/);
+    expect(parseMeetingActionInput({ action: 'pipeline', steps: [] })).toEqual({
+      action: 'pipeline',
+      steps: [],
+    });
   });
 
   it('emits a join action that satisfies the schema', () => {
