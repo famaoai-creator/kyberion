@@ -46,6 +46,7 @@ import {
   requirePresenceStudioAccess,
   requirePresenceStudioRateLimit,
   PresenceStudioViewerError,
+  presenceStudioMinutesSessionStartSchema,
   narrowPresenceStudioTenant,
   presenceStudioHeadlessScope,
   resolvePresenceStudioViewerContext,
@@ -1060,11 +1061,12 @@ app.post('/api/minutes/session/start', async (req, res) => {
       res.status(409).json({ ok: false, error: `既に録音中です (${inRoomMinutesMissionId})` });
       return;
     }
-    const missionId = String(req.body?.missionId || '').trim();
-    if (!missionId) {
-      res.status(400).json({ ok: false, error: 'missionId が必要です' });
+    const parsed = presenceStudioMinutesSessionStartSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ ok: false, error: validationErrorMessage(parsed.error) });
       return;
     }
+    const { missionId, title, language, device } = parsed.data;
     const probe = probeMicCapture();
     if (!probe.available) {
       res.status(503).json({ ok: false, error: probe.reason || 'マイクが利用できません' });
@@ -1107,9 +1109,9 @@ app.post('/api/minutes/session/start', async (req, res) => {
     }
     inRoomMinutesSession = await startInRoomMinutesSession({
       missionId,
-      meetingTitle: typeof req.body?.title === 'string' ? req.body.title : undefined,
-      language: typeof req.body?.language === 'string' ? req.body.language : 'ja',
-      mic: { device: typeof req.body?.device === 'string' ? req.body.device : undefined },
+      meetingTitle: title,
+      language: language || 'ja',
+      mic: { device },
       onTranscriptChunk: (chunk) => {
         broadcast('minutes-transcript', chunk);
       },
