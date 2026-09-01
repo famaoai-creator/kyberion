@@ -25,6 +25,7 @@ import { appendJsonLine } from './foundation/json.js';
 import type { AudioBus } from './audio-bus.js';
 import { randomBytes } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { createLogger } from './logger.js';
 import { ocrImage } from './ocr-bridge.js';
 import { pathResolver } from './path-resolver.js';
@@ -67,6 +68,16 @@ const MAX_AI_TEXT = 12_000;
 interface ExtensionEvent {
   event: string;
   [k: string]: unknown;
+}
+
+export function parseChromeExtensionEvent(raw: string): ExtensionEvent | undefined {
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'Chrome extension event');
+    if (!parsed || typeof parsed.event !== 'string' || !parsed.event.trim()) return undefined;
+    return parsed as ExtensionEvent;
+  } catch {
+    return undefined;
+  }
 }
 
 // Minimal structural type so we don't hard-fail typecheck if `ws` types drift.
@@ -367,7 +378,8 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
         let authenticated = false;
         candidate.on('message', (...margs: unknown[]) => {
           try {
-            const parsed = JSON.parse(String(margs[0])) as ExtensionEvent;
+            const parsed = parseChromeExtensionEvent(String(margs[0]));
+            if (!parsed) return;
             if (!authenticated) {
               if (parsed.event !== 'hello' || parsed.auth_token !== authToken) {
                 candidate.close();
