@@ -19,6 +19,7 @@ import {
   stripUnresolvedTemplateValues,
 } from './service-engine-helpers.js';
 import { resolveServiceBinding } from './service-binding.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 const logger = createLogger('service-engine-execution');
 
@@ -28,6 +29,15 @@ function buildChildEnv(env?: Record<string, unknown>): Record<string, string> | 
     .filter(([, value]) => value !== undefined && value !== null)
     .map(([key, value]) => [key, String(value)] as const);
   return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+/** Parse untrusted CLI output without allowing unsafe JSON objects into mappings. */
+export function parseServiceCliOutput(rawOutput: string): unknown {
+  try {
+    return parseSafeJsonInput(rawOutput, 'service CLI JSON output');
+  } catch (_) {
+    return tryRepairJson(rawOutput) ?? rawOutput;
+  }
 }
 
 export async function executeMcp(
@@ -153,13 +163,7 @@ export async function executeServicePresetAlternative(
       buildRetryOptions(input.serviceConfig, input.preset, input.alt)
     );
 
-    let parsed: unknown = rawOutput;
-    try {
-      parsed = JSON.parse(rawOutput);
-    } catch (_) {
-      const repaired = tryRepairJson(rawOutput);
-      if (repaired !== null) parsed = repaired;
-    }
+    const parsed = parseServiceCliOutput(rawOutput);
     return { result: normalizePresetResult(parsed, input.alt.output_mapping) };
   }
 
