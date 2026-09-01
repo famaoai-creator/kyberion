@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface ManifestEntry {
@@ -258,7 +258,10 @@ function renderKnowledgeIndexFiles(): GeneratedFile[] {
 
 function normalizeManifest(content: string): string {
   try {
-    const parsed = JSON.parse(content) as { files?: unknown[] };
+    const parsed = parseSafeJsonInput(content, 'knowledge integrity manifest') as {
+      files?: unknown[];
+    };
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return content;
     return JSON.stringify(parsed.files || []);
   } catch {
     return content.replace(/"generated": ".*?",\n/g, '');
