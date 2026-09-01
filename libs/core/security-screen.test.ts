@@ -82,6 +82,13 @@ describe('security-screen (QM-04)', () => {
       expect(parseScreenVerdict('{"decision":"dangerous"}').decision).toBe('strict');
     });
 
+    it('fails closed for dangerous nested JSON keys', () => {
+      expect(parseScreenVerdict('{"decision":"auto","metadata":{"__proto__":{"x":1}}}')).toEqual({
+        decision: 'strict',
+        reason: 'invalid security screen verdict',
+      });
+    });
+
     it('treats unknown decisions as strict', () => {
       expect(parseScreenVerdict('{"decision":"allow"}').decision).toBe('strict');
     });

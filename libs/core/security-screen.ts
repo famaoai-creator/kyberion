@@ -33,6 +33,7 @@ import {
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 export type SecurityPosture = 'dangerous' | 'auto' | 'strict';
 
@@ -169,18 +170,20 @@ const INVALID_VERDICT: ScreenDecision = {
 export function parseScreenVerdict(raw: string): ScreenDecision {
   const json = firstJsonObject(String(raw ?? ''));
   if (!json) return INVALID_VERDICT;
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(json);
+    const parsed = parseSafeJsonObjectInput(json, 'security screen verdict');
+    if (!parsed) return INVALID_VERDICT;
+    const decision = parsed.decision;
+    if (decision === 'auto') return { decision: 'auto' };
+    if (decision === 'strict') {
+      const reason = parsed.reason;
+      return {
+        decision: 'strict',
+        reason: typeof reason === 'string' ? reason : 'screener verdict',
+      };
+    }
   } catch {
     return INVALID_VERDICT;
-  }
-  if (typeof parsed !== 'object' || parsed === null) return INVALID_VERDICT;
-  const decision = (parsed as { decision?: unknown }).decision;
-  if (decision === 'auto') return { decision: 'auto' };
-  if (decision === 'strict') {
-    const reason = (parsed as { reason?: unknown }).reason;
-    return { decision: 'strict', reason: typeof reason === 'string' ? reason : 'screener verdict' };
   }
   return INVALID_VERDICT;
 }
