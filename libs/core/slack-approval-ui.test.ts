@@ -37,6 +37,8 @@ describe('Slack approval UI intent contract projection', () => {
       block.text?.text?.includes('*Authority:*')
     );
     expect(contractBlock?.text?.text).toContain('*Authority:* human approval required');
+    expect(contractBlock?.text?.text).toContain('*Understanding:* deploy_release');
+    expect(contractBlock?.text?.text).toContain('*Missing input:* None');
     expect(contractBlock?.text?.text).toContain('*Next action:* Approve this release.');
     expect(contractBlock?.text?.text).toContain(
       '*Consequence:* The release waits until approval is recorded.'
