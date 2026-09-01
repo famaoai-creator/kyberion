@@ -1,6 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
@@ -495,7 +496,7 @@ function scoreScheduleReadAgendaIntent(
     confidence += 0.04;
     reasons.push('read verb matched');
   }
-  confidence = Math.min(0.97, confidence);
+  confidence = clamp(confidence, 0, 0.97);
 
   return {
     intent_id: 'schedule-read-agenda',
@@ -540,7 +541,7 @@ function scoreScheduleCoordinationIntent(
     confidence += 0.03;
     reasons.push(`subject inferred as ${frame.subject}`);
   }
-  confidence = Math.min(0.97, confidence);
+  confidence = clamp(confidence, 0, 0.97);
 
   return {
     intent_id: 'schedule-coordination',
@@ -588,7 +589,7 @@ function scoreApprovalWorkflowIntent(utterance: string): IntentResolutionCandida
 
   return {
     intent_id: intentId,
-    confidence: Number(Math.min(0.97, confidence).toFixed(2)),
+    confidence: Number(clamp(confidence, 0, 0.97).toFixed(2)),
     source: 'heuristic',
     matched_keywords: [],
     reasons,
@@ -615,7 +616,7 @@ function scoreVoiceInputIntent(utterance: string): IntentResolutionCandidate | n
     confidence += 0.03;
     reasons.push('enable phrasing matched');
   }
-  confidence = Math.min(0.97, confidence);
+  confidence = clamp(confidence, 0, 0.97);
 
   return {
     intent_id: 'enable-voice-input',
