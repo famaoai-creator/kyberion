@@ -4,7 +4,7 @@ import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 
 export interface IMessageAttachment {
   id: string;
@@ -332,7 +332,7 @@ export function buildIMessageDifferentialQuery(
   limit = DEFAULT_DIFFERENTIAL_LIMIT
 ): string {
   const cursor = Math.max(0, Math.floor(Number.isFinite(lastSeenId) ? lastSeenId : 0));
-  const rowLimit = Math.max(1, Math.min(1000, Math.floor(limit)));
+  const rowLimit = clamp(Math.floor(limit), 1, 1000);
   return `SELECT
     m.ROWID AS id,
     COALESCE(m.text, '') AS text,
