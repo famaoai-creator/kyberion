@@ -51,4 +51,29 @@ describe('trace-log-access', () => {
     expect(filtered).not.toContain('public-b');
     expect(filtered).not.toContain('legacy');
   });
+
+  it('drops malformed and dangerous JSONL entries before trace projection', () => {
+    const valid = {
+      traceId: 'public-safe',
+      metadata: { tenantSlug: 'tenant-a', tier: 'public' },
+      rootSpan: {
+        spanId: 'public-safe-span',
+        name: 'pipeline:public-safe',
+        status: 'ok',
+        startTime: '2026-05-28T15:59:00.000Z',
+        events: [],
+        artifacts: [],
+        knowledgeRefs: [],
+        children: [],
+      },
+    };
+    const filtered = filterTraceLogContent(
+      [JSON.stringify(valid), '{', '{"__proto__":{"tenantSlug":"tenant-a"}}'].join('\n'),
+      'traces-2026-05-28.jsonl',
+      { tenantSlugs: ['tenant-a'], tierAccess: ['public'] }
+    );
+
+    expect(filtered).toContain('public-safe');
+    expect(filtered).not.toContain('__proto__');
+  });
 });
