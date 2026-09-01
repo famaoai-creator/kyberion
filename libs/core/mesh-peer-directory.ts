@@ -1,6 +1,7 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJsonLines } from './foundation/json.js';
+import { normalizeIso } from './foundation/time.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
@@ -87,15 +88,6 @@ function meshHubRuntimeRoot(tenantId: string): string {
 
 function runtimePath(tenantId: string, segment: string): string {
   return `${meshHubRuntimeRoot(tenantId)}/${segment}`;
-}
-
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
 }
 
 function readJsonlRecords<T>(logicalPath: string): T[] {
@@ -269,7 +261,7 @@ function getCurrentSnapshot(tenantId: string, peerId: string): MeshPeerDirectory
   }
 
   const presence = currentPresence(
-    normalizeIso(),
+    normalizeIso(undefined),
     latestByPeerId(loadPresence(tenantId)).get(peerId) || undefined
   );
   const capabilityMap = latestCapabilityAds(loadCapabilities(tenantId));
