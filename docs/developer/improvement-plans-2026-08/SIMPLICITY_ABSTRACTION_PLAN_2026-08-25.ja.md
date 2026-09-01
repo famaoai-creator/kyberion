@@ -11029,6 +11029,18 @@ SX-03 の private helper 残差をさらに整理し、ingest sync cursor／inte
 
 検証: data／contract／surface **7 files / 65 tests passed**、foundation adoption、root typecheck、PR scope check、`git diff --check`。残る SX-03 の型付き private record／`clamp`／時刻 helper、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 215
+
+SX-03 の exact generic `isRecord` 残差を解消し、ingest asset ledger／peer conversation／peer messaging／surface response blocks を `foundation/text` の canonical helperへ移行した。tenant asset lineage、peer tenant／provenance、wire envelope、surface block sanitization の固有 validation は維持した。adoption checkerで `foundation/text.ts` 自身を除く同一signatureのprivate generic helperが0件であることを確認した。
+
+検証: ingest／peer／surface **5 files / 56 tests passed**、foundation adoption、root typecheck、`git diff --check`。残る SX-03 は型付きprivate record、`clamp`、時刻 helper の adopt-or-deleteであり、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-02 再レビュー修正 216
+
+PR #711 の旧SHAで観測した契約不一致を修正した。intent smoke のCI出力先を `/tmp` から `active/shared/tmp` へ変更し、`AGENTS.md` の一時ファイル境界と `resolveIntentSmokeOutputDir` を一致させた。optional な `gws` CLI 不在は email account registry を壊さず `needs_setup` へ収束させた。`storage-janitor`／`storage-retention-catalog` のテストモックへ、現行 secure-io／path-resolver 契約を反映した。strict schema の `additionalProperties: false` で拒否されていた root `$schema`／`documentation_only` も明示許可した。
+
+検証: path boundary／storage retention **2 files / 19 tests passed**、email／adapter／storage／schema **5 files / 409 tests passed**。残る SX-03 は型付きprivate record、`clamp`、時刻 helper の adopt-or-deleteであり、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。旧SHAで失敗したリモートcore／intent smoke は、この修正を新SHAへ反映後に再評価する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

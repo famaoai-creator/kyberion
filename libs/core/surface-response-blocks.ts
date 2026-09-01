@@ -9,6 +9,7 @@ import type {
 import { extractPlanningPacketBlocks } from './planning-packet-contract.js';
 import { extractTaskResultBlocks } from './task-result-contract.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 const REASONING_TAG_NAMES = [
   'think',
@@ -138,10 +139,6 @@ function sanitizeSurfaceReplyText(input: string): string {
   }
 
   return sanitized.join('\n').trim();
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function optionalString(record: Record<string, unknown>, key: string): string | undefined {

@@ -6765,7 +6765,7 @@
     {
       "path": "product/schemas/contextual-intent-learning-seed.schema.json",
       "tier": "public",
-      "size": 2241,
+      "size": 2290,
       "type": "json"
     },
     {
@@ -6903,7 +6903,7 @@
     {
       "path": "product/schemas/dynamic-permission-policy.schema.json",
       "tier": "public",
-      "size": 1545,
+      "size": 1609,
       "type": "json"
     },
     {
@@ -7977,7 +7977,7 @@
     {
       "path": "product/schemas/operator-learning-scenario-pack.schema.json",
       "tier": "public",
-      "size": 2088,
+      "size": 2137,
       "type": "json"
     },
     {
@@ -8553,13 +8553,13 @@
     {
       "path": "product/schemas/restricted-capabilities.schema.json",
       "tier": "public",
-      "size": 899,
+      "size": 963,
       "type": "json"
     },
     {
       "path": "product/schemas/restricted-skills.schema.json",
       "tier": "public",
-      "size": 1616,
+      "size": 1680,
       "type": "json"
     },
     {
@@ -9069,7 +9069,7 @@
     {
       "path": "product/schemas/track-creation-policy.schema.json",
       "tier": "public",
-      "size": 2235,
+      "size": 2299,
       "type": "json"
     },
     {

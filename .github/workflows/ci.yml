@@ -173,14 +173,14 @@ jobs:
         run: pnpm run build
 
       - name: Run lightweight intent smoke suite
-        run: pnpm kyberion smoke intent --output /tmp/intent-smoke
+        run: pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke
 
       - name: Upload intent smoke logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: intent-smoke-logs
-          path: /tmp/intent-smoke
+          path: active/shared/tmp/intent-smoke
           retention-days: 14
 
   test:

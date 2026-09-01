@@ -21,6 +21,7 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data);
     },
+    assertSafeRepositoryPath: (p: string) => p,
     // AL-04: soft-delete moves + deletion audit appends.
     safeAppendFileSync: (p: string, data: string) => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
@@ -63,9 +64,15 @@ vi.mock('./foundation/io.js', () => ({
 let tmpDir: string;
 let logsDir: string;
 let dataVaultDir: string;
+const pathResolverMock = vi.hoisted(() => ({ rootDir: '' }));
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 vi.mock('./path-resolver.js', () => ({
+  pathResolver: {
+    // lock-utils evaluates rootDir while this mock is being hoisted, before
+    // beforeEach initializes the per-test fixture.
+    rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
+  },
   sharedTmp: (sub = '') => path.join(tmpDir, sub),
   shared: (sub = '') => {
     const base = path.dirname(tmpDir); // active/shared
@@ -75,7 +82,7 @@ vi.mock('./path-resolver.js', () => ({
   // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
   // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
   // resolve exactly as they do in the real tree.
-  rootDir: () => testRootDir(),
+  rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
 }));
 
 vi.mock('./core.js', () => ({
@@ -164,6 +171,7 @@ describe('storage-janitor', () => {
     tmpDir = path.join(base, 'active', 'shared', 'tmp');
     logsDir = path.join(base, 'active', 'shared', 'logs');
     dataVaultDir = path.join(base, 'active', 'shared', 'data-vault');
+    pathResolverMock.rootDir = testRootDir();
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.mkdirSync(logsDir, { recursive: true });
     fs.mkdirSync(path.join(base, 'knowledge/product/schemas'), { recursive: true });
