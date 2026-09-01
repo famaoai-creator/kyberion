@@ -10783,6 +10783,12 @@ Tier Guardのsecurity policy、registered tenant、tenant-group、knowledge-sync
 
 検証: Tier Guard policy／tenant **2 files / 27 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 175
+
+Email account catalogの`gws auth status`外部JSONを再監査し、直接 `JSON.parse` の結果を認証状態判定へ渡していた境界をshared safe object parserへ移行した。malformed／primitive／nested dangerous keyはGmail ready判定へ反映せず、正常なoauth／credential presence判定と未認証fallbackは維持した。
+
+検証: Email account catalog **1 file / 2 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
