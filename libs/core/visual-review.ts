@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { safeExistsSync } from './secure-io.js';
 import { validateReasoningEgress, type ContextSecurityScope } from './context-security-scope.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
@@ -371,7 +372,7 @@ export async function runVisualReview(input: RunVisualReviewInput): Promise<Visu
       );
       const jsonText = reply.slice(reply.indexOf('{'), reply.lastIndexOf('}') + 1);
       try {
-        return JSON.parse(jsonText);
+        return parseSafeJsonInput(jsonText, 'visual review response');
       } catch {
         const { tryRepairJson } = await import('./json-repair.js');
         return tryRepairJson(jsonText);

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { createLogger } from './logger.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import {
   loadVideoMotionCatalog,
@@ -324,7 +325,7 @@ export async function authorSceneCompositions(
     const jsonText = reply.slice(reply.indexOf('{'), reply.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'video scene composition response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }

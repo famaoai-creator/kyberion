@@ -105,6 +105,17 @@ describe('video visual direction (agy short-video quality)', () => {
     expect(thrown.resolution?.degraded).toBe(true);
   });
 
+  it('degrades when a model reply contains a dangerous JSON key', async () => {
+    const direction = await generateVideoVisualDirection({
+      title: 'T',
+      story: 'S',
+      frame: PORTRAIT,
+      generate: async () => '{"pattern_id":"warm-documentary","meta":{"__proto__":{}}}',
+    });
+    expect(direction.resolution?.degraded).toBe(true);
+    expect(direction.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+  });
+
   it('uses the deterministic fallback when the pattern catalog is schema-invalid', () => {
     const rootDir = pathResolver.sharedTmp('video-visual-pattern-catalog-tests');
     const catalogDir = path.join(rootDir, 'knowledge/public/design-patterns/media-templates');
