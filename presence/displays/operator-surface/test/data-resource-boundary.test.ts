@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
@@ -14,6 +14,7 @@ const suffix = `${process.pid}-${Date.now()}`;
 const missionDir = pathResolver.rootResolve(`active/missions/public/MSN-BOUNDARY-${suffix}`);
 const auditDir = pathResolver.rootResolve('active/audit');
 const auditLink = path.join(auditDir, `boundary-${suffix}.jsonl`);
+const auditFile = path.join(auditDir, `boundary-regular-${suffix}.jsonl`);
 const missionTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-mission-state.json`);
 const auditTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-audit.jsonl`);
 const providerPinsDir = pathResolver.rootResolve('active/shared/runtime/provider-pins');
@@ -23,9 +24,11 @@ const evidenceTarget = pathResolver.sharedTmp(`operator-surface-${suffix}-eviden
 const evidenceLink = path.join(missionDir, 'evidence', 'linked.json');
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   withExecutionContext('mission_controller', () => {
     safeRmSync(missionDir, { recursive: true, force: true });
     safeRmSync(auditLink, { force: true });
+    safeRmSync(auditFile, { force: true });
     safeRmSync(missionTarget, { force: true });
     safeRmSync(auditTarget, { force: true });
     safeRmSync(providerPinsTarget, { force: true });
@@ -66,6 +69,47 @@ describe('operator surface resource boundaries', () => {
       expect(
         listMissions().some((mission) => mission.mission_id === `MSN-BOUNDARY-${suffix}`)
       ).toBe(false);
+    });
+  });
+
+  it('fails closed for malformed and tenantless audit events in a tenant scope', () => {
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(auditDir, { recursive: true });
+      safeWriteFile(
+        auditFile,
+        [
+          JSON.stringify({
+            id: `audit-tenant-${suffix}`,
+            timestamp: new Date().toISOString(),
+            action: 'allowed',
+            tenant_slug: 'tenant-a',
+          }),
+          JSON.stringify({
+            id: `audit-other-${suffix}`,
+            timestamp: new Date().toISOString(),
+            action: 'hidden',
+            tenant_slug: 'tenant-b',
+          }),
+          JSON.stringify({
+            id: `audit-global-${suffix}`,
+            timestamp: new Date().toISOString(),
+            action: 'hidden',
+          }),
+          JSON.stringify({
+            id: `audit-malformed-${suffix}`,
+            timestamp: new Date().toISOString(),
+            action: 'hidden',
+            tenant_slug: { value: 'tenant-a' },
+          }),
+        ].join('\n') + '\n'
+      );
+
+      const events = listRecentAuditEvents();
+      expect(events.some((event) => event.id === `audit-tenant-${suffix}`)).toBe(true);
+      expect(events.some((event) => event.id === `audit-other-${suffix}`)).toBe(false);
+      expect(events.some((event) => event.id === `audit-global-${suffix}`)).toBe(false);
+      expect(events.some((event) => event.id === `audit-malformed-${suffix}`)).toBe(false);
     });
   });
 
