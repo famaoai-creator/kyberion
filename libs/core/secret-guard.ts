@@ -12,6 +12,7 @@ import {
 } from './secret-encryption.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { RISKY_OPS } from './risky-op-ids.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -49,6 +50,19 @@ interface AuthGrant {
   serviceId?: string;
   authority?: string;
   expiresAt: number; // Timestamp
+}
+
+function isAuthGrant(value: unknown): value is AuthGrant {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.missionId === 'string' &&
+    record.missionId.trim().length > 0 &&
+    typeof record.expiresAt === 'number' &&
+    Number.isFinite(record.expiresAt) &&
+    (record.serviceId === undefined || typeof record.serviceId === 'string') &&
+    (record.authority === undefined || typeof record.authority === 'string')
+  );
 }
 
 /**
@@ -358,7 +372,8 @@ function _loadGrants(): AuthGrant[] {
   if (!safeExistsSync(grantsPath)) return [];
   try {
     const content = safeReadFile(grantsPath, { encoding: 'utf8' }) as string;
-    return JSON.parse(content);
+    const parsed = parseSafeJsonInput(content, 'auth grants');
+    return Array.isArray(parsed) ? parsed.filter(isAuthGrant) : [];
   } catch (_) {
     return [];
   }
