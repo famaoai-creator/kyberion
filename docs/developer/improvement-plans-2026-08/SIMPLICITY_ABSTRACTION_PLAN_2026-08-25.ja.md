@@ -11328,6 +11328,18 @@ Python meeting bridge の URL boundary 回帰、Prettier、`git diff --check`。
 の全 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13 の未完了項目、
 および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 251
+
+meeting target の runtime 入力を再監査し、未知 `platform` が allowlist lookup まで進んで
+内部 `TypeError` になる残存を修正した。canonical validator と Python bridge の両方で既知の
+meeting platform 以外を fail-closed に拒否し、直接 browser bridge でも同じ構造化 error envelope
+へ到達するようにした。既知 platform の URL、provider 選択、in_room の既存 semantics は変更していない。
+
+検証: canonical meeting/browser driver **23 tests passed**、Python unknown platform boundary、直接 bridge の
+unknown platform structured error、Prettier、
+`git diff --check`。残る改善計画は Python bridge の全 subprocess 出力 shape、全surfaceの実ブラウザ／
+外部provider実機確認、SX-03〜SX-13 の未完了項目、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

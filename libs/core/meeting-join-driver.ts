@@ -103,6 +103,14 @@ export function validateMeetingTarget(
   target: MeetingTarget
 ): MeetingTarget & { platform: 'meet' | 'zoom' | 'teams' | 'in_room' } {
   const platform = resolveMeetingPlatform(target);
+  if (
+    platform !== 'meet' &&
+    platform !== 'zoom' &&
+    platform !== 'teams' &&
+    platform !== 'in_room'
+  ) {
+    throw new Error(`[browser-driver] unsupported meeting platform: ${String(platform)}`);
+  }
   // 同席モード: the meeting happens in the physical room — there is no URL
   // host to allow-list. Accept the sentinel room:// URL as-is.
   if (platform === 'in_room') {

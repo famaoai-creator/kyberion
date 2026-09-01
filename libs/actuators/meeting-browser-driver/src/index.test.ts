@@ -234,6 +234,9 @@ describe('resolveMeetingPlatform', () => {
     expect(() =>
       validateMeetingTarget({ url: 'https://user:pass@zoom.us/j/123', platform: 'zoom' })
     ).toThrow(/invalid meeting URL host/i);
+    expect(() =>
+      validateMeetingTarget({ url: 'https://zoom.us/j/123', platform: 'unknown' } as never)
+    ).toThrow(/unsupported meeting platform/i);
   });
 
   it('redacts meeting urls down to host-only values', () => {
