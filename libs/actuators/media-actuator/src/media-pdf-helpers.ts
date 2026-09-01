@@ -1,5 +1,6 @@
 import type { PdfDesignProtocol } from '@agent/core/media-contracts';
 import type { OcrResult } from '@agent/core/ocr-types';
+import { clamp } from '@agent/core/foundation';
 
 export interface PdfToPptxHints {
   canvas?: { fallbackW?: number; fallbackH?: number };
@@ -273,7 +274,7 @@ export function buildPositionedSlideOcrElementsFromPdfPage(
     },
     text: line.text,
     style: {
-      fontSize: Math.max(12, Math.min(24, Math.round(line.fontSize || 12))),
+      fontSize: clamp(Math.round(line.fontSize || 12), 12, 24),
       bold: line.type === 'heading',
       color: line.type === 'heading' ? 'FFFFFF' : 'F8FAFC',
       fontFamily: 'Aptos',
@@ -742,7 +743,7 @@ export function buildPositionedSlideClipBlocksFromPdfPage(
           lineWidth: bestBorder?.lineWidth || bestRect?.lineWidth || 1,
           opacity:
             bestRect?.opacity !== undefined
-              ? Math.max(1, Math.min(100, Math.round(bestRect.opacity * 100)))
+              ? clamp(Math.round(bestRect.opacity * 100), 1, 100)
               : 16,
         },
       };
@@ -800,7 +801,7 @@ export function buildPositionedSlideElementsFromPdfPage(
       Math.min(canvas.w - x - 0.2, Math.max(1.6, (line.width / pageWidth) * canvas.w)).toFixed(3)
     );
     const h = Number(Math.max(0.32, (line.height / pageHeight) * canvas.h).toFixed(3));
-    const fontSize = Math.max(12, Math.min(24, Math.round((line.fontSize || 12) * 1.18)));
+    const fontSize = clamp(Math.round((line.fontSize || 12) * 1.18), 12, 24);
     return {
       type: 'text',
       id: `pdf-line-${page.pageNumber || 0}-${index + 1}`,

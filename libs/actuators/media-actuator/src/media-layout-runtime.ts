@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { clamp } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { splitLinesBalanced } from '@agent/core/src/native-pptx-engine/text-metrics';
 import { ensureReadableOn, validateThemeContrast } from '@agent/core/design-qa';
@@ -87,7 +88,7 @@ function cssVarHex(value: unknown): string | undefined {
     /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i
   );
   if (!rgba) return undefined;
-  const channels = rgba.slice(1, 4).map((entry) => Math.max(0, Math.min(255, Number(entry))));
+  const channels = rgba.slice(1, 4).map((entry) => clamp(Number(entry), 0, 255));
   if (channels.some((entry) => !Number.isFinite(entry))) return undefined;
   return `#${channels.map((entry) => entry.toString(16).padStart(2, '0')).join('')}`;
 }
