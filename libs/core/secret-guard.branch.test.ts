@@ -4,9 +4,10 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeWriteFile: vi.fn(),
   safeReaddir: vi.fn(),
-  safeStat: vi.fn(),
+  safeLstat: vi.fn(),
   safeFsyncFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  assertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
   ledgerRecord: vi.fn(),
   pathResolve: vi.fn((p: string) => (path.isAbsolute(p) ? p : `/repo/${p}`)),
   pathRootDir: vi.fn(() => '/repo'),
@@ -19,9 +20,10 @@ vi.mock('./secure-io.js', () => ({
     JSON.parse(mocks.safeReadFile(filePath, { encoding: 'utf8' }) as string) as T,
   safeWriteFile: mocks.safeWriteFile,
   safeReaddir: mocks.safeReaddir,
-  safeStat: mocks.safeStat,
+  safeLstat: mocks.safeLstat,
   safeFsyncFile: mocks.safeFsyncFile,
   safeExistsSync: mocks.safeExistsSync,
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
 }));
 
 vi.mock('./foundation/json.js', async () => {
@@ -60,7 +62,11 @@ function setupDefaultIo() {
   mocks.safeExistsSync.mockReturnValue(false);
   mocks.safeReadFile.mockReturnValue('{}');
   mocks.safeReaddir.mockReturnValue([]);
-  mocks.safeStat.mockReturnValue({ isDirectory: () => false });
+  mocks.safeLstat.mockReturnValue({
+    isDirectory: () => false,
+    isFile: () => true,
+    isSymbolicLink: () => false,
+  });
 }
 
 describe('secret-guard branch coverage', () => {
@@ -75,7 +81,7 @@ describe('secret-guard branch coverage', () => {
     mocks.safeReadFile.mockReset();
     mocks.safeWriteFile.mockReset();
     mocks.safeReaddir.mockReset();
-    mocks.safeStat.mockReset();
+    mocks.safeLstat.mockReset();
     mocks.safeFsyncFile.mockReset();
     mocks.safeExistsSync.mockReset();
     mocks.ledgerRecord.mockReset();
@@ -87,14 +93,19 @@ describe('secret-guard branch coverage', () => {
   });
 
   it('loads nested personal secrets on module init and resolves from cache', async () => {
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections')
+    );
     mocks.safeReaddir.mockImplementation((p: string) => {
       if (p.endsWith('/knowledge/personal/connections'))
         return ['slack.json', 'github', 'README.txt'];
       if (p.endsWith('/knowledge/personal/connections/github')) return ['main.json'];
       return [];
     });
-    mocks.safeStat.mockImplementation((p: string) => ({
+    mocks.safeLstat.mockImplementation((p: string) => ({
       isDirectory: () => p.endsWith('/github'),
+      isFile: () => !p.endsWith('/github'),
+      isSymbolicLink: () => false,
     }));
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p.endsWith('/knowledge/personal/connections/slack.json'))
@@ -229,7 +240,11 @@ describe('secret-guard branch coverage', () => {
     mocks.safeReaddir.mockImplementation((p: string) =>
       p.endsWith('/knowledge/personal/connections') ? ['slack.json', 'github.json'] : []
     );
-    mocks.safeStat.mockReturnValue({ isDirectory: () => false });
+    mocks.safeLstat.mockReturnValue({
+      isDirectory: () => false,
+      isFile: () => true,
+      isSymbolicLink: () => false,
+    });
     mocks.safeReadFile.mockImplementation((p: string) => {
       if (p.endsWith('/knowledge/personal/connections/slack.json')) {
         return JSON.stringify({ token: 'old-cached-token' });
@@ -239,7 +254,9 @@ describe('secret-guard branch coverage', () => {
       }
       return '{}';
     });
-    mocks.safeExistsSync.mockReturnValue(false);
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections')
+    );
 
     const mod = await import('./secret-guard.js');
     expect(mod.getSecret('SLACK_TOKEN')).toBe('old-cached-token');
@@ -255,6 +272,20 @@ describe('secret-guard branch coverage', () => {
     );
     mocks.safeReadFile.mockImplementation((p: string) =>
       p.endsWith('/active/shared/auth-grants.json') ? '{not-json' : '{}'
+    );
+
+    const mod = await import('./secret-guard.js');
+    expect(mod.checkAuthority('MSN-X', 'secrets:rotate')).toBe(false);
+  });
+
+  it('does not authorize malformed or prototype-bearing grant records', async () => {
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+    );
+    mocks.safeReadFile.mockImplementation((p: string) =>
+      p.endsWith('/active/shared/auth-grants.json')
+        ? '[{"missionId":"MSN-X","authority":"secrets:rotate","expiresAt":"future"},{"missionId":"MSN-X","authority":"secrets:rotate","expiresAt":9999999999999,"__proto__":{"expiresAt":0}}]'
+        : '{}'
     );
 
     const mod = await import('./secret-guard.js');
