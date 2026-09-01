@@ -7,6 +7,7 @@ import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { clamp } from './foundation/text.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -297,7 +298,7 @@ export async function reconcileCompletion(
     ) as Partial<CompletionReconciliation>;
     const confidence =
       typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)
-        ? Math.max(0, Math.min(1, parsed.confidence))
+        ? clamp(parsed.confidence, 0, 1)
         : structural.confidence;
     return {
       satisfied: structural.satisfied,

@@ -7,6 +7,7 @@ import { createLogger } from './logger.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 const logger = createLogger('metrics');
 
 /**
@@ -568,7 +569,7 @@ export class MetricsCollector {
       const TIME_BASE = 5000;
       const timeImpact = Math.min(50, (avgMs / TIME_BASE) * 50);
       const cacheBonus = Math.round((cacheHitRatio / 100) * 20);
-      const efficiencyScore = Math.max(0, Math.min(100, Math.round(100 - timeImpact + cacheBonus)));
+      const efficiencyScore = clamp(Math.round(100 - timeImpact + cacheBonus), 0, 100);
 
       return {
         component: name,
