@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { rawExistsSync, rawReadTextFile, rawReaddir } from './fs-primitives.js';
 import { isValidTenantSlug } from './foundation/scope.js';
 import { getProcessEnv } from './foundation/process-env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
  * Path Resolver Utility v4.0 (Protected VFS Edition)
@@ -65,7 +66,10 @@ type MissionTier = 'personal' | 'confidential' | 'public';
 function readConfiguredMissionSubPath(tier: MissionTier): string | undefined {
   if (!rawExistsSync(MISSION_MANAGEMENT_CONFIG_PATH)) return undefined;
   try {
-    const config = JSON.parse(rawReadTextFile(MISSION_MANAGEMENT_CONFIG_PATH)) as {
+    const config = parseSafeJsonInput(
+      rawReadTextFile(MISSION_MANAGEMENT_CONFIG_PATH),
+      'mission management config'
+    ) as {
       directories?: Record<string, unknown>;
     };
     const candidate = config.directories?.[tier];
@@ -207,11 +211,26 @@ export function isProtected(filePath: string) {
 export function capabilityDir(capabilityName: string) {
   const indexPath = INDEX_PATHS.find((candidate) => rawExistsSync(candidate));
   if (!indexPath) return path.join(PROJECT_ROOT_DIR, 'libs/actuators', capabilityName);
-  const index = JSON.parse(rawReadTextFile(indexPath));
-  const capabilityList = index.actuators || index.s || index.skills || [];
-  const capability = capabilityList.find((s: any) => (s.n || s.name) === capabilityName);
+  const index = parseSafeJsonInput(rawReadTextFile(indexPath), 'actuator index') as {
+    actuators?: unknown;
+    s?: unknown;
+    skills?: unknown;
+  };
+  const capabilityList = [index.actuators, index.s, index.skills].find(Array.isArray) ?? [];
+  const capability = capabilityList.find((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const record = entry as Record<string, unknown>;
+    return (record.n || record.name) === capabilityName;
+  });
 
-  if (capability && capability.path) return path.join(PROJECT_ROOT_DIR, capability.path);
+  if (
+    capability &&
+    typeof capability === 'object' &&
+    !Array.isArray(capability) &&
+    typeof (capability as Record<string, unknown>).path === 'string'
+  ) {
+    return path.join(PROJECT_ROOT_DIR, (capability as Record<string, unknown>).path as string);
+  }
 
   // Actuator fallback
   const actuatorPath = path.join(PROJECT_ROOT_DIR, 'libs/actuators', capabilityName);

@@ -6,6 +6,7 @@ import {
 import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildCompletionNextAction,
   type CompletionGoal,
@@ -290,7 +291,10 @@ export async function reconcileCompletion(
       prompt,
       options?.model_tier ? { model_tier: options.model_tier } : undefined
     );
-    const parsed = JSON.parse(raw) as Partial<CompletionReconciliation>;
+    const parsed = parseSafeJsonInput(
+      raw,
+      'completion reconciliation response'
+    ) as Partial<CompletionReconciliation>;
     const confidence =
       typeof parsed.confidence === 'number' && Number.isFinite(parsed.confidence)
         ? Math.max(0, Math.min(1, parsed.confidence))

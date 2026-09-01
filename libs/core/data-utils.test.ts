@@ -32,6 +32,14 @@ describe('data-utils', () => {
 
   it('wraps parser and stringifier errors', () => {
     expect(() => parseData('{', 'json')).toThrow('Failed to parse json');
-    expect(() => stringifyData(1n as unknown as object, 'json')).toThrow('Failed to stringify json');
+    expect(() => stringifyData(1n as unknown as object, 'json')).toThrow(
+      'Failed to stringify json'
+    );
+  });
+
+  it('rejects dangerous JSON keys', () => {
+    expect(() => parseData('{"ok":true,"meta":{"__proto__":{}}}', 'json')).toThrow(
+      'Failed to parse json'
+    );
   });
 });
