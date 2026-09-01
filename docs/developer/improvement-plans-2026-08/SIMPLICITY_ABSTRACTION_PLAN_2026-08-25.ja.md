@@ -11292,6 +11292,16 @@ payload が `.get` や `setdefault` へ到達する経路を修正した。meeti
 残る改善計画は Python bridge の全 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13の
 未完了項目、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 248
+
+media actuator の `pdf_ops_bridge` を再監査し、password／PDF metadata の JSON object 入力が dict shape のみを確認し、
+nested dangerous key は受け入れていた残存を修正した。bridge 内の共通 parser で object shape と dangerous key を再帰検証し、
+既存の bare password 互換、metadata の invalid input error、PDF の出力 semantics は維持した。
+
+検証: PDF JSON boundary の valid／array／nested dangerous key **3ケース**、Python syntax、`git diff --check`。残る改善計画は
+Python bridge の全 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13の未完了項目、および
+voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

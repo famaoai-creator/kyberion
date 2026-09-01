@@ -32,16 +32,40 @@ def _fail(code, message, status):
     sys.exit(status)
 
 
+_DANGEROUS_JSON_KEYS = {"__proto__", "constructor", "prototype"}
+
+
+def _contains_dangerous_key(value):
+    if isinstance(value, dict):
+        return any(
+            key in _DANGEROUS_JSON_KEYS or _contains_dangerous_key(nested)
+            for key, nested in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_dangerous_key(item) for item in value)
+    return False
+
+
+def _parse_json_object(raw, label):
+    value = json.loads(raw)
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    if _contains_dangerous_key(value):
+        raise ValueError(f"{label} contains a dangerous JSON key")
+    return value
+
+
 def _read_stdin_passwords():
     raw = sys.stdin.read() if not sys.stdin.isatty() else ""
     if not raw.strip():
         return {}
     try:
-        data = json.loads(raw)
-        return data if isinstance(data, dict) else {}
+        return _parse_json_object(raw, "PDF password input")
     except json.JSONDecodeError:
         # Backward-friendly: a bare line is treated as the decrypt password.
         return {"password": raw.split("\n", 1)[0].rstrip("\r")}
+    except ValueError:
+        return {}
 
 
 def _parse_page_spec(spec, total):
@@ -189,10 +213,8 @@ def cmd_metadata(args, pw):
     updates = {}
     if args.set:
         try:
-            parsed = json.loads(args.set)
-            if not isinstance(parsed, dict):
-                raise ValueError
-        except ValueError:
+            parsed = _parse_json_object(args.set, "PDF metadata")
+        except (json.JSONDecodeError, ValueError):
             _fail("bad_args", "--set must be a JSON object of {\"/Key\": \"value\"}", 1)
         # Normalize keys to the PDF "/Key" convention.
         updates = {(k if k.startswith("/") else f"/{k}"): str(v) for k, v in parsed.items()}
