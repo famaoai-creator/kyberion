@@ -10849,6 +10849,12 @@ PTY engineのterminal outputに埋め込まれるADF tunnel payloadを再監査�
 
 検証: PTY ADF boundary **1 file / 2 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 186
+
+Email workflowのモデルJSONと`gws auth status`応答を再監査し、直接 `JSON.parse` の結果をメール草稿・認証状態へ渡していた境界をshared safe object parserへ移行した。root配列、malformed JSON、nested dangerous keyはメール構造化結果・Gmail ready判定へ昇格させず、fenced／周辺テキストからのobject抽出、未認証fallback、既存の草稿生成 semanticsは維持した。
+
+検証: email workflow／adapter／archive **3 files / 12 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
