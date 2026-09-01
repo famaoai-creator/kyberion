@@ -304,6 +304,21 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
   });
 
+  it('does not treat dangerous JSON keys as a valid ADF input', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify({ capability: 'demo', action: 'run' }));
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture(
+      'dangerous.json',
+      '{"capability":"demo","action":"run","meta":{"__proto__":{"x":1}}}'
+    );
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
+  });
+
   it('repairs lightweight JSON defects without delegating to the reasoning backend', async () => {
     const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
     registerFakeRepairBackend(delegateTask);
