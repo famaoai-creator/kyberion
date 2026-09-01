@@ -66,13 +66,24 @@ describe('intelligence observations', () => {
         {
           session_id: 'chronos-intelligence-observations-test',
           surface: 'chronos',
-          status: 'active',
+          status: 'observing',
           mode: 'interactive',
           updated_at: '2099-01-01T00:00:00.000Z',
-          goal: { summary: 'test goal' },
-          candidate_targets: ['a'],
+          goal: { summary: 'test goal', success_condition: 'test complete' },
+          candidate_targets: [{ element_id: '@a', confidence: 0.8 }],
           conversation_context: { pending_confirmation: true },
-          active_step: { description: 'step' },
+          active_step: {
+            step_id: 'step-1',
+            kind: 'observe',
+            description: 'step',
+            status: 'pending',
+          },
+          control: {
+            interruptible: true,
+            requires_approval: false,
+            awaiting_user_input: false,
+          },
+          history: [],
         },
         null,
         2
@@ -92,6 +103,31 @@ describe('intelligence observations', () => {
   it('ignores primitive or array session payloads', () => {
     safeMkdir(browserSessionsDir, { recursive: true });
     safeWriteFile(browserSessionFile, '[]');
+
+    expect(collectBrowserSessions()).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          session_id: 'chronos-intelligence-observations-test',
+        }),
+      ])
+    );
+  });
+
+  it('ignores browser session metadata with invalid projected field types', () => {
+    safeMkdir(browserSessionsDir, { recursive: true });
+    safeWriteFile(
+      browserSessionFile,
+      JSON.stringify({
+        session_id: 'chronos-intelligence-observations-test',
+        active_tab_id: 'tab-1',
+        tab_count: '2',
+        updated_at: '2099-01-01T00:00:00.000Z',
+        lease_status: 'active',
+        retained: true,
+        action_trail_count: 0,
+        recent_actions: [],
+      })
+    );
 
     expect(collectBrowserSessions()).not.toEqual(
       expect.arrayContaining([
