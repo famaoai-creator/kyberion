@@ -10529,6 +10529,14 @@ SX-05 の command entry を再監査し、重複していた31件のpackage scri
 
 検証: module-backed `chronos uninstall` 実走、CLI manifest／script-integrity／CI gate parity、package scripts ≤120 ratchet、catalogs／pseudo-locale full gate、CLI／release／launchd **4 files / 44 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る12 surfaceの全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 133
+
+SX-08 の surface contract 描画を再監査し、Computer Surface が authority／next action／consequence だけを表示し、understanding／missing input／outcome を欠落させていたため、6項目（4問の回答＋authority／consequence）を表示するカードへ修正した。Operator Surface の intent snapshot も understanding／missing input を追加し、共有 `IntentResolutionContract` の主要項目を同じ画面で確認できるようにした。Computer Surface のブラウザ側入力検証にも missing input／outcome の enum・配列検証を追加した。
+
+併せて、契約対象12 surface（Chronos／Computer／Concierge／Operator／Presence／Terminal／Voice と4 bridge／Cowork）の実装ファイルと描画マーカーを `tests/ux-contract-surfaces.test.ts` で機械検査し、surface追加時に契約経路の証拠が欠けたまま通過しない回帰を追加した。
+
+検証: surface contract coverage／Computer Surface **2 files / 5 tests passed**、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

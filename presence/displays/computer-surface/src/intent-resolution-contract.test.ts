@@ -36,7 +36,7 @@ describe('Computer Surface intent resolution projection', () => {
     ).toEqual({ status: 'running' });
   });
 
-  it('renders authority and next-action fields in the computer surface', () => {
+  it('renders the full operator contract in the computer surface', () => {
     const html = String(
       safeReadFile(
         pathResolver.rootResolve('presence/displays/computer-surface/static/index.html'),
@@ -45,7 +45,10 @@ describe('Computer Surface intent resolution projection', () => {
         }
       )
     );
+    expect(html).toContain('intent-resolution-understanding');
+    expect(html).toContain('intent-resolution-missing');
     expect(html).toContain('intent-resolution-authority');
+    expect(html).toContain('intent-resolution-outcome');
     expect(html).toContain('intent-resolution-next-action');
     expect(html).toContain('renderIntentResolution(data)');
   });
