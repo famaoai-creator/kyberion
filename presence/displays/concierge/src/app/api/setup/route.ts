@@ -29,6 +29,8 @@ import {
   optionalSetupObject,
   optionalSetupString,
   optionalSetupStringArray,
+  requireKnownFormKeys,
+  requireKnownRequestKeys,
   requireSetupObject,
   SetupInputError,
   type SetupInputObject,
@@ -260,6 +262,11 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
       const form = await req.formData();
+      try {
+        requireKnownFormKeys(form, ['action', 'file', 'profile_id', 'source']);
+      } catch {
+        return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
+      }
       const actionValue = form.get('action');
       if (actionValue !== null && typeof actionValue !== 'string') {
         return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
@@ -332,12 +339,29 @@ export async function POST(req: NextRequest) {
     let body: SetupInputObject;
     try {
       body = requireSetupObject(await req.json(), 'request body');
+      const allowedKeys =
+        body.action === 'save_management'
+          ? ['action', 'tenant', 'agent', 'vision', 'name', 'primary_domain']
+          : body.action === 'apply_onboarding'
+            ? ['action', 'draft']
+            : ['action'];
+      requireKnownRequestKeys(body, allowedKeys);
     } catch {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
     }
     if (body?.action === 'save_management') {
       const tenantInput = optionalSetupObject(body, 'tenant') || {};
       const agentInput = optionalSetupObject(body, 'agent') || {};
+      requireKnownRequestKeys(
+        tenantInput,
+        ['slug', 'display_name', 'assigned_role', 'status'],
+        'tenant'
+      );
+      requireKnownRequestKeys(
+        agentInput,
+        ['agent_id', 'display_name', 'provider', 'model_id'],
+        'agent'
+      );
       const requestedSlug = optionalSetupString(tenantInput, 'slug');
       const activeSlug = (
         requestedSlug ||

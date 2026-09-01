@@ -76,6 +76,9 @@ describe('concierge setup input contract', () => {
     ['agent object value', { action: 'save_management', agent: { provider: {} } }],
     ['vision array', { action: 'save_management', vision: [] }],
     ['sample refs object', { action: 'apply_onboarding', draft: { voice: { sample_refs: {} } } }],
+    ['unknown root field', { action: 'save_management', debug: true }],
+    ['unknown tenant field', { action: 'save_management', tenant: { debug: true } }],
+    ['unknown agent field', { action: 'save_management', agent: { debug: true } }],
   ])('rejects %s before any write', async (_label, body) => {
     const response = await POST(request(body));
 
