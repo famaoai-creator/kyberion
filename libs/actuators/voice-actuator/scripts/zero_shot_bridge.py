@@ -15,6 +15,8 @@ Actions:
   list_devices            — list audio output devices (for BlackHole routing)
 """
 
+from __future__ import annotations
+
 import sys
 import json
 import os
