@@ -11143,6 +11143,12 @@ SX-08 の承認分岐を再監査し、4 bridge が共有承認テキストを�
 
 検証: surface approval／Slack approval／channel adapter／UX surface／Chronos A2UI **5 files / 58 tests passed**、root typecheck、PR gate、`git diff --check`。残る改善計画は全surfaceの実ブラウザ／外部provider実機確認、SX-04〜SX-14の未完了項目、およびvoice provider／provider CLIの実環境依存である。
 
+## 2026-09-02 再レビュー修正 234
+
+SX-03 の intent scenario confidence 境界を継続監査し、複数の confidence signal から最大値を選んだ後の0〜1制限を `foundation/text` の canonical `clamp`へ移行した。signal の選択、schema-validな0／1境界、scenario の provenance と既存の handoff semantics は維持した。
+
+検証: intent use-case scenario **1 file / 3 tests passed**、root typecheck、PR gate、`git diff --check`。残る改善計画は全surfaceの実ブラウザ／外部provider実機確認、SX-04〜SX-14の未完了項目、およびvoice provider／provider CLIの実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
