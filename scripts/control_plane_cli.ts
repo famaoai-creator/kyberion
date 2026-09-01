@@ -23,7 +23,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -213,7 +213,7 @@ function summarizeSurfaceRuntimeOutput(output: unknown, fallback: string): strin
     return fallback;
   }
   try {
-    const parsed = parseSurfaceRuntimeCommandOutput(JSON.parse(text) as unknown);
+    const parsed = parseSurfaceRuntimeJsonOutput(text);
     const status = parsed.status || 'ok';
     const id = parsed.id;
     const detail = parsed.detail;
@@ -229,6 +229,10 @@ export interface SurfaceRuntimeCommandOutput {
   id?: string;
   detail?: string;
   port?: string | number;
+}
+
+export function parseSurfaceRuntimeJsonOutput(raw: string): SurfaceRuntimeCommandOutput {
+  return parseSurfaceRuntimeCommandOutput(parseSafeJsonInput(raw, 'surface runtime output'));
 }
 
 export function parseSurfaceRuntimeCommandOutput(value: unknown): SurfaceRuntimeCommandOutput {

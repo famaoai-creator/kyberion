@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildChronosNextActions,
+  parseSurfaceRuntimeJsonOutput,
   parseSurfaceRuntimeCommandOutput,
   summarizeMissionSeedAssessment,
 } from './control_plane_cli.js';
@@ -20,6 +21,15 @@ describe('surface runtime command response parser', () => {
       );
     }
   );
+
+  it('rejects dangerous JSON before command output normalization', () => {
+    expect(parseSurfaceRuntimeJsonOutput('{"status":"started"}')).toEqual({
+      status: 'started',
+    });
+    expect(() =>
+      parseSurfaceRuntimeJsonOutput('{"nested":{"constructor":{"polluted":true}}}')
+    ).toThrow('dangerous JSON key');
+  });
 });
 
 describe('control_plane_cli next actions', () => {
