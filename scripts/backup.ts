@@ -21,7 +21,12 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, isRecord, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  isRecord,
+  parseSafeJsonInput,
+  readJson,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { logger } from '@agent/core/core';
 
@@ -730,7 +735,7 @@ interface RestoredBackupManifest {
 export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw) as unknown;
+    parsed = parseSafeJsonInput(raw, 'Backup manifest');
   } catch (error) {
     throw new Error(
       `Backup manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
