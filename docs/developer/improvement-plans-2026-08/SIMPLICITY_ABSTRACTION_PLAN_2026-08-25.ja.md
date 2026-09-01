@@ -10541,6 +10541,18 @@ SX-08 の surface contract 描画を再監査し、Computer Surface が authorit
 
 ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
 
+検証: ingest dedup／parse document **2 files / 18 tests passed**、ingest actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
+## 2026-09-02 再レビュー修正 135
+
+Meeting Actuator の bridge／model response とCLI action inputを再監査し、`JSON.parse` 後の値を meeting action／intelligence parser へ直接渡していた残存を修正した。共有 `parseSafeJsonInput` を外部応答・persisted input・model JSON block の前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の invalid envelope／入力エラー／fallback へ閉じた。会議 action、action-item 抽出、監査 event の既存 semantics は変更していない。
+
+検証: Meeting Actuator **2 files / 24 tests passed**、Meeting Actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
+## 2026-09-02 再レビュー修正 134
+
+ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
+
 検証: ingest dedup／parse document **2 files / 19 tests passed**、ingest actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
 ## 参照

@@ -43,8 +43,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { loadJson } from '@agent/core/foundation';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { loadJson, getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -153,6 +152,36 @@ interface VoiceConsentRecord {
 
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+const MEETING_ACTIONS = new Set<MeetingAction['action']>([
+  'check_consent',
+  'join',
+  'leave',
+  'speak',
+  'listen',
+  'chat',
+  'status',
+]);
+
+/** Validate the structural CLI boundary before the typed action handler runs. */
+export function parseMeetingActionInput(value: unknown): MeetingAction | MeetingPipelineAction {
+  if (!isPlainObject(value) || typeof value.action !== 'string') {
+    throw new Error('meeting action input must be an object with an action');
+  }
+  if (value.action === 'pipeline') {
+    if (!Array.isArray(value.steps)) {
+      throw new Error('meeting action input pipeline steps must be an array');
+    }
+    return value as unknown as MeetingPipelineAction;
+  }
+  if (!MEETING_ACTIONS.has(value.action as MeetingAction['action'])) {
+    throw new Error(`meeting action input has unknown action: ${value.action}`);
+  }
+  if (!isPlainObject(value.params)) {
+    throw new Error('meeting action input params must be an object');
+  }
+  return value as unknown as MeetingAction;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -692,7 +721,9 @@ export async function handleAction(
     if (!normalized) {
       parsed = { status: 'error', message: 'meeting-bridge produced no output' };
     } else {
-      parsed = parseMeetingActionResult(JSON.parse(normalized) as unknown) || {
+      parsed = parseMeetingActionResult(
+        parseSafeJsonInput(normalized, 'meeting bridge result')
+      ) || {
         status: 'error',
         message: 'meeting-bridge produced an invalid result envelope',
       };
@@ -717,7 +748,9 @@ const main = async () => {
 
   const inputPath = resolveExistingMeetingFile(String(argv.input), 'input');
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
+  const result = await handleAction(
+    parseMeetingActionInput(parseSafeJsonInput(inputContent, 'meeting action input'))
+  );
   console.log(JSON.stringify(result, null, 2));
 };
 
