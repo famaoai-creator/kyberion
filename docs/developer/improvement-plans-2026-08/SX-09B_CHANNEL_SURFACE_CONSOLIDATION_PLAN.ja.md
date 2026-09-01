@@ -303,3 +303,9 @@ Concierge の契約テストを現行 `ConversationMessageResponse.reply` 契約
 Concierge setup の JSON／multipart 境界を再監査し、action ごとの未知 root field、tenant／agent の未知 nested field、FormData の未知／重複 field が設定書き込み前に無視される残存を検出した。共通 JSON／FormData key guard を接続し、`save_management`／`apply_onboarding` と avatar／voice sample の許可 field だけを受理するようにした。既存の型検証、profile／tenant／agent の governed write、onboarding draft semantics は変更していない。
 
 検証: Concierge setup input／request input **2 files / 17 tests passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 25
+
+Concierge の voice/listen-once proxy を再監査し、backend／device／locale の型検証はあるものの未知 JSON field を受理して voice-hub 呼び出しへ進める残存を検出した。共通 request key guard を接続し、許可された3 field 以外を外部接続前に 400 で拒否するようにした。既存のtrim、既定locale、voice-hub response parser、Tier-0 fallback semantics は変更していない。
+
+検証: Concierge listen-once **1 file / 6 tests passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

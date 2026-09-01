@@ -24,6 +24,7 @@ describe('concierge listen-once input contract', () => {
     ['backend object', { backend: {} }],
     ['device array', { device: [] }],
     ['locale number', { locale: 1 }],
+    ['unknown field', { locale: 'ja-JP', debug: true }],
   ])('rejects %s before contacting voice-hub', async (_label, body) => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
 

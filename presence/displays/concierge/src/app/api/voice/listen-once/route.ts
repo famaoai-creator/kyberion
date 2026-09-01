@@ -3,6 +3,7 @@ import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import {
   optionalRequestString,
   requireRequestObject,
+  requireKnownRequestKeys,
   RequestInputError,
 } from '../../../../lib/request-input';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
     let body: Record<string, unknown>;
     try {
       body = requireRequestObject(await req.json(), 'request body');
+      requireKnownRequestKeys(body, ['backend', 'device', 'locale']);
     } catch {
       return NextResponse.json({ ok: false, error: 'invalid request body' }, { status: 400 });
     }
