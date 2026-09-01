@@ -59,4 +59,18 @@ describe('migrateConnectionDocuments (AC-05)', () => {
     );
     expect(plain).toEqual({ token: 'ghp_abc' });
   });
+
+  it('skips persisted documents containing dangerous JSON keys', () => {
+    safeWriteFile(
+      path.join(dir, 'unsafe.json'),
+      '{"__proto__":{"token":"should-not-be-reencrypted"}}\n'
+    );
+
+    expect(migrateConnectionDocuments({ decrypt: false, connectionsDir: dir })).toEqual({
+      encrypted: 1,
+      decrypted: 0,
+      skipped: 1,
+    });
+    expect(safeExistsSync(path.join(dir, 'unsafe.json.bak'))).toBe(false);
+  });
 });

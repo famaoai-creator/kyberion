@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
-import { resolveMeetingResourcePath } from './meeting_orchestrator.js';
+import { parseMeetingAttendeesJson, resolveMeetingResourcePath } from './meeting_orchestrator.js';
 
 const fixtureDir = pathResolver.active(`shared/tmp/meeting-orchestrator-boundary-${process.pid}`);
 
@@ -27,6 +27,13 @@ describe('meeting orchestrator resource boundaries', () => {
 
     expect(() => resolveMeetingResourcePath(pathResolver.toRepoRelative(directoryPath))).toThrow(
       '[MEETING_RESOURCE_FILE]'
+    );
+  });
+
+  it('rejects dangerous attendee JSON before orchestration', () => {
+    expect(() => parseMeetingAttendeesJson('[{"name":"A"}]')).not.toThrow();
+    expect(() => parseMeetingAttendeesJson('{"__proto__":{"name":"unsafe"}}')).toThrow(
+      '--attendees contains a dangerous JSON key'
     );
   });
 });

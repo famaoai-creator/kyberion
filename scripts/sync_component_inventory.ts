@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface CapabilityManifest {
@@ -405,7 +405,9 @@ function render(): GeneratedFile[] {
 function normalizeGeneratedContent(content: string): string {
   const withoutGeneratedDate = content.replace(/^Last updated: .*$/mu, 'Last updated: <generated>');
   try {
-    return JSON.stringify(JSON.parse(withoutGeneratedDate));
+    return JSON.stringify(
+      parseSafeJsonObjectInput(withoutGeneratedDate, 'component inventory generated output')
+    );
   } catch {
     return withoutGeneratedDate;
   }
