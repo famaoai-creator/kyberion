@@ -94,6 +94,12 @@ export function buildSurfaceApprovalText(
     ...(intentResolution
       ? [
           '',
+          `Understanding: ${intentResolution.normalized_intent}`,
+          `Missing input: ${
+            intentResolution.missing_inputs.length > 0
+              ? intentResolution.missing_inputs.join(', ')
+              : 'None'
+          }`,
           `Authority: ${renderIntentAuthorityLabel(intentResolution.authority_level, 'ja')}`,
           `Next action: ${intentResolution.next_action.label}`,
           `Consequence: ${intentResolution.next_action.consequence}`,
