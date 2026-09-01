@@ -10987,6 +10987,12 @@ SX-14 の env registry を継続監査し、STT／TTS／VAD の bridge 選択、
 
 検証: voice bridge／env registry **8 files / 42 tests passed**、env registry gate **1/1 passed**、catalog integrity、root typecheck、対象 Prettier、`git diff --check`。
 
+## 2026-09-02 再レビュー修正 208
+
+SX-03 の private helper 残差を再監査し、voice-hub の request／provider response 境界で独自実装されていた `isRecord` を `@agent/core/foundation` の canonical helperへ移行した。request object の null／配列／primitive 拒否と provider response の shape validation は維持し、同じ境界に旧 helper が再導入されない契約テストを追加した。併せて、既に `parseSafeJsonInput` へ移行済みの server に対する stale な `JSON.parse` assertion を現行 parser 契約へ更新した。
+
+検証: voice-hub request boundary／foundation adoption **2 files / 9 tests passed**。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
