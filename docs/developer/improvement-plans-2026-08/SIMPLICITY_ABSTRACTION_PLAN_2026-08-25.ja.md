@@ -11494,6 +11494,19 @@ symlink拒否、tenant／tier filtering、probe／registry／failover semantics 
 追加の direct reader caller、catalog／script／ADF／surface contract の未完了項目、全surfaceの実ブラウザ・
 外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 265
+
+SX-03／SX-08b／SX-09b の direct JSON reader を継続監査し、Chronos の intelligence common barrel と
+browser-session／intelligence observation、さらに core の environment capability／artifact store／
+deal store に残っていた `secure-io.loadJson` の再公開・直接利用を foundation の canonical `readJson`
+へ移行した。intelligence observation のローカル安全読込は foundation reader と名前衝突しない alias
+を介して継続し、既存の path guard、malformed input の拒否、tenant／tier filtering、artifact／deal／
+capability semantics は変更していない。
+
+検証: Chronos intelligence／core **13 test files / 96 tests passed**、Prettier、ESLint、`git diff --check`。
+残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の未完了項目、
+全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

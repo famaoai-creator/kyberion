@@ -1,6 +1,6 @@
 import {
   assertSafeRepositoryPath,
-  loadJson,
+  readJson,
   pathResolver,
   safeExistsSync,
   safeLstat,
@@ -49,7 +49,7 @@ export function applyBrowserSessionControl(
 
   let record: BrowserSessionRecord;
   try {
-    record = loadJson<BrowserSessionRecord>(filePath);
+    record = readJson<BrowserSessionRecord>(filePath);
   } catch {
     return false;
   }
