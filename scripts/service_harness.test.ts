@@ -40,4 +40,22 @@ describe('service_harness', () => {
       expect.objectContaining({ service_id: 'demo', action: 'describe' })
     );
   });
+
+  it('rejects dangerous JSON input before calling the service actuator', async () => {
+    const { main } = await import('./service_harness.js');
+
+    await expect(
+      main([
+        '--service',
+        'demo',
+        '--action',
+        'plan',
+        '--operation',
+        'status',
+        '--inputs',
+        '{"__proto__":{"polluted":true}}',
+      ])
+    ).rejects.toThrow('dangerous JSON key');
+    expect(mocks.handleAction).not.toHaveBeenCalled();
+  });
 });
