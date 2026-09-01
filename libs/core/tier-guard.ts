@@ -5,6 +5,7 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { rawExistsSync, rawReadTextFile } from './fs-primitives.js';
@@ -79,7 +80,9 @@ let corruptPolicyWarned = false;
 function loadPolicy(): PolicyLoad {
   if (!rawExistsSync(POLICY_PATH)) return { status: 'missing' };
   try {
-    return { status: 'loaded', policy: JSON.parse(rawReadTextFile(POLICY_PATH)) };
+    const policy = parseSafeJsonObjectInput(rawReadTextFile(POLICY_PATH), 'security policy');
+    if (!policy) throw new Error('security policy must not be empty');
+    return { status: 'loaded', policy };
   } catch (err) {
     if (!corruptPolicyWarned) {
       corruptPolicyWarned = true;
@@ -230,7 +233,9 @@ function isRegisteredActiveTenant(tenantSlug: string): boolean {
   const profilePath = pathResolver.rootResolve(`knowledge/personal/tenants/${tenantSlug}.json`);
   if (!rawExistsSync(profilePath)) return false;
   try {
-    const profile = normalizeRegisteredTenantProfile(JSON.parse(rawReadTextFile(profilePath)));
+    const profile = normalizeRegisteredTenantProfile(
+      parseSafeJsonInput(rawReadTextFile(profilePath), 'registered tenant profile')
+    );
     if (!profile) return false;
     return profile.tenant_slug === tenantSlug && profile.status === 'active';
   } catch {
@@ -265,7 +270,7 @@ function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   const file = pathResolver.knowledge(`confidential/tenant-groups/${groupId}.json`);
   try {
     if (!rawExistsSync(file)) return null;
-    const profile = JSON.parse(rawReadTextFile(file));
+    const profile = parseSafeJsonInput(rawReadTextFile(file), 'tenant group profile');
     if (!isValidTenantGroupProfile(groupId, profile)) return null;
     return profile;
   } catch (_) {
@@ -827,7 +832,8 @@ function loadMarkerPatterns(): { name: string; regex: string }[] {
   try {
     const policyPath = pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
     if (rawExistsSync(policyPath)) {
-      const rules = JSON.parse(rawReadTextFile(policyPath));
+      const rules = parseSafeJsonObjectInput(rawReadTextFile(policyPath), 'knowledge sync rules');
+      if (!rules) return patterns;
       const security = isRecord(rules) && isRecord(rules.security) ? rules.security : null;
       const pii = security?.pii_patterns;
       if (!Array.isArray(pii)) return patterns;

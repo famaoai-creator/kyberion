@@ -10777,6 +10777,12 @@ Secret Guardのpersisted auth grantを再監査し、直接 `JSON.parse` した�
 
 検証: Secret Guard **2 files / 17 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 174
+
+Tier Guardのsecurity policy、registered tenant、tenant-group、knowledge-sync rulesのJSON読込を再監査し、直接 `JSON.parse` の結果を認可・tenant scope・PII marker判定へ渡していた残存をshared safe parserへ移行した。primitive／配列／malformed／nested dangerous keyはprotected tier policyまたはtenant profileとして採用せず、security policyは既存のfail-closed semantics、tenant／marker readerは既存の無効値スキップ semanticsを維持した。
+
+検証: Tier Guard policy／tenant **2 files / 27 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
