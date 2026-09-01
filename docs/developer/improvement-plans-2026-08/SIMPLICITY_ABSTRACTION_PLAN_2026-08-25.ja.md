@@ -10543,6 +10543,12 @@ Code Actuator の semgrep／skill index／JSON transform／impact analysis 境�
 
 検証: Code Actuator **2 files / 18 tests passed**、Code Actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 137
+
+共通 `secure-io` の `loadJson`／`loadJsonIfPresent` を再監査し、権限・サイズ・パス検査後のJSON parseが通常の `JSON.parse` のままで、nested dangerous keyを含むファイルを全利用者へ返し得る残存を修正した。foundation の `parseSafeJsonInput` を共通loaderへ接続し、malformed／dangerous JSONは従来のthrow／optional null semanticsを維持したまま fail-closed にした。
+
+検証: `secure-io` JSON loader **1 file / 33 tests passed**、core typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
 ## 2026-09-02 再レビュー修正 134
 
 ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
@@ -10560,6 +10566,12 @@ Meeting Actuator の bridge／model response とCLI action inputを再監査し�
 ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
 
 検証: ingest dedup／parse document **2 files / 19 tests passed**、ingest actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
+## 2026-09-02 再レビュー修正 138
+
+File Actuator の `read_json`／`json_parse`／CLI action input／`rg --json` 境界を再監査し、外部ファイル・pipeline context・CLI入力を直接 `JSON.parse` していた残存を共有 safe parser へ移行した。`rg --json` はJSONLとして1行ずつ検証し、malformed／nested dangerous key は pipeline failure／入力エラーへ閉じる。既存のファイル操作、context persistence、検索結果の配列 semantics は維持している。
+
+検証: File Actuator／secure JSON **3 files / 65 tests passed**、File Actuator typecheck、root typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
 ## 参照
 

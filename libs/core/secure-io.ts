@@ -16,6 +16,7 @@ import {
 import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
 import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
@@ -245,7 +246,9 @@ export function safeReadFile(filePath: string, options: SafeReadOptions = {}): s
  */
 function secureLoadJson<T>(filePath: string): T {
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as T;
+  return parseSafeJsonInput(raw, `JSON file ${path.basename(filePath)}`, {
+    preserveParseError: true,
+  }) as T;
 }
 
 /** Read and parse an optional JSON file, returning null for missing or invalid input. */

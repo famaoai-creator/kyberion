@@ -263,6 +263,23 @@ describe('file-actuator', () => {
         expect(result.context.parsed_data).toEqual({ key: 'value' });
       });
 
+      it('json_parse は nested dangerous JSON key を拒否する', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          context: { last_capture: '{"nested":{"constructor":{}}}' },
+          steps: [
+            {
+              type: 'transform',
+              op: 'json_parse',
+              params: { from: 'last_capture', export_as: 'parsed_data' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0]?.error).toContain('contains a dangerous JSON key');
+      });
+
       it('path_join でパスを結合する', async () => {
         const result = await handleAction({
           action: 'pipeline',
