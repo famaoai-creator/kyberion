@@ -363,6 +363,17 @@ describe('trace-feed', () => {
     expect(collectTraceFeed({ dir: TEST_DIR })).toEqual([]);
   });
 
+  it('skips malformed and dangerous JSONL records before projection', () => {
+    resetTestDir();
+    safeWriteFile(
+      path.join(TEST_DIR, 'traces-2026-05-28.jsonl'),
+      '{\n{"__proto__":{"traceId":"poisoned"}}\nnull\n'
+    );
+
+    expect(collectTraceFeed({ dir: TEST_DIR })).toEqual([]);
+    expect(collectTraceDetail('poisoned', { dir: TEST_DIR })).toBeNull();
+  });
+
   it('can enforce the closed extension vocabulary for persisted feeds', () => {
     resetTestDir();
     const record = (traceId: string, name: string) => ({
