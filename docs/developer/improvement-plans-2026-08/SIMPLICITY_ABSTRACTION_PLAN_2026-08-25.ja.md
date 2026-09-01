@@ -11503,7 +11503,7 @@ deal store に残っていた `secure-io.loadJson` の再公開・直接利用�
 を介して継続し、既存の path guard、malformed input の拒否、tenant／tier filtering、artifact／deal／
 capability semantics は変更していない。
 
-検証: Chronos intelligence／core **13 test files / 96 tests passed**、Prettier、ESLint、`git diff --check`。
+検証: Chronos intelligence／core **8 source files / 13 test files / 96 tests passed**、Prettier、ESLint、`git diff --check`。
 残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の未完了項目、
 全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
@@ -11514,7 +11514,7 @@ deal document／desktop recording／onboarding context に残っていた `secur
 foundation の canonical `readJson` へ移行した。既存の scope／tenant activation、terminal session path
 guard、approved recording／intent の検証、deal review、onboarding binding の拒否 semantics は変更していない。
 
-検証: core reader **13 source files / 13 test files / 117 tests passed**、Prettier、ESLint、
+検証: core reader **5 source files / 3 test files / 21 tests passed**、Prettier、ESLint、
 `git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
