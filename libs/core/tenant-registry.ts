@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { customerDirForSlug } from './customer-resolver.js';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -290,7 +291,7 @@ export function readTenantProfile(
   }
   let profile: unknown;
   try {
-    profile = JSON.parse(source);
+    profile = parseSafeJsonInput(source, `tenant profile '${slug}'`);
   } catch (error) {
     throw new Error(
       `[tenant-registry] tenant profile '${slug}' is not valid JSON (${file}): ${(error as Error).message}`
