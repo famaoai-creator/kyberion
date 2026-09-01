@@ -19,6 +19,7 @@ import {
   type EventScopeFilter,
 } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
+import { isRecord } from './foundation/text.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -44,10 +45,6 @@ const LEDGER_STRING_FIELDS = [
   'chain_key_id',
   'hash',
 ] as const;
-
-function isRecord(value: unknown): value is LedgerRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Normalize a persisted ledger line before it reaches projections or hash

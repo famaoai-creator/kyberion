@@ -16,6 +16,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
+import { isRecord } from './foundation/text.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -204,10 +205,6 @@ const PROPOSAL_STATUSES: readonly ProcessImprovementProposal['status'][] = [
   'rejected',
   'applied',
 ];
-
-function isRecord(value: unknown): value is JsonRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
