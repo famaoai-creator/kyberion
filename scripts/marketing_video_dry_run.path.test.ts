@@ -46,4 +46,19 @@ describe('marketing video dry-run path boundaries', () => {
       })
     ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
+
+  it('rejects malformed campaign brief JSON before running media tools', () => {
+    const input = fixture();
+    safeWriteFile(input.briefPath, '{"intake":');
+
+    expect(() =>
+      runMarketingVideoDryRun({
+        campaignBriefPath: input.briefPath,
+        brandProfilePath: input.brandPath,
+        outputRoot: 'active/shared/tmp/marketing-video-output',
+        channel: 'youtube',
+        riskLevel: 0,
+      })
+    ).toThrow('campaign brief JSON must be valid JSON');
+  });
 });
