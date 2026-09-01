@@ -29,6 +29,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { logger } from './core.js';
 import {
   assertSafeRepositoryPath,
@@ -794,7 +795,7 @@ function readJsonlLines(absPath: string): Array<Record<string, unknown>> {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = parseSafeJsonInput(trimmed, 'scope offboarding JSONL entry');
       if (parsed && typeof parsed === 'object') records.push(parsed as Record<string, unknown>);
     } catch {
       /* skip corrupt line */
@@ -842,7 +843,7 @@ function computeDedupRegistryPrune(tenantSlug: string): DedupRegistryPrune {
     if (!trimmed) continue;
     let matches = false;
     try {
-      const record = JSON.parse(trimmed) as {
+      const record = parseSafeJsonInput(trimmed, 'dedup registry JSONL entry') as {
         content_sha256?: string;
         source_system?: string;
         source_id?: string;
