@@ -22,7 +22,7 @@ import {
 import { retry } from '@agent/core/async-utils';
 import { VoiceGenerationRuntime } from '@agent/core/voice-generation-runtime';
 import { waitForJob } from '@agent/core/job-lifecycle';
-import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import type {
   SpeechToTextCapabilities,
   TranscriptSegment,
@@ -54,10 +54,6 @@ export interface VoiceSttBridgeResponse {
   capabilities?: SpeechToTextCapabilities;
   segments?: TranscriptSegment[];
   error?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseVoiceSttBridgeResponse(value: unknown): VoiceSttBridgeResponse | undefined {

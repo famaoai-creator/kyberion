@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 export interface VoiceRepairAttempt {
   segment_id: string;
   attempt: number;
@@ -25,10 +27,6 @@ export interface VoiceRepairSession {
   repair_attempts: VoiceRepairAttempt[];
   replacements: VoiceRepairReplacement[];
   next_action: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {

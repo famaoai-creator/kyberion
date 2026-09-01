@@ -1,4 +1,5 @@
 import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core/runtime-supervisor';
+import { isRecord } from '@agent/core/foundation';
 
 export interface ProcessAction {
   action: 'spawn' | 'stop' | 'list' | 'status' | 'list-surfaces' | 'pipeline';
@@ -19,10 +20,6 @@ export interface ProcessAction {
 }
 
 const PROCESS_ACTIONS = ['spawn', 'stop', 'list', 'status', 'list-surfaces', 'pipeline'] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function isProcessAction(value: unknown): value is ProcessAction['action'] {
   return typeof value === 'string' && PROCESS_ACTIONS.includes(value as ProcessAction['action']);

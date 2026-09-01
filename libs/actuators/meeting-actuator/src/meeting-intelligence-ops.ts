@@ -34,7 +34,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { getWorkItem } from '@agent/core/work-coordination';
 import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning-backend-execution-adapter';
-import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
 
 function writeJSON(rel: string, data: unknown): string {
@@ -158,10 +158,6 @@ function extractFirstJsonBlock(text: string): unknown {
     }
   }
   throw new Error('unbalanced JSON block in delegateTask response');
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
