@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   listEmailAccountProviders,
   registerEmailAccountProvider,
+  isGmailAuthStatusReady,
   type EmailAccountDescriptor,
 } from './email-account-catalog.js';
 
@@ -35,5 +36,14 @@ describe('email-account-catalog', () => {
     dispose();
     dispose = undefined;
     expect(listEmailAccountProviders().some((entry) => entry.id === descriptor.id)).toBe(false);
+  });
+
+  it('fails closed for malformed or prototype-bearing Gmail auth status', () => {
+    expect(isGmailAuthStatusReady('{"auth_method":"oauth"}')).toBe(true);
+    expect(isGmailAuthStatusReady('{"auth_method":"none"}')).toBe(false);
+    expect(isGmailAuthStatusReady('{bad json')).toBe(false);
+    expect(
+      isGmailAuthStatusReady('{"auth_method":"none","__proto__":{"token_cache_exists":true}}')
+    ).toBe(false);
   });
 });
