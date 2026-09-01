@@ -53,6 +53,7 @@ import {
   safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/audit-chain';
 
@@ -137,7 +138,7 @@ function filterAuditChainByMission(
       let event: AuditEntry;
       let persisted: Record<string, unknown>;
       try {
-        const raw = JSON.parse(trimmed) as unknown;
+        const raw = parseSafeJsonInput(trimmed, 'validation bundle audit entry');
         event = normalizePersistedAuditEntry(raw);
         persisted = raw as Record<string, unknown>;
       } catch {

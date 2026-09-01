@@ -20,7 +20,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJsonLines } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJsonLines } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 
 export interface EgressHostSummary {
@@ -84,7 +84,7 @@ function parseEgressAuditValue(value: unknown): EgressAuditRecord | undefined {
 
 function parseEgressAuditRecord(line: string): EgressAuditRecord | undefined {
   try {
-    return parseEgressAuditValue(JSON.parse(line));
+    return parseEgressAuditValue(parseSafeJsonInput(line, 'egress audit entry'));
   } catch {
     return undefined;
   }

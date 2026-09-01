@@ -18,7 +18,7 @@ import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
 import { startServiceRecordingSession } from '@agent/core/service-recording-session';
 import { withExecutionContext } from '@agent/core/authority';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   defineScript,
@@ -60,7 +60,7 @@ function readJsonArgument(value: string, label: string): unknown {
       ? String(safeReadFile(resolveServicePath(candidate, `--${label} path`), { encoding: 'utf8' }))
       : value;
   try {
-    return JSON.parse(source);
+    return parseSafeJsonInput(source, `service recording ${label} input`);
   } catch (error) {
     throw new Error(
       `--${label} must be JSON or @path: ${error instanceof Error ? error.message : String(error)}`

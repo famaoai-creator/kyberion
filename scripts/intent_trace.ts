@@ -19,6 +19,7 @@ import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
@@ -198,7 +199,7 @@ function readJsonlRecords<T>(filePath: string, normalize: (value: unknown) => T 
     .filter(Boolean)
     .flatMap((line) => {
       try {
-        const record = normalize(JSON.parse(line));
+        const record = normalize(parseSafeJsonInput(line, 'intent trace entry'));
         return record ? [record] : [];
       } catch {
         return [];
