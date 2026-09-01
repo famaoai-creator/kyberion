@@ -31,6 +31,7 @@ import {
 } from './delegation-concurrency.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { GrokAdapter, type AgentAskOptions, type AgentResponse } from './agent-adapter.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 import type { ReasoningCallOptions } from './reasoning-backend.js';
@@ -360,7 +361,7 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     const stdout = await this.spawnCli(args, '');
     let cliResult: any;
     try {
-      cliResult = JSON.parse(stdout);
+      cliResult = parseSafeJsonInput(stdout, 'Grok CLI response');
     } catch (err: any) {
       throw new Error(
         `[shell-grok-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
@@ -453,13 +454,13 @@ function resolveGrokSubagentProfile(options?: ReasoningCallOptions) {
 function parseStructuredFromText(text: unknown): unknown {
   if (typeof text !== 'string' || !text.trim()) return undefined;
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'Grok structured response');
   } catch {
     // Some envelopes wrap JSON in fences; strip a single outer fence if present.
     const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/u);
     if (!fenced) return undefined;
     try {
-      return JSON.parse(fenced[1].trim());
+      return parseSafeJsonInput(fenced[1].trim(), 'Grok fenced structured response');
     } catch {
       return undefined;
     }
