@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import type {
   DefectCandidate,
@@ -75,12 +76,15 @@ function deterministicInventory(input: DeriveTestInventoryInput): TestInventoryI
     }));
 }
 
-function parseReasoningItems(raw: string): TestInventoryItem[] {
+export function parseReasoningItems(raw: string): TestInventoryItem[] {
+  const trimmed = raw.trim();
+  const firstJsonToken = trimmed.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return [];
   const match = raw.match(/\{[\s\S]*\}/u);
   if (!match) return [];
   try {
-    const parsed = JSON.parse(match[0]) as { items?: TestInventoryItem[] };
-    return Array.isArray(parsed.items) ? parsed.items : [];
+    const parsed = parseSafeJsonObjectInput(match[0], 'reasoning test inventory');
+    return parsed && Array.isArray(parsed.items) ? (parsed.items as TestInventoryItem[]) : [];
   } catch {
     return [];
   }
@@ -361,9 +365,9 @@ function readDefectEvents(filePath: string): DefectTransitionEvent[] {
     .filter((line) => line.trim() !== '')
     .flatMap((line) => {
       try {
-        return [parseDefectTransitionEvent(JSON.parse(line) as unknown)].filter(
-          (event): event is DefectTransitionEvent => event !== undefined
-        );
+        return [
+          parseDefectTransitionEvent(parseSafeJsonInput(line, 'defect transition event')),
+        ].filter((event): event is DefectTransitionEvent => event !== undefined);
       } catch {
         return [];
       }
