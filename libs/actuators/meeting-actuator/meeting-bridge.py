@@ -148,6 +148,8 @@ def _host_matches(host, allowed):
 
 
 def _validate_url(platform, url):
+    if platform not in ALLOWED_HOSTS:
+        return False, f"unsupported meeting platform: {platform}"
     if not url:
         return False, "url is required"
     try:
