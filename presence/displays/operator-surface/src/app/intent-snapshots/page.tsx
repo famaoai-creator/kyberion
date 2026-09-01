@@ -98,6 +98,16 @@ function IntentResolutionSummary({
       <div style={intentResolutionTitleStyle}>Resolution contract</div>
       <div style={intentResolutionGridStyle}>
         <div>
+          <span style={intentResolutionLabelStyle}>Understanding</span>
+          <strong>{contract.normalized_intent}</strong>
+        </div>
+        <div>
+          <span style={intentResolutionLabelStyle}>Missing input</span>
+          <strong>
+            {contract.missing_inputs.length > 0 ? contract.missing_inputs.join(', ') : 'None'}
+          </strong>
+        </div>
+        <div>
           <span style={intentResolutionLabelStyle}>Authority</span>
           <strong>{renderIntentAuthorityLabel(contract.authority_level, 'en')}</strong>
         </div>

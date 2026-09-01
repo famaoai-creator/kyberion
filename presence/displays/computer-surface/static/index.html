@@ -547,8 +547,20 @@
           <div class="intent-resolution-title">Intent resolution contract</div>
           <div class="intent-resolution-grid">
             <div>
+              <span class="intent-resolution-label">Understanding</span>
+              <strong id="intent-resolution-understanding" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Missing input</span>
+              <strong id="intent-resolution-missing" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
               <span class="intent-resolution-label">Authority</span>
               <strong id="intent-resolution-authority" class="intent-resolution-value">—</strong>
+            </div>
+            <div>
+              <span class="intent-resolution-label">Outcome</span>
+              <strong id="intent-resolution-outcome" class="intent-resolution-value">—</strong>
             </div>
             <div>
               <span class="intent-resolution-label">Next action</span>
@@ -640,7 +652,10 @@
         metadata: document.getElementById('metadata'),
         screenshotPath: document.getElementById('screenshotPath'),
         intentResolutionPanel: document.getElementById('intent-resolution-panel'),
+        intentResolutionUnderstanding: document.getElementById('intent-resolution-understanding'),
+        intentResolutionMissing: document.getElementById('intent-resolution-missing'),
         intentResolutionAuthority: document.getElementById('intent-resolution-authority'),
+        intentResolutionOutcome: document.getElementById('intent-resolution-outcome'),
         intentResolutionNextAction: document.getElementById('intent-resolution-next-action'),
         intentResolutionConsequence: document.getElementById('intent-resolution-consequence'),
       };
@@ -776,6 +791,11 @@
           !Array.isArray(value) &&
           typeof value.request_id === 'string' &&
           typeof value.normalized_intent === 'string' &&
+          Array.isArray(value.missing_inputs) &&
+          value.missing_inputs.every((input) => typeof input === 'string' && input.trim()) &&
+          ['answer', 'artifact', 'approval_ready_plan', 'service_change', 'status_report'].includes(
+            value.outcome_kind
+          ) &&
           ['autonomous', 'approval_required', 'human_clarification_required'].includes(
             value.authority_level
           ) &&
@@ -799,8 +819,20 @@
           approval_required: 'Approval required',
           human_clarification_required: 'Human clarification required',
         };
+        const outcomeLabels = {
+          answer: 'Answer',
+          artifact: 'Artifact',
+          approval_ready_plan: 'Approval-ready plan',
+          service_change: 'Service change',
+          status_report: 'Status report',
+        };
         ids.intentResolutionPanel.classList.remove('hidden');
+        ids.intentResolutionUnderstanding.textContent = contract.normalized_intent;
+        ids.intentResolutionMissing.textContent = contract.missing_inputs.length
+          ? contract.missing_inputs.join(', ')
+          : 'None';
         ids.intentResolutionAuthority.textContent = authorityLabels[contract.authority_level];
+        ids.intentResolutionOutcome.textContent = outcomeLabels[contract.outcome_kind];
         ids.intentResolutionNextAction.textContent = contract.next_action.label;
         ids.intentResolutionConsequence.textContent = contract.next_action.consequence;
       }
