@@ -11271,6 +11271,16 @@ NDJSON の malformed 行スキップ、profile metadata の fallback は維持�
 `git diff --check`。残る改善計画は legacy voice root bridge／meeting／AGY の Python boundary、全surfaceの実ブラウザ／
 外部provider実機確認、SX-03〜SX-13の未完了項目、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 246
+
+voice bridge の実行確認で、`zero_shot_bridge.py` が Python 3.9 では PEP 604 型注釈を評価時に失敗させる残存を
+確認した。`from __future__ import annotations` を追加して、既存の Python 3.9 対応方針と JSON boundary helper の
+実行環境を一致させた。入力契約や voice engine の選択順は変更していない。
+
+検証: Python 3.9 相当 runtime で zero-shot の配列入力が object boundary error になること、syntax check、
+`git diff --check`。残る改善計画は legacy voice root bridge／meeting／AGY の Python boundary、全surfaceの実ブラウザ／
+外部provider実機確認、SX-03〜SX-13の未完了項目、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
