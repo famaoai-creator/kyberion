@@ -7,37 +7,33 @@ vi.mock('./a2a-transport.js', () => ({
   sendA2AMessage: vi.fn().mockResolvedValue(undefined),
   pollA2AInbox: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  return {
-    ...actual,
-    safeReadFile: vi.fn().mockReturnValue('file content'),
-    safeWriteFile: vi.fn(),
-    safeMkdir: vi.fn(),
-    safeExistsSync: vi.fn().mockReturnValue(false),
-    safeExec: vi.fn().mockReturnValue(''),
-    secureFetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
-    derivePipelineStatus: actual.derivePipelineStatus,
-    resolveVars: actual.resolveVars,
-    evaluateCondition: actual.evaluateCondition,
-    getPathValue: actual.getPathValue,
-    resolveWriteArtifactSpec: actual.resolveWriteArtifactSpec,
-    retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
-    pathResolver: {
-      rootDir: vi.fn().mockReturnValue('/mock/root'),
-      resolve: vi.fn((p: string) => `/mock/root/${p}`),
-      rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
-      sharedTmp: vi.fn((p: string) => `/mock/tmp/${p}`),
-      knowledge: vi.fn((p: string) => `/mock/knowledge/${p}`),
-    },
-  };
-});
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeReadFile: vi.fn().mockReturnValue('file content'),
+  safeWriteFile: vi.fn(),
+  safeMkdir: vi.fn(),
+  safeExistsSync: vi.fn().mockReturnValue(false),
+  safeExec: vi.fn().mockReturnValue(''),
+}));
+
+vi.mock('@agent/core/network', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/network')>()),
+  secureFetch: vi.fn().mockResolvedValue({ status: 200, data: {} }),
+}));
+
+vi.mock('@agent/core/core', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: vi.fn(async (fn: () => Promise<unknown>, _options?: unknown) => fn()),
+}));
 
 describe('network-actuator', () => {
   beforeEach(() => {
@@ -75,7 +71,7 @@ describe('network-actuator', () => {
     });
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
-      const { secureFetch } = await import('@agent/core');
+      const { secureFetch } = await import('@agent/core/network');
       vi.mocked(secureFetch).mockRejectedValueOnce(new Error('Network error'));
 
       const result = await handleAction({
@@ -92,7 +88,7 @@ describe('network-actuator', () => {
     });
 
     it('max_steps超過時に[SAFETY_LIMIT]エラーをスロー', async () => {
-      const { secureFetch } = await import('@agent/core');
+      const { secureFetch } = await import('@agent/core/network');
       vi.mocked(secureFetch).mockResolvedValue({ status: 200, data: {} });
 
       const steps = Array.from({ length: 3 }, (_, i) => ({
@@ -108,7 +104,7 @@ describe('network-actuator', () => {
 
     describe('capture ops', () => {
       it('fetch でHTTPリクエストを実行する', async () => {
-        const { secureFetch } = await import('@agent/core');
+        const { secureFetch } = await import('@agent/core/network');
         vi.mocked(secureFetch).mockResolvedValueOnce({ status: 200, data: { result: 'ok' } });
 
         const result = await handleAction({
@@ -128,7 +124,8 @@ describe('network-actuator', () => {
       });
 
       it('fetch は manifest の recovery policy と step override をマージして retry する', async () => {
-        const { secureFetch, retry } = await import('@agent/core');
+        const { secureFetch } = await import('@agent/core/network');
+        const { retry } = await import('@agent/core/async-utils');
         vi.mocked(secureFetch).mockResolvedValueOnce({ status: 200, data: { result: 'ok' } });
 
         const result = await handleAction({
@@ -162,7 +159,7 @@ describe('network-actuator', () => {
       });
 
       it('fetch でPOSTリクエストを実行する', async () => {
-        const { secureFetch } = await import('@agent/core');
+        const { secureFetch } = await import('@agent/core/network');
         vi.mocked(secureFetch).mockResolvedValueOnce({ status: 201, data: { id: 1 } });
 
         const result = await handleAction({
@@ -258,8 +255,24 @@ describe('network-actuator', () => {
     });
 
     describe('apply ops', () => {
+      it('write_file はリポジトリ外の出力先を拒否する', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'apply',
+              op: 'write_file',
+              params: { path: '/tmp/external-network-output.json', content: '{}' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toContain('[RESOURCE_PATH_SCOPE]');
+      });
+
       it('write_file でファイルを書き込む', async () => {
-        const { safeWriteFile, safeExistsSync } = await import('@agent/core');
+        const { safeWriteFile, safeExistsSync } = await import('@agent/core/secure-io');
         vi.mocked(safeExistsSync).mockReturnValue(true);
 
         const result = await handleAction({
@@ -278,7 +291,7 @@ describe('network-actuator', () => {
       });
 
       it('log オペレーターはメッセージをログに記録する', async () => {
-        const { logger } = await import('@agent/core');
+        const { logger } = await import('@agent/core/core');
 
         const result = await handleAction({
           action: 'pipeline',

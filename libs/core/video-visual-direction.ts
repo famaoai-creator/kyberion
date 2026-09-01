@@ -1,6 +1,8 @@
 import { createLogger } from './logger.js';
+import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import type { GovernedCatalog } from './foundation/governed-catalog.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 
@@ -147,31 +149,20 @@ export interface VideoVisualPattern {
   };
 }
 
-let cachedPatternCatalog: Record<string, VideoVisualPattern> | null = null;
+interface VideoVisualPatternCatalog {
+  version: string;
+  description: string;
+  patterns: Record<string, VideoVisualPattern>;
+}
 
-/**
- * Curated pattern pack (pptx themes.json counterpart for video). The LLM
- * only SELECTS an id from this governed catalog — it never invents colors,
- * so a bad model reply can only ever land on another curated pattern or the
- * default, not on an ungoverned palette.
- */
-export function loadVideoVisualPatternCatalog(): Record<string, VideoVisualPattern> {
-  if (cachedPatternCatalog) return cachedPatternCatalog;
-  try {
-    const catalogPath = pathResolver.knowledge(
-      'public/design-patterns/media-templates/video-visual-patterns.json'
-    );
-    if (safeExistsSync(catalogPath)) {
-      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
-      if (parsed?.patterns && typeof parsed.patterns === 'object') {
-        cachedPatternCatalog = parsed.patterns as Record<string, VideoVisualPattern>;
-        return cachedPatternCatalog;
-      }
-    }
-  } catch (error: any) {
-    logger.warn(`pattern catalog unreadable, using built-in default: ${error?.message || error}`);
-  }
-  cachedPatternCatalog = {
+const VIDEO_VISUAL_PATTERN_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-visual-patterns.schema.json'
+);
+
+const DEFAULT_PATTERN_CATALOG: VideoVisualPatternCatalog = {
+  version: '1.0.0',
+  description: 'Deterministic fallback visual pattern catalog.',
+  patterns: {
     'calm-tech': {
       name: 'Calm Tech',
       mood: DEFAULT_VISUAL_DIRECTION.mood,
@@ -181,12 +172,53 @@ export function loadVideoVisualPatternCatalog(): Record<string, VideoVisualPatte
         landscape: { headline_px: 68, body_px: 23 },
       },
     },
-  };
-  return cachedPatternCatalog;
+  },
+};
+
+const videoVisualPatternCatalogs = new Map<string, GovernedCatalog<VideoVisualPatternCatalog>>();
+
+function getVideoVisualPatternCatalog(
+  rootDir?: string
+): GovernedCatalog<VideoVisualPatternCatalog> {
+  const catalogPath = rootDir
+    ? path.join(
+        rootDir,
+        'knowledge',
+        'public',
+        'design-patterns',
+        'media-templates',
+        'video-visual-patterns.json'
+      )
+    : pathResolver.knowledge('public/design-patterns/media-templates/video-visual-patterns.json');
+  let catalog = videoVisualPatternCatalogs.get(catalogPath);
+  if (!catalog) {
+    catalog = defineCatalog<VideoVisualPatternCatalog>({
+      id: 'video-visual-patterns',
+      path: catalogPath,
+      schema: VIDEO_VISUAL_PATTERN_SCHEMA_PATH,
+      fallback: DEFAULT_PATTERN_CATALOG,
+      fallbackOnInvalid: true,
+      onFallback: (error) => {
+        logger.warn(
+          `pattern catalog unreadable, using built-in default: ${error instanceof Error ? error.message : String(error)}`
+        );
+      },
+    });
+    videoVisualPatternCatalogs.set(catalogPath, catalog);
+  }
+  return catalog;
 }
 
-export function resetVideoVisualPatternCatalogCache(): void {
-  cachedPatternCatalog = null;
+/**
+ * Curated pattern pack (pptx themes.json counterpart for video). The LLM
+ * only SELECTS an id from this governed catalog — it never invents colors,
+ * so a bad model reply can only ever land on another curated pattern or the
+ * default, not on an ungoverned palette.
+ */
+export function loadVideoVisualPatternCatalog(
+  rootDir?: string
+): Record<string, VideoVisualPattern> {
+  return getVideoVisualPatternCatalog(rootDir).load().patterns;
 }
 
 /** Resolve a curated pattern into a concrete direction for the given frame. */

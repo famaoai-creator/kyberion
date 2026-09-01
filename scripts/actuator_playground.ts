@@ -1,15 +1,18 @@
 import {
-  safeReaddir,
+  assertSafeRepositoryPath,
   safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
   safeExec,
-  pathResolver,
-} from '@agent/core';
+  safeLstat,
+  safeReaddir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { parseSafeJsonInput, parseSafeJsonObjectInput } from './lib/json-input.js';
 
 interface ActuatorCapability {
   op: string;
@@ -55,7 +58,7 @@ function tryCoerceValue(val: string): any {
   if (!isNaN(Number(val)) && val !== '') return Number(val);
   if (val.startsWith('{') || val.startsWith('[')) {
     try {
-      return JSON.parse(val);
+      return parseSafeJsonInput(val, 'actuator parameter');
     } catch (_) {
       // Fallback to string if parsing fails
     }
@@ -63,21 +66,30 @@ function tryCoerceValue(val: string): any {
   return val;
 }
 
+export function parsePlaygroundParams(raw: string, label = '--params'): Record<string, unknown> {
+  return parseSafeJsonObjectInput(raw, label) || {};
+}
+
 async function runPlayground(args: string[]) {
   console.log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
 
   // 1. Scan available actuators
-  const actuatorsDir = pathResolver.rootResolve('libs/actuators');
+  const actuatorsDir = assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
   const dirEntries = safeReaddir(actuatorsDir);
   const actuators: { id: string; manifestPath: string; manifest: ActuatorManifest }[] = [];
 
   for (const entry of dirEntries) {
-    const entryPath = path.join(actuatorsDir, entry);
-    const manifestPath = path.join(entryPath, 'manifest.json');
-    if (safeExistsSync(manifestPath)) {
+    let manifestPath: string;
+    try {
+      manifestPath = assertSafeRepositoryPath(path.join(actuatorsDir, entry, 'manifest.json'), {
+        allowMissingLeaf: false,
+      });
+    } catch {
+      continue;
+    }
+    if (safeExistsSync(manifestPath) && safeLstat(manifestPath).isFile()) {
       try {
-        const raw = safeReadFile(manifestPath, { encoding: 'utf8' }) as string;
-        const manifest = JSON.parse(raw) as ActuatorManifest;
+        const manifest = readJson<ActuatorManifest>(manifestPath);
         if (manifest && manifest.actuator_id) {
           actuators.push({
             id: entry,
@@ -165,7 +177,7 @@ async function runPlayground(args: string[]) {
 
   if (rawParamsStr) {
     try {
-      paramsObject = JSON.parse(rawParamsStr);
+      paramsObject = parsePlaygroundParams(rawParamsStr);
     } catch (err: any) {
       console.error(chalk.red(`\n❌ Failed to parse --params JSON: ${err.message}`));
       rl.close();
@@ -186,7 +198,7 @@ async function runPlayground(args: string[]) {
       );
       const jsonStr = await question('> ');
       try {
-        paramsObject = JSON.parse(jsonStr);
+        paramsObject = parsePlaygroundParams(jsonStr, 'params');
       } catch (err: any) {
         console.error(chalk.red(`❌ Invalid JSON block: ${err.message}`));
         rl.close();

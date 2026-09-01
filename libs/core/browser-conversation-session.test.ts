@@ -8,6 +8,7 @@ import {
   getActiveBrowserConversationSession,
   listBrowserConversationSessions,
   loadBrowserConversationSession,
+  normalizeBrowserActuatorResult,
   recordBrowserConversationHistory,
   saveBrowserConversationSession,
   validateBrowserConversationCommand,
@@ -41,6 +42,15 @@ describe('browser conversation session helpers', () => {
     expect(session.control.interruptible).toBe(true);
   });
 
+  it('rejects malformed or unsuccessful browser actuator results', () => {
+    expect(() => normalizeBrowserActuatorResult([])).toThrow('non-object result');
+    expect(() => normalizeBrowserActuatorResult({ status: 'unknown' })).toThrow('invalid status');
+    expect(() => normalizeBrowserActuatorResult({ status: 'succeeded', context: [] })).toThrow(
+      'invalid context'
+    );
+    expect(normalizeBrowserActuatorResult({ status: 'failed', results: [] }).status).toBe('failed');
+  });
+
   it('persists and reloads conversation sessions', () => {
     const session = createBrowserConversationSession({
       sessionId: 'BRS-TEST-1',
@@ -56,6 +66,27 @@ describe('browser conversation session helpers', () => {
 
     expect(loaded?.session_id).toBe('BRS-TEST-1');
     expect(listBrowserConversationSessions()).toHaveLength(1);
+  });
+
+  it('rejects schema-invalid persisted conversation sessions', () => {
+    safeMkdir(sessionDir, { recursive: true });
+    safeWriteFile(
+      `${sessionDir}/BRS-TEST-INVALID.json`,
+      JSON.stringify({ session_id: 'BRS-TEST-INVALID', status: 'executing' })
+    );
+
+    expect(loadBrowserConversationSession('BRS-TEST-INVALID')).toBeNull();
+  });
+
+  it('preserves the parse error contract for malformed conversation sessions', () => {
+    safeMkdir(sessionDir, { recursive: true });
+    safeWriteFile(`${sessionDir}/BRS-TEST-MALFORMED.json`, '{ malformed');
+
+    expect(() => loadBrowserConversationSession('BRS-TEST-MALFORMED')).toThrow(SyntaxError);
+  });
+
+  it('rejects traversal-shaped session ids before persistence lookup', () => {
+    expect(() => loadBrowserConversationSession('../outside')).toThrow(/single path segment/);
   });
 
   it('records history entries on an existing session', () => {
@@ -158,17 +189,21 @@ describe('browser conversation session helpers', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/BRS-TEST-5.json`,
-      JSON.stringify({
-        session_id: 'BRS-TEST-5',
-        tab_id: 'tab-1',
-        url: 'https://example.com',
-        title: 'Approval Console',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: 'button', text: '承認', name: '承認' },
-          { ref: '@e2', role: 'button', text: 'キャンセル', name: 'キャンセル' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'BRS-TEST-5',
+          tab_id: 'tab-1',
+          url: 'https://example.com',
+          title: 'Approval Console',
+          captured_at: new Date().toISOString(),
+          elements: [
+            { ref: '@e1', role: 'button', text: '承認', name: '承認' },
+            { ref: '@e2', role: 'button', text: 'キャンセル', name: 'キャンセル' },
+          ],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({
@@ -198,17 +233,21 @@ describe('browser conversation session helpers', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/BRS-TEST-6.json`,
-      JSON.stringify({
-        session_id: 'BRS-TEST-6',
-        tab_id: 'tab-1',
-        url: 'https://example.com',
-        title: 'Approval Console',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: 'button', text: '承認', name: '承認' },
-          { ref: '@e2', role: 'button', text: '承認', name: '承認（下書き）' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'BRS-TEST-6',
+          tab_id: 'tab-1',
+          url: 'https://example.com',
+          title: 'Approval Console',
+          captured_at: new Date().toISOString(),
+          elements: [
+            { ref: '@e1', role: 'button', text: '承認', name: '承認' },
+            { ref: '@e2', role: 'button', text: '承認', name: '承認（下書き）' },
+          ],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({
@@ -239,16 +278,18 @@ describe('browser conversation session helpers', () => {
     safeMkdir(snapshotDir, { recursive: true });
     safeWriteFile(
       `${snapshotDir}/presence-demo.json`,
-      JSON.stringify({
-        session_id: 'presence-demo',
-        tab_id: 'tab-2',
-        url: 'https://example.com',
-        title: 'Example Domain',
-        captured_at: new Date().toISOString(),
-        elements: [
-          { ref: '@e1', role: null, text: 'Learn more', name: 'Learn more' },
-        ],
-      }, null, 2),
+      JSON.stringify(
+        {
+          session_id: 'presence-demo',
+          tab_id: 'tab-2',
+          url: 'https://example.com',
+          title: 'Example Domain',
+          captured_at: new Date().toISOString(),
+          elements: [{ ref: '@e1', role: null, text: 'Learn more', name: 'Learn more' }],
+        },
+        null,
+        2
+      )
     );
 
     const session = createBrowserConversationSession({

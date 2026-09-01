@@ -1,5 +1,4 @@
-import { main as organizationRolesMain } from './org.js';
-import { runOrganizationOperatingModel } from './organization_operating_model.js';
+import { main as organizationMain } from './organization.js';
 import { main as projectControllerMain } from './project_controller.js';
 
 export async function runGovernedController(
@@ -8,10 +7,7 @@ export async function runGovernedController(
 ): Promise<void | undefined> {
   switch (entrypointId) {
     case 'organization-model':
-      await runOrganizationOperatingModel(args);
-      return;
-    case 'organization-roles':
-      await organizationRolesMain(args);
+      await organizationMain(args);
       return;
     case 'project-controller':
       await projectControllerMain(args);

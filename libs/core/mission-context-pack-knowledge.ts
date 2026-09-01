@@ -11,7 +11,7 @@ import {
 import { queryTenantKnowledge } from './tenant-knowledge-retrieval.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import type { ProjectOperationalState } from './project-operational-state-registry.js';
 import type { WorkItem } from './work-coordination.js';
 import type {
@@ -68,9 +68,28 @@ function truncatePinnedExcerpt(body: string, max = PINNED_EXCERPT_MAX_CHARS): st
   return para.replace(/\s+/g, ' ').slice(0, max);
 }
 
+function resolveSafePinnedKnowledgePath(repoRelativePath: string): string | null {
+  const normalized = repoRelativePath.replaceAll('\\', '/');
+  if (!normalized.startsWith('knowledge/')) return null;
+  const root = path.resolve(pathResolver.knowledge());
+  const absolute = path.resolve(pathResolver.rootResolve(normalized));
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return null;
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) break;
+    if (safeLstat(current).isSymbolicLink()) return null;
+  }
+  return absolute;
+}
+
 function loadPinnedKnowledgeHint(repoRelativePath: string): MissionContextPackKnowledgeHint | null {
   try {
-    const abs = pathResolver.rootResolve(repoRelativePath);
+    const abs = resolveSafePinnedKnowledgePath(repoRelativePath);
+    if (!abs) return null;
     if (!safeExistsSync(abs)) return null;
     const raw = safeReadFile(abs, { encoding: 'utf8' }) as string;
     const { title: frontmatterTitle, body } = pinnedFrontmatterTitle(raw);

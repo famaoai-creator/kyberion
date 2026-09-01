@@ -1,7 +1,14 @@
 import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, loadJson, safeUnlink, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  loadJson,
+  safeUnlink,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -46,11 +53,15 @@ const MARKER_RELATIVE_PATH = 'active/shared/runtime/state/reasoning-failover.jso
 const ERROR_SUMMARY_MAX_CHARS = 200;
 
 export function reasoningFailoverEventsPath(): string {
-  return pathResolver.rootResolve(EVENTS_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(EVENTS_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function reasoningFailoverMarkerPath(): string {
-  return pathResolver.rootResolve(MARKER_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(MARKER_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function truncateErrorSummary(message: string): string {

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -18,7 +17,8 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { rootResolve } from './path-resolver.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
 import {
   getSpeechToTextBridge,
   getSpeechToTextBridges,
@@ -26,7 +26,9 @@ import {
   registerSpeechToTextBridge,
   resetSpeechToTextBridge,
   normalizeSpeechToTextResult,
+  parseSpeechToTextCapabilities,
   stubSpeechToTextBridge,
+  ShellSpeechToTextBridge,
   type SpeechToTextBridge,
 } from './speech-to-text-bridge.js';
 
@@ -35,8 +37,12 @@ describe('speech-to-text-bridge', () => {
   const mockResolve = rootResolve as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'stt-'));
-    mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
+    tmpDir = pathResolver.sharedTmp(`stt-${process.pid}`);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
+    mockResolve.mockImplementation((rel: string) =>
+      path.isAbsolute(rel) ? rel : path.join(tmpDir, rel)
+    );
   });
 
   afterEach(() => {
@@ -69,6 +75,75 @@ describe('speech-to-text-bridge', () => {
     await expect(stubSpeechToTextBridge.transcribe({ audioPath: 'call.wav' })).rejects.toThrow(
       /no transcript backend/u
     );
+  });
+
+  it('rejects audio paths outside the repository', async () => {
+    await expect(
+      stubSpeechToTextBridge.transcribe({ audioPath: '/tmp/external-call.wav' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects audio paths traversing a symbolic link', async () => {
+    const targetPath = path.join(tmpDir, 'target.wav');
+    const linkPath = path.join(tmpDir, 'linked.wav');
+    fs.writeFileSync(targetPath, 'fake-audio');
+    safeSymlinkSync(targetPath, linkPath);
+    try {
+      await expect(stubSpeechToTextBridge.transcribe({ audioPath: linkPath })).rejects.toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      safeUnlinkSync(linkPath);
+    }
+  });
+
+  it('rejects a shell transcript output path outside the repository', async () => {
+    fs.writeFileSync(path.join(tmpDir, 'call.wav'), 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({ command: "printf 'hello'" });
+    await expect(
+      bridge.transcribe({ audioPath: 'call.wav', outputPath: '/tmp/external-transcript.txt' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('normalizes structured shell output and drops malformed segments', async () => {
+    const audioPath = path.join(tmpDir, 'structured.wav');
+    fs.writeFileSync(audioPath, 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({
+      command: `printf '%s' '{"text":"hello","capabilities":{"timestamps":true,"granularity":"segment"},"segments":[{"start_sec":0,"end_sec":1,"text":"hello"},null,{"start_sec":"bad"}]}'`,
+      structuredOutput: true,
+    });
+
+    const result = await bridge.transcribe({ audioPath: 'structured.wav' });
+
+    expect(result.text).toBe('hello');
+    expect(result.capabilities).toEqual({ timestamps: true, granularity: 'segment' });
+    expect(result.segments).toEqual([{ start_sec: 0, end_sec: 1, text: 'hello' }]);
+  });
+
+  it('rejects structured output whose root is not a JSON object', async () => {
+    const audioPath = path.join(tmpDir, 'invalid-structured.wav');
+    fs.writeFileSync(audioPath, 'fake-audio');
+    const bridge = new ShellSpeechToTextBridge({
+      command: "printf '%s' '[1,2]'",
+      structuredOutput: true,
+    });
+
+    await expect(bridge.transcribe({ audioPath: 'invalid-structured.wav' })).rejects.toThrow(
+      'structured output was not valid JSON'
+    );
+  });
+
+  it('normalizes configured capabilities and rejects malformed shapes', () => {
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: true, granularity: 'word', local_only: true })
+    ).toEqual({ timestamps: true, granularity: 'word', local_only: true });
+    expect(parseSpeechToTextCapabilities([])).toBeUndefined();
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: 'true', granularity: 'segment' })
+    ).toBeUndefined();
+    expect(
+      parseSpeechToTextCapabilities({ timestamps: true, granularity: 'invalid' })
+    ).toBeUndefined();
   });
 
   it('resolves a registered bridge', () => {

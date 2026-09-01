@@ -1,13 +1,21 @@
 import { createLogger } from './logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReaddir,
+  safeReadFile,
+} from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import type { ChildProcess } from 'node:child_process';
 import { Readable, Writable, PassThrough } from 'node:stream';
 import * as path from 'node:path';
 import { getRegisteredEnvText, safeChildEnv } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { resolveActiveProviderPermissionArgs } from './provider-permission-profiles.js';
+import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import {
   CodexAppServerAdapter,
   CodexExecutionEnhancer,
@@ -242,6 +250,17 @@ function firstStringValue(...values: unknown[]): string | undefined {
   return values.find(
     (value): value is string => typeof value === 'string' && value.trim().length > 0
   );
+}
+
+function parseProviderJsonObject(raw: string): Record<string, unknown> | undefined {
+  try {
+    const parsed: unknown = parseSafeJsonInput(raw, 'provider JSON response');
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function applyEnhancersBeforeAsk(
@@ -848,7 +867,10 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
     prompt: string,
     options?: AgentAskOptions
   ): Promise<{ prompt: string; options?: AgentAskOptions }> {
-    const wisdomDir = path.join(PROJECT_ROOT, 'knowledge/product/evolution');
+    const wisdomDir = assertSafeRepositoryPath(
+      path.join(PROJECT_ROOT, 'knowledge/product/evolution'),
+      { allowMissingLeaf: true }
+    );
     let wisdomContext = '';
 
     try {
@@ -861,7 +883,8 @@ export class GeminiWisdomEnhancer implements AgentEnhancer {
           .slice(-5);
 
         for (const file of mdFiles) {
-          const content = safeReadFile(path.join(wisdomDir, file), { encoding: 'utf8' }) as string;
+          const wisdomFile = assertSafeRepositoryPath(path.join(wisdomDir, file));
+          const content = safeReadFile(wisdomFile, { encoding: 'utf8' }) as string;
           wisdomContext += `\n--- Lesson from ${file} ---\n${content}\n`;
         }
       }
@@ -907,15 +930,21 @@ export class CodexAdapter implements AgentAdapter {
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
+    assertReasoningEgressAllowed('codex-cli');
 
     try {
       // Pass the text as a single argument to npx/codex exec
-      const res = await runCliProcess('npx', ['codex', 'exec', '--json', enhanced.prompt], {
-        env: safeChildEnv() as NodeJS.ProcessEnv,
-        cwd: PROJECT_ROOT,
-        timeoutMs: 300000,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('codex') ?? [];
+      const res = await runCliProcess(
+        'npx',
+        ['codex', 'exec', ...activePermissionArgs, '--json', enhanced.prompt],
+        {
+          env: safeChildEnv() as NodeJS.ProcessEnv,
+          cwd: PROJECT_ROOT,
+          timeoutMs: 300000,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
 
       if (res.status !== 0) {
         logger.error(`[UAA] Codex Exit Code: ${res.status}`);
@@ -923,10 +952,11 @@ export class CodexAdapter implements AgentAdapter {
         return { text: '', stopReason: 'error', trace };
       }
 
-      const parsed = JSON.parse(res.stdout);
+      const parsed = parseProviderJsonObject(res.stdout);
+      if (!parsed) throw new Error('Codex returned a non-object JSON response');
       const agentResponse: AgentResponse = {
-        text: parsed.message || parsed.content || res.stdout,
-        thought: parsed.thought,
+        text: firstStringValue(parsed.message, parsed.content) || res.stdout,
+        ...(typeof parsed.thought === 'string' ? { thought: parsed.thought } : {}),
         stopReason: 'completed',
         trace,
       };
@@ -983,6 +1013,7 @@ export class AgyAdapter implements AgentAdapter {
       `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`
     );
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    assertReasoningEgressAllowed('agy-cli');
 
     try {
       const bin =
@@ -999,7 +1030,12 @@ export class AgyAdapter implements AgentAdapter {
       }
 
       args.push(text);
-      args.push('--dangerously-skip-permissions');
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('agy');
+      if (activePermissionArgs) {
+        args.push(...activePermissionArgs);
+      } else {
+        args.push('--dangerously-skip-permissions');
+      }
 
       // 1. Session Persistence & Continuity
       const session = (options?.conversationId as string | undefined) || options?.intentId;
@@ -1057,11 +1093,12 @@ export class AgyAdapter implements AgentAdapter {
       if (jsonStartIdx !== -1) {
         const cleanStdout = lines.slice(jsonStartIdx).join('\n');
         try {
-          const cliResult = JSON.parse(cleanStdout);
+          const cliResult = parseProviderJsonObject(cleanStdout);
+          if (!cliResult) throw new Error('Agy returned a non-object JSON response');
           this.usageSummary = extractUsageSummary(cliResult);
           return {
-            text: (cliResult.response || output).trim(),
-            thought: cliResult.thought,
+            text: (firstStringValue(cliResult.response) || output).trim(),
+            ...(typeof cliResult.thought === 'string' ? { thought: cliResult.thought } : {}),
             stopReason: res.status === 0 ? 'completed' : 'error',
           };
         } catch (_) {
@@ -1152,6 +1189,7 @@ export class ClaudeAdapter implements AgentAdapter {
   public async ask(text: string): Promise<AgentResponse> {
     logger.info(`[UAA] Claude asking: "${text.slice(0, 80)}..."`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
+    assertReasoningEgressAllowed('claude-cli');
     try {
       const args = ['-p', text, '--output-format', 'json'];
 
@@ -1170,19 +1208,30 @@ export class ClaudeAdapter implements AgentAdapter {
       if (this.options.sessionId) {
         args.push('--session-id', this.options.sessionId);
       }
-      if (this.options.permissionMode) {
+      const activePermissionArgs = resolveActiveProviderPermissionArgs('claude');
+      if (activePermissionArgs) {
+        args.push(...activePermissionArgs);
+      } else if (this.options.permissionMode) {
         args.push('--permission-mode', this.options.permissionMode);
       }
 
       // Tool restrictions from manifest
-      if (this.options.allowedTools && this.options.allowedTools.length > 0) {
+      if (
+        !activePermissionArgs &&
+        this.options.allowedTools &&
+        this.options.allowedTools.length > 0
+      ) {
         // Claude CLI separates tool availability (--tools) from automatic
         // permission approval (--allowedTools). Supplying only the latter
         // can leave print-mode workers with no executable tools at all.
         args.push('--tools', this.options.allowedTools.join(','));
         args.push('--allowedTools', ...this.options.allowedTools);
       }
-      if (this.options.disallowedTools && this.options.disallowedTools.length > 0) {
+      if (
+        !activePermissionArgs &&
+        this.options.disallowedTools &&
+        this.options.disallowedTools.length > 0
+      ) {
         args.push('--disallowedTools', ...this.options.disallowedTools);
       }
 
@@ -1199,11 +1248,12 @@ export class ClaudeAdapter implements AgentAdapter {
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: output.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       try {
-        const parsed = JSON.parse(output);
+        const parsed = parseProviderJsonObject(output);
+        if (!parsed) throw new Error('Claude returned a non-object JSON response');
         this.usageSummary = extractUsageSummary(parsed);
         return {
-          text: parsed.result || parsed.content || parsed.message || output,
-          thought: parsed.thought,
+          text: firstStringValue(parsed.result, parsed.content, parsed.message) || output,
+          ...(typeof parsed.thought === 'string' ? { thought: parsed.thought } : {}),
           stopReason: result.status === 0 ? 'completed' : 'error',
         };
       } catch (_) {

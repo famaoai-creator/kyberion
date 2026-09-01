@@ -1,47 +1,63 @@
 import * as path from 'node:path';
+import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
+import { validateService } from '@agent/core/service-validator';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { readJson } from '@agent/core/foundation';
 import {
-  SovereignSentinel,
-  validateService,
-  pathResolver,
-  resolveActiveProfileRoot,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
   safeReadFile,
   safeWriteFile,
-  logger,
-  withExecutionContext,
-  loadServiceEndpointsCatalog,
-  killSwitch,
-  readJanitorLastRunMs,
-  listOrphanNhiIdentities,
-  readReasoningDegraded,
+} from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { killSwitch } from '@agent/core/kill-switch';
+import { readJanitorLastRunMs } from '@agent/core/storage-janitor';
+import { listOrphanNhiIdentities } from '@agent/core/nhi-lifecycle-governance';
+import { readReasoningDegraded } from '@agent/core/reasoning-degradation';
+import {
   readReasoningFailover,
   type ReasoningFailoverMarker,
-  validateEnv,
-  secretGuard,
+} from '@agent/core/reasoning-failover';
+import { validateEnv } from '@agent/core/env-validator';
+import { secretGuard } from '@agent/core/secret-guard';
+import {
   peekProviderCapabilityRegistry,
   loadProviderCapabilityRegistry,
   DEFAULT_PROVIDER_CAPABILITY_TTL_MS,
   type ProviderCapability,
-  readDaemonHeartbeat,
-  loadScheduleRegistry,
-  matchesCron,
+} from '@agent/core/provider-capability-registry';
+import { readDaemonHeartbeat, type DaemonHeartbeatStatus } from '@agent/core/daemon-heartbeat';
+import { loadScheduleRegistry, type ScheduledPipeline } from '@agent/core/pipeline-scheduler';
+import { matchesCron } from '@agent/core/src/cron-utils';
+import {
   sendOpsAlert,
+  resolveOpsAlertChannelStatus,
+  type OpsAlertReceipt,
+} from '@agent/core/ops-alert';
+import {
   collectFailedSchedules,
   sweepFailedSchedules,
-  enqueueOperationalLearningSignal,
+  type FailedScheduleFinding,
+} from '@agent/core/src/feedback-loop';
+import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
+import {
   loadNotificationPreferences,
   resolveOperatorNotificationRoute,
-  resolveOpsAlertChannelStatus,
-  type DaemonHeartbeatStatus,
-  type ScheduledPipeline,
-  type FailedScheduleFinding,
-  type OpsAlertReceipt,
+} from '@agent/core/operator-notifications';
+import {
   hasRequiredServiceConnectionValue,
+  loadServiceConnectionReadinessConfig,
+} from '@agent/core/service-connection-readiness';
+import {
   assessDesktopObservationReadiness,
   listDesktopObservationSources,
-  macosAutomationBridge,
-} from '@agent/core';
+} from '@agent/core/desktop-recording';
+import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import { runCoworkHealthCheck } from '@agent/core/cowork-health-check';
 import { scanTenantDrift } from './watch_tenant_drift.js';
@@ -79,15 +95,25 @@ export function readAuditLedgerFreshness(
   nowMs = Date.now()
 ): AuditLedgerFreshness {
   try {
-    if (!safeExistsSync(auditDir)) {
+    const safeAuditDir = assertSafeRepositoryPath(auditDir, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeAuditDir) || !safeLstat(safeAuditDir).isDirectory()) {
       return { fresh: false, last_entry_ms: null, age_ms: null, reason: 'missing' };
     }
-    const files = safeReaddir(auditDir)
+    const files = safeReaddir(safeAuditDir)
       .filter((entry) => /^audit-\d{4}-\d{2}-\d{2}\.jsonl$/u.test(entry))
       .sort();
     let lastEntryMs: number | null = null;
     for (const file of files) {
-      const raw = String(safeReadFile(path.join(auditDir, file), { encoding: 'utf8' }) || '');
+      let safeFile: string;
+      try {
+        safeFile = assertSafeRepositoryPath(path.join(safeAuditDir, file), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        continue;
+      }
+      if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) continue;
+      const raw = String(safeReadFile(safeFile, { encoding: 'utf8' }) || '');
       for (const line of raw.split(/\r?\n/u).reverse()) {
         if (!line.trim()) continue;
         try {
@@ -322,10 +348,9 @@ function readSchedulerAlertMarker(): string | null {
 function markSchedulerAlertDay(key: string, now: Date): void {
   const markerPath = pathResolver.shared(SCHEDULER_ALERT_MARKER);
   let existing: Record<string, unknown> = {};
-  const raw = readSchedulerAlertMarker();
-  if (raw) {
+  if (safeExistsSync(markerPath)) {
     try {
-      existing = JSON.parse(raw) as Record<string, unknown>;
+      existing = readJson<Record<string, unknown>>(markerPath);
     } catch {
       existing = {};
     }
@@ -362,8 +387,7 @@ function loadCachedSnapshot<T>(name: string): CachedSnapshot<T> | null {
   const path = cachePath(name);
   if (!safeExistsSync(path)) return null;
   try {
-    const raw = safeReadFile(path, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as CachedEnvelope<T>;
+    const parsed = readJson<CachedEnvelope<T>>(path);
     const computedAt = new Date(parsed.computed_at).getTime();
     if (!Number.isFinite(computedAt)) return null;
     const ageMs = Date.now() - computedAt;
@@ -409,10 +433,8 @@ function loadConnectionReadinessConfig(): {
       configDegraded: false,
     };
   }
-  try {
-    const raw = safeReadFile(configPath, { encoding: 'utf8' }) as string;
-    return parseConnectionReadinessConfig(raw, configPath);
-  } catch (_) {
+  const config = loadServiceConnectionReadinessConfig();
+  if (!config) {
     baselineConfigDegraded = true;
     logger.warn(
       `[baseline-check] service-connection-readiness config parse failed, falling back to defaults: ${configPath}`
@@ -423,6 +445,14 @@ function loadConnectionReadinessConfig(): {
       configDegraded: true,
     };
   }
+  baselineConfigDegraded = false;
+  return {
+    requiredServices: config.required_services || {},
+    tenantGuard: {
+      requireZeroDrift: config.tenant_guard?.require_zero_drift !== false,
+    },
+    configDegraded: false,
+  };
 }
 
 export function parseConnectionReadinessConfig(
@@ -523,8 +553,7 @@ function readJanitorLastSubmissionMs(): number | null {
   const markerPath = pathResolver.shared(JANITOR_SUBMIT_MARKER);
   if (!safeExistsSync(markerPath)) return null;
   try {
-    const raw = safeReadFile(markerPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { submitted_at?: string };
+    const parsed = readJson<{ submitted_at?: string }>(markerPath);
     const submittedAt = Date.parse(String(parsed?.submitted_at || ''));
     return Number.isFinite(submittedAt) ? submittedAt : null;
   } catch {

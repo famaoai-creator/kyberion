@@ -1,6 +1,10 @@
-import { grantVoiceConsent, pathResolver, resolveVars, safeExecResult } from '@agent/core';
+import { grantVoiceConsent } from '@agent/core/voice-consent';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVars } from '@agent/core/src/logic-utils';
+import { safeExecResult } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
+import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 import { applyOnboardingInput } from './onboarding_apply.js';
 import { runCampaignSuite } from './campaign_suite.js';
 import { runAiAudit } from './run_ai_audit.js';
@@ -235,9 +239,15 @@ export async function runInlineOnboardingApply(
   ctx: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
   const raw = resolveVars(params.input ?? ctx.onboarding_input ?? ctx, ctx);
-  const input = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const input = parseInlineOnboardingInput(raw);
   const result = await applyOnboardingInput(input as any);
   return exportValue(params, step, result, ctx);
+}
+
+export function parseInlineOnboardingInput(raw: unknown): Record<string, unknown> {
+  return typeof raw === 'string'
+    ? parseSafeJsonObjectInput(raw, 'onboarding input') || {}
+    : parseSafeJsonObjectValue(raw, 'onboarding input');
 }
 
 export function runInlineCampaignSuite(

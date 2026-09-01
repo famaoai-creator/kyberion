@@ -1,7 +1,7 @@
 import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
-} from '@agent/core';
+} from '@agent/core/media-theme-role-policy';
 import { loadJsonCatalog, loadMediaDesignSystemsCatalog } from './media-catalog-loaders.js';
 
 function loadSemanticRenderTokenCatalog(rootDir: string): any {

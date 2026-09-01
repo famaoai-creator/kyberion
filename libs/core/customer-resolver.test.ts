@@ -88,6 +88,12 @@ describe('customer-resolver', () => {
       const p = customerRoot('identity.json', { [__test__.CUSTOMER_ENV_VAR]: 'acme' });
       expect(p!.endsWith('/customer/acme/identity.json')).toBe(true);
     });
+
+    it('rejects traversal in a customer overlay subPath', () => {
+      expect(() =>
+        customerRoot('../outside.json', { [__test__.CUSTOMER_ENV_VAR]: 'acme' })
+      ).toThrow('[CUSTOMER_SCOPE]');
+    });
   });
 
   describe('overlayCandidates', () => {

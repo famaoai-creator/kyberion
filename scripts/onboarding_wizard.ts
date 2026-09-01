@@ -1,30 +1,26 @@
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import AjvFormats from 'ajv-formats';
 import chalk from 'chalk';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { ensureDefaultTenantProfile } from '@agent/core/tenant-registry';
+import { listServiceOnboardingCatalogEntries } from '@agent/core/service-onboarding-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
-  customerResolver,
-  ensureDefaultTenantProfile,
-  compileSchemaFromPath,
-  listServiceOnboardingCatalogEntries,
-  pathResolver,
-  resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
-  resolveOnboardingSummaryPolicy,
-  resolveVocabularyLocale,
   resolveOnboardingText,
-  isServiceConnectionReady,
-  isValidTenantSlug,
   type LocalizedOnboardingText,
-  type SupportedLocale,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-  withExecutionContext,
-  withLock,
-} from '@agent/core';
+} from '@agent/core/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
+import { resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
+import { isServiceConnectionReady } from '@agent/core/service-connection-readiness';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import type { SupportedLocale } from '@agent/core/locale';
+import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { withLock } from '@agent/core/src/lock-utils';
 import {
-  createAjv,
+  compileSchema,
   getRegisteredEnvText,
   readJson,
   setRegisteredEnv,
@@ -56,11 +52,7 @@ import {
   resolveReasoningBackendMenuSelection,
 } from './reasoning_backend_selection.js';
 
-const addFormats: any = (AjvFormats as any).default || AjvFormats;
-const onboardingStateAjv = createAjv();
-addFormats(onboardingStateAjv);
-const onboardingStateValidate = compileSchemaFromPath(
-  onboardingStateAjv,
+const onboardingStateValidate = compileSchema(
   pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
 );
 
@@ -326,6 +318,7 @@ async function writeTextArtifact(
 function loadState(): OnboardingState | null {
   const filePath = statePath();
   if (!safeExistsSync(filePath)) return null;
+  if (!safeLstat(filePath).isFile()) return null;
   try {
     const parsed = readJson<OnboardingState>(filePath);
     if (parsed.identity && !parsed.identity.persona) {
@@ -1048,8 +1041,8 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
   );
   console.log(
     t(
-      '4. Re-run `pnpm surfaces:reconcile` after the workspace is ready.',
-      '4. ワークスペースの準備ができたら `pnpm surfaces:reconcile` を再実行してください。'
+      '4. Re-run `pnpm surfaces reconcile` after the workspace is ready.',
+      '4. ワークスペースの準備ができたら `pnpm surfaces reconcile` を再実行してください。'
     )
   );
 }
@@ -1065,7 +1058,7 @@ function onboardingArtifactsMissing(state: OnboardingState, phase: OnboardingPha
   );
 }
 
-async function runOnboarding(args: string[] = []): Promise<void> {
+export async function runOnboarding(args: string[] = []): Promise<void> {
   process.env.MISSION_ROLE = 'sovereign_concierge';
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
   const rootDir = pathResolver.rootDir();

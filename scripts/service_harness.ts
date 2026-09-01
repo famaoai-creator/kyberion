@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { createStandardYargs } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import { handleAction } from '../libs/actuators/service-actuator/src/service-actuator-helpers.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type HarnessAction = 'describe' | 'plan' | 'verify' | 'receipt';
 
@@ -17,7 +17,10 @@ function parseObject(value: string, name: string): Record<string, unknown> {
   }
 }
 
-async function main(args: string[] = []): Promise<void> {
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
   // pnpm passes the conventional separator through to the script. Remove it
   // so `pnpm run service:harness -- --service ...` behaves like direct Node
   // execution while preserving yargs' normal option parsing.
@@ -68,13 +71,13 @@ async function main(args: string[] = []): Promise<void> {
     action,
     params,
   });
-  console.log(JSON.stringify(result, null, 2));
+  print(result);
 }
 
 export const runServiceHarness = defineScript({
   name: 'service:harness',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'quiet'],
+  run: ({ argv, print }) => main(stripSharedScriptFlags(argv), print),
 });
 
 if (

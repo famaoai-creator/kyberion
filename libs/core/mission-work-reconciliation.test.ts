@@ -22,7 +22,14 @@ import {
 } from './secure-io.js';
 import { sha256 } from './marketing-workload.js';
 import {
+  approvalEventLogicalPath,
+  approvalRequestLogicalPath,
+  decideApprovalRequest,
+} from './approval-store.js';
+import {
+  createMissionWorkReconciliationApprovalRequest,
   generateMissionWorkReconciliationScaffold,
+  MISSION_RECONCILIATION_APPROVAL_CHANNEL,
   reconcileMissionExistingWork,
   type MissionWorkReconciliationManifest,
 } from './mission-work-reconciliation.js';
@@ -33,7 +40,7 @@ const fixtureRoot = pathResolver.sharedTmp('mission-work-reconciliation-test');
 const manifestPath = nodePath.join(fixtureRoot, 'manifest.json');
 const namespace = 'mission-work-reconciliation-test';
 const actorId = 'reconciliation-test-actor';
-const artifactPath = 'libs/core/src/trace.ts';
+const artifactPath = 'libs/core/entity-scope.ts';
 // Arbitrary small git-tracked file used as evidence-hash fixture material —
 // not a reference to its actual content. Must be a file with no uncommitted
 // changes in the working tree (the commit-binding check below runs `git
@@ -42,6 +49,7 @@ const artifactPath = 'libs/core/src/trace.ts';
 const verificationPath = 'libs/core/mission-status.ts';
 let previousMissionRole: string | undefined;
 let previousPersona: string | undefined;
+const reconciliationApprovalIds: string[] = [];
 
 function fileHash(repoRelativePath: string): string {
   return sha256(safeReadFile(pathResolver.rootResolve(repoRelativePath)) as Buffer);
@@ -211,6 +219,29 @@ function writeManifest(manifest: MissionWorkReconciliationManifest): void {
   safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
+function approveCurrentManifest(): string {
+  const request = createMissionWorkReconciliationApprovalRequest({
+    missionId,
+    manifestPath,
+    requestedBy: actorId,
+  });
+  reconciliationApprovalIds.push(request.id);
+  const decided = decideApprovalRequest('mission_controller', {
+    channel: request.channel,
+    storageChannel: request.storageChannel,
+    requestId: request.id,
+    decision: 'approved',
+    decidedBy: 'human-reconciliation-operator',
+    decidedByRole: 'sovereign',
+    authMethod: 'manual',
+    decidedByType: 'human',
+    authenticated: true,
+    payloadHash: request.accountability?.payloadHash,
+    effectBinding: request.accountability?.effectBinding,
+  });
+  return decided.id;
+}
+
 function prepareReviewReconciliationFixture(input?: {
   receiptHash?: string;
   reviewerAgentId?: string;
@@ -332,6 +363,12 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env.MISSION_ROLE = 'mission_controller';
+  for (const approvalId of reconciliationApprovalIds.splice(0)) {
+    safeRmSync(approvalRequestLogicalPath(MISSION_RECONCILIATION_APPROVAL_CHANNEL, approvalId), {
+      force: true,
+    });
+  }
+  safeRmSync(approvalEventLogicalPath(MISSION_RECONCILIATION_APPROVAL_CHANNEL), { force: true });
   safeRmSync(missionPath, { recursive: true, force: true });
   safeRmSync(fixtureRoot, { recursive: true, force: true });
   safeRmSync(pathResolver.shared(`runtime/work-coordination/${namespace}`), {
@@ -416,9 +453,9 @@ describe('mission existing work reconciliation', () => {
     });
     writeManifest(manifest);
 
-    await expect(reconcileMissionExistingWork({ missionId, manifestPath })).rejects.toThrow(
-      'not found in canonical WorkItems'
-    );
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true })
+    ).rejects.toThrow('not found in canonical WorkItems');
   });
 
   it('validates the canonical manifest example against the schema', () => {
@@ -459,6 +496,19 @@ describe('mission existing work reconciliation', () => {
     );
   });
 
+  it('requires an approved human reconciliation request before applying', async () => {
+    prepareMission();
+    writeManifest(buildManifest());
+
+    await expect(reconcileMissionExistingWork({ missionId, manifestPath })).rejects.toThrow(
+      '[POLICY_VIOLATION] reconcile-work apply requires --approval-request-id'
+    );
+    const tasks = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
+    );
+    expect(tasks[0].status).toBe('planned');
+  });
+
   it('completes verified tasks, resolves the finish repair task, and updates a linked work item', async () => {
     const workItem = importExternalWorkItem({
       source: 'local',
@@ -492,12 +542,21 @@ describe('mission existing work reconciliation', () => {
     safeWriteFile(statePath, JSON.stringify(state, null, 2));
     writeManifest(buildManifest());
 
-    const first = await reconcileMissionExistingWork({ missionId, manifestPath });
+    const approvalRequestId = approveCurrentManifest();
+    const first = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      approvalRequestId,
+    });
     const receiptPath = pathResolver.rootResolve(first.receipt_path!);
     const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
     const receiptBeforeRepeat = String(safeReadFile(receiptPath, { encoding: 'utf8' }));
     const ledgerBeforeRepeat = String(safeReadFile(ledgerPath, { encoding: 'utf8' }));
-    const second = await reconcileMissionExistingWork({ missionId, manifestPath });
+    const second = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      approvalRequestId,
+    });
 
     expect(first.status).toBe('applied');
     expect(first.reconciled_task_ids).toEqual(['implementation']);
@@ -521,6 +580,29 @@ describe('mission existing work reconciliation', () => {
     expect(first.receipt_path && safeExistsSync(pathResolver.rootResolve(first.receipt_path))).toBe(
       true
     );
+    const provisionedEntries = String(
+      safeReadFile(nodePath.join(missionPath, 'coordination', 'provisioned-entries.jsonl'), {
+        encoding: 'utf8',
+      })
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { target_path: string; phase: string });
+    const receiptTargetPath = nodePath
+      .relative(missionPath, receiptPath)
+      .split(nodePath.sep)
+      .join('/');
+    expect(
+      provisionedEntries.filter(
+        (entry) => entry.target_path === receiptTargetPath && entry.phase === 'provisioned'
+      )
+    ).toHaveLength(1);
+    expect(
+      provisionedEntries.filter(
+        (entry) => entry.target_path === receiptTargetPath && entry.phase === 'verified'
+      )
+    ).toHaveLength(1);
   });
 
   it('rejects an artifact hash mismatch', async () => {
@@ -612,7 +694,12 @@ describe('mission existing work reconciliation', () => {
     const manifest = prepareReviewReconciliationFixture();
     writeManifest(manifest);
 
-    const result = await reconcileMissionExistingWork({ missionId, manifestPath });
+    const approvalRequestId = approveCurrentManifest();
+    const result = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      approvalRequestId,
+    });
 
     expect(result.reconciled_task_ids).toEqual(['review-content']);
     const tasks = JSON.parse(
@@ -622,6 +709,39 @@ describe('mission existing work reconciliation', () => {
     expect(tasks[1].artifact_review_profile.required_reviewer_roles).toContain('content-reviewer');
     expect(tasks[1].artifact_review_receipt).toMatch(/^evidence\/reviews\/reconciled-/u);
     expect(safeExistsSync(nodePath.join(missionPath, tasks[1].artifact_review_receipt))).toBe(true);
+  });
+
+  it('binds the approval to the exact manifest content and source commit', async () => {
+    prepareMission();
+    writeManifest(buildManifest());
+    const request = createMissionWorkReconciliationApprovalRequest({
+      missionId,
+      manifestPath,
+      requestedBy: actorId,
+    });
+    reconciliationApprovalIds.push(request.id);
+    decideApprovalRequest('mission_controller', {
+      channel: request.channel,
+      storageChannel: request.storageChannel,
+      requestId: request.id,
+      decision: 'approved',
+      decidedBy: 'human-reconciliation-operator',
+      decidedByRole: 'sovereign',
+      authMethod: 'manual',
+      decidedByType: 'human',
+      authenticated: true,
+      payloadHash: request.accountability?.payloadHash,
+      effectBinding: request.accountability?.effectBinding,
+    });
+    writeManifest(buildManifest({ reason: 'Changed after human approval.' }));
+
+    await expect(
+      reconcileMissionExistingWork({
+        missionId,
+        manifestPath,
+        approvalRequestId: request.id,
+      })
+    ).rejects.toThrow('bound to a different manifest or source commit');
   });
 
   it('uses the manifest receipt when an existing mission-local review profile is stale', async () => {

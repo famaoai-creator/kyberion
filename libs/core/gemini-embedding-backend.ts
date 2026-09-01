@@ -1,4 +1,5 @@
 import { secureFetch } from './network.js';
+import { isRecord } from './foundation/text.js';
 import type { EmbeddingBackend } from './embedding-backend.js';
 
 /**
@@ -28,6 +29,53 @@ interface GeminiEmbeddingOptions {
   fetcher?: typeof secureFetch;
 }
 
+interface GeminiEmbeddingResponse {
+  embedding?: { values?: number[] };
+  embeddings?: Array<{ values?: number[] }>;
+}
+
+/** Normalize the embedding payloads consumed from the Gemini API. */
+export function normalizeGeminiEmbeddingResponse(value: unknown): GeminiEmbeddingResponse | null {
+  if (!isRecord(value)) return null;
+
+  let embedding: GeminiEmbeddingResponse['embedding'];
+  if (value.embedding !== undefined) {
+    if (!isRecord(value.embedding)) return null;
+    const values = normalizeEmbeddingValues(value.embedding.values);
+    if (values === null) return null;
+    embedding = values === undefined ? {} : { values };
+  }
+
+  let embeddings: GeminiEmbeddingResponse['embeddings'];
+  if (value.embeddings !== undefined) {
+    if (!Array.isArray(value.embeddings)) return null;
+    embeddings = [];
+    for (const item of value.embeddings) {
+      if (!isRecord(item)) return null;
+      const values = normalizeEmbeddingValues(item.values);
+      if (values === null) return null;
+      embeddings.push(values === undefined ? {} : { values });
+    }
+  }
+
+  if (embedding === undefined && embeddings === undefined) return null;
+  return {
+    ...(embedding !== undefined ? { embedding } : {}),
+    ...(embeddings !== undefined ? { embeddings } : {}),
+  };
+}
+
+function normalizeEmbeddingValues(value: unknown): number[] | undefined | null {
+  if (value === undefined) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.some((component) => typeof component !== 'number' || !Number.isFinite(component))
+  ) {
+    return null;
+  }
+  return value;
+}
+
 export class GeminiEmbeddingBackend implements EmbeddingBackend {
   readonly name: string;
   readonly dimensions: number;
@@ -44,7 +92,7 @@ export class GeminiEmbeddingBackend implements EmbeddingBackend {
   async embed(text: string): Promise<Float32Array> {
     const key = resolveGeminiEmbeddingKey();
     if (!key) throw new Error('[gemini-embedding] no API key available');
-    const body = await this.fetcher<{ embedding?: { values?: number[] } }>({
+    const rawBody = await this.fetcher({
       method: 'POST',
       url: `${API_BASE}/models/${this.model}:embedContent?key=${key}`,
       headers: { 'content-type': 'application/json' },
@@ -52,6 +100,8 @@ export class GeminiEmbeddingBackend implements EmbeddingBackend {
       authenticateRequest: true,
       timeout: 20000,
     });
+    const body = normalizeGeminiEmbeddingResponse(rawBody);
+    if (!body) throw new Error('[gemini-embedding] response had an invalid shape');
     return toVector(body?.embedding?.values, this.dimensions);
   }
 
@@ -59,7 +109,7 @@ export class GeminiEmbeddingBackend implements EmbeddingBackend {
     if (texts.length === 0) return [];
     const key = resolveGeminiEmbeddingKey();
     if (!key) throw new Error('[gemini-embedding] no API key available');
-    const body = await this.fetcher<{ embeddings?: Array<{ values?: number[] }> }>({
+    const rawBody = await this.fetcher({
       method: 'POST',
       url: `${API_BASE}/models/${this.model}:batchEmbedContents?key=${key}`,
       headers: { 'content-type': 'application/json' },
@@ -72,6 +122,8 @@ export class GeminiEmbeddingBackend implements EmbeddingBackend {
       authenticateRequest: true,
       timeout: 30000,
     });
+    const body = normalizeGeminiEmbeddingResponse(rawBody);
+    if (!body) throw new Error('[gemini-embedding] response had an invalid shape');
     const embeddings = body?.embeddings ?? [];
     return texts.map((_, index) => toVector(embeddings[index]?.values, this.dimensions));
   }

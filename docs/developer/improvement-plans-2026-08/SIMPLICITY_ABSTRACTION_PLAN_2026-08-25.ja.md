@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-08-26
+last_updated: 2026-09-01
 status: active
 ---
 
@@ -26,7 +26,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 | #   | 根本原因                                                 | 代表的な証拠                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | --- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1  | **共通化の種は存在するが採用されない**(「作って終わり」) | `secure-io.loadJson` 呼び出し **0** vs 手書き `JSON.parse(safeReadFile())` **489**。`getRegisteredEnv` 6 箇所 vs 生 `process.env` 460 箇所。`ScopedRegistry<T>` 4 利用 vs 手書き registry/catalog/store/ledger 65。`authorizeSurfaceMutation` 2 surface vs 独自 viewer/auth 4 系統。`validateAndRepairAdf`(AGENTS.md が必須と書く関数)本番呼び出し **0**。`missionSteeringRouteHandler` 外部利用 **0**                                                                                              |
+| R1  | **共通化の種は存在するが採用されない**(「作って終わり」) | `secure-io.loadJson` 呼び出し **0** vs 手書き `JSON.parse(safeReadFile())` **489**。`getRegisteredEnv` 6 箇所 vs 生 `process.env` 460 箇所。`ScopedRegistry<T>` 4 利用 vs 手書き registry/catalog/store/ledger 65。`authorizeSurfaceMutation` 2 surface vs 独自 viewer/auth 4 系統。`validateAndRepairAdf` 本番呼び出し **2**（repair の統合は継続）。`missionSteeringRouteHandler` 外部利用 **0**                                                                                                  |
 | R2  | **境界ルールが「能力」だけで「方向」が無い**             | eslint は `fs` 禁止・`process.exit` 禁止のみ。`import/no-cycle` 無し。core 内 8 モジュールが自身の barrel を import。`libs/core/src/` は層でなく化石(双方向依存)。結果 839 ファイルがフラットのまま、`index.ts` 2,691 行 / 970 export、691 ファイルが bare barrel を import                                                                                                                                                                                                                         |
 | R3  | **入口が多重化し、同じ問いに複数の脳が答える**           | CLI 5 系統(`cli.ts` 34 cmd / `kyberion_home.ts` 12 / `mission_controller.ts` 30 / `control_plane_cli.ts` / `tui`)、`bin.kyberion` と `pnpm kyberion` が別プログラム。自由文の意図解釈が **6 実装**(voice-hub が独自 180 行ルータで shared orchestrator の前段に居座り、concierge/presence-studio がそれを経由)。「環境は準備できているか」に答えるコマンド **18**(実装 11 本、Playwright/ffmpeg を 4 箇所で独立 probe)                                                                              |
 | R4  | **ガバナンス機構の自己増殖**                             | governance JSON 176(スキーマ無し 70、うち `security-policy` `approval-policy` 等の最重要 7 件。コード参照ゼロ 20 — `restricted-capabilities.json` は enforcement に見えて何も読まない)。catalog loader 約 **151** 個の手書き(Ajv 83 / `ensureValidator` 62 / `errorsFrom` 48 / `FALLBACK_*` 48)。`check:*` 62 のうち CI が走らせるのは 31。`pnpm validate` は 39 連 `&&`。状態の「正本」を名乗る文書 6、うち 2 つは優先規則が正反対。改善計画 182 本(docs/ の 58%)中 152 本が完了済み・未アーカイブ |
@@ -74,11 +74,11 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ### SX-01: 初回導線の修復(P0 / S)
 
-**症状**: `README.md:96` / `QUICKSTART.md:33,40` / `INITIALIZATION.md:15,50` の全てが `pnpm prereq:check`(= `node dist/scripts/bootstrap_environment.js`)を `pnpm build` の **前** に置いており、clean clone では `Cannot find module` で止まる。`README.md:68` の「No build needed」も虚偽(`doctor` は `dist/` 依存)。`INITIALIZATION.md` は L46/L95/L123/L322 の fence が不整合で、Stage 1〜12 と tenant/organization 比較表(約 200 行)が 1 つのコードブロックとして描画される。3 文書はコマンド数 10/11/13 で食い違い、正本を名乗る INITIALIZATION.md だけが first-win 成果物を生まない。
+**症状**: 初期状態では README／QUICKSTART／INITIALIZATION の全てが、build 前に dist 依存の旧 toolchain preflight を置いており、clean clone では `Cannot find module` で止まった。`README.md:68` の「No build needed」も虚偽(`doctor` は `dist/` 依存)。`INITIALIZATION.md` は L46/L95/L123/L322 の fence が不整合で、Stage 1〜12 と tenant/organization 比較表(約 200 行)が 1 つのコードブロックとして描画される。3 文書はコマンド数 10/11/13 で食い違い、正本を名乗る INITIALIZATION.md だけが first-win 成果物を生まなかった。
 
 **実装**:
 
-1. 順序を `install → build → prereq:check → doctor → pipeline --input pipelines/verify-session.json` に統一(5 コマンドで `first-win-session.png`)。
+1. 順序を `install → build → env:bootstrap --manifest kyberion-toolchain → doctor → pipeline --input pipelines/verify-session.json` に統一(5 コマンドで `first-win-session.png`)。
 2. fence を修復し、markdown fence-balance lint を docs gate に追加。
 3. 入口文書を 1 つ(`docs/QUICKSTART.md`)に定め、README は 5 行の要約 + リンク、INITIALIZATION は「Day 2(company/tenant/organization/19 種 backend 選択)」に降格。tenant activation の `--probe-ref` 4 個(`QUICKSTART.md:65-74`)は Day 2 へ移す。
 4. CI job `first-win-clean-clone`: 文書に書かれた one-liner を clean checkout で実行し PNG 生成を assert(`check:first-win-smoke` は存在するが CI 未接続 — これを接続)。
@@ -129,7 +129,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ### SX-05: 単一 CLI(P1 / L)
 
-**症状**: `bin.kyberion` → `cli.js`(34 cmd)だが `pnpm kyberion` → `kyberion_home.js`(12 cmd)。`cli.ts:137` の `APPROVED_PACKET_COMMAND_SCRIPTS` は 3 件で、319 scripts の **約 1%** しか bin から到達できない。`pnpm org`(1,059 行で 2 コマンド)/ `organization`(30 subcmd)/ `project` / `company:*` が重複(`organization project list` と `project list` は別実装)。doctor 系 11 実装 / 18 コマンド。runner が dist(114)/ts-loader(142)/tsx(4) の三つ巴。命名は `noun:verb` 168 / `noun:kebab-verb` 108 / colon 無し 6 / 裸 37。
+**症状**: `bin.kyberion` → `cli.js`(34 cmd)だが `pnpm kyberion` → `kyberion_home.js`(12 cmd)。`cli.ts:137` の `APPROVED_PACKET_COMMAND_SCRIPTS` は 3 件で、319 scripts の **約 1%** しか bin から到達できない。旧 role/authority 入口と `organization`(30 subcmd)/ `project` / `company:*` が重複(`organization project list` と `project list` は別実装)。doctor 系 11 実装 / 18 コマンド。runner が dist(114)/ts-loader(142)/tsx(4) の三つ巴。命名は `noun:verb` 168 / `noun:kebab-verb` 108 / colon 無し 6 / 裸 37。
 
 **実装**:
 
@@ -213,7 +213,7 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ### SX-11: ADF ライフサイクルと pipeline 語彙(P2 / M)
 
-**症状**: `draft → preflight → auto-repair → commit → execute` を名前として持つコードが無い(4 モジュールに散在)。`validateAndRepairAdf`(AGENTS.md が必須と書く)本番呼び出し 0、実際は `attemptAutonomousRepair`。`check_golden_output.ts:113` と `libs/core/orchestrator.ts`(第二の legacy engine、`index.ts:757` で export)が検証を迂回。`system:exec/shell` 143 step(19%)、うち 68 がスクリプト包み(CLAUDE.md が禁ずるが guardrail 無し)、actuator を `node dist/libs/actuators/...` で直接起動する pipeline 4 本。`transform-script-oversized` は `warn`。`role`(1,529)vs `type`(19)、`produces`(565)vs `export_as`(72)、bare op 13 種 65 箇所(暗黙 `system:` 付与)、kebab 動詞 10、`cmd` vs `command`。末尾 `system:log` が 82/181 pipeline(全 step の 23%)。fragment 75 のうち未参照 22。`on_error` 利用 3/181。
+**症状**: `draft → preflight → auto-repair → commit → execute` の責務が複数モジュールに分散している。`check_golden_output` は検証済み pipeline 実行入口へ移行済みだが、repair 実装は `validateAndRepairAdf` と `attemptAutonomousRepair` がまだ併存している。`system:exec/shell` の script wrapper、pipeline 語彙の揺れ、末尾 `system:log`、未参照 fragment、`on_error` の低利用は継続監査対象。
 
 **実装**:
 
@@ -290,16 +290,16 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | `process.env.KYBERION_*` 直読                              | 460          | 0      | SX-03    |
 | 手書き catalog loader                                      | ~151         | 0      | SX-04    |
 | schema 無し governance catalog                             | 70           | 0      | SX-04    |
-| npm scripts                                                | 319          | ≤120   | SX-05    |
+| npm scripts                                                | 168          | ≤120   | SX-05    |
 | CLI 入口                                                   | 5            | 1      | SX-05    |
 | doctor/preflight 実装                                      | 11           | 1      | SX-05    |
-| `process.argv` 直読 script                                 | 197          | 0      | SX-06    |
+| `process.argv` 直読 script                                 | 0            | 0      | SX-06    |
 | `check:*` で CI 未実行                                     | 32           | 0      | SX-07    |
 | PR 前に打つコマンド                                        | 6            | 1      | SX-07    |
 | 自由文解釈の実装                                           | 7（未達）    | 1      | SX-08    |
 | `IntentResolutionContract` 描画 surface                    | 部分（未達） | 12/12  | SX-08    |
-| viewer/auth 実装                                           | 4（未達）    | 1      | SX-09    |
-| vocabulary lookup 実装                                     | 6（未達）    | 1      | SX-09    |
+| viewer/auth 実装                                           | 4            | 1      | SX-09    |
+| vocabulary lookup 実装                                     | 6            | 1      | SX-09    |
 | actuator ABI                                               | 4            | 1      | SX-10    |
 | op 入力 schema カバレッジ                                  | 13%          | 100%   | SX-10    |
 | `system:exec` スクリプト包み                               | 68           | 0      | SX-11    |
@@ -309,7 +309,9 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 | docs/developer 配下 md(improvement-plans-archive を除く)\* | 95           | <100   | SX-13    |
 | README の外部 4 語カバレッジ                               | 0/4          | 4/4    | SX-14    |
 
-\* 監査時点(2026-08-25)の docs/developer 配下 md 全数(improvement-plans-archive 移行前の baseline)は 240 件。improvement-plans-archive を除いた active な計画ディレクトリ配下の md 数が上記の現状値。
+\* 指標の定義: `docs/developer` 配下の `.md` を対象にし、`improvement-plans-archive/` 配下を除いた件数を active とする。現在の実測は active **99**、全体 **254**、archive **155**。監査時点(2026-08-25)の baseline は active 95、全体 240 であり、生成・移動後の比較ではこの同じ path filter を使う。
+
+この指標は文書の内容量や行数ではなく、active な計画文書のファイル数を表す。確認コマンドは `find docs/developer -type f -name '*.md' ! -path 'docs/developer/improvement-plans-archive/*' | wc -l` とし、archive を含む総数は除外条件を外して測定する。
 
 ---
 
@@ -324,32 +326,10142 @@ Kyberion のコンセプト([WHY](../../WHY.md) / [INTENT_LOOP_CONCEPT](../../IN
 
 ## 7. 実装状況
 
-| ID    | 状態      | 備考                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SX-01 | PARTIAL   | `pnpm check -- --scope pr --only first-win-docs` と 3 文書の機械検証、`first-win-clean-clone` CI job を追加。リモート CI の green 証跡は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| SX-02 | BASELINED | 4 層宣言、production tree 全体の static/dynamic import 走査、Tarjan SCC、方向 ratchet、public API facade の明示パターンを追加。既存違反は baseline 内。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| SX-03 | PARTIAL   | `foundation/{ajv,json,env,text,time}` を追加し、Ajv/env/JSON/text の主要 helper を移行。JSON reader は `foundation/json.ts`、UTF-8 text reader は `foundation/text.ts` を canonical 実装とし、production `scripts/` の旧 `loadJson` / `@agent/core/cli-input` import は **0**、checker/task/sync/operator/A2A/schedule 経路も移行した。secure-io は権限制御付き bridge と互換 export に限定し、残る codemod は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| SX-04 | PARTIAL   | `defineCatalog<T>()` を追加し drawio policy を移行。全 catalog/schema 統合は未完。後半の全 catalog 統合と未参照 catalog の処分は意図的に先送りしている。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| SX-05 | PARTIAL   | command registry と `bin`/`pnpm kyberion` の単一入口を追加。`doctor` は `run_doctor` に収束し、`organization` / `org` / `project` も governed registry から既存 controller を起動できるようにした。重複していた `media:preflight` alias を canonical `service:preflight -- --service media-generation` へ統合し、package scripts は 238 件、package script の tsx runner は **0** としたが、scripts ≤120、細粒度 verb registry、全 script harness 移行は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| SX-06 | PARTIAL   | `defineScript`/`defineGenerator` と harness test を追加。actuator CLI entry guard と skill CLI の直接 exit を exit-code boundary へ移行し、compiled generator の `.js` direct-entry guard を `check_script_integrity` で機械検証するようにしたが、既存 script 全移行と generator 半分の移行は意図的に先送りしている。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| SX-07 | PARTIAL   | manifest-driven `pnpm check` と PR workflow gate を追加し、`pnpm run` / `pnpm exec` を使う gate の単一レーンを導入。`script-integrity` も build 後の PR scope へ昇格した。全 validate 集合統合と外部依存 gate の sandbox-independent 実行は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| SX-08 | PARTIAL   | IntentResolutionContract の surface 経路と approval wiring を継続中。voice-hub の旧 routing/task/knowledge 梯子は撤去済みだが、自由文入口は実測 **7**（目標1）で未達。後続 SX-08b で、Slack context 破棄、typing 早期停止、approval_required 本番テスト、concierge loopback の personal tier、`KYBERION_ALLOW_UNAUTH_REMOTE` 移行注記、Chronos XFF gate、日英リテラルの `t()` 化を扱う。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| SX-09 | PARTIAL   | 4 bridge を `ChannelAdapter`/`runChannelTurn` に移行し、outbox drain を共通化。adoption check は実配送関数と共通 thread formatter の採用を検査し、Chronos tenant scope は全モードで fail-closed。viewer/auth は実測 **4**（目標1）、vocabulary lookup は **6**（目標1）で未達。Discord/Telegram の thread 履歴重複、viewer 4→1、`as any` 31件、語彙統一を後続 SX-09b で扱う。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| SX-10 | PARTIAL   | 全 31 actuator index を `defineCatalogBackedActuator` + self-described `op-catalog` へ接続し、旧 legacy index は 0 件。discovery **550/550** operation が authored schema と example を持ち、`inferred-legacy` は **112**、`legacy-open` は **0** 件、top-level dynamic envelope も **0** 件となった。SDK は authored schema を dispatch 前に AJV 検証し、placeholder は probe のみ解決して元入力をhandlerへ渡すidentity回帰テストを追加した。code / network / orchestrator / media-generation の固定トップレベル契約を strict 化した。パイプライン共通の `_reasoning_policy` / `_facets` / `_step_id` は execution metadata として validator 境界へ明示した。Android UI selector/login、modeling、browser ref / extension session、artifact delivery-pack、meeting item、media migration、system baseline、wisdom envelope、blockchain metadata、共通 browser/file/system/ingest contract も strict 化した。source に残る `additionalProperties: true` は **3** 件で、service の context / request params / nested steps は外部 service ごとに任意形状を受けるため、nested dynamic boundary として継続管理する。`executePipeline` **12**、`buildRetryOptions` **29**、`OpSpecKind` **30** の dedup、`describeOps` 共有型 **0/31**、`core:run_pipeline` 再帰ガード、`core:*` built-in **39** 件の registry 登録は未完。 |
-| SX-11 | PARTIAL   | `runAdfLifecycle` を追加・実行入口に接続し、script wrapper guardrail を error 化。旧 `libs/core/orchestrator.ts` は削除し、`check_golden_output` は validated path に接続した。`core:run_pipeline`、`core:run_vitest`、onboarding/campaign/audit/backup/soak/i18n/mesh/mission/registry/avatar/OAuth の typed library dispatch と、voice/video、`media-generation:submit_generation`、narrated-video validation、meeting consent、managed process startup を追加した。wrapper baseline は **0** 件。`executePipeline` 12 / `buildRetryOptions` 29 / `OpSpecKind` 30 の重複、共有 `describeOps` 型 **0/31**、`core:run_pipeline` の再帰ガード、`core:*` built-in **39** 件の registry 未登録、repair 統合と残る ADF 語彙統一は継続課題。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| SX-12 | PARTIAL   | max-file-lines checker と記名例外を追加し、voice actuator、FocusedOperatorView、Chronos agent route、Chronos intelligence route、Chronos page、Presence Studio server、surface runtime orchestrator、mission lifecycle、mission context pack の責務分割を実施。`adapters/` の未公開 re-export shim と `mission-team-composer.ts` の alias 実体は削除済み。現行の記名例外は **0 件**。foundation scope primitive、headless surface、public facade の境界を整理し、実測は **4 direction violations、74 dynamic imports**。secure-io audit/tier guard、agent/surface orchestration の実依存は継続管理する。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| SX-13 | PARTIAL   | 2026-08 索引を状態正本として明記し、2026-07 STATUS を凍結記録へ降格。完了済み 2026-07 計画 137 文書を archive/2026-07 へ移管し、追跡対象 **326 文書**を `title/tags/last_updated/status` 付きにした。documentation link checker は active/archive を走査して **1,123 文書 / 断リンク 0**。残: 2026-08 完了計画の追加 archive 移動、knowledge corpus の全件 frontmatter 整備。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| SX-14 | PARTIAL   | front-door UX contract lint を追加し 3 文書を修正、`surface-roles.json` の tagline は **5/5**。security-sensitive env 7件を説明付きへ更新し、env registry の生成・品質 gate は green（**411 entries / documented 68 / required 0 / secret 0**）だが、説明未整備 **343 entries** が残る。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ID    | 状態      | 備考                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SX-01 | PARTIAL   | `pnpm check -- --scope pr --only first-win-docs` と 3 文書の機械検証、`first-win-clean-clone` CI job を追加。今回 `check:first-win-docs` を package script と clean-clone CI に接続し、文書の command order と成果物 checker を両方実行するようにした。リモート CI の green 証跡は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| SX-02 | BASELINED | 4 層宣言、production tree 全体の static/dynamic import 走査、Tarjan SCC、方向 ratchet、public API facade の明示パターンを追加。現行実測は **0 static cycles / 3 direction violations / 84 dynamic imports / max runtime SCC 33** で baseline 内。残る方向違反は `secure-io` の audit／sandbox／tier bootstrap 境界3件。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| SX-03 | PARTIAL   | `foundation/{ajv,json,env,text,time}` を追加し、Ajv/env/JSON/text の主要 helper を移行。JSON reader は `foundation/json.ts`、UTF-8 text reader は `foundation/text.ts` を canonical 実装とし、production `scripts/` の旧 `loadJson` / `@agent/core/cli-input` import は **0**、checker/task/sync/operator/A2A/schedule 経路も移行した。secure-io は権限制御付き bridge と互換 export に限定し、残る codemod は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| SX-04 | PARTIAL   | `defineCatalog<T>()` を追加し、drawio policy、tool runtime registry、provider capability scanner、organization operating model、mission workflow／classification、capability bundle、intent execution profile、ADF execution policy、reasoning provider registry、intent／work／question-resolution／work-scope policy の catalog を移行。全 catalog/schema 統合は未完。後半の全 catalog 統合と未参照 catalog の処分は意図的に先送りしている。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| SX-05 | PARTIAL   | command registry と `bin`/`pnpm kyberion` の単一入口を追加。`doctor` は `run_doctor` に収束し、`organization` / `project` も governed registry から既存 controller を起動できるようにした。role authoring は `organization role` facade に統合し、company onboarding と旧 `cli` operator entry も canonical `onboard`／`kyberion` へ統合した。重複 alias は canonical facade へ順次収束し、未参照 alias を package と governed registry から累計 **28 件**削除、package scripts は実測 **153 件**、package script の tsx runner は **0** とした。scripts ≤120、細粒度 verb registry、全 script harness 移行は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| SX-06 | PARTIAL   | `defineScript`/`defineGenerator` と harness test を追加。actuator CLI entry guard、skill CLI、channel／peer messaging entrypoint、Presence demo の direct-entry／失敗境界を共通化し、compiled generator の `.js` direct-entry guard を `check_script_integrity` で機械検証している。production script の直接 `process.argv` は harness／refactor utility を除いて **0 files**、`defineScript` 採用は **247 files**、`defineGenerator` 採用は **19 scripts**、実運用 script の `main().catch` は **0 files**まで整理した。今回までに lifecycle／extension check、config fallback reconciliation、pinned dependency、install-script allowlist、process definition、module invariant、reasoning provider registry、facet purity、wisdom forwarder、seam multiplicity、ESM integrity、lockfile commit gate、unhandled-intent reconciliation、contract schema check の14 entrypointを shared harness へ移行し、programmatic tool runner の専用 stdout protocol も shared harness の失敗境界へ移した。残る直接入口は actuator template／refactor utility／server protocol に限定され、server／interactive／custom output を含む全 script 移行と generator の全件化は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| SX-07 | PARTIAL   | manifest-driven `pnpm check` と PR workflow gate を追加し、`pnpm run` / `pnpm exec` を使う gate の単一レーンを導入。`script-integrity` も build 後の PR scope へ昇格した。全 validate 集合統合と外部依存 gate の sandbox-independent 実行は未完。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| SX-08 | PARTIAL   | IntentResolutionContract の surface 経路と approval wiring を継続中。voice-hub の旧 routing/task/knowledge 梯子は撤去済みだが、自由文入口は実測 **7**（目標1）で未達。後続 SX-08b で、Slack context 破棄、typing 早期停止、approval_required 本番テスト、concierge loopback の personal tier、`KYBERION_ALLOW_UNAUTH_REMOTE` 移行注記、Chronos XFF gate、日英リテラルの `t()` 化を扱う。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| SX-09 | PARTIAL   | 4 bridge を `ChannelAdapter`/`runChannelTurn` に移行し、outbox drain と共通 thread formatter を採用。current message の履歴二重投入は Telegram/Discord persisted fallback、Slack API 除外、iMessage provider context 除外の回帰で固定し、Chronos tenant scope は全モードで fail-closed。共通 thread／approval 契約の固定文言は bridge vocabulary + `t()` へ移行し、4 bridge の対象 entrypoint の `as any` は **0**。viewer scope materialization は `resolveSurfaceViewerScope` へ正本化し、browser vocabulary lookup は共通 resolver へ集約した。Concierge の主要 mutation route、setup／voice、Chronos の主要 agent／mutation／preview／headless route、operator-surface inbox に共通 JSON object reader と strict field parser を適用したが、framework 固有の request gate と Node/browser の実行環境差は adapter に残るため、request-boundary の完全整理を SX-09b で継続する。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| SX-10 | PARTIAL   | 全 31 actuator index を `defineCatalogBackedActuator` + self-described `op-catalog` へ接続し、旧 legacy index は 0 件。discovery **550/550** operation が authored schema と example を持ち、`inferred-legacy` は **112**、`legacy-open` は **0** 件、top-level dynamic envelope も **0** 件となった。SDK は authored schema を dispatch 前に AJV 検証し、placeholder は probe のみ解決して元入力をhandlerへ渡すidentity回帰テストを追加した。code / network / orchestrator / media-generation の固定トップレベル契約を strict 化した。パイプライン共通の `_reasoning_policy` / `_facets` / `_step_id` は execution metadata として validator 境界へ明示した。Android UI selector/login、modeling、browser ref / extension session、artifact delivery-pack、meeting item、media migration、system baseline、wisdom envelope、blockchain metadata、共通 browser/file/system/ingest contract も strict 化した。source に残る `additionalProperties: true` は **3** 件で、service の context / request params / nested steps は外部 service ごとに任意形状を受けるため、nested dynamic boundary として継続管理する。`OpSpecKind` **30** の dedup、`describeOps` 共有戻り値型 **31/31**、定型 retry wrapper **26** 件の factory 化を実装した。ADF engineのproduction actuator直接呼び出しは **0** 件となり、12 runnerを共有SDK入口へ移行した。現行コードに video-composition の public `executePipeline` wrapper は存在せず、domain-specific internal helper **7** 件（code／modeling／wisdom／android／orchestrator／browser／ios）と、それぞれの control／trace／runtime 差分の完全収束を継続課題とする。core built-in **39** 件は `domains.core` へ登録済み。 |
+| SX-11 | PARTIAL   | `runAdfLifecycle` は共通実行境界として存在し、`check_golden_output` は `executePipelineFile` 経由の validated path に接続済み。script wrapper guardrail、typed library dispatch、wrapper baseline **0** 件、`OpSpecKind` 30 の重複、`core:run_pipeline` の再帰ガード、`core:*` built-in **39** 件の registry 登録を確認済み。`validateAndRepairAdf` の本番呼び出しは **2** 件まで進み、ADF engineのproduction actuator直接呼び出しも **0** 件となった。runtime guardrail は独立 shell scanner と同じ node／tsx／pnpm wrapper 形式を検査するよう補強し、Super-Nerve の修復にも durable pipeline path と修正版 ADF の再読込を接続したが、残るADF語彙統一は継続課題。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| SX-12 | PARTIAL   | max-file-lines checker と記名例外を追加し、voice actuator、FocusedOperatorView、Chronos agent route、Chronos intelligence route、Chronos page、Presence Studio server、surface runtime orchestrator、mission lifecycle、mission context pack の責務分割を実施。`adapters/` の未公開 re-export shim と `mission-team-composer.ts` の alias 実体は削除済み。現行の記名例外は **0 件**。foundation scope primitive、headless surface、public facade の境界を整理し、現行実測は **0 cycles / 3 direction violations / 84 dynamic imports / max runtime SCC 33**。secure-io の audit／sandbox／tier bootstrap 依存は継続管理する。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| SX-13 | PARTIAL   | 2026-08 索引を状態正本として明記し、2026-07 STATUS を凍結記録へ降格。完了済み 2026-07 計画 137 文書を archive/2026-07 へ移管し、2026-08 の完了済み Cloudflare OS 計画も archive/2026-08 へ移管した。追跡対象 **326 文書**を `title/tags/last_updated/status` 付きにし、documentation link checker は active/archive を走査して **断リンク 0**。残: 2026-08 完了計画の追加 archive 移動、knowledge corpus の全件 frontmatter 整備。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| SX-14 | PARTIAL   | front-door UX contract lint を追加し 3 文書を修正、`surface-roles.json` の tagline は **5/5**。security-sensitive env は全件 documentation 必須、provider entry も今回全件説明済みとして env registry quality gate で再発を防止する。env registry の生成・品質 gate は green（**411 entries / documented 202 / undocumented 209 / required 0 / undocumented secret 0 / undocumented flag 0 / undocumented provider 0**）。構造・重複・名前・型・enum の品質検査も追加したが、runtime／tuning／path entry の全件説明整備は未完了。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+
+> **2026-08-29 更新**: SX-11 の repair 統合と本番入口数は §204 の実測を正とする。上表に残る過去の `validateAndRepairAdf` 呼び出し数は更新前の記録であり、現在の canonical helper 内は **1** 件である。
 
 ### R6時点の受入境界と意図的な先送り
 
 - `import/no-cycle` は `libs/**` / `scripts/**` に適用し、既存の6件は理由付きの明示baselineとして固定している。設定の `maxDepth: 1` はeditor上の早期検出に限定され、全グラフの正本はTarjan SCCを使う `check:module-boundaries` である。fixtureのplugin動作テストはCLIで `import/no-cycle` を明示して実行するため、shipped configそのものの深いcycle検出を証明するものではない。
-- foundationの実依存には `secure-io → audit-chain / tier-guard` の方向違反2件と、`foundation/json → secure-io → audit-chain → audit-forwarder → network → egress-policy → governed-catalog` のruntime cycleが残る。`max_runtime_scc_size: 261` を増加禁止ratchetにし、SX-02/03の完全な一方向化は次段へ先送りする。
-- bare `@agent/core` importer は **762**（main **689** から増加、目標0）、`reset*Cache` は **86**（目標≤10）、`check_contract_schemas_checks_{1,2,3}` は未着手である。governance schema **55** 件は `$schema` を許可しておらず、現状は慣習で維持しているため、foundation の後続課題とする。
+- foundationの実依存には `secure-io → audit-chain / tier-guard` の方向違反2件が残る。`audit-chain → audit-forwarder → network → secure-io` の runtime cycle は 2026-08-28 に optional publisher seam へ置換して解消し、`max_runtime_scc_size` は初回 **82** から現在 **33** へ下がった。
+- bare `@agent/core` importer **762**（main **689** から増加、目標0）と `reset*Cache` **86**（目標≤10）は R6 時点のスナップショットである。`check_contract_schemas_checks_{1,2,3}` は後続の §267 で 3 分割 module として実装済みと突合済みであり、現行 checkout の値は下記「現行 checkout との指標突合」を正とする。governance schema **55** 件は `$schema` を許可しておらず、現状は慣習で維持しているため、foundation の後続課題とする。
 - `no-unused-vars` は10ファイル限定、`no-restricted-syntax` は `fs.*Sync` の単一selectorであり、未使用import約1,655本と計画上の残りの禁止パターンは未着手である。`module-layer-boundaries.json` のcontract 7本の降格、`structured-output-contracts.ts` の二重定義も継続課題とする。
 - `customer/{slug}` tenant stance、Codex `multiAgentMode`、narrow-authority-rolesの不変条件コメントは現行コードの挙動を変えない説明不足として残課題である。voice-hubの旧 `processAsyncDelegation` 系5関数は現行surface flowへ再配置せず、旧routing梯子の撤去に伴う意図的廃止として扱い、必要になった場合は別計画で再設計する。
 - `governance-action-recorder` はkill-switchをimportしない低層境界を維持するため、sink未登録プロセスでは256件まで一時保持し、超過時は警告して最新256件を保持する。異常監視が必要な起動経路はkill-switchを明示的に読み込む。この境界とoverflow警告は回帰テストで固定した。
-- R6以降の優先残件は、operator影響のある `KYBERION_ENV_REGISTRY_STRICT` 文書化、docs指標の定義、READMEのGlossaryリンク、STATUSの長大1行、surfaceの重複整理、`core:run_pipeline` の再帰ガードであり、現ラウンドのマージ条件外として先送りする。
+- R6以降の優先残件は、STATUS の長大行と surface の重複整理である。docs 指標定義、README の Glossary link、`KYBERION_ENV_REGISTRY_STRICT` の利用者向け説明、Chronos XFF gate、Concierge personal tier masking、`core:run_pipeline` の再帰ガードは実装済みとして現行コードと突合済みであり、旧レビューの先送り記述とは分離して扱う。
+
+### 2026-08-30 現行 checkout との指標突合
+
+R6 時点の受入境界に記録された数値には、その後の実装で更新されたものがある。現行 checkout で再計測した正本は次のとおりである。
+
+- production の bare `@agent/core` importer は **0 files**。
+- runtime 用の `reset*Cache` export は **9 件**（`_reset*CacheForTests` の test hook **29 件**は別契約）で、受入基準 **≤10** を満たす。
+- `check_contract_schemas_checks_{1,2,3}` は未着手ではなく、3 分割 module として存在し `check_contract_schemas.ts` から統合利用されている。
+- `knowledge/product/schemas/` の `$schema` なし JSON は **31 件**で、すべて `.example.json` の payload fixture。schema 定義の欠落数として扱わない。
+- `scripts/check_module_boundaries` は **0 static cycles / 2 direction violations / max runtime SCC 33 / 81 dynamic imports**。2 direction violations は `secure-io` の audit／tier bootstrap 境界である。
+
+## 8. 2026-08-28 actuator catalog 型契約の重複除去
+
+- 30 actuator の `op-catalog.ts` に複製されていた `OpSpecKind` 定義を削除し、共有 `PipelineStepType` (`capture | transform | apply | control`) を利用するように統一した。型専用 import のため、実行時の依存グラフや dispatch 挙動は変わらない。
+- `scripts/generate_op_registry.ts` の `PipelineOpKind`、descriptor/discovery の匿名オブジェクト型も `ActuatorOpDescription` / `PipelineStepType` に統合した。generator の source map が全 self-described catalog を共有型で受けるため、個別 catalog と生成器の契約が型レベルで同一になる。
+- `libs/core/actuator-sdk.ts` の `ActuatorOpDescription` に optional `examples` を追加し、生成済み discovery の既存 schema/examples は再生成せず保持した。
+- 全 31 actuator catalog の `describeOps()` に `ActuatorOpDescription[]` の共有戻り値型を明示し、generator の受け側とカタログ側の契約を型レベルで一致させた。
+- 検証: `pnpm run typecheck`、`pnpm run lint`、`pnpm run build:packages`、`pnpm exec vitest run scripts/generate_op_registry.test.ts` (3 tests)、`pnpm run generate:op-registry -- --check`、`pnpm run check -- --scope pr` (31/31) が green。
+
+## 9. 2026-08-28 foundation の監査 forwarder 循環解消
+
+`secure-io → audit-chain → audit-forwarder → network → secure-io` の runtime
+SCC を、監査チェーン側へ optional publisher seam を置き、forwarder がロード時に
+callback を登録する形へ変更して解消した。監査の非同期 fan-out、stub、SIEM 障害時の
+非遮断動作は維持している。`max_runtime_scc_size` は 261 から 82 へ下がり、
+`audit-chain-tenant.test.ts` に forwarder seam の回帰を追加した。
+併せて `approval-gate` の governance action 記録を `kill-switch` の互換再 export から
+低層 recorder へ直接向け、不要な governance 依存辺を除去した。
+
+さらに `delegation-concurrency` の timeout 記録と kill-switch termination wiring を
+低層 recorder / registrar seam へ移し、`delegation-concurrency → kill-switch` の動的
+import を除去した。既存の `wireDelegationKillSwitchIntegration()` の呼び出し契約と
+SIGTERM → SIGKILL cascade は維持している。runtime SCC は 82 から 76、dynamic import
+は 73 から 72 へ減少した。
+
+さらに injection suspicion の信号読取を `injection-signal.ts` へ分離し、
+`approval-policy` が非同期の reasoning backend を持つ `untrusted-content` 全体を
+依存しないようにした。`isInjectionSuspected` の公開互換 export と fail-closed の
+scope 判定は維持している。さらに A2A route、risky approval、ACP tool approval、
+lifecycle hook の kill-switch 記録を低依存 port / recorder seam へ分離し、A2A の
+runtime route と approval gate の深い相互参照を解消した。`max_runtime_scc_size` は
+**76 → 33**、dynamic import は **72 → 68**、深い cycle の測定対象は **4 件 → 0 件**
+となった。認可は handler 未登録時に fail-closed のまま維持している。
+
+## 10. 2026-08-28 retry policy builder の定型重複除去
+
+`buildGovernedRetryOptions` の manifest/default/fallback wiring を各 actuator が個別に
+再記述していたため、`createGovernedRetryOptionsBuilder` を recovery-policy に追加した。
+定型 wrapper **24 件**をこの factory へ移し、manifest policy、明示 override、fallback
+category の適用順は共通実装に一本化した。step パラメータを `max_retries` / retry delay
+へ変換する browser/network も builder の override adapter へ移し、selector 判定など actuator
+固有の追加条件は builder の `additionalShouldRetry` へ移した。呼び出し側から retry defaults
+を注入する video-composition だけは特殊境界として残した。
+factory の override 適用と既存 actuator の terminal/media-generation 回帰をテストした。
+
+## 11. 2026-08-28 core built-in registry の正本化
+
+`core:*` の leaf operation は実行器に個別分岐がある一方、registry には shared op として
+部分的にしか現れず、core 固有の39件を検査できなかった。`domains.core` に capture 5件、
+transform 3件、apply 31件を登録し、`determineActuatorStepType('core', ...)` と
+`listKnownActuatorOps('core')` が全件を解決する回帰テストを追加した。
+
+また、`core:run_pipeline` の自己参照・循環参照・最大深度超過を拒否する実装は既に
+`pipeline-execution-part-control.ts` に存在するため、残件ではなく実装済みとして扱う。
+再帰 guard の挙動は `pipeline-run-pipeline-nesting.test.ts` で検証済みである。
+
+## 12. 2026-08-28 channel 共通 formatter の語彙正本化
+
+`channel-adapter.ts` に残っていた thread context と approval/clarification の固定ラベルを
+`user-facing-vocabulary.json` の `bridge` domain へ移し、共通 `t()` から解決するようにした。
+既存の言語判定、出力順、配送 gate、provider 固有の送信処理は変更していない。これにより
+4 bridge が共有する text-only delivery の固定文言を、surface ごとの複製ではなく catalog の
+同一キーで検査・追加できる。
+
+検証: `pnpm exec vitest run libs/core/channel-adapter.test.ts libs/core/t.test.ts
+libs/core/vocabulary-catalog.test.ts`（3 files / 26 tests）、`pnpm generate:vocabulary-types`。
+
+## 13. 2026-08-28 Chronos tenant scope の語彙移行
+
+Chronos の tenant / organization / project scope selector に残っていた表示ラベルと
+空選択肢を `user-facing-vocabulary.json` の `chronos` domain へ移し、client-safe な
+`uxText` で解決するようにした。scope query key、認可境界、選択状態のリセット規則は
+変更していない。`qps-ploc` を含む生成済み vocabulary key union も再生成した。
+
+検証: `pnpm exec vitest run libs/core/channel-adapter.test.ts
+presence/displays/chronos-mirror-v2/src/lib/ux-locale.test.ts`（2 files / 20 tests）、
+`pnpm generate:vocabulary-types`、`git diff --check`。
+
+## 14. 2026-08-28 生成済み vocabulary 型の type-ratchet 境界
+
+`generate:vocabulary-types` が更新する `libs/core/vocabulary-keys.generated.ts` は、語彙
+追加に比例して行数が増える生成物である。type-ratchet の source 最大行数に含めると、正当な
+catalog 拡張だけで `src.max_lines` が増加し、実装コードの肥大化と区別できない。生成物を
+ratchet の走査対象外へ明示し、実装ファイルの最大行数と `max-file-lines` の検査は維持した。
+
+検証: `pnpm run build:repo`、`pnpm run check -- --only type-ratchet`、`pnpm run check -- --scope pr`
+（31 gates / 0 failed）。
+
+## 15. 2026-08-28 channel bridge の provider 型境界
+
+Slack / Telegram / Discord / iMessage の4 bridge entrypoint に残っていた `any` と
+`as any` を、provider SDK 型または `unknown` からの明示的な正規化へ置換した。Slack は
+Bolt client と modal view、Discord は interaction / component builder、Telegram は API
+応答、iMessage は例外境界を対象にした。4 bridge の対象ファイル内の検出数は **0件**で、
+既存の `ChannelAdapter`、承認、proposal、thread context、outbox の契約は維持している。
+
+検証: 各 bridge の package build、Slack/Telegram/Discord/iMessage の対象テスト、
+各 entrypoint の `any` 検索がすべて green。
+
+## 16. 2026-08-28 channel thread の current message 二重投入防止
+
+4 bridge の provider-specific thread context を、共通 runtime が current incoming message を
+付加する前提に揃えた。Telegram/Discord は persisted fallback を append 前に読む既存境界を
+維持し、Slack は replies API の current event を除外し、iMessage は provider context から
+current message を削って `formatChannelThreadContext` へ接続した。各経路に、current message
+が context に現れない回帰を追加した。
+
+検証: `pnpm exec vitest run satellites/slack-bridge/src/index.test.ts`（3 tests）、
+`pnpm exec vitest run satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts`（各対象合計 12 tests）、
+Slack/iMessage package build、`pnpm run typecheck`、`pnpm run lint`、
+`pnpm run check -- --scope pr`（31/31）が green。
+
+## 17. 2026-08-28 viewer scope materialization の正本化
+
+`libs/core/surface-mutation-guard.ts` に `resolveSurfaceViewerScope` を追加し、登録 token、
+設定 token、loopback compatibility、server-owned tenant binding、principal、role tier policy
+を一つの core 境界へ集約した。Chronos / Concierge / Presence Studio / Computer Surface の
+viewer context resolver はこの materializer を利用する。Next/Express の peer 判定、rate limit、
+remote-safe path、surface ごとの error response と tier の wire order は各 adapter の責務として
+維持し、認可集合の判定だけを重複させない構成にした。
+
+検証: viewer context / core scope tests（合計 38 tests）、`pnpm run typecheck` が green。
+
+## 18. 2026-08-28 browser/network retry adapter の factory 化
+
+browser と network に残っていた `buildGovernedRetryOptions` の直接 wrapper を、
+`createGovernedRetryOptionsBuilder` へ移行した。step params の `max_retries` / `retry_delay_ms`
+変換は builder の explicit override として適用し、browser の selector 系追加 retry 判定は
+`additionalShouldRetry` へ移した。manifest/default/fallback の選択規則は他 actuator と同じ
+core factory を通る。caller から retry defaults 自体を受け取る video-composition の wrapper
+だけは、default の所有権が provider 呼び出し側にあるため継続管理する。
+
+検証: browser/network actuator と `libs/core/recovery-policy.test.ts`（8 files / 85 tests）、
+`pnpm run typecheck` が green。
+
+## 19. 2026-08-28 golden output の validated lifecycle 接続
+
+`scripts/check_golden_output.ts` が ADF を直接読み込み `runSteps` で実行していたため、通常の
+validation、include 展開、guardrail、ADF lifecycle を通らない別経路になっていた。これを
+`executePipelineFile` 経由へ変更し、golden 比較から実行環境依存のパス・時刻・trace 情報を除外した。
+validated lifecycle への移行に伴う現在の active profile の実体パス変更を意図した契約更新として
+golden snapshot に反映した。
+
+検証: `pnpm run build:repo`、`pnpm run check -- --scope pr --only golden` を連続 2 回実行し、
+いずれも green。
+
+## 20. 2026-08-28 実装レビューと生成物ドリフト修正
+
+累積変更を対象に typecheck、lint、module boundary、core / actuator / script / bridge の
+回帰を実行した。初回の scripts 回帰で、追加した bridge / Chronos 語彙の pseudo-locale が
+未生成であることを検出したため、`pnpm generate:pseudo-locale` を実行して
+`user-facing-vocabulary.json` を同期した。再実行では scripts **127 files / 772 tests**、
+4 bridge **4 files / 15 tests**、core **800 files / 5,785 tests（1 skipped）**、actuator
+**80 files / 870 tests（11 skipped）**が green となった。
+
+最終確認: `pnpm run check -- --scope pr` **31/31**、`pnpm run typecheck`、`pnpm run lint`、
+`pnpm run check -- --scope pr --only module-boundaries`（0 cycles / 4 direction violations / 68 dynamic imports）、
+`git diff --check` が green。残存課題はこの計画の PARTIAL 項目として維持する。
+
+## 21. 2026-08-29 actuator pipeline preflight 境界の共通化
+
+SX-10/SX-11 の残存 `executePipeline` のうち、ingest と email actuator が持っていた
+`resolve → preflight → execute → context更新` の loop を `libs/core/actuator-sdk.ts` の
+`runActuatorPipeline` へ移行した。domain handler、placeholder 解決、email の preflight 前後の
+順序は各 actuator 側に残し、preflight の actuator scope、repair 済み input、block/ask の
+fail-closed error、step 順序は共通 helper が担う。core SDK の契約テストで context 引き継ぎと
+block 時の handler 非実行を固定した。
+
+検証: `./node_modules/.bin/vitest run libs/core/actuator-sdk.test.ts
+libs/actuators/ingest-actuator/src/index.test.ts libs/actuators/email-actuator/src/index.test.ts`
+（3 files / 15 tests）、
+`pnpm run typecheck`、`pnpm run check -- --scope pr`（31/31）が green。
+残りの domain-specific `executePipeline` は10件で、各 actuator の context / retry / control-flow
+差分を確認しながら段階移行する。
+
+## 22. 2026-08-29 preflight coverage の対象漏れ修正
+
+レビューで、file/network actuator が `executeAdfSteps` 内の共通 preflight を利用しているにも
+かかわらず、coverage checker の public boundary 一覧から漏れていることを検出した。checker は
+`runActuatorPipeline` と `executeAdfSteps` の各 shared implementation が実際に
+`ensureDefaultOpPreflight()` を呼ぶことを確認し、両 actuator を対象へ追加した。これにより
+検査対象は **34 → 36 public boundaries** となった。
+
+検証: `pnpm run check -- --only op-preflight-coverage`（36 boundaries）、`pnpm run check -- --scope pr`
+（31/31）が green。
+
+## 23. 2026-08-29 mobile actuator の preflight 入力実値化
+
+レビューで、Android/iOS actuator が `{{context}}` を解決する前の raw params を preflight へ渡して
+いることを検出した。これでは policy が URL、tenant、provider などの実行値を判定できず、後段の
+handler だけが placeholder を解決するため、認可判定と実行入力の観測対象がずれる。共通の
+`resolvePipelineContextValues` を core に追加し、配列・オブジェクトを再帰的に解決してから
+preflight へ渡すよう修正した。既存の mobile pipeline の失敗時停止、結果 envelope、handler 側の
+防御的解決は維持し、Android/iOS の回帰テストで preflight listener が実値を受け取ることを固定した。
+
+検証: Android/iOS/ingest **3 files / 55 tests**、`pnpm run typecheck`、`pnpm run lint` が green。
+
+## 24. 2026-08-29 mobile custom loop の admission 共通化
+
+Android/iOS に残っていた custom loop の preflight 実装を、各 step を
+`runActuatorPipeline` に渡す形へ移行した。mobile 固有の結果 envelope、`max_steps`、失敗時の
+停止、context persistence、capture/transform/apply の dispatch は domain 側に残し、標準
+preflight と repaired input の受け渡しを SDK 側へ寄せた。これにより ingest/email/mobile の
+非 ADF pipeline で admission の順序と拒否時の扱いが同じ契約になる。Android/iOS には
+placeholder を再帰解決してから listener が観測する回帰も追加した。
+
+検証: Android/iOS **2 files / 51 tests**、`pnpm run check -- --scope pr --only module-boundaries`（4 direction
+violations）、`pnpm run check -- --scope pr`（31/31）が green。
+
+## 25. 2026-08-29 Concierge 会話 loopback の viewer scope 伝播
+
+レビューで、Concierge の `/api/message` が mutation guard の後に viewer scope を解決せず、
+voice-hub と orchestrator fallback の両経路へ tenant/tier 境界を渡していないことを検出した。
+`resolveConciergeViewer` で server-side viewer を解決し、personal を除外した
+`conciergeConversationScope` を生成して、voice-hub の ingest body と in-process
+`runSurfaceMessageConversation` の双方へ伝播するよう修正した。単一 tenant かつ confidential
+権限の viewer は tenant-scoped confidential、public のみなら tenant-scoped public、複数 tenant
+または tenant 不明の viewer は public/system に縮退し、リクエスト body から強い tier を選べない。voice-hub 側もこの scope を
+会話入力へ接続し、viewer scope の境界を fallback で失わないようにした。
+
+検証: Concierge viewer context **9 tests**、Concierge package contract **26 tests**、
+`pnpm run typecheck`、lint、変更ファイルの Prettier、`git diff --check` が green。
+
+## 26. 2026-08-29 Vision custom pipeline の admission 共通化
+
+追加レビューで、Vision actuator の action-form pipeline loop が独自の admission 実装を持っている
+ことを確認した。single action の domain 実行を分離し、schema の `action` step を shared runner
+の `op` ABI へ明示変換してから、`runActuatorPipeline` の標準 preflight を通して perception /
+legacy fallback を実行する形へ移行した。既存の単発 action と legacy media-generation への委譲は
+維持し、schema どおりの inspect step を通る回帰を追加した。
+
+検証: Vision actuator **6 tests** が green。
+
+## 27. 2026-08-29 Media Generation custom pipeline の admission 共通化
+
+追加レビューで、Media Generation actuator の `continue_on_error` pipeline が各 step を
+独自に `handleSingleAction` へ渡し、標準 preflight の順序を loop 自身が所有していることを
+確認した。action-form step を shared runner の `op` へ変換し、各 step の preflight と domain
+実行を分離した。step failure の集約、`continue_on_error`、trace span と既存 result envelope は
+維持した。
+
+検証: Media Generation actuator **2 files / 33 tests**、`pnpm run typecheck` が green。
+
+## 28. 2026-08-29 Voice custom pipeline の admission 共通化
+
+追加レビューで、Voice actuator の pipeline が各 step を `handleSingleAction` へ渡すことで
+単発入口の preflight wrapper に依存し、action-form と top-level action contract の扱いを
+pipeline 側で暗黙に持っていることを確認した。domain 実行を `executeSingleAction` に分離し、
+検証済み step 全体を preflight input として保持したまま、各 step を
+`runActuatorPipeline` へ渡す形へ移行した。既存の trace span、step 順序、失敗時の結果 envelope、
+単発 `handleSingleAction` の互換性は維持した。
+
+検証: Voice actuator **2 files / 16 tests** が green。
+
+## 29. 2026-08-29 Orchestrator custom pipeline の admission 共通化
+
+追加レビューで、Orchestrator の control-flow 対応 pipeline loop が preflight waterfall を直接
+実装していることを確認した。step 上限、timeout、if/while/nested pipeline の状態機械と
+context persistence は Orchestrator 側に残し、capture/transform/apply/control の dispatch を
+`runActuatorPipeline` の execute callback へ移した。これにより nested control を壊さず、step
+ごとの repaired input と fail-closed admission を shared SDK へ統一した。
+
+検証: Orchestrator **3 files / 32 tests** が green。
+
+## 30. 2026-08-29 Trace consumer の replay validation
+
+PI-06 のレビューで、Chronos trace feed と Terminal HUD の統計表示が JSONL の構文エラーだけを
+除外し、schema 不整合の persisted Trace を表示し得ることを確認した。両読み出し境界へ
+`validateTraceReplay` を接続し、一覧・詳細・統計のいずれも壊れた record を採用しないようにした。
+既存 extension span の現行名・namespace を明示 registry 化し、strict replay consumer では
+未登録名を拒否する形で互換性と閉じた語彙を両立した。新規 namespace の登録 ceremony と
+Exact telemetry 型の全面適用は継続課題として残した。
+
+検証: Chronos trace feed / Terminal HUD **2 files / 9 tests** が green。
+
+## 31. 2026-08-29 viewer tier 境界の再監査
+
+DSH/PI のレビューで、Chronos の deliverable inbox が artifact の tenant scope だけを適用し、viewer の tierAccess を一覧へ伝播していないことを確認した。あわせて trace feed、raw trace log、knowledge-ref の直接 read path も tier の server-side 判定を追加し、mission state/metadata/path から解決できない legacy record は fail-closed で除外した。
+
+検証: deliverable inbox / trace feed / trace-log access **3 files / 17 tests** が green、typecheck green。
+
+## 32. 2026-08-29 runtime reference の scope 再監査
+
+同じ直接 read boundary の再検索で、Chronos の `runtime-file` が `active/projects` 配下を viewer の tier/tenant scope なしに返していたため修正した。tier 付き canonical path は path segment から、legacy project path は governed project registry から scope を解決し、scope 不明は fail-closed とした。
+
+検証: runtime-file scope **1 file / 2 tests** が green。
+
+## 33. 2026-08-29 intelligence 集約の tier scope 再監査
+
+Chronos の `intelligence` GET は tenant scope を適用していたが、public-only viewer に対して confidential project/mission/work/artifact の集約値を返し得た。active mission/project の入力、project registry に紐付く work item、artifact の mission/project/path-derived tier を共通の viewer tierAccess で絞り込んだ。
+
+検証: `typecheck` / `lint` green。PR gate で再確認する。
+
+## 34. 2026-08-29 intelligence 補助投影の tier scope 再監査
+
+続く adversarial review で、intelligence の履歴イベント、control action、owner summary、agent message、A2A handoff、runtime lease、pending approval が tenant のみで絞られている箇所を確認した。mission state の tier を解決する共通判定を追加し、GET と SSE の双方で viewer tierAccess を適用した。mission に紐付かない承認は confidential 扱いとし、public-only viewer からは隠す。runtime の件数・managed topology・project track/mission seed も許可済み project/lease を基準に揃えた。mission/project control の POST 境界にも実体 tier の検査を追加した。
+
+検証: intelligence scope **3 tests**、関連 read-boundary **5 files / 22 tests**、typecheck / lint が green。
+
+## 35. 2026-08-29 surface routing の viewer scope 伝播
+
+SX-08b の再監査で、surface の最終 `IntentResolutionContract` には scope が渡る一方、
+route family を決める `resolveSurfaceIntent` と live-query classifier が default packet を
+使っていた。canonical router/query resolver に tier/tenant options を追加し、orchestrator の
+pre-resolution、routing helper、voice fallback まで scope を伝播した。public-only viewer が
+route 選択段階で confidential intent を選ぶ境界ずれを防いだ。
+
+検証: router / intent resolution **3 files / 39 tests**、typecheck / lint が green。
+
+## 36. 2026-08-29 Chronos legacy pipeline 実行境界の再監査
+
+追加の adversarial review で、legacy `/api/agent` の deterministic pipeline shortcut が
+`guardRequest` 通過後の readonly viewer でも利用でき、入力 path も `rootResolve` の
+`../` により `pipelines/` 外へ解決できることを確認した。pipeline shortcut を localadmin
+専用にし、実行対象をリポジトリ内の `pipelines/**/*.json` に限定する resolver を追加した。
+会話経路の viewer scope 伝播は維持し、既存の built runner 呼び出し自体は変更していない。
+
+検証: Chronos agent helper / route **2 files / 4 tests**、typecheck が green。
+
+## 37. 2026-08-29 Concierge data-bearing GET の viewer scope
+
+追加の adversarial review で、Concierge の setup、config-missions、notification preferences、
+plugin inventory、hygiene、memory queue、response status、成果物 preview の GET が
+`sovereign_concierge` execution context だけで読み出し、HTTP viewer principal を要求して
+いないことを確認した。各入口で `resolveConciergeViewer` を通すようにし、hygiene と memory
+queue は許可済み tenant/tier のみを一覧・個別決定対象とした。成果物 preview も entry tenant と
+mission state/path-derived tier を検査し、tier 不明・不一致のファイルを読む前に 403 とする。
+legacy hygiene tier の `public` 誤分類も廃止し、未知 tier は fail-closed にした。
+
+検証: Concierge suite **3 files / 27 tests**、scope helper/guard/preview **3 files / 6 tests**、
+`pnpm run typecheck`、lint、PR gate、baseline pipeline が green。
+
+## 38. 2026-08-29 voice-hub / Presence Studio の未使用 prologue 整理
+
+SX-12 の例外として残っていた `satellites/voice-hub/server.ts` を、実行経路を
+変更せずに再監査した。旧 Concierge/Browser/Project/Task の移植前提で残っていた未使用
+import **77 件**、未使用の補助関数・型・状態 **7 件**を削除し、voice-hub を
+`no-unused-vars` 例外リストから除外した。続けて Presence Studio の server 分割境界を
+再監査し、server 側で実測された未使用 import **39 件**と、runtime-data 側で全体 lint が
+検出した未使用 import **8 件**を整理した。必要な分割境界の参照は型検査で確認し、例外は
+Chronos の view/data surface **1 件だけ**に縮小した。
+
+検証: voice-hub 単体の `@typescript-eslint/no-unused-vars` **0 errors**、
+`pnpm run typecheck`、`pnpm run lint`、音声入口契約 **3 files / 20 tests**、
+Presence Studio 対象実行 **4 files / 12 tests**、PR gate **31/31**、`git diff --check` が green。
+併せて root Vitest の include に Presence Studio の server-side contract test を追加し、
+一括実行時に対象外となっていた 3 file を通常 suite へ戻した。OS route 契約テストは
+server 全体の文字列ではなく各 route の範囲を検査するようにして、無関係な error 文言による
+誤検知を防いだ。
+
+## 39. 2026-08-29 contract-schema checker の barrel 境界整理
+
+`scripts/check_contract_schemas.ts` と `check_contract_schemas_checks_1.ts` に残っていた
+`@agent/core` bare barrel import を、`schema-loader`、`promoted-memory`、
+`distill-candidate-registry`、`secure-io`、`next-action-contract`、
+`outcome-contract`、`intent-resolution-contract` の subpath import へ分解した。
+既存の package exports に不足していた後二者も `libs/core/package.json` に追加し、
+checker が公開 package 境界を通る構成に揃えた。処理内容・契約 fixture は変更していない。
+
+検証: `scripts/check_contract_schemas.test.ts` **1 file / 2 tests**、
+`pnpm run typecheck`、対象 lint、`git diff --check` が green。
+
+## 40. 2026-08-29 surface access の subpath 移行
+
+surface の viewer/auth 境界で bare barrel を参照していた Presence Studio、Concierge、
+Computer Surface、Chronos の実装を、`surface-mutation-guard`、`chronos-access-registry`、
+`scope-context`、`entity-scope`、`tenant-rate-limiter` などの canonical subpath へ移行した。
+これらの既存 module を package exports に追加し、認可ロジック自体は変更していない。
+移行後に Concierge の旧 module mock が実 import とずれていたため、mock も同じ境界へ更新した。
+
+検証: surface access 関連 **3 files / 23 tests**、`pnpm run typecheck`、
+`pnpm run lint`、PR gate **31/31**、`git diff --check` が green。
+
+## 41. 2026-08-29 Drawio catalog の未使用 reset API 削除
+
+Drawio の policy / boundary / tier-order / sort / security-group-order と AWS icon rule の
+6 catalog について、`reset*Cache` の repo 内参照を再確認した。各関数は index の再 export
+以外から参照されていなかったため、未使用の公開 wrapper と index export を削除した。
+catalog の load / resolve 処理は変更せず、`reset*Cache` export は実測 **90 → 84** へ縮小した。
+
+検証: 対象 actuator / visual suite **3 files / 99 tests（88 passed / 11 skipped）**、
+`pnpm run typecheck`、対象参照 0 件、`git diff --check` が green。
+
+## 42. 2026-08-29 未参照 catalog reset API の追加削除
+
+Drawio 系に続き、service authority / bootstrap / presets、shell command policy、skill
+install map、spend guard、surface provider manifest、surface query overlay の 8 件を
+再監査した。repo 内の参照が定義自身しかない reset wrapper だったため、load / resolve
+処理を変更せず、未使用の公開 API として削除した。`reset*Cache` export は累計で
+**90 → 76** となった。
+
+検証: 対象 core suite **8 files / 62 tests**、`pnpm run typecheck`、対象参照 0 件が green。
+
+## 43. 2026-08-29 未参照 cache reset wrapper の追加削除
+
+core の cache / catalog API を再走査し、repo 内参照が定義自身しかない
+`reset*Cache` wrapper **13 件**（ADF guardrail、provider bridge、video direction、visual
+review、voice selection など）を削除した。実行時の load / resolve 処理は変更せず、
+index の implicit export も含めて不要な公開 API を縮小した。`reset*Cache` export は累計
+**90 → 63** となった。
+
+検証: 対象 core suite **11 files / 102 tests**、`pnpm run typecheck`、対象参照 0 件が green。
+
+## 44. 2026-08-29 cache reset API の実測値再基準化
+
+前節までの削除後に、動的 import でテストから利用される performance index の
+reset hook を再確認した。`resetAgentPerformanceIndexCache` と
+`resetModelPerformanceIndexCache` は、静的な通常経路から未参照でも
+`mission-retrospective.test.ts` の cache isolation に必要なため公開を維持した。
+一方、その他の未参照 wrapper は削除済みで、現行ソースの `reset*Cache` export は
+実測 **38 件**（目標 **10 件以下**）となった。前節の累計値は、動的 test hook の
+復元前の中間値だったため、今後の進捗はこの実測値を基準にする。
+
+検証: `mission-retrospective.test.ts` **1 file / 5 tests**、core 全体 **800 files / 5,805 tests
+(5,804 passed / 1 skipped)**、`pnpm run typecheck`、`pnpm run lint`、PR gate **31/31**、
+`git diff --check` を実行し、いずれも green だった。
+
+## 45. 2026-08-29 core / checker / pipeline import 境界の追加整理
+
+`libs/core` のテスト・example、`scripts/check_*`、`scripts/refactor`、`scripts/lib` と
+pipeline の共有補助モジュールに残っていた bare `@agent/core` import を、定義元の
+canonical subpath または責務モジュールへ移行した。これにより同一 export の再集約を
+避け、schema / secure-io / path-resolver / authority などの境界を import 側でも明示した。
+機械集計では bare import は **648 files / 791 occurrences** となった（残存は主に
+pipeline execution の大規模互換層と shared / retired compatibility 層）。
+
+併せて ADF engine の共通 preflight に `hasHuman` と durable approval 判定を伝播させた。
+上位 `runSteps` で得た非対話境界・承認 binding が engine 側の二重 preflight で失われ、
+承認済み resume が失敗する問題を修正した。旧 barrel を直接 mock していた step-hooks
+テストも実 import と同じ subpath を mock するように更新した。
+
+検証: import 移行対象テストを複数 suite、`run_pipeline` 関連 **4 files / 147 tests**、
+scripts 全体 **128 files / 779 tests**、core 全体 **800 files / 5,805 tests
+(5,804 passed / 1 skipped)**、`pnpm run typecheck`、`pnpm run lint`、`git diff --check`、
+PR gate **31/31** を実行し、いずれも green だった。
+
+## 46. 2026-08-29 shared / scripts / satellite import 境界の継続整理
+
+前節の core / checker / pipeline に続き、plugins、retired actuator、shared-media / shared-
+vision / shared-nerve / shared-network、satellite の process bootstrap、scripts の
+基盤・生成・検索・ingest・intent 系を、bare `@agent/core` から canonical subpath へ移行した。
+shared-network の MCP engine では、移行後の依存先に合わせてテスト mock も subpath 単位へ
+変更し、secure-io の共通 mock が protocol registry の fixture を誤って読む回帰も固定した。
+bare import は機械集計で **610 files / 743 occurrences** まで減少した。
+
+検証: shared-network MCP **1 file / 31 tests**、scripts 対象 **6 files / 31 tests**、
+`pnpm run typecheck`、`pnpm run lint`、`git diff --check`、PR gate **31/31** を実行し、
+いずれも green だった。
+
+## 47. 2026-08-29 viewer read-boundary の adversarial 修正
+
+直前までの surface / viewer scope 実装を再レビューし、runtime-file の legacy
+`active/projects/{tier}/{file}` path を tenant 名として誤認する問題と、mission-asset /
+outcome preview が `active/shared/exports/public/...` のような非 canonical segment を tier
+として採用する問題を確認した。canonical な `active/{missions|projects}/{tier}/` だけを
+path-derived tier とし、短い legacy project path は governed project registry、shared
+artifact は artifact / mission metadata による判定へ戻して、tier 不明は fail-closed とした。
+再発防止として runtime-file、mission-asset、outcome preview に **3 files / 10 tests** を追加した。
+
+検証: 対象 viewer read-boundary **3 files / 10 tests**、`pnpm run typecheck`、
+`pnpm run lint`、PR gate **31/31**、`git diff --check` が green。
+
+## 48. 2026-08-29 subpath 移行後の mock drift 修正
+
+viewer materializer と organization projection の subpath 移行後に、Chronos の既存テストが
+旧 bare barrel を mock していたため、registry が実際のファイルを読み、organization route の
+canonical scope helper が未定義になる回帰を確認した。テスト mock を実 import と同じ
+`chronos-access-registry`、`organization-operating-model-management`、`tenant-registry`、
+`strictViewerScopeTenantSlugs` へ揃え、organization route 本体も canonical subpath import
+へ移行した。bare import は **743 → 742 occurrences** へ減少した。
+
+検証: Chronos **43 files / 159 tests**、core **800 files / 5,805 tests
+(5,804 passed / 1 skipped)**、scripts **128 files / 779 tests**、`pnpm run typecheck`、
+`pnpm run lint`、PR gate **31/31**、`git diff --check` が green。
+
+## 49. 2026-08-29 4 bridge entrypoint の import 境界継続整理
+
+Slack / Telegram / Discord / iMessage の entrypoint に残っていた bare
+`@agent/core` import を、`channel-surface`、`channel-adapter`、outbox、approval、
+mission proposal、provider adapter などの canonical subpath へ分割した。対応する
+テストの mock も、実際に参照する subpath と同じ境界へ揃えた。最初の分割で bridge から
+orchestration 実装への直接依存が module-layer baseline を **4 → 8** に増やしたため、
+`runSurfaceMessageConversation` は既存の `channel-surface` facade 経由に戻し、方向違反を
+baseline の **4件**へ復元した。
+
+このサイクル後の機械集計は bare import **742 → 732 occurrences / 603 → 601 files**。
+package export には bridge が必要とする service / Slack UI / automation の subpath を追加し、
+既存の処理・認可契約は変更していない。
+
+検証: Slack / Telegram / Discord / iMessage **4 files / 15 tests**、4 bridge package build、
+`pnpm run typecheck`、`pnpm run lint`、PR gate **31/31**、module-boundary direction violations
+**4件**、`git diff --check`、baseline pipeline が green。
+
+## 50. 2026-08-29 voice-hub import 境界の継続整理
+
+`satellites/voice-hub/server.ts` に残っていた voice/STT/TTS、surface catalog、secure-io、
+tool runtime、native speech の bare `@agent/core` import を、それぞれの canonical subpath
+へ分割した。surface conversation は module-layer の方向違反を増やさないため、既存の
+`channel-surface` facade 経由を維持した。実行処理、音声 provider の選択、echo suppression、
+HTTP 境界は変更していない。
+
+このサイクル後、リポジトリ全体の bare import は **732 → 731 occurrences / 601 → 600 files**、
+satellite 配下の残存は **0**。voice-hub は独立 package manifest を持たないため個別 package
+build の対象外とし、root typecheck と対象 lint で import/type 境界を確認した。
+
+検証: `pnpm run typecheck`、voice-hub 対象 lint、module-boundary direction violations
+**4件**、`git diff --check` が green。
+
+## 51. 2026-08-29 cache reset hook の test-only 境界化
+
+cache isolation のためだけに公開されていた reset wrapper **28件**を、
+`_reset…CacheForTests` という明示的な test hook へ改名した。通常 runtime から利用される
+性能・推論・voice profile・presentation preference の **7件**は既存 API として維持し、
+production の挙動や cache の無効化タイミングは変更していない。外部テストの import も同じ
+test hook 名へ更新し、旧名の参照を repository 全体で 0 件にした。
+
+現行ソースの `reset*Cache` export は **34件 → 7件**となり、SX-12 の目標 **10件以下**を
+満たした。test hook は direct module import に限定され、index barrel からの不要な再公開は
+追加していない。
+
+検証: cache 関連 **39 files / 289 tests**、`pnpm run typecheck`、`git diff --check` が green。
+
+## 52. 2026-08-29 agent-actuator の canonical import と SDK 型境界
+
+`agent-actuator` の helper / entrypoint / test に残っていた bare `@agent/core` import を、
+agent registry、A2A、mission-team、runtime supervisor、execution port、preflight などの
+責務別 subpath へ分割した。テストの module mock と dynamic import も同じ subpath に揃え、
+barrel mock による実装差し替え漏れを防いだ。
+
+併せて `runActuatorPipeline` の parameter generic を index signature 必須から `object` へ
+修正し、具体的な parameter interface を canonical runner に渡せるようにした。これに伴う
+共有 actuator build の型エラー（email / media-generation）も最小修正し、既存の preflight・
+result envelope の挙動は維持した。bare import は **730 → 724 occurrences / 600 → 596 files**。
+
+検証: agent-actuator **1 file / 28 tests**、`actuator-sdk` **1 file / 9 tests**、agent-actuator
+package build、root typecheck、対象 lint、全体 lint、module-boundary direction violations
+**4件**、PR gate **31/31**、`git diff --check` が green。
+
+## 53. 2026-08-29 approval-actuator の canonical import 境界
+
+`approval-actuator` の helper / approval operation / entrypoint / schema test に残っていた
+bare `@agent/core` import を、approval store、approval gate、decision rights、ADF engine、
+preflight、retry、secure path などの canonical subpath へ分割した。approval operation が
+`governance` facade に含まれない decision-rights 実装を直接参照していたため、subpath mock の
+部分実装による `resolveDecisionRightsMatrix` 欠落も修正し、テスト mock は `importOriginal` を
+使う部分 mock として実際の export を保持する形にした。
+
+bare import は **724 → 717 occurrences / 596 → 592 files**。approval action の処理順序、
+human approval 判定、結果 envelope は変更していない。
+
+検証: approval-actuator **1 file / 9 tests**、approval package build、root typecheck、対象
+lint、`git diff --check` が green。
+
+## 54. 2026-08-29 actuator import 境界の継続整理
+
+artifact / blockchain / build / calendar / deployment / file / process / presence / secret の
+9 actuator について、bare `@agent/core` import を artifact-store、secure-io、path-resolver、
+preflight、retry、runtime、service binding などの canonical subpath へ分割した。entrypoint
+の actuator SDK は相対 facade を維持し、artifact store の公開 subpath を package export に
+追加した。実処理の順序、preflight、retry、secret mutation の ephemeral mission wrapping は
+変更していない。subpath 移行で旧 barrel mock が実装を差し替え損なわないよう、secret の
+test mock も実 import と同じ境界へ揃えた。
+
+このサイクル後の機械集計は bare import **843 occurrences / 587 files**。今回の対象 actuator
+内では **317 occurrences / 161 files** が残るため、SX-03 の全体整理は継続する。
+
+検証: artifact **1 file / 2 tests**、blockchain **2 tests**、file **22 tests**、calendar
+**2 files / 18 tests**、process **1 file / 2 tests**、presence **1 file / 2 tests**、secret
+**1 file / 8 tests**、対象 9 actuator の package build、対象 lint、`pnpm run typecheck`、
+`pnpm run lint`、PR gate **31/31**、`git diff --check` を実行し、いずれも green だった。
+
+## 55. 2026-08-29 terminal / code actuator の canonical import 境界
+
+terminal-actuator と code-actuator に残っていた bare `@agent/core` import を、pty / terminal
+keys / computer surface、semantic decision、ADF engine、secure-io、provider capability、
+command runner、trace、preflight などの責務別 subpath へ分割した。code-actuator の dynamic
+import とテスト側の dynamic import / mock も実際の依存境界へ揃え、旧 barrel mock が実装を
+差し替え損なう経路を残さないようにした。新たに必要な公開 subpath は package export と
+dist build まで確認し、既存の actuator 処理・安全制約・結果 envelope は変更していない。
+
+このサイクル後の機械集計は bare import **826 occurrences / 581 files**。terminal-actuator と
+code-actuator の対象ファイル内は **0件**となったが、media / wisdom / ingest / orchestrator
+などの大規模 actuator と scripts は SX-03 の継続対象である。
+
+検証: terminal **1 file / 2 tests**、code **1 file / 16 tests**、core package build、対象 2
+actuator の package build、対象 lint、`git diff --check` を実行し、いずれも green だった。
+
+## 56. 2026-08-29 service actuator の canonical import 境界
+
+service-actuator の helper / entrypoint / op catalog / test に残っていた bare
+`@agent/core` import を、foundation、secure-io、service-engine、OAuth、service harness、
+recording session、Cloudflare OS、egress、preflight などの責務別 subpath へ分割した。
+テスト mock も実 import と同じ module boundary へ移し、旧 barrel mock の影響で service engine
+が実ネットワーク・実 credential・実 MCP に到達してしまう drift を修正した。必要な public
+subpath export は package に追加し、既存の service approval、scope、observation、recording
+および結果 envelope の挙動は維持した。
+
+このサイクル後の機械集計は bare import **820 occurrences / 577 files**。service-actuator
+内は **0件**であり、SX-03 の残存は media / wisdom / ingest / orchestrator と scripts へ
+限定して継続する。
+
+検証: service-actuator **1 file / 16 tests**、core package build、service-actuator package
+build、対象 lint、`git diff --check` を実行し、いずれも green だった。
+
+## 57. 2026-08-29 meeting browser driver の canonical import 境界
+
+meeting-browser-driver の driver、selector、retry helper、cookie store、test から残っていた
+bare `@agent/core` import を、meeting join/session/audio の型、path-resolver、recovery-policy、
+foundation、secure-io、core logger、async-utils へ分割した。cookie store のテスト mock も
+secure-io / foundation / path-resolver の実際の境界へ分け、barrel mock による cookie fixture
+の取り違えを修正した。必要な `meeting-session-types` と `audio-bus` の public subpath export
+を追加し、ブラウザ driver の join / cleanup / cookie persistence の順序は変更していない。
+
+meeting-browser-driver 内の bare import は **0件**となった。残存は system / media / wisdom /
+ingest / orchestrator と scripts の継続対象である。
+
+検証: meeting-browser-driver **1 file / 21 tests**、meeting-browser-driver package build、
+対象 lint、`git diff --check` を実行し、いずれも green だった。
+
+## 58. 2026-08-29 email actuator の canonical import 境界
+
+email-actuator の logger、secure-io、path、retry、logic、email bridge 依存を bare barrel
+から責務別 subpath へ分割した。テスト mock も同じ境界へ移し、実装と mock の依存先がずれる
+余地を縮小した。メール本文の解決、draft / send の選択、retry の挙動は変更していない。
+
+email-actuator 内の bare import は **0件**となった。
+
+検証: email-actuator **1 file / 3 tests**、package build、対象 lint、`git diff --check` を
+実行し、いずれも green だった。
+
+## 59. 2026-08-29 vision / working-memory actuator の canonical import 境界
+
+vision-actuator の認識・画像説明・legacy media route と working-memory-actuator の secure
+file I/O、memory promotion、notebook、volatile path 依存を責務別 subpath へ分割した。
+working-memory の型と notebook API を利用する public export を補い、vision の test mock も
+secure-io / service-engine / image-description / core logger へ分けた。perception の preflight、
+legacy route、memory tier / promotion の処理順は変更していない。
+
+vision-actuator と working-memory-actuator 内の bare import は **0件**となった。
+
+対象を含む repository-wide の機械集計は bare import **800 occurrences / 568 files**まで
+減少したが、SX-03 の全体完了条件には未到達である。
+
+検証: vision **1 file / 6 tests**、working-memory **1 file / 4 tests**、両 package build、
+対象 lint、`git diff --check` を実行し、いずれも green だった。
+
+## 60. 2026-08-29 orchestrator actuator の canonical import 境界
+
+orchestrator-actuator の execution brief、task-plan、task coordinator、super-nerve、resolver、
+entrypoint から残っていた bare `@agent/core` import を、pipeline / ADF、secure-io、task-plan
+store、agent execution port、governance、repair、intent compiler、super-nerve port などの
+責務別 subpath へ分割した。op catalog は actuator SDK の相対 facade を使う形に揃えた。
+テスト mock も直接の依存 module に分割し、旧 barrel mock が load / execution-plan / macro の
+fixture を差し替え損なう問題を修正した。orchestrator の task decomposition、execution plan
+preflight、super-nerve の ADF control flow は変更していない。
+
+orchestrator-actuator 内の bare import は **0件**となった。
+
+検証: orchestrator **2 files / 27 tests**、core package build、orchestrator package build、
+対象 lint、全体 typecheck、全体 lint、PR gate **31/31**、baseline pipeline、`git diff --check`
+を実行し、いずれも green だった。
+
+## 61. 2026-08-29 network actuator の canonical import 境界
+
+network-actuator の secure fetch、HTTP response distillation、ADF、A2A transport、retry、
+path、secure-io 依存を責務別 subpath へ分割し、op catalog と entrypoint は actuator SDK / CLI
+の facade に揃えた。A2A transport のテストも secure-io / path-resolver へ移し、network の
+barrel mock は secure fetch、filesystem、logger、retry の直接 mock に分割した。allow-list、
+egress、retry、未知 op の候補表示、A2A outbox の挙動は変更していない。
+
+network-actuator 内の bare import は **0件**となった。
+
+検証: network **2 files / 22 tests**、core package build、network package build、対象 lint、
+`git diff --check` を実行し、いずれも green だった。
+
+## 62. 2026-08-29 media-generation actuator の canonical import 境界
+
+media-generation-actuator の generation helper、provider client、capture forwarding、job state、
+entrypoint とテストに残っていた bare `@agent/core` import を、secure-io、network、service
+engine、workflow compiler、media backend registry、recovery-policy、job lifecycle、path resolver
+などの責務別 subpath へ分割した。direct image bridge、ComfyUI provider、video / music backend
+解決、generation job の retry / artifact collection の処理順は変更していない。テストは直接の
+依存 module を mock する形へ揃え、テスト間で secure file mock が registry JSON を汚染しない
+よう状態初期化も追加した。
+
+media-generation-actuator 内の bare import は **0件**となった。SX-03 の残存は system / wisdom /
+ingest と scripts を中心に継続する。
+
+検証: media-generation **7 files / 45 tests**、package build、対象 lint、`git diff --check` を
+実行し、いずれも green だった。
+
+## 63. 2026-08-29 meeting actuator の canonical import 境界
+
+meeting-actuator の meeting helper、intelligence operation、entrypoint、op catalog とテストに
+残っていた bare `@agent/core` import を、audit、core logger、secure-io、path、retry、trace、
+authority、ADF、action-item、reasoning、voice、meeting policy、preflight などの責務別 subpath
+へ分割した。WorkItem delegation と Slack outbox はそれぞれ canonical facade へ分離し、会議の
+同意ゲート、監査、action item、provider dispatch の挙動は変更していない。必要な core public
+subpath export も追加した。
+
+meeting-actuator 内の bare import は **0件**となった。system / media / wisdom / ingest と
+scripts の残存は SX-03 の継続対象である。
+
+検証: meeting **2 files / 17 tests**、package build、対象 lint、`git diff --check` を実行し、
+いずれも green だった。
+
+## 64. 2026-08-29 ingest actuator の canonical import 境界
+
+ingest-actuator の parse、normalize、dedup、sync、commit、op catalog と受入テストに残っていた
+bare `@agent/core` import を、tenant registry、path-resolver、secure-io、ingest ledger、sync
+cursor、quota、PII scrub、untrusted content、tier gate、authority、memory queue などの責務別
+subpath へ分割した。commit の tenant isolation、steward approval、PII / injection gate、quota
+と append-only ledger の順序は変更していない。core package には sync cursor、ingest quota、action
+item 等の必要な public subpath export を補った。
+
+ingest-actuator 内の bare import は **0件**となった。残存は system / media / wisdom と scripts
+を中心に継続する。
+
+検証: ingest **8 files / 60 tests**、package build、`git diff --check` を実行し、いずれも green
+だった。
+
+## 65. 2026-08-29 wisdom actuator の canonical import 境界
+
+wisdom-actuator の decision、reasoning、knowledge package、stakeholder support、pipeline、
+compatibility boundary、entrypoint、op catalog とテストに残っていた bare `@agent/core` import
+を、reasoning、knowledge index、context security、secure-io、history、preflight、ADF、forwarding
+port 等の責務別 subpath へ分割した。テストの backend / file I/O mock も直接依存 module へ移し、
+stub backend が誤って選ばれる境界 drift を修正した。wisdom の operation dispatch、knowledge
+tier、tool-role、forwarding、retry の意味は変更していない。必要な core public subpath export
+を追加した。
+
+wisdom-actuator 内の bare import は **0件**となった。
+
+検証: wisdom **7 files / 104 tests**、package build、対象 lint、`git diff --check` を実行し、
+いずれも green だった。
+
+## 66. 2026-08-29 browser actuator の canonical import 境界
+
+browser-actuator の runtime、passkey、control、pipeline、entrypoint、op catalog と受入テストに
+残っていた bare `@agent/core` import を、foundation、secure-io、network、path、op vocabulary、
+op input contract、ADF、trace、semantic decision、secret、browser extension bridge 等の責務別
+subpath へ分割した。既存の Chromium / CDP attach、navigation policy、secret redaction、recorded
+ref、retry、screenshot の挙動は変更していない。直接依存 mock へ切り替えたことで、browser runtime
+の secure execution と test double の境界も一致させた。
+
+browser-actuator 内の bare import は **0件**となった。
+
+検証: browser **5 files / 60 tests**、package build、対象 lint、`git diff --check` を実行し、
+いずれも green だった。
+
+## 67. 2026-08-29 actuator import wave の再検証
+
+media-generation、meeting、ingest、wisdom、browser の 5 actuator について、本体・関連テスト
+の bare `@agent/core` import を 0件へ収束させた。テストでは direct subpath mock を実際の依存
+境界に合わせ、registry / secure-io / backend が前テストの状態を引き継がないことも確認した。
+この wave の対象テストは **286 tests**（45 + 17 + 60 + 104 + 60）である。
+
+repository-wide の同一機械集計は **674 occurrences / 490 files**まで減少した。media / ios /
+android / modeling / video-composition / voice と scripts の残存は、次の import wave および
+SX-03 の継続対象として残す。
+
+検証: 対象 5 actuator の全テスト、各 package build、対象 lint、全体 typecheck、全体 lint、PR
+gate **31/31**、baseline pipeline、`git diff --check` を実行し、いずれも green だった。
+
+## 68. 2026-08-29 system actuator の canonical import 境界
+
+system-actuator の focus、display、action、pipeline、entrypoint、op catalog とテストに残っていた
+bare `@agent/core` import を、secure-io、path-resolver、preflight、ADF、OS automation、screen /
+video bridge、runtime registry、report、reconcile などの責務別 subpath へ分割した。テストも
+barrel mock を使わず、実際に import される canonical module の test double を使うよう揃えた。
+これにより screen capture / recording、computer interaction の focus guard、destructive
+approval、unknown-op、pipeline context persistence の検証対象と実装依存境界が一致した。
+
+system-actuator 内の bare import は **0件**となった。必要な core public subpath export も追加した。
+この修正後の repository-wide 集計は **646 occurrences / 488 files**で、media / ios / android /
+modeling / video-composition / voice と scripts が次の継続対象である。
+
+検証: system **2 files / 97 tests**、package build、全体 typecheck、全体 lint、PR gate **31/31**、
+baseline pipeline、`git diff --check` を実行し、いずれも green だった。
+
+## 69. 2026-08-29 canonical import wave のレビューと mock drift 修正
+
+iOS / Android / modeling / video-composition / voice actuator を再レビューし、実装側の bare
+`@agent/core` import は 0件であることを確認した。移行後のテストでは、旧 barrel mock が実際の
+canonical module を差し替えず、音声の secure-io が `/tmp` を実書き込みし、音声 engine / sample
+collection の実装がテストへ漏れる問題を検出した。直接依存する subpath mock を追加し、voice の
+全3ファイルを含む対象6 actuator の **11 files / 200 tests** を再通過させた。voice の op catalog
+にも残っていた barrel import を actuator SDK の相対 facade へ揃えた。
+
+repository-wide の bare import は **570 occurrences / 461 files**まで減少した。残存は主に
+media-actuator と scripts であり、今回のレビューでは未着手範囲として扱った。対象6 actuator の
+テスト実行、全体 typecheck、全体 lint、PR gate **31/31**、baseline pipeline、`git diff --check`
+を実行し、いずれも green だった。
+
+## 70. 2026-08-29 全 actuator suite のレビュー指摘修正
+
+全 actuator suite を再実行し、canonical import wave の影響で旧 barrel mock に戻っていた
+terminal / blockchain / service の3テスト群を追加で検出した。terminal は実 PTY / retry、
+blockchain は実 path resolver、service は実 foundation JSON loader / `services.json` が混入して
+いたため、各 canonical subpath の mock へ修正した。production の処理順や認証・anchor・PTY
+契約は変更していない。
+
+修正後は全 actuator **81 files / 879 passed / 11 skipped** となった。既存の audit tenant mirror
+warning と外部 visual-review skip はテストが想定する deny 行動であり、失敗ではない。
+
+## 71. 2026-08-29 media actuator の canonical import 境界
+
+media-actuator の実装と関連テストに残っていた bare `@agent/core` import を、secure-io、
+path-resolver、ADF / preflight、media policy、native media utility、visual review などの責務別
+subpath へ分割した。テストも barrel mock から実際の依存先を置き換える mock へ揃え、presentation
+preference、personal theme、OCR、diagram、document / spreadsheet / PDF の依存境界を実装と一致
+させた。必要な core public subpath export も追加し、media-actuator 内の bare import は **0件**と
+なった。
+
+修正後は media actuator **13 files / 136 passed / 11 skipped**、package build、scripts **128
+files / 779 tests**、全体 typecheck、PR gate **31/31** を実行して green を確認した。外部
+visual-review の skip は security scope による想定された deny である。repository-wide の bare
+import は **508 occurrences** まで減少したが、scripts の production entrypoint には残存がある
+ため、SX-03 の継続対象として次の wave へ送る。
+
+## 72. 2026-08-29 production script 境界レビューと packaging 指摘の修正
+
+直前 wave の残存範囲を再レビューし、`libs/core/package.json` の duplicate export key を検出する
+仕組みが無かったため、JSON.parse では見えなくなる重複を `check_packaging_contract` で検査する
+ようにした。`./channel-surface-types`、`./native-speech-listen-bridge`、
+`./surface-interaction-model` の重複宣言も除去し、検出関数の回帰テスト **2件**を追加した。
+最終ゲートで追加の `./service-distill-candidate`、`./validators` 重複も検出・除去し、checker 自身の
+診断文字列が ESM 検査の `exports.*` 誤検出を起こさないよう clause 名も調整した。
+
+production script は、memory notebook、egress policy、governance scanner、knowledge feedback、
+agent runtime supervisor、audit report、virtual camera、health degradation、provider capability、
+dependency vulnerability、service recording / procedure、meeting、voice profile 等を責務別の
+core public subpath へ移した。`run_service_procedure` の dispatcher 直接依存が境界 checker の
+direction violation を 4→5 に増やしたため、実行入口を orchestration 層として明示し、baseline を
+緩めずに **4件**へ戻した。
+
+この wave 後の実測は repository-wide bare import **471 occurrences / 385 files**、scripts の
+production entrypoint は **215 occurrences / 159 files**である。残存 script の一括移行は、公開
+subpath と層境界を確認しながら次 wave で継続する。
+
+検証: `libs/core` package build、全体 typecheck、packaging / module-boundary targeted test **5/5**、
+scripts **129 files / 781 tests** を実行して green を確認した。
+
+## 73. 2026-08-29 production script 境界レビューの継続と再発防止
+
+前節の残存 script を責務別に追加レビューし、tenant activation / governance、service preflight /
+lifecycle、voice setup / upgrade / consent、environment manifest、i18n report、customer overlay、
+generation schedule、model registry、OAuth、portal inbox、reconciliation、vocabulary generation
+などの entrypoint を canonical public subpath へ移した。`service-validator` は既存の `src/pfc` 配置を
+外部へ漏らさない `libs/core/service-validator.ts` facade を追加し、Vitest の package-subpath alias
+と実 package export の両方を同じ境界へ揃えた。
+
+移行後に root barrel mock が direct subpath import を差し替えないテストをレビューで検出した。
+service preflight、vital check、customer create / switch、schedule、service endpoint、specialist
+catalog、i18n coverage の各テストへ canonical module mock を追加し、実環境の secure-io・registry・
+ops alert がテストへ漏れないことを確認した。さらに PR gate で追加した
+`./agent-collaboration-projection` export の重複も検出・除去した。
+
+今回の再集計は scripts の production entrypoint が **183 occurrences / 122 files**、repository-wide
+が **439 occurrences / 353 files**である。scripts の残存 bare import は SX-03 / SX-06 の継続対象とし、
+公開 subpath の有無と module layer を確認した次の wave で段階的に移行する。
+
+検証: `pnpm test -- --suite scripts` **129 files / 781 tests**、`libs/core` build、全体 typecheck、全体
+lint、PR gate **31/31**、packaging contract、module boundaries **0 cycles / 4 direction violations**、
+ESM、`git diff --check`、baseline pipeline を実行して green を確認した。baseline の copilot auth
+probe warning は既存の未確定状態であり、今回の変更による失敗ではない。
+
+## 74. 2026-08-29 baseline / doctor 境界の継続実装
+
+実行入口の追加 wave として、`generate_op_registry`、`run_checks`、pipeline dry-run、service
+harness registry、actuator scaffold、presence controller、runtime supervisor、schedule daemon、
+daemon watchdog、doctor、baseline check、company onboarding、scope、各 demo などの production
+script を canonical public subpath へ移した。`pipeline-scheduler` と `SovereignSentinel` は
+内部配置を隠す facade を追加し、package export と Vitest alias が同じ entrypoint を解決するように
+した。新規の `scripts/demos/*.ts` は実行入口として orchestration 層へ明示し、境界違反の増加を
+許容値変更なしで解消した。
+
+移行後の root barrel mock drift を `run_doctor` テストで検出し、environment capability の direct
+module mock を追加した。これにより、doctor の manifest 選択を実際の依存 module の差し替えで検証し、
+実ファイルを読む副作用に依存しないテストになった。
+
+実測は scripts の production entrypoint が **150 occurrences / 102 files**、repository-wide が
+**406 occurrences / 333 files**まで減少した。module boundary は **0 cycles / 4 direction violations**、
+dynamic import は 80 件で baseline 内を維持している。残存 bare import は SX-03 / SX-06 の継続対象で、
+未公開 module の facade 化と entrypoint 単位の移行を次 wave で続ける。
+
+検証: `pnpm test -- --suite scripts` **129 files / 781 tests**、doctor / baseline / environment-doctor /
+company onboarding target **43 tests**、`libs/core` build、全体 typecheck、全体 lint、PR gate **31/31**、packaging
+contract、module boundaries、ESM、`git diff --check` を実行して green を確認した。baseline pipeline
+も成功し、copilot auth probe の uncertain warning のみ既存状態として残っている。
+
+## 75. 2026-08-29 peer / service / intent entrypoint 境界の継続実装
+
+さらに `marketing_review_aggregate`、`services_setup`、`delegated_task_worker`、
+`pipeline_promote`、`sync_intent_contract_memory` と peer messaging の send / conversation server /
+server entrypoint を責務別 public subpath へ移した。peer messaging では peer envelope、mesh
+directory、conversation responder、protocol service lifecycle の所属を分離し、単一 barrel に依存
+しない構成へ揃えた。これに伴い `peer-messaging`、`delegated-task-observability`、
+`physical-namespace` など必要な package export も追加した。
+
+実装中の型検査で検出した export 所属違い、重複 import、未公開 subpath はその場で修正し、実装を
+未検証のまま残さなかった。最終的な bare import は scripts の production entrypoint が **139
+occurrences / 94 files**、repository-wide が **395 occurrences / 325 files**となった。残存は
+大型の CLI / pipeline orchestration と未公開責務の facade 化を含む SX-03 / SX-06 の次 wave 対象である。
+
+検証: `pnpm test -- --suite scripts` **129 files / 781 tests**、関連 target tests **7 tests**、core build、
+全体 typecheck、packaging contract、PR gate **31/31**、module boundary **0 cycles / 4 direction
+violations**、ESM、`git diff --check`、baseline pipeline を実行して green を確認した。外部
+provider の copilot auth probe uncertain warning は既存の環境状態である。
+
+## 76. 2026-08-29 actuator sequence SDK と追加 script 境界の継続実装
+
+SX-10 / SX-11 の残存重複を再確認し、domain handler の責務を変えずに、step 単位の preflight、
+step budget、失敗時の停止、結果 envelope を共通化する `runActuatorStepSequence` を actuator SDK
+へ追加した。Android / iOS の手書き loop をこの helper へ移し、現在の `status` / `results` /
+`context` 形式、context persistence、domain-specific handler、失敗時の first-error stop を維持した。
+SDK には順序・失敗停止と step budget の回帰テスト **2件**を追加した。残る file / network /
+system / code / modeling / wisdom / orchestrator / browser の full ADF runner は、それぞれ nested
+control、trace、retry、domain dispatcher の差異を確認してから別 wave で統合する。
+
+SX-03 の継続として、reasoning route、migration、environment bootstrap、campaign、skill installer、
+facet / eval、mesh inspection、onboarding、mission alignment、marketing video、peer recovery /
+registration、local chat、mission worker 等の script を責務別 public subpath へ移した。新たに
+必要となった core facade / package export を追加し、package export の duplicate key guard により
+移行時の重複公開も検査できるようにした。canonical import へ切り替えた後、旧 barrel mock が実
+依存を差し替えない問題を mission alignment の unit / E2E test で検出し、direct module mock へ
+更新した。
+
+この波の実測は scripts の production entrypoint が **105 occurrences / 65 files**、repository-wide
+が **361 occurrences / 296 files**である。module boundary は **0 cycles / 4 direction violations**、
+dynamic import は **81件**で、既存 baseline を超えていない。`executePipeline` という名前を持つ
+実装は **10件**残るが、Android / iOS の step sequence accounting は共通 SDK へ移行済みであり、
+残る実装は full ADF / nested control / trace の互換性を検証する次の SX-10 / SX-11 wave 対象とする。
+
+検証: `pnpm test -- --suite scripts` **129 files / 781 tests**、`pnpm test -- --suite actuators` **81 files /
+879 passed / 11 skipped**、SDK / alignment を含む対象テスト、`libs/core` build、全体 typecheck、
+packaging contract、module boundaries、ESM、`git diff --check` を実行して green を確認した。並列
+実行時に発生した tier-hygiene timeout は負荷によるものとして単独実行で切り分ける。baseline の
+copilot auth probe uncertain warning と外部 visual-review の security-scope skip は既存の環境制約で
+あり、今回の code failure ではない。
+
+## 77. 2026-08-29 operator home / presentation 境界の継続実装
+
+operator home と CLI presentation の残存 root barrel 依存を再レビューし、customer conversation
+mode、channel binding、deal、distill candidate、execution feedback、operator home summary、governance
+status、next action、desktop event / pipeline / recording compiler / promotion transaction / intent
+reconstruction などの責務別 public subpath へ移した。`libs/core/package.json` の export と Vitest の
+alias を同じ facade に揃え、`kyberion_home` からの `sampleDesktopObservation` などの所属違いも型検査で
+修正した。
+
+entrypoint が orchestration 層として core の dispatcher / surface runtime を利用する構造は、既存の
+module-layer baseline を緩めず、`kyberion_home`、`cli`、`kyberion` の明示的な orchestration pattern と
+して記録した。これにより境界 checker は **0 cycles / 4 direction violations** を維持している。
+
+この波の実測は scripts の production entrypoint が **96 occurrences / 61 files**、repository-wide が
+**352 occurrences / 292 files**となった。前節の数値からさらに削減したが、目標の bare import **0件**
+には未到達であり、SX-03 / SX-06 として残存 script の public facade 化・harness 移行を継続する。
+`executePipeline` の full ADF runner 統合、SX-04〜SX-14 の未完了項目も残存スコープである。
+
+検証: baseline pipeline、全体 typecheck、全体 lint、scripts **129 files / 781 tests**、PR gate
+**31/31**、packaging contract、module boundaries、ESM、`git diff --check` を実行して green を確認した。
+baseline の copilot auth probe uncertain warning は既存の環境状態であり、今回の変更によるゲート失敗は
+確認されていない。
+
+## 78. 2026-08-29 pipeline / CLI / coordination entrypoint 境界の継続実装
+
+`run_pipeline` の bootstrap / execution / results 分割、CLI、surface runtime、intent runner、
+mission router、work coordination、knowledge scope reconciliation、config mission、storage
+governance の各 entrypoint に残っていた `@agent/core` root barrel 依存を責務別 public subpath へ
+移した。ADFの `runAdfLifecycle`、step dispatch、repair、journal、trace、approval、graph、scope
+処理の順序と実行契約は変更せず、実際の所属に合わせて import と type import を整理した。
+
+移行中のレビューで、package export の重複、`ResourceClaim` の所属違い、`pipeline-preview` の
+`src/` 配置とのalias不一致を検出し、各々を packaging checker・型検査・対象テストで修正した。
+新しく必要になった public subpath は package export に追加し、既存の重複 export は除去した。
+
+この波の実測は scripts の production entrypoint が **57 occurrences / 49 files**、repository-wide が
+**313 occurrences / 280 files**となった。前節からさらに削減したが、目標の bare import **0件**、
+SX-05/SX-06 の全entrypoint harness化、SX-10/SX-11 の full ADF runner・repair統合は未完了である。
+module boundary は **0 cycles / 4 direction violations / max runtime SCC 33 / 80 dynamic imports**
+を維持した。
+
+検証: baseline pipeline、全体 typecheck、全体 lint、scripts **129 files / 781 tests**（並列負荷で
+timeoutした3件は単独再実行で成功）、CLI / pipeline 対象 **99 tests**、PR gate **31/31**、packaging
+contract、module boundaries、ESM、`git diff --check` を実行して green を確認した。baselineのcopilot
+auth probe uncertain warningは既存環境状態である。
+
+## 79. 2026-08-29 ADF actuator SDK の接続レビューと preflight 検査修正
+
+SX-10/SX-11 の次の小さな統合として、ADF engineを直接呼ぶrunner向けに
+`runAdfActuatorPipeline` を SDK の共通入口として追加した。engine の `maxSteps` / `timeoutMs`、
+承認・step gate・repeat governor・graph観測・resumeなどの制御を公開し、runnerごとの domain
+handler と context persistence は維持した。network、modeling、file runnerはengine呼び出しだけを
+この入口へ移行し、ADFのcontrol semantics、result envelope、context保存の順序は変更していない。
+
+実装後のレビューで、共有入口経由のpreflightを既存の静的coverage checkerが認識できず、file / network
+を未接続と誤検出する指摘を検出した。checkerに `runAdfActuatorPipeline` の共有接続を追加し、
+コメント・文字列を除外する検査と回帰テストを維持した。この指摘は修正後に解消した。
+
+この波の実測は scripts の production entrypoint が **57 occurrences / 49 files**、repository-wide が
+**313 occurrences / 280 files**で、bare root import の削減値を維持した。module boundary は
+**0 cycles / 4 direction violations / max runtime SCC 33 / 80 dynamic imports**を維持し、
+SX-03、SX-05/SX-06、残る full ADF runner と repair統合（SX-10/SX-11）は継続課題である。
+
+検証: SDK / modeling / file 対象 **46 tests**、全 actuator **81 files / 879 passed / 11 skipped**、
+`pnpm run typecheck`、`pnpm run lint`、PR gate **31/31**、packaging contract、module boundaries、
+ESM、`git diff --check` を順次実行して green を確認した。既存の audit mirror、video catalog、
+外部 visual-review の warning / skip はテスト失敗ではなく、既存環境・security scopeの状態として
+残っている。
+
+## 80. 2026-08-29 full ADF runner の共通SDK移行継続
+
+`runAdfActuatorPipeline` の適用範囲を拡張し、system、deployment、approval、code、media、meeting、
+wisdom、browser、orchestrator の各runnerも共有ADF入口へ移行した。domain固有のtrace hook、mediaの
+step正規化、wisdomのoperation retry state、orchestratorの試行間step counterとrepair retryは各runner
+側に残し、SDKへはADF options・handler・hook・result envelopeだけを渡す構造にした。orchestratorの
+外側状態を共通化のために消去せず、既存の安全予算と再試行境界を維持している。
+
+production actuatorの実装で `executeAdfSteps` を直接呼ぶ箇所は、互換コメントを除いて解消した。
+これによりpreflight、step budget、control / on_error、result accountingの入口が全runnerで追跡可能に
+なった。SDKのengine optionsは承認、step gate、repeat governor、graph観測、resumeを含む形で公開し、
+移行による安全制御の欠落を防いだ。
+
+この波の実測は scripts の production entrypoint が **57 occurrences / 49 files**、repository-wide が
+**313 occurrences / 280 files**、module boundary が **0 cycles / 4 direction violations / max
+runtime SCC 33 / 80 dynamic imports**で、既存値を維持した。SX-10はfull runnerの共通入口まで進んだが、
+ABI / catalog / retry複製の全完了、SX-11のrepair統合、SX-03、SX-05/SX-06、SX-12〜SX-14は継続課題である。
+
+検証: system **109 tests**、approval **21 tests**、code **28 tests**、media **148 passed / 11 skipped**、
+meeting **29 tests**、wisdom **66 tests**、browser **50 tests**、orchestrator **44 tests**を対象に実行し、
+全 actuator **81 files / 879 passed / 11 skipped**、全体 typecheck、lint、PR gate **31/31**、preflight
+coverage、packaging contract、module boundaries、ESM、`git diff --check` を順次実行して green を確認した。
+既存のaudit mirror、video catalog、外部visual-reviewのwarning / skipはテスト失敗ではなく環境・security
+scope由来の状態として残っている。
+
+## 81. 2026-08-29 scripts canonical subpath 移行の継続
+
+SX-03/SX-06 の残存root barrel依存を再点検し、company bootstrap、dependency patch、audit mirror、
+backup、customer migration、DS-04 video proof、secret encryption、validation bundle、first-win smoke、
+meeting preflight、knowledge index、Chronos launchd、Chronos daemonのentrypointを責務別subpathへ
+移行した。secret-encryption、generation-quota、text-escaping、chronos-deliveryの不足していたpackage
+exportsも追加し、canonical importへ移行したテストmockも更新した。
+
+scriptsのproduction entrypointにおけるroot barrel依存は **57 occurrences / 49 files** から
+**37 occurrences / 32 files** へ削減した（soak endurance / restart の canonical subpath 移行を含む）。repository-wideは
+**293 occurrences / 263 files**であり、
+scripts全体のharness移行、残るroot barrelの所属整理、package facadeの完全収束は継続課題である。
+
+検証: 変更対象テストを順次実行し、全scripts **129 files / 782 passed**、全体 typecheck、lint、PR
+gate **31/31**、packaging contract、`git diff --check` を確認した。OAuth callbackのloopback HTTP
+テストはsandboxではbind権限により起動できなかったため、同一テストを承認済みのローカル実行で
+**2 tests passed**として確認した。
+
+## 82. 2026-08-29 review: repository scan テストの実測 timeout ずれを修正
+
+前節までの実装を全 scripts suite で再監査したところ、機能 assertion の失敗ではなく、非 CI の
+既定 test timeout **10秒**が repository-wide scan の実測時間（module boundary 単独約17秒、tier
+hygiene 単独約29秒）を下回るため、並列実行時に2件が timeout する指摘を再現した。重い scan の
+対象である `check_module_boundaries.test.ts` と `check_tier_hygiene.test.ts` の各テストに **60秒**の
+明示 timeout を設定し、global timeout を緩めずに局所的な実行契約へ修正した。
+
+修正後は `pnpm exec vitest run scripts` が **129 files / 782 tests passed**、typecheck、lint、
+packaging contract、baseline pipeline、PR gate **31/31**、preflight coverage、`git diff --check`
+を再確認した。root barrel の現行 production 残存は **37 occurrences / 32 files**で、remaining
+SX-03/SX-06 の整理、SX-10/SX-11 の ABI / repair 統合、SX-12〜SX-14 は次 wave に残す。
+
+## 83. 2026-08-29 review: canonical subpath 移行後の回帰修正
+
+§81〜§82の実装を adversarial に再レビューし、残存していた scripts の root barrel import を継続して
+責務別 public subpath へ移行した。今回の波では pilot / organization / onboarding / alignment、runtime
+supervisor、meeting / minutes、virtual office、background review、control plane、reporting、migration
+entrypoint を対象にし、必要な package export を追加した。production scripts の bare `@agent/core`
+依存は **37 occurrences / 32 files から 4 occurrences / 3 files** まで削減した。残るのは
+`run_realtime_voice_conversation.ts`、`mission_controller.ts`、`browser_bridge_host.ts` の既存 facade
+利用であり、SX-03/SX-06 の次 waveに残す。
+
+レビューでは、subpath移行で orchestration 層への依存が可視化されたため、`background_review_mission_e2e.ts`
+を実際の責務に合わせて module-layer manifest の orchestration pattern に登録した。また、root barrel
+mockに依存していた `agent_runtime_supervisor_daemon` テストを各 subpath mockへ移し、`runtimeSupervisor`
+の `startSweep` を含む共有APIを維持した。最初の全体テストで検出した provider差し替え、delegated worker、
+client timeout、inflight limit、model_tier の6件の回帰はこの修正で解消した。最後に meeting entrypoint の
+未使用型import 6件も削除した。
+
+検証: `pnpm exec vitest run scripts --reporter=dot --pool=forks --maxWorkers=1` が **129 files / 782 tests
+passed**、`agent_runtime_supervisor_daemon.test.ts` が **9 tests passed**、module boundary が **3 tests
+passed**、全体 typecheck、lint、packaging contract、PR gate **31/31**、`git diff --check` を確認した。
+既存の環境依存 warning（real reasoning backend未設定、meeting/browser runtime不足、surface delivery残件）
+は今回の失敗ではなく、各テストが期待する診断状態として残っている。
+
+## 84. 2026-08-29 review: Presence の import 境界と viewer mock drift の修正
+
+§83後の実装を Presence 全体で再レビューした。最初の `presence` テストでは、viewer-context が
+`@agent/core` root mock から `@agent/core/chronos-access-registry` の実 import に移行した際に、
+`findChronosTokenRegistration` が mock から欠落して認可判定前に失敗した。また operator-surface の
+inbox route では、`authorizeSurfaceMutation` が新しい `surface-mutation-guard` 境界へ移った後も、
+テストが旧 root barrel mock のままだった。
+
+viewer-context の registry mock を実モジュールを部分 mock する形へ変更し、inbox route は
+`deliverable-inbox` と `surface-mutation-guard` をそれぞれ直接 mock するように修正した。併せて
+`presence/bridge/terminal/server.ts` の root import を surface mutation guard、process guards、
+reflex terminal、runtime supervisor、secure-io、path resolver、logger の canonical subpath へ分割した。
+この波の結果、production `scripts/` の bare `@agent/core` は 0件を維持し、Presence は **80 occurrences /
+74 files から 74 occurrences / 69 files**へ減少した。Presence の残存分は次 wave の責務別移行対象である。
+
+検証: 最初のレビューで検出した **4件**を修正後、対象テスト **2 files / 10 tests passed**、Presence 全体
+**72 files / 262 tests passed**、typecheck、lint、packaging contract、PR gate **31/31**、`git diff --check`
+を確認した。
+
+## 85. 2026-08-29 SX-03 環境 accessor と Presence Studio import 境界の継続実装
+
+現行コードを再計測し、production の `process.env.KYBERION_*` 直読が Chronos middleware の1件だけ
+残っていることを確認した。edge runtime で利用可能な `@agent/core/foundation/env` の
+`getRegisteredEnvBool` に置換し、Chronos route guard と `KYBERION_TRUST_PROXY` の許容値・fail-closed
+判定を共有した。これにより production code の該当直読は **0件**となった。
+
+併せて Presence Studio の server と runtime-data に残っていた root barrel import を、browser
+onboarding/session、surface UX、OS surface、presence avatar、project/task registry、meeting、voice、
+secure I/O などの canonical subpath へ移行した。不足していた package export も追加し、挙動を変えずに
+依存境界を明示した。
+
+検証: middleware **1 file / 8 tests passed**、Presence Studio **4 files / 12 tests passed**、typecheck、
+packaging contract、Prettier（変更コード）を確認した。Presence の production root import は引き続き
+**74 occurrences / 69 files**であり、残りは次の境界移行 wave とする。
+
+## 86. 2026-08-29 review: Presence production import 全移行と mock drift の修正
+
+### 判定
+
+- 前回までの Presence production barrel import 74 occurrences / 69 files を再走査し、`from '@agent/core';` を 0 occurrences にした。
+- `presence/displays/concierge` の API route 群、Chronos の OS share-grants、operator-surface data、Terminal HUD などを canonical subpath に移行した。
+- subpath 化で発生した viewer / share-grant / control-plane の Vitest mock drift を direct module mock に修正した。認可結果が 403 に落ちる回帰を、実装変更ではなくテスト境界の不整合として切り分けた。
+- `terminal-hud/actions/ask.ts` は orchestration 実装へ直結せず `@agent/core/channel-surface` facade を利用し、module-layer direction violation を増やさない形にした。
+- 必要な package exports（generation-cost-settlement、skill-plugin-loader、share-grant 系）を追加した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run presence --reporter=dot --pool=forks --maxWorkers=1`: 72 files / 262 tests passed。
+- `pnpm exec vitest run scripts --reporter=dot --pool=forks --maxWorkers=1`: 129 files / 782 tests passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm run check -- --scope pr --only packaging-contract`: passed。
+- `pnpm check -- --scope pr`: 31/31 gates passed。
+- `pnpm run check -- --scope pr --only module-boundaries`: 0 cycles、4 direction violations（baseline 内）。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- tests 内には互換性のための `@agent/core` root import が残るが、production source の import は 0 件。今後の mock drift 防止では direct module mock を優先する。
+- module-boundaries の既存 direction violation 4 件、full plan 文書の既存 Prettier warning、環境依存の voice/browser capability 不足は今回の import 境界修正の対象外。
+
+## 87. 2026-08-29 SX-11 repair 実装の canonical 化
+
+### 判定
+
+- ADF repair の canonical agent は `validateAndRepairAdf` に保ち、すべての本番入口は `attemptAutonomousRepair` の共通 boolean boundary を通す。helper は file-backed ADF の canonical agent へ委譲するだけで、独自の JSON repair / LLM delegation / hint persistence は持たない。
+- `super-nerve` は `pipelinePath` が明示された file-backed 実行だけ共通 repair boundary を呼び、`run_super_pipeline` は検証済み input の絶対パスを渡す。A2A や in-memory step は durable contract がないため自動変更せず、失敗結果を返す。
+- sensitive category の approval / ops alert、canonical repair 後の caller validation、未指定 path の fail-closed を維持した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/autonomous-repair.test.ts libs/core/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: 3 files / 24 tests passed。
+- `pnpm run typecheck`: passed。
+
+### 残存リスク
+
+- SX-11 の `system:exec` 全件 guardrail、pipeline 語彙統一、未参照 fragment 処分は別 wave として残る。in-memory super-nerve の自動 repair を復活させる場合は、まず durable ADF contract を与える設計変更が必要である。
+
+## 88. 2026-08-29 SX-10 retry defaults の所有権整理
+
+### 判定
+
+- `video-composition` の retry wrapper が caller から `defaultRetry` を受け取っていたため、actuator ごとの retry defaults の所有権が共通 factory の外へ漏れていた。
+- 固定 defaults を `createGovernedRetryOptionsBuilder` に閉じ込め、manifest の recovery policy と retryable category 判定を通る `buildVideoRetryOptions()` へ統一した。render bundle と backend の両 retry は同一 builder を使用する。
+- iOS の `executePipeline` は index の public export から除外した。内部 runner は `handleAction` からのみ利用し、actuator ABI に domain-specific runner を追加しない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/actuators/video-composition-actuator/src/index.test.ts libs/actuators/ios-actuator/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: 2 files / 41 tests passed。
+- `pnpm run typecheck`: passed。
+- `pnpm run check -- --only op-preflight-coverage`: 36 public boundaries passed。
+
+### 残存リスク
+
+- 他 actuator の domain-specific `executePipeline` は nested control、trace、context persistence の差異を含むため、共通 SDK への移行は各 runner の契約テストを追加しながら継続する。
+
+## 89. 2026-08-29 SX-14 env registry 構造品質の fail-closed 化
+
+### 判定
+
+- env registry quality checker が required/documented/secret の意味検査だけを行い、malformed entry、重複名、不正な `category` / `type`、不正な enum を受け入れる余地があった。
+- checker に canonical な `KYBERION_*` 名、許可された category/type、boolean/string の型、enum の存在・一意性、重複名を追加検査し、壊れた入力は checker 自体を落とさず違反一覧として fail-closed に返すようにした。
+- discovery 用の非アンカー regex と registry entry 検証用のアンカー regex を分離し、動的 prefix の検出除外を維持した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/generate_env_registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: 1 file / 10 tests passed。
+- `pnpm run check -- --scope full --only env-registry`: 1/1 passed（412 entries）。
+
+### 残存リスク
+
+- registry の説明未整備 entry は **342件**残る。自動生成の一般文で documented 扱いにせず、運用意味を確認できる単位で段階的に記述する。
+
+## 90. 2026-08-29 SX-03 JSON foundation adoption の検出漏れ修正と残差移行
+
+### 判定
+
+- foundation adoption checker の `JSON.parse(safeReadFile(...))` 検出が、改行と `String(...)` を含む実際の記述を見逃していたため、改行・ラッパーを含む正規表現へ修正し、検出回帰テストを追加した。
+- 検出された本番 32 箇所を `readJson` / `readJsonIfPresent` へ移行した。health / spend / service readiness、selection preferences、mission / peer state、plugin / source metadata、schema checker、first-win / migration / facet scripts、Concierge preview を含む。既存の raw text、JSONL 行、CLI stdout の parse はファイル JSON loader の対象外として維持した。
+- foundation 側の optional reader が missing / malformed を `null` に収束させる契約を利用し、既存の fail-closed fallback と、plugin manifest の invalid JSON に対する診断ログを保った。
+
+### 実測 evidence
+
+- 強化後の production scan: 対象 bypass **0件**。
+- `pnpm exec vitest run ...`: **10 files / 66 tests passed**（health、spend、service readiness、selection、source analysis、plugin、control plane、mission、peer recovery、foundation checker）。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-03 の Ajv 全移行、env accessor の全体計測、private text/time helper の adopt-or-delete、catalog loader (SX-04) は未完了であり、今回の JSON loader slice の完了を SX-03 全体の完了とは扱わない。
+
+## 91. 2026-08-29 SX-04 policy catalog fallback の共通化
+
+### 判定
+
+- `defineCatalog` に `fallbackOnInvalid` を opt-in で追加し、存在するが JSON/schema 検証に失敗した catalog を、missing catalog と同じ cache 経路で fallback できるようにした。既存 catalog は opt-in しない限り従来どおり invalid を throw する。
+- `video-render-runtime-policy` の手書き `safeJsonParse` loader を `defineCatalog` へ移行した。環境変数による path override、schema検証、mtime/size cache、既存 fallback、invalid時の warning を保持した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **2 files / 10 tests passed**。
+- invalid override の fallback 回帰テストを追加。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+
+### 残存リスク
+
+- `tool-runtime-policy` と `voice-sample-ingestion-policy` など、dynamic path・execution context・fallback logging を持つ手書き loader は未移行。各々の context boundary と fallback telemetry を確認してから同じ opt-in catalog へ移す。
+
+## 92. 2026-08-29 SX-04 dynamic policy catalog の追加移行
+
+### 判定
+
+- `tool-runtime-policy` と `voice-sample-ingestion-policy` の手書き JSON loader を `defineCatalog` へ移行した。前者は `sovereign_concierge` の execution context、後者は invalid catalog の warning、両者とも env path override・fallback・cache reset を維持した。
+- `video-render-runtime-policy` を含む dynamic policy 3 件が、schema 検証と `fallbackOnInvalid` を共有する状態になった。catalog cache の reset API から内部 catalog cache も reset するようにし、テスト間の状態漏れを防いだ。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/tool-runtime-policy.test.ts libs/core/voice-sample-ingestion-policy.test.ts libs/core/video-render-runtime-policy.test.ts libs/core/foundation/index.test.ts`: **4 files / 17 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader 0 件、未参照 catalog 処分、schema 根統合、`*_PATH` 上書きの一元化は未完了。今回の 3 policy 移行を SX-04 全体の完了とは扱わない。
+
+## 93. 2026-08-29 SX-04 policy / template catalog の追加移行
+
+### 判定
+
+- `tool-runtime-policy`、`voice-sample-ingestion-policy`、`video-render-runtime-policy` に続き、`video-composition-template-registry` の手書き JSON loader も `defineCatalog` へ統合した。
+- 4 policy / registry は schema、dynamic path、fallback、mtime/size cache を共通 foundation で扱う。tool runtime の execution context、invalid 時の voice/video warning、各テスト用 cache reset は個別の境界として維持した。
+- provider egress の missing/invalid status API、quota の tenant override、security screen の strict fail-closed など、domain 判定そのものが loader 結果を表すものは今回の単純 fallback 移行対象から除外した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/video-composition-template-registry.test.ts libs/core/video-render-runtime-policy.test.ts libs/core/tool-runtime-policy.test.ts libs/core/voice-sample-ingestion-policy.test.ts libs/core/foundation/index.test.ts`: **5 files / 19 tests passed**。
+- invalid schema fallback の回帰テストを追加。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader 0 件、未参照 catalog 処分、schema 根統合、`*_PATH` 上書きの一元化は未完了。provider egress、quota、security posture などは domain-specific fail-closed contract を確認して段階移行する。
+
+## 94. 2026-08-29 SX-04 provider egress catalog の検証経路統合
+
+### 判定
+
+- `provider-egress-gate` の手書き `safeReadFile` / `JSON.parse` / Ajv validator を `defineCatalog` に統合した。
+- `missing` / `invalid` / `ok` の `PolicyLoadResult` は維持し、invalid policy を fallback へ置換せず、confidential / personal の fail-closed 判定と既存の missing 文言を保持した。
+- provider egress の外側の結果 cache と catalog の schema / secure I/O / path-signature cache を分離して保ち、既存の test reset から両方を初期化するようにした。checked-in policy の `$schema` metadata も回帰テストで確認した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/provider-egress-gate.test.ts libs/core/foundation/index.test.ts`: **2 files / 31 tests passed**。
+
+### 残存リスク
+
+- provider egress の quota、security posture、その他 tenant-specific catalog は domain 判定と loader 結果が結合しているため、単純な `fallbackOnInvalid` への置換は行っていない。SX-04 の全 catalog loader 0 件、未参照 catalog 処分、schema 根統合、`*_PATH` 上書きの一元化は引き続き未完了。
+
+## 95. 2026-08-29 SX-03 provider capability snapshot の JSON foundation 移行
+
+### 判定
+
+- provider capability registry の persisted snapshot 読み込みに残っていた `safeReadFile` + `JSON.parse` を foundation の `readJson` へ移行した。
+- snapshot の malformed / missing / expired を `null` に収束させる既存の fail-soft 契約、`safeExistsSync` による存在確認、write 側の secure I/O は維持した。
+- foundation bridge をモックする回帰テストを追加し、probe / TTL / schema 契約の既存テストを壊していないことを確認した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/provider-capability-registry.test.ts`: **1 file / 10 tests passed**。
+
+### 残存リスク
+
+- SX-03 の JSON foundation adoption には、CLI stdout / JSONL / schema artifact など意図的に raw parse を残す領域と、未移行の state / registry loader がまだある。全 Ajv 経路、env accessor、private helper の整理も別途継続する。
+
+## 96. 2026-08-29 SX-03/SX-06 production bare core import の残差整理
+
+### 判定
+
+- production tree に残っていた bare `@agent/core` import 4 箇所を、tenant design / secure I/O / audio bus / path resolver / logger / mission-team-index / event-scope の公開 subpath へ分割した。
+- runtime の処理順序と公開 API は変更せず、Chronos の dynamic import と型参照も実際の責務境界に揃えた。
+- 機械走査上、`libs` / `scripts` / `presence` / `satellites` の production bare core import は **0件**になった。test fixture の root import は今回の production boundary 対象外として維持した。
+
+### 実測 evidence
+
+- production scan: **0 occurrences**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-03 の subpath 整理は production bare import 以外にも、private helper、未移行 state loader、Ajv 経路、scripts の細粒度 harness などが残る。test-only root import と package barrel 自体は互換性のため残す。
+
+## 97. 2026-08-29 SX-03 project / track / service binding registry の foundation 移行
+
+### 判定
+
+- project、project-track、service-binding registry に残っていた schema の `safeReadFile` + `JSON.parse` + module-local Ajv compile を foundation の `compileSchema` / `readJson` に統合した。
+- 保存・読み込み・一覧化・不正レコードの除外という既存の registry 契約と、alternate root を受ける project/track path は維持した。
+- foundation の secure I/O bridge と schema compile 経路を 3 registry で共有し、直接 JSON loader と Ajv インスタンス生成の重複を削減した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/project-track-registry.test.ts`: **2 files / 7 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- state / session / artifact の JSON loader、custom Ajv を伴う schema compiler、CLI stdout / JSONL は引き続き責務別に段階移行する。schema artifact の `$schema` 互換と domain-specific invalid handling は各契約を確認してから扱う。
+
+## 98. 2026-08-29 SX-03/SX-04 service runtime registry の foundation 統合
+
+### 判定
+
+- `service-runtime-registry` の registry / state 読み込みに残っていた `safeReadFile` + `safeJsonParse` を foundation の `defineCatalog` / `readJson` へ移行した。
+- missing は従来どおり fallback、invalid registry も fallback、state の malformed は `null` という既存の fail-soft 契約を維持した。registry schema、dynamic env path、test cache reset も共通 catalog に接続した。
+- `fallbackOnInvalid` は domain の fallback が明示されている service registry にだけ適用し、provider egress のような status 判定型 loader と同じ扱いにはしていない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/service-runtime-registry.test.ts`: **1 file / 3 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader 統合、未参照 catalog 処分、schema 根統合、`*_PATH` 上書きの一元化は未完了。service runtime state の構造 schema 検証と、他の tenant/state registry は別スライスで継続する。
+
+## 99. 2026-08-29 SX-03 protocol service registry の JSON foundation 移行
+
+### 判定
+
+- protocol service registry のファイル読み込みを `safeReadFile` + `JSON.parse` から foundation `readJson` へ移行した。
+- `entries` の存在・各 scope / authority metadata の必須検査は domain-specific contract として維持し、未知の service を拒否する既存の fail-closed 経路も変更していない。
+- generic `governance-catalog` schema は追加属性を許容するため、今回 `defineCatalog` による fallback は導入せず、foundation JSON reader の adoption に限定した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/protocol-service-registry.test.ts`: **1 file / 2 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- governance catalog の domain-specific schema 根統合、provider capability catalog、schedule registry、security posture などは引き続き個別契約を確認して移行する。
+
+## 100. 2026-08-29 SX-03 schedule registry の JSON foundation 移行
+
+### 判定
+
+- pipeline scheduler の persisted schedule registry 読み込みを `safeReadFile` + `JSON.parse` から foundation `readJson` へ移行した。
+- missing registry の empty fallback、malformed registry の warning + empty fallback、`pipelinePath` の repo-relative 正規化と外部絶対パス拒否は従来どおり維持した。
+- scheduler の state-driven 制御や run lock の責務には変更を加えず、ファイル JSON loader の境界だけを整理した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/src/pipeline-scheduler.test.ts`: **1 file / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- state / session / artifact の JSON loader、provider capability catalog、security posture、scripts の raw JSON loader は引き続き段階移行する。JSONL と CLI stdout の parse は foundation JSON reader の対象外である。
+
+## 101. 2026-08-29 SX-03 security posture の JSON foundation 移行
+
+### 判定
+
+- security screen の posture catalog 読み込みを `safeReadFile` + `JSON.parse` から foundation `readJson` へ移行した。
+- `dangerous/auto/strict` の環境変数・catalog 解釈、invalid JSON 時の strict、invalid field 時の auto、短時間 cache は維持した。
+- quarantine の JSONL rotation / append と screener verdict の raw model output parse は別の入力形式・責務のため変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/security-screen.test.ts`: **1 file / 26 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- security posture の dedicated schema、state / session / artifact loader、provider capability catalog、scripts の raw JSON loader は引き続き別契約として段階移行する。
+
+## 102. 2026-08-29 SX-03 provider discovery の JSON foundation 移行
+
+### 判定
+
+- provider discovery の disk cache、knowledge capability catalog、probe merge 読み込みに残っていた 3 つの `safeReadFile` + `JSON.parse` を foundation `readJson` へ移行した。
+- cache miss、malformed catalog、probe merge の空 catalog fallback と manual capability の保持・union/replace semantics は維持した。
+- capability catalog に dedicated schema がないため `defineCatalog` fallback は追加せず、既存の entry shape 検査と非致命 fallback を維持した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/provider-discovery.test.ts libs/core/provider-capability-catalog.test.ts libs/core/provider-capability-catalog-writer.test.ts`: **3 files / 8 tests passed**。
+- foundation reader を導入したテスト double の不足を修正し、knowledge catalog の present / malformed / malformed-entry fallback と probe merge の union / discovery 反映を再確認した。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
+
+### 残存リスク
+
+- state / session / artifact の JSON loader、provider capability catalog の schema 根統合、scripts の raw JSON loader は引き続き残存する。今回の catalog は既存の runtime fallback 契約を壊さない範囲に限定した。
+
+## 103. 2026-08-29 SX-03 heartbeat / cowork health state の JSON foundation 移行
+
+### 判定
+
+- daemon heartbeat と cowork sync state の persisted JSON 読み込みを foundation `readJson` へ移行した。
+- heartbeat の missing / malformed / stale 判定、cowork state の missing / unreadable を未同期扱いにする health 契約は維持した。
+- heartbeat / cowork の JSON state と、security-screen の quarantine JSONL、model / CLI の structured stdout parse は入力形式が異なるため混同していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/daemon-heartbeat.test.ts libs/core/cowork-health-check.test.ts`: **2 files / 13 tests passed**。
+- foundation reader を導入した cowork health test double を補完し、stale / fresh / missing state の既存挙動を再確認した。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
+
+### 残存リスク
+
+- session / artifact / relationship / intent cache などの state loader、provider capability catalog の schema 根統合、scripts の raw JSON loader は引き続き段階移行する。
+
+## 104. 2026-08-29 SX-03 artifact / relationship / data-vault state の JSON foundation 移行
+
+### 判定
+
+- artifact record、relationship graph node、data-vault entry の persisted JSON 読み込みを foundation `readJson` に移行した。
+- artifact / relationship の missing→`null`、data-vault の missing・malformed→`null`、既存の artifact record validation と relationship path sanitization は維持した。
+- confidential relationship と vault の読み込みは secure I/O bridge を通り、tier boundary や write path を迂回しない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/artifact-record.test.ts libs/core/data-vault.test.ts libs/core/relationship-graph-store.test.ts libs/core/project-registry.test.ts`: **4 files / 35 tests passed**。
+- foundation reader を導入した data-vault test double を補完し、cache hit / persisted entry / listing / expired entry の既存挙動を再確認した。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
+
+### 残存リスク
+
+- intent-flow cache、delegated-task、mission/artifact closure、peer state などの state loader、scripts の raw JSON loader、schema/Ajv の統合は引き続き段階移行する。
+
+## 105. 2026-08-29 SX-03 intent-flow cache の JSON foundation 移行
+
+### 判定
+
+- intent-flow cache store の persisted JSON 読み込みを `safeReadFile` + `JSON.parse` から foundation `readJson` へ移行した。
+- cache miss、malformed JSON の fail-open、schema validation failure、TTL / hit / write の既存契約は維持した。cache の内容や personal-tier 非保存ルールは変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/intent-flow-cache.test.ts`: **1 file / 5 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
+
+### 残存リスク
+
+- delegated-task、mission/artifact closure、peer state、scripts の raw JSON loader、schema/Ajv の全体統合は引き続き段階移行する。
+
+## 106. 2026-08-29 SX-03 delegated-task / distill-candidate state の JSON foundation 移行
+
+### 判定
+
+- delegated-task observability record と distill-candidate record の persisted JSON 読み込みを foundation `readJson` へ移行した。
+- missing / malformed record の nullable・非致命扱い、delegation の active/completed 状態復元、distill candidate の schema validation / list / update は維持した。
+- JSONL trace / inbox / notification は行単位の形式と append/replay 契約があるため、今回の JSON object reader 移行対象には含めていない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/delegated-task-observability.test.ts libs/core/distill-candidate-registry.test.ts`: **2 files / 20 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`（31/31）、`git diff --check`、`pnpm exec tsx scripts/check_foundation_adoption.ts` も passed。
+
+### 残存リスク
+
+- mission/artifact closure、peer state、scripts の raw JSON loader、schema/Ajv の全体統合、full ADF runner/repair は引き続き段階移行する。
+
+## 107. 2026-08-29 SX-03/SX-04 company・conversation・project state loader の foundation 統合
+
+### 判定
+
+- company aggregate の customer / identity / organization profile、browser conversation の schema・session・snapshot・runtime session、intent handoff・injection signal の JSON object loader を foundation `readJson` へ移行した。
+- peer conversation の schema・session、task session、project operational state の schema・state loader も同じ境界へ統合した。
+- 既存の missing / malformed の扱い、Ajv validation、session list、tenant/project query、handoff 消費後の削除、injection scope 判定は維持した。
+- JSONL inbox / peer event / trace、lock metadata、CLI・model stdout は行形式または別の入力責務のため変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/company.test.ts libs/core/browser-conversation-session.test.ts libs/core/intent-handoff.test.ts`: **3 files / 14 tests passed**。
+- `pnpm exec vitest run libs/core/peer-conversation.test.ts libs/core/task-session.test.ts`: **2 files / 22 tests passed**。
+- `pnpm exec vitest run libs/core/project-operational-state-registry.test.ts`: **1 file / 3 tests passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- mission/artifact closure、feedback / intent compiler、procedure / seed / peer messaging catalog、scripts の raw JSON loader、schema/Ajv の全体統合、full ADF runner/repair は引き続き責務ごとに段階移行する。
+
+## 108. 2026-08-29 SX-03/SX-04 mission seed / procedure registry の foundation 統合
+
+### 判定
+
+- mission seed record の persisted JSON 読み込みを foundation `readJson` へ移行した。customer overlay と shared runtime の優先順、schema validation、missing / invalid の既存挙動は維持した。
+- procedure registry の personal / public catalog 読み込みを foundation `readJson` へ移行した。optional overlay、first-win の重複排除、構造不正 entry の除外、desktop promotion pending の遮蔽、malformed public catalog の empty fallback は維持した。
+- `compileSchema` を既に利用している mission seed の schema 境界と、domain-specific shape 検証を行う procedure catalog の境界を混同せず、generic fallback を追加していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/mission-seed-registry.test.ts libs/core/mission-seed-registry.overlay.test.ts`: **2 files / 4 tests passed**。
+- `pnpm exec vitest run libs/core/procedure-registry.test.ts`: **1 file / 25 tests passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- mission/artifact closure、feedback / intent compiler、peer messaging catalog、scripts の raw JSON loader、schema/Ajv の全体統合、full ADF runner/repair は引き続き責務ごとに段階移行する。
+
+## 109. 2026-08-29 SX-03 peer messaging / evidence / feedback state の foundation 統合
+
+### 判定
+
+- peer network catalog の load / registration、evidence chain registry の load / query、feedback-loop の hint / schedule registry 読み込みを foundation `readJson` へ移行した。
+- peer catalog の tenant / visibility / shared secret 検査、registration の confidential-or-tmp path 制約、evidence の array / `entries` / `chain` 互換、feedback の malformed fallback と schedule auto-disable の既存 semantics は維持した。
+- peer HTTP response の structured stdout、evidence の raw artifact hash、JSONL event / inbox / trace は別形式・別責務として変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/peer-messaging.test.ts libs/core/mesh-hub-peer-messaging-adapter.test.ts libs/core/evidence-chain.test.ts`: **3 files / 23 tests passed**。
+- `pnpm exec vitest run libs/core/src/feedback-loop.test.ts`: **1 file / 7 tests passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- mission/artifact closure、feedback / intent compiler の未移行 loader、tool runtime / media / voice catalog、scripts の raw JSON loader、schema/Ajv の全体統合、full ADF runner/repair は引き続き責務ごとに段階移行する。
+
+## 110. 2026-08-29 SX-03/SX-04 PFC・knowledge・policy/catalog loader の foundation 統合
+
+### 判定
+
+- PFC state、procedure self-repair delta、external hook config、plugin manifest、untrusted-content の signal / mission state を foundation `readJson` に移行した。
+- knowledge slices、knowledge index の disk cache、knowledge feedback aggregate、pipeline engine の sub-pipeline、delegation child registry、storage janitor の data-vault / delegation state を移行した。
+- presence avatar、voice TTS / voice profile、brand token、autonomous ops、media backend、tool actuator routing、intent compiler の file catalog / policy loader も foundation 境界へ統合した。
+- plugin manifest の unreadable / invalid JSON 診断、policy の fallback、knowledge の fail-open、PFC の forward-compatible default backfill、storage の malformed-entry skip など既存の domain semantics を維持した。
+- JSONL（A2A / inbox / trace / artifact closure）、CLI・model・HTTP structured output、env string の JSON、raw text / binary hash は別形式・別責務のため対象外とした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/src/pfc/PfcController.test.ts libs/core/procedure-self-repair.test.ts`: **2 files / 26 tests passed**。
+- `pnpm exec vitest run libs/core/plugin-managed-install.test.ts`: **1 file / 6 tests passed**。
+- `pnpm exec vitest run libs/core/external-hook-discovery.test.ts libs/core/surface-access-policy.test.ts`: **2 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/untrusted-content.test.ts`: **1 file / 16 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge-slices.test.ts libs/core/src/knowledge-index.test.ts libs/core/src/knowledge-feedback-loop.test.ts libs/core/src/pipeline-engine.test.ts`: **4 files / 46 tests passed**。
+- `pnpm exec vitest run libs/core/delegation-concurrency.test.ts libs/core/storage-janitor.test.ts`: **2 files / 59 tests passed**。
+- `pnpm exec vitest run libs/core/presence-avatar.test.ts libs/core/voice-tts-config.test.ts`: **2 files / 4 tests passed**。
+- `pnpm exec vitest run libs/core/voice-profile-registry.test.ts`: **1 file / 6 tests passed**。
+- `pnpm exec vitest run libs/core/src/intent-compiler.test.ts`: **1 file / 8 tests passed**。
+- `pnpm exec vitest run libs/core/src/autonomous-ops-gate.test.ts libs/core/media-backend-registry.test.ts`: **2 files / 14 tests passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `safeJsonParse` を使う file loader の残存（必要な error-label semantics を確認して個別移行）、mission/artifact closure、storage / PFC の追加 schema 強化、scripts の raw JSON loader、full ADF runner/repair は継続対象である。
+
+## 111. 2026-08-29 SX-03/SX-04 cowork・worker state と script loader の foundation 統合
+
+### 判定
+
+- Cowork outbox packet と worker state journal の派生 summary index の persisted JSON 読み込みを foundation `readJson` へ移行した。JSONL journal の行単位 replay は authoritative append-only format のため従来どおり維持した。
+- `run_baseline_check` の scheduler marker、baseline cache envelope、janitor submission marker を foundation `readJson` へ移行した。daily alert の pure parser、audit JSONL、service-connection-readiness の raw config parser は入力形式とテスト契約を維持した。
+- CI gate parity の `package.json`、ADF input の JSON file、actuator playground の manifest を foundation `readJson` へ統合した。ADF fragment の repair-aware raw parser、CLI引数・HTTP/model stdout の JSON parse はそれぞれの責務を維持した。
+- Cowork outbox の corrupt entry skip、worker summary の self-healing、baseline の cache miss / stale fallback、ADF の trust gate・guardrail validation、manifest の invalid skip は変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/run_baseline_check.test.ts`: **1 file / 28 tests passed**。
+- `pnpm exec vitest run libs/core/cowork-surface.test.ts libs/core/worker-state-journal.test.ts`: **2 files / 26 tests passed**。
+- `pnpm exec vitest run scripts/refactor/adf-input.test.ts scripts/check_ci_gate_parity.test.ts`: **2 files / 13 tests passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- script 側では JSONL、CLI・HTTP/model stdout、stdin / env / raw input parser を除外しているため、これらを file loader と誤認して一括移行しない。mission/artifact closure の JSONL、storage / PFC の追加 schema 強化、full ADF runner/repair は引き続き別スライスで扱う。
+
+## 112. 2026-08-29 SX-03/SX-04 ADF 実行・repair の trust boundary 補強
+
+### 判定
+
+- `run_super_pipeline` と `run_pipeline_dry_run` が、任意の project-local ADF を無条件に `trustResolved: true` で読み込む経路を修正した。repository-owned の built-in pipeline は従来どおり起動でき、project-local resource は明示的な project-trust approval id がない限り blocked になる。
+- Super-Nerve の `core:call` / `core:include` は、repo 外の絶対・相対パスを拒否し、trust decision または exact project-trust approval がない限り macro をロードしないようにした。ADF engine の失敗結果契約（`status: failed`）は維持した。
+- `pipeline-adf` の autonomous repair も同じ repo containment と trust boundary を通すようにし、未承認の project-local ADF を repair agent が直接読み書きできる抜け道を塞いだ。実行時の trust／approval context は retry、preflight auto-repair、Super-Nerve repair まで伝播する。
+- 直前の SX-03/SX-04 loader 移行として、knowledge provider、pipeline preview、campaign、documentation source map、meeting、avatar の persisted JSON loader も foundation `readJson` に統合した。JSONL、CLI・HTTP・model stdout、ADF fragment の repair-aware parser など、別形式・別責務の parse は変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/adf-repair-agent.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts`: **2 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/knowledge-provider.test.ts libs/core/src/pipeline-preview.test.ts scripts/check_documentation_source_map.test.ts`: **3 files / 17 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: passed。
+- `pnpm check -- --scope pr`: **31/31 gates passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- JSONL の mission/artifact closure、inbox、trace、外部 structured output、raw input parser は形式責務が異なるため未移行である。
+- 全 ADF runner／repair 呼び出し元の trust・approval 網羅性、storage / PFC の追加 schema 強化、actuator 内の domain-specific `loadJson` は引き続き個別レビュー対象である。
+
+## 113. 2026-08-29 SX-03/SX-04 mission・registry loader の foundation 統合
+
+### 判定
+
+- mission orchestration event、phase gate、task recovery、planning packet、process planning、mission progress、mission lifecycle completion の persisted JSON loader を foundation `readJson` へ統合した。
+- mission hygiene、pending intent、promotion candidate、mission state の optional JSON と、organization operating model の schema／catalog／state loader を foundation 境界へ統合した。既存の nullable fallback、schema validation、状態の優先順位、organization scope の semantics は維持した。
+- mission team index の agent／authority／team role／template catalog、model registry directory、capability bundle registry、analysis execution contract の JSON catalog を統合した。directory filename／id 整合性、Ajv validation、overlay の適用順、cache semantics は変更していない。
+- JSONL の orchestration journal、worker event、inbox、mesh subscription、trace、および task board 等の raw text は行形式・append-only・表示責務のため未変更とした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/mission-orchestration-events.test.ts libs/core/mission-task-recovery.test.ts libs/core/mission-process-planning.test.ts libs/core/organization-operating-model.test.ts`: **4 files / 34 tests passed**。
+- `pnpm exec vitest run libs/core/mission-hygiene.test.ts libs/core/pending-intent-store.test.ts libs/core/mission-lifecycle.test.ts libs/core/mission-orchestration-scenario-pack.test.ts libs/core/organization-profile.test.ts libs/core/mission-team-composer.test.ts`: **6 files / 54 tests passed**。
+- `pnpm exec vitest run libs/core/model-registry-directory.test.ts libs/core/analysis-contract.test.ts libs/core/capability-bundle-registry.test.ts`: **3 files / 14 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- JSONL replay／corrupt-line policy の共通化、外部 CLI・HTTP・model structured output、raw input parser は別形式のため未移行である。
+- core／actuator 内に残る domain-specific `loadJson`、tier-guard／authority bootstrap、追加 storage／PFC schema 強化は引き続き個別レビューが必要である。
+
+## 114. 2026-08-29 SX-03/SX-04 operator・runtime state loader の foundation 統合
+
+### 判定
+
+- agent activity board、artifact bundle、capability broker の pin、execution feedback、operator home summary、surface runtime、surface UX、trigger runner の persisted JSON loader を foundation `readJson` に統合した。
+- operator／surface の missing state、malformed state の fail-open、artifact／feedback の schema validation、provider pin の cache fallback、surface の manifest／runtime status 集約、trigger の audit failure handling は維持した。
+- 既存の secure-io を mock する hermetic tests には foundation JSON bridge の test double を追加した。テストだけが foundation 登録なしで silent empty fallback になる状態を防いだ。
+- event stream／trigger ledger 等の JSONL、surface log と raw text、外部 structured output は今回も対象外とした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/agent-activity-board.test.ts libs/core/artifact-bundle.test.ts libs/core/capability-broker.test.ts libs/core/execution-feedback.test.ts libs/core/operator-home-summary.test.ts libs/core/surface-ux-contract.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/trigger-runner.test.ts`: **8 files / 54 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- JSONL の共通 replay／corrupt-line policy、外部 CLI・HTTP・model structured output、tier-guard／authority の bootstrap reader は別責務として残っている。
+- actuator 内の domain-specific `loadJson`、追加 storage／PFC schema 強化、全 production caller の loader coverage は継続レビュー対象である。
+
+## 115. 2026-08-29 SX-03 JSONL replay helper の共通化
+
+### 判定
+
+- foundation `readJsonLines` に `throw`／`skip` の malformed policy と one-based line number mapper を追加した。secure foundation I/O の存在確認・読み取りを維持し、JSONL を通常の JSON object loader と混同しない共通境界を整えた。
+- history search の conversation／channel／trace replay、worker event stream replay、mesh topic subscription replay を共通 helper へ移行した。
+- history search と worker event stream の corrupt-line skip、trace／event の domain validation、mesh の malformed record を throw する既存契約は維持した。mission graph／agent input queue／prompt visibility の line-specific error semantics は別実装として残した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/worker-event-stream.test.ts libs/core/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- JSONL の各 domain が要求する line number／corruption／scope validation の差分は残るため、全 JSONL を無条件に helper 置換してはいけない。
+- 外部 CLI・HTTP・model structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、追加 storage／PFC schema 強化は継続対象である。
+
+## 115. 2026-08-29 SX-03 JSONL replay helper の共通化
+
+### 判定
+
+- foundation `readJsonLines` に malformed JSON／domain mapper の `throw`・`skip` policy と one-based line number を追加した。通常の persisted JSON reader と JSONL replay の形式差を保ったまま、secure foundation I/O 上で再利用できる境界を整えた。
+- history search の conversation／channel／trace replay、worker event stream replay、mesh topic subscription replay を共通 helper へ移行した。
+- history search／worker event stream の corrupt-line skip、trace／event の schema validation、mesh replay の throw semantics は維持した。line-specific なエラー形式を持つ mission graph／agent input queue／prompt visibility は独自 parser のまま残した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/history-search-index.test.ts libs/core/worker-event-stream.test.ts libs/core/mesh-topic-registry.test.ts`: **4 files / 24 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- JSONL 各 domain の scope／line validation と append/replay の個別契約、外部 CLI・HTTP・model structured output、tier-guard／authority bootstrap reader は継続対象である。
+- actuator 内の domain-specific loader、追加 storage／PFC schema 強化、全 production caller の foundation adoption coverage も未完了である。
+
+## 116. 2026-08-29 SX-03 deliverable inbox JSONL replay の foundation 統合
+
+### 判定
+
+- deliverable inbox の append-only `entries.jsonl` 読み込みを foundation `readJsonLines` へ移行した。
+- malformed JSON の skip、必須 `entry_id` による無効 entry の除外、legacy entry の default 補完、lock metadata の診断と lock／rewrite の動作は維持した。
+- JSONL の line-specific error contract を持つ prompt visibility、mission graph、agent input queue は別責務として変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/deliverable-inbox.test.ts libs/core/foundation/json.test.ts`: **2 files / 6 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- prompt visibility／mission graph／agent input queue の domain-specific JSONL corruption semantics、外部 CLI・HTTP・model structured output、tier-guard／authority bootstrap reader は継続対象である。
+- actuator 内の domain-specific loader と追加 storage／PFC schema 強化も未完了である。
+
+## 117. 2026-08-29 SX-03 domain-specific JSONL error policy の共通化
+
+### 判定
+
+- foundation `readJsonLines` に domain callback を追加し、malformed JSON／mapper failure を domain 固有の stable error へ変換できるようにした。
+- prompt visibility ledger を共通 helper へ移行し、`MISSION_LOG_CORRUPT:prompt_visibility_record:<line>` の throw semantics と record-shape validation を維持した。
+- deliverable inbox の skip／normalization、history／worker／mesh replay の既存 policy と組み合わせ、共通 helper の適用範囲を拡張した。mission graph／agent input queue の複雑な line-specific validation は独自 parser のまま残した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/foundation/json.test.ts libs/core/prompt-visibility-ledger.test.ts`: **2 files / 7 tests passed**。
+- `pnpm exec vitest run libs/core/deliverable-inbox.test.ts libs/core/foundation/json.test.ts`: **2 files / 6 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed。
+
+### 残存リスク
+
+- mission graph／agent input queue の sequence／line error、artifact closure／trace の replay semantics、外部 CLI・HTTP・model structured output は継続対象である。
+- tier-guard／authority bootstrap、actuator 内の domain-specific loader、追加 storage／PFC schema 強化も未完了である。
+
+## 118. 2026-08-29 SX-03 mission graph・agent queue・mesh registry replay の foundation 統合
+
+### 判定
+
+- mission graph journal は foundation `readJsonLines` で JSON の読み取りを行い、`graph_started`、sequence 連続性、node payload、finish 状態の domain validation は既存 parser に残した。
+- agent input queue は foundation `readJsonLines` の one-based line number を利用し、malformed JSON を `unreadable record:<line>`、shape 不正を `invalid record:<line>` として fail-closed に維持した。delivery／metadata／scope の固有 validation error も隠蔽しない。
+- mesh peer の tenant 別 registration／presence／capability registry replay を foundation `readJsonLines` へ移行した。blank line の扱い、latest-by-peer／capability の reducer、tenant boundary は変更していない。malformed registry は従来どおり例外で停止する。
+- CLI／HTTP／model の structured output は外部 transport の応答 parser であり、永続 JSON loader／JSONL replay と責務が異なるため対象外とした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/mesh-peer-directory.test.ts libs/core/agent-input-queue.test.ts libs/core/mission-graph-run-journal.test.ts libs/core/foundation/json.test.ts`: **4 files / 20 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope pr`（31/31）、`git diff --check`: passed（直前の foundation／JSONL 移行後の gate 実測）。
+
+### 残存リスク
+
+- artifact closure／trace、agent collaboration projection、その他の append-only event／ledger は、skip・監査・hash・tenant projection などの domain policy を個別確認してから追加移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、追加 storage／PFC schema 強化は未完了である。
+
+## 119. 2026-08-29 SX-03 artifact index・ownership registry replay の foundation 統合
+
+### 判定
+
+- scope-local `artifacts-index.jsonl` と shared artifact ownership `registry.jsonl` の読み込みを foundation `readJsonLines` へ移行した。
+- どちらも malformed JSON を skip せず fail-closed に維持し、artifact scope placement、ownership query、created_at／artifact_id の並び替え、既存の concurrent-delete race 処理は変更していない。
+- mission closure の index rewrite は解釈できない行を verbatim 保存する別契約のため、今回の typed reader へ統合していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/artifact-registry.test.ts libs/core/artifact-store.test.ts libs/core/agent-collaboration-projection.test.ts libs/core/graph-run-artifact.test.ts libs/core/foundation/json.test.ts`: **5 files / 29 tests passed**。
+
+### 残存リスク
+
+- mission closure／trace、knowledge feedback／memory queue、その他の append-only ledger は、raw record preservation・hash・audit・tenant projection の個別契約を確認してから移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、SX-12〜14 の大きな残差は継続対象である。
+
+## 120. 2026-08-29 SX-03 feedback・performance state replay の foundation 統合
+
+### 判定
+
+- memory promotion queue の global／tenant queue 読み取りを foundation `readJsonLines` へ移行した。scope key、candidate 重複判定、ambiguity 拒否、status rewrite は変更していない。不正 JSON は従来どおり停止する。
+- knowledge gap feedback の cluster count と intent snapshot、runtime health、agent/model performance の JSONL 読み取りを共通化した。各 domain の malformed record policy（skip または throw）と集計・drift 判定を維持した。
+- 外部 structured output、mission closure の raw line preservation、trace persistence は JSONL reader と異なる責務のため引き続き個別管理とした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/model-performance-index.test.ts libs/core/intent-snapshot-store.test.ts libs/core/runtime-health-history.test.ts libs/core/agent-collaboration-projection.test.ts libs/core/artifact-registry.test.ts libs/core/artifact-store.test.ts libs/core/src/knowledge-feedback-loop.test.ts libs/core/memory-promotion-queue.test.ts libs/core/foundation/json.test.ts`: **9 files / 66 tests passed**。
+
+### 残存リスク
+
+- mission closure／trace、その他の append-only ledger は raw record preservation・hash・audit・tenant projection の domain policy を個別確認してから移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、SX-12〜14 の大きな残差は未完了である。
+
+## 121. 2026-08-29 SX-03 work coordination・action item replay の foundation 統合
+
+### 判定
+
+- work-coordination の items／leases／coordination events と action-item store の mission evidence JSONL 読み込みを foundation `readJsonLines` へ移行した。
+- work item の fail-closed validation と action item の malformed／legacy-policy skip、latest record reduction、lease／handoff、scope validation は既存の domain layer に残した。
+- stimuli journal は secure-io の bounded read（5MB ceiling）と回転処理が一体のため、共通 helper への移行対象から除外した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/work-coordination.test.ts libs/core/action-item-store.test.ts libs/core/foundation/json.test.ts`: **3 files / 34 tests passed**。
+
+### 残存リスク
+
+- mission closure、trace／stimuli、その他の append-only ledger は raw preservation、bounded read、hash、audit、tenant projection の個別 policy を確認してから移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、SX-12〜14 の大きな残差は未完了である。
+
+## 122. 2026-08-29 SX-03 peer messaging・delegation notification replay の foundation 統合
+
+### 判定
+
+- peer messaging の tenant registry／peer directory JSONL と delegation notification の永続 JSONL 読み込みを foundation `readJsonLines` へ移行した。
+- malformed JSON の扱い、legacy `report_provenance` の補完、tenant／scope validation、通知の順序付けと既存の transport payload 読み取りは変更していない。
+- peer messaging の署名・TTL・送信権限や delegation notification の append／rewrite は domain layer に残し、外部 HTTP 応答 parser は今回の永続 replay 移行に含めていない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/peer-messaging.test.ts libs/core/peer-messaging-peer.test.ts libs/core/delegation-notifications.test.ts libs/core/foundation/json.test.ts --reporter=dot`: **3 files / 24 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed（途中で検出された未使用 import を削除後に再実行）。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: **OK**。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- mission closure、trace／stimuli、hash／audit chain を持つ append-only ledger は raw preservation、bounded read、整合性検証の個別 policy を確認してから移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、SX-12〜14 の大きな残差は未完了である。
+
+## 123. 2026-08-29 SX-03 metrics・trash index replay の foundation 統合
+
+### 判定
+
+- `metrics.ts` の execution／resource usage JSONL 読み込みを foundation `readJsonLines` へ移行した。
+- metrics の既存契約である「読み込み中に malformed JSON があれば履歴全体を空として fail-closed」と、resource usage の型付き replay を維持した。
+- `storage-janitor.ts` の `.trash-index.jsonl` replay も共通化した。torn line の skip、最後の path record の優先、mtime fallback、読取失敗時の警告は変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/metrics.test.ts libs/core/foundation/json.test.ts --reporter=dot`: **2 files / 18 tests passed**。
+- `pnpm exec vitest run libs/core/storage-janitor.test.ts libs/core/foundation/json.test.ts --reporter=dot`: **2 files / 48 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`git diff --check`: passed。
+
+### 残存リスク
+
+- mission closure、trace／stimuli、hash／audit chain を持つ append-only ledger は raw preservation、bounded read、整合性検証の個別 policy を確認してから移行する必要がある。
+- 外部 structured output、tier-guard／authority bootstrap、actuator 内の domain-specific loader、SX-12〜14 の大きな残差は未完了である。
+
+## 124. 2026-08-29 SX-14 security-sensitive environment registry の文書化と再発防止
+
+### 判定
+
+- 未文書化だった secret 系 environment variable 21件を、実際の利用箇所に基づく説明付きで登録した。`KYBERION_SECRET_RESOLVER_COMMAND` は provider string、`KYBERION_SECRET_RESOLVER_TIMEOUT_MS` は tuning number として誤分類も修正した。
+- 既存の Antigravity SDK API key を含め、secret entry は全件 `documented: true`、説明ありとなった。秘密値そのものは registry／生成ドキュメントへ記録していない。
+- `validateEnvRegistryQuality` に secret entry の documentation 必須ルールを追加し、新しい secret の未文書化を生成時に fail-closed で検出するようにした。
+- `env.example` と `CONFIGURATION.md` は generator で再生成し、registry を単一 source of truth として維持した。
+
+### 実測 evidence
+
+- `pnpm generate:env-registry`: changed files なし（registry と生成物が一致）。
+- `pnpm exec vitest run scripts/generate_env_registry.test.ts --reporter=dot`: **1 file / 11 tests passed**。
+- `pnpm check -- --scope full --only env-registry`: passed。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- 現行 registry 集計: **412 entries / documented 92 / undocumented 320 / undocumented secret 0 / empty descriptions 319**。
+
+### 残存リスク
+
+- provider／runtime／tuning／path entry の説明未整備は残っている。secret 以外は discovery state を許容しているため、実利用の責務を確認しながら段階的に文書化する。
+- SX-01〜SX-13 の PARTIAL 項目、特に SX-04 の全 catalog 統合、SX-05/06 の script／CLI 統合、SX-12 の god module 分割は未完了である。
+
+## 125. 2026-08-29 SX-14 feature flag registry の文書化と再発防止
+
+### 判定
+
+- 未文書化だった feature flag 4件（agent runtime supervisor 無効化、embeddings 無効化、service-actuate 有効化、type-ratchet skip）を利用箇所に基づく説明付きで登録した。
+- flag entry は operator が意図と安全境界を確認できるよう、`validateEnvRegistryQuality` で `documented: true` と非空 description を必須化した。既存の任意 runtime discovery entry は引き続き許容する。
+- `env.example` と `CONFIGURATION.md` は generator で再生成し、registry 変更時の generated artifact drift を残さないようにした。
+
+### 実測 evidence
+
+- `pnpm generate:env-registry`: generated artifacts updated and synchronized。
+- `pnpm exec vitest run scripts/generate_env_registry.test.ts --reporter=dot`: **1 file / 12 tests passed**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- 現行 registry 集計: **412 entries / documented 96 / undocumented 316 / empty descriptions 315 / undocumented secret 0 / undocumented flag 0**。
+
+### 残存リスク
+
+- provider／runtime／tuning／path entry の説明未整備は残っている。これらは実利用の責務と default／安全境界を確認しながら段階的に文書化する。
+- SX-01〜SX-13 の PARTIAL 項目、特に SX-04 の全 catalog 統合、SX-05/06 の script／CLI 統合、SX-12 の god module 分割は未完了である。
+
+## 126. 2026-08-29 SX-14 local provider endpoint・model registry の文書化
+
+### 判定
+
+- llama.cpp、LM Studio（canonical／compatibility alias）、LocalAI、MLX-LM、Nemotron、Ollama、vLLM の endpoint／model 設定17件を、実際の OpenAI-compatible backend と routing／probe の利用箇所に基づいて説明付きで登録した。
+- `KYBERION_MLX_EMBED_MODEL` は reasoning model ではなく embedding backend の Hugging Face model identifier として用途を明記した。
+- provider registry の documentation は provider capability／route policy の挙動を変更せず、生成 configuration docs で operator が endpoint と model の対応を確認できる状態にした。
+
+### 実測 evidence
+
+- `pnpm generate:env-registry`: generated `env.example`／`CONFIGURATION.md` を更新。
+- `pnpm exec vitest run libs/core/openai-compatible-backend.test.ts libs/core/reasoning-bootstrap.test.ts libs/core/reasoning-endpoint-discovery.test.ts libs/core/reasoning-backend-policy.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **5 files / 61 tests passed**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- 現行 registry 集計: **412 entries / documented 113 / undocumented 299 / empty descriptions 298 / undocumented secret 0 / undocumented flag 0**。
+
+### 残存リスク
+
+- provider の CLI model／URL、audio／SMTP／surface endpoint などの説明未整備は残っている。provider capability registry／route policy の canonical model ID と env display name を混同せず、利用箇所を確認して段階的に文書化する。
+- SX-04 の全 catalog loader／schema 統合、SX-05/06 の CLI・script 統合、SX-12 の god module 分割は未完了である。
+
+## 127. 2026-08-29 SX-14 reasoning provider CLI model registry の文書化
+
+### 判定
+
+- AGY／Anthropic／Claude CLI／Codex CLI／Copilot／Gemini CLI／Grok CLI の model 設定と、intent compiler／global reasoning fallback の model・provider 設定20件を、実際の bootstrap・route resolver・intent compiler の参照に基づいて説明付きで登録した。
+- Claude fast alias、Codex model provider hint、OpenAI vision fallback など、canonical model registry の ID と環境変数の override／alias の役割を説明上分離した。
+- provider の選択順・fallback・認証・外部呼び出しの挙動は変更せず、生成 configuration docs の説明だけを更新した。
+
+### 実測 evidence
+
+- `pnpm generate:env-registry`: generated `env.example`／`CONFIGURATION.md` を更新。
+- `pnpm exec vitest run libs/core/reasoning-route-resolver.test.ts libs/core/reasoning-model-routing.test.ts libs/core/intent-contract.test.ts scripts/generate_env_registry.test.ts --reporter=dot`: **4 files / 60 tests passed**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- 現行 registry 集計: **412 entries / documented 133 / undocumented 279 / empty descriptions 278 / undocumented secret 0 / undocumented flag 0 / undocumented provider 23**。
+
+### 残存リスク
+
+- provider の URL／command／audio／SMTP／surface endpoint など、23件の provider entry と runtime／tuning／path entry の説明未整備は残っている。
+- SX-04 の全 catalog loader／schema 統合、SX-05/06 の CLI・script 統合、SX-12 の god module 分割は未完了である。
+
+## 128. 2026-08-29 SX-04 tool runtime registry の governed catalog 統合
+
+### 判定
+
+- `tool-runtime-registry.ts` の手書き `exists → readJson → cache → fallback` 経路を `defineCatalog<T>()` へ統合した。registry の環境変数 path override、schema 検証、missing／invalid 時の fallback、invalid 時の warning、test 用 cache reset を維持した。
+- runtime state の読み書き、install／pin 状態、platform 別 backend 選択は別責務として変更していない。
+- registry が schema 違反になった場合に fallback catalog が使用される回帰テストを追加した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: **OK**。
+- `pnpm check -- --scope full --only catalogs`: passed（事前に `pnpm generate:knowledge-index` で既存 knowledge index／manifest の drift を再生成）。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- `pnpm exec tsx scripts/check_module_boundaries.ts`: **0 cycles、4 direction violations、max runtime SCC 33、80 dynamic imports**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader／schema 統合、未参照 catalog の処分、schema 根統合、`*_PATH` 上書きの一元化は未完了である。domain-specific な quota／security／tenant state は境界を確認してから段階移行する。
+- SX-05/06 の CLI・script 統合、SX-12 の god module 分割、SX-14 の provider／runtime／tuning／path entry 文書化も継続課題である。
+
+## 129. 2026-08-29 SX-04 capability／workflow catalog の追加統合
+
+### 判定
+
+- `provider-capability-scanner.ts` の capability registry／provider scan policy を `defineCatalog<T>()` に統合し、Schema 検証を runtime load path に追加した。従来の相対 path 引数は維持し、canonical path では catalog cache を利用する。
+- `organization-operating-model-persistence.ts` はトップレベル operating-model catalog の読み込みだけを `defineCatalog<T>()` に移行した。organization record の tenant validation、個別 record schema、保存処理は既存の domain layer に残した。
+- `mission-workflow-catalog.ts`、`mission-classification.ts`、`capability-bundle-registry.ts`、`intent-execution-profile-registry.ts` の固定 governance catalog も共通 loader に統合した。`$schema` metadata の除外、schema failure のエラー境界、resolution／ranking／classification ロジックは維持した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/provider-capability-scanner.test.ts libs/core/organization-operating-model.test.ts libs/core/mission-workflow-catalog.test.ts libs/core/mission-orchestration-scenario-pack.test.ts libs/core/mission-classification.test.ts libs/core/mission-classification-contract.test.ts libs/core/mission-task-classification-scenarios.test.ts libs/core/capability-bundle-registry.test.ts libs/core/intent-execution-profile-registry.test.ts`: **9 files / 67 tests passed**。
+- `pnpm exec vitest run libs/core/tool-runtime-registry.test.ts`: **1 file / 11 tests passed**（前回の同対象 migration regression）。
+- 変更後の全体 gate: `pnpm run typecheck`、`pnpm lint`、`pnpm exec tsx scripts/check_foundation_adoption.ts`、`pnpm check -- --scope full --only catalogs`、`pnpm check -- --scope pr` (**31/31**)、strict env registry、module boundary、`git diff --check` がすべて passed。
+
+### 残存リスク
+
+- SX-04 の手書き catalog loader 0件化、全 governance schema の根統合、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。動的 customer／tenant path、runtime state、quota／security policy は個別の fail-closed／fallback 契約を確認してから移行する。
+- SX-05/06 の CLI・script 統合、SX-12 の god module 分割、SX-14 の provider／runtime／tuning／path entry 文書化も継続課題である。
+
+## 130. 2026-08-29 SX-04 ADF／reasoning provider catalog の Schema 統合
+
+### 判定
+
+- `adf-execution-policy` に専用 Schema を追加し、部分設定の既定値補完を維持したまま `defineCatalog<T>()` へ移行した。invalid／missing catalog は既定 policy へ fallback し、ADF guardrail の判定・上限値・local network 判定は変更していない。
+- `reasoning-provider-registry` に top-level Schema を追加し、registry の読み込みを `defineCatalog<T>()` へ移行した。legacy descriptor の permissive filtering、capability normalization、duplicate mode 検査、provider factory registration は domain logic として維持した。
+- provider item の全フィールドを強制する厳格化は legacy registry 互換性を壊すため行わず、descriptor contract の完全 Schema 化は別の移行課題として残した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/adf-guardrails.test.ts libs/core/reasoning-provider-registry.test.ts`: **2 files / 23 tests passed**。
+- `pnpm generate:knowledge-index`: knowledge index／integrity manifest updated successfully。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`: **OK**。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- `pnpm exec tsx scripts/check_module_boundaries.ts`: **0 cycles、4 direction violations、max runtime SCC 33、80 dynamic imports**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- SX-04 の手書き catalog loader 0件化、全 governance schema の根統合、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。provider descriptor item の厳格 Schema 化は legacy fallback／normalization を整理してから行う。
+- 動的 customer／tenant path、runtime state、quota／security policy、structured output は catalog loader と異なる fail-closed 契約を持つため、同じ fallback へ一括統合しない。
+- SX-05/06 の CLI・script 統合、SX-12 の god module 分割、SX-14 の provider／runtime／tuning／path entry 文書化も継続課題である。
+
+## 131. 2026-08-29 SX-14 provider environment entry の文書化
+
+### 判定
+
+- 未文書化だった provider entry 23件（A2UI、runtime supervisor、音声 capture／STT／TTS／VAD、audit forwarding、BlueBubbles、ComfyUI、deployment、Gemini、mflux、OAuth callback、ops webhook、guarded surface、peer、SMTP、terminal、Windows AI／STT）を、実利用箇所に基づく説明付きで登録した。
+- endpoint／host は用途と既定の loopback／egress 境界を明記し、command は approval／governed bridge の下で実行されること、model は endpoint／runtime 選択であり認可ではないことを記載した。registry の category／type／required と runtime の挙動は変更していない。
+- generator を唯一の出力経路として `env.example` と `CONFIGURATION.md` を更新し、registry の provider documentation 要件を満たす状態にした。
+
+### 実測 evidence
+
+- `pnpm generate:env-registry`: `env.example`／`CONFIGURATION.md` updated successfully。
+- `pnpm generate:knowledge-index`: knowledge index／integrity manifest updated successfully。
+- `pnpm exec vitest run scripts/generate_env_registry.test.ts`: **1 file / 12 tests passed**。
+- 現行 env registry 集計: **412 entries / documented 156 / undocumented 256 / undocumented provider 0 / undocumented secret 0 / undocumented flag 0**。
+- `env KYBERION_ENV_REGISTRY_STRICT_DOCS=1 pnpm check -- --scope full --only env-registry`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- provider entry は全件説明済みだが、runtime／tuning／path の任意 entry 256件は、実利用と operator-facing default／安全境界を確認しながら段階的に文書化する。
+- SX-04 の全 catalog loader／schema 統合、SX-05/06 の CLI・script 統合、SX-12 の god module 分割は未完了である。
+
+## 132. 2026-08-29 SX-06 channel／demo script の harness 統合
+
+### 判定
+
+- `scripts/channel_directory.ts`、`scripts/peer_messaging_send.ts`、`scripts/presence/demo_presence_timeline.ts`、`scripts/presence/demo_voice_hub_ingest.ts`、`scripts/presence/demo_presence_surface.ts` を `defineScript` と `isDirectScript` に統合した。
+- yargs を使う既存引数契約、JSON payload／channel validation、peer dispatch、A2UI／HTTP demo の処理は変更せず、個別 `main().catch` と直接 import 時の起動を共通 entrypoint 境界へ移した。
+- server の signal shutdown、interactive REPL、custom degraded JSON output を持つ script は、終了コード・出力契約を確認してから別 slice で移行する。
+
+### 実測 evidence
+
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts`: **2 files / 9 tests passed**。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 最終全体確認: `pnpm check -- --scope pr` **31/31 passed**、`pnpm check -- --scope full --only catalogs` passed。
+- 現行 source 集計: `defineScript` **197 files**、`main().catch` **37 files**。直接 `process.argv` の残存は harness／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り37件は、server lifecycle／signal handling、interactive stdin、独自 JSON degraded response、または legacy yargs boundary を持つ。共通化時に出力・終了コード・shutdown semantics を壊さない個別移行が必要である。
+- SX-05 の scripts ≤120、細粒度 command registry、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合は未完了である。
+
+## 133. 2026-08-29 SX-06 read-only／governance script の追加 harness 統合
+
+### 判定
+
+- `model_feedback.ts`、`peer_collaboration.ts`、`check_apple_fm.ts`、`intent_smoke.ts`、`mesh_hub_inspect.ts`、`voice_consent.ts` の6件を `defineScript`／`isDirectScript` へ移行した。
+- yargs の引数を harness の `argv` から明示的に構築し、import 時には実行せず、直接実行時だけ共通の失敗・終了コード境界を通すようにした。intent smoke の `active/shared/tmp` 出力、mesh／voice の tenant／mission 必須引数、Apple FM の degraded 表示は維持した。
+- custom degraded JSON、server lifecycle、interactive stdin を持つ script は、既存の出力・終了契約を個別検証してから別 slice で扱う。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts scripts/voice_consent.test.ts`: **3 files / 11 tests passed**。
+- 実CLI `--help`: 5 entrypoint が exit code 0 で help を表示した。
+- `pnpm run typecheck`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 現行 source 集計: `defineScript` **203 files**、`main().catch` **32 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り32件は、server lifecycle／signal handling、interactive stdin、独自 JSON degraded response、または legacy yargs boundary を持つ。共通化時に出力・終了コード・shutdown semantics を壊さない個別移行が必要である。
+- SX-05 の scripts ≤120、細粒度 command registry、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合は未完了である。
+
+## 134. 2026-08-29 SX-06 review／eval／setup script の harness 統合
+
+### 判定
+
+- `marketing_review_aggregate.ts`、`eval_japanese_contextual_intent.ts`、`agy_sdk_setup.ts` を `defineScript`／`isDirectScript` へ統合した。既存の yargs 引数は harness の `argv` から構築し、import 時の副作用を除去した。
+- Japanese contextual intent eval は mismatch を検出した場合に終了コード1を返すよう修正した。実 corpus 50件で frame／route／ask-vs-act の各 accuracy **1.0**、failures **0** を確認した。
+- marketing review の approval gate、agy SDK の inspect／`--apply` 境界は既存 domain function を維持し、今回の共通化では install や review artifact の実処理を変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts scripts/voice_consent.test.ts`: **3 files / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 実CLI `--help`: marketing review／agy SDK setup の2 entrypoint が exit code 0 で help を表示した。
+- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50/50**、全指標 **1.0**、failures **0**、exit code 0。
+- 現行 source 集計: `defineScript` **206 files**、`main().catch` **29 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り29件は、server lifecycle／signal handling、interactive stdin、独自 JSON degraded response、または legacy yargs boundary を持つ。共通化時に出力・終了コード・shutdown semantics を壊さない個別移行が必要である。
+- SX-05 の scripts ≤120、細粒度 command registry、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合は未完了である。
+
+## 135. 2026-08-29 SX-06 marketing dry-run／benchmark script の harness 統合
+
+### 判定
+
+- `marketing_publish_dry_run.ts`、`marketing_video_dry_run.ts`、`benchmark_learning_efficiency.ts` を `defineScript`／`isDirectScript` へ統合した。
+- marketing の approval／technical validation／artifact write と benchmark の cache・LLM mock は既存処理を維持し、引数は harness から明示的に yargs へ渡すようにした。import 時の benchmark 実行もなくした。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts scripts/voice_consent.test.ts`: **3 files / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 実CLI `--help`: marketing publish／video dry-run の2 entrypoint が exit code 0 で help を表示した。
+- 現行 source 集計: `defineScript` **209 files**、`main().catch` **26 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り26件は、server lifecycle／signal handling、interactive stdin、独自 JSON degraded response、または legacy yargs boundary を持つ。共通化時に出力・終了コード・shutdown semantics を壊さない個別移行が必要である。
+- SX-05 の scripts ≤120、細粒度 command registry、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合は未完了である。
+
+## 136. 2026-08-29 SX-04 intent／work／question policy の catalog loader 統合
+
+### 判定
+
+- `libs/core/intent-contract.ts` の intent policy／work policy と `libs/core/question-resolver.ts` の question-resolution policy を、個別 `readJson + compileSchema` から `defineCatalog<T>()` へ移行した。
+- 3 policy は固定 governance artifact と専用 schema を持つため、missing／invalid は fallback を設定せず fail-closed のまま、`$schema` metadata の扱いと validation error の共通境界だけを統合した。
+- 動的 tenant／customer path、directory merge、runtime state、quota／security policy の loader は別契約のため今回の一括移行対象から外した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/question-resolver.test.ts libs/core/intent-contract.test.ts`: **2 files / 30 tests passed**。
+- `pnpm exec vitest run libs/core/intent-contract.test.ts libs/core/intent-resolution.test.ts libs/core/work-design.test.ts`: **3 files / 64 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- 手書き loader の全件0化、全 governance schema の根統合、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。directory merge／dynamic scope／domain-specific fail-closed policy は loader の単純置換を行わない。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割も継続課題である。
+
+## 137. 2026-08-29 SX-06 peer conversation／mission team の import-safe 化
+
+### 判定
+
+- `peer_conversation.ts` と `compose_mission_team.ts` を `defineScript`／`isDirectScript` へ移行した。両方とも従来は module import 時に `main()` を開始していたため、直接実行時だけ処理する境界へ修正した。
+- peer の session／message 操作と mission team の organization context／`--write` 処理は変更せず、yargs へ渡す引数だけを harness の `argv` に統一した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts scripts/voice_consent.test.ts`: **3 files / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 実CLI `--help`: peer conversation／compose mission team の2 entrypoint が exit code 0 で help を表示した。
+- `node --import ./scripts/ts-loader.mjs --input-type=module -e "await import('./scripts/peer_conversation.ts'); await import('./scripts/compose_mission_team.ts'); console.log('import-safe')"`: `import-safe`、exit code 0。
+- 現行 source 集計: `defineScript` **212 files**、`main().catch` **24 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り24件は、server lifecycle／signal handling、interactive stdin、独自 JSON degraded response、または legacy yargs boundary を持つ。共通化時に出力・終了コード・shutdown semantics を壊さない個別移行が必要である。
+- SX-05 の scripts ≤120、細粒度 command registry、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合は未完了である。
+
+## 138. 2026-08-29 SX-04 work-scope policy の catalog loader 統合
+
+### 判定
+
+- `libs/core/work-scope-decision.ts` の固定 `work-scope-policy` を、個別 `readJson + compileSchema` から `defineCatalog<WorkScopePolicy>()` へ移行した。
+- missing／invalid catalog は fallback を設定せず、従来どおり fail-closed とした。mandatory／accumulation trigger の判定ロジックは変更していない。
+- 既存テストが内部 `readJson` の mock に依存していたため、共通 loader の一時 invalid fixture による schema failure 検証へ更新した。これは production の validation boundary を弱めない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/work-scope-decision.test.ts libs/core/work-design.test.ts`: **2 files / 25 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- 手書き loader の全件0化、全 governance schema の根統合、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。dynamic path／directory merge／runtime state／domain-specific fallback policy は個別契約を確認してから移行する。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割も継続課題である。
+
+## 139. 2026-08-29 SX-06 directory／design／type generator の共通化
+
+### 判定
+
+- `sync_specialist_catalog.ts` と `sync_service_endpoints.ts` の directory merge を `defineGenerator` の純粋 render として整理し、既存の schema validation、file/id consistency、version／pattern consistency を維持した。
+- `generate_design_tokens.ts` は7つの出力候補を差分 render し、`--check`／`--dry-run` では書き込まず、`generate_types.ts` は全 schema-to-TypeScript 出力を宣言された output 集合として扱うようにした。
+- generator は `ecosystem_architect` の execution context 内でのみ書き込まれ、出力は宣言外 path を拒否する。生成物の drift は一度再生成し、以後 `--check` で空差分を確認した。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/sync_specialist_catalog.test.ts scripts/sync_service_endpoints.test.ts scripts/design-token-utils.test.ts`: **3 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/generate_design_tokens.ts --check`: `ok: true`、`changed: []`。
+- `node --import ./scripts/ts-loader.mjs scripts/generate_types.ts`: 生成対象40件を処理し、drift 8件を再生成。
+- `node --import ./scripts/ts-loader.mjs scripts/generate_types.ts --check`: `ok: true`、`changed: []`。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 現行 source 集計: `defineGenerator` **15 files**、`defineScript` **211 files**、`main().catch` **24 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- server lifecycle、interactive stdin、独自 JSON degraded response、legacy yargs boundary を持つ script は残り24件で、終了コード・shutdown semantics の個別検証が必要である。
+- `defineGenerator` 未移行の generator／sync script、SX-05 の scripts ≤120、SX-07 の全 validate 集合統合、SX-12 の god module 分割は未完了である。
+
+## 140. 2026-08-29 SX-06 runtime／operations script の harness 統合
+
+### 判定
+
+- `agent_runtime_supervisor_status.ts`、`run_ai_audit.ts`、`service_lifecycle_control.ts`、`voice_setup.ts`、`install_chronos_launchd.ts`、`work_coordination.ts` を `defineScript`／`isDirectScript` へ統合した。
+- runtime status の degraded JSON と exit 0、AI audit の skip／fail exit code、voice／launchd setup の `--apply`、work coordination の mutation／tenant context は既存契約を維持した。
+- 全対象で argv を harness から明示的に渡し、module import 時の実行をなくした。server lifecycle／interactive stdin を持つ実装そのものは変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/run_ai_audit.test.ts scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts`: **3 files / 18 tests passed**。
+- `pnpm exec vitest run scripts/install_chronos_launchd.test.ts scripts/help_entrypoints.test.ts scripts/check_script_integrity.test.ts`: **3 files / 17 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 対象6 entrypoint の実CLI `--help`：すべて exit code 0。
+- import-safe probe：対象6 module を import して `import-safe`、exit code 0。
+- 現行 source 集計: `defineScript` **217 files**、`defineGenerator` **15 files**、`main().catch` **18 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+- `git diff --check`: passed。
+
+### 残存リスク
+
+- `main().catch` の残り18件は、daemon／server lifecycle、interactive stdin、独自 degraded output、または legacy yargs boundary を持つ。終了コード・shutdown semantics・長時間実行の個別テストが必要である。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割は未完了である。
+
+## 141. 2026-08-29 SX-06 server／runtime／watch script の harness 統合
+
+### 判定
+
+- `agent_runtime_manager.ts`、`peer_conversation_server.ts`、`peer_messaging_server.ts`、`mesh_delivery_driver.ts`、`virtual_office.ts` を `defineScript`／`isDirectScript` へ統合した。
+- server の起動・signal／shutdown、delivery loop、virtual-office の `--watch` 常駐 semantics は変更せず、argv の受け渡しと direct-entry 判定だけを共通 harness に寄せた。
+- module import 時の副作用をなくし、既存の secret／tenant／tier 境界と長時間実行の責務は各 script に残した。
+
+### 実測 evidence
+
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 対象5 entrypoint の実CLI `--help`: すべて exit code 0。
+- import-safe probe: 対象5 module を import して `import-safe`、exit code 0。
+- 現行 source 集計: `defineScript` **226 files**、`defineGenerator` **15 files**、`main().catch` **9 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+
+### 残存リスク
+
+- `main().catch` の残り13件は、daemon／server lifecycle、interactive stdin、独自 degraded output、または legacy yargs boundary を持つ。終了コード・shutdown semantics・長時間実行の個別テストが必要である。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割は未完了である。
+
+## 142. 2026-08-29 SX-06 meeting／service／design import script の harness 統合
+
+### 判定
+
+- `import_design_md_catalog.ts`、`services_setup.ts`、`meeting_orchestrator.ts`、`meeting_participate.ts` を `defineScript`／`isDirectScript` へ統合した。
+- meeting の参加・音声処理、service setup の出力、design catalog import の生成処理は変更せず、harness から argv を明示的に渡す形へ整理した。
+- `services_setup` の既存 `runServiceSetup` export と、meeting の既存 runner export は維持した。module import 時の実行は発生しない。
+
+### 実測 evidence
+
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- 対象4 entrypoint の実CLI `--help`: すべて exit code 0。
+- import-safe probe: 対象4 module を import して `import-safe`、exit code 0。
+- 現行 source 集計: `defineScript` **226 files**、`defineGenerator` **15 files**、`main().catch` **9 files**。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+
+### 残存リスク
+
+- `main().catch` の残り9件は、daemon／server lifecycle、interactive stdin、signal handling、または特殊な legacy yargs／生成テンプレート境界を持つ。終了コード・shutdown semantics・長時間実行の個別テストが必要である。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割は未完了である。
+
+## 143. 2026-08-29 SX-06 残存 script entrypoint の収束
+
+### 判定
+
+- `control_plane_cli.ts`、`run_realtime_voice_conversation.ts`、`chat_local.ts`、`chronos_daemon.ts`、`run_generation_schedule_daemon.ts`、`agent_runtime_supervisor_daemon.ts` を `defineScript`／`isDirectScript` へ統合した。
+- `pipeline-execution-part-results.ts` の到達不能な direct-entry catch を削除し、実際の CLI entrypoint である `run_pipeline.ts` の責務を単一化した。
+- control-plane の remediation 表示、realtime voice／REPL の対話境界、daemon の heartbeat・ops alert・signal／shutdown・常駐 loop は維持し、module import 時の CLI／daemon 起動を防いだ。
+
+### 実測 evidence
+
+- `pnpm exec vitest run scripts/control_plane_cli.test.ts scripts/run_realtime_voice_conversation.test.ts`: **2 files / 10 tests passed**。
+- `pnpm exec vitest run scripts/agent_runtime_supervisor_daemon.test.ts`: **1 file / 9 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr --only script-integrity`: passed。
+- control-plane／realtime／chat／chronos／generation schedule／supervisor の import-safe probe: すべて `import-safe`、exit code 0。
+- 現行 source 集計: `defineScript` **232 files**、`defineGenerator` **15 files**、実運用 script の `main().catch` **0 files**。残る検出2件は生成テンプレートとテストコメントである。直接 `process.argv` は harness／テスト／refactor utility に限定される。
+
+### 残存リスク
+
+- 新規 actuator scaffold の生成テンプレートは package-local の `runActuatorCli` 入口を使用しており、`main().catch` の静的検出対象として残る。既存 actuator index との共通化方式を決めてからテンプレートを更新する。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-12 の god module 分割は未完了である。
+
+## 144. 2026-08-29 SX-04 intent resolution catalog の共通 loader 統合
+
+### 判定
+
+- `intent-resolution.ts` の標準 intent catalog、intent-resolution policy、intent-domain ontology を `defineCatalog` へ移行した。
+- personal／confidential overlay は動的な path を保持しつつ、path ごとの governed catalog を共有する形に整理した。overlay が存在しない場合は従来どおり無視し、存在するが不正な JSON／Schema の場合は fail-closed で拒否する。
+- intent の tier／tenant overlay merge、legacy candidate、ontology の surface exposure 判定、既存の cache key と選択ロジックは変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/intent-resolution.test.ts libs/core/router-contract.test.ts libs/core/intent-resolution-contract.test.ts`: **3 files / 39 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- 現行の intent resolution 経路は `defineCatalog` の共通 validation／cache 境界を利用している。domain-specific な dynamic loader と、残る全 governance catalog の根統合は継続課題である。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader 0件化、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。tenant／customer path、runtime state、domain-specific fallback は個別の fail-closed 契約を確認してから移行する。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-08b の自由文入口統合、SX-12 の god module 分割は未完了である。
+
+## 145. 2026-08-29 SX-04 specialist／work policy の共通 loader 統合
+
+### 判定
+
+- `work-design.ts` の specialist catalog を、単一ファイルと directory merge の両経路で `defineCatalog` に接続した。
+- specialist 各ファイルは既存の file/id/version 整合性検査に加えて `specialist-catalog.schema.json` を共通 loader で検証する。directory がない場合の単一 catalog fallback は維持した。
+- `work-policy.json` の手書き `readJson + compileSchema` を `defineCatalog` へ移行し、specialist routing／profile routing／design rules の選択ロジックは変更していない。
+
+### 実測 evidence
+
+- `pnpm exec vitest run libs/core/work-design.test.ts libs/core/work-scope-decision.test.ts libs/core/intent-resolution.test.ts`: **3 files / 52 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- 固定 catalog の schema 検証と specialist directory merge の runtime path を通過した。dynamic profile loader と domain-specific fallback の全件統合は継続課題である。
+
+### 残存リスク
+
+- SX-04 の全 catalog loader 0件化、未参照 catalog の処分、`*_PATH` 上書きの一元化は未完了である。directory merge／runtime state／tenant-specific fallback は個別契約を確認してから移行する。
+- SX-05 の scripts ≤120、SX-06 の全 generator／script harness 化、SX-07 の全 validate 集合統合、SX-08b の自由文入口統合、SX-12 の god module 分割は未完了である。
+
+## 146. 2026-08-29 R7 レビュー指摘の反映と channel-adapter gate 強化
+
+R7 の最終レビューを現行計画へ反映し、受入基準を満たしていない surface 指標を実測値へ訂正した。`IntentResolutionContract` の全 surface 描画、自由文入口 1 件化、viewer/auth 4→1、vocabulary 6→1 は未達または部分達成として扱い、SX-08b/SX-09b の後続スコープに残す。`executePipeline`／`buildRetryOptions`／`OpSpecKind` の残存 dedup、`core:run_pipeline` の再帰ガード、`core:*` built-in、bare barrel importer、`reset*Cache`、contract schema の `$schema` 方針も §7 の継続課題として明記した。
+
+併せて `scripts/check_channel_adapter_adoption.ts` の thread formatter 検査を、関数名の存在確認から `@agent/core/channel-adapter` の canonical import 確認へ強化した。ローカル関数やコメントで gate を通過できず、Discord／Telegram の共通履歴 formatter 採用を実際に検証する。回帰テストは `scripts/check_channel_adapter_adoption.test.ts` に固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_channel_adapter_adoption.test.ts scripts/check_ci_gate_parity.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 3 tests passed**。
+- `pnpm run check -- --scope pr --only channel-adapter-adoption`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する surface 先送りは、自由文入口 7→1、contract 描画の全 surface 化、viewer/auth 4→1、vocabulary 6→1、Discord／Telegram の履歴重複、Slack thread context 破棄、typing 停止順序、`approval_required` 本番経路テスト、Concierge personal tier、Chronos XFF 移行である。これらは本修正の checker 強化とは別の SX-08b/SX-09b 実装として扱う。
+
+## 147. 2026-08-29 SX-04 固定 outcome／analysis catalog の schema 統合
+
+固定 governance catalog のうち、loader が `readJson`／`loadJson` の型キャストだけに依存していた `analysis-execution-contracts` と `intent-outcome-patterns` を `defineCatalog` へ移行した。両 catalog に専用 JSON Schema を追加し、`$schema` metadata を保持したまま、必須 envelope・配列・文字列要素・catalog entry の形状を runtime で検証する。
+
+動的 tenant／customer overlay、runtime state、domain-specific fallback は変更していない。既存の intent 解決・分析契約の選択ロジックは維持し、実ファイルを読む loader 回帰テストを追加した。schema 追加後は canonical knowledge index generator を実行して integrity manifest を同期した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/analysis-contract.test.ts libs/core/intent-outcome-patterns.test.ts libs/core/intent-coverage-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 8 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `git diff --check`: passed。
+
+残存する SX-04 の手書き loader、未参照 catalog の処分、`*_PATH` 上書きの一元化、dynamic scope／fallback policy の統合は、契約を確認した単位で継続する。
+
+## 148. 2026-08-29 SX-04 media semantic catalog の共通 loader 統合
+
+`media-semantic-map` の手書き `safeExistsSync`／`loadJson`／`compileSchema` loader を `defineCatalog` へ移行した。既存の契約どおり、catalog が missing の場合だけ保守的な組み込み fallback を使い、存在するが JSON／schema 不正の場合は fail-closed でエラーにする。`$schema` metadata の除外、cache、semantic type／proposal evidence／section keyword の解決結果は共通 loader に委譲し、変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/media-semantic-map.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 178 tests passed**。
+- `pnpm run check -- --scope full --only catalogs`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の手書き loader は、固定 catalog と動的／tenant-specific／runtime-state loader を区別し、fallback・overlay・directory merge の境界を確認した単位で継続移行する。
+
+## 149. 2026-08-29 SX-04 autonomous ops policy の共通 loader 統合
+
+`autonomous-ops-policy` の動的 `*_PATH`、mtime cache、missing／invalid 時の fail-closed fallback を確認し、policy loader を `defineCatalog` と専用 schema へ移行した。固定 catalog と同じ validation 境界を使いながら、policy が利用できない場合に action を `approve`／`allowed: false` とする既存の安全側判定、tenant override と dry-run／budget 判定は維持した。
+
+この catalog は動的 path と fallback を持つため、単純な固定 catalog 化は行わず、path は環境 accessorから解決し、fallback は loader 外側で状態（source healthy）と併せて扱う。invalid override と missing override の回帰テストを既存 suite で通過させた。schema 追加後は canonical knowledge index generator で integrity manifest を同期した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/autonomous-ops-gate.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader、未参照 catalog、`*_PATH` 上書きの一元化、domain-specific fallback の全件統合は、動的 scope と状態保持を個別に確認して継続する。
+
+## 150. 2026-08-29 SX-04 protocol service registry の共通 loader 統合
+
+`protocol-service-registry` の手書き `readJson` と必須フィールド検査を `defineCatalog` へ移行し、registry 専用 JSON Schema を追加した。既存の version／description／entries envelope、protocol classification、process scope、lifecycle owner の語彙を schema で fail-closed に検証し、既存の `[PROTOCOL_SERVICE_REGISTRY_INVALID]` エラー境界と lifecycle registry の利用結果は維持した。
+
+固定 catalog として共通 validation／cache 境界へ寄せた一方、runtime service discovery や tenant／customer overlay を含む loader は変更していない。schema 追加後は canonical knowledge index generator で integrity manifest を同期した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/protocol-service-registry.test.ts libs/core/protocol-service-lifecycle.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm check -- --scope full --only catalogs`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／directory merge／domain-specific fallback の統合は、契約と安全側挙動を確認した単位で継続する。
+
+## 151. 2026-08-29 SX-04 model registry snapshot の共通 loader 統合
+
+`reasoning-model-routing` が互換 snapshot を読む経路を、手書き `loadJson`／snapshot validator から `defineCatalog` と既存の `model-registry.schema.json` へ移行した。canonical model registry directory を先に読む既存の優先順位、directory の filename／index 整合性検査、directory 不在時の互換 snapshot fallback、routing cache と reset semantics は維持した。
+
+directory は index・個別 item・snapshot projection の複合契約であり、単一 catalog の path／schema に置き換えると filename と order の検査境界を失うため今回は対象外とした。固定 snapshot の validation／cache 境界だけを共通化し、runtime discovery や provider routing の挙動は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/reasoning-model-routing.test.ts libs/core/intent-flow-cache.test.ts libs/core/model-registry-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、model registry directory の複合契約、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 152. 2026-08-29 SX-04 software test viewpoints の共通 loader 統合
+
+`software-quality-operations` の `software-test-viewpoints` 読み込みを手書き `readJson` から `defineCatalog` と既存 schema へ移行した。viewpoint の選択、system tag による applicability、critical viewpoint の `approval_required` 化、reasoning backend からの追加項目処理は変更していない。
+
+固定 QA catalog の validation／cache 境界を共通化し、runtime inventory と ADF compilation の責務は従来どおり operations 層に残した。schema 追加は不要だったため、knowledge index の生成物は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/software-quality-operations.test.ts libs/core/software-quality.test.ts libs/core/software-quality-lifecycle.e2e.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 22 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、model registry directory の複合契約、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 153. 2026-08-29 SX-04 tool actuator routing policy の共通 loader 統合
+
+`tool-actuator-routing` の手書き `exists → readJson → cache → fallback` 経路を `defineCatalog` と既存 `tool-actuator-routing-policy.schema.json` へ移行した。`KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH` の動的 override、missing 時の安全側 fallback、invalid JSON／schema の throw、tool／intent route の選択と approval mismatch flag は維持した。
+
+二重 cache の外側契約は既存の path 切り替え semantics を保つため残し、実ファイルの schema validation と mtime／size cache は共通 loader に委譲した。configured route と unknown tool fallback の runtime 回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/tool-actuator-routing.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 179 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、model registry／service endpoint／surface manifest などの複合 directory 契約、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 154. 2026-08-29 SX-04 service endpoint catalog の共通 loader 統合
+
+`service-endpoint-registry` の snapshot／directory entry 読み込みを `defineCatalog` と既存 `service-endpoints.schema.json` へ接続した。canonical directory 優先、directory の service id／filename・version・default pattern 整合性検査、`KYBERION_SERVICE_ENDPOINTS_PATH`／`KYBERION_SERVICE_ENDPOINTS_DIR` override、directory／snapshot の不正時に fallback snapshot へ戻る既存挙動を維持した。
+
+directory は複数ファイルの merge と staged rollout の fallback を持つため、directory 全体を単一 catalog に置換せず、個別 envelope の validation を共通 loader に委譲した。service engine／binding が利用する endpoint record と intent alias 解決の挙動は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/service-binding.test.ts libs/core/service-engine-connectors.test.ts libs/core/service-engine.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 220 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、model registry／surface manifest などの複合 directory 契約、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 155. 2026-08-29 SX-04 surface provider manifest catalog の共通 loader 統合
+
+`surface-provider-manifest-catalog` の手書き `loadJson`／`compileSchema` validation を `defineCatalog` へ移行した。互換 snapshot と分割 directory entry の双方で既存 schema を利用し、directory の一件性・filename と entry id の一致、directory 優先、snapshot fallback、mtime cache は維持した。
+
+surface の channel directory／provider manifest 解決は従来の catalog API を通し、manifest の visibility・provider path・status の値を変更していない。分割 directory は複数ファイルをまとめる複合契約のため、directory 全体の merge と consistency checks は domain 層に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-provider-manifest-catalog.test.ts libs/core/channel-directory.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 187 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、model registry の複合 directory 契約、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 156. 2026-08-29 SX-04 model registry directory の index／entry loader 統合
+
+`model-registry-directory` の index と個別 model entry の JSON 読み込みを `defineCatalog` へ移行し、専用の `model-registry-directory-index.schema.json` と `model-registry-directory-entry.schema.json` を追加した。index の必須項目・重複しない order、default model の包含、portable filename と model id の一致、directory から snapshot への order projection は既存 domain 検査として維持した。
+
+個別 entry は汎用 directory helper の互換性を保つため `model_id` を schema の最低契約とし、production の完全な model shape は従来どおり snapshot projection 後に `model-registry.schema.json` で検証する。invalid index の既存エラー接頭辞も回帰テストで保持した。
+
+検証:
+
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm exec vitest run libs/core/model-registry-directory.test.ts libs/core/reasoning-model-routing.test.ts libs/core/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、および model／surface の他の複合 state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 157. 2026-08-29 SX-04 voice engine directory entry loader 統合
+
+`voice-engine-registry` の分割 directory に残っていた `readJson` 経路を、既存の `voice-engine-registry.schema.json` を使う `defineCatalog` へ移行した。canonical directory の default engine／version 一致、filename と `engine_id` の一致、directory 優先、snapshot override、invalid snapshot の安全側 fallback、cache reset は維持した。
+
+snapshot 全体は既存の registry catalog、directory の各 envelope は entry catalog として検証し、voice engine の platform／supports／fallback chain の解決ロジックは変更していない。runtime provider probe や音声 artifact の実行契約には手を入れていない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/voice-engine-registry.test.ts libs/core/realtime-voice-conversation.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 16 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、および provider capability／state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 158. 2026-08-29 SX-04 service preset loader の共通 schema 統合
+
+`service-preset-registry` の各 preset 読み込みを手書き `readJson` から `defineCatalog` と `service-presets.schema.json` へ移行した。canonical directory の service id／filename 検査、endpoint-linked preset fallback、明示的 hint path の優先、invalid preset の best-effort fallback、service engine／OAuth の利用結果を維持した。
+
+OAuth の既存 suite は secure I/O 全体を mock するため、preset loader の内部 I/O を暗黙に mock する構造を改め、OAuth 責務では `getServicePresetRecord` を明示 stub とした。preset loader と実ファイル schema 契約は専用 registry／harness／connector suite で検証する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/service-preset-registry.test.ts libs/core/service-harness.test.ts libs/core/service-engine-connectors.test.ts libs/core/oauth-broker.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 41 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、および provider capability／state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 159. 2026-08-29 SX-04 voice TTS config の共通 loader 統合
+
+`voice-tts-config` の手書き `exists → readJson → fallback → cache` 経路を、専用 `voice-tts-config.schema.json` と `defineCatalog` へ移行した。`KYBERION_VOICE_HUB_TTS_CONFIG_PATH` override、missing／invalid 時の built-in fallback、valid partial registry と built-in `en` の merge、default language の選択、cache reset は維持した。
+
+schema は language ごとの voice／positive rate を検証し、TTS actuator の実行・request／URL token の補間ロジックは変更していない。invalid source は従来どおり warning 後に安全側の fallback を返し、runtime の音声 provider registry とは別責務として扱った。
+
+検証:
+
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm exec vitest run libs/core/voice-tts-config.test.ts libs/core/voice-stt.test.ts libs/actuators/voice-actuator/src/index.test.ts libs/actuators/voice-actuator/src/voice-runtime-helpers.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 28 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、provider capability／state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 160. 2026-08-29 SX-04 SDLC gate readiness の正本切り替え
+
+`sdlc-gate-readiness` が参照していた非推奨 `sdlc-gate-catalog.json` を、正本の `gate-profiles/gate-profile-registry.json` 内 `profiles.sdlc` へ切り替えた。`gate-profile.schema.json` を `defineCatalog` に接続し、profile missing 時の空 gate fallback を維持しながら、gate の required artifacts／phase／scope／readiness 判定と next-work proposal の既存挙動を保持した。
+
+これにより SDLC gate 定義の重複参照を runtime から除去し、`gate-profile-registry` に集約された decision owner／governance body／mission gate binding を将来の gate ceremony と同じ正本から取得できる。非推奨 snapshot は互換 pointer のため削除せず、runtime consumer の移行を完了した。
+
+検証:
+
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm exec vitest run libs/core/sdlc-gate-readiness.test.ts libs/core/mission-gate-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、provider capability／state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 161. 2026-08-29 SX-04 media backend registry の専用 schema 統合
+
+`media-backend-registry` が canonical JSON を型キャストだけで読み込んでいたため、`defineCatalog` と専用 `media-backend-registry.schema.json` を接続した。default backend の modality 4 種、backend identity／provider／status／platform、supports、credential／endpoint／command、fallback を schema で検証し、実データに存在する `agent_tool` kind も TypeScript の union に追加した。artifact の `$schema` は既存の governance envelope 契約を維持し、runtime loader 側で専用 schema を適用する。
+
+missing／invalid registry の built-in fallback、voice engine からの backend 補完、modality／platform 解決、live availability probe と TTL cache は変更していない。固定 registry の契約検証だけを共通 loader に寄せ、runtime probe state は従来の別責務として残した。既存の公開 cache reset API は互換名で復元し、内部テスト用 alias との双方を検証した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/media-backend-registry.test.ts libs/core/adapter-default-selection.test.ts libs/core/image-generation-bridge.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 36 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback、provider capability／state loader を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 162. 2026-08-29 SX-04 provider capability snapshot の governed loader 統合
+
+`provider-capability-registry` の persisted TTL snapshot に残っていた `readJson` 経路を `defineCatalog` と既存の `provider-capability-registry.schema.json` へ移行した。欠損・不正 snapshot を `null` として扱い、`computed_at`／`ttl_ms` による期限切れ再 probe、probe result の永続化、provider probe の fail-soft 挙動は維持した。
+
+この snapshot は canonical capability catalog ではなく transient runtime state のため fallback は設定せず、schema／JSON parse／Foundation I/O のどの失敗も従来どおり「no opinion」に畳み込む。CLI probe、Claude fallback discovery、runtime cache の TTL 政策には変更を加えていない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/provider-capability-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、runtime／tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 163. 2026-08-29 SX-04 provider health runtime state の schema 統合
+
+`provider-health-registry` の永続 demotion state に残っていた `readJson` 経路を、専用 `provider-health-state.schema.json` と `defineCatalog` へ移行した。欠損・壊れた state は従来どおり空の in-memory registry として扱い、期限切れ demotion の自然回復、provider／instance 単位の failover、best-effort persistence、test 用 state path override は維持した。
+
+runtime state は canonical catalog ではないため fallback を設定せず、schema／JSON parse／Foundation I/O の失敗を安全側の空 registry に畳み込む。`clearProviderHealth` の削除処理と capability resolution、TTL／instance policy の責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/provider-health-registry.test.ts libs/core/provider-health-view.test.ts libs/core/provider-backend-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 24 tests passed**（指定した `provider-health-view.test.ts` は存在せず、Vitest は実在する 2 file を実行）。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 164. 2026-08-29 SX-04 service binding record loader の governed 化
+
+`service-binding-registry` の record 読み込みに残っていた `readJson` と module-local validation 経路を、既存 `service-binding-record.schema.json` を使う `defineCatalog` へ統合した。保存時の schema validation、missing record の null、schema-invalid record の null、JSON parse failure の例外、binding directory の一覧順序は維持し、service binding の scope／secret／approval policy の意味は変更していない。
+
+record は runtime の個別 state であり、registry 全体の fallback や tenant overlay を追加していない。`service-binding` の endpoint／OAuth 解決と media actuator の利用側は既存 API を通し、loader の共通化だけを行った。
+
+検証:
+
+- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/service-binding.test.ts libs/actuators/media-actuator/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 62 tests passed / 11 skipped**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 165. 2026-08-29 SX-04 project track record loader の governed 化
+
+`project-track-registry` の record 読み込みと module-local Ajv validation を、既存 `project-track-record.schema.json` を使う `defineCatalog` へ統合した。root directory override、record の save/list/resolve、schema-invalid record の null、JSON parse failure の例外、track の lifecycle／tier／tenant_slug 契約は維持した。
+
+project track は runtime の個別 record であり、registry-wide fallback や scope の再解釈は追加していない。project management／mission context が利用する既存 API の identity、sort order、検索 semantics は変更せず、JSON load と schema validation の共通境界だけを置き換えた。
+
+検証:
+
+- `pnpm exec vitest run libs/core/project-track-registry.test.ts libs/core/project-management.test.ts libs/core/mission-project-reassignment.test.ts libs/core/project-operational-state-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 15 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 166. 2026-08-29 SX-04 project record loader の governed 化
+
+`project-registry` の project record 読み込みと module-local Ajv validation を、既存 `project-record.schema.json` を使う `defineCatalog` へ統合した。root directory override、project の save/list/text resolve、schema-invalid record の null、JSON parse failure の扱い、project bootstrap work item の生成と project identity は変更していない。
+
+project record の `tier`／`tenant_slug`／organization chain は domain schema と既存 project facade の責務に残し、loader 移行で scope を再解釈しない。artifact、mission context、project management からの既存 API 利用を回帰 suite で確認した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/project-registry.test.ts libs/core/project-management.test.ts libs/core/mission-context-pack.test.ts libs/core/onboarding-context.test.ts libs/core/analysis-intent-support.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 47 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 167. 2026-08-29 SX-04 distill candidate record loader の governed 化
+
+`distill-candidate-registry` の persisted candidate record 読み込みと module-local Ajv validation を、既存 `distill-candidate-record.schema.json` を使う `defineCatalog` へ統合した。candidate の create/save/update/list、updated_at の更新、schema-invalid record の null、JSON parse failure の扱い、work loop／scope／promotion metadata は変更していない。
+
+これは runtime の候補 record であり、mission-wide state や tenant overlay の loader ではないため、registry fallback や scope の再解釈は追加していない。background review、memory promotion、service/task distill の既存利用経路を回帰 suite で確認する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/distill-candidate-registry.test.ts libs/core/background-review-curator.test.ts libs/core/background-review-runner.test.ts libs/core/memory-promotion-workflow.test.ts libs/core/service-distill-candidate.test.ts libs/core/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 34 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 168. 2026-08-29 SX-04 mission seed record loader の governed 化
+
+`mission-seed-registry` の seed record 読み込みと module-local Ajv validation を、既存 `mission-seed-record.schema.json` を使う `defineCatalog` へ統合した。customer overlay → shared runtime の探索順、root directory override、save/list/load の identity、schema-invalid record の skip、JSON parse failure の扱い、mission seed の work loop／promotion fields は変更していない。
+
+customer path の解決と overlay 優先順位は既存の customer resolver／scope 契約に残し、loader 共通化で別 tenant の seed を参照したり mission-wide state を更新したりしない。mission seed assessment と project management の既存利用経路を回帰 suite で確認する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-seed-registry.test.ts libs/core/mission-seed-registry.overlay.test.ts libs/core/mission-seed-assessment.test.ts libs/core/project-management.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 13 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 169. 2026-08-29 SX-04 project operational state loader の governed 化
+
+`project-operational-state-registry` の state file 読み込みと module-local Ajv compile を、既存 `project-operational-state.schema.json` を使う `defineCatalog` へ統合した。project/tier/tenant path の探索、query filtering、invalid state の skip/null、parse failure の caller 別挙動、state sync／mission relationship の更新は変更していない。
+
+複数の state file を扱うため file path ごとの governed catalog を cache し、schema validation は各 file の load boundary で実行する。tenant_slug の confidential 必須条件、reserved scope、project workspace path、mission-wide state mutation の責務は既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/project-operational-state-registry.test.ts libs/core/project-state-sync.test.ts libs/core/project-management.test.ts libs/core/mission-context-pack.test.ts libs/core/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 170. 2026-08-29 SX-04 voice profile overlay loader の governed 化
+
+`voice-profile-registry` の snapshot、directory entry、personal overlay、customer overlay の registry envelope 読み込みを、base/directory は `voice-profile-registry.schema.json`、overlay は空状態を表現できる `voice-profile-registry-overlay.schema.json` を使う `defineCatalog` に統合した。canonical directory の優先、customer → personal → base の merge、profile id／filename consistency、tier、sample reference、writable registry の選択は変更していない。
+
+voice profile は personal／confidential／public のデータ tier と customer scope を持つため、overlay の path 解決・merge 順序・sample materialization は既存 domain logic に残した。空の personal overlay は初回登録前の有効状態として許可し、それ以外の invalid overlay の best-effort fallback、missing registry の built-in fallback、voice engine resolution の挙動を回帰 suite で確認する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/voice-profile-registry.test.ts libs/core/voice-profile-promotion.test.ts libs/core/voice-engine-registry.test.ts libs/core/realtime-voice-conversation.test.ts libs/core/realtime-voice-loop.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 29 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 171. 2026-08-29 SX-04 contextual intent learning store の governed 化
+
+`contextual-intent-learning` の tenant／mission scoped store 読み込みと schema validation を、既存 `contextual-intent-learning.schema.json` を使う `defineCatalog` に統合した。missing、malformed JSON、schema invalid のいずれも従来どおり空の default store に戻し、直近 500 件の保持、scope path、tier、確認済み学習データの意味は変更していない。
+
+store の write 前 validation も同じ catalog contract に揃え、`date-time` 等の format validation は shared Ajv foundation に委譲した。tenant／mission の物理 namespace、personal／confidential／public tier、学習データの昇格条件は既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/contextual-intent-learning.test.ts libs/core/contextual-intent-clarification-policy.test.ts libs/core/contextual-intent-frame-schema.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 6 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 172. 2026-08-29 SX-04 egress security-policy view の governed 化
+
+`egress-policy` が許可ドメインの補助情報として読む `security-policy.json` を、既存の
+`governance-policy.schema.json` を使う `defineCatalog` に統合した。security policy が missing／不正
+JSON／schema invalid の場合は、従来どおり security-policy 由来のドメインを追加せず、service endpoint
+と egress policy の読み込みへ処理を継続する。egress の manual／blocked／tenant allowlist、tier floor、
+service endpoint の解決順序は変更していない。
+
+この loader は security policy 全体の authority 判定を置き換えず、network_guardrails.allowed_domains
+の read-only view に限定した。tenant scope、tier、approval、実際の外部送信 gate は既存の egress domain
+logic と provider gate に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/egress-policy.test.ts libs/core/egress-policy-tier.test.ts libs/core/egress-audience-floor.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 33 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `pnpm check -- --scope full --only catalogs`: **1/1 passed**。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 173. 2026-08-29 SX-03/SX-04 execution feedback store の governed 化
+
+`execution-feedback` の persisted store 読み込みと write／public validation を、既存
+`execution-feedback.schema.json` を使う `defineCatalog` に統合した。missing、malformed JSON、schema
+invalid は従来どおり空 store に戻し、feedback の最大 500 件、候補 materialization、要約、ユーザー向け
+parse fallback は変更していない。
+
+feedback は procedure を自動変更せず、distill candidate を review-required で提案する既存の human
+approval boundary を維持した。catalog 化したのは persisted envelope の構文・schema 境界だけであり、
+correlation、surface、source、tier、candidate promotion の意味は既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/execution-feedback.test.ts libs/core/distill-candidate-registry.test.ts libs/core/background-review-curator.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 7 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `pnpm check -- --scope full --only catalogs`: **1/1 passed**。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 174. 2026-08-29 SX-03/SX-04 intent flow cache の governed 化
+
+`intent-flow-cache` の persisted cache envelope 読み込みを、既存 `intent-flow-cache.schema.json` を使う
+`defineCatalog` に統合した。missing は空 cache、invalid JSON／schema invalid は lookup では `invalid`、
+write では安全な空 cache へ移行する既存の挙動を維持し、cache key の tenant/tier、secret-bearing
+runtime context の拒否、TTL、payload の個別 contract validation は変更していない。
+
+cache refresh 時には governed catalog の cache も明示的に reset し、テスト・runtime の再読み込みで
+stale snapshot を残さないようにした。approval／clarification が必要な flow を cache しない条件と、
+redacted request/source text の保存は既存のまま維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-flow-cache.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。併走した intent contract suite では既存の trace metadata test が 10 秒 timeout となったため、cache 単独 suite で切り分けた。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+- `pnpm check -- --scope full --only catalogs`: **1/1 passed**。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 175. 2026-08-29 SX-04 peer conversation session loader の governed 化
+
+tenant／peer scoped に永続化される `peer-conversation` session file の読み込みを、既存
+`peer-conversation-session.schema.json` を使う `defineCatalog` に統合した。schema invalid の session は
+従来どおり warning を記録して一覧・会話から除外し、JSON parse error は既存どおり caller へ返す。
+session の transcript 上限、peer／tenant path、event 記録、message payload の wire validation は変更していない。
+
+session file と inbound message payload を分離し、後者は persisted catalog ではなく peer message の
+boundary contract として既存 `peer-conversation-message.schema.json` の validation を継続利用する。
+tenant mismatch、peer dispatch、handoff／close の lifecycle と transport authority は既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/peer-conversation.test.ts libs/core/peer-messaging.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 176. 2026-08-29 SX-04 surface runtime manifest file loader の governed 化
+
+`surface-runtime` の分割 manifest file と互換 snapshot の JSON／schema 読み込みを、既存
+`runtime-surface-manifest.schema.json` を使う `defineCatalog` に統合した。分割 directory の directory
+優先、各 file の surface 一件性、snapshot fallback、surface 定義の port／health／owner validation、
+runtime state の PID／shutdown 管理は既存の domain logic に残した。
+
+schema invalid は従来の invalid manifest error として扱い、JSON parse error は従来どおり parse error
+として伝播する。これにより manifest の受入契約だけを共通 loader に寄せ、runtime state の schema が
+未定義な部分を推測で固定しない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 177. 2026-08-29 SX-03/SX-04 knowledge slices manifest の governed 化
+
+`knowledge-slices` の manifest 読み込みを、既存 `knowledge-slices.schema.json` を使う
+`defineCatalog` に統合した。missing は warning なしの `null`、malformed JSON／schema invalid は
+path ごとに一度 warning を記録して `null` とする従来の fail-open 契約を維持した。
+
+slice の specificity、later-wins tie break、pinned／exclude の union、search_roots の
+most-specific-wins、tenant／project matching、dispatch 時の phase fallback は変更していない。
+schema validation のみを shared foundation に寄せ、knowledge delivery の tier／scope filtering は
+既存 resolver に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/knowledge-slices.test.ts libs/core/mission-context-pack.test.ts libs/core/mission-context-pack.tenant.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 50 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+残存する SX-04 の hand-written loader は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 178. 2026-08-29 review cycle: mission state repair compatibility と egress cache reset
+
+§172 以降の governed loader 化を再監査し、`egress-policy` の public cache reset を旧 API 名でも呼べる互換 alias として維持した。security-policy view の catalog cache も同じ reset で破棄するため、テストや runtime の設定再読込で許可ドメインの古い snapshot を残さない。
+
+また `mission-state.json` の読み込みを既存 `mission-state.schema.json` の `defineCatalog` に統合した際、legacy repair が schema-invalid な旧 state を見つけられなくなる回帰を検出した。通常の `loadState` は invalid state を `null` として mission lifecycle に渡さず、明示的な `repairLegacyMissionState` だけが `loadStateForRepair` を使って secure I/O 経由で legacy state を読み込み、path から tier を確定してから既存の `saveState` schema gate へ戻す責務分離に修正した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/egress-policy.test.ts libs/core/egress-policy-tier.test.ts libs/core/reasoning-egress-scope.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 33 tests passed**。
+- `pnpm exec vitest run libs/core/mission-state.test.ts libs/core/mission-lifecycle.test.ts libs/core/mission-distill.test.ts libs/core/mission-project-reassignment.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 30 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+レビューで確認した残存課題は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 179. 2026-08-29 SX-04 task session loader の governed 化
+
+`task-session` の persisted session 読み込みを、既存 `task-session.schema.json` を使う `defineCatalog` に統合した。schema-invalid session は warning と `null`、malformed JSON は既存どおり parse error の throw とし、completed session の evidence／outcome gate、surface 別の一覧、session lifecycle は変更していない。
+
+保存側の completion reconciliation と write validation は既存 domain logic に残し、catalog は persisted envelope の受入境界だけを担当する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+## 180. 2026-08-29 SX-04 browser conversation session loader の governed 化
+
+`browser-conversation-session` の会話 session file を既存 `browser-conversation-session.schema.json` の `defineCatalog` で読むようにした。schema-invalid session は warning と `null`、malformed JSON は parse error の throw を維持した。browser snapshot と browser runtime session は異なる観測／runtime record で専用 schema がないため、今回の catalog 対象から除外した。
+
+candidate resolution、confirmation、browser actuator の実行、snapshot の fallback、surface/session path は既存ロジックに残し、会話 session envelope のみを共通 loader に寄せた。
+
+検証:
+
+- `pnpm exec vitest run libs/core/browser-conversation-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+## 181. 2026-08-29 SX-04 mission orchestration event envelope の governed 化
+
+`mission-orchestration-event` の persisted event envelope を既存 `mission-orchestration-event.schema.json` の `defineCatalog` で読むようにした。schema-invalid envelope は既存の `MISSION_ORCHESTRATION_EVENT_INVALID` へ統一し、malformed JSON は既存どおり parse error として返す。payload reference の mission-local path 制約、payload envelope の event／mission identity 検査、mission state からの authority scope 解決は domain logic として維持した。
+
+payload 本体は任意の event-specific object のため envelope catalog の schema boundary と分離し、`payload_ref` がある場合も参照先を検査してから payload を復元する順序を変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-orchestration-events.test.ts libs/core/mission-orchestration-worker.resume.test.ts libs/core/mission-orchestration-journal.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 15 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+レビューで確認した残存課題は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 182. 2026-08-29 SX-04 requirements draft loader の governed 化
+
+`requirements-draft-store` の persisted draft load、draft save、customer signoff save を既存 `requirements-draft.schema.json` の `defineCatalog` に統合した。schema-invalid draft は受入時に拒否し、malformed JSON は従来どおり parse error として返す。requirements completeness／customer signoff gate、version bump、再抽出時の signoff invalidation は変更していない。
+
+実装型の `OpenQuestion.blocking` が schema の `additionalProperties: false` で拒否される不一致も修正し、blocking flag を schema の optional boolean として明示した。顧客・要件・source refs の tier／evidence 意味は既存の mission evidence boundary に残している。
+
+検証:
+
+- `pnpm exec vitest run libs/core/requirements-draft-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 14 tests passed**。
+- `pnpm run typecheck`: passed。
+- `pnpm lint`: passed。
+
+レビューで確認した残存課題は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 183. 2026-08-29 SX-04 action-item JSONL 境界の schema validation
+
+`action-item-store` の append-only JSONL 読み込みを、既存 `action-item.schema.json` の shared Ajv
+validator と `readJsonLines` の境界に統合した。malformed 行と schema-invalid 行は従来の logical view から
+skip し、legacy flat policy fields は schema validation 前に現行の `policy` object へ migrate する。
+新規 record と status／reminder 更新は write 前にも同じ schema を通すため、保存後に読めなくなる record を
+生成しない。
+
+JSONL は一行ごとに reducer で最新 record を得る形式のため、単一 JSON envelope 用の `defineCatalog` は
+適用せず、line reader と schema validator を組み合わせた。action item の status transition、reminder cap、
+owner 別 pending view、legacy policy compatibility は既存 domain logic のまま維持した。既存の
+`ActionItem` 型と schema の不一致だった `blocked_reason` も schema に追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/action-item-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 17 tests passed**。
+
+レビューで確認した残存課題は、未参照 catalog の処分、`*_PATH` 上書きの一元化、tenant-specific／domain-specific fallback を優先順位と fail-closed 境界を確認した単位で継続する。
+
+## 184. 2026-08-29 SX-04 customer channel binding の governed 化
+
+`customer-channel-binding` が customer overlay の `channel-bindings.json` を型キャストだけで読む経路を、
+既存 `customer-channel-binding.schema.json` の `defineCatalog` に統合した。missing、malformed JSON、schema
+invalid は従来どおり空の binding として扱い、tenant directory の列挙、inactive binding の除外、channel／surface
+一致、customer mode の解決は変更していない。
+
+実装型に存在する `mode`（sales／support／requirements_hearing）と、customer template が持つ `_comment` を
+schema に追加し、既存の保存形式を schema の `additionalProperties: false` により誤って排除しないようにした。
+customer overlay の tenant scope と customer stance の解決は既存の path／delivery domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/customer-channel-binding.test.ts libs/core/customer-conversation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
+
+## 185. 2026-08-29 SX-04 restricted action policy の governed 化
+
+`restricted-action-policy` の pattern policy 読み込みを既存 `restricted-action-kinds-policy.schema.json` の
+`defineCatalog` に統合した。default policy と明示 path／環境 override のいずれも schema validation を通し、
+missing／malformed／schema-invalid は従来どおり warning と空の rule set へ退避する。rule の順序、regex の
+個別 compile error 処理、action item の restricted flag／approval gate は変更していない。
+
+policy 全体の受入契約を catalog に寄せ、実行時の regex matching と human approval boundary は domain logic
+として分離した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/restricted-action-policy.test.ts libs/core/meeting-facilitator-policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 14 tests passed**。
+
+## 186. 2026-08-29 SX-04 tenant rate-limit policy／state の schema 統合
+
+`tenant-rate-limiter` の policy と runtime state をそれぞれ `tenant-rate-limit-policy.schema.json`、
+`tenant-rate-limit-state.schema.json` の governed catalog で検証するようにした。policy の欠損時は既存の
+既定値、state の欠損・malformed・schema-invalid 時は既存の空 state を維持し、bucket refill、exempt persona、
+lock、tenant ごとの budget 判定は変更していない。
+
+policy は token rate／burst／denial grace／operation cost の正数境界を明示し、state は token の非負値と
+timestamp を検証する。state write 前にも同じ schema を通すため、不正な bucket が次回の quota 判定を
+汚染しない。quota enforcement の tenant scope と persona exemption は既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/tenant-rate-limiter.test.ts libs/core/operation-policy-gate.test.ts libs/core/provider-health-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 24 tests passed**。
+
+## 187. 2026-08-29 SX-04 external service registry／provider catalog の schema 統合
+
+public／personal／runtime の三層を merge する `external-service-registry` と、provider URL template を読む
+`service-provider-catalog` に専用 schema と governed loader を接続した。各層の missing／malformed／schema-invalid
+は従来どおり空層として merge を継続し、runtime の register／stats write 前にも registry schema を検証する。
+
+service id、URL、日時、成功／失敗カウンタ、provider alias／topic／template の受入境界を schema に置き、
+runtime 優先の merge、topic matching、URL template fill、外部送信の approval／egress gate は既存 domain
+logic のまま維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/external-service-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 3 tests passed**。
+
+## 188. 2026-08-29 SX-04 heuristic feedback record の governed 化
+
+`heuristic-feedback` の confidential heuristic record 読み込みを既存 `heuristic-entry.schema.json` の
+`defineCatalog` に統合し、validation block を含む更新も write 前に同じ schema で検証するようにした。
+missing entry、heuristic の score／retrospective summary、memory promotion の tier／evidence 判定は変更せず、
+不正な persisted record は従来の例外境界で検出する。
+
+## 189. 2026-08-29 SX-04 SDLC design spec／task plan の governed 化
+
+`sdlc-artifact-store` の design spec と task plan を、それぞれ既存 `design-spec.schema.json`、
+`task-plan.schema.json` の governed catalog で load／save 前検証するようにした。test plan は専用 schema が
+存在しないため今回の対象から外し、三種類の version bump、mission evidence path、ARCHITECTURE_READY／
+QA_READY／TASK_PLAN_READY の domain gate は変更していない。
+
+schema が存在する persisted artifact の受入境界だけを共通化し、requirements／design／task 間の意味的な
+参照整合性と readiness 判定は既存 gate logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/heuristic-feedback.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 13 tests passed**。
+- `pnpm exec vitest run libs/core/sdlc-artifact-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 18 tests passed**。
+
+## 190. 2026-08-29 SX-04 voice profile promotion receipt の governed 化
+
+voice profile の promotion 入力 receipt を新設した `voice-profile-registration-receipt.schema.json` で
+検証し、promotion 時に読む target registry も既存 `voice-profile-registry.schema.json` の governed catalog
+へ統合した。receipt の missing／malformed／schema-invalid、pending promotion status、sample materialization、
+approval actor の検査順を維持し、promoted／shadow の registry 更新と personal／confidential／public tier の
+書き込み先は変更していない。
+
+registration request schema と promotion receipt は形が異なるため別 schema とし、承認済みであることの
+domain gate を schema validation に置き換えていない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/voice-profile-promotion.test.ts libs/core/voice-profile-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 11 tests passed**。
+
+## 191. 2026-08-29 SX-04 marketing risk policy の governed 化
+
+`marketing-workload` の product default／customer overlay policy を新設した
+`marketing-risk-policy.schema.json` の governed catalog で読むようにした。customer policy は全 levels の
+置換ではなく部分 overlay である既存契約を schema に反映し、customer selector の安全な path 解決、channel／CTA
+allowlist、risk gate の意味は変更していない。
+
+汎用 `governance-catalog.schema.json` が保証していた envelope だけでは level の gate／reviewer／approval
+境界を検証できなかったため、marketing policy 固有の schema を追加した。public／customer の data classification
+と publication approval、sensitive-data scan は既存 domain gate に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/marketing-workload.test.ts libs/core/marketing-customer-overlay.test.ts libs/core/marketing-workload-schema.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 28 tests passed**。
+
+## 192. 2026-08-29 SX-03 service recording schema compilation の foundation 統合
+
+`service-recording` の schema 読み込みと Ajv／format 初期化を、既存 `foundation/ajv.ts` の
+`compileSchema` に統合した。service recording の schema validation、risk／approval の意味的検証、placeholder
+と secret binding の検査は変更せず、個別 module の Ajv interop／format wiring だけを削除した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/service-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 8 tests passed**。
+
+## 193. 2026-08-29 SX-04 intent contract learning の governed catalog 統合
+
+`intent-contract-learning` の memory seed／runtime、selection policy、domain ontology の読み書きを `defineCatalog` に統合した。runtime の欠損時は従来どおり空 memory として seed merge を継続し、存在する JSON の parse／schema 不正は従来どおり fail-fast、保存前 validation も同じ catalog contract に揃えた。tenant／mission namespace、contract candidate の選択、outcome の集計責務は domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-contract-learning.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+
+## 194. 2026-08-29 SX-04 work-design profile の専用 schema 統合
+
+`execution-boundary-profiles.json` と `runtime-design-profiles.json` は、これまで汎用
+`governance-catalog.schema.json` の envelope 検査に留まっていたため、それぞれ専用 schema と
+`defineCatalog` を接続した。LLM／knowledge／compiler／executor zone、runtime owner／assignment、
+coordination bus、mission memory scope の値域を persisted profile の受入境界で検証する。
+work design の profile routing、intent／outcome／specialist の解決、実行境界の意味的判定は既存
+domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/work-design.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 15 tests passed**。
+
+## 195. 2026-08-29 SX-04 semantic degradation runtime log の governed 化
+
+`semantic-degradation-log` の配列 state を専用 schema の `defineCatalog` で読むようにし、各 run の
+date-time、pipeline id、reason count、total を検証する。malformed／schema-invalid state は従来どおり
+空の観測状態へ退避し、append 前にも同じ schema を通す。degradation の集計、rolling window、最大 200 run
+制限、呼び出し元を止めない観測方針は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/semantic-degradation-log.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+
+## 196. 2026-08-29 SX-04 cowork sync policy の専用 schema 統合
+
+`cowork-sync-policy.json` の tier assignment、memory kind inference、public-only supply、feedback loop、
+conflict resolution を専用 schema の `defineCatalog` で検証するようにした。policy の欠損・malformed・
+schema-invalid は従来どおり `null` として安全側の既定分類へ退避し、Cowork へ confidential／personal を供給しない
+既存の leakage prevention と idempotency の domain logic は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/cowork-knowledge-bridge.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 15 tests passed**。
+
+## 197. 2026-08-29 SX-04 procedure catalog の promotion／registry 境界統合
+
+service／browser／desktop promotion と procedure registry が共有する `procedures.schema.json` を
+共通 validator に接続した。catalog envelope は fail-closed に検証し、既存 registry の互換方針である
+個別の不正 entry の drop、重複 ID の first-wins、optional personal overlay の優先順位は維持した。
+promotion では catalog validation を pipeline／catalog の書き込み前に実施し、不正 catalog 時に pipeline
+だけが残る部分書き込みを防止した。recording の allowlist、approval gate、desktop transaction の責務は
+既存 domain logic に残した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/procedure-registry.test.ts libs/core/service-procedure-promotion.test.ts libs/core/browser-procedure-promotion.test.ts libs/core/desktop-recording.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 43 tests passed**。
+
+## 198. 2026-08-29 SX-04 observation registry の governed catalog 統合
+
+`unhandled-intent-registry.json` と `unclassified-error-registry.json` は、呼び出し元を止めない観測用
+state である一方、従来は型 assertion だけで読み書きしていたため、破損した entry が reconciliation の
+proposal 生成まで流入し得た。両 registry に専用 schema と `defineCatalog` を接続し、missing／malformed／
+schema-invalid は従来どおり空の観測状態へ退避する。record／mark／prune の cooldown、集計、proposal
+生成、観測失敗を呼び出し元へ伝播しない責務は維持し、保存前にも同じ schema を通す。
+
+検証:
+
+- `pnpm exec vitest run libs/core/reconcile-ops.test.ts --reporter=verbose --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+
+## 199. 2026-08-29 SX-04 pipeline schedule registry の専用 schema 統合
+
+`pipeline-schedules.json` は foundation `readJson` へ移行済みだったが、cron／interval trigger、runtime
+failure counter、auto-disable metadata、run lock、delivery target の構造は型 assertion に依存していた。
+専用 schema と path 別の `defineCatalog` cache を導入し、load 時の schema-invalid は従来の空 registry fallback、
+repo 外 absolute path／空 path は従来どおり明示拒否とした。save／claim／complete と feedback loop の
+`recordPipelineResult`／`checkScheduleHealth` も共通 scheduler API を通るため、runtime state が catalog validation
+を bypass しない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/pipeline-scheduler.test.ts libs/core/src/feedback-loop.test.ts libs/core/automation-blueprint.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 34 tests passed**。
+- `pnpm run generate:knowledge-index`: passed。
+
+## 200. 2026-08-29 SX-04 actuator manifest の governed loader 統合
+
+`libs/actuators/*/manifest.json` の discovery と capability evaluator は foundation `readJson` の型 assertion に留まっていたため、
+既存の `actuator-manifest.schema.json` を各 manifest path の `defineCatalog` に接続した。manifest の
+actuator id、capability、platform、resilience declaration は load boundary で検証され、不正 manifest は
+無検証の discovery entry にならない。capability evaluator の static manifest read も foundation 境界へ揃えた。
+actuator discovery の directory order、global catalog 用の entry 変換、
+capability count／operation 集計、schema 外の将来拡張属性を許容する既存方針は維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/actuator-capability.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 188 tests passed**。
+- `pnpm exec vitest run libs/core/src/actuator-capability.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 11 tests passed**。
+
+## 201. 2026-08-29 SX-04 knowledge curation／index loader の境界統合
+
+knowledge curation の SLO／taxonomy と knowledge index の cache usage／JSON hint scan に残っていた
+個別 JSON loader を foundation／governed catalog へ整理した。SLO は既存の専用 schema と完全 default
+fallback を使い、taxonomy は schema-invalid／missing を従来どおり scan 対象なしへ退避する。index の
+cache usage と hint parser は JSON object／array の動的データであるため schema を新設せず、foundation
+reader の secure I/O 境界だけを共有した。tenant scan、LRU eviction、hint dedup、curation report の
+deterministic output は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/knowledge-curation-report.test.ts libs/core/src/knowledge-curation-tenant-ingest.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
+- `pnpm exec vitest run libs/core/src/knowledge-index.test.ts libs/core/src/knowledge-cache-budget.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+
+## 202. 2026-08-29 SX-03 PFC service preset loader の foundation 移行
+
+PFC の service auth inspection に残っていた preset file の `safeReadFile` + `JSON.parse` を
+foundation `readJson` へ移行した。preset 不在時の host-managed fallback、auth strategy／credential
+suffix の判定、CLI fallback と setup hint の生成、secret value をログへ出さない既存境界は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/pfc/ServiceValidator.test.ts libs/core/src/pfc/PfcController.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
+
+## 203. 2026-08-29 SX-09 channel adapter の日本語契約重複判定修正
+
+レビューで、`formatChannelTurnText` が既に描画済みの日本語契約欄を英語の
+`Understanding:`／`Intent:` だけで判定していたため、日本語の `理解:`／`不足入力:`／`次の操作:`
+を含む返信へ契約欄を重複付加する経路を確認した。共有 vocabulary から解決した locale 別ラベルを
+判定対象に加え、単独の自然文 `結果:` は契約描画済みと誤認しないよう、ローカライズ済みラベルは
+2 件以上を既存契約の条件とした。4 bridge の delivery／typing／thread context 回帰も同じ adapter
+境界で再確認した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/channel-adapter.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 30 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`pnpm check -- --scope pr`: **31/31 passed**。
+- `pnpm exec tsx scripts/check_foundation_adoption.ts`、`git diff --check`: passed。
+
+## 204. 2026-08-29 SX-11 ADF repair boundary の実行経路統合
+
+再レビューで、通常 pipeline の preflight／step retry と Super-Nerve が `validateAndRepairAdf` を個別に呼び出し、
+`attemptAutonomousRepair` の sensitive category fail-closed／operator escalation を経由しない重複経路を確認した。
+全実行経路を共通 repair boundary へ移行し、`permission_error`／`auth_error`／`config_error`／`env_error` は
+自動修復せず、project-local ADF の trust decision／durable approval と reasoning policy は共通 helper から
+canonical repair agent へ渡すようにした。修復後の step 再読込と Super-Nerve の retry 回数は既存の実行責務として維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/autonomous-repair.test.ts scripts/run_pipeline.test.ts libs/actuators/orchestrator-actuator/src/super-nerve/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 83 tests passed**。
+- trust／approval／policy forwarding の回帰を `libs/core/autonomous-repair.test.ts` に追加。
+
+## 205. 2026-08-29 SX-04 surface-query provider catalog の governed 化
+
+`surface-query` の base／role／phase／tenant／personal provider config は専用 schema を持ちながら、
+module-local Ajv／`loadJson`／単一 cache を併用していたため、各ファイルの load boundary を
+`defineCatalog` に統合した。overlay の解決順序と scope／role／phase の意味は変更せず、missing／
+malformed／schema-invalid の catalog は空 config として安全側に退避し、base invalid が既存の
+valid overlay を巻き込んで全体を空にする挙動を解消した。test cache reset は path 別 catalog も
+reset するようにした。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-query.test.ts libs/core/surface-runtime.test.ts libs/core/surface-runtime-router.test.ts libs/core/surface-runtime-orchestrator.intent-context.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 17 tests passed**。
+
+## 206. 2026-08-29 SX-04 OKR tracker overlay の governed 化
+
+`okr-tracker` は customer／confidential／public の候補を順番に読む際、secure I/O の
+JSON 読み込みだけで schema validation を通っていなかった。`okr.schema.json` を共有する
+`defineCatalog` 境界へ移し、無効な高優先度 overlay は従来どおりスキップして次候補へ
+進むようにした。これにより tenant overlay の malformed／schema-invalid データが、
+有効な public governance catalog や derived fallback を隠さない。また tenant slug は
+`isValidTenantSlug` で先に検証し、不正値から customer／confidential のパスへ traversal
+しないよう fail-closed にした。
+
+検証:
+
+- `pnpm exec vitest run libs/core/okr-tracker.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+- invalid customer overlay から public candidate へ進む回帰テストを追加。
+- invalid tenant slug が derived fallback に退避し、traversal しない回帰テストを追加。
+
+## 207. 2026-08-29 SX-04 financial model overlay の governed 化
+
+`financial-model` の専用 JSON は `financial-model.schema.json` を持つ一方、候補読込が
+secure JSON helper と手書きの `periods` 配列判定に留まっていた。専用モデルの候補を
+`defineCatalog` で検証し、invalid な上位候補は次の scoped source または legacy
+customer adapter へ進むようにした。既存の numeric string 正規化契約は schema 側で許容し、
+tenant slug は `isValidTenantSlug` で検証して path traversal を防ぐ。
+
+検証:
+
+- `pnpm exec vitest run libs/core/financial-model.test.ts libs/core/company.test.ts libs/core/finance-controller.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 7 tests passed**。
+- invalid model overlay／invalid tenant slug の回帰テストを追加。
+
+## 208. 2026-08-29 R7残件の現行突合
+
+R7 レビューに残っていた項目を現行 checkout と再突合した。`core:run_pipeline` の
+自己参照・循環・最大深度ガードは `pipeline-execution-part-control.ts` に実装済みで、
+`pipeline-run-pipeline-nesting.test.ts` が 7 tests で検証している。README の Glossary
+link は既に追加済みで、docs/developer の計画文書数は active 99／全体 254／archive
+155 と定義を明記した。残る実装対象は surface の重複整理、bare barrel／cache reset の
+削減、全 catalog／script 移行などであり、実装済みの guardrail や docs 修正を残件として
+二重計上しない。
+
+## 209. 2026-08-29 SX-09 channel adapter adoption gate の全 bridge 適用
+
+共通 `formatChannelThreadContext` は Slack／Telegram／Discord／iMessage の全 bridge で利用済み
+だったが、adoption checker の import 検査は Discord／Telegram に限定されていた。検査対象を
+4 bridge 全てへ拡張し、実リポジトリの全対象が canonical module から formatter を import している
+ことを checker test で固定した。実行経路、provider ごとの delivery、thread context の内容は変更していない。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_channel_adapter_adoption.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 17 tests passed**。
+- `pnpm exec tsx scripts/check_channel_adapter_adoption.ts`、`git diff --check`: passed。
+
+## 210. 2026-08-29 review cycle: package export／生成物整合の修正
+
+full validate で、`process-actuator` の foundation `readJson` 結果が CLI schema の `object` 型へ
+渡る箇所の型不足と、package の公開 export 外である `@agent/core/foundation/json` を production
+evidence／subagent generator が参照している問題を検出した。前者は schema 型を明示し、後者は
+公開 `@agent/core/foundation` barrel へ統一した。あわせて計画文書追加後の knowledge index／
+integrity manifest を canonical generator で再生成した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_channel_adapter_adoption.test.ts scripts/check_production_evidence.test.ts scripts/generate_subagent_definitions.test.ts libs/actuators/process-actuator/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 51 tests passed**。
+- `pnpm run validate`: **full 67/67 gates passed**（build／typecheck を含む）。
+- `pnpm check -- --scope pr`: **31/31 passed**、`pnpm lint`、`git diff --check`: passed。
+
+## 211. 2026-08-29 SX-04 mission team index の governed loader 統合
+
+mission team の agent profile／authority role／team role／base template／organization template／
+tenant overlay は専用 schema が存在する一方、index 側では型付き `readJson` のみで読み込んでいた。
+各 snapshot／directory entry／overlay の load boundary を `defineCatalog` へ統合し、schema-invalid
+な entry が構成へ混入しないようにした。directory の filename と id の一致、directory 優先と
+snapshot fallback、organization／tenant overlay の merge 順序は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission-team-composer.test.ts libs/core/mission-team-binding.test.ts libs/core/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 35 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`pnpm check -- --scope pr`: passed。
+
+## 212. 2026-08-29 SX-04 organization profile の governed loader 統合
+
+`organization-profile` は専用 schema を持ちながら、candidate path ごとに手書き validator と
+`readJson` を実行していた。customer overlay／public profile の候補ごとに `defineCatalog` を
+使う load boundary へ統合し、schema-invalid または malformed な候補は従来どおり次候補へ
+進むようにした。customer 解決、root fixture の優先順位、public fallback、`$schema` metadata
+の扱いは維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/organization-profile.test.ts libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`git diff --check`: passed。
+
+## 213. 2026-08-29 SX-04 tenant registry の governed validation 統合
+
+tenant profile／tenant group は tier・tenant scope の正本で専用 schema を持つ一方、module-local
+`compileSchema` cache で個別に検証していた。profile／group の validation を `defineCatalog` の
+canonical schema boundary に統合し、default profile の既存読み込みも同じ境界へ揃えた。personal
+tier の read failure と malformed JSON の診断、tenant slug／group id の path guard、write 時の
+normalization と既存の fail-closed 挙動は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/tenant-registry.test.ts libs/core/tier-guard-tenant.test.ts libs/core/tenant-activation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 38 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`: passed。
+
+## 214. 2026-08-29 SX-04 org chart の governed loader 統合
+
+`org-chart` は専用 schema を持ちながら、明示 chart と team／authority role index を
+secure JSON helper と手書きの配列判定で読み込んでいた。org chart の候補を
+`defineCatalog` で検証し、schema-invalid な上位候補は次の scoped candidate または
+derived chart へ進むようにした。派生 chart の team／authority role 解決は mission-team
+index の governed loader を root fixture にも適用し、既存の directory 優先・snapshot fallback
+と source metadata の挙動は維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission-team-index.test.ts tests/mission-team-composition-contract.test.ts libs/core/mission-team-composer.test.ts libs/core/mission-team-binding.test.ts libs/core/organization-profile.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 39 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 215. 2026-08-29 review cycle: org chart の scope／source 判定を補強
+
+§214 の実装を再レビューし、tenant slug をそのまま候補 path に渡していた点を追加修正した。
+不正 slug は default の derived chart へ fail-closed で退避する。また source kind を
+`candidatePath.includes` で判定していたため、path separator に依存しない候補 metadata 方式へ
+変更した。明示 chart の schema-invalid fallback と traversal tenant の回帰テストを固定した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/org-chart.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 5 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 216. 2026-08-29 SX-04 price book の governed loader 統合
+
+customer-facing quote の価格正本 `price-book` は専用 schema が存在する一方、deal store が
+secure JSON helper の型キャストだけで読み込んでいた。tenant overlay と public catalog の
+各候補を `defineCatalog` で検証し、invalid な上位候補は次の public candidate へ進むようにした。
+tenant slug は `isValidTenantSlug` を通して、価格 catalog の path traversal を防ぐ。root fixture
+を注入できる optional 引数も追加し、実運用の既存呼び出し互換性は維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/deal-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 217. 2026-08-29 SX-04 video visual pattern catalog の schema 境界追加
+
+動画の visual pattern は、reasoning layer が選択する色・タイポグラフィの正本だが、従来は
+専用 schema なしで raw JSON を読み、形だけを手書き判定していた。専用
+`video-visual-patterns.schema.json` を追加し、`defineCatalog` の `fallbackOnInvalid` へ移行した。
+不正または欠落した catalog は deterministic な `calm-tech` default へ退避し、既存の pattern
+選択・unknown id・backend failure の挙動は変更していない。fixture root 対応と invalid catalog
+回帰テストも追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/video-visual-direction.test.ts libs/core/deal-store.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 10 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 218. 2026-08-29 SX-04 restricted-skills policy の fail-closed schema 化
+
+`restricted-skills.json` はスキル実行可否を決める governance catalog だが、従来は
+envelope の存在確認後に raw JSON を型キャストしていた。専用 schema を追加し、
+`isSkillAllowed` の policy load を `defineCatalog` へ移行した。schema-invalid／malformed
+policy は例外を許可側へ流さず deny とし、tenant／organization／project overlay の narrow-only
+挙動は維持した。fixture root を指定できる loader 境界と fail-closed 回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/skill-plugin-loader.test.ts libs/core/skill-resource-loader.test.ts libs/core/skill-wrapper.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 26 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 219. 2026-08-30 SX-04 restricted-capabilities の実行 gate 接続
+
+`restricted-capabilities.json` は actuator／capability の実行禁止を定義する正本だが、従来は
+文書と catalog contract にだけ存在し、実行経路から参照されていなかった。専用 schema と
+`capability-restriction-policy` loader を追加し、`resolveActuatorOperation` と
+`runActuatorCli` の両方で operation／actuator／domain の restriction を確認するようにした。
+policy の missing／malformed は fail-closed とし、`allow_override` を暗黙の bypass として扱わない。
+既存の manifest／platform capability check と順序は維持し、restriction はその前段で評価する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/capability-restriction-policy.test.ts libs/core/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 21 tests passed**。
+- `pnpm exec tsc -p tsconfig.json --noEmit`、`pnpm lint`、`git diff --check`: passed。
+
+## 220. 2026-08-30 review cycle: 専用 governance schema の catalog gate 互換性
+
+§219 の実装後に全体 `validate` を回したところ、`governance-catalog-contracts.json` の
+旧契約が専用 schema を参照する `restricted-skills.json`／`restricted-capabilities.json` を
+「envelope schema に裏付けられていない」と誤検知していた。checker の裏付け判定を declared
+schema の実在性へ拡張し、専用 schema へ移行中も既存の契約 top-level key 検査を継続するよう修正した。
+これにより専用 schema の検証強化と既存契約表の段階移行を両立した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_catalog_integrity.test.ts libs/core/capability-restriction-policy.test.ts libs/core/actuator-op-registry.test.ts libs/core/cli-utils.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 34 tests passed**。
+- `pnpm run validate`: **full 67/67 gates passed**（build／typecheck を含む）。
+- `pnpm check -- --scope pr`: **31/31 passed**、`pnpm lint`、`git diff --check`: passed。
+
+## 221. 2026-08-30 SX-08B intent resolution の二重解釈を解消
+
+`resolveIntentResolutionContract` は既に選択済みの `IntentResolutionPacket` を受け取れるが、
+task／mission／project の要件を補う際に `classifyTaskSessionIntent` が同じ自由文を再解決していた。
+このため、呼び出し側が渡した packet と生文の再判定が異なると、契約の intent と要件・権限判断が
+不一致になる可能性があった。`classifyTaskSessionIntent` に任意の resolved packet を渡せる境界を追加し、
+契約 resolver からは同じ packet を再利用するようにした。既存の直接呼び出しは引き続き内部解決を行う。
+
+packet を注入した契約が生文の別解釈へ戻らず、`bootstrap-project` の `project_brief` を保持する
+回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+- `pnpm exec vitest run libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+
+## 222. 2026-08-30 SX-08B canonical packet の fallback／router 伝播
+
+§221 の再レビューで、`IntentResolutionPacket` を先に得ているにもかかわらず、
+`intent-contract` の fallback と surface router が task-session classifier を生文から
+再実行している残存を検出した。fallback は入力に保持された packet を再利用し、classifier
+にも同じ packet を渡すようにした。surface router の compile 判定も同じ packet を使うため、
+scope 付きの選択結果と後段の task 判定が別の intent へ分岐しない。
+
+注入 packet と生文の解釈が異なる回帰ケースを追加し、fallback の intent、required inputs、
+execution shape が packet と一致することを固定した。既存の shape disagreement テストは、
+canonical packet を正とする現在の契約に合わせて更新した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **1 file / 24 tests passed**。
+- `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts libs/core/router-contract.test.ts libs/core/task-session.test.ts --reporter=dot --pool=forks --maxWorkers=1`: passed。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**。
+
+## 223. 2026-08-30 SX-08B surface orchestrator の packet 再利用
+
+§222 の再レビューで、surface orchestrator の1ターン内に同じ `originalText` を契約、
+compile 判定、flow compile、route context がそれぞれ解決していた。`originalText` 用の
+packet を orchestrator の1箇所で生成し、surface router、`compileUserIntentFlow`、route context
+へ渡すようにした。pending clarification の source text を含む契約解決は別の
+`resolutionText` として維持し、pending context の意味と tenant/tier scope は変更していない。
+
+router の packet 注入境界と、surface compile 判定の packet 再利用を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: passed。
+
+## 224. 2026-08-30 SX-08B router／orchestrator の共有 packet 境界を実装
+
+§223 の再レビューで、surface intent の packet を後段へ渡す API 境界が不足しており、
+router と compile 判定が受け取った結果を使えない残存を検出した。`resolveSurfaceIntent` と
+`shouldCompileSurfaceIntent` に optional packet を追加し、orchestrator が `originalText` 用に
+一度だけ解決した packet を、pre-resolve、compile 判定、flow compile、route context へ渡すようにした。
+これにより scope 付き viewer の同一ターンで intent 選択が段階ごとに揺れる余地と、不要な
+resolver 呼び出しを縮小した。packet 未指定の既存呼び出しは従来どおり内部解決する。
+
+router の packet 注入、compile 判定の packet 注入、surface runtime の fastpath／approval／通常経路を
+回帰テストで確認した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm exec vitest run libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **3 files / 31 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: passed。
+
+## 225. 2026-08-30 SX-08B task route／live-query の packet 再利用を拡張
+
+§224 のレビューで、live-query の classifier と router の間、および task-session route の
+handler 判定と新規 session 作成の間に、同一ターンの再解決が残っていた。`classifySurfaceQueryIntent`
+が optional packet を受け取り、`resolveSurfaceIntent` が同じ packet を渡すようにした。
+さらに route context に packet を保持し、task-session の handler 判定・fresh classifier・
+governed execution hint が同じ選択結果を使うようにした。packet 未指定の外部呼び出しは従来の
+内部解決を維持する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-query.test.ts libs/core/router-contract.test.ts libs/core/surface-runtime-router.test.ts libs/core/surface-runtime.test.ts libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/surface-runtime-orchestrator.approval-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000`: **6 files / 53 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: passed。
+
+## 226. 2026-08-30 SX-08B approval／mission proposal envelope の契約描画を補完
+
+再レビューで、通常の text reply は `formatChannelTurnText` を通る一方、approval request と
+mission proposal は bridge ごとの専用 envelope へ分岐するため、同じターンで生成済みの
+`IntentResolutionContract` の authority／next action／consequence が表示から消える欠落を検出した。
+共通 `buildSurfaceApprovalText`、Slack の approval block、mission proposal の fallback／block と、
+Telegram／Discord／iMessage の確認文へ既存の contract を optional に渡すよう修正した。承認レコード
+への保存や決定処理、`shouldSend` gate、tenant/tier 境界は変更していない。
+
+これにより、承認・提案 envelope でも「誰の判断が必要か」「次に何をすべきか」「待機時に何が起きるか」
+を同じターンの正本 contract から表示できる。contract 未指定の既存 UI 呼び出しは従来の表示を維持する。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-approval-ui.test.ts libs/core/slack-approval-ui.test.ts libs/core/slack-mission-proposal-ui.test.ts libs/core/surface-mission-proposals.confirmation.test.ts satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **8 files / 35 tests passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: passed。
+- `pnpm check -- --scope pr`: **31/31 passed**、baseline pipeline が green。
+
+## 227. 2026-08-30 SX-04 knowledge weights の専用 schema／catalog 化
+
+再レビューで、`knowledge-weights.json` がランキング参照と承認済み再計算の2箇所から
+個別に JSON 読み込みされ、専用 schema と governed catalog の検証契約から外れている残存を検出した。
+専用 `knowledge-weights.schema.json` を追加し、ランキング参照と適用処理を同じ
+`defineCatalog` ベースの loader へ統一した。通常のランキング参照は不正カタログ時に従来どおり
+既定値へフォールバックする一方、承認済み適用は不正な現行カタログを黙って上書きしない厳格経路を
+選択する。テナント override の解決順、承認、履歴バックアップ、監査記録は変更していない。
+
+不正な custom catalog が schema 検証後に既定値へ戻ることと、既存の再計算提案／適用契約を回帰テストで
+確認した。ガバナンス catalog の `$schema` も専用 schema へ更新し、integrity manifest を再生成した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/ranking-signals.test.ts libs/core/knowledge-weight-recalculation.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 228. 2026-08-30 SX-04 security policy egress view の専用 schema 化
+
+再レビューで、egress の `security-policy.json` 補助 view が汎用 envelope schema を参照し、
+security policy 本体の dedicated schema を使っていない残存を検出した。egress view の loader と
+正本 JSON の `$schema` を `security-policy.schema.json` に揃え、security policy の構造が壊れた場合に
+許可ドメインだけを部分的に採用し続けない検証境界を追加した。既存の service endpoint／manual
+allowlist の統合、egress mode、tier／tenant 判定は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/egress-policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 229. 2026-08-30 SX-04 network guardrails の governed loader 化
+
+security policy の専用 schema 化後の再レビューで、`network.ts` の payload size guard だけが
+個別 `loadJson` と手書き fallback を使い続けている残存を検出した。security policy の dedicated
+schema を使う `defineCatalog` に移し、欠損・不正時は既存どおり `2048KB` の安全な既定値へ戻す
+ようにした。egress allowlist、secret redaction、URL／tier／tenant gate、リクエスト制限の値の
+意味は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/network.test.ts libs/core/egress-policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **9 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 230. 2026-08-30 SX-04 PII rule catalog の fail-closed schema 統合
+
+再レビューで、ingest の PII rule loader が `readJson` 後に domain validation を手書きしており、
+`knowledge-sync-rules.json` の構造検証が共通 catalog 契約から外れている残存を検出した。PII gate は
+missing／corrupt／空配列を許容できないため fallback は導入せず、専用 schema を使う governed catalog
+へ移行した。regex のコンパイル、severity／action／validator の意味検証、legacy `name` 形状、
+masked preview と fail-closed のエラー分類は既存 domain logic に残した。正本 JSON の `$schema` も
+専用 schema へ更新した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/pii-scrubber.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **12 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 231. 2026-08-30 SX-04 mission quality policy view の governed 化
+
+security policy の専用 schema を各利用箇所へ適用する再レビューで、mission quality gate が
+個別 `readJsonFile` で `quality_requirements` だけを読む残存を検出した。存在確認後に dedicated
+schema の governed catalog をロードするようにし、ファイル欠損時は従来どおり追加 quality gate
+なし、存在する不正 JSON／schema の場合は従来どおり fail-fast となる境界を維持した。artifact
+review、outcome、deliverable、tenant／tier の判定責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 232. 2026-08-30 SX-04 trust policy の loader 正本化
+
+再レビューで、`trust-engine` と `kill-switch` が同一の `trust-policy.json` を別々に読み、
+fallback と config-fallback 記録も二重化している残存を検出した。専用 `trust-policy.schema.json`
+を使う `trust-engine` の governed catalog を正本 loader とし、kill-switch の anomaly detection
+も同じ validated snapshot から読むように統合した。欠損／不正時の既定値、trust score、decay、
+regime shift、kill 判定の閾値と termination wiring は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/trust-engine.test.ts libs/core/kill-switch.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 233. 2026-08-30 SX-04 spend guard policy の governed 化
+
+再レビューで、budget 制御の `spend-policy.json` が `readJsonIfPresent` と domain 正規化だけで
+読み込まれ、専用 schema が runtime loader に接続されていない残存を検出した。`defineCatalog` と
+既存の `spend-policy.schema.json` を接続し、欠損時は従来の既定 policy、存在する不正 policy は
+従来どおり例外となる strict 境界を保った。warn／block posture、daily／mission cap、tenant
+override の適用順、metrics 集計と ops alert は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/spend-guard.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **10 tests passed**。
+- `pnpm check -- --scope full --only catalogs`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 234. 2026-08-30 SX-04 ingest／generation quota policy の governed 化
+
+再レビューで、tenant quota の runtime policy が専用 schema を持つだけで loader には接続されて
+いない残存を検出した。`ingest-quota.ts` は新設した `ingest-quota-policy.schema.json`、
+`generation-quota.ts` は既存の `media-generation-quota-policy.schema.json` をそれぞれ
+`defineCatalog` に接続した。欠損／不正時に quota guard を無効化しない既定値、tenant override、
+UTC 日次 counter、warn→block と reservation/release の責務は変更していない。custom root の
+hermetic test seam も維持し、commit fixture を schema-valid な catalog envelope に更新した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/ingest-quota.test.ts libs/actuators/ingest-actuator/src/commit-quota.test.ts libs/actuators/ingest-actuator/src/commit-pii-gate.test.ts`: **20 tests passed**。
+- `pnpm exec vitest run libs/core/generation-quota.test.ts`: **4 tests passed**。
+- `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 235. 2026-08-30 SX-04 delegation path-scope catalog の loader 統合
+
+再レビューで、delegation preflight が専用 `path-scope-policy.schema.json` を持ちながら、
+`loadJson` と個別 AJV validator を併用していた残存を検出した。`defineCatalog` に loader と
+schema validation を統合し、policy 欠損／不正時の fail-closed、assignment の
+`allowed_write_scopes`、scope class 判定、unknown scope の block／warning 挙動は維持した。
+これにより同一 policy の cache と schema error 表現も governed catalog の共通境界に揃えた。
+
+検証:
+
+- `pnpm exec vitest run libs/core/delegation-preflight.test.ts`: **3 tests passed**。
+- `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 236. 2026-08-30 SX-04 service readiness／health thresholds の governed 化
+
+再レビューで、service connection readiness と degradation detection が専用 schema を持ちながら
+optional raw JSON reader に留まっていた残存を検出した。両 loader を `defineCatalog` に接続し、
+readiness は欠損／不正を従来どおり未設定（null）、health thresholds は欠損／不正を従来どおり
+既定値として扱う安全境界を維持した。service readiness 判定、provider demotion、latency／RSS／
+restart threshold、finance signal の評価責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/runtime-health-history.test.ts`: **18 tests passed**。
+- `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 237. 2026-08-30 SX-04 task-session policy の loader 統合
+
+再レビューで、task session 本体は governed catalog なのに、同じ runtime の
+`task-session-policy.json` だけ個別 AJV validator と `loadJson` を併用していた残存を検出した。
+既存の `task-session-policy.schema.json` を `defineCatalog` に接続し、policy の strict validation、
+intent resolution、requirements／payload の生成、session 本体の validation と persistence の
+責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/task-session.test.ts`: **21 tests passed**。
+- `pnpm run typecheck`: **passed**。
+
+## 238. 2026-08-30 SX-04 Mesh Hub policy の governed 化
+
+再レビューで、tenant scope、routing、topic delivery、recipient acceptance を定義する
+`mesh-hub-policy.json` が generic envelope schema と `readJson` のみで読み込まれていた残存を
+検出した。Mesh Hub 専用 schema を追加し、route decision が `defineCatalog` の validated policy
+を参照するように統合した。same-tenant 制約、runtime presence、automatic peer selection の
+operator gate、fan-out 上限、request kind と recipient acceptance の責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mesh-router.test.ts libs/core/mesh-topic-registry.test.ts`: **8 tests passed**。
+- `pnpm exec tsx scripts/check_catalog_integrity.ts`: **passed**。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check`: **passed**。
+
+## 239. 2026-08-30 SX-06 残存 CLI の shared harness 移行
+
+再レビューで、`apply_dependency_patch.ts` と `history_search.ts` が直接 `main()`／
+`process.exitCode` を持ち、他の CLI と異なる終了境界になっている残存を検出した。両 CLI を
+`defineScript` に接続し、引数は `currentProcessArgv()` seam 経由で yargs に渡すよう統一した。
+依存パッチの propose／apply、rollback、audit、canary、履歴検索の public tier／mission scope
+制約、JSON 出力と終了コードの責務は変更していない。生成物を更新した後の script-integrity
+検査でも直接 argv 参照は検出されないことを確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/apply_dependency_patch.test.ts scripts/help_entrypoints.test.ts libs/core/ingest-quota.test.ts libs/core/generation-quota.test.ts libs/core/delegation-preflight.test.ts libs/core/service-connection-readiness.test.ts libs/core/health-degradation.test.ts libs/core/runtime-health.test.ts libs/core/task-session.test.ts libs/core/mesh-router.test.ts libs/core/mesh-topic-registry.test.ts`: **74 tests passed**。
+- `pnpm exec tsx scripts/history_search.ts --help`、`pnpm exec tsx scripts/apply_dependency_patch.ts --help`: **passed**。
+- `pnpm run check -- --scope pr --only script-integrity`: **passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`pnpm exec tsx scripts/check_catalog_integrity.ts`、`git diff --check`: **passed**。
+- `pnpm pipeline --input pipelines/baseline-check.json`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 240. 2026-08-30 SX-04 mission lifecycle ADF の governed 化
+
+再レビューで、mission purge／archive が専用 `mission-lifecycle-policy.schema.json` を持ちながら
+`cli-input` の型付き JSON 読み込みに留まっている残存を検出した。lifecycle ADF を
+`defineCatalog` と foundation JSON に接続し、欠損時の critical ops alert と `adf_missing` の
+構造化結果、policy の status＋age の AND 判定、archive audit は維持した。hermetic purge fixture
+には新しい schema 契約を seed し、import-time の root 解決を避ける lazy schema path も確認した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-maintenance.purge.test.ts`: **6 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 241. 2026-08-30 SX-04 storage retention catalog の schema 実行化
+
+再レビューで、storage retention catalog が専用 schema を文書化している一方、runtime は
+module-local の structural validation と `readJson` に依存している残存を検出した。loader を
+`defineCatalog` に接続し、schema／JSON の不正・欠損時に janitor を止めない builtin fallback、
+repo-relative path／重複 path の retention 固有検証、soft-delete／review-required／event-store の
+挙動は維持した。temp-root テストで schema を明示的に seed し、catalog validation による
+hermetic 回帰も固定した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/storage-retention-catalog.test.ts libs/core/storage-janitor.test.ts`: **56 tests passed**。
+- `pnpm run typecheck`: **passed**。
+
+## 242. 2026-08-30 SX-04 knowledge taxonomy の governed loader 統合
+
+再レビューで、ingest の `knowledge-taxonomy.json` が専用 schema を持ちながら、module-local の
+永久 cache と foundation `readJson` のみで読み込まれている残存を検出した。`defineCatalog` に
+schema validation と mtime／size cache を接続し、directory default の最長 prefix、kind default、
+knowledge-card 生成、tenant path resolution の責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/actuators/ingest-actuator/src/normalize-card.test.ts libs/actuators/ingest-actuator/src/commit.test.ts libs/actuators/ingest-actuator/src/commit-pii-gate.test.ts libs/actuators/ingest-actuator/src/commit-quota.test.ts`: **29 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 243. 2026-08-30 SX-02 module boundary の facade 宣言補正
+
+方向違反の再レビューで、`channel-surface.ts` は複数 surface が利用する公開集約 facade なのに
+facade registry に未登録で、内部 orchestrator への正当な委譲を domain→orchestration 違反として
+数えていることを検出した。`module-layer-boundaries.json` に facade を明示し、実装を隠すための
+baseline 緩和は行わず、実測方向違反を **4 件から 3 件**へ減らした。残る
+`agent-runtime-supervisor → mission-team-orchestrator` と `secure-io` の audit／tier bootstrap
+依存は、責務移動を伴う別波として残した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs --input-type=module -e "import {checkModuleBoundaries} from './scripts/check_module_boundaries.ts'; const r=checkModuleBoundaries(); if (r.violations.length) throw new Error(r.violations.join('\\n')); console.log(JSON.stringify({cycles:r.cycles.length,directionViolations:r.directionViolations.length,maxRuntimeSccSize:r.maxRuntimeSccSize,dynamicImports:r.dynamicImportEdges.length}));"`: **3 direction violations**。
+- `pnpm exec vitest run libs/core/agent-runtime-supervisor.test.ts libs/core/channel-surface-routing.test.ts libs/core/channel-surface-supervisor.test.ts`: **22 tests passed**。
+
+## 244. 2026-08-30 SX-04 security posture の正本 catalog 化
+
+再レビューで、QM-04 の `security-posture.json` が設計文書と loader の参照にだけ現れ、実ファイル
+と専用 schema が存在しない残存を検出した。`security-posture.schema.json` と `posture=auto` の
+public catalog を追加し、`security-screen` は `defineCatalog` で検証するようにした。欠損時の
+`auto`、JSON／I/O 破損時の `strict`、schema 不正時の `auto`、環境変数による明示 override、
+15 秒の runtime cache は維持し、security screen の fail-closed verdict／quarantine／approval
+floor の責務は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/security-screen.test.ts libs/core/approval-policy.test.ts libs/core/egress-policy.test.ts libs/core/tier-guard-policy-corruption.test.ts`: **39 tests passed**。
+- `pnpm run typecheck`: **passed**。
+- catalog integrity は index／manifest 更新後に再確認する。
+
+## 245. 2026-08-30 SX-04 authority role registry の共通 governed loader 化
+
+再レビューで、trigger runner の authority role file／snapshot が専用 schema を持つにもかかわらず、
+foundation JSON reader と手書き fallback が複数箇所に分散して認可レベル判定へ渡されている残存を検出した。
+directory→snapshot の優先順位と directory entry の filename／role 整合性を
+`authority-role-registry.ts` に集約し、role file は `authority-role.schema.json`、snapshot は
+`authority-role-index.schema.json` を通る `defineCatalog` loader に統合した。mission team index、
+trigger runner、surface UX はこの共通 loader を参照する。trigger の tenant／role binding、scope class
+からの level 算出、delivery 前の escalation 拒否は変更していない。identity bootstrap の
+`authority.ts` は secure-io 循環を避ける別責務として raw bootstrap IO を維持した。併せて surface UX の
+service endpoint／preset 参照を既存の schema 検証済み registry へ寄せ、同一 catalog の二重 reader を
+撤去した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-team-index.test.ts libs/core/trigger-runner.test.ts libs/core/service-binding.test.ts libs/core/service-preset-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 25 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 246. 2026-08-30 SX-04 intent compiler の standard-intents loader 統合
+
+再レビューで、legacy `intent-compiler` が `standard-intents.json` を独自に raw read し、
+`intent-resolution` の専用 schema 付き catalog loader と異なる validation／欠損処理を持つ残存を
+検出した。未指定時は `loadStandardIntentCatalog()` を使い、呼び出し側が明示した
+`standardIntents` はそのまま優先するように整理した。exact／keyword／hint の解決順、confidence、
+決定的 pipeline step の生成、LLM 用 prompt の形は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/intent-compiler.test.ts libs/core/intent-resolution.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=10000`: **2 files / 35 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 247. 2026-08-30 SX-04 agentic source review rule pack の schema 統合
+
+再レビューで、security scanner の `agentic-rule-hierarchy.json` が runtime の rule selection に使われる
+正本データである一方、専用 schema なしに `readJson` と手書き shape check だけで読み込まれている残存を
+検出した。`agentic-source-review-rules.schema.json` を追加し、rule pack を `defineCatalog` に接続した。
+rule category／match 条件／stages の構造検証を共通境界へ移し、domain／language／dependency／always-on
+の選択順、security review の human approval／egress gate、hypothesis は untrusted のままという契約は
+変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/agentic-source-review.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 tests passed**。
+- `pnpm run typecheck`、`pnpm exec tsx scripts/check_catalog_integrity.ts`、`git diff --check`: **passed**。
+
+## 248. 2026-08-30 SX-04 visual review rubric の governed catalog 化
+
+再レビューで、rendered artifact の visual review が参照する rubric に専用 schema はなく、runtime 側で
+手書きの部分整形をしていた残存を検出した。`visual-review-rubric.schema.json` を追加し、public rubric と
+tenant override の選択結果を `defineCatalog` で検証するように整理した。不正または読めない rubric は
+従来どおり built-in rubric へ降格し、tenant slug の検証、egress 制御、finding の severity／action、
+human review が必要な skipped 判定は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/visual-review.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 25 tests passed**。
+
+## 249. 2026-08-30 SX-04 video motion catalog の governed loader 統合
+
+再レビューで、video compiler が選択する `video-motion-patterns.json` が専用 schema なしの独自
+`loadJson`／`_meta` 除去で読まれている残存を検出した。`video-motion-patterns.schema.json` を追加し、
+`defineCatalog` で構造を検証してから既存の正規化へ渡すように整理した。`_meta` の非公開化、role
+default の補完、duration／offset の clamp、未知の model selection の built-in fallback、生成 CSS の
+決定性は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/video-motion-direction.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 17 tests passed**。
+
+## 250. 2026-08-30 SX-04 intent routing map の重複 reader 除去
+
+再レビューで、`intent-routing-map.json` は `router-contract.ts` の schema 付き governed catalog が
+正本である一方、`intent-track-resolver.ts` が同じ JSON を別の `readJson` で読む重複を検出した。
+canonical loader を公開し、surface route と intent-to-track gate の双方が同じ validated map を参照する
+ように整理した。pipeline／mission／direct command の routing、track の lifecycle／confidence gate、
+tenant override の merge と persistence は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
+
+## 251. 2026-08-30 SX-04 track creation policy の専用 schema 化
+
+再レビューで、intent-to-track provisioning の global policy が generic
+`governance-catalog.schema.json` と直接 `readJson` に依存している残存を検出した。専用の
+`track-creation-policy.schema.json` を追加し、global `track-creation-policy.json` を
+`defineCatalog` で検証するように整理した。tenant／personal の partial override は従来の
+`track-policy-override.schema.json` と merge 経路を維持し、track type、lifecycle、confidence
+gate、project track record の生成結果は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+
+## 252. 2026-08-30 SX-04 intent routing の track mapping schema 補強
+
+§250 の canonical loader 統合を再レビューし、`intent-routing-map.schema.json` が
+`track_intent_policy_map` を未定義のまま root の `additionalProperties: true` に通していた境界 gap を
+検出した。track type、lifecycle、autostart confidence（0〜1）を専用 property として追加し、surface
+routing と intent-to-track provisioning が同じ map を schema 上も検証するよう補強した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/intent-track-resolver.test.ts libs/core/router-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
+
+## 253. 2026-08-30 SX-03 meeting facilitator policy の registered env accessor 化
+
+再レビューで、meeting facilitator の policy loader がテスト用 env 注入を受ける一方、各
+`KYBERION_*` 値を `env.KEY` から直接参照している残存を検出した。foundation の
+`getRegisteredEnvText(name, { env })` を追加し、registry の型定義を経由して同じ文字列 semantics
+（`KYBERION_SUDO` の厳密な `true` 判定、数値／comma-separated list の既存 fallback）を保つよう移行した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+
+## 254. 2026-08-30 SX-04 dynamic permission policy の fail-closed catalog 化
+
+再レビューで、contextual permission grant の `dynamic-policies.json` が generic schema と raw
+`JSON.parse` に依存し、読み込み失敗時に既存の grant を保持し得る残存を検出した。専用の
+`dynamic-permission-policy.schema.json` と `defineCatalog` を接続し、schema／JSON／I/O が不正または
+欠損の場合は policy を空にして grant を停止するよう修正した。grant の role／path 判定、intent／keyword
+の lookback、既存の sensory memory TTL と audit 境界は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/dynamic-permission-guard.test.ts libs/core/meeting-facilitator-policy.test.ts libs/core/foundation/index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
+
+## 255. 2026-08-30 SX-04 model cost registry の schema/loader 統合
+
+再レビューで、料金・コスト計測の正本である `model-cost-registry.json` と fallback が、独自の
+structural filter だけで読み込まれ、runtime の schema 検証を受けていない残存を検出した。専用の
+`model-cost-registry.schema.json` と `defineCatalog` を接続し、モデル料金、alias、default、cache
+rate、入力 token 段階制の shape を同じ契約で検証するよう整理した。primary が優先される既存の
+fallback merge、壊れた一方を無視して他方を利用する挙動、料金解決の substring／tier semantics と
+テスト用 cache reset は維持している。
+
+検証:
+
+- `pnpm exec vitest run libs/core/metrics-cost.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 4 tests passed**。
+
+## 256. 2026-08-30 SX-04 mission template catalog の governed 化
+
+再レビューで、ミッション生成の正本 `mission-templates.json` が専用 schema を持つ一方、
+`mission-creation.ts` では `readJsonFile` による直接読み込みに留まり、runtime の共通 validation
+境界から外れている残存を検出した。`defineCatalog` による loader／validator を接続し、template の
+knowledge injection、生成 file、content template の shape を schema で検証するようにした。
+併せて生成 file の相対 path が mission directory の外へ出ない runtime boundary を追加した。
+mission type の選択、tier auto-elevation、placeholder 展開、既存 mission の扱い、team／workflow
+初期化の順序は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-template-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+
+## 257. 2026-08-30 SX-04 wisdom policy の governed loader 統合
+
+再レビューで、ミッション蒸留が参照する `wisdom-policy.json` は専用 schema を持つ一方、
+`readJsonFile` と module-local の partial Zod validation で読み込まれている残存を検出した。
+`defineCatalog` に専用 schema を接続し、LLM profile、distillation rule、tier mapping の構造を
+runtime の共通境界で検証するよう整理した。不正または欠損時の警告と構造的蒸留への fallback、
+LLM profile の選択、tier ごとの output directory、prompt／wisdom の生成契約は維持している。
+
+検証:
+
+- `pnpm exec vitest run libs/core/wisdom-policy-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+
+## 258. 2026-08-30 SX-04 persisted trust ledger の governed 化
+
+再レビューで、委譲可否に参照される personal-tier の `agent-trust-scores.json` が専用 schema なしの
+raw reader であり、`trust-engine` と mission governance の読み込みが分散している残存を検出した。
+専用 `agent-trust-scores.schema.json` と root-aware な `defineCatalog` loader を追加し、永続 trust
+record の score、tier、dimension、timestamp を検証してから双方が同じ snapshot を利用するようにした。
+既存の trust score 永続化形式、明示 root のテスト、壊れた／欠損 ledger を既定状態として扱う
+fail-closed の委譲境界、trust policy の scoring／decay／propagation は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/trust-ledger-catalog.test.ts libs/core/trust-engine.test.ts libs/core/mission-governance.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 10 tests passed**。
+
+## 259. 2026-08-30 SX-04 company organization profile の loader 重複除去
+
+再レビューで、company aggregate が customer／public／fallback の候補を選択する際、既存の
+organization profile governed loader を使わず `readJson` で再読している残存を検出した。明示 path を
+schema 境界へ渡す `loadOrganizationProfileAtPath` を追加し、候補の優先順位と invalid candidate 時の
+停止挙動を維持したまま、company aggregate と通常の profile 解決が同じ validation 契約を共有するようにした。
+
+検証:
+
+- `pnpm exec vitest run libs/core/company-profile-loader.test.ts libs/core/company.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 3 tests passed**。
+
+## 260. 2026-08-30 SX-04 mission management config の共有 loader 化
+
+再レビューで、mission の tier directory／archive directory を定める
+`mission-management-config.json` が mission-state、mission-seal、operator summary で個別に
+JSON 読み込みされ、専用 schema が runtime の共通境界に接続されていない残存を検出した。
+root-aware な governed loader を追加し、3 箇所を同じ validated snapshot に統合した。欠損時の
+既定 directory、schema／JSON 不正時の安全な fallback、custom root の hermetic test、tier directory
+と archive の解決結果は維持している。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-management-config.test.ts libs/core/mission-seal.test.ts libs/core/mission-state.test.ts libs/core/operator-home-summary.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 10 tests passed**。
+
+## 261. 2026-08-30 SX-04 Chronos mission history の config reader 統合
+
+再レビューで、Chronos の `su-surface-data` が mission history の tier directory を解決する際、
+`mission-management-config.json` を個別の `loadJson` と手書き fallback で読み込んでいる残存を検出した。
+既存の `loadMissionManagementConfig` を利用し、mission-state、mission-seal、operator summary と同じ
+schema validation／欠損・不正時 fallback 境界へ統合した。Chronos の mission history の tier 検索順と
+archive fallback は変更していない。
+
+検証:
+
+- `pnpm exec vitest run presence/displays/chronos-mirror-v2/src/lib/su-surface-data.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 5 tests passed**。
+
+## 262. 2026-08-30 SX-04 mission path config の bootstrap 境界 hardening
+
+再レビューで、上位の governed loader とは別に、循環依存を避ける `path-resolver` の bootstrap reader が
+mission directory 設定を直接解釈している残存を確認した。低層 reader を一つの helper に集約し、directory
+値を repo-relative、非空、`..` なしに限定した。併せて mission-management schema の全 directory key に
+同じ相対パス契約を適用し、上位 consumer と bootstrap consumer の境界を揃えた。欠損・不正設定時の既定
+layout、tenant path、tier の検索順は維持している。
+
+検証:
+
+- `pnpm exec vitest run libs/core/path-resolver.test.ts libs/core/mission-management-config.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
+
+## 263. 2026-08-30 SX-03 mission reader の foundation 統合
+
+再レビューで、mission の LLM identity、governance procedure、project ledger、mission state が
+互換目的の `cli-input` wrapper を経由しており、canonical foundation reader の採用状況が見えにくい
+残存を確認した。各 reader を `foundation/json` または `foundation/text` へ直接接続し、欠損時 fallback、
+repair 用の permissive read、mission state の schema-validated 通常 read は従来どおり維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/mission-llm.test.ts libs/core/mission-governance.test.ts libs/core/mission-state.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 14 tests passed**。
+
+## 264. 2026-08-30 SX-08/SX-09 bridge のユーザー向け語彙統合
+
+再レビューで、channel adapter の共通 delivery は語彙経由になっている一方、Telegram/Discord の
+承認ボタン、iMessage の長時間処理通知、Slack の承認 fallback に日英リテラルが残っていることを
+検出した。既存の `bridge` namespace に承認ボタン、承認 fallback、処理中通知を追加し、各 bridge が
+`t()` と operator locale を通るようにした。外部送信の gate、approval callback、typing の停止順序、
+既存の日本語表示は変更していない。
+
+検証:
+
+- `pnpm exec vitest run satellites/slack-bridge/src/index.test.ts satellites/telegram-bridge/src/index.test.ts satellites/discord-bridge/src/index.test.ts satellites/imessage-bridge/src/index.test.ts libs/core/surface-approval-ui.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 26 tests passed**。
+- `pnpm run typecheck`、`pnpm exec tsx scripts/check_i18n_hardcoding.ts --update-baseline`、catalog／knowledge index regeneration: passed。
+
+## 265. 2026-08-30 SX-08 intent packet 選択後の service target 保持
+
+再レビューで、`run_intent` が canonical `IntentResolutionPacket` の `selected_intent_id` を実行へ渡す際、
+自由文そのものを失い、`stop-service` / `start-service` の対象 service 抽出が一覧操作へ退避する残存を検出した。
+実行コンテキストへ `source_text` を保持し、Super-Nerve resolver が intent ID と元の utterance を分けて扱うよう修正した。
+明示的な `service_name` の優先、service 名の安全な文字種検査、他 intent の compile 経路は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/actuators/orchestrator-actuator/src/super-nerve/resolver.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 7 tests passed**。
+- `pnpm --filter @actuator/orchestrator run build`、`git diff --check`: passed。
+
+## 266. 2026-08-30 SX-08 surface intent packet の通常ターン再利用
+
+再レビューで、surface runtime が routing 用に `originalResolutionPacket` を生成済みであるにもかかわらず、
+通常ターンの `IntentResolutionContract` 生成で同じ自由文を再解決している残存を検出した。pending clarification
+の source text と current text を合成する場合は別の resolution text が必要なため従来経路を維持し、通常ターンのみ
+既存 packet を contract に渡すようにした。intent の選択結果、viewer scope、pending clarification の意味は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/surface-runtime-orchestrator.fastpath.test.ts libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 30 tests passed**。
+
+## 267. 2026-08-30 SX-04 contract-schema checker の実装状況再突合
+
+再レビューで、R6 の先送り欄に `check_contract_schemas_checks_{1,2,3}` が「未着手」と残っている一方、
+現行 checker は 3 つの check part を import して統合している不整合を確認した。`check:contract-schemas`
+の source entrypoint を実行し、`[check:contract-schemas] OK` を確認した。これは未着手の実装を新規追加したもの
+ではなく、既存の part 1/2/3、evidence、policy check の組み込み済み状態を計画上の実測へ反映する更新である。
+今後の残件は checker の機能追加ではなく、分割ファイルの構造整理と、未統合の個別 schema/catalog が残って
+いないかの再監査として扱う。
+
+検証:
+
+- `pnpm exec tsx scripts/check_contract_schemas.ts`: **OK**。
+
+## 268. 2026-08-30 SX-08 Concierge voice status の viewer 認可漏れ修正
+
+再レビューで、Concierge の音声 mutation (`listen-once` / `stop`) には既に mutation guard がある一方、
+`GET /api/voice/status` だけが viewer を解決せず、voice-hub の稼働状態、STT backend、入力デバイス、
+発話状態を未認証リクエストへ返していた。`resolveConciergeViewer` を status route の入口へ追加し、loopback
+または許可済み token の server-side viewer が解決できない場合は voice-hub probe より先に拒否するようにした。
+既存の Tier 0 fallback、voice-hub の timeout、Tier 1 の payload 形式は変更していない。再発防止として、
+Concierge の operator-data GET 契約テストに voice status route を追加した。
+
+検証:
+
+- `pnpm --dir presence/displays/concierge test -- --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 27 tests passed**。
+
+## 269. 2026-08-30 SX-04 lifecycle hook config の governed schema 化
+
+再レビューで、実行前後の block／ask を決める `lifecycle-hooks.json` が存在する場合、foundation の
+JSON reader と entry 単位の手書き検査だけで engine へ登録される残存を検出した。専用
+`lifecycle-hooks.schema.json` と `defineCatalog` を接続し、config の top-level／hook entry の構造を
+共通 schema 境界で検証するようにした。schema／JSON が不正な場合は空の engine へ降格し、既存の
+不正 entry の個別 skip、hook の matcher／event 検査、fail-open の実行 semantics は維持した。
+併せて contract-schema checker に valid／invalid fixture を追加し、実運用 schema の検査対象へ登録した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/lifecycle-hook-engine.test.ts scripts/check_contract_schemas.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 20 tests passed**。
+- `pnpm exec tsx scripts/check_contract_schemas.ts`: **OK**。
+- `pnpm generate:knowledge-index`、`pnpm run typecheck`、`pnpm run lint`、catalog／module-boundaries／diff check: passed。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 270. 2026-08-30 SX-04 knowledge feedback policy の governed schema 化
+
+再レビューで、knowledge usage aggregate の上限を決める `knowledge-feedback-policy.json` が存在する一方、
+`knowledge-feedback-loop` が foundation の JSON reader と手書きの値検査だけで設定を解釈している残存を検出した。
+専用 `knowledge-feedback-policy.schema.json` と `defineCatalog` を接続し、defaults／tenant_overrides の構造と
+正の整数上限を共通 schema 境界で検証するようにした。不正な設定は既定の bounded cap へフォールバックし、
+既存のテナント上書き、欠損時の既定値、delivery／feedback JSONL の証跡は変更していない。併せて
+contract-schema checker に valid／invalid fixture と、通常値・テナント上書き・不正設定の回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/src/knowledge-feedback-loop.test.ts scripts/check_contract_schemas.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 12 tests passed**。
+- `pnpm exec tsx scripts/check_contract_schemas.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 271. 2026-08-30 SX-04 Presence Studio の standard-intents catalog 統合
+
+再レビューで、Presence Studio の `/api/standard-intents` が canonical な intent catalog loader を使わず、
+`standard-intents.json` を route 内で個別 `readJson` している残存を検出した。shared の
+`loadStandardIntentCatalog()` へ切り替え、既存の surface intent の絞り込み、work design 解決、レスポンス形状は
+維持した。これにより route と intent compiler が同じ schema 検証・cache 境界を共有する。不要になった
+Presence 専用の重複 catalog 型を削除し、route contract test で canonical loader の採用を固定した。
+
+検証:
+
+- `pnpm exec vitest run presence/displays/presence-studio/os-control-plane-route.test.ts presence/displays/presence-studio/security.test.ts presence/displays/presence-studio/src/headless.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 10 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 272. 2026-08-30 SX-03/SX-04 MCP tool catalog の secure／governed loader 統合
+
+再レビューで、共有 MCP server の allowlist が `safeReadFile` と手書き `JSON.parse` の型キャストだけで
+読み込まれ、`mcp-tool-catalog.json` の構造不正を検出できない残存を検出した。専用 schema と
+`defineCatalog` を接続し、MCP tool の caller role／tier allowlist と pipeline allowlist を検証するようにした。
+不正または欠損時は空の allowlist へ降格し、未登録 tool を実行しない既存の fail-closed 境界を維持した。
+テストでは governed catalog を模した Foundation I/O を使い、既存の handler mock と catalog cache が干渉しない
+よう署名を分離し、invalid catalog の拒否を固定した。
+
+検証:
+
+- `pnpm exec vitest run libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 32 tests passed**。
+
+## 273. 2026-08-30 SX-04 Concierge setup の surface manifest loader 統合
+
+再レビューで、Concierge の setup GET が `active-surfaces.json` を route 内で個別 `readJson` している残存を検出した。
+既存の `loadSurfaceManifest()` へ切り替え、専用 schema、surface directory／snapshot の正本選択、manifest 不正時の
+既存エラー境界を共有するようにした。setup response の `id`／`port`／`enabled` 投影と、surface roles、identity、
+tenant profile の表示契約は変更していない。Concierge contract test に canonical loader の利用と route 内の個別 path
+読込が再発しないことを追加した。
+
+検証:
+
+- `pnpm --dir presence/displays/concierge test -- --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 27 tests passed**。
+
+## 274. 2026-08-30 SX-05 operator home の CLI manifest loader 統合
+
+再レビューで、operator home のコマンド表示が `cli-commands.json` を個別 `readJson` し、同じ scripts 配下の
+`loadCliManifest()` が提供する schema／catalog 境界を迂回している残存を検出した。表示処理を既存の governed
+loader へ切り替え、user audience の絞り込み、表示ラベル、既存の static command list は変更していない。
+再発防止として CLI manifest contract test に operator home の loader 利用を固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_cli_manifest.test.ts scripts/help_entrypoints.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
+
+## 275. 2026-08-30 SX-04 surface roles catalog の governed loader 化
+
+再レビューで、Concierge setup が `surface-roles.json` を route 内で個別 `readJson` し、surface manifest とは別の
+検証境界を持っている残存を検出した。core に `loadSurfaceRoleCatalog()` を追加し、専用 schema で role の責務、
+write posture、repo-relative directory、port を検証するようにした。setup response の roles 投影、tagline、
+既存 viewer／mutation guard は変更していない。contract-schema checker と Concierge contract test に schema／loader
+利用を追加した。
+
+検証:
+
+- `pnpm --dir presence/displays/concierge test -- --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 27 tests passed**。
+- `pnpm exec tsx scripts/check_contract_schemas.ts`、`pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 276. 2026-08-30 SX-04 mission process bindings checker の governed loader 統合
+
+再レビューで、mission workflow／classification／review、process registry、gate profile、scenario pack、
+standard intents を check_mission_process_bindings が汎用 readJson で個別に読み込み、実行側の
+defineCatalog schema／cache 境界と異なる経路で検査している残存を検出した。既存の mission runtime loader を
+公開し、未整備だった process governance／gate profile／verification pack 用にも専用 governed loader を追加した。
+checker はこれらの loader を通るようにし、standard intents の overlay を含む canonical な intent 一覧も再利用する。
+併せて checker が実際に参照する workflow の playbook_ref を型へ追加し、汎用 JSON 型に隠れていた型不整合を解消した。
+
+検証:
+
+- pnpm exec vitest run scripts/check_mission_process_bindings.test.ts --reporter=dot --pool=forks --maxWorkers=1: **1 file / 2 tests passed**。
+- pnpm exec tsx scripts/check_mission_process_bindings.ts、pnpm exec tsx scripts/check_contract_schemas.ts、pnpm run typecheck、pnpm run lint: passed。
+
+## 277. 2026-08-30 SX-04 intent domain coverage checker の governed loader 統合
+
+追加監査で、intent-domain coverage checker にも standard intents／mission classification policy／mission workflow
+catalog の汎用 JSON 読込が残っていることを確認した。canonical loader へ切り替え、通常 runtime と同じ schema 検証、
+cache、standard intent の正本を使って domain／workflow の整合性を検査するようにした。ontology、team template、
+outcome catalog など専用 loader が未整備のデータは今回の変更範囲を広げず、既存の secure reader を維持した。
+
+検証:
+
+- pnpm exec tsx scripts/check_intent_domain_coverage.ts: OK（137 intents）。
+- pnpm run typecheck、pnpm run lint、pnpm check -- --scope full（67/67）、git diff --check: passed。
+
+## 278. 2026-08-30 SX-04 intent domain coverage の catalog loader 完全統合
+
+再レビューで、同 checker に ontology、mission team template、outcome catalog の汎用 JSON 読込も残っていることを確認した。
+ontology の完全なエントリ形状を core の governed loader から取得できる API を公開し、team template と outcome は既存 loader を
+再利用するように変更した。これにより checker の governance catalog 読込は schema 検証・cache・既存 overlay semantics を持つ
+canonical loader に統一され、generic readJson helper と foundation JSON reader への依存を除去した。
+
+検証:
+
+- pnpm exec vitest run scripts/check_intent_domain_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1: **1 file / 2 tests passed**。
+- pnpm exec tsx scripts/check_intent_domain_coverage.ts: OK（137 intents）。
+- pnpm run typecheck、pnpm run lint、@agent/core build: passed。
+
+## 279. 2026-08-30 SX-11 first-win smoke の validated ADF 境界統合
+
+再レビューで、first-win smoke checker が verify-session と weekly lifecycle の pipeline JSON を foundation の汎用 reader と
+手書き検査だけで読み込み、通常の ADF schema／include／guardrail 境界を通らない残存を検出した。pipeline 読込を
+readValidatedPipelineAdf へ切り替え、checker 自身も validated ADF の入力契約を使うようにした。first-win 固有の
+headless、local data URL、screenshot path、dry-run op の意味検査は維持し、不正 pipeline は従来どおり checker の
+violation として扱う。
+
+検証:
+
+- pnpm exec vitest run scripts/check_first_win_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1: **1 file / 5 tests passed**。
+- pnpm run typecheck、pnpm run lint、git diff --check: passed。
+
+## 280. 2026-08-30 SX-04 sovereign dashboard の readiness／trust loader 統合
+
+再レビューで、Sovereign Dashboard が service connection readiness と agent trust ledger を汎用 JSON reader で再読し、
+既存 core loader の schema 検証・cache・欠損時 semantics を迂回している残存を検出した。readiness は
+loadServiceConnectionReadinessConfig、trust ledger は loadPersistedTrustLedger を利用するように変更し、
+不正／欠損時に dashboard が安全側で「未設定」と表示する既存挙動と、score の表示形式は維持した。
+再発防止として loader 利用を source 契約テストで固定した。
+
+検証:
+
+- pnpm exec vitest run scripts/sovereign_dashboard.test.ts --reporter=dot --pool=forks --maxWorkers=1: **1 file / 1 test passed**。
+- pnpm run typecheck、pnpm run lint: passed。
+
+## 281. 2026-08-30 SX-04 baseline readiness loader の正本統合
+
+再レビューで、baseline checker が service-connection-readiness を独自の raw JSON parser と fallback で読み、
+Sovereign Dashboard や readiness predicate が利用する core の schema 付き loader と二重化している残存を検出した。
+実運用の config 読込を loadServiceConnectionReadinessConfig に統合し、欠損時は未設定、不正時は config degraded
+として baseline を劣化させる既存 semantics を維持した。テスト用の raw parser API は、入力文字列の controlled failure
+検証に必要なため残している。
+
+検証:
+
+- pnpm exec vitest run scripts/run_baseline_check.test.ts --reporter=dot --pool=forks --maxWorkers=1: **1 file / 29 tests passed**。
+- pnpm run typecheck、pnpm run lint、git diff --check: passed。
+
+## 282. 2026-08-30 SX-04 global skill index の governed loader 統合
+
+再レビューで、Sovereign Dashboard の skill landscape が生成済みの `global_skill_index.json` を汎用 JSON reader で
+直接読み込み、catalog の schema／cache 境界を迂回している残存を検出した。生成形式に対応する専用 schema と
+`loadSkillIndex()` を core に追加し、Dashboard は不在／不正時の既存 empty-state を維持したまま governed loader を
+利用するように変更した。component inventory の生成形式、表示項目、実装数の投影は変更していない。
+
+検証:
+
+- `pnpm exec vitest run libs/core/skill-index.test.ts scripts/sovereign_dashboard.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 283. 2026-08-30 SX-04 UX contract checker の surface role loader 統合
+
+再レビューで、`check_ux_contract_docs` が実行側に存在する `loadSurfaceRoleCatalog()` を使わず、surface role catalog を
+個別 `readJson` している残存を検出した。checker を schema 検証・cache を持つ canonical loader 経由へ変更し、公開文書の
+語彙検査、tagline key 検査、違反時の報告は維持した。loader 利用と旧経路の不在を contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_ux_contract_docs.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 284. 2026-08-30 SX-04 role snapshot generator の governed loader 統合
+
+再レビューで、team-role と authority-role の snapshot generator が canonical directory／snapshot を汎用 `readJson` で
+読み込み、実行側の schema 付き loader と異なる検証境界を持っている残存を検出した。両 generator の入力読込を既存の
+mission team index／authority role loader へ統一し、ファイル名と role id の整合、directory 優先・snapshot fallback、出力形式は
+維持した。loader 経路の利用を各 generator の contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/sync_team_roles.test.ts scripts/sync_authority_roles.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 4 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 285. 2026-08-30 SX-04 model registry bootstrap の governed loader 統合
+
+再レビューで、model registry の bootstrap 経路だけが snapshot を foundation の汎用 `readJson` で読み、通常の
+model routing と異なる schema 検証・directory 優先／snapshot fallback の境界を持っている残存を検出した。
+bootstrap の入力を既存の `loadModelRegistry()` に統合し、directory が空の場合の snapshot fallback、生成する index／model
+files、非空 directory の拒否は維持した。loader の利用を source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/sync_model_registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 286. 2026-08-30 SX-04 service endpoint generator の catalog 検証統合
+
+再レビューで、service endpoint snapshot generator が schema を毎回 `createAjv` と汎用 `readJson` で読み込み、runtime の
+`loadServiceEndpointsCatalog()` と異なる検証実装を持っている残存を検出した。directory の各 endpoint と生成 snapshot の
+検証を `defineCatalog().load/validate` へ統一し、service id／ファイル名、default pattern、version の整合性検査と出力形式は
+維持した。既存 generator のテスト double を catalog 境界に合わせ、独自 Ajv reader の再導入を contract test で防止した。
+
+検証:
+
+- `pnpm exec vitest run scripts/sync_service_endpoints.test.ts scripts/sync_service_endpoints.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 287. 2026-08-30 SX-04 PII rule generator の fail-closed loader 統合
+
+再レビューで、extension 向け PII ルール生成器が `knowledge-sync-rules.json` を汎用 `readJson` で読み、実行時の
+`loadPiiRules()` が持つ schema／regex／severity／action／validator の fail-closed 検証を再実装していない残存を検出した。
+生成器を既存の `loadPiiRules()` 経由へ統合し、extension へ出力する id／regex と生成コメント、2つの出力先は維持した。
+実生成で両出力が変更なしであることも確認し、独自 reader の再導入を contract test で防止した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_pii_rules.test.ts libs/core/pii-scrubber.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 13 tests passed**。
+- `pnpm generate:pii-rules`: **changed=[]**。
+- `pnpm run typecheck`、`pnpm run lint`: passed。
+
+## 288. 2026-08-30 SX-04 pseudo-locale generator の vocabulary loader 統合
+
+再レビューで、pseudo-locale generator が user-facing vocabulary catalog を汎用 `readJson` で読み、runtime の
+`loadVocabularyCatalog()` と schema／cache 境界を共有していない残存を検出した。生成器の入力を canonical vocabulary loader
+へ統合し、catalog が不在・不正の場合は生成を停止する fail-safe、placeholder 保持、qps-ploc の導出規則、出力形式は維持した。
+loader 利用と旧 reader の不在を generator test で固定し、実生成で出力 drift が無いことも確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_pseudo_locale.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 21 tests passed**。
+- `pnpm generate:pseudo-locale`: **changed=[]**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 289. 2026-08-30 SX-04 vocabulary type generator の catalog loader 統合
+
+再レビューで、vocabulary type generator が user-facing vocabulary catalog を汎用 `readJson` で読み、pseudo-locale や
+runtime resolver と異なる schema／cache 境界を持っている残存を検出した。generator の入力を
+`loadVocabularyCatalog()` へ統合し、catalog 不在・不正時の明示的な停止、locale／key の導出規則、生成先と出力形式は維持した。
+独自 reader の再導入を generator test で固定し、実生成で locale／key artifacts に drift がないことを確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_vocabulary_types.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 7 tests passed**。
+- `pnpm generate:vocabulary-types`: **changed=[]**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 290. 2026-08-30 SX-04 op registry generator の canonical reader／packaging 整合
+
+再レビューで、op registry generator が runtime の `loadActuatorOpRegistry()` を迂回して registry snapshot を
+汎用 `readJson` で読み、media actuator manifest も独自 reader で読み込んでいる残存を検出した。registry は core の
+governed loader、manifest は `defineCatalog` の schema 検証へ統合し、operation discovery、describeOps の生成規則、
+生成先は維持した。loader を公開 API に追加する際に runtime 型へ実データの `version`／`description` metadata も反映した。
+実生成で source／dist の export を確認し、dist が古い場合に generator が失敗する packaging 境界も build gate として検証した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_op_registry.test.ts libs/core/actuator-op-registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 16 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm run build:packages`: passed。
+- `pnpm generate:op-registry`: **changed=[]**。
+
+## 291. 2026-08-30 SX-04 subagent definition generator の team-role loader 統合
+
+再レビューで、subagent definition generator が team-role directory の個別 JSON を汎用 reader で読み、runtime の
+`loadTeamRoleIndex()` と schema／directory 優先の境界を共有していない残存を検出した。生成器の team-role 解決を canonical
+loader へ統合し、未登録 role の明示エラー、authority procedure の markdown 取り込み、Claude／AGY の生成形式は維持した。
+生成物の read-only check は `changed=[]` で通過した。write ceremony はこの checkout の `.agents/agents` read-only 制約により
+atomic write が EPERM となったため、生成物を変更せず検証を継続した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_subagent_definitions.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 15 tests passed**。
+- `pnpm agents:generate -- --check`: **ok=true / changed=[]**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 292. 2026-08-30 SX-04 specialist catalog generator の governed loader 統合
+
+再レビューで、specialist catalog の snapshot generator だけが、runtime の `loadSpecialistCatalog()` と異なる
+独自 Ajv／`readJson` 境界で directory 内の JSON を検証している残存を検出した。生成器の各入力と生成 snapshot の
+検証を `defineCatalog` の schema 境界へ統合し、specialist id とファイル名の整合、version の扱い、snapshot の
+ソート規則、出力形式は維持した。旧 reader／Ajv 経路の再導入を source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/sync_specialist_catalog.test.ts scripts/sync_specialist_catalog.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
+- 旧 `sync:specialist-catalog` generator の再実行結果: **changed=[]**（現在は孤立入口として削除済み）。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 293. 2026-08-30 SX-04 intent contract memory sync の governed loader 統合
+
+再レビューで、intent contract memory sync が runtime／governance seed／merge snapshot を独自の
+`createAjv`、`compileSchemaFromPath`、`readJson` で扱い、runtime の intent-contract-memory loader と
+異なる schema 検証境界を持っている残存を検出した。読込と snapshot 検証を `defineCatalog` の共通 schema
+境界へ統合し、tenant scope、tenant memory の global seed 昇格禁止、seed が無い場合の空 catalog、merge／report／
+optional export の既存 semantics は維持した。旧 reader／Ajv 経路の再導入を source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/sync_intent_contract_memory.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 294. 2026-08-30 SX-04 provider CLI capability report の adapter loader 統合
+
+再レビューで、provider CLI capability report が harness adapter registry を foundation の汎用 JSON reader で
+読み込み、governance の schema 検証境界を迂回している残存を検出した。adapter registry を `defineCatalog` と
+`harness-adapter-registry.schema.json` に接続し、capability との対応集計、provider probe、Markdown の出力形式は
+維持した。旧 reader の再導入を source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/generate_provider_cli_capability_report.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 295. 2026-08-30 SX-04 workflow registration request の governed validation 化
+
+再レビューで、workflow 登録 CLI の request schema が `readJson` と script-local `createAjv` で検証され、他の
+catalog／request 境界と異なる schema 読込・エラー処理を持っている残存を検出した。registration request の読込と
+検証を `defineCatalog` に統合し、propose／apply の動作、生成される workflow／intent／ontology／routing の内容、
+governed catalog への書込制約は変更しなかった。旧 Ajv 経路の再導入を source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/register_workflow.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 296. 2026-08-30 SX-04/SX-14 env registry の専用 schema／loader 統合
+
+再レビューで、env registry が generic governance envelope と raw JSON reader に留まり、runtime validator と
+generator が専用の構造検証境界を共有していない残存を検出した。`env-registry.schema.json` と core の
+`loadEnvRegistryFile()` を追加し、validator は不正／欠損時の既存 warn-safe（空エントリ）を維持しつつ、generator は
+既存 registry を strict に読み込むよう統合した。生成物の `$schema` を専用 schema に更新し、環境値の型変換、品質検査、
+生成される env.example／CONFIGURATION.md の内容は維持した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/env-validator.test.ts scripts/generate_env_registry.test.ts scripts/generate_env_registry.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 29 tests passed**。
+- `pnpm run build:packages`: passed。
+- `pnpm generate:env-registry`: **changed=[env-registry.json]**（専用 `$schema` 更新のみ）。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 297. 2026-08-30 SX-04 mission orchestration evaluation の入力／出力 schema 統合
+
+再レビューで、mission orchestration evaluation が scenario runs と evaluation report を独自の
+`readJson`／Ajv で扱い、入力 artifact と出力 contract の validation 境界を共有していない残存を検出した。
+scenario runs 用 schema を追加し、入力読込と report 検証を `defineCatalog` へ統合した。評価指標、delta 計算、
+出力先、CLI の表示は変更していない。実 fixture で入力から report 生成まで確認し、旧 reader／Ajv 経路の再導入を
+source contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/evaluate_mission_orchestration.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- 契約 fixture による `evaluate_mission_orchestration.ts` 実行: report 生成・schema 検証成功。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 298. 2026-08-30 SX-04 workflow catalog reference checker の loader 統合
+
+再レビューで、workflow catalog reference checker が mission workflow runtime の canonical loader を使わず、
+foundation の汎用 JSON reader と checker-local 型で catalog を再解釈している残存を検出した。checker を
+`loadMissionWorkflowCatalog()` へ統合し、pipeline／brief の参照存在検査、exit gate 検査、process template expansion、
+違反時の exit semantics は維持した。loader 境界の再逸脱を source contract test で固定し、実 checker も通過させた。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_workflow_catalog_refs.contract.test.ts libs/core/mission-workflow-catalog.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 18 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_workflow_catalog_refs.ts`: passed。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 299. 2026-08-30 SX-04 org CLI role loader の canonical index 統合
+
+再レビューで、org CLI の authority role／team role 読込が directory と snapshot を独自の raw JSON reader で
+再構成し、runtime の governed role index と schema 検証境界を共有していない残存を検出した。読込を
+`mission-team-index` の canonical loader に統合し、role id の directory 整合検査、directory 優先／snapshot fallback、
+新規 workspace で両方が未生成の場合の空 fallback は維持した。既存データが存在する場合の invalid catalog エラーは
+握り潰さず fail-closed とし、role 作成・promotion の書込フローは変更していない。
+
+検証:
+
+- `pnpm exec vitest run scripts/org.test.ts scripts/org-role-loaders.contract.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 6 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 300. 2026-08-30 SX-04 governance directory consistency の snapshot loader 統合
+
+再レビューで、governance directory consistency checker が agent profile／team role／service endpoint の canonical
+snapshot を汎用 JSON reader で読み、runtime／generator と異なる schema／cache 境界を持っている残存を検出した。
+agent profile と team role は既存 snapshot loader、service endpoint は directory 優先 semantics を壊さない専用
+snapshot catalog に統合した。directory と snapshot の id／内容比較、違反メッセージ、他の catalog 検査は維持した。
+service endpoint を directory 優先 loader で自己比較してしまう退行も避け、loader 境界を contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_governance_directory_consistency.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 301. 2026-08-30 SX-04 directory consistency の追加 snapshot loader 統合
+
+再レビューで、directory consistency checker の agent profile／team role／service endpoint の snapshot 比較だけが
+汎用 JSON reader に残り、既存の schema／directory 優先ローダー境界を共有していない残存を検出した。agent profile と
+team role は canonical snapshot loader、service endpoint は directory 優先 runtime loaderによる自己比較を避けるため
+snapshot 固定 path の `defineCatalog` に統合した。id／alias／path／内容の比較、既存の directory 個別検査は維持し、
+loader 境界を contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_governance_directory_consistency.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 302. 2026-08-30 SX-04 governance rules の voice engine snapshot loader 統合
+
+再レビューで、governance rules checker が voice profile の `default_engine_id` 照合時に voice engine registry の
+生成 snapshot を汎用 `readJson` で読み、schema／cache 境界を共有していない残存を検出した。directory 優先の
+runtime loaderでは snapshot 検査の対象が変わるため、固定 snapshot path の `defineCatalog` に統合した。profile と
+engine の参照整合性、既存の violation メッセージ、他の governance rule 検査は維持し、loader 境界を source
+contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_governance_rules.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check-governance-directory-consistency.ts`、
+  `node --import ./scripts/ts-loader.mjs scripts/check_governance_rules.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 303. 2026-08-30 SX-03/SX-04 contract schema checker の foundation compiler 統合
+
+再レビューで、contract schema checker が legacy `compileSchemaFromPath(ajv, ...)` と module-local の Ajv
+instance を保持し、foundation の schema compiler と validation 境界が二重化している残存を検出した。通常の
+contract schema 検査を foundation `compileSchema` に移行し、draft-2020 の A2UI 検査だけは foundation の
+`createAjv2020` を明示的に渡す形へ整理した。valid／invalid payload の判定、format 登録、違反メッセージ、exit
+semantics は維持し、旧経路の再導入を loader contract test で固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_contract_schemas.loader.contract.test.ts scripts/check_contract_schemas.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 3 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 304. 2026-08-30 SX-03 foundation schema compiler の追加採用 wave
+
+再レビューで、production module に legacy `compileSchemaFromPath` と個別 Ajv／`ajv-formats` の組み合わせが
+残り、foundation の compiler 境界を迂回している残存を検出した。operator learning、report contract、desktop
+pipeline／recording、mission classification、task session、source analysis、onboarding context の8 moduleを
+foundation `compileSchema` へ移行した。schema の検証結果、format 対応、validator cache、既存の error mapping と
+実行契約は維持し、採用境界を contract test で固定した。
+
+検証:
+
+- 対象テスト: **12 files / 83 tests passed**。
+- foundation adoption contract test: **1 file / 1 test passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 305. 2026-08-30 SX-03 onboarding entrypoint の foundation schema compiler 統合
+
+再レビューで、onboarding の apply／wizard entrypoint が個別 `createAjv`、`ajv-formats`、legacy
+`compileSchemaFromPath` を保持し、core の foundation compiler と異なる validation 初期化経路を持つ残存を
+検出した。両 entrypoint の onboarding state validation を foundation `compileSchema` に統合し、入力検証、state
+schema の format 対応、既存の CLI／exit semantics は維持した。foundation adoption contract test の対象にも追加した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts scripts/onboarding_apply.test.ts scripts/first_win_lifecycle_smoke.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 18 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 306. 2026-08-30 SX-03 catalog integrity checker の foundation compiler 統合
+
+再レビューで、catalog integrity checker が schema を直接 `readJson` し、checker-local Ajv と手動の外部
+`$ref` 登録を行っていた残存を検出した。schema の読込・参照解決・format 登録を foundation `compileSchema` に
+統合し、organization catalog の外部参照も同じ compiler 境界で検証するようにした。service／specialist の
+directory 比較、設計 token・vocabulary 検査、違反の収集、既存の exit semantics は維持し、legacy Ajv 経路を
+contract test で固定的に禁止した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_catalog_integrity.loader.contract.test.ts scripts/check_catalog_integrity.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 14 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 307. 2026-08-30 SX-03 core schema validator の追加 foundation compiler 統合
+
+再レビューで、browser extension bridge、browser conversation session、pipeline contract、organization
+operating model persistence が file-backed schema の検証時に個別 Ajv／legacy compiler を保持している残存を
+検出した。これらの validator を foundation `compileSchema` に統合し、schema の format 対応、validator cache、
+既存の error mapping と呼出し契約は維持した。organization operating model の management／operations に残って
+いた未使用の Ajv 初期化も除去し、foundation adoption contract test で移行済み module と不要な local Ajv の再導入を
+固定的に検出できるようにした。
+
+検証:
+
+- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/browser-extension-bridge.test.ts libs/core/browser-conversation-session.test.ts libs/core/pipeline-adf.test.ts libs/core/chronos-delivery.test.ts libs/core/organization-operating-model.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 67 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 308. 2026-08-30 SX-06 authority/team role sync の generator harness 統合
+
+再レビューで、`sync_authority_roles` と `sync_team_roles` が canonical role loader を使っている一方、独自の
+書込み・実行入口を持ち、`--check` による生成物ドリフト検出を提供していない残存を検出した。両 script を
+既存 `defineGenerator` に統合し、directory と snapshot の複数生成物、既存の directory 優先／snapshot fallback、
+execution context は維持した。JSON は意味的同一性で比較して、既存の Prettier 整形差分だけで `--check` が失敗する
+ことを避けた。harness 境界と両 script の generator 登録は contract test で固定した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/sync_authority_roles.ts --check`、`node --import ./scripts/ts-loader.mjs scripts/sync_team_roles.ts --check`: **両方 changed=[]**。
+- `pnpm exec vitest run scripts/sync_authority_roles.test.ts scripts/sync_team_roles.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 8 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 309. 2026-08-30 SX-06 component inventory generator の harness 統合
+
+再レビューで、`sync_component_inventory` が actuator manifest から5つの生成物を作るにもかかわらず、独自の
+書込み・execution context・entrypoint を持ち、生成物の drift を `--check` で確認できない残存を検出した。
+render と出力宣言を既存 `defineGenerator` に統合し、global actuator／skill／legacy index、lifecycle inventory、
+`CAPABILITIES_GUIDE.md` の5出力、manifest discovery、互換説明、exit semantics を維持した。日付と JSON 整形の
+非意味差分は比較時に正規化し、既存生成物を不要に変更しないようにした。canonical generator を実行して stale
+だった3生成物も現行 manifest と同期した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/sync_component_inventory.ts`: **5 outputs generated; 3 stale outputs synchronized**。
+- `node --import ./scripts/ts-loader.mjs scripts/sync_component_inventory.ts --check`: **changed=[]**。
+- `node --import ./scripts/ts-loader.mjs scripts/sync_authority_roles.ts --check`、`node --import ./scripts/ts-loader.mjs scripts/sync_team_roles.ts --check`: **両方 changed=[]**。
+- `pnpm exec vitest run scripts/sync_authority_roles.test.ts scripts/sync_team_roles.test.ts scripts/sync_component_inventory.contract.test.ts scripts/lib/harness.test.ts libs/core/mission-team-index.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 12 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 310. 2026-08-30 SX-06 model registry sync の generator harness 統合
+
+再レビューで、`sync_model_registry` が snapshot 同期と初期 directory bootstrap を `defineScript` と個別の
+書込み処理に分けて持ち、生成物の比較・出力宣言・失敗境界が共通 generator と一致していない残存を検出した。
+通常の snapshot 出力と `--bootstrap` の index／model files を同じ `defineGenerator` の render 境界へ統合し、
+directory 優先の読み込み、非空 directory の bootstrap 拒否、model filename の injective encoding、Prettier
+整形、schema marker は維持した。実行時に露出した `@agent/core/model-registry-contract` の package export 欠落も
+追加し、compiled／ts-loader 両方の entrypoint から canonical contract を解決できるようにした。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/sync_model_registry.ts --check`: **changed=[]**。
+- `pnpm exec vitest run scripts/sync_model_registry.test.ts libs/core/model-registry-directory.test.ts libs/core/governance-contracts.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 184 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 311. 2026-08-30 SX-06 provider CLI report generator の harness 統合
+
+再レビューで、provider CLI capability report generator が governed adapter registry を読む一方、任意の
+`--out` を独自に処理し、直接 `safeWriteFile`／`defineScript` を使っている残存を検出した。report の render と
+出力先解決を `defineGenerator` に移し、既定出力と custom output、provider probe、adapter／capability の内容、
+既存の markdown 出力契約を維持した。`defineGenerator` には invocation context から declared outputs を解決する
+機能を追加し、固定出力 generator の安全性を保ったまま custom output を許可した。既存 report は現行 registry
+から再生成して同期した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/generate_provider_cli_capability_report.ts`: **report regenerated**。
+- `node --import ./scripts/ts-loader.mjs scripts/generate_provider_cli_capability_report.ts --check`: **changed=[]**。
+- `node --import ./scripts/ts-loader.mjs scripts/generate_provider_cli_capability_report.ts --out active/shared/tmp/provider-report-check.md --dry-run`: **成功**。
+- `pnpm exec vitest run scripts/generate_provider_cli_capability_report.contract.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 6 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+
+## 312. 2026-08-30 再レビュー: foundation Ajv 初期化の二重化除去
+
+これまでの実装を対象に再レビューしたところ、`createAjv()` が foundation 側で `ajv-formats` を登録済みであるにも
+かかわらず、`actuator-sdk` と pipeline op schema checker が個別に `ajv-formats` を import／登録していた。これにより
+schema validation の初期化境界が二重化し、将来の keyword 登録変更時に重複登録エラーを起こし得る残存を検出した。
+両利用箇所のローカル `addFormats()` と直接依存を削除し、foundation の `createAjv()` に一本化した。動的な actuator
+catalog schema と pipeline の format 検証、placeholder 解決、既存の違反メッセージは維持し、foundation adoption の契約
+テストで直接 `ajv-formats` 依存の再導入を検出するようにした。
+
+検証:
+
+- `pnpm exec vitest run libs/core/foundation-adoption.contract.test.ts libs/core/actuator-sdk.test.ts scripts/check_pipeline_op_schema_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 17 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_pipeline_op_schema_coverage.ts`: **678 schema-bound steps / 1,562 steps checked; OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: passed。
+- `pnpm check -- --scope full`: **67/67 passed**。
+
+## 313. 2026-08-30 再レビュー: agent runtime supervisor の public facade 宣言
+
+再レビューで、`agent-runtime-supervisor` が runtime の ensure／ask／refresh／restart／stop を束ねる
+運用フロントドアであり、mission／surface／daemon から呼ばれる public authority であることを
+architecture の責務記述と実装の依存関係で再確認した。これを orchestration 層へ分類すると、利用側の
+正当な domain→runtime-authority 入口まで一括して逆方向違反になるため不適切だった。そこで
+`module-layer-boundaries.json` の `facade_patterns` に対象を明示し、既存の public `index`／surface
+facade と同じく、facade 内部の委譲だけを checker の責務判定から分離した。実測値は **2 direction
+violations** で、違反数を baseline 緩和で減らしてはいない。残る `secure-io → audit-chain /
+tier-guard` と、runtime authority の facade 内部責務は別波として継続管理する。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs --input-type=module -e "import {checkModuleBoundaries} from './scripts/check_module_boundaries.ts'; const r=checkModuleBoundaries(); console.log(JSON.stringify({cycles:r.cycles.length,directionViolations:r.directionViolations.length,maxRuntimeSccSize:r.maxRuntimeSccSize,dynamicImports:r.dynamicImportEdges.length,violations:r.directionViolations}));"`: **0 cycles / 2 direction violations / max runtime SCC 33 / 81 dynamic imports**。
+- `pnpm exec vitest run scripts/check_module_boundaries.test.ts libs/core/agent-runtime-supervisor.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 8 tests passed**。
+
+## 314. 2026-08-30 SX-06 lifecycle check／reconciliation shell の harness 統合
+
+再レビューで、`check_extension_order.ts` が import 時に検査を実行し、`reconcile_config_fallbacks.ts` が
+直接 `process.stdout.write` していたため、shared harness の import-safe、構造化出力、失敗境界を利用していない
+残存を検出した。両 script を `defineScript` と `isDirectScript` に接続し、検査本体／既存の reconciliation
+operation、直接実行時の出力契約、config fallback の authority／tier 挙動は維持した。reconciliation の結果型を
+mock した script 回帰テストを追加し、テストが実際の fallback registry を変更しないようにした。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_extension_order.test.ts scripts/reconcile_config_fallbacks.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 7 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_extension_order.ts`: **15 runtime events**。
+- `node --import ./scripts/ts-loader.mjs scripts/reconcile_config_fallbacks.ts --json --quiet`: **structured empty result**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 315. 2026-08-30 SX-06 pre-build policy check の harness 統合
+
+再レビューで、`check_pinned_deps.ts` と `check_install_script_allowlist.ts` が top-level で policy を読み込み、
+直接 `process.exitCode` と console 出力を管理していた残存を検出した。両 script の検査ロジックを副作用のない
+関数へ分離し、`defineScript`／`ScriptExitError`／`isDirectScript` の共通境界へ接続した。package manager・override・
+lockfile の pin 検査、workspace `allowBuilds` と governance policy の整合検査、pre-build 用 source import の
+互換性、失敗時の非ゼロ終了は維持した。実際の policy ファイルを読む回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_pinned_deps.test.ts scripts/check_install_script_allowlist.test.ts scripts/check_extension_order.test.ts scripts/reconcile_config_fallbacks.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 9 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_pinned_deps.ts`、`node --import ./scripts/ts-loader.mjs scripts/check_install_script_allowlist.ts`: **両方 OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 316. 2026-08-30 SX-06 registry／invariant check の harness 統合
+
+再レビューで、`check_process_definition_registry.ts`、`check_module_invariants.ts`、
+`check_reasoning_provider_registry.ts` が import 時に検査を実行し、console／throw の境界を各 script が
+個別に持っていた残存を検出した。検査ロジックを副作用のない関数へ分離し、`defineScript`／
+`isDirectScript` の direct-entry に統合した。process definition の一覧、module source assertion、
+reasoning policy と descriptor の整合性、共有 provider の informational warning、既存の失敗条件は維持した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_process_definition_registry.test.ts scripts/check_module_invariants.test.ts scripts/check_reasoning_provider_registry.test.ts scripts/check_pinned_deps.test.ts scripts/check_install_script_allowlist.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 5 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_process_definition_registry.ts`、`scripts/check_module_invariants.ts`、`scripts/check_reasoning_provider_registry.ts`: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 317. 2026-08-30 SX-06 facet purity check の harness 統合
+
+再レビューで、`check_facet_purity.ts` が import 時に全 facet を走査し、直接 console／`process.exitCode` を管理していた
+残存を検出した。facet 走査を副作用のない `checkFacetPurity()` へ分離し、`defineScript`／`ScriptExitError`／
+`isDirectScript` の共通 direct-entry に統合した。kind ごとの root、markdown の検証順序、違反内容、非ゼロ終了契約は
+維持し、import 時には検査を実行しない回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_facet_purity.test.ts scripts/check_process_definition_registry.test.ts scripts/check_module_invariants.test.ts scripts/check_reasoning_provider_registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_facet_purity.ts`: **passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 318. 2026-08-30 SX-06 wisdom forwarder check の harness 統合
+
+再レビューで、`check_wisdom_forwarders.ts` が module import 時に registry と pipeline を走査し、直接
+console／`process.exitCode` を管理していた残存を検出した。registry の canonical target 検査、pipeline kind
+整合検査、JSON 読み込み失敗時の既存 skip semantics、違反メッセージを `checkWisdomForwarders()` に分離し、
+`defineScript`／`ScriptExitError`／`isDirectScript` の共通境界へ接続した。import-safe 回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_wisdom_forwarders.test.ts scripts/check_facet_purity.test.ts scripts/check_reasoning_provider_registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 3 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_wisdom_forwarders.ts`: **OK (targets exist and pipeline kinds agree)**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 319. 2026-08-30 SX-06 seam multiplicity check の harness 統合
+
+再レビューで、`check_seam_multiplicity.ts` が import 時に seam catalog を読み込み、直接 console／
+`process.exitCode` を管理していた残存を検出した。重複 seam key、provider id、多重度違反の検査を
+`checkSeamMultiplicity()` に分離し、`defineScript`／`ScriptExitError`／`isDirectScript` の共通境界へ統合した。
+21 seam の既存検査、違反メッセージ、非ゼロ終了契約を維持し、import-safe 回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_seam_multiplicity.test.ts scripts/check_wisdom_forwarders.test.ts scripts/check_module_invariants.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 3 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_seam_multiplicity.ts`: **OK (21 seams)**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 320. 2026-08-30 SX-06 ESM integrity check の harness 統合
+
+再レビューで、`check_esm_integrity.ts` が import 時に package／source tree 全体を走査し、直接 console と
+`process.exitCode` を管理していた残存を検出した。package type、相対 import 拡張子、workspace source import、
+legacy JavaScript shadow の既存検査と allowlist を `checkEsmIntegrity()` に分離し、`defineScript`／
+`ScriptExitError`／`isDirectScript` の共通境界へ接続した。違反のソート順、メッセージ、非ゼロ終了契約を維持し、
+import-safe 回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_esm_integrity.test.ts scripts/check_seam_multiplicity.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_esm_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 321. 2026-08-30 SX-06 lockfile commit gate の harness 統合
+
+再レビューで、`check_lockfile_commit_gate.ts` が import 時に git 差分・環境変数・review evidence を評価し、
+直接 `process.exitCode` と console 出力を管理していた残存を検出した。差分収集、base ref の安全な解決、
+lockfile hash と evidence の照合を `checkLockfileCommitGate()` に分離し、`defineScript`／`ScriptExitError`／
+`isDirectScript` の共通境界へ接続した。lockfile 変更時に明示 override と hash-bound evidence の両方を要求する
+fail-closed 契約は維持し、許可判定の組み合わせテストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_lockfile_commit_gate.test.ts scripts/check_esm_integrity.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 7 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_lockfile_commit_gate.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 322. 2026-08-30 SX-06 unhandled intent reconciliation shell の harness 統合
+
+再レビューで、`reconcile_unhandled_intents.ts` が直接 `process.stdout.write` し、shared harness の import-safe／
+構造化出力境界を利用していない残存を検出した。既存の `reconcileUnhandledIntents()` operation をそのまま
+呼び出す `defineScript`／`isDirectScript` entrypointへ移行し、proposal／summary の結果型、JSON 出力、直接実行時の
+挙動を維持した。実データを変更しない mock 回帰テストと実 CLI の empty result 検証を追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/reconcile_unhandled_intents.test.ts scripts/reconcile_config_fallbacks.test.ts scripts/check_lockfile_commit_gate.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **3 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/reconcile_unhandled_intents.ts --json --quiet`: **structured empty result**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: 次の full gate で再確認する。
+
+## 323. 2026-08-30 SX-06 contract schema check の harness 統合
+
+再レビューで、CI／package script から直接起動される `check_contract_schemas.ts` が、schema 検査そのものと
+console／`process.exitCode` による直接実行境界を同じ関数に持つ残存を検出した。既存の AJV 検査、golden scenario
+catalog の未管理検出、A2UI の valid／invalid payload 検査を `checkContractSchemas()` として import-safe な戻り値へ
+分離し、`defineScript`／`ScriptExitError`／`isDirectScript` の共通境界へ接続した。成功時の `[check:contract-schemas] OK`、
+違反一覧、非ゼロ終了コード、既存の source import 互換性は維持した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_contract_schemas.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_contract_schemas.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`、`pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 324. 2026-08-30 SX-06 governance rules の失敗境界統一
+
+再レビューで、`check_governance_rules.ts` は shared harness の direct-entry を持つ一方、違反時だけ
+`console.error` と `process.exitCode` を直接扱う残存を検出した。違反一覧のソート順と内容を維持したまま
+`ScriptExitError` へ移行し、harness が stderr と非ゼロ終了コードを一括して扱う境界に統一した。import 時の
+検査非実行、成功時の `[check:governance-rules] OK`、deterministic catalog 検出を実 CLI 回帰テストで確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_governance_rules.test.ts scripts/check_governance_rules.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 3 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_governance_rules.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+
+## 325. 2026-08-30 SX-06 CI checker の失敗境界追加統一
+
+再レビューで、shared harness の direct-entry を持つ `check_type_ratchet.ts`、`check_first_win_smoke.ts`、
+`check_pipeline_shell_independence.ts`、`check_mission_process_bindings.ts` が、違反時だけ個別に
+`console.error`、`process.exitCode`、または通常の `Error` を使う残存を検出した。各 checker の違反内容・ソート順・
+baseline 更新・成功出力を維持したまま、`ScriptExitError` による共通の stderr／非ゼロ終了境界へ統一し、成功時の
+戻り値も harness の結果として返すようにした。これにより、import-safe な検査本体と direct-entry の失敗処理を
+分離した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/check_type_ratchet.ts`、`check_first_win_smoke.ts`、
+  `check_pipeline_shell_independence.ts`、`check_mission_process_bindings.ts`: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 326. 2026-08-30 SX-06 CI checker の追加失敗境界統一
+
+再レビューで、shared harness の direct-entry を持つ `check_design_contrast.ts`、
+`check_production_evidence.ts`、`check_tenant_registry_consistency.ts`、`check_tier_hygiene.ts` が、
+違反時に checker 固有の `console.error`／`process.exitCode` または数値 status を直接扱う残存を検出した。
+各 checker の既存の検査ロジック、baseline／register 引数、出力文面、非致命 warning を維持したまま、違反時は
+`ScriptExitError`、成功時は harness の結果戻り値へ統一した。design contrast は検査本体を
+`checkDesignContrast()` として import-safe に分離した。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/check_design_contrast.ts`、`check_production_evidence.ts`、
+  `check_tenant_registry_consistency.ts`、`check_tier_hygiene.ts`: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 327. 2026-08-30 SX-14 i18n checker の失敗境界統一
+
+再レビューで、`check_i18n_hardcoding.ts` は shared harness の direct-entry を持つ一方、human report の
+`console.*` と違反時の `process.exitCode` を checker 内部で直接扱う残存を検出した。baseline 更新、human
+report、`--json` の構造化出力、違反／stale entry の文面を維持し、report formatter を純粋な文字列生成へ分離した。
+違反時は `ScriptExitError`、成功時は harness の出力・戻り値へ統一し、import-safe な実行境界を完成させた。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/check_i18n_hardcoding.ts`: **OK（1,804 files / 758 baseline-frozen violations）**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_i18n_hardcoding.ts --json --quiet`: **JSON report / exit 0**。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 328. 2026-08-30 SX-06 documentation／governance checker の失敗境界統一
+
+再レビューで、shared harness の direct-entry を持つ `check_design_ledger.ts`、
+`check_documentation_links.ts`、`check_documentation_source_map.ts`、`check_mission_gate_docs.ts`、
+`check_work_scope_policy.ts` が、違反時に個別の `console.error`、`process.exitCode`、または通常の
+`Error` を使う残存を検出した。各 checker の検査ロジック、文書走査範囲、tier access warning、成功出力を維持し、
+違反時は `ScriptExitError`、成功時は harness の結果戻り値へ統一した。これにより documentation／governance
+系の direct-entry も import-safe な検査本体と共通失敗境界に分離した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_design_ledger.test.ts scripts/check_documentation_links.test.ts scripts/check_documentation_source_map.test.ts scripts/check_mission_gate_docs.test.ts scripts/check_work_scope_policy.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **5 files / 10 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_design_ledger.ts`、`check_documentation_links.ts`、
+  `check_documentation_source_map.ts`、`check_mission_gate_docs.ts`、`check_work_scope_policy.ts`: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 329. 2026-08-30 SX-06 foundation／governance checker の失敗境界統一
+
+再レビューで、shared harness の direct-entry を持つ `check_foundation_adoption.ts`、
+`check_improvement_plan_metadata.ts`、`check_knowledge_scope_boundaries.ts`、`check_max_file_lines.ts`、
+`check_module_boundaries.ts`、`check_wire_error_boundary.ts` が、違反時に個別の `console.error`、
+`process.exitCode`、または通常の `Error` を使う残存を検出した。各 checker の baseline 更新、走査範囲、
+既存の violation 文面、module boundary の測定値を維持したまま、違反時は `ScriptExitError`、成功時は
+harness の結果戻り値へ統一した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_design_ledger.test.ts scripts/check_documentation_links.test.ts scripts/check_documentation_source_map.test.ts scripts/check_mission_gate_docs.test.ts scripts/check_work_scope_policy.test.ts scripts/check_module_boundaries.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **6 files / 13 tests passed**。
+- `node --import ./scripts/ts-loader.mjs` による対象6 checkerの実 CLI: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 330. 2026-08-30 SX-06 execution contract checker の失敗境界統一
+
+再レビューで、`check_event_wiring.ts`、`check_entity_governance.ts`、`check_op_input_contract_coverage.ts`、
+`check_op_preflight_coverage.ts`、`check_pipeline_op_schema_coverage.ts` が、違反時に個別の
+`console.error`／`process.exitCode`／通常の `Error` を使う残存を検出した。event／entity の JSON report、
+op input の inferred-legacy warning、preflight／schema coverage の違反内容と既存測定値を維持したまま、
+失敗時は `ScriptExitError`、成功時は harness の結果戻り値へ統一した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_event_wiring.test.ts scripts/check_op_input_contract_coverage.test.ts scripts/check_op_preflight_coverage.test.ts scripts/check_pipeline_op_schema_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 26 tests passed**。
+- `node --import ./scripts/ts-loader.mjs` による対象5 checkerの実 CLI: **すべて OK**。
+- entity governance は **violations 0**（warning-only）、op input は **112 inferred-legacy** を維持。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 331. 2026-08-30 SX-06 contract／documentation checker の出力境界統一
+
+再レビューで、`check_contract_semver.ts`、`check_doc_examples.ts`、`check_workflow_catalog_refs.ts` が、
+`--help`／`--list`／warning／human report と違反時の終了処理を checker 固有の `console.*` と通常の
+`Error` に分散している残存を検出した。rebaseline、list、warning、既存の検査・展開ロジックを変更せず、
+通常出力を harness の `context.print`、違反時を `ScriptExitError`、成功時を結果戻り値へ統一した。
+workflow catalog の違反検査本体は `checkWorkflowCatalogRefs()` として import-safe に分離した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_contract_semver.test.ts scripts/check_workflow_catalog_refs.contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 20 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_contract_semver.ts`: **32 actuators / 0 warnings / OK**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_doc_examples.ts`: **328 files / 476 blocks / OK**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_workflow_catalog_refs.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 332. 2026-08-30 SX-14 UI/UX checker の失敗境界統一
+
+再レビューで、`check_ui_ux_governance.ts` と `check_ux_contract_docs.ts` が、JSON／human report の違反時に
+`console.error`／`process.exitCode`／通常の `Error` を直接扱う残存を検出した。semantic token、status vocabulary、
+front-door 文書、surface tagline の既存検査と JSON report を維持し、通常出力を harness、違反時を
+`ScriptExitError`、成功時を結果戻り値へ統一した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_ui_ux_governance.test.ts scripts/check_ux_contract_docs.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_ui_ux_governance.ts` と `--json --quiet`: **23 files / violations 0**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_ux_contract_docs.ts`: **3 documents and surface taglines OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 333. 2026-08-30 SX-06 golden／packaging／Chronos checker の失敗境界統一
+
+再レビューで、`check_golden_output.ts`、`check_packaging_contract.ts`、`check_chronos_dom_contrast.ts` が、
+golden の進捗・warning、packaging clause、Chronos の非同期 server cleanup と違反時の `console.*`／通常の
+`Error` に実行境界を分散している残存を検出した。rebaseline、warning、snapshot比較、tier isolation、DOM contrast
+測定、server の finally cleanup を変更せず、通常出力を harness、違反時を `ScriptExitError`、成功時を結果戻り値へ
+統一した。packaging と Chronos の検査本体も import-safe な戻り値境界へ整理した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_packaging_contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_packaging_contract.ts`: **OK**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_golden_output.ts`: **2 pipelines / OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 334. 2026-08-30 SX-04／SX-06 catalog／Wisdom checker の失敗境界統一
+
+再レビューで、`check_catalog_integrity.ts` と `check_deprecated_wisdom_ops.ts` が、再利用される
+catalog warning と違反／`--fail` の終了処理を checker 固有の `console.*`／`process.exitCode`／通常の
+`Error` に分散している残存を検出した。catalog integrity の warning semantics と pipeline op からの再利用境界、
+deprecated Wisdom の warning 出力を維持し、違反時と `--fail` 時のみ `ScriptExitError`、成功時は harness の
+結果戻り値へ統一した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_catalog_integrity.test.ts scripts/check_packaging_contract.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 15 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_catalog_integrity.ts`: **status=passed / warnings=[]**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_deprecated_wisdom_ops.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 335. 2026-08-30 SX-06 checker 実行境界の再レビュー修正
+
+§334 後の再レビューで、`check_intent_domain_coverage.ts`、`check_channel_adapter_adoption.ts`、
+`check_chronos_perf_baseline.ts` に加え、`check_capability_seams_ast.ts`、`check_ci_gate_parity.ts`、
+`check_config_fallbacks.ts`、`check_first_win_docs.ts`、`check_cli_manifest.ts`、
+`check_script_integrity.ts`、`check_extension_order.ts`、`check_module_invariants.ts`、
+`check_reasoning_provider_registry.ts` の wrapper に通常の `Error`／直接終了処理が残っていることを検出した。
+違反内容、成功表示、config fallback／provider warning、Chronos の server／browser cleanup、既存の canonical
+catalog loader を変更せず、CI checker の失敗だけを `ScriptExitError` に揃えた。また実 CLI の再確認で
+intent-domain checker の戻り値化により成功表示が消える回帰を検出し、`context.print` を復元してテストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_channel_adapter_adoption.test.ts scripts/check_intent_domain_coverage.test.ts scripts/check_ci_gate_parity.test.ts scripts/check_first_win_docs.test.ts scripts/check_cli_manifest.test.ts scripts/check_script_integrity.test.ts scripts/check_extension_order.test.ts scripts/check_module_invariants.test.ts scripts/check_reasoning_provider_registry.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **9 files / 20 tests passed**。
+- intent-domain、channel-adapter、CI gate parity、first-win docs、CLI manifest、extension order、module invariants、reasoning provider の実 CLI: **すべて OK**。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+
+## 336. 2026-08-30 SX-06 checker／probe の再レビュー回帰修正
+
+§335 の実 CLI 再確認で、`check_intent_domain_coverage.ts` の成功表示が戻り値化で消える回帰、
+`check_apple_fm.ts` の `defineScript` 接続後も `--quiet` が無効な残存、さらに commit／PR title、
+Chronos DOM startup、op input baseline の例外が shared failure boundary／import-safe 境界から外れる残存を検出した。
+intent-domain は `context.print` を復元し、Apple FM は probe の内容と device degradation semantics を維持して
+全出力を `context.print` に集約し `quiet` flag を有効化した。commit／PR title は不正入力を
+`ScriptExitError` へ移行し、Chronos startup failure も server cleanup を維持したまま同じ境界へ接続した。
+op input baseline の解決は module top-level から検査実行時へ移し、設定不備が import 時にプロセスを落とさないようにした。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_apple_fm.test.ts scripts/check_pr_title.test.ts scripts/check_commit_subject.test.ts scripts/check_op_input_contract_coverage.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **4 files / 9 tests passed**。
+- Apple FM、PR title、commit subject、op input coverage の実 CLI: **すべて成功**。`check_apple_fm --quiet` は probe 標準出力を抑制し、非致命な device warning のみを保持した。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+
+## 337. 2026-08-30 SX-06 generator harness の失敗境界統一
+
+再レビューで、共通 `defineGenerator()` が generator 固有の未宣言 output を通常の `Error` で扱い、
+`--check` の drift だけ `process.exitCode` を直接設定している残存を検出した。生成物比較、normalization、
+dry-run／write、JSON の `ok=false` report は維持し、`ScriptExitError` に optional な return value を追加して、
+drift の結果を返しながら exit code を harness の単一境界で設定できるようにした。未宣言 output も同じ失敗経路に
+統一し、既存の generator 利用側の API 互換性を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/generate_subagent_definitions.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **2 files / 21 tests passed**。
+- generator drift、undeclared output、正常な `--check` の戻り値／exit code を focused test で確認。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+
+## 338. 2026-08-30 改善計画の現行指標記述を再レビュー修正
+
+再レビューで、R6 時点の受入境界に残っていた `check_contract_schemas_checks_{1,2,3}` の「未着手」記述が、
+後続 §267 および現行 checkout の突合結果と矛盾していることを確認した。R6 の数値は履歴スナップショットとして
+明示し、3 分割 checker は実装済み、現行の bare barrel／cache reset／schema fixture の値は直後の
+「現行 checkout との指標突合」を正本とするように修正した。実装状態や gate の基準は変更していない。
+
+検証:
+
+- `pnpm generate:knowledge-index`: **成功**。
+- `pnpm check -- --scope full`: **67/67 gates passed**。
+
+## 339. 2026-08-30 SX-06 ReflexTerminal probe の import-safe harness 化
+
+再監査で、`scripts/check_rt_mode.ts` だけが module import 時に PTY probe を実行し、
+`catch(console.error)` で direct-entry／失敗境界を迂回している残存を検出した。2 秒の実行待ち、
+`ReflexTerminal` の fallback、kill と終了ログの意味は維持したまま、probe を `defineScript` と
+`isDirectScript` の guarded entrypoint へ移し、出力を `context.print` に集約した。import-safe な
+source 契約を回帰テストで固定した。module boundary manifest は、plural suffix のため
+`structured-output-contracts.ts` が包括 `*-contract.ts` パターンに一致しないことを実測し、
+分類を変える冗長行削除は採用しなかった。
+
+検証:
+
+- `pnpm exec vitest run scripts/check_rt_mode.test.ts --reporter=dot --pool=forks --maxWorkers=1`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_rt_mode.ts`: **実 PTY probe 成功**（ChildProcess fallback を含む）。
+- `pnpm run typecheck`、`pnpm run lint`: **passed**。
+
+## 340. 2026-08-30 SX-06 shared script flags の省略時デフォルト修正
+
+再レビューで、`defineScript` の `flags` が型上は省略可能である一方、実行時には `undefined` をそのまま
+`parseScriptFlags` に渡して `Set` を構築していたため、flags を省略した script が即時失敗する不整合を検出した。
+省略時は shared harness の標準 flag 集合（`json`／`dry-run`／`check`／`quiet`）を使用するよう修正し、
+省略 path の JSON／quiet／positional 引数を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/check_rt_mode.test.ts scripts/check_foundation_adoption.test.ts`: **3 files / 10 tests passed**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
+
+## 341. 2026-08-30 SX-04 media-style policy fallback の二重定義除去
+
+再レビューで、`media-style-policy.ts` が governed catalog と同じ tone rank／border side の値を
+`FALLBACK_*` として二重保持している残存を確認した。正本 catalog が存在する通常経路は維持し、catalog 欠損時は
+設定値をコード内で再生成せず、tone は neutral rank、border は空集合へ倒す安全側 fallback に縮小した。
+
+検証:
+
+- `pnpm exec vitest run libs/core/media-style-policy.test.ts scripts/lib/harness.test.ts`: **2 files / 9 tests passed**。
+- `pnpm run typecheck`: **passed**。
+- `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
+
+## 342. 2026-08-30 SX-06 memory benchmark の import-safe harness 化
+
+再レビューで、`benchmark_memory.ts` が import 時に deterministic benchmark を実行し、結果を直接 `console.log`
+し、失敗時に `process.exitCode` を設定している残存を検出した。ベンチマークの 5 checks と deterministic な
+入力・期待値は変更せず、`runMemoryBenchmark()` の純粋な結果境界と `defineScript` の構造化出力／失敗境界へ移行し、
+import-safe な回帰テストを追加した。
+
+検証:
+
+- `pnpm exec vitest run scripts/benchmark_memory.test.ts scripts/lib/harness.test.ts`: **2 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/benchmark_memory.ts`: **実 CLI passed**（5 checks）。
+- `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
+
+## 343. 2026-08-30 SX-06 pipeline dry-run の shared harness 化
+
+再レビューで、`run_pipeline_dry_run.ts` が direct entrypoint から `process.stdout.write` と
+`process.exitCode` を直接扱い、dry-run の blocked report だけが独自の出力境界に残っていることを検出した。
+既存の yargs オプション、project trust 判定、ADF 検証、blocked report と exit 1 の意味は維持し、
+human formatter を純粋関数として分離したうえで `defineScript`／`ScriptExitError` に接続した。
+
+検証:
+
+- `pnpm exec vitest run scripts/run_pipeline_dry_run.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/run_pipeline_dry_run.ts --input pipelines/does-not-exist.json --json`: **blocked report と exit 1 を確認**。
+- `pnpm run typecheck`: **passed**。
+
+## 344. 2026-08-30 SX-06 pipeline dry-run の direct argv 残存修正
+
+§343 の再検証で、移行後の `main(args = process.argv)` が `check_script_integrity` の direct argv 検査に抵触することを
+検出した。実行時の argv 取得を harness の `currentProcessArgv()` に寄せ、直接 process API の再導入を防いだ。
+
+検証:
+
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm exec vitest run scripts/run_pipeline_dry_run.test.ts`: **1 file / 1 test passed**。
+- `pnpm run lint`: **passed**。
+
+## 345. 2026-08-30 SX-06 cost report の shared harness 化
+
+再レビューで、`cost_report.ts` が `createStandardYargs` と集計結果の表示を持ちながら、direct entrypoint で
+`console.*` と `process.exitCode` を直接扱っている残存を検出した。since／until／last-days／scope filter、JSON／human
+出力、cost zero の warning は維持し、集計を戻り値化して `defineScript` の出力・終了境界へ接続した。
+
+検証:
+
+- `pnpm exec vitest run scripts/cost_report.test.ts scripts/run_pipeline_dry_run.test.ts`: **2 files / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/cost_report.ts --last-days 1 --json`: **実 CLI passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 346. 2026-08-30 SX-06 contextual intent evaluation の失敗境界統一
+
+再レビューで、`eval_japanese_contextual_intent.ts` は `defineScript` wrapper を持つ一方、corpus schema error／mismatch
+時の `console.*` と `process.exitCode` が内部 `main()` に残っていることを検出した。50 件の deterministic corpus、
+frame／route／clarification の比較、成功時の report と OK 表示は維持し、評価計算を戻り値化して wrapper の
+`context.print`／`ScriptExitError` に集約した。50 件の実 corpus 評価は accuracy 1.0 で成功し、Vitest は重い評価を
+再実行せず import-safe な source 契約を検証する形に分離した。
+
+検証:
+
+- `pnpm exec vitest run scripts/eval_japanese_contextual_intent.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval_japanese_contextual_intent.ts`: **50 items / frame 1.0 / route 1.0 / ask-vs-act 1.0 / OK**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 347. 2026-08-30 SX-06 distill evaluation の import-safe harness 化
+
+再レビューで、CI の `eval-distill` gate が直接実行する `eval_distill.ts` に import 時評価、直接 `console.log`、
+直接 `process.exitCode` が残っていることを検出した。deterministic な desktop intent／native-op／redaction 評価と
+`distill-eval.v1` report schema は維持し、評価結果を戻り値化して `defineScript` の構造化出力と
+`ScriptExitError` の失敗境界へ接続した。
+
+検証:
+
+- `pnpm exec vitest run scripts/eval_distill.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/eval_distill.ts`: **score 1.0 / hard_failures 0 / exit 0**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 348. 2026-08-30 SX-06 intent smoke の結果境界統一
+
+再レビューで、`intent_smoke.ts` は既に shared wrapper を持つ一方、intent subprocess の summary 出力と失敗時の
+`process.exitCode` が内部 `main()` に残っていることを検出した。intent ごとのログ保存、summary JSON、各 subprocess の
+失敗集計、既存の logger warning は維持し、summary／失敗数を戻り値化して `context.print`／`ScriptExitError` に集約した。
+
+検証:
+
+- `pnpm exec vitest run scripts/intent_smoke.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm check -- --scope full`: **67/67 gates passed**（Chronos を含む承認付き実行）。
+
+## 349. 2026-08-30 SX-06 AGY SDK setup の結果境界統一
+
+再レビューで、`agy_sdk_setup.ts` は既に `defineScript` wrapper を持つ一方、inspect／install の結果表示を
+`console.log` で行い、`needs_install` の終了コードを内部 `main()` が直接設定していることを検出した。
+managed runtime の probe、`--apply` の install 操作、既存の人間向け案内は維持し、report formatter を純粋関数へ分離して
+`context.print`／`ScriptExitError` に接続した。外部環境を変更する `--apply` は実行せず、非破壊の inspect 経路を確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/agy_sdk_setup.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/agy_sdk_setup.ts`: **needs_install の案内を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`: **passed**。
+
+## 350. 2026-08-30 SX-06 marketing review aggregation の結果境界統一
+
+再レビューで、`marketing_review_aggregate.ts` は shared wrapper 済みでも、review artifact の再ハッシュ、risk policy
+による reviewer gate、Mission Evidence の書き込み後に `logger.success` と `process.exitCode` を内部 `main()` が直接
+扱っていることを検出した。artifact binding、blocking finding、`ready_for_approval` の意味と approval／publish を
+行わない境界は維持し、結果表示を `context.print`、not-ready を `ScriptExitError` へ集約した。
+
+検証:
+
+- `pnpm exec vitest run scripts/marketing_review_aggregate.test.ts`: **1 file / 5 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`: **passed**。
+
+## 351. 2026-08-30 SX-06 voice setup の結果境界統一
+
+再レビューで、`voice_setup.ts` は shared wrapper 済みでも、managed voice runtime の inspect／install 結果を
+内部 `printReport()` が直接 `console.log` し、`needs_install` の終了コードを `main()` が直接設定していることを検出した。
+7 runtime の platform 判定、health check、`--apply` の managed install、既存の recovery／health 案内は維持し、
+report formatter を純粋関数へ分離して `context.print`／`ScriptExitError` に集約した。外部環境を変更する `--apply` は実行せず、
+inspect 経路を実 CLI で確認した。
+
+検証:
+
+- `pnpm exec vitest run scripts/voice_setup.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/voice_setup.ts`: **7 runtime の inspect と recovery guidance を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`: **passed**。
+
+## 352. 2026-08-30 SX-08 mission alignment request の harness 境界統一
+
+再レビューで、`mission_alignment_request.ts` が brief の hash binding、pending approval の再利用、surface 横断の
+approval store 連携を実装済みである一方、CLI の JSON／human 出力と reason による終了コードを直接扱っていることを検出した。
+brief drift 防止、`human_only` accountability、approval を自動決定しない境界は維持し、formatter を純粋関数へ分離して
+`defineScript`／`ScriptExitError` に接続した。
+
+検証:
+
+- `pnpm exec vitest run scripts/mission_alignment_request.test.ts scripts/mission_alignment_e2e.test.ts`: **2 files / 5 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_request.ts --mission missing-review-probe --json`: **fail-closed JSON と exit 1 を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`: **passed**。
+
+## 353. 2026-08-30 SX-08 mission alignment decision の harness 境界統一
+
+再レビューで、`mission_alignment_decision.ts` が approval store の single source、brief payload hash の drift 検証、
+`--strict` の fail-closed gate を正しく持つ一方、CLI の JSON／human 出力と strict exit code を直接扱っていることを検出した。
+非 strict の対話利用は exit 0、strict の不成立だけ exit 1 とする既存互換を維持し、formatter と shared
+`defineScript`／`ScriptExitError` 境界へ移行した。
+
+検証:
+
+- `pnpm exec vitest run scripts/mission_alignment_decision.test.ts scripts/mission_alignment_decision.entrypoint.test.ts scripts/mission_alignment_e2e.test.ts`: **3 files / 17 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/mission_alignment_decision.ts --mission missing-review-probe --strict --json`: **fail-closed report と exit 1 を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 354. 2026-08-30 SX-10 super pipeline の結果・失敗境界統一
+
+再レビューで、`run_super_pipeline.ts` が検証済み ADF、project trust、super-nerve 実行、trace 永続化を正しく利用する一方、
+実行結果を直接 `console.log` し、status failure／例外時に `process.exitCode` と logger error で終了していることを検出した。
+成功／失敗 trace の永続化、result envelope、失敗時 exit 1、成功時の案内は維持し、結果出力を `context.print`、失敗を
+`ScriptExitError` へ集約した。
+
+検証:
+
+- `pnpm exec vitest run scripts/run_super_pipeline.test.ts`: **1 file / 1 test passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/run_super_pipeline.ts --input pipelines/does-not-exist.json`: **ADF missing の exit 1 を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`: **passed**。
+
+## 355. 2026-08-30 SX-06 残存 CLI の結果出力境界統一
+
+再レビューで、`defineScript` に接続済みでも結果を直接 `console.log` していた
+`model_feedback.ts`、`promote_voice_profile.ts`、`peer_runtime_recovery.ts`、
+`action_item_reminders.ts`、`agent_runtime_supervisor_status.ts` を検出した。各 script の引数解析、
+副作用、approval／degraded の意味は維持し、結果を戻り値化して `context.print` へ集約した。
+supervisor status の daemon unavailable 時は従来どおり degraded な成功 report を返す。5 入口の
+source boundary test を追加し、将来の direct output 再導入を検知できるようにした。
+
+検証:
+
+- `pnpm exec vitest run scripts/action_item_reminders.test.ts scripts/agent_runtime_supervisor_status.test.ts scripts/model_feedback.entrypoint.test.ts scripts/promote_voice_profile.test.ts scripts/peer_runtime_recovery.test.ts`: **5 files / 5 tests passed**。
+- 各 3 CLI の `--help` を実行し、**exit 0 と usage 出力**を確認（昇格／復旧／feedback の write 操作は実行せず）。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 356. 2026-08-30 SX-06 report／watchdog CLI の出力境界統一
+
+再レビューで、`audit_verify.ts`、`egress_warn_report.ts`、`daemon_watchdog.ts` が report-ops／typed
+watchdog を利用しながら、JSON／human 出力と終了コードを直接 `console.*`／独自 status exception で扱う
+残存を検出した。監査 continuity の warn-only policy、egress recommendation、daemon recovery／alert の
+副作用と fail-closed exit は維持し、report formatter を harness の `context.print` へ接続した。
+`audit_verify` と `daemon_watchdog` の不成立は `ScriptExitError`、egress report は常に read-only 成功 report
+として返す。JSON flag は shared harness の `flags: ['json']` と整合させ、import 時に report／daemon probe
+を実行しない境界を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/audit_verify.test.ts scripts/audit_verify.entrypoint.test.ts scripts/egress_warn_report.test.ts scripts/egress_warn_report.entrypoint.test.ts scripts/daemon_watchdog.test.ts scripts/daemon_watchdog.entrypoint.test.ts`: **6 files / 12 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit_verify.ts --json`: **実 CLI は既存 tenant mirror mismatch 8 件を検出し exit 1**（master／ledger integrity は OK。データ修復は行わず、監査の fail-closed 結果を確認）。
+- `node --import ./scripts/ts-loader.mjs scripts/egress_warn_report.ts --json`: **exit 0、warn mode の read-only report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/daemon_watchdog.ts --help`: **exit 0、JSON option／usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`、`pnpm check -- --scope full`: **passed / 67/67 gates**。
+
+## 357. 2026-08-30 SX-06 audit mirror reconcile の help／結果境界修正
+
+再レビューで、`audit_mirror_reconcile.ts` が既に `defineScript` を持つ一方、reconcile／approval の結果を
+直接 `console.log` し、`--help` が custom parser に処理されず既定の dry-run write path へ進む残存を検出した。
+approval／dry-run／apply の authority gate と結果 schema は維持し、結果を戻り値化して `context.print` に集約した。
+また help は副作用なしで usage report を返すようにし、誤った help 実行が evidence write を誘発しない境界を固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/audit_mirror_reconcile.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/audit_mirror_reconcile.ts --help`: **exit 0、usage report を確認**。
+- 同 CLI の既定 dry-run write は authority gate によって拒否され、今回の確認で実データ変更がないことを確認。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 358. 2026-08-30 SX-06 health／Cowork bridge の出力境界統一
+
+再レビューで、`health_degradation_watch.ts` と `cowork_knowledge_bridge.ts` が shared `defineScript` を
+持ちながら、report／usage／同期の診断を直接 stdout／stderr へ出している残存を検出した。health watch の
+alert id と常時 exit 0 方針、Cowork の direction／tier gate／同期結果とエラー一覧は維持し、構造化結果を
+`context.print` へ集約した。Cowork の help は usage report を返すだけにし、import／help 実行時に同期や
+ファイル書き込みを開始しない境界を固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/health_degradation_watch.entrypoint.test.ts scripts/cowork_knowledge_bridge.entrypoint.test.ts libs/core/health-degradation.test.ts`: **3 files / 13 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/cowork_knowledge_bridge.ts --help`: **exit 0、同期なしで usage report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+## 359. 2026-08-30 SX-06 provider scan／mission team composition の出力境界統一
+
+再レビューで、`scan_provider_cli_capabilities.ts` と `compose_mission_team.ts` は import-safe 化済みでも、
+結果を直接 `console.log` し、provider scan の `--help` が検出・snapshot write に進み得る残存を検出した。
+provider discovery／capability snapshot、mission team の organization context／`--write`、provider preference
+の既存契約は変更せず、両 entrypoint の結果を shared harness の `context.print` へ集約した。provider scan の
+`--help` と mission team composition の `--help` は usage report を返すだけにし、probe／binding write を開始
+しない境界を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/scan_provider_cli_capabilities.entrypoint.test.ts scripts/compose_mission_team.entrypoint.test.ts libs/core/mission-team-composer.test.ts`: **3 files / 16 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/scan_provider_cli_capabilities.ts --help`: **exit 0、probe／snapshot write なしで usage report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/compose_mission_team.ts --help`: **exit 0、mission 必須検証／binding write なしで usage report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+
+## 360. 2026-08-30 SX-06 app preflight／env report の出力境界統一
+
+再レビューで、`app_preflight.ts` と `env_config_report.ts` は report builder を持ちながら、human／JSON の
+表示と失敗終了を `main()` 内の direct console／独自 exception に残していることを確認した。端末・秘密情報・
+環境 registry の probe 内容、値を表示しない方針、`--fail-on-undocumented` と preflight の fail 判定は維持し、
+report formatter と終了コードを shared harness の `context.print`／`ScriptExitError` へ接続した。両 CLI の
+`--help` は probe／registry 読み込みを開始せず usage のみ返す。
+
+検証:
+
+- `pnpm exec vitest run scripts/app_preflight.entrypoint.test.ts scripts/app_preflight.test.ts scripts/env_config_report.entrypoint.test.ts`: **3 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/app_preflight.ts --help`: **exit 0、probe なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/env_config_report.ts --help`: **exit 0、registry 読み込みなしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+- `pnpm run typecheck`、`pnpm run lint`、`git diff --check`: **passed**。
+
+## 361. 2026-08-30 SX-06 knowledge scope health の出力境界統一
+
+再レビューで、`watch_knowledge_scope_health.ts` が shared `defineScript` の内側で report／alert receipt を
+直接 stdout／stderr へ出している残存を検出した。tenant root／positive retrieval allowlist の検査、legacy
+history の `--alert` 保存、ops alert、`--fail` の fail-closed 終了は維持し、human／JSON report と alert receipt
+を `context.print` へ集約した。`--help` は health scan、履歴保存、alert 記録を開始しない usage report とし、
+副作用境界を回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/watch_knowledge_scope_health.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --help`: **exit 0、scan／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch_knowledge_scope_health.ts --json --fail`: **exit 0、3 tenant healthy／legacy 0 の report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 362. 2026-08-30 SX-06 tenant drift watchdog の出力境界統一
+
+再レビューで、`watch_tenant_drift.ts` が shared harness の内側で JSON／human report と監査失敗を logger
+へ直接出している残存を検出した。confidential mission state の tenant drift 検出、監査 chain 記録、`--alert`
+の ops alert、drift 時の exit 1 は維持し、監査記録に失敗した場合は report の `audit_error` として可視化した。
+結果と alert receipt は `context.print` に集約し、`--help` は confidential state の scan／audit／alert を開始
+しない usage report として回帰テストで固定した。
+
+検証:
+
+- `pnpm exec vitest run scripts/watch_tenant_drift.entrypoint.test.ts scripts/run_baseline_check.test.ts`: **2 files / 31 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --help`: **exit 0、scan／audit／alert なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/watch_tenant_drift.ts --json`: **exit 0、9 mission paths／drift 0 の report を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 363. 2026-08-30 SX-06 vital／dependency report の出力境界統一
+
+再レビューで、`vital_check.ts` と `dependency_resolver.ts` が shared harness を持ちながら report を
+`process.stdout`／`console.log` へ直接出し、必須条件不成立時の終了処理を main 内に残していることを確認した。
+runtime foundation／collaboration projection の vital 判定、actuator dependency の probe と missing dependency
+の説明、既存の `--format`／`--actuator` 引数は維持し、human／JSON report を `context.print` へ集約した。
+report を出力してから `ScriptExitError` で既存の fail-closed exit code を返すため、機械利用時の結果と終了判定を
+分離した。help は report／dependency probe を開始しない usage のみとした。
+
+検証:
+
+- `pnpm exec vitest run scripts/vital_check.entrypoint.test.ts scripts/vital_check.test.ts scripts/dependency_resolver.entrypoint.test.ts`: **3 files / 8 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/vital_check.ts --help`: **exit 0、runtime report 構築なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/dependency_resolver.ts --help`: **exit 0、dependency probe なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 364. 2026-08-30 SX-06 promotion／routing summary shell の出力境界統一
+
+再レビューで、`summarize_memory_promotion_queue.ts` と `summarize_task_model_routing.ts` が core の
+report-ops を呼び出す薄い shell でありながら、JSON／Markdown／table 出力を直接 `console.log` している
+残存を検出した。集計、明示された `--output` への保存、`--status`／event path の引数は維持し、結果を戻り値化
+して shared harness の `context.print` へ集約した。`--help` は queue／event の読み込みや output write を
+開始しない usage のみとした。
+
+検証:
+
+- `pnpm exec vitest run scripts/summarize_memory_promotion_queue.entrypoint.test.ts scripts/summarize_task_model_routing.entrypoint.test.ts`: **2 files / 4 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize_memory_promotion_queue.ts --help`: **exit 0、queue read／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/summarize_task_model_routing.ts --help`: **exit 0、event read／write なしで usage を確認**。
+- `node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **OK**。
+
+## 365. 2026-08-30 SX-08 run_intent gateway の解釈・出力境界統一
+
+再レビューで、`run_intent.ts` は canonical `IntentResolutionPacket` を選択に使っている一方、
+task-session／scenario／assistant delegation／mission fallback の各分岐で個別に stdout／logger を
+出していることを検出した。packet から execution intent を選ぶ経路、governed task-session／mission
+発行、assistant request artifact、deterministic fallback の順序は変更せず、結果を一つの structured
+result として `context.print` へ集約した。fallback の失敗理由と clarification text は result field に残し、
+`--help` は reasoning bootstrap／実行／write を開始しない usage report とした。これにより自由文 CLI の
+複数分岐が同一 resolver と同一出力境界へ収束する。
+
+検証:
+
+- `pnpm exec vitest run scripts/run_intent.entrypoint.test.ts`: **1 file / 2 tests passed**。
+- `node --import ./scripts/ts-loader.mjs scripts/run_intent.ts --help`: **exit 0、bootstrap／実行／write なしで usage を確認**。
+- `pnpm run typecheck`、`git diff --check`、`node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`: **passed / OK**。
+
+## 366. 2026-08-30 SX-08 legacy cli intent --run の実行経路統合
+
+再レビューで、`scripts/cli.ts` の `cli intent --run` だけが canonical surface entrypoint を経由せず、
+独自に intent packet を解決して一時 pipeline を生成し、`run_pipeline` を直接起動していた。この差分は
+同じ自由文に対する resolver／approval／execution boundary の二重化であり、旧 CLI からだけ別の実行結果に
+到達し得るため、残存指摘として修正した。`--run` は互換フラグとして受け付け、`kyberion ask` の共通
+surface conversation へ転送するように変更した。clarify と通常の read/execute request も同じ route を
+使うため、旧一時 pipeline の生成と直接起動は削除した。
+
+検証:
+
+- `pnpm exec vitest run scripts/cli.test.ts scripts/run_intent.entrypoint.test.ts`: **2 files / 35 tests passed**。
+- `pnpm run typecheck`: **passed**。
+- `git diff --check`: **passed**。
+- `pnpm check -- --scope full` (approval-enabled runtime): **67/67 gates passed**。
+
+SX-08B の残存（free-text resolver 全体の 1 実装化、12 surface の contract 描画、production-like approval
+test、日英 literal の全面移行）と、SX-09B の framework-specific request parsing／rate limit／remote-safe
+path は引き続き別課題として残る。
+
+## 367. 2026-08-30 SX-08 Chronos quick action／mission proposal mutation 境界の是正
+
+再レビューで `presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts` の
+`chronos://quick-action/*` が viewer 解決後に localadmin 再確認を行わず、tenant-scoped viewer
+から repository-wide な mission／audit／runtime 情報の参照や `schedule-tick`／`build-test` の
+command 実行へ到達できることを検出した。また、同じ route の mission proposal confirmation／
+rejection が readonly viewer からも durable state の削除または mission 発行へ進める状態だった。
+quick action と proposal mutation を localadmin + all-tenant viewer に限定し、proposal state に
+tenant binding が存在しない間は scoped viewer を fail-closed にした。
+
+検証:
+
+- `pnpm exec vitest run presence/displays/chronos-mirror-v2/src/app/api/agent/route.test.ts presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.test.ts`: **2 files / 7 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+SX-08B の 12 surface contract 描画、production-like approval test の全範囲、日英 literal 移行、
+SX-09B の framework-specific request parsing／rate limit／remote-safe path は継続課題である。
+
+## 369. 2026-08-30 SX-09 Concierge request rate limit の共通化
+
+再レビューで Concierge の API route 群に request-level rate limit がなく、viewer 解決後も同一
+token／IP からの過剰な GET／POST を抑制できないことを検出した。`viewer-context` の共通入口へ
+token または trusted IP、HTTP method 別の sliding-window limiter を追加し、429 と `Retry-After` を
+返すようにした。mutation guard が role 確認のため同じ request を再解決しても WeakSet で二重計上
+しない。proxy header は `KYBERION_TRUST_PROXY` 有効時だけ信頼し、viewer scope、CSRF、mutation role
+の既存境界は維持した。
+
+検証:
+
+- Concierge api guard／viewer rate limit／関連 scope: **4 files / 8 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+SX-09B の framework-specific request parsing／remote-safe path／wire shape、SX-08B の 12 surface
+contract 描画、production-like approval test の全範囲、日英 literal 移行は継続課題である。
+
+## 368. 2026-08-30 SX-08 Chronos pipeline shortcut の tenant scope 境界
+
+再レビューで `/api/agent` の明示 pipeline shortcut が localadmin 権限のみを確認し、tenant-scoped
+localadmin にも repository-wide ADF の直接起動を許していたことを検出した。対象 pipeline の
+path allowlist と localadmin gate は維持したまま、tenant-aware projection を持たない shortcut を
+all-tenant localadmin に限定し、scoped viewer からは 403 を返すよう修正した。これにより quick
+action、mission proposal mutation、pipeline shortcut の operator control boundary を揃えた。
+
+検証:
+
+- `pnpm exec vitest run presence/displays/chronos-mirror-v2/src/app/api/agent/route.test.ts presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.test.ts`: **2 files / 8 tests passed**。
+- `pnpm run typecheck`、`git diff --check`: **passed**。
+
+SX-08B の 12 surface contract 描画、production-like approval test の全範囲、日英 literal 移行、
+SX-09B の framework-specific request parsing／rate limit／remote-safe path は継続課題である。
+
+## 370. 2026-08-30 SX-09 Concierge の request 型境界を fail-closed 化
+
+再レビューで Concierge の message／notification API が JSON の配列・オブジェクトを `String(...)`
+で暗黙変換して受理し得ることを検出した。会話 `text`、通知 `surface`、通知 `target` を明示的な
+文字列入力として扱い、型が違う値は既存の必須／不正入力応答へ落とすよう修正した。provider の
+reply も文字列だけを成功とするよう揃えた。
+
+検証: message input **1 file / 3 tests passed**、`pnpm run typecheck`、`git diff --check` が green。
+
+## 371. 2026-08-30 SX-06 customer:list の結果出力境界統一
+
+再レビューで `scripts/customer_list.ts` が `defineScript` を使っている一方、テキスト結果だけを
+`console.log` から直接出力していた。これを `printText` が行配列を返し、script harness の
+`context.print` が最終出力を担当する形へ揃えた。これにより import／テスト時の副作用を除き、JSON
+出力とテキスト出力の責務を同じ実行境界へ集約した。
+
+検証: `pnpm exec vitest run scripts/customer_list.test.ts`: **1 file / 3 tests passed**、
+`node --import ./scripts/ts-loader.mjs scripts/check_script_integrity.ts`、`git diff --check` が OK。
+
+## 372. 2026-08-30 SX-06 customer overlay CLI 群の結果出力境界統一
+
+同じ再レビューで、関連する `customer:create`、`customer:switch`、
+`customer:migrate-from-personal` にも処理関数からの `console.log` 直書きが残っていることを確認した。
+各処理の成功メッセージを行配列として返す formatter に分離し、`defineScript` の `context.print` が
+最終出力を担当する形へ揃えた。これにより customer overlay 操作も import／テスト時に stdout を
+汚染せず、harness が出力を一元管理できる。
+
+検証: customer overlay **3 files / 9 tests passed**、`git diff --check` が OK。
+
+## 373. 2026-08-30 SX-09 Concierge setup request の strict parsing
+
+再レビューで Concierge setup POST の tenant／agent nested object、profile fields、onboarding draft
+の `voice.sample_refs` が配列・オブジェクトでも `String(...)` により暗黙変換され、状態書き込みへ到達し得る
+ことを検出した。共通 `setup-input` parser を導入し、JSON body／nested object／string／boolean／string
+array を検証して、不正入力を 400 で fail-closed 化した。入力検証は tenant／profile の書き込み前に完了
+させ、multipart の action／profile_id／source も文字列だけを受理する。route 内の `pathResolver` 参照は
+core の正規 import へ修正した。
+
+検証: setup parser／route input **2 files / 23 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check` が green。
+
+## 374. 2026-08-30 SX-14 secret classifier の passphrase／SMTP password 漏れ修正
+
+再レビューで env registry classifier が `KYBERION_BACKUP_PASSPHRASE` と `KYBERION_SMTP_PASS` を
+runtime と判定しており、実際の暗号化 passphrase／SMTP password が secret の必須文書化・保護境界を
+迂回していたことを検出した。`PASSPHRASE` と単語境界付き `PASS` を secret として分類し、両エントリを
+秘密値を保存しない旨付きで registry／生成設定文書へ反映した。既存の `A2A_SIGNATURE` や
+`GATE_OVERRIDE_SIGNATURE` は warn/enforce のモード設定であり、誤って secret 化しないよう回帰テストで
+分類境界を固定した。
+
+検証: `pnpm exec vitest run scripts/generate_env_registry.test.ts`: **1 file / 12 tests passed**、
+`pnpm generate:env-registry`、env registry quality gate の対象生成物更新が OK。
+
+## 375. 2026-08-30 SX-14 A2A／gate override／SMTP env の型・説明整備
+
+env registry の実利用を再確認し、A2A signature policy と gate override signature policy が実際には
+`warn|enforce` の enum なのに未文書の string として残り、SMTP user／port も operator-facing の説明が
+欠けていた。両 policy を enum として registry／生成設定文書へ反映し、SMTP 接続の user／port も用途と
+安全な運用境界付きで文書化した。これにより設定値の許容範囲を schema 上でも明示した。
+
+検証: `pnpm generate:env-registry`、env registry **1/1 gate passed**、registry 集計 **412 entries /
+documented 162 / undocumented 250**。
+
+## 376. 2026-08-30 SX-09 Concierge voice listen-once の request 型境界統一
+
+再レビューで voice `listen-once` route が null body の property access で 500 になり、backend／device／locale
+の配列・オブジェクトを既定値へ落として voice-hub へ転送し得ることを検出した。Concierge 共通
+`request-input` helper を追加し、JSON body と文字列 field を strict に検証して malformed input を 400 で
+fail-closed 化した。setup route も共通 primitive を利用し、入力検証を外部呼び出し・状態書き込みより前に置いた。
+
+検証: voice／setup input **3 files / 28 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check` が green。
+
+## 377. 2026-08-30 SX-14 agent runtime supervisor env の文書化・型整備
+
+env registry の実利用を再確認し、agent runtime supervisor の boot／idle／inflight timeout、lock／socket
+path、TCP port、transport、agent identity／ring／tier が未文書のまま operator 設定面に露出していた。
+実装の既定値と authority／local transport の境界を確認し、11 エントリを用途・安全な既定値付きで文書化した。
+`KYBERION_AGENT_RING` は実際の数値 policy ring と一致するよう tuning/number に補正し、transport は
+`unix|tcp` enum として schema に反映した。
+
+検証: `pnpm generate:env-registry`、env registry **1/1 gate passed**、registry 集計 **412 entries /
+documented 173 / undocumented 239**、`pnpm exec vitest run scripts/generate_env_registry.test.ts` が passed。
+
+## 378. 2026-08-30 SX-14 delegation governance env の型・説明整備
+
+env registry の実利用を再確認し、delegation concurrency／depth／summary retry の operator 設定が未文書のまま
+残っていたことを検出した。実装上の既定値と安全な override 境界を確認し、global／provider concurrency、delegation
+depth、wall-clock／kill grace、provider capability、notification／store／trace path、summary retry の 10 エントリを
+registry に追加した。provider capability は JSON object text として扱い、不正な JSON は既定値へ戻る実装に合わせて
+説明し、summary retry は既定有効の boolean flag として schema に反映した。
+
+検証: `pnpm generate:env-registry`、env registry **1/1 gate passed**、registry 集計 **412 entries /
+documented 183 / undocumented 229**。
+
+## 379. 2026-08-30 SX-11 runtime script-wrapper 判定の検出漏れ修正
+
+再レビューで、独立した pipeline shell scanner が検出する `/usr/bin/node scripts/...`、`node --import ...
+scripts/...`、直接 `tsx` の wrapper 形式を、ADF runtime guardrail が一部検出できない差分を確認した。現行 catalog
+の wrapper は **0 件**であるが、新規 pipeline の再発防止として executable basename、script／source 拡張子、`node -e`、
+直接 `tsx` と alternate node flags を runtime 判定へ追加し、判定関数をテスト可能な共有境界にした。
+
+検証: ADF／input／catalog／shell scanner **4 files / 330 tests passed**、`pnpm run check -- --scope full --only pipeline-shell-independence`
+が OK、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+
+## 380. 2026-08-30 SX-11 Super-Nerve 修復結果の再実行反映
+
+再レビューで、Super-Nerve が修復 helper に durable `pipelinePath` を渡さず、さらに修復成功後もメモリ上の元の
+normalized step を再試行していたため、修復 agent が書き込んだ ADF の変更が実行へ反映されないことを検出した。
+`pipelinePath` を canonical repair へ渡し、成功後は repository 内の修正版 ADF を `secure-io` 経由で再読込してから
+step を再正規化するよう修正した。再読込に失敗した場合は元の契約を再試行せず、失敗結果を返す fail-closed 境界にした。
+
+検証: Super-Nerve／canonical repair **2 files / 16 tests passed**。
+
+## 381. 2026-08-30 SX-09 Chronos agents API の request 型境界統一
+
+再レビューで `/api/agents` が `req.json()` の malformed body を 500 へ流し、null／配列や action ごとの
+`agentId`、`query`、`provider`、limit、capabilities、runtimeMetadata、A2A envelope の型を暗黙に扱っていた。
+runtime spawn／ask／restart／A2A と shutdown の前に共通 parser を置き、action 別の必須値・1〜500 の limit・
+string array／object の shape を検証し、不正入力を 400 で fail-closed 化した。
+
+検証: Chronos agents parser／route input **2 files / 17 tests passed**。
+
+## 382. 2026-08-30 SX-09 Chronos mutation route の共通 JSON reader
+
+再レビューで、connections、deliverable-review、workitems、share-grants の mutation route が malformed JSON を
+500 へ流し、null／配列を route ごとに異なる形で扱っていた。`readChronosJsonObject` を追加し、JSON parse failure と
+non-object body を外部呼び出し・状態変更より前に 400 で拒否する共通境界へ統一した。route 固有の operation／status／
+tenant scope 検証は各 route に残し、共通 reader が責務を越えないようにした。
+
+検証: common reader／agents parser **3 files / 22 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check`、`pnpm check -- --scope full`（67/67）が green。
+
+## 383. 2026-08-30 SX-09 Chronos route 群への共通 JSON reader 適用
+
+再レビューで、intelligence、knowledge-feedback、plan-preview、headless work-items status にも route ごとの
+`req.json()` 直接呼び出しが残り、malformed JSON の扱いが共通化されていなかった。`readChronosJsonObject` を各 route
+の外部処理より前に適用し、parse failure と non-object body を 400 で fail-closed 化した。これにより共通 reader の
+適用先は主要 Chronos mutation／preview／headless 入力まで拡張された。
+
+検証: common reader／Chronos route input **3 files / 19 tests passed**、`pnpm run typecheck` が passed。
+
+## 384. 2026-08-30 SX-09 Chronos agent 主入口の malformed JSON 応答統一
+
+再レビューで、主要な `/api/agent` だけは `req.json()` の parse exception が共通 reader を通らず、入力不備でも
+user-facing 内部エラー envelope の 500 を返していた。`readChronosAgentBody` を agent parser と共通 JSON object reader の
+境界に置き、malformed JSON／non-object body を実処理前に 400 で返すよう修正した。既存の業務エラー向け envelope は
+維持し、入力エラーと内部エラーの HTTP 境界を分離した。
+
+検証: Chronos agent route／helper／common reader **3 files / 24 tests passed**、max-file-lines gate、typecheck が passed。
+
+## 385. 2026-08-30 SX-09 Concierge mutation route の malformed JSON 境界統一
+
+再レビューで、Concierge の approvals、config-missions、hygiene、memory-queue、message、notification-preferences、
+outcomes、plugins が malformed JSON を空オブジェクトへ置換する個別 fallback を持っていた。共通 `readRequestObject` を
+追加し、parse failure と non-object body を route 固有の mutation／外部 controller 呼び出しより前に 400 で拒否する形へ
+統一した。message route の既存 vocabulary 応答など、surface 固有のエラー表現は維持した。
+
+検証: Concierge common reader／existing input suites **5 files / 36 tests passed**。
+
+## 386. 2026-08-30 SX-09 operator-surface inbox の入力型境界統一
+
+再レビューで、operator-surface inbox が malformed JSON の例外を処理せず、form の File 値を `String(...)` で
+identifier／status に変換し得ることを検出した。JSON body は object のみ、form 値は文字列のみを受理し、不正値は
+承認・状態更新前に 400 で拒否するよう修正した。
+
+検証: operator-surface inbox **1 file / 5 tests passed**。
+
+## 387. 2026-08-30 SX-13 完了済み Cloudflare OS 計画のアーカイブ
+
+実装状況が OS-01〜15 まで完了し、本文にも deferred task や残課題がない Cloudflare OS 計画を active 索引から
+`improvement-plans-archive/2026-08` へ移管した。frontmatter を `status: archived` に更新し、2026-08 索引・archive
+索引・PI 計画の参照を新しい正本 path へ追随させた。
+
+検証: `documentation-links` **1/1 gate passed**。
+
+## 388. 2026-08-30 SX-09 terminal bridge の remote 認証境界是正
+
+再レビューで、terminal bridge が `x-forwarded-for` を常に信頼して loopback 判定し、`KYBERION_TERMINAL_ALLOW_REMOTE=true` だけで
+token 無しの remote HTTP／WebSocket 接続を許可する残存を検出した。認証 helper を HTTP／WebSocket 共通の副作用なし境界へ切り出し、
+forwarded peer は `KYBERION_TRUST_PROXY` 有効時だけ利用し、remote 接続は terminal/API token 必須へ変更した。無効化した旧 remote
+switch は env registry から生成時に除去し、認証回帰テストで spoofed loopback、trusted proxy、remote token、token 欠落を固定した。
+
+検証: terminal auth／Chronos agents input **2 files / 10 tests passed**、`pnpm run typecheck`、`pnpm generate:env-registry`、
+env registry **1/1 gate passed**、`git diff --check` が green。
+
+## 389. 2026-08-30 SX-14 governance／scope env の説明整備
+
+再レビューで、監査継続、autonomous operation、curation、knowledge tier、NHI、security posture、shell policy、surface query、
+task model routing、tenant design root の10設定が実装済みなのに未文書だった。実装の既定値・許容値・fail-closed／hint-only の意味を
+確認し、registry に subsystem と説明を追加して `env.example` と `CONFIGURATION.md` を生成し直した。secret／flag／provider の
+未文書件数は引き続き 0 件で、runtime／tuning／path の未文書件数を 219 から 209 に削減した。
+
+検証: `pnpm generate:env-registry`、env registry **1/1 gate passed**。
+
+## 390. 2026-08-30 SX-09 iMessage bridge の request 型境界統一
+
+再レビューで iMessage bridge の `/send` が request body を型アサーションだけで受け取り、
+`recipient`／`text`／`serviceName`／`attachments` の配列・オブジェクトを文字列化または未検証のまま
+送信処理へ渡し得ることを検出した。`parseIMessageBridgeInput` を追加し、HTTP `/send` と CLI input file
+の双方で object、string field、string array を strict に検証してから処理するよう修正した。
+BlueBubbles webhook は provider payload 用の既存 parser と認証境界を維持している。
+
+検証: iMessage bridge **1 file / 5 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check` が green。SX-08 の自由文入口統合、12 surface の contract 描画、SX-09b の全
+framework-specific parsing、日英 literal の全面移行は引き続き未完了である。
+
+## 391. 2026-08-30 SX-09 voice-hub の request 型境界統一
+
+再レビューで voice-hub の `/api/stop-speaking`、`/api/ingest-text`、`/api/listen-once` が
+Express の body を object として検証せず、配列・`null` などを既定値化して処理へ進め得ることを検出した。
+`readVoiceHubRequestObject` を共通入力境界として追加し、3 endpoint で外部処理・音声録音・状態変更より前に
+非 object JSON を 400 で拒否するよう修正した。未指定 body の既定値互換は維持している。
+
+検証: voice-hub request input **1 file / 2 tests passed**、`pnpm run typecheck`、`git diff --check` が
+green。SX-08 の自由文入口統合、12 surface の contract 描画、SX-09b の全 framework-specific parsing、
+日英 literal の全面移行は引き続き未完了である。
+
+## 392. 2026-08-30 SX-04 provider capability catalog の governed loader 統合
+
+再レビューで provider capability catalog が `readJson` と手作業の型判定だけで読み込まれ、primary／fallback の
+catalog と probe 結果の書き込みが共通の schema 境界を持っていないことを確認した。provider と model capability
+の配列・map、entry provenance、top-level provenance を定義する
+`provider-capabilities.schema.json` を追加し、primary／fallback の読み込みと probe merge の読み込みを
+`defineCatalog` に統合した。probe merge の書き込み前にも同じ validator を通すため、実行時に不正な probe payload
+が catalog を汚染しない。既存の malformed／missing catalog の fallback 動作と union／replace semantics は維持した。
+
+検証: provider capability catalog／writer **2 files / 8 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check` が green。SX-04 の全 catalog／schema 統合は引き続き未完了である。
+
+## 393. 2026-08-30 SX-04 presence avatar registry の governed catalog 統合
+
+再レビューで presence avatar registry が `readJson` 後の部分的な filtering に依存し、default registry と環境変数で
+指定された override の構造 schema が共有されていないことを確認した。profile、expression avatar map、alias、default
+agent を定義する `presence-avatar-profiles.schema.json` を追加し、path override を維持したまま `defineCatalog` の
+共通 loader／validator と built-in fallback へ移行した。schema 違反時は個別 profile を不完全なまま採用せず、従来の
+安全な default profile へ戻る。既存の alias 解決と未知 agent の表示 fallback は維持した。
+
+検証: presence avatar **1 file / 3 tests passed**、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+SX-04 の全 catalog／schema 統合は引き続き未完了である。
+
+## 394. 2026-08-30 SX-04 design-fonts の brand tokens governed loader 統合
+
+再レビューで design-fonts が brand tokens を `readJson` と探索時の存在確認だけで読み込み、既存の
+`brand-tokens.schema.json` を runtime loader の検証に接続していないことを確認した。探索経路は維持しつつ
+`defineCatalog` に移行し、schema 違反または fresh checkout での token 不在時は従来どおり組み込み font stack
+へ安全に戻るようにした。これにより design token の編集ミスが module 初期化や font 解決へ未検証のまま流れない。
+
+検証: design-fonts の実 import、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。SX-04 の全
+catalog／schema 統合は引き続き未完了である。
+
+## 395. 2026-08-30 SX-04 peer network catalog の governed loader 統合
+
+再レビューで peer network catalog が `readJson` の型アサーションを使い、読み込み時の schema 検証と登録時の
+書き込み検証が分離していた。既存の tenant slug／tenant mismatch、public metadata catalog への secret 混入禁止、
+confidential／test tmp path 制約を維持しつつ、path ごとの `defineCatalog` loader に統合した。登録前後とも
+`peer-network.schema.json` を通すため、不正な既存 peer や malformed capabilities は送信・保存へ進まない。
+
+検証: peer messaging **1 file / 17 tests passed**、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+SX-04 の全 catalog／schema 統合は引き続き未完了である。
+
+## 396. 2026-08-30 SX-04 locale の vocabulary catalog 重複 reader 除去
+
+再レビューで locale が `default_locale` だけを独自に `readJson` し、既に存在する vocabulary catalog の
+schema 検証・cache・fallback 経路と重複していた。`vocabulary-catalog.ts` の共有 governed loader を直接利用する
+ように変更し、locale default の fallback は維持した。identity／tenant overlay は precedence と scope が異なる
+ため、共有 catalog に混在させず既存の動的境界を維持している。
+
+検証: locale／vocabulary／t **3 files / 30 tests passed**、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+SX-04 の全 catalog／schema 統合は引き続き未完了である。
+
+## 397. 2026-08-30 SX-04 project operating system artifact map の governed loader 統合
+
+再レビューで project scaffold が `project-operating-system-artifact-map.json` を型アサーション付きの
+`readJson` で読み込み、lifecycle／layer／dependency の構造を検証していなかった。専用 schema を追加し、
+scaffold 生成から `defineCatalog` loader を利用するようにした。project／track／mixed の scope と required
+artifact、dependency pair を検証し、map が壊れている場合は不完全な scaffold を生成せず fail-closed する。
+既存の project path、tenant 引数、blueprint の生成契約は変更していない。
+
+検証: artifact map loader の実読み込み、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。SX-04 の
+全 catalog／schema 統合は引き続き未完了である。
+
+## 398. 2026-08-30 SX-05/SX-06 `capability_discovery` の shared script harness 移行
+
+### 対応内容
+
+- `package.json` の `capabilities` と CI が実行する `scripts/capability_discovery.ts` を `defineScript`／`isDirectScript` に接続し、import 時の暗黙実行を廃止した。
+- capability の判定結果を `CapabilityDiscoveryReport` に分離し、`--json` は構造化結果、通常実行は既存の human-readable 表示を shared harness の出力境界から返すようにした。
+- `evaluateCapability` と `formatCapabilityDiscovery` の回帰テストを追加し、platform mismatch／不足 binary と表示形式を固定した。
+
+### 検証
+
+- `pnpm pipeline --input pipelines/baseline-check.json` — pipeline completed。
+- `pnpm exec vitest run scripts/capability_discovery.test.ts scripts/check_script_integrity.test.ts` — 2 files / 7 tests passed。
+- `pnpm exec tsx scripts/capability_discovery.ts --json` — 実 actuator manifest を走査し、`errors: []` の JSON を出力。
+- `pnpm exec tsx scripts/capability_discovery.ts --quiet` — quiet path completed。
+- `pnpm run check -- --scope pr --only script-integrity` — `[check:script-integrity] OK`。
+
+### 残存
+
+`scripts/` 全体の server／interactive／custom-output entrypoint 移行、`defineGenerator` 未適用の生成系 script、script registry の全件化は SX-05／SX-06 の次段として継続する。
+
+## 399. 2026-08-30 SX-06 固定出力 generator の `defineGenerator` 移行
+
+### 対応内容
+
+- `scripts/generate_knowledge_index.ts` の knowledge index／integrity manifest 生成を shared `defineGenerator` に移行し、出力先を 2 ファイルの declared outputs として固定した。
+- tier をまたぐ読み取りに必要な `mission_controller` execution context と、既存 `generateIndex(true)` の compatibility API を維持した。
+- `--check`／`--dry-run` の write boundary を harness に集約し、既存の snapshot 比較と frontmatter exclusion 検証を保持した。
+- generator の clean check と legacy compatibility check の回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/generate_knowledge_index.test.ts scripts/check_catalog_integrity.test.ts scripts/capability_discovery.test.ts` — 3 files / 17 tests passed。
+- `pnpm run generate:knowledge-index -- --check --quiet` — exit 0。
+- `pnpm run generate:knowledge-index -- --dry-run --quiet` — exit 0。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+`defineGenerator` 未適用の動的 scaffold／報告系 script、server／interactive entrypoint と script registry の全件化は SX-05／SX-06 の次段として継続する。
+
+## 400. 2026-08-30 SX-04/SX-06 project OS scaffold の governed generator 統合
+
+### 対応内容
+
+- `scripts/generate_project_os.ts` の動的 scaffold を `defineGenerator` に移行し、生成対象ファイルを invocation 単位の declared outputs として扱うようにした。
+- `--name`／`--out` と harness 標準の `--check`／`--dry-run`／`--quiet` を同じ argv 境界で処理し、render 中の mkdir／write と標準出力を除去した。
+- artifact map の読み込みを `loadProjectOperatingSystemArtifactMap()` に統合し、SX-04 の schema／governed catalog 検証を project OS scaffold にも適用した。
+- README の生成日時と machine-specific な blueprint absolute path を除去し、生成物を deterministic／portable にした。
+- 実生成後の再 `--check` と dry-run を回帰テストで固定した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/generate_project_os.test.ts scripts/generate_knowledge_index.test.ts` — 2 files / 4 tests passed。
+- `pnpm run build:packages`、`pnpm run build:repo` — passed。
+- build 済み `pnpm run project-os:init -- --name ... --out ...` の実生成と再 `--check --quiet` — exit 0。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+動的報告系 script、server／interactive entrypoint、script registry 全件化、SX-05 の scripts 数削減は引き続き未完了である。
+
+## 401. 2026-08-30 SX-06 `report:i18n-coverage` の output／副作用境界統合
+
+### 対応内容
+
+- `report_i18n_translation_coverage.ts` の human／JSON 出力を `context.print` へ一本化し、`console.log`／`console.warn` の custom output を除去した。
+- `--dry-run`／`--check` では coverage と regression の preview のみを行い、ops alert dispatch と history write を抑止するようにした。
+- report 本体と regression 表示を返値モデルに分離し、shared harness の `--json`／`--quiet` を実運用で機能させた。
+- read-only preview、structured harness result、human formatter の回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/report_i18n_translation_coverage.test.ts` — 13 tests passed。
+- `pnpm run report:i18n-coverage -- --json --dry-run` — structured report を出力。
+- `pnpm run report:i18n-coverage -- --json --dry-run --quiet` — 無出力で exit 0。
+- `pnpm run report:i18n-coverage -- --alert-on-regression --dry-run --quiet` — alert／history write なしで exit 0。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+`generate_changelog` 等の非 package／custom report entrypoint、server／interactive entrypoint、script registry 全件化は SX-05／SX-06 の継続課題である。
+
+## 402. 2026-08-30 SX-03/SX-06 `generate_changelog` の governed command／output 境界統合
+
+### 対応内容
+
+- import 時の `execSync` と shell command string 組み立てを廃止し、repository root 解決を `pathResolver`、Git 実行を `safeExec` に統合した。
+- Conventional Commit の分類・policy-based rendering は維持しつつ、通常 report の JSON 出力を構造化結果として `context.print` から返すようにした。
+- `--prepend` の更新内容を pure builder に分離し、`--dry-run`／`--check` では CHANGELOG を変更しない境界を追加した。`--check` で差分がある場合は governed non-zero exit を返す。
+- prepend 形式、shared command boundary、structured result、dry-run read-only を回帰テストで固定した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/generate_changelog.test.ts` — 6 tests passed。
+- direct CLI `--from HEAD --to HEAD --json` — structured report を出力。
+- direct CLI `--prepend --dry-run --quiet` — 無出力・無変更で exit 0。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+非 package／custom report の残り、server／interactive entrypoint、script registry 全件化、SX-05 の scripts 数削減は継続課題である。
+
+## 403. 2026-08-30 SX-06 peer server の startup side effect／失敗境界是正
+
+### 対応内容
+
+- `peer_conversation_server.ts` の HTTP listen を Mesh peer 登録、capability advertise、heartbeat 開始より先に確定する順序へ変更した。
+- listen 後の startup 処理が失敗した場合は heartbeat timer を停止し、開始済み lifecycle の stop を記録して server を close することで、未 bind listener や stale presence を残さないようにした。
+- `peer_conversation_server.ts` と `peer_messaging_server.ts` の entrypoint 内 catch／`process.exitCode` 設定を除去し、失敗を `defineScript` の共通境界へ戻した。
+- server entrypoint の順序と直接 exit 残存を検査する回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts tests/mesh-two-peer-e2e.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 5 tests passed。
+- `pnpm exec vitest run tests/mesh-two-peer-e2e.test.ts libs/core/mesh-peer-directory.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 11 tests passed。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm pipeline --input pipelines/baseline-check.json --json` — baseline pipeline completed successfully。
+
+### 残存
+
+interactive dashboard、MCP／server 系の custom output と script registry 全件化、SX-05 の scripts 数削減は引き続き継続課題である。
+
+## 404. 2026-08-30 SX-05 CLI command registry の dispatch key 重複防止
+
+### 対応内容
+
+- `checkCliManifest` に command ID だけでなく dispatch key (`command`) の重複検査を追加した。default command (`''`) の重複も明示的に拒否する。
+- runtime の `selectEntrypoint`／`resolveCommand` も複数定義を先頭採用せず、`CLI command registry has duplicate command` として fail-closed にした。未知 command に対する従来の `undefined` 戻り値契約は `resolveCommand` で維持した。
+- 同一 command key の registry 検査と runtime dispatch の回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 18 tests passed。
+- `node --import ./scripts/ts-loader.mjs scripts/check_cli_manifest.ts` — `[check:cli-manifest] OK`。
+
+### 残存
+
+command registry の細粒度 verb 化、package scripts の ≤120 化、dashboard／MCP／server の custom output 整理は継続課題である。
+
+## 405. 2026-08-30 SX-06 `email:workflow` の shared output／dry-run 境界統合
+
+### 対応内容
+
+- `email-workflow.ts` の直接 `console.log` を除去し、結果と help を `defineScript` の printer から出力するようにした。
+- pnpm の `--` sentinel と shared flags (`--json`／`--quiet`／`--dry-run`／`--check`) を custom parser が正しく扱うようにした。
+- draft／deliver の dry-run は reasoning、メール送信、draft 作成を行わず preview を返し、archive は `apply=false` の read-only preview に固定した。
+- email workflow の help、JSON、quiet 出力境界を回帰テストで固定した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 1 file / 5 tests passed。
+- `pnpm email:workflow -- status --json` — structured account report を出力。
+- `pnpm email:workflow -- status --json --quiet` — workflow 出力なしで exit 0。
+- `pnpm email:workflow -- deliver --body-markdown 'hello' --approved --dry-run --json` — 送信なしの dry-run preview を出力。
+
+### 残存
+
+calendar workflow の旧入口、interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 406. 2026-08-30 SX-06 calendar workflow の shared output／provider 境界統合
+
+### 対応内容
+
+- `calendar-workflow.ts` の直接 `console.log` を除去し、結果と help を `defineScript` の printer から出力するようにした。
+- pnpm の `--` sentinel と shared flags (`--json`／`--quiet`／`--dry-run`／`--check`) を custom parser が正しく扱うようにした。
+- `create-event` の dry-run／check では calendar API を呼ばず preview を返すようにした。
+- 未知の calendar provider を Google Workspace に暗黙 fallback せず、入力エラーとして fail-closed にした。
+- calendar workflow の help、JSON、quiet、provider validation を回帰テストで固定した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/help_entrypoints.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 1 file / 7 tests passed。
+- `pnpm kyberion calendar status --json` — structured auth status を出力。
+- `pnpm kyberion calendar create-event --summary Planning --start 2026-08-30T13:00:00+09:00 --end 2026-08-30T14:00:00+09:00 --dry-run --json` — API 呼び出しなしの preview を出力。
+
+### 残存
+
+interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 407. 2026-08-30 SX-06 `service:preflight` の shared output／sentinel 境界統合
+
+### 対応内容
+
+- `service_preflight.ts` の human／JSON report を shared harness の printer に統合し、直接 `console`／logger 出力を除去した。
+- pnpm の `--` sentinel を yargs に渡す前に正規化し、`--service`／`--all` が実際の package entrypoint で解釈されるようにした。
+- `--json`／`--quiet`／`--check` の共通境界と、未 ready 時の `ScriptExitError` による report 保持・exit 1 を実装した。
+- entrypoint 静的検査と help／JSON／quiet の runtime 回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/service_preflight.test.ts scripts/service_preflight.entrypoint.test.ts scripts/help_entrypoints.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 12 tests passed。
+- `pnpm run build:repo` — green。
+- `pnpm service:preflight -- --service google-workspace --json` — 指定 service の structured report を出力。
+- `pnpm service:preflight -- --service google-workspace --json --quiet` — workflow 出力なしで exit 0。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 408. 2026-08-30 SX-06 `surface_runtime` の report／mutation dry-run 境界統合
+
+### 対応内容
+
+- `surface_runtime` の `list-units`／`setup` table rendering を pure formatter に分離し、main の結果出力を shared harness printer に統合した。
+- `surfaces:*` の pnpm／CLI 引数に含まれる `--` sentinel を除去してから yargs へ渡すようにした。
+- reconcile／start／stop／repair／enable／disable／register／unregister は `--dry-run`／`--check` 時に lifecycle mutation を実行せず、action preview を返すようにした。
+- surface runtime の stale import mock／contract test を現行 explicit module boundary に同期し、直接 stdout 出力の残存を除去した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/surface-auth.test.ts tests/runtime-surface-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 8 tests passed。
+- `pnpm run build:repo` — green。
+- `node dist/scripts/surface_runtime.js --action setup --json` — structured setup report を出力。
+- `node dist/scripts/surface_runtime.js --action setup --json --quiet` — 無出力で exit 0。
+- `node dist/scripts/surface_runtime.js --action start --surface nonexistent --dry-run --json` — mutation なしの preview を出力。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0。
+
+### 残存
+
+interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 409. 2026-08-30 SX-06 `setup:report --quiet` の依存診断ログ伝播
+
+### 対応内容
+
+- `setup:report` の shared harness が受け取った `quiet`／`json` を内部 quiet context として、surface／service／reasoning の各診断処理へ明示的に伝播するようにした。
+- shared harness 自体も JSON／quiet 実行中に既存の `LOG_LEVEL=silent` context を設定し、構造化 logger と legacy core logger の依存ログが report 出力へ混入しない境界を設けた。
+- `runReasoningSetup` に quiet オプションを追加し、setup report の JSON／quiet 出力へ reasoning guidance や依存診断の人間向け出力が混入しないようにした。
+- setup report の entrypoint 静的検査と、operator／first-time-user それぞれの quiet 契約、および JSON 実行中の logger context 復元を回帰テストへ追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/setup_report.entrypoint.test.ts tests/setup-report.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 11 tests passed。
+- `pnpm --filter @agent/core run build`、`pnpm run build:repo` — green。
+- `pnpm setup:report -- --json --quiet` — 依存診断の標準出力を抑制。
+- `pnpm setup:report -- --json` — 人間向け table／logger 出力を混ぜず、report JSON のみを出力。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
+
+### 残存
+
+interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 410. 2026-08-30 SX-05/SX-06 `doctor` の shared output／exit 境界統合
+
+### 対応内容
+
+- `run_doctor` の human report を pure formatter に分離し、JSON は report object を shared printer から一度だけ出力するようにした。
+- `--` sentinel と shared flags（`--json`／`--quiet`／`--dry-run`／`--check`）を doctor 固有の yargs parsing 前に除去し、`flags: []` と直接 `process.exitCode` 変更を撤去した。
+- required capability がある場合は `ScriptExitError` の silent return value で report を保持しながら exit 1 とし、成功時は shared harness の標準成功境界へ委譲した。
+- entrypoint 静的検査と既存 doctor の human／JSON／missing-next-action 回帰テストを追加した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/run_doctor.entrypoint.test.ts scripts/run_doctor.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 2 files / 9 tests passed。
+- `pnpm --filter @agent/core run build`、`pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm doctor -- --json` — report JSON のみを shared printer から出力。
+
+### 残存
+
+interactive dashboard、MCP／server の custom output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 411. 2026-08-30 SX-05/SX-06 MCP／peer server の shared flag／ログ境界統合
+
+### 対応内容
+
+- MCP stdio と peer HTTP server の entrypoint から `flags: []` を除去し、shared harness の `--json`／`--quiet`／`--dry-run`／`--check`／`--` 認識を有効化した。
+- peer server 固有の yargs へ渡す前に shared flags と sentinel を除去し、server 固有オプションの解釈を壊さずに入口を統一した。
+- MCP lifecycle の停止失敗ログを直接 `console.error` から core logger へ移し、protocol stdout と運用ログの境界を維持した。
+- peer／MCP entrypoint 静的検査と shared-network の既存テストを実行した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 35 tests passed。
+- `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo` — green。
+- `pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
+
+### 残存
+
+interactive dashboard、MCP tool catalog／server の custom protocol output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 412. 2026-08-30 SX-05/SX-06 peer 操作 CLI の shared output 統合
+
+### 対応内容
+
+- `peer_conversation` と `peer_collaboration` の操作結果を direct `console.log` ではなく戻り値として返し、shared harness の printer から一度だけ出力するようにした。
+- 両 CLI の `flags: []` と成功時の独自 logger 出力を除去し、JSON／quiet 出力が protocol／操作結果へ混入しないようにした。
+- peer 固有 yargs の前に shared flags と `--` sentinel を正規化し、pnpm 経由でも command option を安定して解釈するようにした。
+- 操作 CLI の entrypoint 静的検査を追加した。実 peer への送信・proposal mutation は行っていない。
+
+### 検証
+
+- `pnpm exec vitest run scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 4 files / 36 tests passed。
+- `pnpm --filter @agent/shared-network run build`、`pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
+
+### 残存
+
+interactive dashboard、MCP tool catalog／server の custom protocol output、細粒度 command registry と package scripts 削減は継続課題である。
+
+## 413. 2026-08-30 レビュー修正: peer／MCP の dry-run 副作用境界と CLI 入口 fail-closed
+
+### 対応内容
+
+- 前段の shared harness 統合を再レビューし、peer 操作 CLI と peer／MCP server が `--dry-run`／`--check` を parser から除去した後も mutation／listen／stdio 接続を実行していた欠陥を修正した。preview 時は操作内容だけを structured output で返し、proposal decision、peer message、session close、server bind、MCP 接続を行わない。
+- `peer_conversation open-session` は生成結果を表示するだけだったため、通常実行時に `savePeerConversationSession` を通して永続化するよう修正した。dry-run／check は保存しない。
+- `peer_messaging_server` は startup lifecycle receipt 失敗時に listener が残る可能性があったため、失敗時に stop receipt を試行して listener を close する境界を追加した。
+- shared flags の除去処理を各 entrypoint の重複 `Set` から `stripSharedScriptFlags` に集約した。未知の CLI entrypoint は operator-home へ fallback せず fail-closed にした。
+- dry-run の実出力を `peer_conversation`、`peer_collaboration`、両 peer server、MCP server で確認した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/lib/harness.test.ts scripts/kyberion.test.ts scripts/check_cli_manifest.test.ts scripts/peer_cli.entrypoint.test.ts scripts/peer_server.entrypoint.test.ts scripts/mcp_server.entrypoint.test.ts libs/core/peer-conversation.test.ts libs/shared-network/src/mcp-server-engine.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 8 files / 67 tests passed。
+- `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm pipeline --input pipelines/baseline-check.json` — baseline check success。
+- `node dist/scripts/peer_conversation.js --json --dry-run open-session --tenant-id tenant-check --local-peer-id peer-a --remote-peer-id peer-b --topic review`、`node dist/scripts/peer_collaboration.js --json --dry-run accept --peer-id peer-a --tenant-id tenant-check --proposal-id proposal-1 --actor-id operator --reason review`、`node dist/scripts/peer_conversation_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49998`、`node dist/scripts/peer_messaging_server.js --json --dry-run --peer-id peer-a --shared-secret check-secret --tenant-id tenant-check --port 49999`、`node dist/scripts/mcp_server.js --json --dry-run` — いずれも JSON を出力し、外部送信／proposal decision／session 保存／listener bind／stdio 接続なし。
+- `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
+
+### 残存
+
+interactive dashboard、MCP tool catalog／server の custom protocol output、細粒度 command registry の verb 化と package scripts 削減は継続課題である。
+
+## 414. 2026-08-30 SX-05/SX-06 voice route alias の単一入口化
+
+### 対応内容
+
+- `voice:route:list`、`voice:route:probe`、`voice:loopback:test` の 3 package script を `voice:route <list|probe|test>` へ統合し、package script 数を **242 → 240** とした。既存の音声 route CLI の機能分岐は維持し、実行入口だけを一つにした。
+- `voice_route_cli.ts` を shared harness に移行し、独自 `console.log`／`flags: []`／`--json` 出力を除去した。shared printer が JSON／quiet を担当し、`--` sentinel と shared flags は harness の共通 helper で固有 parser の前に除去する。
+- voice route の `--dry-run`／`--check` は actuator を呼ばず preview envelope のみを返すようにした。従来は actuator の `dry_run` 分岐まで進み、音声処理を止めても receipt／trace を生成していた。
+- runbook、音声手順、meeting preflight の案内を `pnpm voice:route <command> -- ...` へ更新した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/voice_route_cli.entrypoint.test.ts scripts/meeting_preflight.test.ts scripts/lib/harness.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 14 tests passed。
+- `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm voice:route -- --json --dry-run test --text review` — preview JSON を出力し、receipt file 数は **2 → 2**。音声出力／capture／STT／receipt 追加なし。
+
+### 残存
+
+interactive dashboard、MCP tool catalog／server の custom protocol output、細粒度 command registry の verb 化と package scripts **240 → ≤120** は継続課題である。
+
+## 415. 2026-08-30 レビュー修正: knowledge index generator の書き込み権限整合
+
+### 対応内容
+
+- `generate_knowledge_index.ts` が `mission_controller`（次に `knowledge_steward`）として knowledge root の manifest／index を書こうとして、現行 security policy の `KNOWLEDGE_WRITE` と不一致になる欠陥を修正した。
+- committed な knowledge root の所有 persona である `ecosystem_architect` を generator の execution context とし、`secure-io` と shared `defineGenerator` の出力境界を維持した。
+- 生成 index／manifest の stale check、frontmatter exclusion failure、undeclared output failure を generator／shared harness の戻り値と exit 境界に統合した。
+
+### 検証
+
+- `pnpm generate:knowledge-index` — 現行 policy で index／manifest の生成に成功。
+- `pnpm exec vitest run scripts/generate_knowledge_index.test.ts scripts/voice_route_cli.entrypoint.test.ts scripts/meeting_preflight.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 3 files / 7 tests passed。
+- `pnpm run check -- --scope full` — 67 gates / failed=0（Chronos の localhost bind を許可した実環境再検証）。
+
+### 残存
+
+generator 実行 context の authority 検査を他の生成 script へ横展開すること、interactive dashboard、MCP／server の custom protocol output、細粒度 command registry の verb 化と package scripts 削減は継続課題である。
+
+## 416. 2026-08-30 レビュー修正: voice upgrade の単一入口と未達時の fail-closed
+
+### 対応内容
+
+- `voice:upgrade-cloud`／`voice:upgrade-local` の二つの package alias を削除し、`pnpm voice:upgrade cloud|local` と `--tier 0|1|2` の単一入口へ統合した。旧 environment bridge は直接 caller 互換のため残した。
+- `voice_upgrade.ts` を shared harness に移行し、`--json`／`--dry-run`／`--check`／`--quiet` の出力・実行境界を共通化した。
+- 前提条件が未達のときは profile を書かず、失敗 report を返して exit 1 とする fail-closed 動作へ修正した。dry-run／check は profile を変更しない。
+- first-win 文書と script comment の tier 設定先を、未使用の環境変数ではなく実際の profile field `voice_tier` と一致させた。
+- voice upgrade の parser／package script 契約テストを追加し、既存の voice first-win 文書を新しい単一入口へ更新した。
+
+### 検証
+
+- `pnpm exec vitest run scripts/voice_upgrade.entrypoint.test.ts tests/voice-upgrade-contract.test.ts scripts/lib/harness.test.ts scripts/voice_route_cli.entrypoint.test.ts scripts/meeting_preflight.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 19 tests passed。
+- `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm voice:upgrade -- --dry-run --json cloud` — prerequisites report を JSON で出力し、profile を未変更のまま維持。
+- 未達の通常実行 `pnpm voice:upgrade -- --json cloud` — report を出力して exit 1、profile hash は実行前後とも `ABSENT`。
+
+### 残存
+
+voice surface の end-to-end runtime switching、interactive dashboard、MCP／server の custom protocol output、細粒度 command registry の verb 化と package scripts **240 → ≤120** は継続課題である。
+
+## 417. 2026-08-30 SX-05/SX-06 surface lifecycle alias の単一入口化
+
+### 対応内容
+
+- `surfaces:setup`／`reconcile`／`status`／`repair`／`start`／`stop` の6 package scriptを削除し、`pnpm surfaces <action>` の一つの入口へ統合した。worker persona と `surface_runtime` role の環境境界は共通入口に保持した。
+- `surface_runtime.ts` は既存の `--action` 互換を維持しつつ、単一入口の positional action を `--action` へ正規化するようにした。shared `--json`／`--quiet`／`--dry-run`／`--check` は固有 parser 前に除去する。
+- runtime の repair／status／setup next action、onboarding、control-plane、first-win、pipeline／knowledge procedure、運用ドキュメントの参照を新しい入口へ更新した。
+- 旧 alias の削除を package script 契約テストで固定し、実行時の surface authority と dry-run 境界は変更していない。
+
+### 検証
+
+- `pnpm exec vitest run scripts/surface_runtime.entrypoint.test.ts tests/runtime-surface-operations-contract.test.ts tests/next-action.test.ts tests/setup-report.test.ts tests/workflow-operations-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1` — 5 files / 21 tests passed。
+- `pnpm run build:repo`、`pnpm run typecheck`、`pnpm lint`、`git diff --check` — green。
+- `pnpm surfaces status -- --json`、`pnpm surfaces reconcile -- --dry-run --json` — surface status と mutation-free preview を実機確認する。
+
+### 残存
+
+voice surface の end-to-end runtime switching、interactive dashboard、MCP／server の custom protocol output、細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 418. 2026-08-30 SX-08B intent contract／compiler の tier／tenant overlay 収束
+
+再レビューで、`resolveIntentResolutionPacket` が tier／tenant overlay を適用して intent を選択する一方、
+`resolveIntentResolutionContract` と `intent-contract` の summary／fallback lookup が base catalog だけから
+`risk_profile` と intake policy を取得していたため、同じ packet でも authority／missing input と compiler
+context が overlay 前の値になる残存を検出した。契約 resolver、関連 intent summary、fallback／compiler target
+の intent lookup を `loadResolvedStandardIntentCatalog` に揃え、`overlayPaths` を契約 options に追加した。
+personal／tenant 用 catalog を使う injected packet の回帰テストも追加した。
+
+検証: `pnpm exec vitest run libs/core/intent-resolution-contract.test.ts --reporter=dot --pool=forks --maxWorkers=1 --testTimeout=60000` — **1 file / 8 tests passed**。
+
+## 419. 2026-08-30 レビュー修正: surface intent contract の表示投影を補完
+
+Chronos の A2UI と Presence Studio の voice 応答を再監査し、契約を計算・返却していても、表示側で
+authority／consequence または契約全体を欠落させていたため、利用者が「何を理解したか」「次に何をするか」
+「実行時の影響」を確認できない残存を修正した。Chronos は shared bridge vocabulary と route locale を使う
+投影へ収束し、Presence Studio は voice-hub 応答の intent contract を専用パネルへ表示する。各投影の field
+coverage を回帰テストで固定した。
+
+検証: surface contract **2 files / 18 tests passed**、`pnpm run generate:vocabulary-types`、
+`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+
+### 残存
+
+voice surface の end-to-end runtime switching、interactive dashboard、MCP／server の custom protocol output、
+細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 420. 2026-08-30 レビュー修正: Cowork／MCP delivery へ intent contract を接続
+
+Cowork outbox と MCP delivery の境界を再監査し、成果物の説明が文字列だけで構造化されていたため、
+operator が承認要否や実行影響を機械的・一貫的に確認できない残存を修正した。既存 packet との互換性を
+保ったまま optional な `intent_resolution` を追加し、MCP schema で contract の enum と必須項目を検証する。
+`intent_resolution` は表示用の説明情報に限定し、認可や実行判断の根拠には使用しない。
+
+検証: Cowork surface／MCP server **2 files / 42 tests passed**、`pnpm run typecheck`、
+`pnpm run lint`、`git diff --check`、`pnpm run check -- --scope full` **67/67** が green。
+
+### 残存
+
+voice surface の end-to-end runtime switching、interactive dashboard、MCP／server の custom protocol output、
+細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 421. 2026-08-30 レビュー修正: operator-surface の intent snapshot diff を実装
+
+operator-surface の `/intent-snapshots` を再監査し、placeholder のため mission の intent drift を画面で
+確認できない残存を修正した。read-only data loader が public／viewer tenant の confidential mission evidence
+だけを読み、snapshot と直前 snapshot の persisted delta を結合する。UI は stage・source・goal・drift verdict・
+score・field changes を表示し、承認や状態変更の操作は追加しない。foundation の JSON／JSONL loader を使い、
+tenant filtering と no-write contract をテストで固定した。
+
+検証: operator-surface snapshot **2 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check`、`pnpm run check -- --scope full` **67/67** が green。
+
+### 残存
+
+voice surface の end-to-end runtime switching、interactive dashboard の残り機能、MCP／server の custom protocol
+output、細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 422. 2026-08-30 レビュー修正: voice selection を実行時STTへ接続
+
+voice selection の保存・表示だけでなく、capture 実行時の backend 解決まで再監査した。保存済み
+`stt_backend` を voice-hub の `listen-once` の既定値と `/api/stt/backends` の selected order に接続し、
+明示された backend は従来どおり request 単位で優先する。さらに、registry に定義済みだった
+FluidAudio／faster-whisper を voice-hub の実際の transcription adapter と capability probe に接続し、
+Concierge の status も保存済み選択を表示できるようにした。
+
+検証: voice／Concierge 対象 **3 files / 23 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice surface の他の runtime switching（TTS artifact／provider 実機確認）、interactive dashboard の残り機能、
+MCP／server の custom protocol output、細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 423. 2026-08-30 レビュー修正: interactive dashboard の shared output 境界を有効化
+
+`sovereign_dashboard` は shared harness を使っていたが、描画関数が直接 console output を行い、
+`--json`／`--quiet`／`--dry-run`／`--check` が実質無効だった。既存の読み取り専用 ANSI 表示を
+維持しながら、描画を一度の snapshot として収集する境界を追加した。JSON は `{ok, focus, output}` の
+構造化結果として harness printer から出力し、quiet は出力せず、dry-run／check は5秒 refreshを開始
+しない。これにより interactive 表示と機械利用時の出力責務を分離した。
+
+検証: dashboard／runtime contract **3 files / 9 tests passed**、JSON snapshot の実機実行、
+`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice surface の他の runtime switching（TTS artifact／provider 実機確認）、MCP／server の custom protocol output、
+細粒度 command registry の verb 化と package scripts **233 → ≤120** は継続課題である。
+
+## 424. 2026-08-30 レビュー修正: MCP tool 応答の structured wire 境界を共通化
+
+MCP server の governed tool が JSON text、raw command output、wire error を個別に返しており、client 側に
+tool ごとの custom parser が必要だった。既存の text content と error 文言を維持したまま、共通登録境界で
+`structuredContent` を付加し、成功は `{ ok: true, data }`、失敗は `{ ok: false, error: { message } }` へ統一した。
+JSON text は JSON 値へ復元し、raw output は string として保持するため、既存 client 互換と機械利用の統一を
+同時に満たす。全 governed tool が同じ adapter を通ることを regression test で固定した。
+
+検証: `mcp-server-engine.test.ts` **1 file / 33 tests passed**、`pnpm run typecheck`、`pnpm run lint`、
+`git diff --check`、`pnpm run check -- --scope full` **67/67** が green。
+
+### 残存
+
+voice surface の他の runtime switching（TTS artifact／provider 実機確認）、細粒度 command registry の verb 化と
+package scripts **233 → ≤120** は継続課題である。
+
+## 425. 2026-08-30 レビュー修正: CLI noun／verb registry を subcommand まで拡張
+
+email／calendar／task／schedule／project-trust の handler に存在する subcommand を governed CLI registry に登録し、
+`kyberion` router が payload 引数より先に最長の `noun verb` prefix を解決するようにした。既存の top-level command と
+全 argv の handler 引き渡しは維持しているため、既存呼び出しを壊さず command metadata／help／route 検証を同じ registry
+へ収束できる。package script 削減へ進むための command-level dispatch 境界も明確になった。
+
+検証: CLI registry／router **2 files / 20 tests passed**、`pnpm run typecheck`、`pnpm run lint`、`git diff --check` が green。
+
+### 残存
+
+voice surface の他の runtime switching（TTS artifact／provider 実機確認）、package scripts **233 → ≤120** と、残りの
+script-level command の noun／verb registry 化は継続課題である。
+
+## 426. 2026-08-30 レビュー修正: dashboard onboarding alias を canonical flags へ統合
+
+`dashboard:onboarding` は `dashboard` に `--once --focus onboarding` を付与するだけの重複 package script だったため、
+documentation と contract test を `pnpm dashboard -- --once --focus onboarding` へ統一し、alias を削除した。build 済み
+dist を使った実機 JSON snapshot でも `{ ok, focus, output }` を確認し、interactive refresh を package invocation で開始しない
+ことを検証した。package scripts は **233 → 232** へ減少した。
+
+検証: `pnpm run build:repo`、`CI=true pnpm dashboard -- --json --focus onboarding`、
+`pnpm run check -- --scope full` **67/67** が green。
+
+### 残存
+
+voice surface の他の runtime switching（TTS artifact／provider 実機確認）、package scripts **232 → ≤120** と、残りの
+script-level command の noun／verb registry 化は継続課題である。
+
+## 427. 2026-08-30 レビュー修正: TTS 一時 artifact の失敗時後始末を固定
+
+保存済み `tts_engine_id` の adapter 解決から TTS artifact の生成・再生までを再監査した。Python bridge が作成する
+共有 tmp の WAV が再生後に残り、bridge が部分 artifact を生成してから終了した場合にも残る残存を修正した。
+bridge 実行と artifact 検証を失敗時 cleanup で囲み、再生側も `finally` で削除する。これにより成功・bridge failure・
+再生 failure のいずれでも一時 artifact を残さない。provider の選択 semantics や fallback は変更していない。
+
+検証: TTS artifact lifecycle contract **1 test passed**、`pnpm run typecheck`、`CI=true pnpm run lint`、
+`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **232 → ≤120** は継続課題である。
+
+## 428. 2026-08-30 レビュー修正: native TTS の OS 別 command を voice-hub に接続
+
+voice engine registry の `local_say` は darwin／linux／win32 を宣言しているが、voice-hub の実行分岐は
+macOS の `/usr/bin/say` に固定され、非 darwin では早期 return していた。共有 `native-tts` の command builder を
+再利用し、macOS は `say`、Linux は `espeak`、Windows は PowerShell を voice-hub の既存 process state／停止制御へ
+接続した。これにより OS ごとの engine metadata と実際の server-side TTS 経路が一致する。provider の fallback semantics は変更していない。
+
+検証: native TTS／voice-hub **2 files / 10 tests passed**、変更対象への eslint、`pnpm run typecheck`、
+`git diff --check`、`CI=true pnpm run check -- --scope full` **67/67** が green。
+
+### 残存
+
+voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **232 → ≤120** は継続課題である。
+
+## 429. 2026-08-30 レビュー修正: voice clone の重複 alias を削除
+
+`voice:clone` は現行の onboarding 文書・実装から参照されず、`onboard:voice` と同じ
+`clone-my-voice` pipeline を別名で公開していた。現行の onboarding 入口を残して旧 alias を削除し、
+script registry の重複を減らした。package scripts は **232 → 231** になった。
+
+検証: `node dist/scripts/check_script_integrity.js`、`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 431. 2026-08-30 レビュー修正: actuator scaffold の CLI error boundary を共通化
+
+`create_actuator` が生成する actuator template に `main().catch` と直接 `process.exitCode` が残り、
+既存 actuator の `runActuatorCli` と異なる entrypoint error boundary を再生成する状態だった。core の
+`runActuatorCliEntryPoint` を追加し、scaffold template がこの共通境界を使うよう修正した。生成物の contract test と
+core helper test で、template の再発と entrypoint error の表示・終了コードを固定した。
+
+検証: CLI helper／scaffold **2 files / 9 tests passed**、`pnpm --filter @agent/core run build`、
+変更対象への eslint、`pnpm run typecheck`、`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 430. 2026-08-30 レビュー修正: SX-05 現行 script 指標を実数へ同期
+
+直近の alias 削除後も、計画冒頭の現行指標と SX-05 状態が過去の **242 件**を示していたため、
+履歴節を変更せず、現行の削減指標と状態表だけを実測値 **231 件**へ同期した。削減目標 **≤120**、
+細粒度 verb registry、全 script harness 化が未完であることは維持した。
+
+検証: package script 数 **231**、`git diff --check` が green。全 gate は次の検証で再実行する。
+
+### 残存
+
+voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 432. 2026-08-30 レビュー修正: surface directory の CLI 契約テストを現行語彙へ同期
+
+surface directory は auth 未設定時の復旧操作として現行の noun/verb CLI `pnpm surfaces setup` を返しているが、
+契約テストが旧来の `pnpm surfaces:` prefix を期待していた。実装の recovery command を変更せず、テストの期待値を
+canonical command に同期し、CLI registry 移行後の契約ドリフトを解消した。
+
+検証: operator-surface の surface directory **1 file / 4 tests passed**。全 gate は次の検証で再実行する。
+
+## 433. 2026-08-30 レビュー修正: voice-hub scope 入力の strict 境界を追加
+
+voice-hub の `scope` 入力を再監査し、object であることだけを確認して型キャストしていたため、tenant／tier／
+scope kind の配列・未知フィールド・不正 enum が normalization 前に request 境界を通過し得る残存を検出した。
+共通 `parseEventScopeInput` を追加し、voice-hub では `normalizeEventScope` と組み合わせて外部処理・stimulus
+保存より前に strict 検証するようにした。scope の権限をクライアント入力で拡張する変更は行わず、既存の surface
+ingress normalization と tier policy を維持している。
+
+検証: event-scope／voice-hub request input **2 files / 12 tests passed**、変更対象 lint、`pnpm run typecheck`、
+`git diff --check`、full gate **67/67** が green。framework-specific parsing の全 route と日英 literal の全面移行は
+引き続き未完了である。
+
+## 434. 2026-08-30 レビュー修正: terminal bridge の session 入力境界を strict 化
+
+terminal bridge の `/sessions` と WebSocket control message を再監査し、session ID・PTY サイズ・input payload
+を暗黙受理していたため、runtime path に入る値の path traversal と不正な resize／write の余地が残っていた。
+共有 session parser を追加し、ID を安全な basename に限定、HTTP body と init／input／resize の型・範囲・未知キーを
+検証してから session／PTY へ渡すようにした。不正 JSON object は PTY へ書き戻さず、構造化 error を返す。既存の
+認証、session persistence、未 JSON の terminal input fallback は維持している。
+
+検証: terminal session/auth **2 files / 9 tests passed**、変更対象 lint、root typecheck、`git diff --check`、
+`CI=true pnpm run check -- --scope full` **67/67** が green。レビュー追試で、壊れた JSON object を未 JSON の
+terminal input fallback と誤認しない判定と、state の directory id／payload id 一致検証を追加した。
+
+## 435. 2026-08-30 レビュー修正: Presence Studio の request schema を strict 化
+
+Presence Studio の高リスク request schema を再監査し、Zod の既定挙動で未知フィールドが破棄されるほか、
+native-listen／location route が `Number(...)` で文字列を暗黙変換し、approval decision も `String(...)`
+で入力を変換していた残存を検出した。voice／email／minutes／location／browser bootstrap の schema を
+strict 化し、native-listen／location は検証済み body をそのまま受理、approval decision は文字列値だけを
+許可するよう修正した。既存のブラウザ payload と承認 gate は維持している。
+
+検証: Presence Studio security／OS route **3 files / 14 tests passed**、変更対象 lint、root typecheck、
+`git diff --check` が green。全 route の framework-specific parsing と日英 literal の全面移行は引き続き未完了である。
+
+## 436. 2026-08-30 レビュー修正: Telegram send payload の provider 到達前検証
+
+Telegram bridge の `/send` と `--input` の send 分岐を再監査し、`chatId`／`text`／`parseMode` を
+`|| ''` で既定値化していたため、配列・オブジェクト・空文字が provider 呼び出しへ到達し得る残存を検出した。
+strict な `parseTelegramSendInput` を HTTP と CLI の双方へ接続し、chat ID、本文、parse mode、未知フィールドを
+検証してから `sendTelegramMessage` を呼ぶようにした。webhook の provider payload parser と外部送信 gate は変更していない。
+
+検証: Telegram bridge **1 file / 8 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 route の framework-specific parsing と日英 literal の全面移行は引き続き未完了である。
+
+## 437. 2026-08-30 レビュー修正: Chronos connections mutation の request 境界
+
+Chronos の `/api/connections` を再監査し、body が object であることだけを確認した後、binding ID、action、
+note、tenant を個別に既定値化して connection review の durable write へ渡していた残存を検出した。専用 parser を
+追加し、binding ID を path-safe な basename に限定、action enum、文字列 field の型・長さ、未知フィールドを
+mutation 前に検証するようにした。viewer／tenant scope と connection review の既存権限・保存 gate は維持している。
+
+検証: Chronos connections input **1 file / 2 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 route の framework-specific parsing と日英 literal の全面移行は引き続き未完了である。
+
+## 438. 2026-08-30 レビュー修正: Chronos deliverable／knowledge feedback の strict 境界
+
+Chronos の deliverable review と knowledge feedback を再監査し、object 判定後に artifact ID、verdict、comment、
+reason、tenant／organization／project を個別に既定値化していた残存を検出した。専用 parser を追加し、durable review
+write と feedback 記録より前に、path-safe ID、knowledge path の traversal、enum、文字列の型・長さ、未知フィールドを
+検証するようにした。viewer／tenant／tier／organization／project の既存 scope 判定と review／feedback の責務は維持している。
+
+検証: Chronos deliverable／knowledge input **2 files / 4 tests passed**、変更対象 lint、root typecheck、
+`git diff --check` が green。全 route の framework-specific parsing と日英 literal の全面移行は引き続き未完了である。
+
+## 439. 2026-08-30 レビュー修正: Chronos share-grants mutation の strict 境界
+
+Chronos の OS share-grants mutation を再監査し、object 判定後に operation、taint、role、tenant、TTL、日時を
+個別に既定値化・型キャストして共有グラフへ渡していた残存を検出した。operation ごとの strict parser を追加し、未知
+フィールド、enum、path-safe な識別子、TTL 上限、expiresAt／connectedAt、非 public taint の provenance を graph／
+session mutation より前に検証するようにした。localadmin、viewer actor、provenance、share-link token の既存認証・
+認可責務は維持している。
+
+検証: Chronos share-grant input／route **2 files / 7 tests passed**、変更対象 lint、root typecheck、
+`git diff --check` が green。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は
+引き続き未完了である。
+
+## 440. 2026-08-30 レビュー修正: PPTX showcase generator の shared entrypoint 化
+
+`generate_all_objects_layout_sample.ts` を再監査し、固定された共有 tmp への PPTX 生成が独自の
+`console`／`process.exitCode` 境界と直接 `main()` 呼び出しを持つ残存を検出した。shared script harness へ移行し、
+compiled direct-entry guard、共通 error boundary、JSON／quiet／dry-run／check の入口を追加した。PPTX の
+semantic content、出力先、生成 engine は変更していない。
+
+検証: showcase entrypoint 契約 **1 test passed**、変更対象 lint、root typecheck、script-integrity、
+`git diff --check`、compiled `--dry-run --json --quiet`、full gate **67/67** が green。
+
+### 残存
+
+server／interactive／custom output を含む全 script の harness 移行、voice provider の実機依存部分、細粒度 command
+registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 441. 2026-08-30 レビュー修正: channel directory の output boundary 統合
+
+`channels:list` の channel filter と directory 表示を再監査し、yargs 解析後の custom `console` 出力が
+shared harness の JSON／quiet 制御を迂回していた残存を検出した。channel filter の型検証と human-readable
+report の構築を専用関数へ分離し、JSON は構造化 object、通常表示は一つの text report として harness の
+`print` に渡すよう修正した。channel manifest の解決、scope、provider adapter、外部作用は変更していない。
+
+検証: channel directory **1 file / 2 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+server／interactive／custom output を含む全 script の harness 移行、voice provider の実機依存部分、細粒度 command
+registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 442. 2026-08-30 レビュー修正: Chronos agents request schema の strict 化
+
+Chronos の agents spawn／ask／A2A／runtime 操作を再監査し、object と主要 field の型だけを確認して未知 field、
+過大な query／prompt、空または過大な capabilities を runtime supervisor へ渡し得る残存を検出した。共通 parser
+に action ごとの許可 field、文字列上限、capabilities の件数・要素検証を追加し、POST／DELETE の runtime dispatch
+より前に拒否するようにした。viewer／localadmin gate、daemon fallback、A2A envelope の既存責務は変更していない。
+
+検証: agents helper／route input **2 files / 23 tests passed**、変更対象 lint、root typecheck が green。
+server／interactive／custom output を含む全 script の harness 移行、voice provider の実機依存部分、細粒度 command
+registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 443. 2026-08-30 レビュー修正: Chronos headless work-item status の strict 境界
+
+Chronos の headless work-item status 更新を再監査し、JSON body が object であることだけを確認した後、
+`item_id` と `status` を未検証のまま work-item 更新へ渡していた残存を検出した。専用 parser を追加し、未知
+フィールド、path-safe な item ID、status enum、文字列型を mutation 前に検証するようにした。localadmin／viewer
+scope、operation authorization、work-item の tenant／organization／project 判定と既存の更新責務は維持している。
+
+検証: headless status input **1 file / 9 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+server／interactive／custom output を含む全 script の harness 移行、voice provider の実機依存部分、細粒度 command
+registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 444. 2026-08-30 レビュー修正: Chronos work-items status の strict 境界
+
+Chronos の既存 work-items status 更新 API も再監査し、object 判定後に `itemId` と `status` を個別に
+既定値化・型キャストしていた残存を検出した。headless API と同じ更新契約を専用 parser に分離し、未知
+フィールド、path-safe な item ID、status enum、文字列型を `updateWorkItem` 前に検証するようにした。既存の
+viewer scope、work-item の tenant／organization／project 判定、Kanban projection は維持している。
+
+検証: work-items route／input **2 files / 10 tests passed**、変更対象 lint、root typecheck、`git diff --check` が
+green。server／interactive／custom output を含む全 script の harness 移行、voice provider の実機依存部分、細粒度
+command registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 445. 2026-08-30 レビュー修正: Chronos intelligence action の strict 境界
+
+Chronos の `/api/intelligence` を再監査し、action whitelist 後も各分岐で request field を個別に既定値化・
+型判定していたため、未知フィールドや配列・object の暗黙変換が承認、memory、mission／surface、runtime の
+worker／durable write へ進み得る残存を検出した。action ごとの許可フィールド、必須値、文字列上限、identifier、
+enum、boolean を共通 parser に集約し、control-plane side effect より前に拒否するようにした。既存の
+localadmin／viewer scope、approval gate、mission worker、runtime supervisor の責務は維持している。
+
+検証: intelligence input／existing intelligence **2 files / 14 tests passed**、変更対象 lint、root typecheck、
+`git diff --check` が green。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行、
+細粒度 command registry の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 446. 2026-08-30 レビュー修正: Chronos agent conversation request の strict 境界
+
+Chronos の会話 `/api/agent` を再監査し、JSON object 判定後に query／intent、locale、session、requester、
+mission、team role を個別に既定値化していたため、未知フィールド、object、過大文字列、不正 proposal action が
+会話 dispatch や mission proposal 操作へ進み得る残存を検出した。共通 body parser に許可フィールド、文字列上限、
+control character、mission action enum を追加し、core load／会話処理より前に拒否するようにした。既存の
+viewer／localadmin gate、quick-action 制限、mission proposal の責務は維持している。
+
+検証: agent helper／route **2 files / 32 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行、細粒度 command registry の
+verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 447. 2026-08-30 レビュー修正: actuator example discovery の harness／catalog 境界
+
+`examples` package script を再監査し、直接 `console` 出力と direct module 実行を shared harness の外で行い、
+さらに video-composition の array-shaped catalog を object catalog として扱って実機で `localeCompare` が落ちる
+残存を検出した。JSON／quiet 出力と compiled direct-entry guard を shared harness へ移行し、catalog の runtime
+shape を検証して malformed entry を skip するようにした。既存の actuator example catalog の内容と read-only
+discovery の責務は維持している。
+
+検証: example discovery **1 file / 3 tests passed**、変更対象 lint、root typecheck、compiled `--json` 実行、
+`git diff --check` が green。全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry
+の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 448. 2026-08-30 レビュー修正: DS-04 visual proof の shared entrypoint 化
+
+`media:visual-proof:ds04` を再監査し、外部 renderer を呼ぶ script が top-level 実行と直接 `console.log` の
+境界を残していた残存を検出した。render／snapshot／artifact 検証の処理は維持し、shared harness、JSON／quiet
+出力、compiled direct-entry guard へ移行した。出力先は従来どおり `active/shared/tmp` に限定している。
+
+検証: DS-04 semantic ADF **1 test passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts
+**231 → ≤120** は継続課題である。
+
+## 449. 2026-08-30 レビュー修正: task:list の output boundary 統合
+
+`task:list` を再監査し、shared harness を宣言しているにもかかわらず、human／JSON／empty catalog の各出力が
+内部の直接 `console` 呼び出しへ分散し、quiet／structured output を迂回していた残存を検出した。Scenario の
+readiness 判定と profile／pipeline の参照は維持し、render と printer を分離して harness の JSON／quiet 境界へ
+接続した。空 catalog は従来どおり readiness 用の actionable な正常応答として扱っている。
+
+検証: task list **1 file / 2 tests passed**、変更対象 lint、root typecheck、compiled `--json --quiet`、
+`git diff --check` が green。全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry
+の verb 化と package scripts **231 → ≤120** は継続課題である。
+
+## 450. 2026-08-30 レビュー修正: task:run の output boundary 統合
+
+`task:run` を再監査し、shared harness を宣言している一方で usage と dry-run plan を直接 `console` 出力して
+おり、JSON／quiet 境界を迂回していた残存を検出した。TaskScenario の profile path 制約、dry-run only の実行方針、
+missing profile の recovery message は維持し、usage／plan を supplied printer 経由へ移行した。JSON では
+scenario ID と plan を構造化して返す。
+
+検証: task run **1 file / 2 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。全 script の
+harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は
+継続課題である。
+
+## 451. 2026-08-30 レビュー修正: intent:trace の共有出力境界統合
+
+`intent:trace` を再監査し、トレースレポートが direct `console.log` へ出力され、共有 harness の quiet／共通フラグ
+境界を迂回していた残存を検出した。`trace` サブコマンド、correlation ID、locale の既存入力契約とレポートの
+機密情報 redaction は維持し、レポート出力を supplied printer と compiled direct-entry guard 経由へ移行した。
+
+検証: intent trace entrypoint／既存 report **3 tests passed**、変更対象 lint、root typecheck、`git diff --check` が
+green。全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts
+**231 → ≤120** は継続課題である。
+
+## 452. 2026-08-30 レビュー修正: intent CLI の共有出力境界統合
+
+`intent` package script を再監査し、JSON report、usage、human-readable timeline が direct `console` 出力へ
+分散して共有 harness の JSON／quiet 境界を迂回していた残存を検出した。`trace` コマンド、correlation ID、
+`--limit`、機密情報の path sanitization は維持し、構造化 JSON と usage／report を supplied printer 経由へ統合した。
+
+検証: intent trace **2 files / 2 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。全 script の
+harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は
+継続課題である。
+
+## 453. 2026-08-30 レビュー修正: ops:alerts の共有出力境界統合
+
+`ops:alerts` を再監査し、redelivery／ack／summary の human output が logger、JSON output が direct `console` に
+分散して shared harness の quiet／structured output 境界を迂回していた残存を検出した。append-only alert log、
+redelivery／ack の外部作用、運用上の recovery message は維持し、全結果を supplied printer と JSON object 経由へ
+統合した。
+
+検証: ops alerts entrypoint **1 test passed**、変更対象 lint、root typecheck、`git diff --check` が green。全 script の
+harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は
+継続課題である。
+
+## 454. 2026-08-30 レビュー修正: service:recording の共有出力境界統合
+
+`service:recording` を再監査し、capture／compile／candidate／review／promote の各分岐が直接 JSON を出力し、
+preflight 不合格時の `process.exitCode` も個別に変更していた残存を検出した。recording の検証・保存、pipeline
+draft、promotion の既存責務は維持し、分岐結果と exit policy を値として返して shared harness の JSON／quiet／
+共通エラー境界へ集約した。
+
+検証: service recording entrypoint **2 tests passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts
+**231 → ≤120** は継続課題である。
+
+## 455. 2026-08-30 レビュー修正: dependency vulnerability scan の共有出力境界統合
+
+`dependency-vulnerability-scan` を再監査し、audit／outdated の scan 結果が logger と direct JSON output に分散して
+shared harness の quiet／structured output 境界を迂回していた残存を検出した。workspace dependency の reachability、
+patch decision、defer reevaluation、append-only ledger 書き込みは維持し、scan 結果を値として返して human summary／
+JSON を supplied printer 経由へ統合した。
+
+検証: vulnerability scan entrypoint **1 test passed**、既存 scan tests、変更対象 lint、root typecheck、`git diff --check`
+が green。全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts
+**231 → ≤120** は継続課題である。
+
+## 456. 2026-08-30 レビュー修正: reasoning auth check の共有出力境界統合
+
+`reasoning:auth-check` を再監査し、shared harness を宣言しているにもかかわらず human output が direct
+`console.log` へ流れ、JSON 判定も argv の再解釈に依存していた残存を検出した。backend の auth preflight、missing
+configuration 時の fail policy、credential 値を出力しない契約は維持し、`context.json` と `context.print` に統合した。
+
+検証: reasoning auth check entrypoint **1 test passed**、変更対象 lint、root typecheck、`git diff --check` が green。
+全 script の harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts
+**231 → ≤120** は継続課題である。
+
+## 457. 2026-08-30 レビュー修正: license audit の共有出力境界統合
+
+`license:audit` を再監査し、package scan の進捗、license 集計、issue 表示、JSON report が複数の direct
+`console` 出力へ分散していた残存を検出した。resolved dependency の走査、`docs/legal/third-party-licenses.json`
+生成、`--check` の issue 判定は維持し、human report／JSON と失敗終了を shared harness の printer／exit boundary
+へ統合した。
+
+検証: license audit entrypoint **1 test passed**、変更対象 lint、root typecheck、`git diff --check` が green。全 script の
+harness 移行、voice provider の実機依存部分、細粒度 command registry の verb 化と package scripts **231 → ≤120** は
+継続課題である。
+
+## 458. 2026-08-31 レビュー修正: module layer の残存方向違反を分類整合
+
+SX-02 の実測を再確認し、`libs/core/src/lock-utils.ts` は logger／path resolver だけに依存する低レベル排他 helper
+であり foundation 層、`bindings` とそれを検査・生成する script は seam catalog を構成する orchestration 層であるのに、
+manifest の分類が default `domain` のままになっていた残存を検出した。実体に合わせて層宣言を補正し、checker の方向違反を
+**4 件から2件**へ減らした。残る2件は `secure-io` が audit chain／tier guard を bootstrap する意図的な依存であり、
+foundation の初期化 cycle を別途 seam 化する継続課題として扱う。
+
+検証: `check_module_boundaries` は **0 cycles / 2 direction violations / 80 dynamic imports / max runtime SCC 33**。
+`libs/core/src/` の root 統合自体と secure-io bootstrap の seam 化は継続課題である。
+
+## 459. 2026-08-31 レビュー修正: actuator action と context path の fail-closed 境界
+
+SX-10 の actuator ABI を再監査し、code と modeling の `handleAction` が `reconcile` 以外を無条件に
+pipeline runnerへ渡し、未知の action を空 pipeline の成功として返す残存を検出した。また code／modeling／
+wisdom の ADF context persistence が `root` 配下への lexical resolve のみで、repository 外または symbolic
+link 経由の context file を共通 path boundary で検査していなかった。
+
+code／modeling は pipeline 以外を明示的に拒否し、3 actuator の context path は
+`assertSafeRepositoryPath(..., { allowMissingLeaf: true })` を read／write の共通入口として通すよう修正した。
+未知 action と repository 外 context path の回帰テストを追加し、既存の context persistence と pipeline result
+envelope は維持した。
+
+検証: 対象 actuator **3 files / 30 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る domain-specific `executePipeline` は nested control／trace／context persistence の契約差分を含むため、
+各 runner の契約テストを追加しながら段階的に共通 SDK へ移行する。
+
+## 460. 2026-08-31 レビュー修正: scope persistence の repository path 境界
+
+SX-03／entity scope の継続監査で、`KYBERION_SCOPE_ENV_PATH` と mission state の読み込みが
+resolver の返す path をそのまま secure I/O に渡しており、path の所属と symbolic link 経由を
+scope-context 自身で明示していない残存を確認した。scope.env の読み書き・削除と mission state の
+読み込みを `assertSafeRepositoryPath` に通し、設定された scope file が repository 外なら fail-closed
+で拒否するようにした。scope の merge 優先順位、tenant／organization／project の containment、
+既定の shared runtime path は変更していない。
+
+検証: scope-context／secure-io **2 files / 43 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る foundation loader の全件移行と secure-io bootstrap 境界の整理は継続課題である。
+
+## 461. 2026-08-31 レビュー修正: recording allowlist と procedure promotion の symlink 境界
+
+PI-03／SX-03 の loader 監査で、procedure の `recording_ref` が許可 store 内にあるかを lexical に
+判定した後、その配下の symbolic link を検査せずに読み込める残存を検出した。また service／browser／
+desktop promotion の catalog と生成 pipeline の任意 path も、親ディレクトリの symlink を共通境界で
+検査していなかった。
+
+recording allowlist を `assertSafeRepositoryPath` と接続して store 内の symlink を拒否し、3系統の
+promotion が catalog／生成 pipeline を read／write する前に repository path と missing leaf を検証する
+ようにした。既存の recording store allowlist、approved review、promotion transaction の順序は維持した。
+
+検証: procedure registry／browser／service／desktop **4 files / 44 tests passed**、対象 lint、
+`pnpm run typecheck`、`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate
+**67/67 passed**。残る foundation loader の全件移行、promotion の追加 schema 強化、secure-io bootstrap
+境界の整理は継続課題である。
+
+## 462. 2026-08-31 レビュー修正: ADF repair target の trust／symlink 境界
+
+ADF repair の再監査で、pipeline ADF の trust 判定は repository 外を lexical に拒否する一方、
+repair 対象の既存 path component が symbolic link かを共通検査せず、`safeReadFile`／`safeWriteFile`
+がリンク先を扱える残存を検出した。これにより、承認済みまたは built-in と判定された ADF でも、
+同じ repository 内の symlink 経由で別 scope の内容を repair する余地があった。
+
+`validateAndRepairAdf` の全 schema 対象で repair target を `assertSafeRepositoryPath` に通し、
+trust 判定・初回 read・軽量 repair・delegated repair の再読込・書き戻しへ同一の canonical absolute
+path を渡すようにした。repository 外 path と symlink target の回帰テストを追加し、repair の
+schema／guardrail／delegation 順序は維持した。
+
+検証: ADF repair／autonomous repair **2 files / 22 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る repair 語彙の一本化と全 direct loader の path coverage は継続課題である。
+
+## 463. 2026-08-31 レビュー修正: report-ops の入出力 path 境界
+
+レビューで、task model routing と memory promotion の report op が `pathResolver.resolve` または
+呼び出し元の path を直接 `safeReadFile`／`safeWriteFile` に渡しており、repository 所属と既存の
+symbolic link を report-ops 自身で明示検査していない残存を確認した。イベント入力と report 出力が
+scope を越えて扱われると、監査用の集計が誤った tenant／tier のファイルを読む、または意図しない
+場所へ書く余地がある。
+
+memory promotion、task routing の JSONL 入力、task routing report 出力を `assertSafeRepositoryPath`
+へ統一し、missing leaf は許可しつつ repository 外 path と symlink component は fail-closed で拒否する
+ようにした。集計結果の形式、既定出力、イベントの分類処理は変更していない。repository 外の入力・
+出力を拒否する回帰テストを追加した。
+
+検証: report-ops **1 file / 3 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る direct loader の全件移行と report 入力の tenant-aware discovery は継続課題である。
+
+## 464. 2026-08-31 レビュー修正: background-review patch の target／backup symlink 境界
+
+承認済み background-review patch の再監査で、pipeline／managed skill／memory notebook の target は
+厳しい ref pattern と lexical な repository containment を持つ一方、既存 path component の symbolic
+link を共通検査していない残存を確認した。さらに、承認結果の backup path も固定 prefix から生成される
+とはいえ、親ディレクトリの置換を明示的に拒否していなかった。
+
+3 種類の patch target と backup artifact を `assertSafeRepositoryPath` に接続し、missing leaf を許可する
+pipeline／backup と、既存ファイルを要求する skill／memory の違いを維持した。managed skill の provenance
+sidecar は、既存の「sidecar 不在」エラー契約を保ちながら、親 component の symlink を拒否する。
+pipeline target の symlink 回帰テストを追加し、承認・pre-image hash・guardrail・backup・promotion の
+順序と既存の失敗分類は変更していない。
+
+検証: background-review patch **1 file / 10 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る patch schema の全 action 統合と、全 direct loader の tenant-aware path discovery は継続課題である。
+
+## 465. 2026-08-31 レビュー修正: Cowork knowledge bridge の artifact／supply path 境界
+
+PI-03 の direct loader 監査で、Cowork から取り込む artifact path が `rootResolve` 後に直接読み込まれ、
+public knowledge の供給走査も domain／entry path の symbolic link を明示検査していない残存を確認した。
+また scoped sync state の path は固定 logical path から導出されるが、bridge の入出力境界として同じ検査を
+持っていなかった。
+
+ingest artifact、public supply の root／domain／entry、scoped sync state の read／write／返却 path を
+`assertSafeRepositoryPath` へ接続した。missing leaf は従来どおり `File not found`／empty supply の契約を
+保ち、repository 外または symlink component は読み込み前に拒否する。tier 分類、hash idempotency、
+Cowork outbox の delivery 形式は変更していない。
+
+検証: Cowork bridge **1 file / 16 tests passed**、対象 lint、次の knowledge-slices 修正を含む型・build・
+差分・canonical full gate で再確認する。残る provider capability probe と全 provider adapter の sandbox
+context wiring は継続課題である。
+
+## 466. 2026-08-31 レビュー修正: knowledge-slices manifest の path 境界
+
+設定由来の knowledge-slices manifest が `pathResolver.rootResolve` だけで解決され、public な
+`loadKnowledgeSlicesFile(dataPath)` の test／override path から repository 外や symlink 経由の manifestを
+読む余地が残っていた。
+
+manifest の存在確認前に `assertSafeRepositoryPath(..., { allowMissingLeaf: true })` を通し、従来の
+missing／parse／schema-invalid 時の fail-open と warn-once、slice の merge／precedence を維持した。
+repository 外 manifest が空 resolution へ戻る回帰テストを追加した。
+
+検証: knowledge-slices **1 file / 19 tests passed**、Cowork bridge **1 file / 16 tests passed**、対象 lint、
+`pnpm run typecheck`、`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate
+**67/67 passed**。
+
+## 467. 2026-08-31 レビュー修正: promotion-candidates の ledger path provenance
+
+成功した ad-hoc pipeline の path を記録する promotion ledger を再監査し、ledger 内の path が後から
+repository 外や symbolic link 経由へ置き換えられた場合、候補列挙時の `rootResolve` と `safeExistsSync`
+だけでは path identity を再検査しない残存を確認した。記録時も入力 path の所属を明示していなかった。
+
+ledger 自体、記録対象、候補列挙時の対象を `assertSafeRepositoryPath` へ接続した。記録側は不正な
+ad-hoc path を ledger に追加せず、列挙側は不正または symlink の entry を候補から除外する。成功回数の
+集計、recency rotation、既存の exact-path promotion 候補契約は維持した。
+
+検証: promotion-candidates **1 file / 2 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+残る provider capability probe と全 provider adapter の sandbox context wiring は継続課題である。
+
+## 468. 2026-08-31 レビュー修正: provider capability scanner の override path provenance
+
+PI-03 の direct loader 追加レビューで、provider capability registry／scan policy の既定 catalog は
+schema 付きだった一方、テスト・運用時の明示 override path が `rootResolve` 後に直接 catalog へ渡され、
+repository 外の設定や path component の symbolic link を読む余地が残っていた。
+
+既定 path は既存の governed catalog を継続利用し、明示 override path だけを
+`assertSafeRepositoryPath` に通してから schema 付き catalog を構築するようにした。registry／policy の
+schema 検証、probe の実行方式、既定の fallback 契約は変更していない。repository 外 override を読み込まず
+`[RESOURCE_PATH_SCOPE]` で拒否する回帰を追加した。
+
+検証: provider capability scanner **1 file / 9 tests passed**、対象 lint、`pnpm run typecheck`、
+`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+provider capability probe による enforcement 実測と全 provider adapter の sandbox context wiring は継続課題である。
+
+## 469. 2026-08-31 レビュー修正: active sandbox policy の provider adapter 伝播と evidence probe fail-closed
+
+DH-11 の async-local sandbox policy が ADF／secure-io／egress には届く一方、provider adapter の child CLI
+permission projection には届かず、ADF 内の reasoning delegation が unprofiled の既定権限へ戻る残存を確認した。
+さらに capability-specific `evidence_probe` の失敗時も primary probe 成功だけで capability を available としていた。
+
+provider-neutral な effective permission profile を追加し、active policy が read-only の場合は explicit な
+implementer 要求を含めて explorer へ狭め、workspace-write の unprofiled call は implementer 相当へ接続した。
+Claude／Codex／AGY／Grok の delegation、native subagent、structured CLI path に射影し、AGY の partial enforcement は
+spawn 前に拒否する。reasoning egress の全 outbound choke point に network-disabled gate を追加し、provider scanner は
+evidence probe 失敗を `missing` として返す（`includeUnavailable` 時は失敗 probe も保持）。legacy agent adapter を含む既存の active policy 外の
+argv、provider matrix、tier egress、probe cache 契約は変更していない。
+
+検証: provider permission／egress／CLI adapter／legacy adapter／scanner／registry **151 tests passed**、対象 lint、
+`pnpm run typecheck`、`CI=true pnpm run build:packages`、`git diff --check`、canonical full gate で確認する。
+実 CLI の OS-level sandbox enforcement live probe は、provider 側の安定した非対話 probe 契約が必要なため継続課題である。
+
+## 470. 2026-08-31 レビュー修正: Gemini/Copilot の sandbox context と provider flag probe
+
+469 の再レビューで、Gemini CLI の delegation が active policy 下でも従来の `-y` を使い続け、Copilot ACP が
+sandbox policy を表現しないまま session を起動できる残存を確認した。また registry の sandbox capability は
+宣言値だけで、provider CLI の flag 変更を検出できなかった。
+
+Gemini は `--sandbox`／`--approval-mode` へ provider-neutral policy を射影し、`extraArgs` の競合 flag を除去する。
+Copilot ACP は projection 不在時に boot 前で拒否する。provider capability registry には `--help` の flag-support
+probe と `supported／unsupported／unknown` の schema 付き証跡を追加した。これは実モデルを起動しない安全な
+受入確認であり、OS-level enforcement の証明とは分離している。
+
+検証: provider registry／scanner／Gemini／Copilot／permission／egress **66 tests passed**、対象 lint、
+`pnpm run typecheck`、`pnpm run build:packages`、`git diff --check`、canonical full gate **67/67 passed**。
+provider CLI の非対話 OS-level enforcement probe と全 provider の実機受入は継続課題である。
+
+## 471. 2026-08-31 レビュー修正: onboarding／mission process／deal direct loader の path 境界
+
+PI-03 の direct loader 再レビューで、browser onboarding の active profile と voice sample 保存先、mission process template の mission-local 入出力、deal store／deal document の customer path に、repository 所属と既存 path component の symbolic link を一貫して検査していない残存を確認した。さらに deal store は tenant slug と deal ID を受け取ったまま customer overlay／ファイル名を解決しており、予約語・不正 slug・traversal-shaped ID を共通境界で拒否していなかった。契約テンプレートの明示 path も knowledge root を越え得た。
+
+active profile、voice sample root／profile、mission directory／definition entry、deal／deal document directory を `assertSafeRepositoryPath` へ接続し、missing leaf の既存契約は維持した。deal store では `isValidTenantSlug` と単一セグメントの deal ID 検証を先に適用し、repository 外、symlink component、invalid tenant／deal ID は読み書き前に fail-closed とした。契約テンプレートは knowledge root と symlink 境界を再検査する。browser onboarding の symlink profile 回帰、mission process の外部 path 回帰、deal store の invalid tenant／deal ID 回帰を追加した。
+
+検証: browser onboarding／mission process／deal store **30 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。残る direct loader の全件 inventory、tenant-aware discovery、実 CLI の非対話 enforcement probe は継続課題である。
+
+## 472. 2026-08-31 レビュー修正: mission lifecycle completion の path 境界
+
+PI-03 の direct loader 再レビューで、mission completion が受け取る mission directory、evidence、review receipt、deliverable path を `path.join`／`path.resolve` 後に直接 secure-io へ渡しており、repository 外、mission 外、path component の symbolic link を共通検査していない残存を確認した。meeting deliverable の customer root と mission id も、公開 completion 経路の入力境界として再検査が必要だった。
+
+completion の mission／evidence／receipt／deliverable path を `assertSafeRepositoryPath` と mission-relative helper へ統一し、絶対 path と `../` を mission 外として拒否した。artifact review receipt の repo-root path、customer deliverable root、mission id も同じ path identity／segment 検査へ接続し、既存の missing artifact と no-op 契約は維持した。外部 mission directory と symlink mission path を読む前に拒否する回帰を追加した。
+
+検証: mission lifecycle **25 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。残る direct loader の全件 inventory と tenant-aware discovery は継続課題である。
+
+## 473. 2026-08-31 レビュー修正: peer runtime recovery の quarantine path 境界
+
+PI-03 の direct loader 再レビューで、peer runtime recovery が tenant-scoped quarantine path を lexical prefix だけで判定し、manifest、peer directory、move source／destination を symbolic link と repository path identity の再検査なしに扱っていた。prefix の trailing separator 差異により正当な tenant path を拒否し得る点も確認した。
+
+quarantine path を canonical tenant root の segment boundary と `assertSafeRepositoryPath` へ接続し、manifest／peer directory／peer entry／move source／destination／recovery event log を読み書き・移動前に再検査した。peer ID は単一 path segment に限定し、authenticated human approval、effect binding、fresh heartbeat、known label mapping の既存 gate は変更していない。symlink quarantine／event log の回帰を追加した。
+
+検証: peer runtime recovery **3 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。残る direct loader の全件 inventory と tenant-aware discovery は継続課題である。
+
+## 474. 2026-08-31 レビュー修正: tenant design discovery の context／tier 境界
+
+473 までの再レビューで、tenant design resolver の `customerId` 経路が fixture／設定済み `rootDir` ではなく実 repo の customer overlay を参照していた。また明示 tenant context がある場合も confidential design を全 tenant 走査し、confidential index の `override_path` は personal tier などへ向けられた場合に読み込める残存を確認した。
+
+customer overlay の解決に `rootDir` を伝播し、明示 tenant context がある場合は同 tenant の confidential design のみを走査するようにした。registry の override は `knowledge/confidential/{tenant}/design` 配下かつ regular file の場合だけ候補化し、personal-tier override と別 tenant branding の混入を拒否する回帰を追加した。既存の customer overlay 優先、default fallback、theme／layout／logo の契約は維持した。
+
+検証: tenant design resolver／Chronos route **11 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory は継続課題である。
+
+## 475. 2026-08-31 レビュー修正: mission orchestration artifact の path 境界
+
+tenant design の次の direct loader 監査で、mission phase gate、work graph projection、mission hygiene、planning progress、planning packet が `missionDir()` の結果を存在確認後に文字列連結し、gate definition、NEXT_TASKS、TASK_BOARD、dispatch manifest を直接読み書きしていた。mission directory や個別 artifact が symbolic link に置き換えられた場合、外部内容が gate 判定や operator 投影へ混入し得る残存を確認した。
+
+各 loader に `assertSafeRepositoryPath` ベースの mission artifact helper を追加し、repository 所属と既存 path component の symbolic link を読み書き前に再検査した。監視系の mission hygiene は不正 path を全体停止させず候補から除外し、phase gate／projection／planning progress は安全違反を明示的に fail-closed とした。symlink mission／gate definition の回帰を追加し、既存の missing artifact と projection 契約は維持した。
+
+検証: phase gate／work graph／mission hygiene／planning progress／tenant design の関連 **6 files / 33 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory は継続課題である。
+
+## 476. 2026-08-31 レビュー修正: mission context pack の artifact 境界
+
+mission context pack の追加監査で、mission root、mission-state、dispatch manifest／response、context rollup／context-pack の経路に、存在確認後の直接 path 連結が残っていた。manifest の response path が repository 外や symlink 経由の場合、prior work の seed としてモデル可視コンテキストへ混入し得る残存を確認した。
+
+mission root と mission-local artifact を `assertSafeRepositoryPath` で再検査し、context pack の build／save と rollup 出力を repository 内かつ non-symlink component に限定した。manifest 由来の response／reflection path は安全な repository path のみ seed へ取り込み、unsafe な response はスキップする回帰を追加した。
+
+検証: context pack 単体 **22 tests passed**、関連 **8 files / 68 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory は継続課題である。
+
+## 477. 2026-08-31 レビュー修正: mission closure／governance の destructive path 境界
+
+mission artifact closure、purge/archive、finish quality／artifact review／marketing gate、orchestration event loader の追加監査で、mission root や artifact path を存在確認後に直接連結する経路が残っていた。symlink や policy／receipt／payload の外部 path が、削除・移動・gate 判定・イベント payload 読み込みへ到達し得る残存を確認した。
+
+mission root、mission-local artifact、event/payload、review receipt、marketing evidence、archive target を `assertSafeRepositoryPath` で検証した。closure／purge は destructive target を事前検証し、全候補を preflight して部分適用を避ける。unsafe な index entry や evidence は削除・判定対象から除外し、外部内容を governance／model-visible 経路へ混入させない回帰を追加した。
+
+検証: closure／governance／maintenance／orchestration event と既存直前 wave の関連 **15 files / 125 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory は継続課題である。
+
+## 478. 2026-08-31 レビュー修正: mission retrospective の telemetry 境界
+
+mission retrospective が mission telemetry、NEXT_TASKS、dispatch manifest、mission-state を直接 path 連結して読み、report と process-improvement queue を直接書いていた。symlinked telemetry や外部 artifact が実行統計・改善提案・operator report に混入し得る残存を確認した。
+
+mission artifact と shared queue/report を `assertSafeRepositoryPath` で検証し、統計読み込みは unsafe／symlink path を空結果として除外する fail-closed helper を経由させた。mission-local retrospective report、approved work order、queue 更新の出力先も repository 境界へ統一し、symlinked telemetry の回帰を追加した。
+
+検証: retrospective 単体 **6 tests passed**、既存直前 wave を含む関連 **16 files / 131 tests passed**、対象 lint、root typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory は継続課題である。
+
+## 479. 2026-08-31 レビュー修正: collaboration／lifecycle／ledger の path 境界
+
+478 までの direct loader 再レビューで、operator collaboration projection の worker event／mission JSONL、worker の draft-refine deliverable、mission finish／seal、team binding、global／mission ledger に、外部 path や path component の symbolic link を既存確認後に扱う残存を確認した。特に collaboration projection は worker event の nested discovery、finish／seal は archive・temporary・memory・seal artifact、team binding と ledger は caller 由来の path hint／ledger path が入力境界となる。
+
+worker event、mission artifact、team binding、ledger、seal、finish の全 read／write／move／delete 前に `assertSafeRepositoryPath` を通し、missing leaf の既存契約を保ったまま repository 所属と non-symlink component を fail-closed で固定した。collaboration projection は unsafe な worker JSONL を投影へ混入させず、finish／seal の archive・temporary target は検証済み path のみを操作する。外部 symlink worker event と既存 lifecycle／seal／binding／ledger 回帰を確認した。
+
+検証: collaboration／draft-refine／lifecycle／seal／team-binding／ledger **7 files / 58 tests passed**、対象 lint、core typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory と tenant-aware discovery は継続課題である。
+
+## 480. 2026-08-31 レビュー修正: mission working memory の path 境界
+
+mission working memory の persistence path が、discovery した mission directory または confidential fallback を直接 `.mwm-entries.json` へ連結していた。mission directory の symbolic link や repository 外の解決結果があると、worker context の読み書きが governed root の外へ到達し得る残存を確認した。
+
+mission root と working-memory entry file を `assertSafeRepositoryPath` へ接続し、missing leaf の作成契約を維持した。unsafe／symlink path は load では空結果、save では best-effort failure として扱い、外部内容を context へ取り込まない。
+
+検証: working-memory／worker compaction **3 files / 18 tests passed**、対象 lint、core typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory と tenant-aware discovery は継続課題である。
+
+## 481. 2026-08-31 レビュー修正: gate／offboarding／dispatch artifact の path 境界
+
+480 までの direct loader 再レビューで、mission gate の evidence／deliverable／LLM review、graph journal／coordination bus、scope offboarding の discovery／export／soft-delete、mission dispatch I/O、evidence document、mission creation の template／initial artifact に、path component の symbolic link や外部 path を secure-io の存在確認前に扱う残存を確認した。gate の明示 `recordPath` は file path 自体を mkdir する不具合もあり、offboarding は複数 namespace を横断するため、読み込みだけでなく copy／move／trash 対象の事前検証が必要だった。
+
+共通の `assertSafeRepositoryPath` を各 loader の read／write／append／copy／move／delete 前へ接続し、gate の明示 record は親 directory だけを作成するよう修正した。offboarding は unsafe directory／entry を discovery から除外し、export source／destination、dedup registry、manifest、soft-delete target を検証済み path に限定した。外部 evidence、symlink coordination／mission／deliverable、filename traversal の回帰を追加し、既存の dry-run、human approval、soft-delete、append-only、template expansion 契約を維持した。
+
+検証: gate／graph journal／coordination bus／offboarding／dispatch／evidence／creation **11 files / 93 tests passed**、対象 lint、core typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**。未監査の direct loader 全件 inventory と tenant-aware discovery は継続課題である。
+
+## 482. 2026-08-31 レビュー修正: runtime／team catalog／worker journal の path 境界
+
+481 までの direct loader 再レビューで、agent runtime root／prewarm queue／manual-drive bridge、team／authority catalog、worker event recorder／state journal に、固定ディレクトリ配下でも既存 path component の symbolic link を経由し得る残存があった。また supervisor の request artifact loader は caller 由来 path を queue 外まで制限していなかった。
+
+runtime root、supervisor queue、manual-drive bridge の生成・読込・削除 path を `assertSafeRepositoryPath` へ接続し、prewarm request は request queue 配下だけを受け付けるようにした。team／authority catalog は rootDir、directory、entry、tenant overlay の各 path を同じ境界で再検査する。worker event recorder／replay と state journal は journal／index／lease／observability partition を repository 内かつ non-symlink component に限定し、外部内容が operator replay や復元 state に混入しない回帰を追加した。
+
+検証: runtime／team catalog／worker event／state journal **7 test files / 51 tests passed**、対象 lint、core typecheck、5 package build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 483. 2026-08-31 レビュー修正: ingest ledger／dedup／landing の path 境界
+
+情報資産 ingest の追加レビューで、tenant ledger の `rootDir`／`knowledge_root` と dedup registry／target path が、repository 所属と既存 path component の symbolic link を secure-io の read／append 前に再検査していない残存を確認した。さらに `ingest:commit` の tenant landing は lexical な tenant root 判定だけで、reports などの symlink directory を経由して外部へ書けた。
+
+tenant ledger と dedup registry／target path を `assertSafeRepositoryPath` へ接続し、未作成 leaf の既存契約を保ったまま repository 外・symlink path を拒否した。commit の tenant root／landing path も同じ path identity 検査へ統一し、ledger provenance と scrub 済み card の両方が外部 path へ到達しない回帰を追加した。tenant slug、steward approval、PII／injection gate、append-only／supersede 契約は維持した。
+
+検証: ingest ledger **11 tests**、dedup **7 tests**、ingest commit **11 tests**、計 **29 tests passed**、対象 lint、core／actuator typecheck、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 484. 2026-08-31 レビュー修正: action item／A2A history／runtime event の path 境界
+
+483 の ingest 修正後に隣接する model-visible persistence を再レビューしたところ、action item の mission evidence、A2A conversation history、runtime supervisor event の固定 path が、secure-io の存在確認前に symbolic link を経由し得る残存を確認した。
+
+action item store の evidence file、A2A conversation file、runtime event の observability directory／event file を `assertSafeRepositoryPath` へ接続し、repository 外・symlink component を read／append／write 前に拒否した。既存の append-only action item／conversation replay／best-effort observability 契約は維持した。
+
+検証: action item／A2A history／runtime supervisor **3 test files / 28 tests passed**、対象 lint、core typecheck、core build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 485. 2026-08-31 レビュー修正: scoped artifact／ownership registry の path 境界
+
+484 の persistence 再レビューに続き、scoped artifact 本体と scope-local index、artifact ownership registry を確認したところ、scope resolver の lexical 判定と固定 registry path が、既存 path component の symbolic link を secure-io 前に再検査していない残存を確認した。
+
+governed artifact、mission／project／session／tenant の scoped artifact、scope-local index、ownership registry を `assertSafeRepositoryPath` へ接続し、repository 外・symlink component を read／append／write 前に fail-closed とした。scope placement、retention class、ownership query、artifact index の既存契約は維持した。
+
+検証: artifact store／ownership registry **2 test files / 17 tests passed**、対象 lint、core typecheck、core build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 486. 2026-08-31 レビュー修正: deliverable inbox／lock の path 境界
+
+485 の artifact persistence 再レビューに続き、deliverable inbox の entries／lock path が固定値であっても、既存 path component の symbolic link を secure-io 前に再検査していない残存を確認した。ここは human acceptance／review verdict の durable state を保持するため、外部内容の混入と lock bypass の双方を防ぐ必要がある。
+
+inbox file、親 directory、exclusive lock、stale lock read／unlink の path を `assertSafeRepositoryPath` へ接続し、repository 外・symlink component を read／write／lock 操作前に fail-closed とした。human receipt による final acceptance、review status、atomic lock 契約は維持した。
+
+検証: deliverable inbox **1 test file / 4 tests passed**、対象 lint、core typecheck、core build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 487. 2026-08-31 レビュー修正: artifact review／input queue／activity observability の path 境界
+
+artifact review の artifact hash／receipt loader、agent input queue の明示 `queuePath`、
+activity board の mission tenant state loader、agent performance index、runtime supervisor の
+socket／spawn lock／code stamp を共通の `assertSafeRepositoryPath` へ接続した。repository 外・
+path component の symlink は hash／review receipt、durable input、operator activity、performance
+集計、supervisor 起動準備へ到達せず、既存の review hash binding、queue の append-only／wake、
+tenant 表示、performance cache、daemon stale-code 判定の契約は維持した。
+
+検証: artifact review／governance／dispatch（3 files / 45 tests）、agent input queue（13 tests）、
+activity board（4 tests）、runtime supervisor／retrospective（3 files / 14 tests）、対象 lint、
+core typecheck、core build、`git diff --check`、canonical full gate（67/67）、baseline pipeline。
+
+## 488. 2026-08-31 レビュー修正: history search／runtime performance の path 境界
+
+history search の public／private mission、A2A、channel、trace reader と scoped SQLite path を
+共通の `assertSafeRepositoryPath` へ接続し、symlink 経由の履歴を index／検索結果へ取り込まない
+ようにした。agent／model performance index と runtime health history の固定 persistence path
+も同じ boundary に統一し、tier isolation、mission authority、FTS repair、performance cache、
+best-effort health sample の既存契約は維持した。
+
+検証: history search（11 tests）、model performance／runtime health／mission retrospective（3 files / 14 tests）、
+対象 lint、core typecheck、`git diff --check`。
+
+## 489. 2026-08-31 レビュー修正: SDLC／artifact／mission state loader の path 境界
+
+SDLC requirements／design／test／task artifact、artifact record／bundle、graph run artifact、
+mission seed registry、mission state の path を repository root・path component symlink 検査へ
+接続した。任意の artifact／bundle／seed ID と明示 mission／output path の namespace escape を
+拒否し、customer overlay、schema validation、approval／fulfillment、mission writer lease の
+既存契約を維持した。
+
+検証: artifact／bundle／SDLC／requirements（4 files / 39 tests）、graph／seed／project management
+（4 files / 13 tests）、mission state／lifecycle／reassignment（4 files / 32 tests）、対象 lint、
+core typecheck、`git diff --check`。
+
+## 490. 2026-08-31 レビュー修正: OAuth session／callback lock の path 境界
+
+OAuth session store の shared temporary root、service directory、state session file、callback
+lock、一覧走査の entry path を `assertSafeRepositoryPath` へ接続した。service／state の既存
+safe token、expiry、timing-safe comparison、exclusive callback lock 契約を維持しつつ、
+repository 外または symlink component を credential-adjacent state の read／write／unlink／
+enumeration へ到達させない。
+
+検証: `oauth-session-store.test.ts`（3 tests）、対象 lint、core typecheck、`git diff --check`。
+
+## 491. 2026-08-31 レビュー修正: mission/project ledger の path 境界
+
+mission の project relationship から解決される markdown／JSON ledger path は、secure-io の
+lexical permission だけに依存しており、repository 外の project path や既存 path component の
+symbolic link を ledger の存在確認・生成・同期・削除前に再検査していなかった。
+
+project ledger の markdown／JSON path、ledger directory、blueprint、同期前の生成先を
+`assertSafeRepositoryPath` へ接続し、repository 外または symlink component を ledger read／write／
+mkdir へ到達させないようにした。既存の project relationship、JSON／markdown 同期、mission
+reassignment の契約は維持し、symlink project path の回帰テストを追加した。
+
+検証: mission project reassignment **1 file / 4 tests passed**、対象 lint、core build、
+`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct
+loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 492. 2026-08-31 レビュー修正: provider health state の path 境界
+
+provider health の永続 state は `KYBERION_PROVIDER_HEALTH_STATE_PATH` で差し替え可能だったが、
+override を `rootResolve` のみで解決していたため、repository 外または symlink の state file を
+demotion の load／persist／clear に使える残存があった。
+
+既定 path と override path を `assertSafeRepositoryPath` へ接続し、credential／provider 状態に
+隣接する永続 file は repository 内かつ non-symlink component に限定した。TTL recovery、instance
+pool、provider failover、best-effort の壊れた state file fallback 契約は維持し、外部／symlink
+override の回帰を追加した。
+
+## 493. 2026-08-31 レビュー修正: memory promotion queue の path 境界
+
+memory promotion queue の explicit override と tenant shard discovery は、secure-io の lexical
+permission と `safeExistsSync` だけに依存しており、repository 外／symlink の queue、tenant shard、
+candidate entry を全 scope scan・enqueue・status update へ渡せる残存があった。
+
+global／tenant queue、override、tenant shard、queue directory を `assertSafeRepositoryPath` へ接続し、
+unsafe shard は全体 scan から除外、明示 override は fail-closed とした。scope isolation、dedup、
+ratification／redaction、append／rewrite の既存契約は維持し、外部／symlink queue の回帰を追加した。
+
+検証: provider health／memory promotion **4 test files / 37 tests passed**、対象 lint、core build、
+`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct
+loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 494. 2026-08-31 レビュー修正: delegated-task observability の path 境界
+
+DH-12 の durable delegation trace／snapshot は trace と store の環境 override、record、child inbox、
+worker script path を `rootResolve` と `safe*` I/O だけで扱っており、repository 外または symlink
+component を再開状態・監査履歴・worker 起動へ到達させる残存があった。
+
+trace、store、record、child inbox、managed worker script を `assertSafeRepositoryPath` へ接続し、
+unsafe override は persistence／enumeration／cold-resume worker 起動前に fail-closed とした。child
+session の one-shot activation、owner check、durable inbox、best-effort observability 契約は維持し、
+外部 trace と symlink store の回帰を追加した。
+
+## 495. 2026-08-31 レビュー修正: service runtime managed root の path 境界
+
+service runtime policy の `managed_roots` は schema で形状を検証していたが、runtime/cache root の
+解決結果をそのまま下流へ返しており、外部 path を runtime provisioning や cache 操作へ渡せる残存が
+あった。
+
+managed runtime root と cache root の解決結果を `assertSafeRepositoryPath` へ接続し、repository 外
+path を fail-closed とした。trial／installed mode と approval policy の既存契約は維持し、両 root の
+外部 path 回帰を追加した。
+
+検証: delegated-task observability／service runtime **2 files / 22 tests passed**、対象 lint、
+core build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。未監査の
+direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 496. 2026-08-31 レビュー修正: heuristic feedback の path 境界
+
+confidential heuristic entry の directory と entry ID は `rootResolve`／`path.join` のみで解決され、
+traversal-shaped ID と symlinked heuristic directory が read／list／validation write へ到達できる
+残存があった。
+
+heuristic schema、directory、entry file、entry ID を `assertSafeRepositoryPath` へ接続し、不正 ID は
+単一 segment として拒否、list は unsafe／schema-invalid entry を全体処理から除外するようにした。
+score／validation／summary と既存の schema-invalid read 契約は維持した。
+
+## 497. 2026-08-31 レビュー修正: speech-to-text bridge の path 境界
+
+STT の audio input、sidecar、transcript output、managed MLX bridge script が `rootResolve` だけで
+解決され、repository 外または symlink component を音声 read、transcript write、local backend 起動へ
+渡せる残存があった。
+
+audio／sidecar／output／managed script／project root を `assertSafeRepositoryPath` へ接続し、外部または
+symlink path は backend 実行前に fail-closed とした。stub sidecar、shell structured output、MLX bridge、
+timestamp capability の既存契約は維持した。
+
+検証: heuristic feedback **1 file / 14 tests**、STT／voice integration **4 files / 23 tests passed**、
+対象 lint、core build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。
+未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 498. 2026-08-31 レビュー修正: relationship graph store の path 境界
+
+confidential relationship graph の org/person path は segment 文字列の検査後に `rootResolve` へ渡されて
+いたが、既存 path component の symbolic link を repository 境界の前に検査していなかった。
+
+relationship node の read／create／append／suggestion write path を `assertSafeRepositoryPath` へ接続し、
+symlinked organization directory を trust／history／pending suggestion の read／write へ到達させない
+ようにした。org/person segment の traversal 拒否、rolling history、trusted source、pending suggestion
+の既存契約は維持した。
+
+検証: relationship graph **1 file / 10 tests passed**、対象 lint、core build、`git diff --check`、
+canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、
+tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 499. 2026-08-31 レビュー修正: virtual camera injection の file path 境界
+
+virtual camera injection の MP4 source／replay output と frame archive temporary path は
+`rootResolve` のみで解決され、repository 外または symlink component を frame read／replay write へ
+渡せる残存があった。一方、Linux の `/dev/video*` は repository 外の正当な OS device sink であり、
+repository file path と同一の検査を適用してはいけない。
+
+MP4 source、replay output、archive temporary path を `assertSafeRepositoryPath` へ接続し、file path
+だけを repository 内かつ non-symlink component に限定した。OS device path は device backend の
+selection として分離し、v4l2 injection の既存契約を維持した。外部 source／output の回帰を追加した。
+
+検証: virtual camera injection **1 file / 5 tests passed**、対象 lint、core build、`git diff --check`、
+canonical full gate **67/67 passed**、baseline pipeline passed。未監査の direct loader 全件 inventory、
+tenant-aware discovery、provider CLI の非対話 enforcement probe は継続課題である。
+
+## 500. 2026-08-31 レビュー修正: audio／OCR／screen／video の OS bridge path 境界
+
+audio input recording／output playback、OCR provider、screen capture／recording、video frame
+archive、virtual camera、Apple Speech file STT の入力・出力 path に `rootResolve`／`path.resolve` の
+直接利用が残り、repository 外または symlink component を OS command、画像／音声 read、archive write
+へ渡せる箇所があった。
+
+各 bridge の file path を `assertSafeRepositoryPath` へ接続し、生成する一時ファイルは governed shared
+tmp、既存入力は repository 内の non-symlink path に限定した。Linux の `/dev/video*` のような正当な
+OS device path と repository file path は分離し、既存の backend／redaction／egress 契約を維持した。
+外部 path、traversal、symlink の回帰を追加した。
+
+検証: OS bridge／OCR／archive **8 files / 44 tests passed**、対象 lint、core build、`git diff --check`、
+canonical full gate **67/67 passed**、baseline pipeline passed。tenant-aware discovery、
+provider CLI の非対話 enforcement probe、未監査 direct loader の全件 inventory は継続課題である。
+
+## 501. 2026-08-31 レビュー修正: OS script／failover persistence の path 境界
+
+前節の OS bridge 監査後、TEN VAD の設定 `scriptPath`、Windows native OCR の直接 helper API、reasoning
+failover の marker／event persistence に、repository 外または symlink component を共通検査しない経路が
+残っていた。特に provider bridge script は設定値から spawn され、failover 証跡は固定 path でも既存
+runtime directory の置換を許していた。
+
+TEN VAD の configured script と Windows native OCR の image input を `assertSafeRepositoryPath` へ接続し、
+probe／spawn／native helper 実行前に外部 path を fail-closed とした。reasoning failover の固定 event／marker
+path も同じ helper を通し、既存の best-effort failover logging、provider-neutral command injection、OS
+device path の契約は維持した。external path の回帰と、既存 failover fixture の schema 完備を追加した。
+
+検証: 関連 **11 test files / 54 tests passed**、対象 lint、core build、`git diff --check`、canonical full gate
+**67/67 passed**、baseline pipeline passed。残る tenant-aware discovery、provider CLI の非対話
+enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 502. 2026-08-31 レビュー修正: visual-raster の artifact／workdir path 境界
+
+visual-raster は tier／tenant／mission の lexical policy を持っていたが、画像化する artifact と
+mission-local work directory の既存 path component が symbolic link へ置換された場合の identity
+再検査がなかった。model-visible な render 入力と生成画像が別 scope へ流れる余地が残っていた。
+
+artifact、workdir、生成 run directory を `assertSafeRepositoryPath` へ接続し、既存の tier／tenant／mission
+policy と public／confidential の出力配置を維持した。symlink artifact の回帰を追加した。
+
+検証: visual-raster **11 tests passed**、対象 lint、core build、`git diff --check`、canonical full gate
+**67/67 passed**、baseline pipeline passed。tenant-aware discovery、provider CLI の非対話 enforcement
+probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 503. 2026-08-31 レビュー修正: CLI input／video render の file path 境界
+
+共通 CLI JSON input、video render の output／bundle／audio ref、fallback output、内部 render script に
+repository 外または symlink component を明示検査しない経路が残っていた。CLI input や media command の
+引数が安全な reader／writer の前に外部 path を保持できる状態だった。
+
+CLI input と video render の file path を `assertSafeRepositoryPath` へ接続し、生成物は governed shared
+tmp または repository 配下、provider／OS executable 自体は command boundary として分離した。fallback／
+audio mux／hyperframes の既存契約と degradation 表示を維持し、外部 output／input の回帰を追加した。
+
+検証: CLI input／video render **2 files / 7 tests passed**、対象 lint、core build、`git diff --check`、
+canonical full gate **67/67 passed**、baseline pipeline passed。tenant-aware discovery、provider CLI の
+非対話 enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 504. 2026-08-31 レビュー修正: 共通 path token と tenant-aware report／runtime loader 境界
+
+前節までの direct loader 修正を再レビューし、ADF／pipeline の `@domain:path` token が domain 外へ
+escape できる経路、tenant-scoped な routing report が旧形式または別 tenant の observability event を
+相関する経路、Codex app-server の cwd／read-only approval と image／deployment／mesh／specialist loader
+の明示 path を repository 外または symlink component へ解決できる経路を追加で確認した。
+
+path token を共通 resolver へ集約し、root／knowledge／active／shared／tmp／vault ごとの confinement と
+symlink 再検査を適用した。routing report は `currentScope()` を authoritative source とし、tenant-scoped
+caller には同 tenant の event だけを渡し、scope のない legacy event は混入させないようにした。Codex の
+cwd／approval path、image generation target、deployment config、mesh peer JSONL、specialist catalog の
+file／directory を secure-io の repository path assertion に接続し、既存の相対 path／best-effort／degradation
+契約は維持した。
+
+検証: 関連 **8 files / 97 tests passed**、対象 lint、`@agent/core` build、`git diff --check`、canonical
+full gate **67/67 passed**、baseline pipeline passed で確認した。provider CLI の OS-level 非対話
+enforcement probe と未監査 direct loader 全件 inventory は、証拠不足のため継続課題として残す。
+
+## 505. 2026-08-31 レビュー修正: tenant knowledge provenance と provider child env 境界
+
+再レビューで、knowledge index の JSON／Markdown scan が repository 内の symlink を辿って外部文書を
+索引化できる経路、tenant knowledge source／hit projection が別 tenant または不正 tier を model-visible
+結果へ混入させる経路、tenant profile の明示 `knowledge_root` が別 tenant root を指せる経路を確認した。
+加えて provider CLI の Gemini backend に異 provider の credential-shaped environment を子プロセスへ渡す
+残存と、provider capability／evaluation／memory report CLI の `--out` path 境界を確認した。
+
+knowledge index は repository root と path component の symlink を走査前に再検査し、tenant source は
+canonical path normalization と tenant／tier allowlist で hit 化した。tenant registry は knowledge root の
+同一 tenant confinement と symlink 拒否を secure-io の root-aware guard へ接続した。provider CLI の出力は
+5 entrypoint を repository path assertion へ統一し、Gemini は provider-specific child env allowlist を使う
+ようにした。full gate の tenant registry が権限付き lstat のため一度回帰したが、検査 root を明示できる
+secure-io helper へ修正して解消した。
+
+検証: 関連 **20 files / 170 tests passed**、追加 tenant／knowledge／Gemini 回帰 **3 files / 30 tests passed**、
+対象 lint、`@agent/core` build、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline
+passed。provider CLI の OS-level 非対話 enforcement probe と未監査 direct loader 全件 inventory は、実測
+証拠が不足しているため継続課題として残す。
+
+## 506. 2026-08-31 レビュー修正: organization／facet／runtime／customer loader の境界
+
+505 の後続監査で、organization record の再帰探索、Gemini wisdom、tool runtime の managed root、
+managed facet、customer requirements capture、desktop promotion marker に、入力値や既存 path component の
+symlink／namespace escape を共通に拒否しない残存があった。さらに Chronos の production build で使用する
+`@agent/core/mission-management-config` が package exports に登録されていない統合不具合を確認した。
+
+各 loader／transaction path を `assertSafeRepositoryPath` へ接続し、organization record 探索は symlink
+entry を fail-closed、tool runtime は configured managed root 外を拒否、facet／customer は識別子と実体 path
+を検証、desktop marker は repository 外の restore target を拒否するようにした。Chronos が利用する core
+module を package exports に追加し、既存の governed persistence／trust／approval 契約は維持した。
+
+検証: 関連 **11 files / 92 tests passed**（organization／agent／peer／tool runtime／facet／customer／desktop）、
+Chronos build passed、対象 lint、core package build、`git diff --check`、canonical full gate **67/67 passed**。
+未監査の direct loader 全件 inventory、tenant-aware discovery、provider CLI の OS-level 非対話 enforcement
+probe は継続課題である。
+
+## 507. 2026-08-31 レビュー修正: provider conformance の sandbox 実行時証跡
+
+provider capability registry の `--help` flag probe は、sandbox／approval flag の広告を記録するだけで
+OS-level enforcement を証明しない。既存の reasoning backend conformance にその区別を表す
+`sandbox_enforcement` check と注入可能な runtime probe 契約を追加し、実 provider の live conformance は
+probe がない場合 `unavailable`、write sentinel が作成された場合 `failed` とするようにした。stub と
+API provider は local process sandbox がないことを `declared`／`not_applicable` として明示する。
+
+検証: reasoning backend conformance／provider registry／plugin contribution **18 tests passed**、typecheck、
+`git diff --check`。実 CLI を起動する provider-specific の write-sentinel probe と全 adapter への接続は、
+安定した非対話引数・provider credential・隔離 runtime が必要なため継続課題である。
+
+## 508. 2026-08-31 レビュー修正: customer channel binding の tenant registry discovery 境界
+
+customer channel binding が `customer/{slug}` のディレクトリ名だけを tenant identity として採用し、未登録・
+非アクティブ tenant や symlink overlay 配下の binding を inbound channel の解決結果へ混入させる残存を修正した。
+binding discovery は tenant registry の active profile を authoritative source とし、repository root・path component
+の symlink を `assertSafeRepositoryPath` で検査し、registry の profile directory／file 自体も symlink を拒否する。
+tenant registry が返す customer overlay root も同じ assertion で検査する。fixture root を明示できる options seam と、
+未登録・suspended・registry profile／overlay symlink の fail-closed 回帰も追加した。
+
+検証: customer channel binding／tenant registry **2 files / 22 tests passed**、typecheck、package build、lint、
+`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。provider CLI の実 CLI
+enforcement probe と未監査 direct loader 全件 inventory は継続課題として残る。
+
+## 509. 2026-08-31 レビュー修正: audit mirror の customer discovery と symlink write 境界
+
+audit mirror の検証が `customer` 配下の任意ディレクトリ名を tenant として列挙し、既存 stance overlay が symlink
+の場合に外部 audit file へ書き込み・読み込みできる残存を修正した。tenant mirror の対象は master audit chain に
+現れる有効 tenant slug を起点にし、secure-io から注入した `assertSafePath` で stance directory、audit directory、
+mirror file を毎回検査する。path assertion capability がない adapter は mirror を継続せず fail-closed とし、
+macOS の system temp alias を誤検知しない test seam も追加した。
+
+検証: audit chain／customer／tenant boundary **4 files / 45 tests passed**、typecheck、package build、lint、
+`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline passed。provider CLI の実 CLI
+enforcement probe と未監査 direct loader 全件 inventory は継続課題として残る。
+
+## 510. 2026-08-31 レビュー修正: runtime／service loader の保存先と識別子境界
+
+追加の direct loader 再レビューで、service connection fallback の service ID、Cloudflare OS control-plane の
+`statePath`、daemon heartbeat の任意 `rootDir`、service recording の recording ID、provider capability cache、
+A2A共有秘密、stimuli journal に、repository 外または既存 symlink component を経由できる保存・読込経路が残っていた。
+service ID は単一 path segment に限定し、runtime／service の全対象を `assertSafeRepositoryPath` へ接続した。
+service-engine の仮想プリセットテストは governed catalog 移行後の入力 seam を明示し、実装テストを環境依存にしないようにした。
+
+検証: 関連 **8 test files / 73 tests passed**、typecheck、package build、lint、`git diff --check`、canonical full gate
+**67/67 passed**、baseline pipeline、`check -- --only op-preflight-coverage` **37 public boundaries passed** で確認した。provider CLI の
+実 CLI enforcement probe と未監査 direct loader 全件 inventory は継続課題として残る。
+
+## 511. 2026-08-31 レビュー修正: 動的セッション／一時 artifact の path segment 境界
+
+追加の direct loader 再レビューで、browser conversation の session／snapshot／runtime file と refresh・bootstrap・action 用一時 JSON、realtime voice の session／artifact、plugin managed install／pack fetch の一時ディレクトリ、desktop screenshot と screen capture stream の生成 path に、動的識別子を共通 path assertion へ渡す前の残存を確認した。session ID と request tag は単一 path segment に限定し、生成した保存先・取得先は `assertSafeRepositoryPath` で repository／既存 component の symlink を再検査するよう修正した。正常な ID 形式は維持し、`../`・区切り文字・NUL は fail-closed とした。
+
+検証: browser conversation／realtime voice／plugin managed／plugin pack／procedure dispatcher／screen capture **6 files / 75 tests passed**、typecheck、`git diff --check`、baseline pipeline passed。canonical full gate はこの修正を含めて実行したが、約3分半後も結果を返さない子プロセス無応答のため停止した。provider CLI の実 CLI enforcement probe と未監査 direct loader 全件 inventory は継続課題として残す。
+
+## 512. 2026-08-31 レビュー修正: working-memory の volatile path と consolidation 境界
+
+working-memory actuator の `read`／`nominate-promotion` が任意の repo 内 path を存在確認へ渡していたため、`active/` 配下の
+volatile face に限定し、既存 component の symlink も `assertSafeRepositoryPath` で拒否するようにした。QM-03 の
+`DEFAULT_CONSOLIDATE_AFTER`／`bulletsBelowMarker` は `consolidation-status` と note 結果の `consolidation` 状態へ接続し、
+10 件到達を read-only に検知できるようにした。さらに consolidation の UPDATE は既存 provenance を保持し、新規
+`(said in ...)` は claimed source へ中立化する。
+
+検証: memory notebook／promotion queue／background review／working-memory actuator **5 files / 52 tests passed**、
+`bench:memory`、typecheck、package build、lint、`check -- --only op-preflight-coverage` **37 public boundaries passed**、
+`git diff --check`。canonical full gate は直前の実行で子プロセス無応答となったため、今回も targeted evidence として記録する。
+
+## 513. 2026-08-31 レビュー修正: working-memory op の registry／週次 dry-run 接続
+
+working-memory actuator の self-described catalog が op registry generator に未登録で、既存 `weekly-review` の
+`weekly-open`／`nominate-promotion` まで dry-run で `UNKNOWN_OP` になる残存を修正した。catalog を generator の正本へ
+追加し、15 op の input schema／examples、`trusted`／`source_ref` の action schema を生成物へ反映した。週次 pipeline には
+personal MEMORY の consolidation status と運用ログを追加し、capability resolution と flow contract が同時に検証できるようにした。
+
+検証: op registry／weekly dry-run／pipeline contract **3 files / 297 tests passed**、`generate:op-registry --check`、
+weekly-review dry-run `ready`、module invariants **6 registered invariants**。full gate は依存再構成後も子プロセス無応答のため
+停止済みであり、今回の成功判定には含めない。
+
+## 514. 2026-08-31 レビュー修正: 共通 loader の再監査で見つかった path 境界
+
+513 の後続レビューで、`prompt-visibility-ledger` の任意 ledger path、共通 actuator CLI の `--input`、
+JSONL tailer の監視対象、oversized output の spill directory、mission orchestration の provisioned artifact、
+pending intent の volatile directory に、secure I/O を使う前の repository／symlink 境界検査が不足していた。
+
+各公開 helper の path を `assertSafeRepositoryPath(..., { allowMissingLeaf: true })` に接続し、生成前の
+repository 外 path と既存 component の symlink を fail-closed とした。spill は既存の fail-soft 契約を維持し、
+不正 path の場合も元の値を返す。orchestration の provisioned artifact は journal receipt の検証前に対象 path
+を検査し、pending intent は相関 ID の正規化後に volatile root を再検査する。
+
+検証: prompt visibility／CLI／JSONL tail／spill **4 files / 30 tests passed**、orchestration journal／pending
+intent **2 files / 12 tests passed**、typecheck、`check -- --only op-preflight-coverage` **37 public boundaries passed**。
+lint は実行済み。canonical full gate は従来どおり子プロセス無応答のため別証跡に含めない。provider CLI の実 CLI
+enforcement probe と未監査 direct loader 全件 inventory は引き続き継続課題である。
+
+## 515. 2026-08-31 provider CLI conformance の環境実測
+
+provider CLI の非対話 enforcement 課題を切り分けるため、`check:backend-conformance` を実行した。
+今回の live `--version`／`--help` 結果は `codex` **verified (0.146.0)**、`gemini` **verified (0.46.0)**、
+`agy` **verified (1.1.13)**、`grok` **verified (1.0.13 alpha)**、`claude` **unavailable**（pnpm placeholder
+shim が native binary 未導入を返却）、`copilot` **unavailable**（ENOENT）だった。
+
+この probe は CLI の存在・version・help と structured-output marker の観測に限定され、実際の model turn、
+write sentinel、OS-level sandbox enforcement は検証しない。従って、今回の environment evidence により help
+広告と enforcement 証明を混同しない状態は確認できたが、provider-specific の非対話 enforcement probe は
+実 CLI の隔離 runtime／安定した非対話引数が揃うまで継続課題とする。
+
+検証: `node --import ./scripts/ts-loader.mjs scripts/check_backend_conformance.ts` exit 0、provider 6 mode の report 生成。今回の実測は外部 CLI
+環境に依存するため full gate の成功判定には含めない。
+
+## 516. 2026-08-31 レビュー修正: 残存 runtime path の格納先境界
+
+515 の後続レビューで、audio device lease の任意 lease directory、project track の track ID、delegation
+notification の queue override、worker context compaction の summary directory、service runtime registry の
+managed subpath に、repository 内の別領域または repository 外へ到達し得る path 組み立てが残っていた。
+
+各保存・読込入口を `assertSafeRepositoryPath` に接続し、track／service のように repository 内に留まりながら
+専用格納先を脱出するケースは、その格納先との相対関係も検査するようにした。不正な compaction 保存先は既存の
+non-fatal persistence 契約を維持して artifact を生成せず、テスト用 queue／registry override も repository 外を
+拒否する。正常な governed shared tmp と canonical runtime path は維持した。
+
+検証: audio lease／project track／delegation notification／worker compaction **4 files / 24 tests passed**、
+service runtime registry **1 file / 4 tests passed**、typecheck／lint／package build／`git diff --check` は
+後続の全体再検証対象。provider CLI の OS-level enforcement probe と未監査 direct loader 全件 inventory は
+引き続き継続課題である。
+
+## 517. 2026-08-31 レビュー修正: 残存 direct loader の repository path 境界
+
+516 の後続レビューで、project OS scaffold の artifact map、mission path lookup、in-room minutes の evidence／
+segment、contextual intent memory の環境変数 override、ingest cursor の保存先、AI-DLC phase state、computer
+surface の session file、surface runtime の manifest／state／log、generation cost settlement、trust ledger、project
+operational state の各保存・読込経路に、動的識別子または明示 root を secure I/O 前に検証しない残存を確認した。
+
+phase／artifact／surface／session／mission の path segment を限定し、派生したファイル・ディレクトリを
+`assertSafeRepositoryPath` へ接続した。`findMissionPath` は lookup 前に mission ID を検証し、任意の環境変数／
+test seam の外部保存先は repository 外なら fail-closed とした。正常な governed `active/`／`knowledge/`／shared
+runtime と repository 内の hermetic fixture は維持した。
+
+検証: **14 files / 78 tests passed**（project management、path resolver、in-room minutes、source analysis、
+contextual intent、ingest cursor、AI-DLC、computer／surface runtime、generation cost、trust、project operational
+state）、typecheck、lint、package build、`git diff --check`。full gate は従来どおり子プロセスが結果を返さず停止した
+ため成功判定には含めない。provider CLI の OS-level enforcement probe と、今回の static heuristic に残る canonical
+loader（config fallback、provider discovery、reconcile／video／onboarding 等）の全件 inventory は、別実測・整理課題
+として継続する。
+
+## 518. 2026-08-31 レビュー修正: catalog／op registry の直接検査入口
+
+SX-04／AR-02 の実行導線を再確認し、catalog integrity と op registry の検査本体は存在する一方、計画・過去の
+運用文書で使われる `pnpm run check -- --scope full --only catalogs`／`pnpm generate:op-registry -- --check` が root `package.json` の script として
+公開されていない不整合を修正した。両入口は source loader 経由の既存 checker／generator に接続し、既存の
+manifest-driven `ci-gates.json` の実行経路とは別実装を増やさない。catalog checker が検出した knowledge index
+manifest の stale も `generate_knowledge_index` の正規生成器で更新した。
+
+検証: `check_catalog_integrity` passed、`generate_op_registry --check` passed（`changed: []`）、
+`check_script_integrity` passed、first-win docs／smoke passed、module boundary passed（0 cycles）、focused
+runtime suite **4 files / 17 tests passed**、`git diff --check`。full gate は継続して子プロセス無応答のため
+未確認とし、provider CLI の OS-level enforcement probe と未監査 direct loader 全件 inventory は引き続き残す。
+
+## 519. 2026-08-31 レビュー修正: pipeline journal の再開 path 境界
+
+pipeline run journal の生成 path は正規化済みだったが、公開 `readPipelineRunJournal` と再開時の journal append が
+受け取った path をそのまま secure I/O に渡していた。repository 外の journal を読み書きできないよう、生成・候補探索・
+読み込み・append の全境界を `assertSafeRepositoryPath` に接続した。mission 候補列挙中に既存の symlink fixture を見つけた
+場合は外部へ追従せず、その候補だけをスキップして他の有効な mission journal の探索を継続する。
+
+検証: pipeline journal **5 tests passed**（外部 path read の fail-closed と symlink 候補共存を含む）、
+`check_catalog_integrity`、`generate_op_registry --check`、`check_script_integrity`、`git diff --check`。
+full gate は子プロセス無応答のため未確認であり、残存する canonical loader 全件 inventory は継続課題である。
+
+## 520. 2026-08-31 レビュー修正: security quarantine の保存先境界
+
+QM-04 の quarantine は secure I/O を利用していたが、`KYBERION_SECURITY_QUARANTINE_DIR` の repository 外 override
+を受け入れていた。quarantine directory と rotation target を `assertSafeRepositoryPath` に接続し、strict-screened
+content が管理対象外の絶対 path へ保存されないようにした。既存の `active/shared/tmp` fixture と quarantine の
+rotation／一覧取得 semantics は維持した。
+
+検証: security-screen **27 tests passed**、catalog／op registry／script integrity、module boundary、
+typecheck、lint、package build、`git diff --check`。full gate と provider CLI enforcement probe は未確認／継続課題である。
+
+## 521. 2026-08-31 レビュー修正: fs-utils の standards loader 統合
+
+SX-04 の loader inventory で、`fs-utils` が専用 `config-loader` を経由して `project_standards.json` を
+手書き `safeReadFile` + `JSON.parse` で読み込んでいた。専用 loader を残すのではなく、`fs-utils` の実 caller
+へ `defineCatalog` を直接接続し、`project-standards.schema.json` を追加して catalog integrity の明示対象にした。
+missing／invalid catalog 時の従来 fallback は `fallbackOnInvalid` で維持し、file walker の ignore semantics は変更していない。
+
+検証: `format.test` **23 tests passed**、catalog integrity、script integrity、improvement-plan metadata、
+typecheck、対象 lint／Prettier、`git diff --check`。SX-04 の全 loader／schema 移行と未参照 catalog の処分は引き続き残存する。
+
+## 522. 2026-08-31 レビュー修正: protocol service lifecycle の read path 境界
+
+protocol service lifecycle receipt の write 側は governed artifact facade で保護されていたが、read 側は
+`pathResolver.resolve` の結果を直接 secure I/O に渡していた。service／tenant の segment 検証に加え、最終 read path も
+`assertSafeRepositoryPath` で再検査し、既存 receipt の読み取り semantics を維持した。
+
+検証: protocol service lifecycle focused suite、typecheck、対象 lint、catalog／script integrity、`git diff --check`。
+full gate と provider CLI enforcement probe は継続未確認である。
+
+## 523. 2026-08-31 レビュー修正: shell policy catalog の override 境界
+
+追加の catalog 再レビューで、shell command policy の `KYBERION_SHELL_COMMAND_POLICY_PATH` だけが
+`defineCatalog` の path resolver へ未検査の override を渡していた。これにより repository 外、または既存
+symlink component 経由の policy を deny／approval 判定の入力にできる残差があったため、canonical policy と
+override の両方を `assertSafeRepositoryPath`（missing leaf 許可）へ接続した。不正な override は policy を
+差し替えず、評価入口で `[RESOURCE_PATH_SCOPE]` として fail-closed になる。
+
+同時に `check_catalog_integrity` の明示対象へ shell policy schema/data を追加し、catalog checker がこの
+重要 policy の schema drift も検査するようにした。shell policy の既存 deny、approval、難読化防御の挙動は
+変更していない。
+
+検証: shell-command-policy **29 tests passed**、`check_catalog_integrity` passed、`git diff --check`。
+typecheck、全 package build、全体 lint、canonical full gate は後続の全体再検証対象であり、provider CLI の
+OS-level enforcement probe と未監査 direct loader 全件 inventory は引き続き残存する。
+
+## 524. 2026-08-31 レビュー修正: video／voice runtime catalog の override 境界
+
+同じ path override inventory を video／voice の runtime policy と template registry へ拡張したところ、
+`KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH`、`KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH`、
+`KYBERION_VOICE_RUNTIME_POLICY_PATH` に repository 外または既存 symlink component を拒否する境界が無かった。
+3 loader の canonical path と test override を `assertSafeRepositoryPath` へ統一し、外部 path は video 系では
+例外として停止、voice 系では既存の conservative fallback へ縮退する契約を固定した。repository 内の runtime
+policy／template override と schema-invalid fallback は変更していない。
+
+検証: policy／template **3 files / 8 tests passed**、core typecheck、core package build、対象 lint／Prettier。
+full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 525. 2026-08-31 レビュー修正: Compliance-2 restricted-action policy の fail-closed 境界
+
+restricted-action policy の任意 path override を再レビューし、repository 外の path を許したまま、読み込み失敗時に
+空の rule set へ縮退するため、制限判定を無効化できる残差を修正した。canonical policy と明示 override を
+`assertSafeRepositoryPath` で先に検査し、外部／symlink path は例外で停止する。schema-invalid の repository 内
+override については、従来の互換性ある空 rule set fallback を維持した。
+
+併せて catalog integrity の明示対象へ restricted-action policy の schema/data を追加し、shell policy と同じく
+checker の対象から外れないようにした。Compliance-2 の action-item classification と既存 regex の順序は変更していない。
+
+検証: restricted-action **10 tests passed**、catalog integrity、core typecheck、core package build、対象 lint／Prettier、
+`git diff --check`。full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 526. 2026-08-31 catalog integrity の監査対象拡張
+
+直前の loader 修正を checker の実効範囲へ反映し、`voice-runtime-policy`、`video-render-runtime-policy`、
+`video-composition-template-registry`、`service-runtime-policy` の schema/data を `check_catalog_integrity`
+の明示対象へ追加した。これで今回レビューした policy／registry の path 境界と schema drift 検査が同じ
+実行入口から確認できる。checker の実装方式や既存 catalog の fallback／runtime semantics は変更していない。
+
+検証: `check_catalog_integrity` passed（warnings **0**）、対象 lint／Prettier、`git diff --check`。
+全 catalog の単一 loader 化、未参照 catalog の処分、provider CLI enforcement probe、canonical full gate は
+継続課題である。
+
+## 527. 2026-08-31 レビュー修正: autonomous ops policy の path fail-closed
+
+自律実行ゲートの policy override を再レビューし、`KYBERION_AUTONOMOUS_OPS_POLICY_PATH` が repository 外を
+指した場合、policy path の解決自体が gate の fail-closed 結果へ到達する前に例外化する残差を確認した。
+canonical／override の path を `assertSafeRepositoryPath` で検査し、不正 path は conservative fallback と
+`approve`／`allowed=false` の既存 unavailable 判定へ縮退するよう修正した。repository 内 override、action
+score、budget、dry-run の意味は維持した。
+
+同時に autonomous ops policy を catalog integrity の明示対象へ追加し、policy schema drift を checker で検出
+できるようにした。
+
+検証: autonomous ops **5 tests passed**、catalog integrity、core typecheck、core package build、対象 lint／Prettier、
+`git diff --check`。full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は
+継続課題である。
+
+## 528. 2026-08-31 レビュー修正: service／tool／media catalog の override 境界
+
+policy／registry override の再監査を service runtime、tool actuator routing、media backend へ広げ、3つの
+`*_PATH` が repository 外または既存 symlink component を経由できる残差を修正した。各 loader を
+`assertSafeRepositoryPath` へ接続し、不正 path は service／tool／media の既存 conservative fallback へ
+縮退する。repository 内の test override、backend availability probe、tool route の approval-required
+fallback、service runtime root の追加検査は維持した。
+
+3 catalog の schema/data も `check_catalog_integrity` の明示対象へ追加し、path boundary と schema drift を同じ
+検査入口から追跡可能にした。
+
+検証: service／tool／media **3 files / 18 tests passed**、catalog integrity、core typecheck、core package build、
+対象 lint／Prettier、module boundary（0 cycles）、`git diff --check`。full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 529. 2026-08-31 レビュー修正: contextual intent learning の保存先境界
+
+direct loader inventory で、contextual intent learning の `KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH` が
+tenant namespace 付与前後とも repository 外を指し得る残存を確認した。scope namespace を構成した最終 path を
+`assertSafeRepositoryPath` で検査し、個人／tenant 学習データの read／write が外部 path や既存 symlink component
+へ到達しないようにした。既存の repository 内 test seam と学習記録・scope namespace の意味は維持した。
+
+検証: contextual-intent-learning **2 tests passed**、core typecheck、core package build、対象 lint／Prettier、
+module boundary（0 cycles）、`git diff --check`。full gate、provider CLI の OS-level enforcement probe、
+未監査 direct loader 全件 inventory は継続課題である。
+
+## 530. 2026-08-31 レビュー修正: intent contract memory の runtime path 境界
+
+intent contract learning の runtime memory は `KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH` と tenant
+namespace を組み合わせて解決するため、base path だけを見た監査では外部保存先を見逃す残差があった。
+scope namespace 付与後の最終 runtime path と seed read path を `assertSafeRepositoryPath` で検査し、外部／
+symlink component 経由の memory read／write を拒否するようにした。snapshot cache、seed と runtime の merge、
+tenant namespace の既存 semantics は維持した。
+
+検証: intent-contract-learning **5 tests passed**、core typecheck、core package build、対象 lint／Prettier、
+module boundary（0 cycles）、catalog integrity、`git diff --check`。full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 531. 2026-08-31 レビュー修正: registry／grant／egress override の境界統一
+
+530 の後続 direct-loader 監査で、provider egress policy、voice engine／presence avatar／voice TTS registry、
+share grant ledger、task-scoped grant store の明示 path override または constructor path が、repository 外や
+既存 symlink component を経由して secure I/O に到達し得る残差を確認した。各入口を `assertSafeRepositoryPath`
+へ接続し、provider／egress／tool runtime は conservative fallback または invalid fail-closed、voice／presence は
+組み込み fallback、share／task grant は読み書き前に例外化する既存の責任分界を維持した。canonical directory の
+各 entry path も最終 path を再検査するようにした。
+
+併せて caller-supplied intent overlay と voice TTS config の loader も同じ境界へ接続し、外部 overlay／registry が
+intent resolution や音声設定へ混入しないことを回帰テストで固定した。
+
+検証: provider／presence／voice engine／share grant／task grant **5 files / 75 tests passed**、egress／tool runtime／
+intent resolution／voice TTS **4 files / 41 tests passed**、core typecheck、core package build、対象 lint／Prettier、
+`git diff --check`。catalog integrity、script integrity、op registry、module boundary、metadata、knowledge index、
+baseline は後続の全体再検証対象。canonical full gate は子プロセス無応答、provider CLI の OS-level enforcement probe、
+未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 532. 2026-08-31 catalog integrity の監査対象拡張
+
+531 で境界を修正した provider egress、voice engine、presence avatar、voice TTS、一般 egress、tool runtime の
+schema/data を `check_catalog_integrity` の明示対象へ追加した。これにより loader の path boundary と catalog schema
+drift を同じ直接検査入口から追跡できる。
+
+検証: `check_catalog_integrity` passed（warnings **0**）、`generate_op_registry --check` passed、
+`check_script_integrity` passed、module boundary（0 cycles）、improvement-plan metadata、対象 lint／Prettier、
+`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件
+inventory、SX-05／SX-06 は継続課題である。
+
+## 533. 2026-08-31 レビュー修正: identity／orchestrator journal の path 境界
+
+532 の後続 direct-loader 監査で、`AgentIdentityJournal` と `OrchestratorSessionJournal` の constructor が caller
+由来の journal path を `rootResolve` 後に直接保持していた残差を確認した。両 journal の生成・restore・append は
+durable な identity／mission ownership state を扱うため、constructor 時点で `assertSafeRepositoryPath` を適用し、
+repository 外および既存 path component の symbolic link 経由を拒否するようにした。既存の governed shared runtime と
+hermetic fixture の journal semantics は維持した。
+
+検証: identity／orchestrator **2 files / 54 tests passed**、対象 lint／Prettier、typecheck、`git diff --check`。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は
+継続課題である。
+
+## 534. 2026-08-31 レビュー修正: actuator／surface／automation loader の境界
+
+533 の後続 direct-loader 監査で、actuator manifest catalog／capability check、automation blueprint の pipeline
+参照、surface query の base／tenant／role／phase／personal overlay が、caller または catalog data の path を
+`rootResolve` 後に直接 secure I/O へ渡す残差を確認した。catalog directory、manifest、pipeline、provider config の
+最終 path を `assertSafeRepositoryPath` へ接続し、surface query は不正な base／overlay path を既存の空 config
+fallback へ縮退させるようにした。正常な `libs/actuators`、`pipelines/`、tier／tenant overlay の semantics は維持した。
+
+検証: actuator／capability **2 files / 18 tests passed**、surface query **2 files / 12 tests passed**、automation
+blueprint **1 file / 14 tests passed**、typecheck、対象 lint／Prettier、`git diff --check`。canonical full gate、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 535. 2026-08-31 レビュー修正: dispatch／knowledge feedback／voice receipt の保存先境界
+
+534 の後続レビューで、SX-04 の loader inventory に残っていた mission task trace directory、knowledge
+feedback policy、TTS loopback receipt output を再点検した。環境・request 由来の path を
+`assertSafeRepositoryPath`（missing leaf 許可）へ接続し、外部／既存 symlink component を secure I/O へ渡さないようにした。
+trace policy は不正 override を既定 sink へ縮退し、knowledge feedback policy も canonical policy へ縮退する。
+loopback は repository 内の出力だけを許可し、request ID は receipt の directory／filename に使える安全な識別子へ制限した。
+actuator manifest では、entrypoint に加えて `actuator_id` の schema と dispatch resolver の双方で path component を検証し、
+manifest 由来の module path escape を防止した。`check_catalog_integrity` に knowledge feedback policy を追加した。
+
+検証: actuator／capability **2 files / 27 tests passed**、knowledge feedback／TTS loopback／mission trace
+**3 files / 19 tests passed**、catalog integrity、typecheck、対象 lint／Prettier、`git diff --check`。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 536. 2026-08-31 レビュー修正: knowledge curation catalog override の境界
+
+535 の後続レビューで、KP-06 の SLO／taxonomy／report／archive-history override が `rootResolve` 後に直接
+catalog または secure I/O へ到達する残差を確認した。4つの入口を `assertSafeRepositoryPath`（missing leaf 許可）へ
+統一し、不正な外部／symlink path は各 canonical path へ縮退するようにした。tenant archive history の physical
+namespace は引き続き global override より優先する。`check_catalog_integrity` に SLO と taxonomy の schema/data を追加した。
+
+検証: knowledge curation **1 file / 19 tests passed**、catalog integrity、core build、typecheck、対象 lint／Prettier、
+`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、
+SX-05／SX-06 は継続課題である。
+
+## 537. 2026-08-31 SX-06 レビュー修正: auto checkpoint entrypoint の harness 統一
+
+直接 entrypoint inventory で、`scripts/auto_checkpoint.ts` だけが shared `defineScript()` を使わず、独自の
+Promise error／`process.exitCode` 処理を持つ残存を確認した。mission／pipeline から呼ばれる `runAutoCheckpoint()`
+の API は維持し、CLI 起動時だけ `defineScript({ name: 'auto:checkpoint' })` へ接続した。これにより共通の
+`--json`／`--quiet`／exit boundary と同じ harness で failure を処理できる。
+
+検証: auto checkpoint／script integrity **2 files / 7 tests passed**、対象 lint／Prettier。
+全 script harness 化、SX-05／SX-07、canonical full gate、provider CLI の OS-level enforcement probe は継続課題である。
+
+## 538. 2026-08-31 レビュー修正: video composition compiler の artifact path 境界
+
+537 の後続 direct-loader／ADF-origin path 監査で、video composition compiler が output bundle、音声参照、scene asset
+参照を `rootResolve` 後に render plan と secure I/O へ渡す残差を確認した。compile 時点で各最終 path を
+`assertSafeRepositoryPath`（missing leaf 許可）へ接続し、repository 外／既存 symlink component を含む参照を拒否するようにした。
+通常の `active/shared/tmp` bundle と未作成の fixture asset は維持し、外部 bundle／audio／asset は回帰テストで固定した。
+
+検証: video composition compiler **1 file / 18 tests passed**、core typecheck、対象 lint／Prettier。catalog integrity、
+core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 539. 2026-08-31 レビュー修正: generation scheduler の delivery path 境界
+
+538 の後続レビューで、generation scheduler は tenant schedule の delivery には namespace 検査がある一方、system
+schedule の `artifact_dir`、`latest_alias_path`、job parameter の target path は `rootResolve` 後に直接利用される残差を確認した。
+共通の root-relative resolver を `assertSafeRepositoryPath`（missing leaf 許可）へ接続し、外部／既存 symlink component を
+delivery／artifact の secure I/O へ渡さないようにした。tenant namespace の containment と既存 schedule semantics は維持した。
+
+検証: generation scheduler **2 files / 27 tests passed**、対象 lint／Prettier。catalog integrity、core build、typecheck、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 540. 2026-08-31 レビュー修正: authority の task-grant read path 境界
+
+539 の後続 direct-loader 監査で、secure-io の循環を避ける authority の raw read-side が
+`KYBERION_TASK_GRANTS_PATH` を `rootResolve` 後に直接読む残差を確認した。foundation の低レベル read helper に
+`lstat` を追加し、authority 側で repository 外および既存 symlink component を拒否して、不正 override は grant
+authority を一件も付与しない fail-closed にした。secure-io の import cycle 回避と既存の task／tenant／audience 判定は維持した。
+
+検証: authority／task-scoped grants **3 files / 42 tests passed**、core typecheck、対象 lint／Prettier、catalog integrity、
+script integrity、module boundary、plan metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 541. 2026-08-31 レビュー修正: tenant ingest curation の fixture root 境界
+
+540 の後続 path inventory で、DA-08 tenant ingest curation の
+`KYBERION_CURATION_TENANT_ROOTDIR` が `rootDir` として downstream ledger へ渡される前に外部 path を検査していない残差を確認した。
+override の解決時点で `assertSafeRepositoryPath` を適用し、repository 外／既存 symlink component は ledger access 前に拒否するようにした。
+repository 内 fixture、登録 tenant の advisory／fail-open semantics、asset freshness 判定は変更していない。
+
+検証: tenant ingest／curation report **2 files / 23 tests passed**、core typecheck、対象 lint／Prettier、catalog integrity、
+script integrity、module boundary、plan metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 542. 2026-08-31 レビュー修正: memory promotion review の evidence path 境界
+
+541 の後続レビューで、memory promotion review が candidate の evidence ref を absolute path のまま
+`safeExistsSync` へ渡し、repository 外のファイル存在を review evidence として扱える残差を確認した。
+path evidence を `assertSafeRepositoryPath` で検査し、外部／symlink 経由の参照は読み込まず missing evidence として
+promotion blocker にするよう修正した。logical evidence ref と既存の review／audit 判定は維持した。
+
+検証: memory promotion review **1 file / 6 tests passed**、core typecheck、対象 lint／Prettier、catalog integrity、
+script integrity、module boundary、plan metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 543. 2026-08-31 レビュー修正: promoted memory の hints／record 出力境界
+
+542 の後続レビューで、promoted memory の hints／archive override と generated record path が
+`pathResolver.resolve` 後に直接 secure I/O へ到達する残差を確認した。override は repository 内に限定し、外部／symlink
+経由の場合は canonical fallback へ縮退する。tenant evolution root、record の JSON／Markdown、archive、superseded record
+参照も最終 path を検査し、personal／confidential の既存配置と rotation semantics は維持した。
+
+検証: promoted memory／promotion review **2 files / 23 tests passed**、core typecheck、対象 lint／Prettier、catalog integrity、
+script integrity、module boundary、plan metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 544. 2026-08-31 レビュー修正: knowledge feedback loop の runtime path 境界
+
+543 の後続 direct-loader 監査で、KP-05 の delivery／usage／feedback runtime override と scoped final path が
+`rootResolve` 後に直接 secure I/O へ到達する残差を確認した。override と scope 展開後の最終 path を
+`assertSafeRepositoryPath`（missing leaf 許可）へ接続し、repository 外／既存 symlink component は canonical runtime
+root へ縮退するようにした。knowledge feedback policy の外部 override も canonical policy へ縮退し、JSONL の malformed
+line 読み込みは governed `readJsonLines` に統一した。
+
+検証: knowledge feedback loop **1 file / 12 tests passed**、core typecheck、対象 lint／Prettier。catalog integrity、
+script integrity、module boundary、plan metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 545. 2026-08-31 レビュー修正: curation scan root／service preset の入力境界
+
+544 の追加レビューで、knowledge curation の `KYBERION_CURATION_SCAN_ROOTS` と service preset validator の明示
+`presetPath` が repository 外または symlink 経由の path を入力境界で拒否していない残差を確認した。scan root と再帰中の
+各 corpus entry は不正値を scan 対象から除外し、tenant archive history の最終 path も再検査した。preset は認証結果を
+valid とせず fail-closed にした。既存の repository 内 fixture path と preset semantics は維持した。
+
+検証: knowledge curation／service validator **2 files / 追加テスト 3件**、対象 lint／Prettier。catalog integrity、
+core build、typecheck、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 546. 2026-08-31 レビュー修正: modeling actuator の SDLC artifact path 境界
+
+545 の後続 direct-loader 監査で、modeling actuator の requirements source／prior draft／design spec／quality contract と
+test inventory output が `rootResolve` 後に直接 secure I/O へ到達する残差を確認した。各入力と output path を
+`assertSafeRepositoryPath`（missing leaf 許可）へ接続し、repository 外または既存 symlink component の artifact read／write を
+拒否するようにした。既存の mission artifact fallback と modeling pipeline semantics は維持した。
+
+検証: modeling actuator **2 files / 16 tests passed**、actuator typecheck、対象 lint／Prettier。catalog integrity、
+core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 547. 2026-08-31 レビュー修正: build actuator の project／artifact path 境界
+
+546 の後続 direct-loader 監査で、build actuator の `project_dir`、scaffold `dest_dir`、build log／artifact path が
+repository／symlink 境界を明示的に再検査していない残差を確認した。共通 resolver と最終 path 検査を接続し、外部または
+symlink 経由の build working directory と scaffold 出力を拒否した。既存の in-repository mobile fixture と長時間 build の
+timeout semantics は維持した。
+
+検証: build actuator **1 file / 3 tests**、対象 typecheck／lint／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 548. 2026-08-31 レビュー修正: wisdom decision persistence の path 境界
+
+547 の後続 direct-loader 監査で、wisdom decision の source／output、simulation manifest／output directory、ensemble
+run directory が `rootResolve` 後に直接 secure I/O へ到達する残差を確認した。共通 decision path resolver を read／write／
+mkdir と manifest existence check に接続し、repository 外および既存 symlink component の decision artifact 操作を拒否した。
+既存の dissent／hypothesis／simulation の出力形式と retry semantics は維持した。
+
+検証: wisdom decision **1 file / 47 tests passed**、actuator typecheck、対象 lint／Prettier。catalog integrity、core build、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 549. 2026-08-31 レビュー修正: file actuator の全操作 path 境界
+
+548 の後続レビューで、共通 file actuator の read／stat／exists／search／tail と write／append／delete／mkdir／copy／move、
+context persistence が `path.resolve` 後に直接 secure I/O へ到達する残差を確認した。全操作を共通の
+`assertSafeRepositoryPath` resolver へ接続し、repository 外および既存 symlink component の read／write／mutation を拒否した。
+missing leaf の存在確認は従来どおり secure I/O に委ね、既存の ADF failure semantics は維持した。
+
+検証: file actuator **1 file / 24 tests passed**、actuator typecheck、対象 lint／Prettier。catalog integrity、core build、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 550. 2026-08-31 レビュー修正: system pipeline の動的 path 境界
+
+549 の後続レビューで、system pipeline の `cwd`、read_json、glob／scan、camera input、screen capture／recording output、
+open_file、context persistence が `rootResolve` または lexical 判定後に下流へ到達する残差を確認した。共通 system path
+resolver と再帰 scan entry の最終検査を接続し、repository 外または symlink 経由の read／exec／scan／artifact 操作を拒否した。
+既存 system actuator の adapter semantics と computer-surface test seam は維持した。
+
+検証: system actuator **1 file / 92 tests passed**、actuator typecheck、対象 lint／Prettier。catalog integrity、core build、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 551. 2026-08-31 レビュー修正: network／A2A transport の artifact path 境界
+
+550 の後続 direct-loader 監査で、network actuator の context／write artifact／target public key と A2A local outbox の
+message id／inbox entry／quarantine path が `rootResolve` または filename 連結後に直接 secure I/O へ到達する残差を確認した。
+共通 network path resolver と A2A の id／最終 path 検査を接続し、repository 外・symlink 経由・path traversal の transport
+read／write を拒否した。既存の local A2A delivery と encryption semantics は維持した。
+
+検証: network／A2A **2 files / 追加テスト 2件**、actuator typecheck、対象 lint／Prettier。catalog integrity、core build、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 552. 2026-08-31 レビュー修正: process actuator の spawn cwd 境界
+
+551 の後続 direct-loader 監査で、process actuator の caller 由来 `cwd` と CLI input path が `rootResolve` 後に直接 process
+spawn または secure I/O へ到達する残差を確認した。既存 process runtime の working directory と CLI input を
+`assertSafeRepositoryPath` へ接続し、repository 外／既存 symlink component の process execution を拒否した。
+
+検証: process actuator **1 file / 3 tests passed**、actuator typecheck、対象 lint／Prettier。catalog integrity、core build、
+module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 553. 2026-08-31 レビュー修正: email actuator の body file 境界
+
+552 の後続 direct-loader 監査で、email actuator の `body_file` が絶対 path または `rootResolve` 後に直接 secure I/O へ
+到達する残差を確認した。body source を `assertSafeRepositoryPath`（missing leaf 許可）へ接続し、repository 外および既存
+symlink component のメール本文 read を拒否した。送信／draft の既存 semantics は変更していない。
+
+検証: email actuator **1 file / 4 tests passed**、対象 typecheck／lint／Prettier。catalog integrity、core build、module
+boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の
+OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 554. 2026-08-31 レビュー修正: meeting actuator の transcript／report path 境界
+
+553 の後続 direct-loader 監査で、meeting actuator の transcript、self-action／speaker-fairness report、CLI input と meeting
+intelligence の report／JSON output が `rootResolve` 後に直接 secure I/O へ到達する残差を確認した。共通 meeting path resolver と
+最終 report path 検査を接続し、repository 外および既存 symlink component の meeting artifact read／write を拒否した。既存の
+meeting consent、audit、delegation semantics は維持した。
+
+検証: meeting actuator **1 file / 15 tests passed**、対象 typecheck／lint／Prettier。catalog integrity、core build、module boundary、metadata、knowledge
+index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement probe、未監査
+direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 555. 2026-08-31 レビュー修正: ingest parse／presentation preference の入力 path 境界
+
+554 の後続 direct-loader 監査で、ingest `parse_document` の `source_path` と media presentation preference の
+profile／registry path が絶対 path または `rootResolve` 後に直接 secure I/O／registry write へ到達する残差を確認した。
+各明示入力を `assertSafeRepositoryPath`（missing leaf 許可）へ接続し、repository 外および既存 symlink component の
+ingest read／preference read／write を拒否した。既存の parse IR と profile registry semantics は維持した。
+
+検証: ingest parse **1 file / 9 tests passed**、presentation preference **1 file / 2 tests passed**、対象 typecheck／lint／Prettier。
+catalog integrity、core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 556. 2026-08-31 レビュー修正: orchestrator task-plan fallback の入力 path 境界
+
+555 の後続 direct-loader 監査で、orchestrator の requirements draft／design spec fallback path が `rootResolve` 後に
+直接 `safeExistsSync`／`loadJson` へ到達する残差を確認した。fallback input を `assertSafeRepositoryPath`（missing leaf 許可）へ
+接続し、repository 外および既存 symlink component の task-plan artifact read を拒否した。mission-scoped artifact の既存
+優先順位と task plan 生成 semantics は維持した。
+
+検証: task-plan boundary **1 file / 1 test passed**、actuator typecheck／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 557. 2026-08-31 レビュー修正: wisdom stakeholder readiness の path 境界
+
+556 の後続 direct-loader 監査で、stakeholder readiness の visits directory、readiness reference、matrix output が
+`rootResolve` 後に直接 recursive scan／`loadJson`／`safeWriteFile` へ到達する残差を確認した。入力 directory と各 scan entry、
+reference、output を `assertSafeRepositoryPath` へ接続し、repository 外または symlink 経由の stakeholder artifact read／write を
+拒否した。scan 中に混入した不正 entry は除外し、既存の readiness score／recommendation semantics は維持した。
+
+検証: wisdom decision **1 file / 48 tests passed**、actuator typecheck／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 558. 2026-08-31 レビュー修正: video／media document artifact path 境界
+
+557 の後続 direct-loader 監査で、video composition の lint／verify／validation／job ticket と media document action の
+diagram／PPTX／XLSX／DOCX／PDF／Draw.io／generic write path が actuator 内で直接 `rootResolve`／`path.resolve` 後に
+下流 read／write／exec へ到達する残差を確認した。動的 artifact path と source path を共通 `assertSafeRepositoryPath`
+resolver へ接続し、repository 外・path traversal・既存 symlink component の操作を拒否した。video compiler の既存 bundle
+guard と media の tenant design write semantics は維持した。
+
+検証: video composition **1 file / 20 tests passed**、media actuator **1 file / 49 tests passed (11 skipped)**、actuator
+typecheck／Prettier。catalog integrity、core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は
+後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、
+SX-05／SX-06 は継続課題である。
+
+## 559. 2026-08-31 レビュー修正: browser actuator の profile／evidence path 境界
+
+558 の後続 direct-loader 監査で、browser actuator の user data directory、video／evidence directory、screenshot、session
+handoff、failure bundle、Playwright／ADF export、operator continue file が `rootResolve` 後に直接 Playwright／secure I/O へ到達する
+残差を確認した。動的 path と session-derived path を `assertSafeRepositoryPath` へ接続し、repository 外・path traversal・既存 symlink
+component の browser artifact 操作を拒否した。browser session／lease semantics は維持した。
+
+検証: browser actuator **2 files / 39 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 560. 2026-08-31 レビュー修正: voice runtime の profile／artifact path 境界
+
+559 の後続 direct-loader 監査で、voice runtime の profile sample、transcript sidecar、artifact output、bridge script、playback source と
+derived temporary artifact が共通安全 path を経ずに secure I/O／OS bridge へ到達する残差を確認した。missing leaf を許可した
+`assertSafeRepositoryPath` へ接続し、repository 外および既存 symlink component の音声 artifact read／write／playback を拒否した。
+TTS fallback／clone／playback の既存 semantics は維持した。
+
+検証: voice runtime **1 file / 4 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 561. 2026-08-31 レビュー修正: android／ios actuator の host artifact path 境界
+
+560 の後続 direct-loader 監査で、android／ios actuator の artifacts directory、context persistence、host-side file read、screen／UI
+tree／session handoff output、ios app path が `path.resolve` 後に直接 secure I/O／device CLI へ到達する残差を確認した。host-side path を
+共通 `assertSafeRepositoryPath` resolver へ接続し、repository 外・path traversal・既存 symlink component の host artifact 操作を拒否した。
+ADB／simctl の device/container path は device-owned boundary として維持した。
+
+検証: android／ios **2 files / 53 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、core build、module boundary、
+metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 562. 2026-08-31 レビュー修正: service／orchestrator legacy path 境界
+
+561 の後続 direct-loader 監査で、service actuator の manifest／pipeline context と orchestrator legacy helper の context、read／write／
+mkdir／symlink、execution-plan output が repository path を直接組み立てて下流へ渡す残差を確認した。各入力・出力を共通
+`assertSafeRepositoryPath` resolver へ接続し、repository 外・path traversal・既存 symlink component の service／orchestration artifact
+操作を拒否した。既存の relative output contract と service／task-plan semantics は維持した。
+
+検証: service reconcile **1 file / 4 tests passed**、orchestrator **2 files / 25 tests passed**、各 actuator typecheck／lint／Prettier。
+catalog integrity、core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 563. 2026-08-31 レビュー修正: code／terminal／artifact／vision の入力 path 境界
+
+562 の後続 direct-loader 監査で、code actuator の read／glob／semgrep／test／impact analysis／write／reconcile、terminal の spawn cwd、
+artifact delivery pack の pack path、vision の inspect／OCR／description 入力が repository 境界検査を経ずに下流へ到達する残差を確認した。
+動的 path と terminal cwd を `assertSafeRepositoryPath` へ接続し、artifact delivery pack は logical path のまま保存するよう修正した。既存の
+relative output contract、artifact role、vision provider routing、terminal session semantics は維持した。
+
+検証: code／terminal／artifact／vision **4 files / 54 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、core build、module
+boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 564. 2026-08-31 レビュー修正: modeling actuator の source／Terraform／review artifact path 境界
+
+563 の後続 direct-loader 監査で、modeling actuator の read_json／read_file／glob、source analysis root、Terraform root、agentic review output、
+generic write path、reconcile strategy が `path.resolve` 後に直接下流へ渡る残差を確認した。入力・出力を共通 resolver へ接続し、review artifact の
+static filename も再検査することで repository 外・path traversal・既存 symlink component の操作を拒否した。source-analysis の relative path
+serialization と既存 mission evidence／tenant gate semantics は維持した。
+
+検証: modeling actuator **1 file / 10 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、core build、module boundary、metadata、
+knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct
+loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 565. 2026-08-31 レビュー修正: media document／diagram／catalog path 境界
+
+564 の後続 direct-loader 監査で、media actuator の JSON／PPTX／XLSX／DOCX／PDF／HTML／Draw.io 入力、diagram icon／source、tenant catalog、
+protocol／logo／design-system pack、document pipeline icon root が secure-io 境界なしに読み込まれる残差を確認した。各 dynamic path を
+`assertSafeRepositoryPath` へ接続し、optional logo は repository 外なら無視、catalog／protocol は不正 path を拒否する fail-closed semantics とした。
+media-generation の direct video provider `target_path` も同じ境界へ接続した。既存の public／confidential theme fallback と renderer semantics は維持した。
+
+検証: media **3 files / 52 tests passed (11 skipped)**、media-generation **1 file / 30 tests passed**、actuator typecheck／lint／Prettier。catalog integrity、
+core build、module boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 566. 2026-08-31 レビュー修正: media confidential brand import／direct video output 境界
+
+565 の再レビューで、media の `save_brand_to_confidential` が tenant slug を含む confidential output／tenant registry path へ直接到達し、
+media-generation の direct video provider が caller の `target_path` をそのまま `safeWriteFile` へ渡す残差を確認した。confidential directory、tenant
+registry、video output を `assertSafeRepositoryPath` へ接続し、tenant path traversal と repository 外の video write を拒否した。既存の tenant registry
+更新、provider download、video artifact metadata semantics は維持した。
+
+検証: media／media-generation **4 files / 83 tests passed (11 skipped)**、actuator typecheck／lint／Prettier。catalog integrity、core build、module
+boundary、metadata、knowledge index、baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement
+probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 567. 2026-08-31 レビュー修正: 直接スクリプトの repository path 境界
+
+566 の再レビューで、アバター生成／登録、validation bundle export、registry manager、intent-contract memory sync の CLI／環境変数由来パスが
+`path.resolve` または `pathResolver.rootResolve` 後に直接 I/O へ渡る残差を確認した。入力写真・生成先・個人 identity、bundle output、adapter／registry
+出力、intent memory の runtime／seed／report／export を `assertSafeRepositoryPath` に接続し、repository 外・path traversal・既存 symlink component を
+拒否する共通境界へ寄せた。既存の optional export の失敗時継続、tenant scope の seed 同期拒否、各 script の harness／出力 semantics は維持した。
+
+検証: 4 files / 14 tests passed（path boundary／catalog boundary／script integrity）、root `tsc --noEmit`、対象 lint、Prettier、`check:script-integrity`、
+`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 568. 2026-08-31 レビュー修正: governance catalog の未参照処分 gate
+
+567 の再レビューで、governance catalog の schema／契約検査は存在しても、production source から参照されない catalog を検知・説明する仕組みが
+不足していることを確認した。`check:catalogs` に production source の filename literal／governance path 参照検査を追加し、生成物ディレクトリを除外した。
+実行時に利用される `decision-rights`／`role-write-access` は `path.join` 形式も認識し、残る互換・設計資料・検査定義19件は `documentation_only: true` を
+明示した。今後、未参照 catalog を追加して説明を付けない変更は catalog gate で失敗する。
+
+検証: `check:catalogs` passed（warnings 0）、catalog integrity tests **2 files / 16 tests passed**、root `tsc --noEmit`、対象 lint、knowledge index generator、
+`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 569. 2026-08-31 レビュー修正: decision-rights の governed catalog 移行
+
+568 の catalog loader 再監査で、実行時に approval／company 解決が利用する `decision-rights` だけが `loadJsonIfPresent` と手書き shape 判定を
+残していることを確認した。tenant／customer／confidential／public の候補順序は維持したまま、dedicated `decision-rights.schema.json` を
+`defineCatalog` に接続し、存在する catalog が schema 不正の場合は黙って空の fallback へ落とさず fail-closed するようにした。schema 不在時の
+public empty matrix という従来の未設定 semantics は維持した。
+
+検証: decision-rights／approval-gate／company **3 files / 25 tests passed**、root `tsc --noEmit`、対象 lint、Prettier。catalog integrity、knowledge index、
+baseline、`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、
+SX-05／SX-06 は継続課題である。
+
+## 570. 2026-08-31 レビュー修正: source archive／camera capture の出力境界
+
+569 の direct script 再監査で、source archive の `--output` と camera capture の出力先が `path.resolve` 後に書き込みへ渡る残差を確認した。archive と
+SHA256SUMS の sibling output、camera capture の `save_path` を `assertSafeRepositoryPath` へ接続し、repository 外の出力を拒否した。source archive の
+既存相対 path 解決 API、checksum 検証、install smoke の semantics は維持し、camera script は shared harness の positional／JSON output 境界も利用する。
+
+検証: source archive／repository path／script integrity **4 files / 18 tests passed**、root `tsc --noEmit`、対象 lint、Prettier、`check:script-integrity`、
+`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 571. 2026-08-31 レビュー修正: intent smoke の report directory 境界
+
+570 の direct output 再監査で、`intent_smoke` の `--output` が `path.resolve` 後にログ／summary の書き込みへ渡る残差を確認した。出力ディレクトリを
+`assertSafeRepositoryPath` に接続し、repository 外のログ生成を拒否した。既存の intent 列挙、subprocess 実行、失敗件数の exit code、shared harness の summary
+出力 semantics は維持した。
+
+検証: repository path／intent smoke **2 files / 7 tests passed**、root `tsc --noEmit`、対象 lint、Prettier。catalog integrity、knowledge index、baseline、
+`git diff --check` は後続の全体再検証対象。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 572. 2026-08-31 レビュー修正: 残存 direct entrypoint の shared harness 統一
+
+571 の後続 direct-loader 監査で、`oauth_callback_surface` の import 時 listener bind、`find_dead_code` の import 時 `main()` 実行、
+`refactor/prune_unused_imports` の独自 `process.argv` 判定、build 前に動く `clean` の裸 `main()` が残っていることを確認した。OAuth
+surface は dry-run／check の preview と listen 起動を `defineScript` に接続し、dead-code finder、import pruner、clean は
+`isDirectScript` と shared harness を経由するようにした。
+OAuth の callback route／header／error masking、各 refactor tool の既存引数・出力・書き込み semantics は維持した。
+
+検証: OAuth／catalog／decision-rights／repository path **4 files / 28 tests passed**、entrypoint import side-effect probe、prune dry-run
+probe、root `tsc --noEmit`、`check:script-integrity`、Prettier。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct
+loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 573. 2026-08-31 再レビュー修正: DESIGN.md 取込 generator の dry-run／入力境界
+
+572 の後続再レビューで、`import_design_md_catalog.ts` が shared harness には接続されていても、生成物を作る処理を `defineScript` の内部で
+直接実行しており、`--dry-run`／`--check`／`--quiet`／`--json` が独自 yargs に流れて書き込みを抑止できない残差を確認した。3 つの出力を
+`defineGenerator` の宣言済み output として返す構造へ変更し、shared flag を custom parser から除外した。`--source`／`--readme` は
+`assertSafeRepositoryPath` を経由させ、リポジトリ外・symlink 経由の入力を読み込まないようにした。index の `generated_at` は比較時だけ
+正規化し、時刻だけで `--check` が不安定にならないようにした。既存の DESIGN.md 解析形式、3 出力の JSON payload、source metadata は維持した。
+
+検証: import generator **1 file / 2 tests passed**（dry-run／shared flags／repository 外入力）、root `tsc --noEmit`、対象 ESLint、
+`check:script-integrity`、`check:catalogs`、`check:foundation-adoption`、module boundary、improvement-plan metadata、`git diff --check`。
+canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 574. 2026-08-31 再レビュー修正: pipeline の unified CLI 到達性と runner harness
+
+573 の後続レビューで、command registry は `pipeline` を宣言している user-facing CLI と、package script の
+`pnpm pipeline` が別の到達経路のまま残っていることを確認した。また `run_pipeline.ts` は手書きの `.catch()` で
+起動し、pipeline 本体の yargs が暗黙に process argv を読むため、shared script harness の argv 境界を利用していなかった。
+`pipeline-runner` entrypoint を registry に追加し、`kyberion pipeline --input ...` を validated runner へ lazy dispatch するようにした。
+runner は `defineScript` を入口にし、pipeline 本体は明示的な argv を受け取る形へ変更した。fallback の source 実行、ADF lifecycle、
+project-trust semantics、pipeline library API は変更していない。
+
+検証: unified CLI の baseline pipeline `--dry-run --json` が `ready`、command manifest **OK**、router／pipeline 回帰 **2 files / 18 tests passed**、
+pipeline 回帰 **2 files / 70 tests passed**、root `tsc --noEmit`、script-integrity、Prettier。
+scripts ≤120、全 script harness 移行、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 575. 2026-08-31 再レビュー修正: readiness／setup CLI の unified 到達性
+
+574 の統合 CLI 再レビューで、実行可能な operator readiness／setup／voice setup が command registry と `kyberion` router から到達できず、
+package script と user-facing CLI の入口が分断している残差を確認した。`vital`、`setup report`、`voice setup` を registry に登録し、既存の
+`vital_check`／setup report／voice setup の harness 実装を router から再利用する lazy route を追加した。既存の診断・音声 runtime の判定、
+`voice setup --apply` の明示的な変更要求、出力形式は維持した。
+
+検証: command manifest **OK**、router 回帰 **18 tests passed**、`build:repo`、compiled runtime の `vital --format=json --exit-on-missing=false`
+（`overall=attention`、missing 4 件を明示）、`voice setup`（未導入 runtime 7 件を警告として明示、apply は未実行）、root `tsc --noEmit`、Prettier。
+scripts ≤120、全 script harness 移行、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 576. 2026-08-31 再レビュー修正: QM-03 V-layer benchmark の CI 接続
+
+QM-03 の実装状況を再確認した結果、`memory-notebook` の fold／provenance 中立化／consolidation action と `bench:memory` 自体は存在する一方、
+V-layer benchmark は package script からの手動実行に留まり、manifest-driven `pnpm check` では実行されていなかった。`ci-gates.json` に
+`memory-benchmark` を PR gate として追加し、full scope でも同じ deterministic benchmark が実行されるようにした。provider、filesystem、network に
+依存しない既存 benchmark の性質は維持した。
+
+検証: `pnpm run check -- --scope pr --only memory-benchmark` passed、`check:ci-gate-parity` passed、`bench:memory` passed、Prettier、baseline pipeline、
+直前の canonical full gate **67/67**。QM-03 の promotion queue／background-review の既存 hash-bound approval 配線は現行コードで確認済み。
+
+## 577. 2026-08-31 再レビュー修正: working-memory actuator の bounded fold
+
+576 の実装後レビューで、working-memory actuator の `note` が共有 notebook helper で provenance／dedupe／日付を処理していても、
+`MAX_FACTS` 上限を適用せず、しかも notes を section 先頭へ挿入するため「最古から削除」の順序契約も満たしていないことを確認した。
+`memory-notebook` に `boundNotebook` を追加して fold 側と actuator 側の上限処理を一本化し、actuator は canonical `foldCapture` で整形した bullet を
+section 末尾へ append するように変更した。既存の section 構造、trusted／untrusted provenance、dedupe、consolidation status の semantics は維持した。
+
+検証: memory notebook／working-memory actuator **2 files / 23 tests passed**、`build:packages`、`build:actuators`、`bench:memory`、Prettier。上限超過時に
+300 facts を維持し oldest 2 facts を除去する actuator 回帰を追加した。
+
+## 578. 2026-08-31 再レビュー修正: marketing／CLI workflow の入力 path 境界
+
+577 の後続 direct-loader 監査で、marketing publication dry-run の approval／approved artifact／output root と、task／email workflow CLI の
+plan／triage／body path が `rootResolve()` 後に直接 secure I/O へ到達する残差を確認した。各入力・出力を `assertSafeRepositoryPath` に接続し、
+repository 外・path traversal・既存 symlink component の読み書きを拒否する共通境界へ寄せた。承認検証、dry-run 出力、task plan、メール草稿の
+既存 semantics は維持した。
+
+検証: marketing dry-run／CLI **2 files / 10 tests passed**、Prettier、`git diff --check`。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 579. 2026-08-31 再レビュー修正: campaign suite の brief／成果物 path 境界
+
+578 の後続 direct-loader 監査で、campaign suite の brief、deliverable output directory、campaign manifest が `rootResolve()` 後に直接
+foundation／secure I/O へ到達する残差を確認した。入力・出力を `assertSafeRepositoryPath` へ接続し、生成計画へ渡す output root は
+repository-relative に正規化した。campaign の design 解決、dry-run、actuator 実行、manifest semantics は維持した。
+
+検証: campaign suite path boundary **1 file / 2 tests passed**、Prettier、`git diff --check`。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 580. 2026-08-31 再レビュー修正: marketing review／video dry-run の path 境界
+
+579 の後続 direct-loader 監査で、marketing review aggregation の review package／artifact／review／output path と video dry-run の
+campaign brief／brand profile／`ffmpeg` artifact output が `rootResolve()` 後に直接 read／write／exec へ到達する残差を確認した。
+各入力・出力を `assertSafeRepositoryPath` へ接続し、生成 artifact は安全な run directory 配下へ限定した。review gate、hash binding、
+technical validation、dry-run の既存 semantics は維持した。
+
+検証: marketing review／video **2 files / 9 tests passed**、Prettier、`git diff --check`。canonical full gate、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 581. 2026-08-31 再レビュー修正: service recording／realtime voice の path 境界
+
+580 の後続 direct-loader 監査で、service recording の `@path` JSON／compile output と realtime voice の custom recording bridge／recording
+output directory が `rootResolve()` 後に直接 read／write／spawn へ到達する残差を確認した。repository-owned input／output を
+`assertSafeRepositoryPath` へ接続し、外部 path・path traversal・既存 symlink component を実行前に拒否した。inline JSON、allowlisted
+recording store、音声会話の録音・STT・再生 semantics は維持した。
+
+検証: service recording／realtime voice **2 files / 9 tests passed**、Prettier、`build:repo`、`git diff --check`。canonical full gate、provider
+CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05／SX-06 は継続課題である。
+
+## 582. 2026-08-31 再レビュー修正: ADF／migration／TaskScenario path 境界
+
+581 の後続 direct-loader 監査で、ADF 共通入力、migration runner の module／state path、generation schedule、TaskScenario の
+scenario／profile／answers path が `rootResolve()` または環境変数 override 後に直接 read／import／write へ到達する残差を確認した。
+共通 `assertSafeRepositoryPath` を各入口と directory entry に適用し、repository 外・path traversal・既存 symlink component を実行前に
+拒否するようにした。ADF trust gate、migration ordering／rollback、generation scheduler、TaskScenario の既存 semantics は維持した。
+
+検証: ADF／migration／generation schedule **3 files / 20 tests passed**、TaskScenario／service recording／realtime voice を含む対象回帰、
+Prettier、`git diff --check`。canonical full gate、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory、
+SX-05／SX-06 は継続課題である。
+
+## 583. 2026-08-31 再レビュー修正: unified CLI router の harness printer 接続
+
+582 の SX-06 再監査で、command registry の統合 router が `console.log` を直接呼び、`--json`／`--quiet` を提供する shared harness の
+printer を迂回している残差を確認した。help／vital readiness の出力を `ScriptContext.print` 経由へ変更し、router 自体の direct stdout
+を除去した。command dispatch、legacy compatibility、readiness result の exit semantics は維持した。
+
+検証: unified CLI router **1 file / 20 tests passed**、Prettier、`build:repo`、`git diff --check`。scripts ≤120、全 script harness 移行、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 584. 2026-08-31 再レビュー修正: generation schedule／service harness／A2A の printer 境界
+
+583 の継続監査で、共有 `defineScript` が提供する明示的 argv／`--json`／`--quiet` と printer を、generation
+schedule、service harness、A2A gateway の3入口が迂回していた。各 `main` に explicit argv と printer を受け渡し、shared
+flag を legacy parser の前に除去する形へ揃えた。これにより import／テスト時に `process.argv` や stdout へ依存せず、JSON／quiet
+出力も一つの harness 境界で扱える。既存の業務処理、A2A envelope、service harness action、generation scheduler の委譲は維持した。
+
+検証: generation schedule／service harness／A2A **3 files / 13 tests passed**、`build:repo`、script-integrity、Prettier、
+`git diff --check`、canonical full gate **68/68 passed**。scripts ≤120、全 script harness 移行、provider CLI の OS-level
+enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 585. 2026-08-31 再レビュー修正: 残存 script の explicit argv／printer 収束
+
+584 の続きとして、画像生成、backup、TaskScenario smoke、peer network register／message send、company bootstrap／onboarding、
+migration、surface runtime、TUI、check runner、environment bootstrap の入口を再監査した。`createStandardYargs()` の暗黙的な
+process argv 生成を production scripts から除去し、各入口へ明示 argv を渡した。stdout の結果・進捗は可能な範囲で
+`ScriptContext.print` へ接続し、JSON／quiet が shared harness で一貫して扱えるようにした。既存の dry-run、migration、surface
+operation、backup、peer envelope、onboarding の実行 semantics は維持した。
+
+検証: 対象 **13 files / 53 tests passed**、production `createStandardYargs()` 暗黙呼び出し **0**、`build:repo`、
+script-integrity、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る interactive／server の rich output、
+scripts ≤120、全 script harness／generator 移行、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory
+は継続課題である。
+
+## 586. 2026-08-31 再レビュー修正: generation schedule alias の canonical 化
+
+SX-05 の package script inventory を再確認し、`schedule:list` が `generation:schedule --action list` と同じ実体を指す
+未使用 alias であることを確認した。文書・intent catalog の参照を canonical command へ更新し、alias を package registry から
+削除した。これにより package scripts は **236 → 235** となり、script-integrity が package／docs／knowledge の参照切れを
+検査できる状態を維持した。knowledge index は正規 generator で同期した。
+
+検証: script-integrity、knowledge index generator、`build:repo`、`git diff --check`、canonical full gate **68/68 passed**。
+scripts ≤120、doctor／CLI alias 全体の整理、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory
+は継続課題である。
+
+## 587. 2026-08-31 再レビュー修正: intent／TUI alias の canonical 化
+
+586 の続きとして package script と文書参照を再監査し、`intent:scenario` は canonical な `intent:run --scenario-only` と重複し、
+`tui:dev` は現在の unified TUI entrypoint と重複していることを確認した。文書の intent 実行例を canonical command へ更新し、
+未使用 alias 2 件を package registry から削除した。package scripts は **235 → 233** となり、script-integrity と catalog の
+参照整合性を維持した。既存の intent scenario 実行と TUI の開発起動 semantics は変更していない。
+
+検証: script-integrity、Prettier、`git diff --check`、canonical full gate **68/68 passed**。scripts ≤120、doctor／CLI alias 全体の整理、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 588. 2026-08-31 再レビュー修正: ADF engine の execution bound 共通化
+
+587 の後続として SX-10/SX-11 の実行上限実装を再監査し、`execution-bounds.ts` に既に抽出されている
+step／wall-clock の既定値が system actuator 以外の共通 ADF engine では重複リテラルとして残っていることを確認した。
+ADF engine の `maxSteps`／`timeoutMs` の既定値と step／timeout guard を shared execution-bounds の定数・関数へ接続し、
+system actuator と ADF actuator が同じ runtime safety contract を参照するようにした。呼び出し側の明示 override、
+`[SAFETY_LIMIT]` の分類可能なエラー形式、nested ADF の state 共有は維持した。
+
+検証: ADF engine／execution-bounds／actuator SDK **3 files / 35 tests passed**、`build:packages`、script-integrity、
+Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る `executePipeline` の domain-specific wrapper、
+全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory
+は継続課題である。
+
+## 589. 2026-08-31 再レビュー修正: domain ADF wrapper の execution bound 参照統一
+
+588 の後続監査で、共通 ADF engine に加えて file／code／modeling／wisdom／network／orchestrator／browser、
+deployment／approval／meeting／media、Super-Nerve の各 wrapper が pipeline option の既定 step 数を個別に
+`1000` としていたことを確認した。browser／media の domain 固有 timeout は維持しつつ、共通 step limit と通常の
+60 秒 timeout を `execution-bounds` の定数へ置換し、wrapper が SDK／engine と同じ runtime safety contract を参照するようにした。
+既存の option override、Super-Nerve の再試行・state accounting、各 domain の長時間処理 semantics は維持した。
+
+検証: 対象 actuator／ADF 回帰 **12 files / 245 tests passed（11 skipped）**、`build:actuators`、script-integrity、
+Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る domain-specific control／trace wrapper、
+全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory
+は継続課題である。
+
+## 590. 2026-08-31 再レビュー修正: actuator SDK の in-process bound 強制
+
+589 の後続レビューで、`runActuatorPipeline` が複数 step の preflight／handler loop を持つ一方、
+SDK 自体には max step／wall-clock の fail-closed guard がなく、各 caller の loop accounting に依存している残差を確認した。
+`RunActuatorPipelineOptions` に `maxSteps`／`timeoutMs` を追加し、shared `execution-bounds` の既定値・state・guard を
+handler admission 前に適用した。既存 caller の context／preflight／sandbox／approval semantics、個別 wrapper の option override は維持し、
+SDK を直接利用する新規 actuator も同じ安全境界を自動的に得られるようにした。
+
+検証: actuator SDK **1 file / 14 tests passed**、`build:packages`、script-integrity、Prettier、`git diff --check`、
+canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の ADF lifecycle 完全収束、scripts ≤120、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 591. 2026-08-31 再レビュー修正: actuator SDK sequence の bound 収束
+
+590 の再レビューで、`runActuatorStepSequence` が複数の `runActuatorPipeline` 呼び出しを束ねる一方、
+既定の step limit を `Infinity` とし、sequence 全体の wall-clock を計測していない残差を確認した。
+sequence に shared execution-bounds の state／step／timeout guard を追加し、未指定時も共通の 1,000 step／60 秒契約を適用した。
+明示 `maxSteps`／`timeoutMs`、最初の handler failure で停止する result envelope、Android／iOS caller の挙動は維持した。
+
+検証: actuator SDK **1 file / 14 tests passed**、`build:packages`、script-integrity、Prettier、`git diff --check`、
+canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の ADF lifecycle 完全収束、scripts ≤120、
+provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 592. 2026-08-31 再レビュー修正: ADF SDK adapter の既定値一本化
+
+591 の後続監査で、`runAdfActuatorPipeline` が `adf-engine` の shared default と同値の
+`1000`／`60_000` を adapter 層で重複定義していることを確認した。SDK adapter の既定値を
+`execution-bounds` の定数へ置換し、ADF engine、ADF adapter、domain wrapper の全てが同じ source of truth を参照するようにした。
+明示 option、result envelope、sandbox／hook／handler の委譲 semantics は維持した。
+
+検証: actuator SDK／ADF engine **2 files / 31 tests passed**、`build:packages`、script-integrity、Prettier、
+`git diff --check`、canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の ADF lifecycle 完全収束、
+scripts ≤120、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 593. 2026-08-31 再レビュー修正: Concierge voice-hub 経路の UX 契約収束
+
+592 の後続レビューで、共通オーケストレータの outbound chokepoint は UX 契約を検証していた一方、Concierge の
+voice-hub 高速経路はその経路を通らず、内部語彙や承認待ち案内の欠落がそのまま返る残差を確認した。検証と安全な語彙修復を
+`checkAndRepairSurfaceUxContract` に共通化し、voice-hub の返信にも適用した。自動修復できない承認案内の不足は内容を捏造せず、
+警告を記録して既存の返信を維持する。`@agent/core/surface-ux-contract` の package export も追加し、surface entrypoint が
+private path に依存しないようにした。既存の voice-hub → orchestrator failover、viewer scope、intent resolution の shape は変更していない。
+
+検証: UX contract／surface orchestrator **3 files / 37 tests passed**、Concierge **3 files / 27 tests passed**、`build:packages`、
+Concierge `next build`、Prettier、`git diff --check`。Turbopack の既存 NFT tracing warning は残るが build は成功した。残る domain-specific
+control／trace wrapper、全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の OS-level enforcement probe、未監査 direct loader 全件 inventory
+は継続課題である。
+
+## 594. 2026-08-31 再レビュー修正: knowledge scope reconciliation の harness 出力収束
+
+593 の後続として script entrypoint を再監査し、`knowledge:scope-reconcile` は `defineScript` を利用しているものの、
+`--json`／`--quiet` の出力を共有 harness ではなく `console` と生 argv 判定で処理していた残存を検出した。標準 flag を
+harness に登録し、構造化 JSON・quiet・通常表示を `context.print` へ統一した。`--alert`／`--fail` の固有動作、report の
+安全な保存、attention 時の stderr 通知は維持した。entrypoint 契約テストを追加し、custom output の移行漏れを再発防止する。
+
+検証: `knowledge:scope-reconcile` entrypoint **1 test passed**、`node dist/scripts/check_script_integrity.js`、`build:packages`、
+Prettier、`git diff --check`。残る server／interactive／custom output の全 script harness 移行、scripts ≤120、残りの
+script-level command の noun／verb registry 化、provider CLI の実 enforcement probe は継続課題である。
+
+## 595. 2026-08-31 再レビュー修正: Chronos LaunchAgent custom output の harness 移行
+
+594 の続きとして、`chronos:install`／`chronos:uninstall` を再監査した。LaunchAgent の dry-run と uninstall 手順が
+複数の `console.log` に分散し、shared harness の printer を使わない custom output 残存があったため、生成・apply・bootout の
+外部作用は変えず、dry-run 出力を注入可能な printer へ集約した。uninstall dry-run の side-effect-free 契約と plist の純粋生成を
+回帰テストで固定した。
+
+検証: Chronos LaunchAgent／knowledge scope entrypoint **2 files / 11 tests passed**、script integrity、Prettier、`git diff --check`。
+残る server／interactive／custom output の全 script harness 移行、scripts ≤120、残りの script-level command の noun／verb registry 化、
+provider CLI の実 enforcement probe は継続課題である。
+
+## 596. 2026-08-31 再レビュー修正: mission evaluation custom output の構造化
+
+595 の後続として、`evaluate:mission-orchestration` を再監査した。shared `defineScript` を使っているにもかかわらず、
+評価レポート生成後の4行の結果表示を直接 `console.log` し、`--json` を harness の構造化出力へ接続していなかった。
+レポートの schema 検証、安全な repository path、生成物の保存は維持し、通常表示を一つの printer 出力へ、`--json` を
+`{ ok, report_path, report }` envelope へ収束した。評価計算と report の内容は変更していない。
+
+検証: mission evaluation／LaunchAgent／knowledge scope entrypoint **3 files / 12 tests passed**、`build:repo`、Prettier、
+`git diff --check`。残る server／interactive／custom output の全 script harness 移行、scripts ≤120、残りの script-level command の
+noun／verb registry 化、provider CLI の実 enforcement probe は継続課題である。
+
+## 597. 2026-08-31 再レビュー修正: realtime voice CLI の output boundary 収束
+
+596 の後続として、`voice:realtime-conversation` を再監査した。shared `defineScript` を使っているにもかかわらず、
+interactive の VAD／turn／loop 状態と one-shot 結果が直接 `console.log` へ出ていたため、printer を main から recorder／
+interactive loop／full-duplex loop／one-shot まで伝播した。録音 bridge の生 stdout/stderr は診断ログとして保持し、音声処理・
+同意確認・STT/TTS 選択・artifact semantics は変更していない。依存注入した interactive 回帰で operator-facing output が
+printer に到達することと、entrypoint に直接 final-output logging がないことを固定した。
+
+検証: realtime voice CLI **1 file / 7 tests passed**、`build:repo`、script integrity、Prettier、`git diff --check`。残る server／
+interactive／custom output の全 script harness 移行、scripts ≤120、残りの script-level command の noun／verb registry 化、
+provider CLI の実 enforcement probe は継続課題である。
+
+## 598. 2026-08-31 再レビュー修正: scoped intent resolver の task-session 収束
+
+597 の後続監査で、tenant／tier overlay から選択した intent resolution packet を後段の
+`classifyTaskSessionIntent` が受け取った場合でも、packet の補助情報が不足すると base catalog を
+再読込してしまう残存を確認した。これにより、scoped catalog 側で shape／risk を変更した intent と
+task-session の分類結果が不一致になる可能性があったため、分類関数に `IntentResolutionOptions` を
+伝播し、packet の再解決と catalog lookup の双方を scoped resolver に統一した。intent contract、surface
+conversation／router／orchestrator、fallback contract の各 caller から viewer scope の tier／tenant を渡し、
+overlay が task-session intent を direct reply に変更した場合に base catalog へ戻らない回帰テストを追加した。
+
+検証: intent resolution／task-session／surface runtime **4 files / 58 tests passed**、`typecheck`、
+`build:packages`、Prettier、`git diff --check`、canonical full gate **68/68 passed**。domain-specific
+control／trace wrapper、全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement
+probe、未監査 direct loader 全件 inventory、残存 surface contract projection は継続課題である。
+
+## 599. 2026-08-31 再レビュー修正: text-only channel 契約投影の authority／enum 収束
+
+598 の scoped resolver 修正に続く surface projection 監査で、approval／clarification の text-only channel が
+`IntentResolutionContract` を補足表示する一方、authority を表示せず、outcome／authority の内部 enum をそのまま
+露出する残存を確認した。共通 channel formatter に authority／outcome の利用者向け `t()` 投影を追加し、英語・日本語
+の両方で内部 enum が wire text に現れない回帰テストを追加した。自動実行候補の通常 reply は従来どおり本文だけを返し、
+voice delivery の `includeContract: false` と approval envelope の既存境界も維持した。
+
+検証: channel adapter **1 file / 16 tests passed**、`typecheck`、`build:packages`、script integrity、
+`git diff --check`、canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の
+ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement probe、未監査 direct loader 全件 inventory、
+残存 surface contract projection は継続課題である。
+
+## 600. 2026-08-31 再レビュー修正: surface enum 投影の利用者向け語彙収束
+
+599 の text-only channel 修正を起点に全 surface projection を再監査し、Concierge の outcome、Chronos A2UI の
+authority／outcome、Presence Studio の authority／outcome が内部 enum を直接表示していた残存を検出した。各
+surface の既存 i18n 入口を維持し、authority／outcome を利用者向け語彙へ投影した。Concierge の outcome 語彙を
+shared vocabulary に追加し、Presence Studio の vocabulary endpoint からも同じ catalog を取得する回帰を固定した。
+contract field、viewer scope、承認処理は変更していない。
+
+検証: channel／Chronos／Concierge／Presence Studio **5 files / 73 tests passed**、`typecheck`、
+`build:packages`、`generate:vocabulary-types`、`git diff --check`、canonical full gate **68/68 passed**。
+domain-specific control／trace wrapper、全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の
+実 enforcement probe、未監査 direct loader 全件 inventory、残存 surface contract projection は継続課題である。
+
+## 601. 2026-08-31 再レビュー修正: approval／proposal envelope の契約 renderer 統一
+
+600 の surface enum 投影修正に続く承認経路監査で、shared text、Slack approval／mission proposal block と fallback、
+Telegram／Discord／iMessage の approval text が authority／outcome の内部 enum を直接表示する残存を確認した。
+`intent-resolution-contract` に共通の authority／outcome renderer を追加し、専用 envelope 全体から利用するようにした。
+承認決定、確認番号、human-only accountability、voice delivery の非表示境界は維持した。
+
+検証: approval／proposal／Chronos／Presence Studio **6 files / 64 tests passed**、`typecheck`、`build:packages`、
+`git diff --check`、canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の
+ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement probe、未監査 direct loader 全件 inventory、
+残存 surface contract projection は継続課題である。
+
+## 602. 2026-08-31 再レビュー修正: approval／proposal envelope の共通 enum renderer 接続
+
+601 の後続監査で、shared approval text、Slack approval／mission proposal block と fallback、Telegram／Discord／
+iMessage の専用表示に authority／outcome の raw enum が残っていることを確認した。`intent-resolution-contract` に
+共通 renderer を追加し、専用 envelope 全体から authority／next action／consequence／outcome を利用者向け語彙で
+投影するようにした。承認決定、確認番号、human-only accountability、voice delivery の非表示境界は維持した。
+
+検証: approval／proposal／Chronos／Presence Studio **6 files / 64 tests passed**、`typecheck`、`build:packages`、
+`git diff --check`、canonical full gate **68/68 passed**。domain-specific control／trace wrapper、全 actuator の
+ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement probe、未監査 direct loader 全件 inventory、
+残存 surface contract projection は継続課題である。
+
+## 603. 2026-08-31 再レビュー修正: task-session 承認ゲートの実配線
+
+production-like な surface conversation を再実行したところ、実カタログで `approval_required` になる
+`rotate-integration-secret` が、汎用 task-session の生成時に承認ポリシーを受け取らず、承認要求なしで
+「必要な情報はそろっています」と返す残存を検出した。task-session の生成境界で承認ポリシーを適用し、
+危険な intent を `approval_confirmation`／`dual_key_confirmation` 待ちにして、実行前の approval request、
+待機の結果、具体的な次アクションを surface response に含めるよう修正した。条件付き payload schema が
+拒否する汎用の policy metadata は payload に追加せず、control／requirements に限定した。
+
+実カタログ・実 intent resolution・実 router・実 task-session route を通る回帰テストを追加し、承認待ちでは
+provider を呼び出さないことも固定した。検証: task-session／production-like approval **2 files / 22 tests passed**、
+`typecheck`、`build:packages`、Prettier。canonical full gate と script integrity はこの修正後に再実行する。
+
+## 604. 2026-08-31 再レビュー修正: operator CLI の enum 投影と最終ゲート
+
+承認経路の横断再監査で、operator CLI の `ask --explain` が authority／outcome の内部 enum を人間向け表示へ
+そのまま出していた残存も検出した。surface／approval envelope と同じ共通 renderer に接続し、JSON 出力の機械可読
+contract は維持した。生成 vocabulary、pseudo-locale、knowledge integrity manifest を更新した。
+
+検証: `typecheck`、`build:packages`、Prettier、`git diff --check`、Chronos localhost 起動を含む canonical full gate
+**68/68 passed**。残る全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement probe、
+未監査 direct loader 全件 inventory、voice provider の実機依存は継続課題である。
+
+## 605. 2026-08-31 実装: release／migration script alias の統合
+
+SX-05 の package script を再監査し、`release:source-archive` が既に `--check` を受け付けるにもかかわらず、
+同じ entrypoint を呼ぶ `check:source-archive` が別 script として残っていることを確認した。また、同一の
+`run_migrations.ts` に通常実行と `--rollback` を固定した `migration:run`／`migration:rollback` も重複していた。
+canonical な `release:source-archive -- --check` と `migration -- --rollback` に統合し、CI、release runbook、
+契約テスト、gate exception を更新した。機能差分は flag の明示指定へ移しただけで、archive checksum／migration
+rollback の実装は変更していない。
+
+検証: package scripts **233 → 231**、release／migration 契約 **2 files / 6 tests passed**、
+CI gate parity、script integrity、Prettier、`git diff --check`。残る全 actuator の ADF lifecycle 完全収束、
+scripts ≤120、provider CLI の実 enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 606. 2026-08-31 実装: test suite dispatcher への集約
+
+SX-05 の package script を再監査し、同じ Vitest 実行境界を持つ test alias が 10 個に分散している残存を確認した。
+`scripts/test_suite.ts` に suite 名と対象ファイルを明示した governed dispatcher を追加し、`test`／`test:unit` と CI、現行
+ドキュメント、契約テストを `pnpm test -- --suite <name>` に統一した。`core` の `--no-file-parallelism`、coverage、meeting／
+browser／TUI の対象集合は維持し、未知 suite は fail-closed で拒否する。package scripts は **231 → 221** に削減した。
+
+検証: dispatcher 契約と関連ドキュメント **6 files / 23 tests passed**、実 dispatcher の smoke **1 file / 2 tests passed**、
+typecheck、Prettier、`git diff --check`。残る全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement
+probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 607. 2026-08-31 実装: system upgrade mode alias の統合
+
+同じ `run_pipeline` に `system-upgrade-check.json`／`system-upgrade-execute.json` だけを切り替えていた
+`system:upgrade:check`／`system:upgrade:execute` を再監査した。`scripts/system_upgrade.ts` に `--mode check|execute`
+を追加し、既定を read-only の check としたうえで、未知 mode は fail-closed に拒否する単一入口へ統合した。
+execute の pipeline、既存の `--dry-run`／`--json`／`--quiet` の引き渡し、推奨 action の表示内容は維持した。package
+scripts は **221 → 220** に削減した。
+
+検証: dispatcher／package／workflow 契約 **4 files / 19 tests passed**、typecheck、Prettier、`git diff --check`。
+残る全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の実 enforcement probe、未監査 direct loader 全件
+inventory は継続課題である。
+
+## 608. 2026-08-31 実装: generator check alias の統合
+
+generator 本体が既に `defineGenerator` の `--check` を実装しているにもかかわらず、`check:op-registry`、
+`check:capability-seams`、`check:subagent-definitions` が別 package script として同じ検査を再公開していた。
+canonical な `generate:op-registry -- --check`、`generate:capability-seams -- --check`、
+`agents:generate -- --check` に統合し、生成される Claude／AGY agent 定義、実行ガイド、計画文書を更新した。CI の
+manifest-driven direct checker と generator の drift 検査内容は変更していない。package scripts は **220 → 217** に削減した。
+
+検証: generator 関連 **2 files / 18 tests passed**、3 generator の `--check`（全て `changed=[]`）、typecheck、
+script-integrity、Prettier、`git diff --check`。残る全 actuator の ADF lifecycle 完全収束、scripts ≤120、provider CLI の
+実 enforcement probe、未監査 direct loader 全件 inventory は継続課題である。
+
+## 609. 2026-08-31 実装: provider CLI sandbox enforcement の opt-in probe
+
+PI-13／DH-11 の再レビューで、version／help と provider capability の宣言だけでは OS-level sandbox enforcement
+を証明できない残存を修正した。`runBackendSandboxConformance` は既存の provider permission matrix を使い、Claude／
+Codex／Gemini／Grok に対して disposable sentinel への一回限りの write attempt を行う opt-in probe を提供する。
+attempt marker、明示的な denial evidence、sentinel 非生成の三条件がそろった場合だけ `verified` とし、help-only、
+sentinel 生成、証跡不足は `failed`、binary 不在は `unavailable` とする。Agy の partial read-only 投影と未登録の
+Copilot は `unsupported` とし、通常の version／help probe と CI からは外部 model turn を発生させない。
+`check:backend-conformance -- --live-sandbox` の明示指定時だけ live probe を実行する。
+
+検証: sandbox conformance **1 file / 5 tests passed**、typecheck、Prettier、`git diff --check`。live provider CLI の実測は
+環境と認証に依存するため今回実行せず、`verified` の実環境証跡は別途 opt-in で取得する。残る全 actuator の ADF lifecycle
+完全収束、scripts ≤120、未監査 direct loader 全件 inventory は継続課題である。
+
+## 610. 2026-08-31 実装: standard yargs の暗黙 argv 依存除去
+
+script harness の再監査で、共通 `createStandardYargs` が引数省略時に `process.argv` を暗黙取得し、actuator／bridge／
+Terminal HUD の一部入口がその既定値に依存していた。共通 helper の argv を必須化し、残存する7つの production 呼出しから
+明示的に `process.argv` を渡すよう修正した。CLI の実行時引数、import 時の非起動、actuator の JSON 入出力 semantics は維持し、
+`createStandardYargs()` の production ゼロ引数呼出しを 0 件にした。
+
+検証: CLI／actuator／bridge **7 files / 67 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る interactive／
+server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 611. 2026-08-31 実装: actuator CLI の argv fallback 除去
+
+610 の再監査で、共通 `createStandardYargs` の暗黙既定値を廃止しても、`runActuatorCli` の `args` が任意のまま
+`process.argv` へ fallback するため、27 actuator の CLI 境界が暗黙入力に依存し続ける残存を確認した。`runActuatorCli` の
+`args` を必須化し、全 actuator entrypoint と `create_actuator` の生成テンプレートから明示 argv を渡すようにした。
+serve／JSON入力／schema validation と import 時の非起動 semantics は維持した。
+
+検証: CLI／actuator／bridge **8 files / 69 tests passed**、27 actuator entrypoint の explicit argv、core／actuator build、
+typecheck、対象 lint、Prettier、`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／
+generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 612. 2026-08-31 再レビュー修正: actuator CLI の生成テンプレート境界
+
+611 の修正後、`runActuatorCli` の argv 必須化を生成器にも適用した結果、`scripts/create_actuator.ts` の生成テンプレートが
+`process.argv` を直接参照し、script-integrity の harness 境界を迂回する残存を検出した。core の明示的な
+`currentProcessArgv()` 境界を生成テンプレートへ渡し、生成された actuator も script-integrity を満たすようにした。
+
+検証: create actuator／CLI **2 files / 10 tests passed**、script-integrity、typecheck、対象 lint、Prettier、
+canonical full gate **68/68 passed**。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、
+未監査 direct loader 全件 inventory は継続課題である。
+
+## 613. 2026-08-31 再レビュー修正: observation-to-op mapping の governed catalog 化
+
+未監査 direct loader の再監査で、`native-op-mapping.ts` が secure I/O の JSON reader だけを通り、構造 schema を検証せずに
+観測→actuator op mapping を取り込んでいた残存を確認した。`defineCatalog` と新規
+`observation-to-op-map.schema.json` を接続し、schema version、mapping entry、signal／preferred／fallback op の配列形状を
+読み込み時に fail-closed で検証するよう修正した。既存の未知 actuator op 検証と fallback 選択 semantics は維持した。
+
+検証: native mapping **1 file / 2 tests passed**、catalog／contract schema check、core typecheck、対象 lint、Prettier、
+`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader
+全件 inventory は継続課題である。
+
+## 614. 2026-08-31 再レビュー修正: company tenant path の fail-closed 化
+
+direct loader の追加監査で、`resolveCompany()` が明示 tenant slug を customer overlay の path segment として検証せず、
+`path.join()` へ渡していた残存を確認した。canonical `isValidTenantSlug` と `assertSafeRepositoryPath` を company／customer
+component path に適用し、traversal、区切り文字、reserved scope name、symlink component を customer scope の読込前に拒否する
+よう修正した。fixture root を使う既存 aggregate 解決と downstream の vision／org chart／finance／OKR 解決 semantics は維持した。
+
+検証: company／financial／org-chart **3 files / 10 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。
+残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は
+継続課題である。
+
+## 615. 2026-08-31 再レビュー修正: company scope loader 群の symlink 再検査
+
+company aggregate の downstream である OKR／org-chart／decision-rights loader を再監査し、tenant slug の syntax check だけでは
+既存の customer／confidential path component の symlink を防げない残存を確認した。各 candidate path を fixture root-aware な
+`assertSafeRepositoryPath` へ接続し、OKR／decision-rights は scope violation を fail-closed、org-chart は既存の invalid overlay
+契約に合わせて derived fallback とした。decision-rights の invalid tenant が結果の company／source path に残る挙動も修正した。
+
+検証: company scope loader **5 files / 26 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 616. 2026-08-31 再レビュー修正: tenant design overlay の symlink 再検査
+
+creative design resolver の tenant slug validation 後に、`tenant-override.json`／`theme.json` と design directory の symbolic link を
+再検査せず JSON input として読んでいた残存を修正した。各 candidate を `assertSafeRepositoryPath` に接続し、不正 overlay は
+次候補または brand default へ戻す既存の degradation semantics を維持した。
+
+検証: creative design **1 file / 9 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 617. 2026-08-31 再レビュー修正: customer grounding の tenant read boundary
+
+customer-facing support／sales grounding の direct read を再監査し、検証済み binding からの呼出しだけを前提にせず、tenant slug と
+solution catalog／price book／sales notes／known-issues の各 path を secure repository assertion へ接続した。invalid tenant、外部 path、
+symlink component は customer context に入る前に拒否し、public fallback と既存の grounding 欠落時の hold semantics は維持した。
+
+検証: customer grounding／creative design **2 files / 11 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 618. 2026-08-31 再レビュー修正: financial model candidate の symlink 再検査
+
+tenant slug validation 済みの financial model loader を再監査し、customer／confidential の model candidate と legacy customer
+financials の read path が symlink component を再検査せず、governed catalog 到達前に resource を切り替え得る残存を確認した。
+candidate／legacy path を fixture root-aware な `assertSafeRepositoryPath` へ接続し、schema-invalid overlay の次候補 fallback と
+invalid tenant の derived fallback semantics は維持した。
+
+検証: financial model／company **2 files / 7 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 619. 2026-08-31 再レビュー修正: meeting orchestrator の resource path 境界
+
+script-side direct loader の棚卸しで、meeting orchestrator の operations profile／`@attendees` JSON と meeting brief output が
+CLI input の path／mission id を repository boundary 前に連結していた残存を修正した。共有 `assertSafeRepositoryPath` を profile／
+attendee read と brief write に適用し、外部・traversal・missing resource は JSON reader／writer へ到達しないようにした。
+
+検証: meeting resource boundary **1 file / 2 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 620. 2026-08-31 再レビュー修正: control-plane catalog resource boundary
+
+control-plane の artifact-library index に含まれる `pack.file` が `path.resolve()` 後に JSON read され、catalog の相対値が
+repository 外または symlink resource を指せる残存を修正した。artifact resource 解決を `assertSafeRepositoryPath` に統一し、
+catalog の search／recommend semantics は維持した。
+
+検証: control-plane resource boundary **2 files / 6 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 621. 2026-08-31 再レビュー修正: script-side scan loader の symlink 境界
+
+`getAllFiles()` が返す pipeline／confidential mission state path を checker が直接 JSON read していたため、symlink file が外部
+resource として検査対象へ入る残存を修正した。pipeline op schema coverage と tenant drift watchdog の discovery／state read に
+`assertSafeRepositoryPath` を適用し、検査処理自体も repository 所属を fail-closed で確認するようにした。
+
+検証: script scan **3 files / 8 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る interactive／server の rich output、
+scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 622. 2026-08-31 再レビュー修正: presence controller の runtime path 境界
+
+presence controller の stimuli／channel registry／archive／Slack reply temporary input を再監査し、canonical path の直接 read／write
+と archive filename 連結に symlink／path boundary の再検査がなかった残存を修正した。共有 `resolvePresencePath` と
+`assertSafeRepositoryPath` を各 runtime resource へ適用し、perceive／resolve／prune の既存 semantics は維持した。
+
+検証: presence resource boundary **3 files / 4 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 623. 2026-08-31 再レビュー修正: test dispatcher の明示 argv 境界
+
+script harness の追加監査で、`scripts/test_suite.ts` の `runTestSuite()` と `defineScript(...)()` が暗黙に process argv を
+取得していた残存を修正した。dispatcher は `context.argv` を明示的に受け取り、direct CLI entrypoint だけが
+`currentProcessArgv().slice(2)` を渡す形に統一した。既存 suite 名、Vitest option の引き渡し、未知 suite の fail-closed semantics は維持した。
+
+検証: test dispatcher **1 file / 4 tests passed**、script-integrity、typecheck、対象 lint、Prettier、`git diff --check`。残る
+interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 624. 2026-08-31 再レビュー修正: plugin-pack registry の symlink 境界
+
+plugin pack の registry directory だけでなく `packs.json`／`pack-imports.jsonl` の leaf path も repository boundary／symlink 再検査へ接続した。外部または symlink resource は registry／import log の read／write に到達せず、managed install の import lifecycle は維持した。
+
+検証: plugin-pack **14 tests passed**、対象 lint、`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 625. 2026-08-31 再レビュー修正: customer／tenant discovery の動的 path 境界
+
+customer resolver の overlay subPath、customer 作成／一覧／切替／personal migration、organization profile loader、tenant registry checker、audit mirror reconciliation を再監査し、customer scope containment と repository path／symlink 再検査を共通化した。隣接 customer への traversal、symlink directory／file、テンプレート由来の不正 catalog path は read／write 前に fail-closed とし、既存の fallback／dry-run／approval semantics は維持した。
+
+検証: customer／tenant discovery の関連テスト、対象 lint、Prettier、`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 626. 2026-08-31 再レビュー修正: onboarding context／tenant activation の customer path 境界
+
+onboarding context／first-work と tenant activation の customer-scoped path を `customerDirForSlug` と `assertSafeRepositoryPath` へ接続した。不正 customer slug、customer root／onboarding component の symlink、repository 外 path は binding／activation record の read／write 前に fail-closed となり、既存の activation／dry-run semantics は維持した。
+
+検証: onboarding／activation **3 files / 34 tests passed**、対象 lint、Prettier、`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 627. 2026-08-31 再レビュー修正: company onboarding の snapshot／rollback path 境界
+
+company onboarding の dry-run、snapshot、rollback、tenant profile read／write を root-aware な `assertSafeRepositoryPath` へ接続した。既存 customer の symlink を通じた外部 snapshot read／rollback write を防ぎ、bootstrap／tenant binding の既存 semantics は維持した。
+
+検証: company onboarding／bootstrap **4 files / 22 tests passed**、core typecheck、対象 lint、`git diff --check`。残る interactive／server の rich output、scripts ≤120、全 script harness／generator 移行、未監査 direct loader 全件 inventory は継続課題である。
+
+## 628. 2026-08-31 再レビュー修正: package script の未参照 alias 収束
+
+package script を再監査し、現行 repository／pipeline／CI から参照されていない `eval:harness`、`entity:cleanup`、
+`sync:service-endpoints`、`check:capability-seams-ast` の重複入口を削除した。`check:chronos-perf` は通常の文書検索では参照ゼロに
+見えたが、`pipelines/ce-chronos-perf.json` の実行入口から参照されていたため維持し、script-integrity で hidden pipeline reference も
+検証した。package script 数は **217 → 213** となった。
+
+検証: `node dist/scripts/check_script_integrity.js`、`git diff --check`。SX-05 の scripts ≤120、全 script harness／generator 移行、
+interactive／server の rich output、未監査 direct loader 全件 inventory は継続課題である。
+
+## 629. 2026-08-31 再レビュー修正: lifecycle hook の default engine／interactive ask 接続
+
+外部 hook discovery が explicit engine にしか登録できず、`ask` が実際の surface で承認要求へ変換されない残存を修正した。
+hash-bound project trust を維持した default engine 登録 API と、単一の global approval-surface resolver／disposer を追加した。
+surface が未登録、対象外、または例外の場合は、従来どおり blocked outcome を返して再許可しない。登録済み resolver が返した場合だけ shared
+approval store の pending request を作成／再利用する。
+
+検証: lifecycle hook／external discovery **3 files / 30 tests passed**、root／core typecheck、対象 lint、`git diff --check`。
+SX-05 の scripts ≤120、未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 630. 2026-08-31 再レビュー修正: environment capability の evidence／receipt path 境界
+
+environment capability の `mission-evidence.filename` と setup receipt の manifest／mission id を JSON read／write 前に再検査し、
+evidence filename を単一 file name、receipt を検証済み manifest id と repository 内 path に限定した。manifest 一覧も symlink／regular file
+以外を採用しないため、外部・traversal・symlink resource が capability／readiness 経路へ混入しない。
+
+検証: environment capability **2 files / 54 tests passed**、core typecheck、対象 lint、`git diff --check`。未監査 direct loader 全件 inventory、
+provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 631. 2026-08-31 再レビュー修正: meeting consent の evidence path 境界
+
+meeting participation の consent loader が mission id と evidence directory を path resolver の結果だけで信頼していた残存を修正した。mission id の検証と `assertSafeRepositoryPath` を `voice-consent.json` の read 前へ置き、traversal／symlinked evidence directory を fail-closed にした。関連 **1 file / 11 tests passed**、対象 lint、typecheck、`git diff --check`、canonical full gate で確認した。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 632. 2026-08-31 再レビュー修正: reflex definition の repository path 境界
+
+untrusted stimulus から自動 dispatch へつながる reflex definition loader を、定義ディレクトリと各 `.adf.json` の `assertSafeRepositoryPath`／`safeLstat` 検査へ接続した。symlink・repository 外・regular file でない定義は個別に skip し、安全な定義の読み込みを継続するため、外部内容が reflex action に混入しない。
+
+検証: shared-nerve **1 file / 14 tests passed**、typecheck、対象 lint、`git diff --check`、canonical full gate。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 633. 2026-08-31 再レビュー修正: operator reasoning selection の path 境界
+
+default reasoning route の operator selection loader に `assertSafeRepositoryPath` を追加し、`llm-selection.json` の repository／symlink 境界を JSON read 前に再検査した。外部または symlink 経由の provider／model 選択は採用せず、通常の policy fallback へ戻る。
+
+検証: reasoning route **2 files / 20 tests passed**、typecheck、対象 lint、`git diff --check`、canonical full gate。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 634. 2026-08-31 再レビュー修正: profile identity loader の path 境界
+
+timezone／locale／operator display name が同じ profile identity を別々に読む3経路へ `assertSafeRepositoryPath` を追加した。`my-identity.json` が外部・symlink resource の場合は各 resolver が安全な fallback へ戻り、identity 内容を採用しない。
+
+検証: profile identity **6 files / 49 tests passed**、typecheck、対象 lint、`git diff --check`、canonical full gate。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 635. 2026-08-31 再レビュー修正: tenant registry enumeration の symlink 境界
+
+tenant profile の一覧時点で symlink を regular file として扱わないよう `safeLstat(...).isFile()` を追加した。あわせて tenant の customer overlay path 解決を error normalization の保護範囲へ置き、repository／symlink failure が domain error を迂回しないようにした。
+
+検証: tenant registry **1 file / 17 tests passed**、typecheck、対象 lint、`git diff --check`、canonical full gate。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 636. 2026-08-31 再レビュー修正: secret-guard の personal resource path 境界
+
+personal connection の起動時 scan、connection document、secrets／grant file、backup path が secure I/O の権限検査だけで
+JSON read／write へ進み、既存 path component／symlink を再検査していなかった残存を修正した。共通 `assertSafeRepositoryPath` と
+`safeLstat` を read 前へ適用し、symlink／非 regular file は秘密値 cache へ取り込まず、unsafe connection は fail-closed とした。
+
+検証: secret-guard **1 file / 8 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件
+inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 637. 2026-08-31 再レビュー修正: operator notification resource path 境界
+
+operator notification preferences と未配送通知の shared log が path resolver の返却値だけで JSON read／JSONL append へ進んでいた
+残存を修正した。preferences／運用ログを `assertSafeRepositoryPath` へ接続し、symlink 経由の通知先読込・ログ書込を fail-closed にした。
+
+検証: operator-notifications **2 files / 8 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader
+全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 638. 2026-08-31 再レビュー修正: procedure catalog reader の path 境界
+
+公開 `readProcedureCatalog(filePath)` の入口で caller の path を再検査せず JSON read へ進み得た残存を修正した。catalog reader に
+`assertSafeRepositoryPath` を必須化し、symlink／repository 外の catalog を schema validation／procedure resolution の入力へ混入させない。
+
+検証: procedure-registry **2 files / 27 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件
+inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 639. 2026-08-31 再レビュー修正: CLI input reader の path 境界
+
+公開 `readJsonFile`／`readTextFile` の入口で caller の path を再検査せず secure reader へ渡し得た残存を修正した。両入口に
+`assertSafeRepositoryPath` を必須化し、repository 外・symlink 経由の CLI input を JSON／text reader へ混入させない。
+
+検証: cli-input **2 files / 3 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、
+provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 640. 2026-08-31 再レビュー修正: mission-state 補助 loader の path 境界
+
+mission focus と project ledger が共有する JSON 補助 loader の入口へ `assertSafeRepositoryPath` を追加した。`readFocusedMissionId`／`writeFocusedMissionId`／`readJsonFileSafe` は symlink 経由の focus／ledger resource を read／write 前に fail-closed とする。
+
+検証: mission-state **2 files / 3 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 641. 2026-08-31 再レビュー修正: media catalog loader の path 境界
+
+media actuator の再帰 catalog discovery と公開 `loadJsonValue` の入口へ `assertSafeRepositoryPath`／regular-file 検査を追加した。JSON symlink、tenant index、confidential tenant directory の symlink は catalog／override authority 候補へ混入しない。
+
+検証: media catalog loader **2 files / 2 tests passed**、actuator typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 642. 2026-08-31 再レビュー修正: fs-utils／orchestrator status loader の path 境界
+
+共通 `fs-utils` の recursive／async enumeration で symlink と非 regular file を返さないようにし、orchestrator の mission／project status snapshot の JSON／README read を `assertSafeRepositoryPath` へ接続した。status read-model に外部 resource を混入させない。
+
+検証: fs-utils／orchestrator **3 files / 25 tests passed**、core／actuator typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 643. 2026-08-31 再レビュー修正: work coordination store の leaf path 境界
+
+work coordination の JSONL／JSON store helper の read／append／write 入口へ `assertSafeRepositoryPath` を追加した。runtime root 配下でも既存 leaf が symlink の場合は coordination state／event に到達せず fail-closed とする。
+
+検証: work coordination **2 files / 21 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 644. 2026-08-31 再レビュー修正: mission-task-events の path 境界
+
+mission task event の mission-local／shared event path と authority state read の入口へ `assertSafeRepositoryPath` を追加した。symlinked mission resource は task event の JSONL／JSON read・append・directory creation へ到達せず fail-closed とする。
+
+検証: mission-task-events **3 files / 5 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 645. 2026-08-31 再レビュー修正: source-analysis metadata loader の path 境界
+
+source-analysis の source root と package manifest の JSON read へ `assertSafeRepositoryPath` を追加した。symlinked package manifest は依存関係 read に到達せず、source-derived analysis の metadata authority に混入しない。
+
+検証: source-analysis **2 files / 6 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 646. 2026-08-31 再レビュー修正: system actuator の directory／status loader path 境界
+
+system actuator の directory scan、mission／capability／trace／artifact loader を `assertSafeRepositoryPath`／`safeLstat` へ接続した。symlink／非 regular file は status・capability・trace・artifact read-model へ混入しない。
+
+検証: system actuator **2 files / 1 test passed**、actuator typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 647. 2026-08-31 再レビュー修正: worker-state journal の操作時 path 境界
+
+worker state journal の append、restore、derived index self-healing の JSONL／JSON read／write を操作時の `assertSafeRepositoryPath` 再検証へ接続した。constructor 後の symlink leaf 差し替えも worker state authority に混入しない。
+
+検証: worker-state-journal **2 files / 20 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 648. 2026-08-31 再レビュー修正: manual-drive bridge の操作時 path 境界
+
+manual-drive bridge の descriptor／command／result／cancellation resource の read・append・write を操作時の `assertSafeRepositoryPath` 再検証へ接続した。初期 path 解決後の leaf 差し替えも durable bridge state に混入しない。
+
+検証: manual-drive bridge **1 file / 17 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 649. 2026-08-31 再レビュー修正: writer-lease の resource path 境界
+
+writer lease 本体と metrics の read／write、metrics path derivation を操作時の `assertSafeRepositoryPath` 再検証へ接続した。symlinked lease は fencing／observability state に混入しない。
+
+検証: writer-lease **2 files / 9 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 650. 2026-08-31 再レビュー修正: surface／task-session／metrics の resource path 境界
+
+surface coordination の record discovery／JSON read／削除、task-session の runtime／manifest／state read、metrics の履歴／SLO read と JSONL append に残っていた operation-time path boundary を修正した。`safeStat` の symlink 追跡を `safeLstat`／`assertSafeRepositoryPath` へ置き換え、symlinked outbox／session／metrics history が外部 resource を read-model・task list・metrics ledger へ混入させない。
+
+検証: surface coordination／task-session／metrics **6 files / 48 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68**。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 651. 2026-08-31 再レビュー修正: governed catalog 共通 loader の resource path 境界
+
+`defineCatalog` の load／generation／publish が Foundation I/O へ委譲する前に catalog path を再検証していなかった残存を修正した。共通入口を `assertSafeRepositoryPath` へ接続し、symlinked catalog が cache／generation 判定／publication の入力へ混入しないようにした。
+
+検証: governed catalog **2 files / 4 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68**。未監査 direct loader 全件 inventory、provider CLI の実 OS-level enforcement probe、SX-05 の scripts ≤120 は継続課題である。
+
+## 652. 2026-08-31 再レビュー修正: intent trace／Nexus daemon の証跡 resource path 境界
+
+intent trace の trace／audit JSONL discovery と Nexus daemon の常駐 JSON／runtime session loader を操作時の `assertSafeRepositoryPath`／`safeLstat` へ接続した。symlink／非 regular file は証跡 read-model、feedback dispatch、runtime session の metadata／response read に混入しない。
+
+検証: intent trace／Nexus **2 files / 5 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+## 653. 2026-08-31 再レビュー修正: 管理 CLI catalog／proposal path 境界
+
+control-plane の artifact／design catalog、knowledge CLI の weight proposal／knowledge write、workflow registration の catalog／request／proposal path を共通 `assertSafeRepositoryPath` へ接続した。repository 外・symlink resource は管理系 JSON read／write へ到達せず、既存の dry-run／catalog semantics は維持した。
+
+検証: control-plane／knowledge／workflow registration **3 files / 3 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+## 654. 2026-08-31 再レビュー修正: egress warn report の audit resource path 境界
+
+egress warn report の caller 指定 audit directory と日付形式 JSONL leaf を操作時の `assertSafeRepositoryPath`／`safeLstat` へ接続した。symlink／非 regular file は運用 report の観測へ混入せず、不正な1 leaf は skip して安全な audit records の集計を継続する。
+
+検証: egress report **2 files / 3 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+## 655. 2026-08-31 再レビュー修正: TaskScenario smoke の scenario／profile path 境界
+
+TaskScenario smoke の scenario read と generated profile write を `assertSafeRepositoryPath` へ接続した。scenario／profile の symlink／repository 外 path は smoke fixture の read／write へ到達しない。
+
+検証: TaskScenario smoke **2 files / 2 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+## 656. 2026-08-31 再レビュー修正: Chronos trace feed の resource path 境界
+
+Chronos の trace feed／detail read-model が trace directory と日付形式 JSONL leaf を列挙時に再検証していなかった残存を修正した。共通 `listTraceFiles` を `assertSafeRepositoryPath`／`safeLstat` へ接続し、symlink／非 regular file は tenant／tier projection 前の保存済み trace read に混入しない。
+
+検証: Chronos trace feed **1 file / 9 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+## 657. 2026-08-31 再レビュー修正: Chronos agent route の mission projection facade／path 境界
+
+Chronos agent route の quick-action mission projection が動的 core facade に存在しない `loadJson` を呼んでいた runtime defect を修正し、`readJson`／`assertSafeRepositoryPath` へ統一した。mission／NEXT_TASKS／PLAN は列挙・read 前に path identity を再検証し、malformed／symlink entry は単一 mission 単位で除外して安全な projection を継続する。
+
+検証: Chronos agent route **3 files / 36 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、SX-05 の scripts ≤120 は継続課題である。
+
+- 2026-09-01: PI-03 の Wisdom actuator direct loader を再レビューし、`knowledge_inject`／`knowledge_export`／`knowledge_import`／reconcile の source、package、destination、strategy path を operation-time の `assertSafeRepositoryPath` へ接続した。入力 leaf は repository／symlink component を先に検査し、missing-resource／schema error semantics を維持した。関連 **2 files / 44 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の system actuator direct loader を再レビューし、focused-target store と reconcile strategy の path を operation-time の `assertSafeRepositoryPath` へ接続した。symlink／repository 外 resource を read／write 前に拒否し、既存の focused target／strategy semantics を維持した。関連 **2 files / 100 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の meeting browser cookie store を再レビューし、account slug の単一 path segment 検証と operation-time の `assertSafeRepositoryPath` を read／write 境界へ追加した。traversal／区切り文字／control character を credential resource へ到達させず、既存の cookie persistence semantics を維持した。関連 **1 file / 22 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の meeting actuator consent loader を再レビューし、mission evidence／`voice-consent.json` path を operation-time の `assertSafeRepositoryPath` へ接続した。symlink／repository 外 evidence を consent read 前に拒否し、既存の missing／malformed／expired semantics を維持した。関連 **4 files / 21 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の browser runtime direct loader を再レビューし、session metadata／CDP marker／action trail／approval／snapshot／operator continue の helper 境界へ `assertSafeRepositoryPath` を追加した。session ID 由来の artifact filename も安全な単一セグメントへ正規化し、repository 外・symlink resource の read／write／poll を fail-closed にした。関連 **4 files / 43 tests passed**、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed**。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の browser passkey catalog direct loader を再レビューし、resolver-derived provider catalog path を `assertSafeRepositoryPath` へ接続した。symlink／repository 外 catalog を provider preset read へ到達させず、既存 fallback semantics を維持した。関連 **2 files / 44 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の working-memory period path を再レビューし、daily／weekly period key の format／calendar validation と sidecar／index／personal path の operation-time `assertSafeRepositoryPath` を追加した。traversal-shaped date／week key が別 resource へ到達しないことを **2 files / 9 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の deployment adapter direct loader を再レビューし、既定の personal deployment config path を `assertSafeRepositoryPath` へ接続した。explicit／default config の repository／symlink 境界を統一し、既存の missing／fallback semantics を維持した。関連 **3 files / 14 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の direct loader 残存を再レビューし、orchestrator bundle template、code skill index、Android UI defaults、media document layout catalog を operation-time の `assertSafeRepositoryPath` へ接続した。resolver の返却値を直接 read せず、ジョブ由来 template と既定 catalog の境界を同じ primitive で保証した。関連 **7 files / 126 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の direct loader 残存を再レビューし、OAuth の state 未指定セッションと plugin pack manifest discovery を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ接続した。symlink／非 regular file の credential／untrusted metadata を JSON read 前に除外し、既存の fallback／discovery semantics を維持した。関連 **2 files / 19 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の mission process planning direct loader 再レビューとして、`NEXT_TASKS.json`、gate definitions／records、`TASK_BOARD.md` の mission-relative child path を operation-time の `assertSafeRepositoryPath` へ統一した。symlink／repository 外の process artifact を read／write／gate evaluation へ到達させず、既存の planning／gate semantics を維持した。関連 **2 files / 16 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の `kyberion_home procedure inspect` trust 再レビューとして、desktop pipeline の inspect が `trustResolved: true` を無条件に渡していた bypass を削除した。未承認の project-local pipeline は inspection でも trust boundary を越えず、既存の blocked／repair guidance を維持することを **1 file / 1 test passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の skill plugin direct loader 再レビューとして、`.kyberion-plugins.json` と plugin manifest の trust input 自体を parse 前に `safeLstat` で検査し、symlink resource を fail-closed にした。プロジェクト外の正当な設定は許容しつつ、symlink 設定を読む回帰を **1 file / 14 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の capability broker direct loader 再レビューとして、`MISSION_ID` 由来の mission pin／shared pin path を read／write 前の `assertSafeRepositoryPath` へ接続した。traversal-shaped mission ID が provider pin resource を repository 外へ向けないことを **1 file / 5 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の intent snapshot direct loader 再レビューとして、mission evidence 配下の snapshot／delta／scope-change JSONL path を read／append 前の `assertSafeRepositoryPath` へ接続した。symlink evidence directory が intent history の read／write へ到達しないことを **1 file / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-05 の追加実装として、provisioned receipt の `provisioned`／`verified` 対を pure reducer で検査し、未検証 receipt が残る replay plan は `recovery_required` を返して orchestration の自動再実行を停止するようにした。orphaned verification と未検証 receipt の回帰を **1 file / 10 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。全 worker 成果物の record→write→verify 接続、手動 `reconcile-work` への自動分岐は継続課題である。
+
+- 2026-09-01: PI-05 の recovery 導線を追加実装し、未検証 provision receipt を検出した `mission_controller resume` が既存 scaffold を再利用しながら `reconcile-work` の operator-editable scaffold を自動生成するようにした。manifest apply は human-gated のまま維持し、scaffold の生成／再利用を **1 file / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。全 worker 成果物の record→write→verify 接続と manifest apply の自動分岐は継続課題である。
+
+- 2026-09-01: PI-05 の成果物 writer 再監査として、process-template planner の `NEXT_TASKS.json`・gate definitions・`TASK_BOARD.md`、reconcile-work 適用時の task 更新、requested task recovery の再発行を共通の provisioned receipt + fenced write + reread verify へ移行した。native JSON／text shape と既存 semantics を維持し、対象 **2 files / 18 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。任意 worker deliverable の全 writer 棚卸し、resume 全体の欠落検出、manifest apply の自動分岐は継続課題である。
+
+- 2026-09-01: PI-03/PI-15 の task recovery 再レビューとして、既存 mission の tier／current tenant path を優先して `NEXT_TASKS.json` を解決し、解決済み mission root を provisioned receipt writer の lease 境界へ渡すようにした。public 固定による scope mismatch を防ぎ、task recovery **1 file / 1 test passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。
+
+- 2026-09-01: PI-05 の replay 欠落検出を追加し、target ごとの最新 verified receipt の消失を `missing_provisioned_entries` として recovery scaffold へ、target 改変／読取不能／scope 外を `MISSION_LOG_CORRUPT` として fail-closed にした。古い receipt を履歴として保持した更新型 artifact の回帰も含め、journal **11**、maintenance／worker **40** tests、typecheck、対象 lint、Prettier、`git diff --check` で確認した。receipt 対象外の shared artifact と manifest apply の自動分岐は継続課題である。
+
+- 2026-09-01: PI-14 の manual-drive resume を再レビュー修正し、承認待ち command の再開を元 command から一度だけ発行する linked command に限定した。command journal に resume 関係を残し、worker の approval gate 再検査を必須化して、通常実行・取消済み・再開済み command の混同を防いだ。bridge／Chronos API／AgentPanel **4 files / 56 tests passed**、`build:packages`、typecheck、対象 lint、`git diff --check`、canonical full gate **68/68** で確認した。provider CLI の実 OS-level enforcement probe、supervisor の正式な restart/recovery ceremony、未監査 direct loader 全件 inventory は継続課題である。
+
+- 2026-09-01: PI-03 の First-Win lifecycle smoke reader 再監査として、live identity／schedule pipeline／dry-run fixture の read 前に `assertSafeRepositoryPath`／`safeLstat` を適用した。repository 外・symlink・非 regular file は live acceptance／schedule validation の入力へ混入しない。関連 **3 files / 16 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、全 script harness／generator 移行は継続課題である。
+
+- 2026-09-01: PI-05 の dispatch writer 再レビュー修正として、ticket／work-item dispatch の manifest、`NEXT_TASKS.json`、reflection、GitHub／Jira payload、artifact-review projection を direct JSON writer から共通 provisioned receipt writer へ移行した。関連 **5 files / 58 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、`build:packages` で確認した。provider CLI の実 enforcement probe、全 worker deliverable の writer 棚卸し、未監査 direct loader 全件 inventory は継続課題である。
+
+- 2026-09-01: PI-08 の approval-after lifecycle resume を再レビュー修正し、pipeline approval を run／step／mission／storage channel／correlation に束縛した。承認後は suspended journal と全 binding を再検証してから managed canonical runner を起動し、stale／mismatched／finished run は自動再開しない。pipeline approval／run journal／approval store **4 files / 82 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。全 surface adapter の実運用接続、supervisor の正式な restart/recovery ceremony、provider CLI の実 enforcement probe は継続課題である。
+
+- 2026-09-01: PI-14/PI-15 の supervisor 残差を再レビュー修正し、mission resume → durable recovery event → paused goal journal の厳密な再検証 → 明示 `resume: true` dispatch という一経路へ集約した。provider runtime supervisor の責務を拡張せず、artifact recovery blocked／rapid resume は自動再実行しない。関連 **5 test files / 44 tests passed**、typecheck、対象 Prettier、`git diff --check` で確認した。全 surface の実運用接続と provider CLI の実 enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の direct loader 再レビューを進め、analysis corpus／Cowork outbox／operator home／video frame archive／intent reconciliation の直接 read path を共通 `secure-io` 境界へ統一した。model／operator-visible resource の字句 allowlist だけに依存する残存を減らし、symlink／外部 path／非 regular file の fail-closed 回帰を **5 files / 27 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の browser observation store 再レビューとして、per-procedure JSONL の read／append path を共通 `secure-io` 境界へ統一した。ページ抽出値を扱う model-visible store の symlink／非 regular file 混入を fail-closed にする **1 file / 1 boundary test** を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の spill-result direct loader 再レビューとして、opaque locator の spill file を `safeLstat`／`assertSafeRepositoryPath` の operation-time 境界へ接続した。symlink／非 regular file を spill result の再読込へ到達させない **1 file / 5 tests passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の mission coordination archive loader 再レビューとして、rotation archive `bus.jsonl.N` も `assertSafeRepositoryPath` の operation-time 境界へ統一した。symlink archive を handoff／review history の read-model へ到達させない **1 file / 7 tests passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Concierge config-mission reader 再レビューとして、preset／tenant brief の directory／JSON leaf を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ統一した。symlink／非 regular file を設定候補・最近の mission read-model へ到達させない **1 file / 1 test passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos computer session reader 再レビューとして、computer／browser session の directory／JSON leaf を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ統一した。symlink metadata を operator-visible session read-model へ到達させない **1 file / 1 test passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos intelligence observation reader 再レビューとして、browser／conversation session の directory／JSON leaf を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ統一した。symlink metadata を browser／conversation session read-model へ到達させない **2 files / 3 tests passed** 回帰を追加した。既存ファイルの非整形箇所は無関係な全体差分を避けて保持している。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos intelligence event reader 再レビューとして、recent events／control actions／owner summaries の observability JSONL leaf を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ統一した。symlink event log を operator-visible read-model へ到達させない **2 files / 4 tests passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos intelligence browser／conversation session reader 再レビューとして、runtime directory／JSON leaf を `assertSafeRepositoryPath`／`safeLstat` の operation-time 境界へ統一した。symlink metadata を browser／conversation session read-model へ到達させない **2 files / 3 tests passed** 回帰を追加した。既存ファイルの非整形箇所は無関係な全体差分を避けて保持している。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-05 の manifest reconciliation facade に承認申請と apply の責務を分離し、hash-bound `mission_gate` を CLI／mission system／core reconciliation に接続した。承認 ID を receipt／ledger／mission context／audit metadata に残し、既存の dry-run semantics を維持した。関連 **2 test files / 89 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、package build、canonical full gate **68/68 passed** で確認した。
+
+- 2026-09-01: PI-03 の Presence Studio／Chronos intelligence runtime reader 再レビューとして、browser session／snapshot、A2A orchestration event、mission progress の direct loader を共通 `secure-io` 境界へ統一した。symlink／非 regular file／不正な session ID を operator-visible projection へ到達させない **4 test files / 6 tests passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos trace-log API reader 再レビューとして、trace root の lexical allowlist と operation-time の実体検査を `resolveSafeTraceLogPath` に集約した。symlink／非 regular file を operator-visible trace output へ到達させない **2 test files / 5 tests passed** 回帰を追加した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の operator-visible direct loader 再レビューとして、Operator Surface の mission／audit projection、Chronos runtime／knowledge／control observation、Terminal HUD tail reader を `assertSafeRepositoryPath`／`safeLstat` と malformed-input fail-closed へ接続した。symlink／非 regular file／壊れた JSON が表示系へ混入しないことを関連 **10 files / 12 tests passed**、対象 lint、typecheck、package build、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の表示系 direct loader 再レビューを継続し、Presence Studio の identity／artifact／runtime-ref／knowledge-ref／stimuli、Chronos agent／deliverable／provider-health／approval tenant／browser-session state、Terminal HUD tail の実体検査を強化した。壊れた JSON は単一 projection を壊さず、symlink／非 regular file は read／download／control 対象から除外する。関連 **11 test files / 41 tests passed**、対象 lint、typecheck、Prettier、package build、`git diff --check`、canonical full gate **68/68 passed** で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-13／DH-11 の provider CLI enforcement probe を再レビュー修正し、write attempt／対象 sentinel／blocked marker／denial の順序を検証するようにした。prompt echo、誤対象、順序逆転は `verified` にならないことを **1 file / 6 tests passed**、対象 lint、typecheck、package build、`git diff --check` で確認した。実 provider CLI の live 証跡は認証・外部実行に依存するため未取得であり、明示 opt-in probe の継続課題として保持する。
+
+- 2026-09-01: PI-03 のレビュー修正サイクルとして、Presence controller の stimuli reader と Chronos trace-feed の mission-state reader を operation-time の `assertSafeRepositoryPath`／`safeLstat` へ統一した。symlink／非 regular file が presence／trace projection に混入しないことを確認し、focused suite **41 files / 100 tests passed**、typecheck、package build、`git diff --check`、canonical full gate **68/68 passed** で再検証した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の表示 API direct loader 再監査として、Chronos の mission asset／deliverable preview／identity、Computer Surface の identity、Collaboration stream の event file／mission partition を operation-time の `assertSafeRepositoryPath`／`safeLstat` へ接続した。viewer scope／既存の allowlist semantics は維持し、symlink／非 regular file／repository 外 resource を read-model／SSE へ到達させないことを **9 test files / 32 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の Operator Surface direct loader 再監査として、intent snapshot／delta JSONL と provider-pin projection の read 前へ `assertSafeRepositoryPath`／`safeLstat` を追加した。symlink／非 regular file／repository 外 resource を snapshot read-model／pin projection へ混入させないことを **2 files / 3 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の Chronos agent quick-action direct loader 再監査として、active mission、proposal state cleanup、knowledge refresh の directory／JSON／Markdown resource を operation-time の `assertSafeRepositoryPath`／`safeLstat` へ接続した。symlink／非 regular file／repository 外 resource を quick-action projection／cleanup／knowledge response へ到達させないことを **2 files / 9 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の表示系 mission progress 再レビューとして、Chronos の `TASK_BOARD.md` と生成成果物を `safeLstat` で regular file と確認してから読み込むようにし、Operator Surface の mission evidence directory も operation-time の `assertSafeRepositoryPath`／`safeLstat` 境界へ統一した。symlink task board／deliverable／evidence が read-model に混入しないことを **2 files / 6 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の display direct loader 再レビューを Concierge／Terminal HUD へ拡張し、hygiene mission-state、受領 artifact preview、onboarding profile の read 前に `assertSafeRepositoryPath`／`safeLstat` を適用した。repository 外・symlink／非 regular file の state・artifact が表示投影へ混入しないようにし、既存の hygiene／preview 認可と Terminal HUD action suite **3 files / 10 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の UI 実行境界を再レビューし、Terminal HUD の schedule pipeline と Concierge hygiene の mission-controller build を operation-time の `assertSafeRepositoryPath`／`safeLstat` で regular file と確認してから登録・実行するようにした。Concierge setup の avatar／identity／agent profile read も同じ境界へ統一し、symlink executable／profile resource を UI 操作へ到達させないことを **4 files / 17 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の Concierge 実行境界を継続監査し、config-mission／memory-promotion／document-ingest の built script check を `assertSafeRepositoryPath`／`safeLstat` の regular-file 判定へ統一した。symlink／不正 executable が UI から `safeExecResult` に到達しないことを **3 files / 15 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の display resource 再レビューとして、Terminal HUD watcher の登録対象を repository-local regular file／directory に限定し、Chronos deliverable inbox と Terminal HUD tail のサイズ・時刻取得も `safeLstat` へ統一した。symlink resource を watcher／metadata projection／tail read に混入させないことを **4 files / 20 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の MCP／terminal bridge direct loader 再レビューとして、MCP の pipeline／actuator manifest の一覧・実行対象を `assertSafeRepositoryPath` と `safeLstat` の existing regular-file 境界へ統一し、allowlist 内 symlink／非 regular file の実行を拒否した。terminal bridge の persisted session state と watcher input、brain profile registry も同じ operation-time 境界へ接続し、symlink state／watcher input を read／実行へ到達させないことを **2 files / 39 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全体 inventory、全 script harness／generator 移行、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の voice-hub provider／artifact direct loader 再レビューとして、STT の CLI／model／bridge／input、TTS の bridge／reference audio／transcript／generated artifact、再生直前の artifact を `assertSafeRepositoryPath`／`safeLstat` の existing regular-file 境界へ統一した。repository 外・symlink・非 regular file が provider 実行・音声送信・再生へ到達しないことを **2 test files / 7 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の voice-runtime／cookie／ingest direct loader 再レビューとして、voice profile／bridge／artifact、meeting cookie、ingest source と dedup registry の read 前へ `assertSafeRepositoryPath`／`safeLstat` を適用した。symlink／非 regular file が音声 provider、認証 cookie、文書 ingest／dedup の入力へ混入しないことを **4 test files / 43 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の browser／working-memory direct loader 再レビューとして、browser session metadata／CDP port／action trail／approval／handoff／passkey catalog と volatile sidecar／index／GC の read／scan 前へ `safeLstat` の regular-file／directory 検査を適用した。symlink／非 regular file が browser runtime や volatile projection に混入しないことを **5 test files / 49 tests passed**、typecheck、対象 lint、Prettier、type-ratchet、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: PI-03 の Nexus／media catalog direct loader 再レビューとして、Nexus の channel／stimuli／session response／brain profile と media fallback catalog の read／scan 前へ `safeLstat` の regular-file／directory 検査を適用した。symlink／非 regular file が daemon dispatch／feedback projection／media design catalog に混入しないことを **2 test files / 4 tests passed**、typecheck、対象 lint、Prettier、type-ratchet、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、interactive／server の rich output は継続課題である。
+
+- 2026-09-01: SX-05 の script-level command 再レビューとして、CLI manifest に現行 package script **213 件**を noun／verb registry として登録し、package.json との欠落・余計な登録、重複、noun／verb 不一致を `checkCliManifest` で検出する gate を追加した。既存 script の実行内容は変更せず、今後の削減候補を利用証跡付きで安全に整理できるようにした。併せて release notes／virtual office／email／media profile の resource boundary を regular-file／repository scope へ統一した。検証: **5 files / 36 tests passed**、compiled CLI manifest check、`check:catalogs`、build、typecheck、対象 lint、Prettier、`git diff --check`。残る scripts **≤120** への削減、全 script harness／generator 移行、voice provider の実機依存、未監査 direct loader inventory は継続課題である。
+
+- 2026-09-01: PI-03 の direct-loader 再レビューを procedure／skill／TaskScenario／browser bridge へ拡張した。procedure delta／catalog、SKILL.md body、scenario／profile／answers file、browser recording／report の operation-time read／write 前に `assertSafeRepositoryPath`／`safeLstat` の regular-file 境界を適用し、directory・symlink・repository 外 resource を fail-closed にした。focused **5 files / 67 tests passed**、typecheck、`build:repo`、type-ratchet、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る scripts **≤120** への削減、全 script harness／generator 移行、voice provider の実機依存、未監査 direct loader inventory、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の direct-loader 再レビューを company onboarding／bootstrap、control-plane catalog、reasoning rollback、service lifecycle、peer tenant／physical namespace migration へ拡張した。operation-time の `assertSafeRepositoryPath`／`safeLstat` により、directory・symlink・repository 外 resource を JSON／JSONL read、migration scan、service state 更新へ到達させないようにした。focused **7 files / 23 tests passed**、typecheck、対象 lint、type-ratchet、Prettier、`git diff --check` で確認した。残る scripts **≤120**、全 direct loader inventory、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: PI-03 の direct-loader 再レビューを context ranking／eval harness／mission alignment gate へ拡張し、taxonomy／analysis config／eval table／review HTML／mission brief を operation-time の `assertSafeRepositoryPath`／`safeLstat` で regular file と確認してから読み込むようにした。directory・symlink・repository 外 resource を ranking／eval／approval surface へ到達させない focused **9 files / 30 tests passed**、typecheck、対象 lint、type-ratchet、Prettier、`git diff --check` で確認した。残る scripts **≤120**、全 direct loader inventory、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+- 2026-09-01: SX-08b の surface contract 再レビューとして、Slack approval envelope の raw `authority_level` 表示を共通 `renderIntentAuthorityLabel` と operator locale へ統一した。機械可読 payload と承認処理は維持し、raw enum が利用者向け text fallback に出ないことを **4 files / 25 tests passed**、typecheck、`build:packages`、対象 lint、Prettier、`git diff --check` で確認した。残る全 surface の契約描画、scripts **≤120**、voice provider の実機依存、未監査 direct loader inventory は継続課題である。
+
+## 2026-09-01 再レビュー修正: A2A／presence／meeting／vision の direct-loader 境界
+
+PI-03 の direct-loader 再レビューを実行系へ拡張し、A2A inbox／公開鍵・秘密鍵、Presence registry、meeting transcript／input、vision image の read 前に `assertSafeRepositoryPath`／`safeLstat` の existing regular-file 境界を適用した。directory・symlink・repository 外 resource を provider／daemon／解析処理へ到達させない。関連 **7 test files / 40 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。未監査 direct loader 全件 inventory、全 script harness／generator 移行、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: intent fallback の candidate registry 再読込
+
+contract convergence の timeout を再現調査し、`buildOrganizationWorkLoopSummary` が distill candidate 552 件を毎回 schema 検証付きで再読込していたことを特定した。`distill-candidate-registry` の governed catalog validator を共有し、secure `lstat` fingerprint が変わらない一覧は再利用、保存時は cache を無効化するよう修正した。free-text の canonical resolver／typed service parameter の収束を維持したまま、初回一覧読み込みを約 2.9 秒から約 94 ms、再読込を約 13 ms へ短縮した。関連 **6 test files / 79 tests passed**、typecheck、対象 lint、type-ratchet、`git diff --check`、canonical full gate **68/68 passed** で確認した。
+
+## 2026-09-01 再レビュー修正: 孤立した CEO intent simulation の削除
+
+package script、pipeline、docs、実行コードから参照されていない `scripts/simulate_ceo_intents.ts` を再監査した。このファイルは現行の governed pipeline catalog を検証するものではなく、9 本の `system:shell` を生成して実行する古いモックだったため、孤立した実行経路として削除した。現行の pipeline／scenario 検証経路には変更がなく、削除後に参照残骸がないことと script-integrity **OK** を確認した。
+
+## 2026-09-01 再レビュー修正: design resolution 検証の共有 resolver 化
+
+`scripts/verify-design-resolution.mjs` に残っていた layout template／body-zone の手書き resolver を削除し、media-actuator が実際に利用する `resolveLayoutTemplate`／`resolveBodyZoneKey` と catalog loader を参照するようにした。検証スクリプトと本番描画経路の解釈差をなくし、fixture 不在時の skip semantics は維持した。dist runtime の直接 probe で 58 design systems、layout 4 keys、`problem → two_column_callout`、`summary → statement` を確認し、script は全 fixture 不在時にも正常終了した。Prettier、`git diff --check`、script-integrity **OK** で確認した。
+
+## 2026-09-01 再レビュー修正: 未使用 CLI alias の整理
+
+CLI manifest と package script の利用実態を突合し、現行コード／pipeline／docs から参照されず、同一の pipeline template へ直接到達できる `analysis:job`／`judgment:job` alias を package.json と CLI manifest から削除した。baseline／daily 運用で参照される `storage:janitor` は維持した。package script は **213 件から 211 件**へ減少し、CLI manifest test **21 tests passed**、catalog check、script-integrity、knowledge index、`git diff --check` で確認した。
+
+## 2026-09-01 再レビュー修正: intelligence projection の JSON shape narrowing
+
+Chronos の computer session／browser session／orchestration event projection に残っていた `JSON.parse(...) as any` を再監査し、共通の JSON object parser と primitive field narrowing へ置き換えた。文字列・数値・nested object を期待型へ絞り、配列・primitive・不正 JSON は既存の skip semantics のまま projection へ到達させない。関連 **4 test files / 7 tests passed**、TypeScript compile、`git diff --check`、対象 `as any` 検索で残存 0 を確認した。
+
+## 2026-09-01 再レビュー修正: viewer-scoped intelligence control projection の型境界
+
+viewer／tenant／tier filtering を担う `intelligence-control-data.ts` にも同じ `JSON.parse(...) as any` が残っていたため、共有 `json-record` helper の object／field narrowing を適用した。mission／surface／memory promotion／next-action の各 control event は既存の status・scope semantics を維持し、primitive・配列・不正 JSON は fail-closed で無視する。関連 **2 test files / 4 tests passed**、TypeScript compile、対象 ESLint、`git diff --check`、canonical full gate **68/68 passed** で確認した。
+
+## 2026-09-01 再レビュー修正: handoff／tenant theme projection の型収束
+
+PI-03／SX-08B の projection 再レビューとして、Chronos の A2A handoff feed に残っていた `JSON.parse(...) as any` を共有 JSON object parser と primitive field narrowing へ置き換えた。あわせて tenant design API と video contract に分散していた WebThemePack 判定を共通 `isWebThemePack` へ統合し、壊れた theme／primitive／配列を CSS projection へ渡さないようにした。関連 **3 test files / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission observation JSON shape 境界
+
+PI-03 の Chronos mission observation を再レビューし、`mission-state.json`／`NEXT_TASKS.json` の read model が `any` と raw property access に依存していた残差を修正した。mission state は object と status／tenant／tier／relationship の string field へ狭め、NEXT_TASKS は配列要素ごとに status を抽出し、primitive／配列 state や malformed JSON は active mission projection から除外する。secure path／tenant scope の既存境界は維持した。関連 **2 test files / 6 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: quick-action mission projection の型境界
+
+SX-08／PI-03 の Chronos quick-action 経路を再レビューし、mission state と NEXT_TASKS の `readJson<any>` を廃止した。status を active／planned／paused／failed に限定し、mission id／tier／mission type／checkpoint を primitive・array shape の検査後に投影することで、壊れた state が quick-action の一覧や操作対象へ混入しないようにした。既存の repository path boundary と all-tenant localadmin 要件は維持した。関連 **3 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: cost projection の metric shape narrowing
+
+SX-09／PI-03 の Chronos cost projection を再レビューし、viewer-scoped summary が `Record<string, any>` と暗黙の `Number(...)` に依存していた残差を修正した。history は JSON record として扱い、usage／token／cost／timestamp／mission id を型付き field helper で読み、非数値・配列・object の metric は 0 として集計する。既存の tenant scope filter、generation settlement、budget semantics は維持した。関連 **1 test file / 6 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: evidence-chain registry の型境界
+
+PI-03 の監査証跡 loader を再レビューし、`readJson<any>` と `registry.chain` の raw access を廃止した。registry の chain／entries は unknown record として読み、evidence id／hash／path／timestamp を必須 field として正規化し、不正 entry は query／lineage／重複判定から除外する。既存の `id`／`timestamp` 保存形式、hash 重複防止、parent lineage、artifact path の secure boundary は維持した。関連 **1 test file / 5 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: authority JSON shape の fail-closed 境界
+
+PI-03 の direct-loader／権限境界を再レビューし、`authority.ts` の role persona index、role-authority map、mission state、legacy auth grant、task-scoped grant の raw cast／未検証 property access を除去した。JSON object、string／number／array の shape と許可された `Persona`／`Authority` を読み取り時に絞り、malformed record・配列・未知の値は persona／authority へ昇格させない。循環依存を避ける bootstrap raw read は維持し、task grant の repository／symlink boundary と既存の tenant・audience semantics も維持した。関連 **3 test files / 44 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Chronos tenant scope projection の型境界
+
+SX-08B／PI-03 の Chronos tenant scope selector を再レビューし、API 応答の `as any` と未検証の organization／project 配列を表示 state へ直接渡していた残差を修正した。tenant／organization／project の option model を共有 helper で正規化し、primitive、配列、必須 ID 欠落の record は selector に到達させない。認可・tenant scope の決定は従来どおり server-side viewer context に残し、client の query parameter は表示状態のみに利用する。関連 **1 test file / 2 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Chronos trace projection の JSON shape 境界
+
+PI-03／SX-08B の trace feed／raw trace log projection を再レビューし、JSONL の `JSON.parse(...) as PersistedTraceShape` を validator 後の明示的な normalized record へ置き換えた。traceId、metadata の primitive field、rootSpan の入力を validation と object boundary の後に projection へ渡し、primitive・配列・不正 schema の record は tenant／tier filtering 前に除外する。trace log access も同じ normalizer を共有し、既存の viewer scope と strict span vocabulary を維持した。関連 **3 test files / 16 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Chronos UI persisted state の型境界
+
+SX-08B／PI-03 の Chronos UI を再レビューし、TraceViewer、Mission Intelligence、Focused Operator の localStorage／raw trace JSON parse に残っていた型キャストを共有 JSON record helper へ統合した。primitive・配列・不正 object は既定値または未選択へ fail-closed し、trace focus の `traceId`、filter、gap phase も primitive field を検査してから UI state に投影する。認可・tenant scope の判定は変更せず、viewer API の server-side boundary を維持した。関連 **3 test files / 21 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission queue JSONL の dispatch shape 境界
+
+PI-03／mission lifecycle の queue loader を再レビューし、`mission-queue.ts` の `JSON.parse(line) as MissionQueueEntry` を廃止した。dispatch 前に JSON object、mission id、許可された tier／status、ISO 日時、整数 priority、文字列 dependencies を検証し、malformed record・配列・未知値を queue authority と `onDispatch` へ到達させない。append／lock／priority sort／dependency check／dispatched rewrite の既存 semantics は維持した。関連 **1 test file / 2 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission journal の state／trust projection 境界
+
+PI-03／mission lifecycle の `mission_journal.ts` を再レビューし、mission-state と personal trust-score ledger の generic `readJson`／`any` projection を明示的な shape normalizer へ置き換えた。mission id、status、tier、history、relationship は型検査後に表示し、primitive／配列／不正 history は journal へ到達させない。trust score は有限値かつ 0〜1000 の範囲だけを表示し、既存の secure path、symlink 拒否、tenant filter、CLI の表示 semantics は維持した。関連 **1 test file / 3 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission controller CLI input の許可値境界
+
+PI-03／mission lifecycle の CLI input を再レビューし、relationships JSON、mission tier、ticket target、work-item dispatch mode／status／source、limit／rounds の raw cast／未検証値を除去した。JSON object、許可された enum、非負整数を parser 境界で検証し、不正な入力は mission create／dispatch の内部処理へ渡さず明示的に拒否する。既存の named／positional compatibility、project／track relationship overlay、execution surface resolver は維持した。関連 **1 test file / 72 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission controller router の実行時入力境界
+
+PI-03／mission lifecycle の router を再レビューし、record-task details、review-task findings、record-evidence actor type、memory queue／promotion execution role、enqueue tier／priority の unchecked JSON parse／raw cast／部分的整数解釈を除去した。handler 呼び出し前に JSON object／array、許可された enum、必須 tier、整数 priority を検証し、mission queue の tier も読み書き双方で union 型へ統合した。routing decision の配列混入も拒否し、既存の command routing と queue dispatch semantics は維持した。関連 **2 test files / 77 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: pipeline ref loader の ADF shape 境界
+
+PI-03／ADF execution の ref pipeline loader を再レビューし、`readJson<any>` と `parsed.steps || []` による未検証 sub-pipeline の実行経路を除去した。repository／symlink／project-trust の既存 resource boundary の後に `validatePipelineAdf` を適用し、steps／context を検証済み `PipelineAdf` として返す。壊れた JSON shape や steps object は fallback で実行せず fail-closed にし、bind merge、depth guard、既存の fallback semantics は維持した。関連 **1 test file / 10 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: pipeline preview ref の ADF shape 境界
+
+PI-03／SX-08B の pipeline preview を再レビューし、ref 展開時の `readJson<Record<string, any>>` を廃止して `validatePipelineAdf(readJson<unknown>(...))` へ統合した。preview でも壊れた JSON、steps object、未定義 steps を children として描画せず warning に留め、実行側と表示側の ref 契約を一致させた。repository／symlink boundary、variable warning、graph rendering、既存 preview semantics は維持した。関連 **1 test file / 14 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: STT structured output の shape 境界
+
+PI-03／voice pipeline の Shell／MLX STT bridge を再レビューし、外部 structured output の `JSON.parse(...) as Partial<TranscribeResult>` を root／field projector へ置き換えた。JSON object の root、text／language、capabilities の許可語彙、segments の number／string shape を検査し、配列・null・不正 segment は transcript 結果へそのまま流さない。ログ混在時の末尾 JSON 対応、sidecar fallback、既存の capability semantics は維持した。関連 **1 test file / 13 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: question resolver profile loader の schema 境界
+
+PI-03／clarification intake の profile fallback を再レビューし、meeting／narrated-video example の `readJson<any>` を governed catalog と対応 schema へ統合した。profile の object／必須 question set／role／theme／policy shape を catalog load 時に検証し、壊れた example を question generation の `.find`／配列処理へ未検証のまま渡さない。既存の locale、intent requirement、presentation profile、clarification packet semantics は維持した。関連 **1 test file / 7 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: visual／dashboard／untrusted state の shape 境界
+
+PI-03／SX-08B の visual review tenant 判定、Sovereign Dashboard の active mission projection、prompt-injection signal／mission state 更新を再レビューし、`readJson<Record<string, any>>`／`readJson<any>` を object／string-array／許可 status の明示的 normalizer へ置き換えた。malformed state、配列、未知の mission status は tenant ownership／orphan lease／dashboard 表示／injection state 更新へ未検証のまま到達させない。既存の authority context、resource path／symlink boundary、tenant mismatch、dashboard display、taint propagation semantics は維持した。関連 **3 test files / 31 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: context ranker config の shape 境界
+
+PI-03／knowledge operability の context ranker を再レビューし、`analysis-config.json` の `readJson<any>` と nested property access を廃止した。config／algorithms／ranking／weights の object shape と、既知の ranking weight 各値が finite number であることを検証し、primitive・配列・不正値は ranking defaults へ混入させない。scope-aware knowledge weight overlay、taxonomy、frontmatter ranking semantics は維持した。関連 **1 test file / 2 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: pipeline promotion source／advice 境界
+
+PI-03／LC-02 の pipeline promotion を再レビューし、source ADF の `readJson<any>` と reasoning advice の raw cast を除去した。source は `unknown` から `validatePipelineAdf` 済みの typed pipeline へ昇格し、advice は object、placeholder の safe index／path、semantic index を正規化してから適用する。resource／trust／guardrail、再検証、dry-run／force、catalog promotion semantics は維持した。関連 **1 test file / 3 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Telegram／Discord thread history の shape 境界
+
+PI-03／channel surface の persisted thread context を再レビューし、Telegram／Discord の `JSON.parse(line) as HistoryEntry` を role／必須 string field の normalizer へ置き換えた。malformed JSON、primitive、配列、未知 role、欠落 field は model context へ渡さず、既存の thread fallback、送受信履歴、surface allowlist semantics は維持した。関連 **2 test files / 15 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: avatar identity loader の shape 境界
+
+PI-03／personal profile の avatar registration を再レビューし、既存 identity の `readJson<Record<string, any>>` を object root の normalizer へ置き換えた。primitive／配列の identity JSON は profile mutation 前に拒否し、既存の path／regular-file／avatar copy／field-preserving update semantics は維持した。関連 **2 test files / 11 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: TaskScenario catalog／profile の shape 境界
+
+PI-03／TaskScenario の共通 loader を再レビューし、`task:list`／`task:init`／`task:run`／`task:smoke` に分散していた `readJson<TaskScenario>` を既存 `task-scenario.schema.json` の実行時 validator へ統合した。さらに `--answers-json`、answers file、profile file は unknown から object root を正規化し、primitive／配列を template／profile mutation／dry-run 表示へ渡さないようにした。既存の scenario path boundary、profile output、dry-run only、smoke fixture semantics は維持した。関連 **4 files / 20 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 direct loader inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: JSONL／NerveMessage の配送 shape 境界
+
+PI-03／EV-08 の JSONL tail を再レビューし、generic `JSON.parse(line) as T` を parser hook 付きの配送境界へ拡張した。Nerve bridge は必須 string field、許可された message type、metadata の object／string／finite number shape を正規化してから listener へ渡し、primitive・配列・未知 enum・不正 metadata は malformed record として除外する。混在する presence／sensor stimulus の `loadRecentStimuli` semantics、rotation／partial-line／TTL semantics は変更していない。関連 **2 test files / 27 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: native speech bridge の外部 JSON shape 境界
+
+PI-03／voice bridge の native speech subprocess 応答を再レビューし、`JSON.parse(raw) as NativeSpeechListenResult` と `Boolean(parsed.ok)` による unchecked projection を除去した。root object、`ok`／`isFinal` の boolean、text／error／locale／deviceId の string shape を検証し、欠落 locale／device は request fallback へ投影する。Swift／PowerShell の起動、timeout／kill、実機依存の provider semantics は変更していない。関連 **2 test files / 20 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: STT capabilities 設定の shape 境界
+
+PI-03／voice pipeline の `KYBERION_STT_CAPABILITIES` 設定を再レビューし、環境変数の `JSON.parse(...) as SpeechToTextCapabilities` を既存 structured-output projector へ統合した。root object、timestamps／granularity の許可値、optional boolean を検証し、primitive・配列・未知値は bridge capabilities へ混入させず既定値へ戻す。実機 provider の起動・音声処理 semantics は変更していない。関連 **1 test file / 14 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: runtime supervisor IPC response の envelope 境界
+
+PI-03／agent runtime supervisor の socket response を再レビューし、`JSON.parse(line) as SupervisorResponse<TResult>` の unchecked envelope cast を除去した。response の root object、non-empty id、ok boolean、error／errorDetail の shape を検証してから成功・失敗分岐へ渡し、endpoint 固有 result の既存型境界は維持した。socket timeout、daemon spawn、stale-code recycle、各 operation の payload semantics は変更していない。関連 **1 test file / 9 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: programmatic tool-calling protocol の shape 境界
+
+PI-03／HA-04 の programmatic tool-calling を再レビューし、親側 RPC request／runner output と子側 runner envelope／RPC response の unchecked JSON cast を除去した。token／id／method／op／params、runner の `ok`／stdout／calls／error、envelope の socket／limit fields を object／許可された primitive shape として検証し、malformed payload は dispatch／result handling 前に拒否する。UDS token、sandbox allowlist、call／timeout／stdout limit、typed-op の既存 semantics は維持した。関連 **1 test file / 8 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: warm actuator protocol の shape 境界
+
+PI-03／SX-10 の warm actuator serve mode を再レビューし、serve request と client response の unchecked JSON cast／truthiness 判定を除去した。request／response の root object、id、ok、error、result の shape を検証してから dispatch／pending request matching へ渡し、malformed frame は listener を壊さず記録して無視する。warm process、result prefix、request timeout／abort、actuator input schema の既存 semantics は維持した。関連 **2 test files / 15 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: trigger receipt JSONL の shape 境界
+
+PI-03／QM-02 の trigger runner persisted receipt を再レビューし、`JSON.parse(line) as TriggerRecord` を除去した。idempotency key、source／status、authority snapshot、timestamp、claim lease fields を読み取り時に検証し、malformed record・配列・未知 enum・不正日時は idempotency／claim 判定へ到達させず skip する。torn-line recovery、dedup、retry、claim lease、compaction semantics は維持した。関連 **1 test file / 10 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface response block の shape 境界
+
+PI-03／SX-08B の model response block parser を再レビューし、A2UI／A2A／approval／nerve route／mission proposal の `JSON.parse(...) as ...` を unknown からの明示的 normalizer へ置き換えた。root object、operation、必須 string、許可された enum、component／header／payload の shape を検証し、配列・primitive・未知 tier／performative は surface runtime の dispatch／approval／mission proposal 経路へ到達させない。既存の legacy A2A、reasoning tag 除去、task／planning block semantics は維持した。関連 **1 test file / 9 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: browser conversation actuator result の status 境界
+
+PI-03／SX-10 の browser conversation action を再レビューし、subprocess 出力の `JSON.parse(stdout) as Record<string, unknown>` と object-only 成功判定を actuator result normalizer へ置き換えた。root object、許可された status、results／context／total_steps の shape を検証し、`failed`／`blocked` を completed session として保存しない。既存の candidate confirmation、browser actuator 呼び出し、trace／snapshot semantics は維持した。関連 **1 test file / 13 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: independent reviewer verdict の shape 境界
+
+PI-03／QM-02 の high-stakes work-item reviewer 応答を再レビューし、`JSON.parse(...) as Record<string, unknown>` と findings の任意値 stringify を除去した。verdict の root object、approved／refuted の boolean、findings の string array、rationale の string を検証し、malformed JSON shape は本文の語句 heuristic で approved に昇格させない。既存の legacy string boolean と reviewer の refuted／approved dispatch semantics は維持した。関連 **1 test file / 33 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: ingest asset ledger の persisted record 境界
+
+PI-03／DA-05 の tenant information-asset ledger を再レビューし、`JSON.parse(line) as IngestAssetRecord` と asset_id だけの部分検証を除去した。必須 provenance fields、SHA-256、version／status、string arrays、asset_id の導出整合、traversal を含む target path を読み取り時に検証し、malformed record は lineage／dedup／staleness projection へ渡さない。append-only、version lineage、tenant path、symlink 拒否 semantics は維持した。関連 **1 test file / 12 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: system ledger の persisted record 境界
+
+PI-03／監査投影を再レビューし、`loadForScope`／integrity verification／append chain の JSONL 読込に `normalizeLedgerRecord` を追加した。ルート object、予約 envelope field の string shape、chain algorithm、scope／payload の object shape を検証し、配列・primitive・型不正を system／tenant projection や hash verification へ渡さないよう fail-closed 化した。既存のレガシー台帳形式、HMAC chain、system／tenant scope filtering semantics は維持した。関連 **1 test file / 7 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission retrospective の JSONL／提案 shape 境界
+
+PI-03／mission retrospective の durable telemetry と process-improvement queue を再レビューし、`JSON.parse(line) as Record`／queue の raw cast／LLM proposal の unchecked cast を除去した。JSONL root、proposal の必須 string、kind／status enum、evidence の string array、LLM draft の許可 shape を正規化し、配列・primitive・型不正を統計・承認・apply・通知の経路へ渡さないよう fail-closed 化した。既存のレガシー telemetry、stub／LLM proposal、approve→apply lifecycle semantics は維持した。関連 **2 test files / 15 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Claude CLI stream-json の protocol shape 境界
+
+PI-03／CN-01 の Claude CLI native subagent adapter を再レビューし、`JSON.parse(line) as StreamMessage` と content block の raw cast を除去した。stream envelope の primitive fields、agent／tool arrays、message content、tool_use input の shape を正規化し、配列・型不正・不正な background flag を delegation observer／completion 判定へ渡さない。既存の native delegation proof、built-in subagent deny、background acknowledgement、session lifecycle semantics は維持した。関連 **1 test file / 16 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Apple Speech file STT の外部 JSON shape 境界
+
+PI-03／Apple Speech file bridge の Swift subprocess 応答を再レビューし、`JSON.parse(line) as NativeSttPayload` を専用 normalizer へ置き換えた。root object、`ok` boolean、text／error／locale の string shape を検証し、framework の loader noise や配列・型不正を transcription result／error projection へ渡さない。既存の末尾 JSON 探索、locale fallback、on-device bridge／output path semantics は維持した。関連 **1 test file / 3 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: plugin pack import history の shape 境界
+
+PI-03／QM-07 の plugin pack import history を再レビューし、`JSON.parse(trimmed) as PackImportRecord` を persisted record normalizer へ置き換えた。必須 pack／timestamp／URL／結果 fields、installed／archived の string array、skipped の plugin_id／reason、optional ref／commit／error を検証し、配列・primitive・型不正を import history の表示へ渡さない。provenance-gated install、failed import の記録、collision／archive semantics は維持した。関連 **1 test file / 17 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Apple Intelligence bridge の外部 JSON shape 境界
+
+PI-03／Apple Intelligence の availability／Vision／Speech／Image Playground 応答を再レビューし、複数箇所の `JSON.parse(...) as` と `Boolean(parsed.available)`／`String(parsed...)` による unchecked projection を専用 normalizer へ置き換えた。availability、OCR labels、transcript、image result の root／必須 field／primitive shape を検証し、loader noise、配列、型不正を assist／QA／STT／画像生成結果へ渡さない。既存の macOS／Apple Silicon gate、cache、実機 runner、best-effort fallback semantics は維持した。関連 **1 test file / 11 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission orchestration journal の persisted shape／scope 境界
+
+PI-03／mission orchestration journal の provision receipt／operation replay を再レビューし、`JSON.parse(line) as Partial<...>` を root／required field normalizer へ置き換えた。provisioned record と journal の必須 fields、operation／outcome、status、scope を検証し、JSON 配列・primitive・不正 scope／enum を replay／recovery state へ渡さない。provision→write→verify、attempt regression、scope-aware mission path semantics は維持した。関連 **1 test file / 11 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: plugin pack loader の manifest／nested shape 境界
+
+直前の QM-07 修正を再レビューし、normalizer 内の skipped entry cast と manifest の `readJson<Record<string, unknown>>` も除去した。nested entry helper と `readJson<unknown>`→object guard に統合し、malformed manifest／nested import record が plugin discovery／history projection に混入しないことを focused test、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で再確認した。
+
+## 2026-09-01 再レビュー修正: deliverable inbox lock record の shape 境界
+
+PI-03／deliverable inbox の stale-lock 判定を再レビューし、`JSON.parse(raw) as { pid?: number }` を lock record normalizer へ置き換えた。root object、正の有限整数 PID を検証し、配列・primitive・小数・不正 PID を stale として fail-closed に扱う。inbox lock、human acceptance、delivery receipt の既存 lifecycle semantics は維持した。関連 **1 test file / 5 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。
+
+## 2026-09-01 再レビュー修正: governed code response の envelope 境界
+
+PI-03／Cloudflare OS control-plane の governed code 実行結果を再レビューし、`JSON.parse(result.stdout) as { value: T }` を envelope normalizer へ置き換えた。root object と明示的な `value` field を検証し、undefined の既存結果は sentinel で保持しながら、配列・欠落 envelope・不正 sentinel を generic result projection へ渡さない。sandboxed code、binding freeze、同期実行、既存 policy violation semantics は維持した。関連 **1 test file / 21 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。
+
+## 2026-09-01 再レビュー修正: intent-contract LLM JSON parser の shape 境界
+
+PI-03／意図解釈の LLM compiler を再レビューし、generic `parseJsonObject<T>` の unchecked cast を object-only parser へ変更した。execution brief は既存 normalizer、intent contract／work loop は既存 AJV validator へ unknown のまま渡し、配列・primitive の応答を契約として扱わず fallback／invalid path へ収束させる。LLM 呼び出し順、fallback semantics、IntentResolutionContract の既存 schema 検証は維持した。関連 **1 test file / 25 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。
+
+## 2026-09-01 再レビュー修正: VAD subprocess response の probability shape 境界
+
+PI-03／voice pipeline の TEN VAD／Silero VAD subprocess 応答を再レビューし、両ブリッジの `JSON.parse(line) as { prob?: number; error?: string }` を共通 NDJSON normalizer へ統合した。root object、有限な `prob` の 0〜1 範囲、`error`／`ok` の primitive shape を検証し、配列・primitive・不正確率・型不正の応答を speech state／fallback 判定へ渡さず無視する。既存の one-chunk-late semantics、endpoint、energy fallback、bridge error／reset semantics は維持した。関連 **3 test files / 9 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: MLX embedding subprocess response の vector shape 境界
+
+PI-03／knowledge pipeline の MLX embedding subprocess 応答を再レビューし、`JSON.parse(line) as { vectors?: number[][]; error?: string }` を専用 normalizer へ置き換えた。root object、vectors の nested array、各 component の有限 number、error の string shape を検証し、配列・primitive・非数値・非有限値を `Float32Array`／embedding projection へ渡さない。既存の末尾 JSON 探索、model／Python runtime 選択、MLX unavailable fallback semantics は維持した。関連 **2 test files / 5 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Gemini API／embedding response の shape 境界
+
+PI-03／provider integration の Gemini API 応答を再レビューし、generateContent の transport／SSE data と embedding の `secureFetch<T>` generic 信頼に残っていた unchecked projection を除去した。text／functionCall／finishReason／error、single／batch embedding values の root／nested object／primitive／有限 number shape を normalizer で検証し、malformed response を本文・tool call・`Float32Array` へ渡さず fail-closed にした。API key egress、model routing、streaming、tool／embedding の既存 semantics は維持した。関連 **2 test files / 17 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: AGY SDK bridge response の shape 境界
+
+PI-03／native provider integration の AGY SDK bridge を再レビューし、`JSON.parse(line) as BridgeResponse` を ready／error／request frame の normalizer へ置き換えた。root object、event／id、ok、pid、text／thought／stopReason、metadata、error の primitive／record shape を検証し、配列・不正 pid・型不正 frame を boot／pending request の完了応答へ渡さない。既存の native delegation、boot lifecycle、cancel／timeout、provider-unavailable semantics は維持した。関連 **1 test file / 5 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Codex App Server JSON-RPC envelope の shape 境界
+
+PI-03／native provider integration の Codex App Server を再レビューし、stdout の JSON-RPC `JSON.parse` 結果を unchecked message として dispatch していた残差を除去した。jsonrpc／id／method／params／result／error の envelope shape、finite error code、相互排他の result／error を検証し、配列・primitive・不正 protocol version・型不正 frame を pending request／approval／notification dispatch へ渡さない。既存の thread／turn lifecycle、approval policy、native subagent、timeout semantics は維持した。関連 **1 test file / 19 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: control-plane HTTP JSON projection の shape 境界
+
+PI-03／SX-09 の control-plane client を再レビューし、HTTP JSON response と projects／approvals／mission seeds／project tracks／outcomes／task sessions の `any`／generic cast projection を除去した。root object、必須 ID、optional primitive、string array、gate readiness の nested shape を normalizer で検証し、配列・primitive・ID 欠落の record を surface read model へ渡さない。viewer token／surface routing／stale-surface remediation、Chronos next-action contract の既存 semantics は維持した。関連 **1 test file / 9 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: tenant profile JSON の authority shape 境界
+
+PI-03／DA-01 の tenant registry を再レビューし、`JSON.parse(source) as TenantProfile` の validation 前 cast を除去した。profile JSON は unknown のまま governed catalog schema へ渡し、object／必須 tenant fields／tenant knowledge root／status の検証成功後だけ authority として扱う。配列・primitive・破損 JSON・tenant slug mismatch の既存拒否 semantics、personal-tier read hint、symlink／tenant scope boundary は維持した。関連 **1 test file / 18 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: tenant rate-limit lock の shape 境界
+
+PI-03／DA-05 の tenant rate-limit lock を再レビューし、`JSON.parse(raw) as { pid?: number; created_at?: string }` を lock record normalizer へ置き換えた。root object、正の有限整数 PID、optional created_at の shape を検証し、配列・primitive・小数・非有限値・型不正 lock は stale として fail-closed に扱う。quota bucket の read-modify-write、lock timeout、tenant/persona exemption の既存 semantics は維持した。関連 **1 test file / 8 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: tier-guard tenant authority／marker config の shape 境界
+
+PI-03／DA-01 の tier-guard を再レビューし、registered tenant profile と shared tenant-group profile の `JSON.parse(...) as` を unknown の runtime normalizer／type guard へ置き換えた。tenant slug／status、group member／shared prefix を検証し、配列・primitive・不正 member を tenant scope authorization へ渡さない。knowledge-sync marker の security／PII nested config も object／string shape を確認してから scanner に投影する。既存の fail-closed corrupt policy、SUDO／broker／shared-group semantics と raw bootstrap I/O boundary は維持した。関連 **2 test files / 26 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: report-ops observability JSONL の event shape 境界
+
+PI-03／QM-02 の task model routing report を再レビューし、generic `parseJsonl<T>` と tenant／supervisor event の unchecked cast を除去した。task issue／model hint／scope、supervisor completion／numeric metrics を各 normalizer で検証し、malformed JSON、primitive／配列、未知 tier／effort、非有限 metric を tenant filter／routing 集計へ渡さない。既存の shared observability path、tenant visibility、rework／cost summary semantics は維持した。関連 **1 test file / 4 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: process-definition registry payload の shape 境界
+
+PI-03／SX-04 の process-definition registry audit を再レビューし、登録済み JSON payload の `loadJson<Record<string, unknown>>` を unknown 読込後の object guard へ置き換えた。監査対象が配列・primitive の場合は expected count projection へ進めず、source audit を invalid として扱う。registry catalog の governed schema、repository path／symlink boundary、source existence／consumer path audit semantics は維持した。関連 **1 test file / 4 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: history search の SQLite／persisted record 境界
+
+PI-03／SX-08B の history search を再レビューし、SQLite JSON projection の unchecked cast、mission／A2A／channel persisted record の無条件 object cast を除去した。検索 row の root、必須 ID／timestamp／content、tier、boolean flag、finite rank を normalizer で検証し、壊れた JSON、primitive、未知 tier、object を文字列化した履歴を検索結果・context・tier filter へ渡さない。private mission の path／state tier agreement、public index の higher-tier exclusion、FTS repair semantics は維持した。関連 **1 test file / 11 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: best-of judge 応答の shape 境界
+
+PI-03／MO-07 の best-of judge parser を再レビューし、`JSON.parse(...) as Record` と `merge_hints.map(String)` を除去した。judge 応答は object root、winner の A／B、rationale の string、merge hint の string array のみを受理し、配列内 object の誤抽出や arbitrary value の文字列化を候補選択・証拠保存へ渡さない。judge 失敗時の candidate A fallback は維持した。関連 **1 test file / 3 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: image generation 外部応答の bytes 境界
+
+PI-03／SX-10 の Gemini service／Imagen／DALL·E 応答を再レビューし、service preset と `fetch().json()` の `any` cast を bytes extractor へ置き換えた。許可された base64 string の root／nested path だけを抽出し、配列・object・bytes 欠落は既存の no-image error へ fail-closed にする。既存 provider routing、target path boundary、成功時の artifact write semantics は維持した。関連 **1 test file / 25 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る endpoint result の strict schema、direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mesh delivery JSONL の root 境界
+
+PI-03／SX-10 の mesh delivery／dead-letter persisted JSONL を再レビューし、行単位の `JSON.parse(...) as T` を safe reader へ置き換えた。malformed JSON と primitive root を該当行だけ skip して一覧・dedupe を継続し、single-writer、tenant validation、delivery state transition semantics は維持した。関連 **1 test file / 6 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。なお nested delivery／dead-letter schema の全項目 normalizer と mesh recipient proposal の direct JSONL inventory は継続課題である。
+
+## 2026-09-01 再レビュー修正: action-item migration／task dispatch の型収束
+
+PI-03／SX-08B／SX-10 の action-item legacy policy migration と mission task dispatch を再レビューし、migration の `any` と、既に `PlannedNextTask` が宣言する acceptance criteria／dependencies の不要な `any` 参照を除去した。legacy object は object guard 後に policy へ移行し、最終的な ActionItem schema validation と malformed JSONL skip を維持した。task dispatch の prompt／A2A payload semantics も変更していない。関連 **1 test file / 18 tests passed**、task worker suite **29 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: supervisor IPC request／response の shape 境界
+
+PI-03／SX-09b の agent runtime supervisor daemon を再レビューし、IPC request の `JSON.parse(...) as SupervisorRequest` と health probe response の未検証 parse を除去した。id、許可 method、auth token、payload object を入口で検証し、response は共有 normalizer へ通すことで、配列・primitive・未知 method を runtime handler／認証判定へ渡さない。既存の loopback／token／single-daemon／fail-open health semantics は維持した。関連 **1 test file / 10 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る nested response result の strict schema、direct JSONL／外部応答全件 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: service preflight bridge response の shape 境界
+
+PI-03／SX-10 の voice／meeting direct probe を再レビューし、probe stdout の root object と status string を normalizer で検証した。配列・primitive・boolean status は success とせず、既存の preflight attention 判定へ閉じる。service catalog、auth inspection、runtime probe、direct bridge の実行順序は変更していない。関連 **2 test files / 6 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Claude hook／Virtual Office projection の shape 境界
+
+PI-03／SX-08B／SX-14 の Claude Code hook stdin、Virtual Office ops-alert JSONL を再レビューし、object root と primitive string field の明示検証を追加した。配列・primitive・malformed hook payload は空 payload として fail-open し、壊れた alert は bulletin UI へ表示しない。hook の session lifecycle、PreToolUse fail-open、tenant visibility、Office の dashboard semantics は維持した。関連 **3 test files / 8 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: design token／stimuli journal の persisted shape 境界
+
+PI-03／SX-08B／SX-10 の design token JSON 更新と stimuli journal を再レビューし、themes root／nested themes と NerveMessage JSONL の unknown boundary を追加した。非 object の themes root は拒否し、配列 themes は merge 対象にせず、stimuli の malformed／必須 field 欠落行は sensory-memory へ渡さない。既存の design token merge、TTL、journal rotation、Nerve routing semantics は維持した。関連 **3 test files / 16 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る direct JSONL／外部応答全件 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: backup archive manifest の shape 境界
+
+PI-03／SX-10 の backup restore を再レビューし、tar から取得した manifest の parse／validation を `parseRestoredBackupManifest` へ集約した。root、format、scope、entries、tenant、mission git metadata の shape を検証してから tenant allowlist／archive path boundary へ渡し、配列 root や malformed nested metadata を復旧対象として扱わない。既存の encryption、manifest scope、tenant quarantine、restore rollback semantics は維持した。関連 **1 test file / 18 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る scripts **≤120**、全 direct JSONL／外部応答 inventory、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: supervisor／preflight／hook／dashboard の外部入力境界
+
+PI-03／SX-09b／SX-10／SX-14 の supervisor IPC、service preflight、Claude hook、Virtual Office alert projection を再レビューし、各 JSON root と primitive field を runtime normalizer で検証した。配列・primitive・malformed input は handler／認証／success 判定／UI projection へ渡さず、既存の fail-open hook、loopback／token、tenant visibility semantics は維持した。関連 **5 test files / 24 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る supervisor nested result の strict schema、全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: plugin／knowledge cache／operator identity の persisted shape 境界
+
+PI-03／SX-03／SX-04／SX-10 の plugin contribution manifest、knowledge cache usage map、operator identity loader を再レビューし、manifest declaration の string array、usage sidecar の string map、identity の object／name string を明示検証した。承認済み plugin の activation、LRU eviction、operator display fallback が配列・object・不正値の coercion に依存しないようにし、provenance gate と既存 fallback semantics は維持した。関連 **3 test files / 29 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 catalog／direct loader inventory、scripts **≤120**、全 surface の契約描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface coordination の単一取得境界
+
+PI-03／SX-08B／SX-09B の `getSurfaceAsyncRequest` を再レビューし、list 経路だけでなく単一取得でも `isSurfaceAsyncRequestRecord` と scope matching を通すようにした。schema-invalid request は update／mutation 経路へ返さず、既存の scoped path、quarantine、outbox／notification semantics は変更していない。関連 **2 test files / 13 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。残る全 surface の契約描画、framework 固有 request gate、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: portal inbox／intent trace JSONL の shape 境界
+
+PI-03／SX-08B の残存 JSON 境界を再レビューし、`process_portal_inbox` の永続 inbox request を `PortalRequest` へ直接 cast せず、object root、必須 intent、許可された status を parser で検証するようにした。malformed JSON、配列、未知 status、空 intent は処理・outbox 投影・processed 再書込みへ進めない。さらに `intent_trace` の trace／audit／snapshot JSONL reader を parser hook 付きへ分離し、trace replay validation、audit object、snapshot の必須 field／string-array shape を projection 前に検証することで、壊れた snapshot が `.toLowerCase()` へ到達する経路を除去した。既存の symlink boundary、strict trace vocabulary、tenant／tier redaction semantics は維持した。関連 **2 test files / 12 tests passed**、対象 ESLint、Prettier、typecheck、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: script registry の unified router と孤立 alias の削除
+
+SX-05／SX-06 の package script 入口を再レビューし、`kyberion` が `cli-commands.json` の script command を noun／verb として解決し、既存 package script を secure child process 経由で dispatch できるようにした。`kyberion --help` は primary command に加えて script-backed operator command を同じ registry から表示し、単語だけの command は `verb=default` へ解決する。参照実態がなく、現行の governed pipeline／catalog 経路にも不要だった `sync:specialist-catalog` と `actuator:play` は package.json と script registry から削除した。package scripts は実測 **211 → 209 件**。compiled `kyberion --help`、CLI manifest、script-integrity、catalog integrity、typecheck、focused **3 files / 33 tests passed**、canonical full gate **68/68 passed** で確認した。目標 **≤120** に対する削減、check／pipeline／onboarding alias の段階的統合、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: organization／company onboarding facade の統合
+
+SX-05 の重複入口を再レビューし、role authoring を `pnpm organization role create|promote` に統合する `scripts/organization.ts`、会社 bootstrap／AI company onboarding を `pnpm onboard company bootstrap`／`pnpm onboard company` に統合する `scripts/onboarding.ts` を追加した。既存の operating model、role authority、company template、interactive onboarding 実装は再利用し、package script／CLI registry／docs／template の入口だけを一つの namespace に揃えた。`org`、`company:bootstrap`、`company:onboard` の package script と registry entry は削除し、package scripts は実測 **209 → 206 件**。organization role の direct／router dry-run、company onboarding の direct／router dry-run、company vertical list、CLI manifest、script-integrity、catalog integrity、typecheck、focused **4 files / 31 tests passed**、canonical full gate **68/68 passed** で確認した。目標 **≤120**、doctor／preflight の完全統合、check／pipeline alias の段階的統合、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: cli alias の kyberion 統合
+
+SX-05 の旧 `cli` package alias を再レビューし、既存 `scripts/cli.ts` の operator command 群を `kyberion` primary entrypoint から引き続き利用できることを確認したうえで、package script と script registry の `cli` entry を削除した。workflow、pipeline、docs、template、next-action、error remediation、生成 vocabulary の command example を `pnpm kyberion`／`pnpm run kyberion`／compiled `kyberion.js` へ移行し、hidden workflow の preview contract も同期した。package scripts は実測 **206 → 205 件**。CLI／workflow／plugin／error-classifier 関連 **11 files / 118 tests passed**、typecheck、target lint、Prettier、CLI manifest、script-integrity、catalog integrity、CI gate parity、`git diff --check` を確認した。scripts **≤120**、check／pipeline alias の段階的統合、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: next-action／error remediation の実在コマンド整合
+
+CLI alias 移行後の再レビューで、`libs/core/next-action.ts` と `error-classifier-rules.json` に旧来の `secret list`／単数 `approval` が残り、利用者へ実行不能な復旧コマンドを提示する指摘を確認した。secret 系は実在する `pnpm setup:report --persona first-time-user`、approval 系は実在する `pnpm kyberion approvals` へ統一し、分類ルール・next-action・回帰テストを同期した。focused **3 files / 77 tests passed**、typecheck、Prettier、CLI manifest、script-integrity、catalog integrity、CI gate parity、`git diff --check`、canonical full gate **68/68 passed** を確認済み。scripts **≤120**、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: app preflight の doctor runtime 統合
+
+SX-05 の doctor／preflight 入口を再レビューし、既存 `app:preflight` の実装を `run_doctor` の `app` runtime preset から再利用するようにした。`pnpm kyberion doctor -- --runtime app --platform ios|android|all [--full]` が app の binary、SDK、device、distribution secret を同じ doctor namespace で検査し、fail は exit 1、warn は継続する。package script と CLI registry の `app:preflight` entry は削除し、専用実装は doctor から呼ばれる focused module として残した。direct／router の compiled runtime が同一の Android preflight report（未配置環境は 3 fail）を返すことを確認した。focused **3 files / 32 tests passed**、repo build、typecheck、CLI manifest、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認した。package scripts は実測 **205 → 204 件**。scripts **≤120**、meeting／service の専門 preflight、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: pipeline alias の preset 集約
+
+SX-05 の頻用 pipeline alias を再レビューし、`vital`、`diagnose`、`voice:health`、`voice:speak`、`onboard:avatar`、`onboard:voice` の6 package script／registry entryを削除した。`scripts/run_pipeline.ts` の governed preset resolver は既存 `--input` 実行を維持したまま、`vital-check`、`system-diagnostics`、`voice-health-check`、`speak-with-my-voice`、`create-my-avatar`、`clone-my-voice` を canonical pipeline input へ解決する。`kyberion` の primary `pipeline-runner` も同じ resolver を通すようにし、初回レビューで検出した router の迂回を修正した。direct／router／explicit-input の vital dry-run が同じ `Ecosystem Vital Check` report（verdict `ready`、side effects `none`）を返すことを確認した。関連 **4 files / 81 tests passed**、repo build、typecheck、旧 alias 参照走査、Prettier、`git diff --check`、canonical full gate **68/68 passed** を確認済み。package scripts は実測 **204 → 198 件**。scripts **≤120**、残る専門 preflight、pipeline alias の全件 inventory、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01 再レビュー修正: toolchain preflight alias の env bootstrap 統合
+
+SX-05 の toolchain preflight を再レビューし、実装が同一だった `prereq:check` package script／CLI registry entryを削除した。first-win、CI、onboarding、deployment、quickstart、readiness matrix、Chronos mirror quick action の全入口を `pnpm env:bootstrap --manifest kyberion-toolchain` へ統一し、既存の `env:bootstrap` の manifest／apply semantics をそのまま利用する。package scripts は実測 **198 → 197 件**、CLI manifest と first-win docs checker の整合を確認した。Chronos route **2 files / 10 tests passed**、first-win checker、CLI manifest、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed** で検証済み。
+
+## 2026-09-01 再レビュー修正: production-like approval の bridge matrix 拡張
+
+SX-08b の `approval_required` production-like 検証を、単一の Telegram ケースから共通 `runSurfaceMessageConversation` を利用する Slack／Chronos／Presence／iMessage／Discord／Telegram の6 bridgeへ拡張した。実 intent resolver と実 approval request 生成を各 surface で確認し、承認前に reasoning provider が呼ばれないことを固定した。Cowork は MCP delivery packet、CLI／Terminal は専用入口のため同じ runner の対象には含めず、各専用契約テストとの責務境界を明記した。関連 **1 file / 7 tests passed**、typecheck、`git diff --check` で確認済み。残る12 surfaceの全面 contract 描画、voice provider の実機依存、package scripts **≤120** は継続課題である。
+
+PI-03／SX-09B の direct JSONL inventory を再レビューし、Nexus daemon の stimuli reader 3箇所が `JSON.parse(...) as GUSPStimulus` のままで、壊れた1行が有効な刺激の dispatch 全体を中断し得る残存を検出した。producer の実データ（`control.feedback` と optional `policy`）を許容する shared `nexus-stimulus` normalizer を追加し、root／timestamp／TTL／origin／signal／control／evidence／未知 field を検証した。無効行は status update で原文を保持し、scan／dispatch ではその行だけを除外する fail-closed semantics とし、legacy silent feedback も維持した。なお daemon／parser tests を root Vitest の include に追加し、既存の bridge boundary test が常時実行されるようにした。関連 **2 files / 7 tests passed**、typecheck、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-10 の direct JSONL inventory を継続し、SA-01 audit mirror の `parseMirrorFile` が各行を `AuditEntry` へ直接 cast していた残存を検出した。core の `normalizePersistedAuditEntry` を追加し、object root、必須識別子／hash／timestamp、result enum、metadata／compliance／scope、chain algorithm を検証してから mirror fingerprint／tenant reconciliation へ渡すようにした。malformed／shape-invalid mirror は従来どおり reconciliation を中断し、master chain を変更しない。Nexus parser と併せた root bridge／audit parser suite を追加した。関連 **4 files / 17 tests passed**、typecheck、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-10 の外部応答 inventory を継続し、voice-hub の managed STT bridge と OpenAI-compatible transcription response が JSON root を parse 後に部分的な型 cast のまま success 判定へ進んでいた残存を検出した。`parseVoiceBridgeResponse`／`parseVoiceTranscriptionResponse` を追加し、root object、status、text、error の型を検証してから transcription success／artifact processing へ渡すようにした。未知の provider metadata は現行どおり無視し、malformed response は backend error へ閉じる。関連 **2 files / 6 tests passed**、typecheck、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SA-04／SA-05 の egress report JSONL を再レビューし、`egress_request` 行を `JSON.parse(...)` 後に部分型として直接集計していた残存を検出した。root、timestamp、result enum、metadata.hostname を `parseEgressAuditRecord` で検証し、配列・primitive・型違い・空 hostname を warn／deny 集計へ渡さないようにした。既存の監査ファイル path boundary、warn／enforce recommendation、symlink 拒否は維持した。関連 **2 files / 3 tests passed**、typecheck、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、全 surface の契約描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface contract の transport／UI projection 境界
+
+SX-08B／PI-03 の surface contract projection を再レビューし、voice-hub の JSON response と Concierge の browser response が `IntentResolutionContract`／conversation response へ unchecked cast される残存を検出した。共有 `parseIntentResolutionContract` で root、enum、next action、project context、未知 field を検証し、voice-hub → Concierge の malformed contract は表示へ渡さないようにした。Concierge 側も reply、shape、promotion、next action を parser 後に UI state へ投影し、既存の承認／確認 action と4項目（understanding／missing／next／outcome）の表示を維持した。不完全な成功 response は mode／shape 必須として fail-closed にした。さらに Presence Studio の static projection も同じ shape／enum 境界で検証してから描画するようにした。関連 **7 files / 11 core tests、Concierge 4 files / 30 tests、Presence Studio 1 file / 5 tests passed**、typecheck、Prettier、`git diff --check` で確認した。残る他 surface の全面 contract 描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-10 の desktop native event feed を再レビューし、Swift helper の JSONL event を `DesktopObservationSnapshot['event']` へ直接 cast していた残存を検出した。`parseDesktopEventLine` で event root、許可 op、座標、click count、key code、余計な params を検証・正規化してから queue／recording へ渡し、malformed／typed-text を含む event は fail-closed で破棄する。関連 **1 test file / 14 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-10 の meeting actuator 外部応答を再レビューし、Python bridge の JSON result を `MeetingActionResult` へ直接 cast していた残存を検出した。`parseMeetingActionResult` で status、文字列／数値／boolean field を検証・許可リスト化し、primitive、未知 status、型違い、非有限値は監査・trace・surface delivery へ渡さず error envelope へ閉じる。既存の join／speak／listen／status の出力 field は allowlist 内で保持した。関連 **1 test file / 18 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-10 の iOS actuator の `simctl --json` response を再レビューし、device list を `Record<string, Array<Record<string, any>>>` へ直接 cast していた残存を検出した。`parseSimctlDevices` で root／runtime array／udid／name／state／availability の shape を検証し、primitive・配列 root・型違いの device は device selection／boot／capture へ渡さないようにした。既存の runtime key と device selection semantics は維持した。関連 **1 test file / 2 parser tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SA-05 の vulnerability ledger reader を再レビューし、JSONL の record／finding を直接 `Record`／`DependencyVulnerabilityFinding` として扱っていた残存を検出した。ledger finding の package、decision、reachability、理由、再評価条件、version field を parser で検証し、primitive、配列、型違いの記録は defer re-evaluation／patched state へ影響させないようにした。既存の最新 snapshot 優先と patch_apply semantics は維持した。関連 **1 test file / 6 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-09B の terminal persisted session state を再レビューし、`state.json` を `PersistedSessionState` へ直接 cast していた残存を検出した。`parsePersistedSessionState` で session id、timestamps、pid、active／connected、brain profile、lastActive、未知 field を検証してから runtime restore／pruning／summary へ渡すようにした。repository path／session id boundary と既存の restore semantics は維持した。関連 **1 test file / 2 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+PI-03／SX-09B の terminal watcher control request を再レビューし、`presence/bridge/terminal/server.ts` の file-backed watcher が `JSON.parse(...)` の戻り値をそのまま PTY 入力と brain profile lookup に渡していた残存を検出した。`parseTerminalControlRequest` を追加し、許可キー、文字列型、入力長、空の stimulus ID を先に検証するようにした。これにより malformed JSON shape が `typeLine` や profile 選択へ到達せず、既存の text／stimulus の優先順は維持される。関連 **1 test file / 4 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` を確認済み。
+
+PI-03／SX-10 の Nexus connector dispatch response を再レビューし、`safeExec` の stdout を JSON parse 後に unchecked result として扱っていた残存を検出した。`parseNexusDispatchResult` で root、`ok`、`error` の型を検証してから dispatch 成否を判定し、primitive／型違いの外部応答を成功扱いにしないようにした。関連 **1 test file / 1 test passed**、typecheck、対象 lint、Prettier、`git diff --check` を確認済み。
+
+PI-03／SX-10 の A2A inbox を再レビューし、JSON parse 成功だけを根拠に inbox message を dispatch context へ渡していた残存を検出した。`parseA2AInboxMessage` で root、`header.msg_id` の安全な識別子、body／payload の存在を検証し、primitive／配列／shape-invalid envelope も quarantine して再処理ループを防ぐようにした。関連 **1 test file / 8 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` を確認済み。
+
+PI-03／SX-10 の voice actuator local STT bridge response を再レビューし、MLX／faster-whisper の JSON stdout を部分型のまま transcript candidate と capabilities／segments に渡していた残存を検出した。`parseVoiceSttBridgeResponse` を共有し、status、text、language、capabilities、segments の shape を検証してから既存の `normalizeSpeechToTextResult` へ渡すようにした。関連 **4 files / 4 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認済み。
+
+PI-03／SX-09B の supervisor IPC を再レビューし、outer response envelope 検証後も `result as TResult` が endpoint 固有の shape を信頼していた残存を検出した。health、snapshot、ask、status、list、touch、shutdown、refresh、terminate、delegated enqueue の result normalizer を追加し、nested scope／metadata／log、PID、boolean、required identifier を endpoint ごとに検証してから caller へ返すようにした。関連 **1 test file / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認済み。
+
+## 2026-09-01 再レビュー修正: supervisor health probe と legacy presence／A2A secret response の shape 境界
+
+PI-03／SX-09B／SX-10 の残存 JSON 境界を継続レビューし、supervisor daemon の health probe にも endpoint 固有の nested result normalizer を適用した。さらに `presence-controller` の legacy stimuli JSONL を parser 経由へ統一し、malformed／shape-invalid 行が perception 全体を中断せず、resolve／prune で不正行を原文のまま保持するようにした。A2A の secret actuator response は成功 status と文字列 passphrase を要求し、parse failure 時も一時入力を cleanup する。既存の fail-open health probe、stimulus status 更新、A2A encryption semantics は維持した。関連 **4 test files / 37 tests passed**、typecheck、lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: iMessage bridge の外部 JSON 応答境界
+
+PI-03／SX-10 の iMessage 外部応答を継続レビューし、`imsg --json` の chat/history 行と sqlite differential JSON を `any`／直接 parse のまま downstream へ渡していた残存を検出した。`parseIMessageChat` と `parseIMessageHistoryEntry` を追加し、object root、識別子、履歴日時、chat scope、基本 field、attachments／tapback の shape を検証してから bridge／polling へ渡すようにした。malformed／primitive 行は該当行だけを除外し、既存の group 判定、attachment summary、tapback semantics は維持した。関連 **1 test file / 8 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed** で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: intent trace JSONL の配列 root 除外
+
+PI-03／SX-08B の intent trace reader を継続レビューし、malformed JSON は除外していたものの、配列 root を object record として扱える残存を検出した。`safeJsonLines` を `Record<string, unknown>` の object-only reader に揃え、snapshot／delta／trace projection へ配列や primitive が到達しないようにした。trace schema validation 後の既存 Trace projection と相関検索 semantics は維持した。関連 **1 test file / 8 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: software quality defect ledger の JSONL shape 境界
+
+PI-03／SA-05 の defect transition ledger を継続レビューし、JSONL 行を `DefectTransitionEvent` へ直接 cast していた残存を検出した。`parseDefectTransitionEvent` で defect id、from／to status、actor type、理由、string-array の evidence、ISO 日時を検証し、malformed／primitive／配列／不正 enum の行は status 集計から除外するようにした。既存の transition graph、human-only の accepted risk、single-writer append semantics は維持した。関連 **1 test file / 8 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: virtual device inventory の system profiler shape 境界
+
+PI-03／SX-10 の macOS／Windows virtual device inventory を継続レビューし、`system_profiler`／PowerShell の JSON root と nested device rows を部分 cast のまま走査していた残存を検出した。`parseSystemProfilerItems` と record-only row filtering を追加し、primitive／配列／null の section・device を audio／camera inventory へ渡さないようにした。既存の virtual device 判定、platform fallback、audio／camera bridge の選択 semantics は維持した。関連 **1 test file / 4 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: screen display inventory の system profiler shape 境界
+
+PI-03／SX-10 の macOS display inventory を継続レビューし、`system_profiler` の section／device 配列を `any` cast のまま display name、primary、resolution projection へ渡していた残存を検出した。`parseSystemProfilerDisplayItems` を追加し、object section と object device の paired record だけを display projection へ渡すようにした。既存の解像度抽出、heuristic fallback、xrandr path、display selection semantics は維持した。関連 **1 test file / 3 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: virtual input inventory の PowerShell row 境界
+
+PI-03／SX-10 の Windows virtual input inventory を継続レビューし、PowerShell JSON の単体／配列 response を `Record<string, unknown>` 配列へ直接 cast していた残存を検出した。`parseWindowsInputDeviceRows` を追加し、object row のみを keyboard／mouse／virtual-input 分類へ渡すようにした。既存の platform adapter、virtual device heuristic、availability semantics は維持した。関連 **1 test file / 2 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission coordination bus の message／ack JSONL 境界
+
+PI-03／mission lifecycle の coordination bus を継続レビューし、handoff／review／task contract の JSONL を `MissionCoordinationEvent`／`MissionCoordinationMessage` へ直接 cast していた残存を検出した。message／ack の parser で object root、必須 identifier、channel／日時、content、acknowledged-by の string-array を検証し、malformed／unknown channel／対象外 mission の行は再構成へ渡さないようにした。既存の append-only、archive rotation、acknowledgement、mission scope semantics は維持した。関連 **1 test file / 9 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface runtime actuator result の projection 境界
+
+PI-03／SX-08B の surface runtime を継続レビューし、approval／system actuator の stdout JSON を root 検証なしで surface completion text へ投影していた残存を検出した。共有 `parseSurfaceActuatorResult` を追加し、object result のみを表示・task session 更新へ渡し、malformed／配列／primitive response は既存の runtime error handling へ閉じるようにした。承認操作、system actuator、completion artifact の既存 semantics は維持した。関連 **1 test file / 5 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Sovereign Dashboard の orchestration JSONL projection 境界
+
+PI-03／SX-08B の Sovereign Dashboard を継続レビューし、orchestration／owner summary JSONL を直接 parse して decision、mission、timestamp、件数を表示していた残存を検出した。共有 parser で object root、日時、文字列 identifier、非負整数 count を検証し、不正行を dashboard projection から除外するようにした。既存の mission／owner summary 表示、fallback、tenant／mission loader semantics は維持した。関連 **2 test files / 9 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` で確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: audit-chain integrity probe の persisted shape 境界
+
+PI-03／SX-10 の環境 capability probe を継続レビューし、`audit-chain.integrity` が JSONL の `id`／`action` だけを確認し、他の必須証跡フィールドを unchecked のまま通していた残存を検出した。既存の `normalizePersistedAuditEntry` を probe の読み取り境界へ接続し、object root、必須識別子／timestamp／operation／hash、result enum、metadata／compliance／scope、chain algorithm を共通 parser で検証するようにした。malformed／shape-invalid 行は capability failure として line number 付きで報告し、監査チェーンの hash verification 責務は従来どおり audit-chain 側に残した。関連 **3 test files / 61 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: share-grant ledger の persisted envelope／event 境界
+
+PI-03／SX-04／SX-10 の tenant share-grant ledger を継続レビューし、JSONL envelope と nested resource／edge／link event を `PersistedEnvelope`／`PersistedEvent` へ直接 cast したまま HMAC 検証・replay していた残存を検出した。`parsePersistedEnvelope` を追加し、version、hash chain fields、event type、resource／edge／link の必須文字列、role／taint enum、optional revoke／provenance fields を検証してから hash verification と state apply へ渡すようにした。検証後も parsed object の property order を保持し、既存 HMAC semantics と tenant／provenance authorization を変更していない。関連 **2 test files / 25 tests passed**、typecheck、対象 ESLint、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+同じ mesh-hub proposal／decision JSONL の一覧 projection も再確認し、shape-valid でも path tenant と異なる `tenant_id` の行が state join へ入る残存を検出した。proposal／decision parser と tenant equality filter を追加し、malformed／unknown selector／不正 decision および cross-tenant row を投影から除外するようにした。関連 **1 test file / 7 tests passed**、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: mission task event dedupe の identity／mission scope 境界
+
+PI-03／mission lifecycle の task event dedupe reader を継続レビューし、JSONL 行の `event_type`／`task_id` を部分 cast して malformed event や別 mission の identity を dedupe set へ取り込む残存を検出した。`parseMissionTaskEventIdentity` を追加し、object root、許可された task event type、mission／task identifier を検証してから、対象 mission と一致する行だけを既存 event key へ投影するようにした。既存の append-only task event、status reconciliation、mission-local path semantics は維持した。関連 **2 test files / 8 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: ingest dedup registry の content hash／record shape 境界
+
+PI-03／SA-05 の ingest dedup registry を継続レビューし、JSONL 行を `IngestRegistryRecord` へ直接 cast し、文字列であることだけを確認して不正な content hash、日時、任意 field を duplicate／supersede 判定へ渡していた残存を検出した。`parseIngestRegistryRecord` で object root、64桁 SHA-256、finite な `first_seen`、optional string field を検証し、入力側にも SHA-256 形式を要求するようにした。malformed row は従来どおりその行だけを除外し、exact duplicate／same-source supersede semantics は維持した。関連 **2 test files / 19 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: scoped artifact index の lifecycle projection 境界
+
+PI-03／AL-02／AL-03 の scoped artifact index を継続レビューし、`artifacts-index.jsonl` の行を `ScopedArtifactIndexEntry` へ直接 cast したまま、mission closure の削除対象判定や公開 artifact index の読み取りへ渡していた残存を検出した。`parseScopedArtifactIndexEntry` を共通化し、artifact class、repo-relative path、scope、scope kind、`written_at` を検証してから projection／reclamation へ渡すようにした。closure は shape-invalid 行を従来どおり原文保持し、通常の governed index reader は malformed shape を fail-closed で報告する。既存の deletion／bundle／retention semantics は維持した。関連 **2 test files / 20 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: ingest sync cursor の tenant／source identity 境界
+
+PI-03／DA-03 の ingest sync cursor を継続レビューし、path は tenant × source に分離されている一方、JSON state の parse 後に `SyncCursorState` へ直接 cast し、ファイル内の tenant／source identity が要求された読み取り対象と一致することを確認していない残存を検出した。`assertCursorState` を unknown-aware validation に揃え、tenant／source の path binding、cursor kind、cursor value、timestamp、failure counter、note を検証してから watermark として返すようにした。不一致・shape-invalid state は既存どおり reset を促さず fail-closed とし、write-after-success／at-least-once semantics は維持した。関連 **2 test files / 28 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: provider CLI response の JSON root／text projection 境界
+
+PI-03／SX-10 の legacy Codex／Agy／Claude adapter を継続レビューし、CLI JSON response の root を検証せず `message`／`response`／`result` を `AgentResponse.text` へ投影する残存を検出した。共通 object parser と string-only field selection を追加し、primitive／配列／型違いの structured response は typed response として扱わず、error または安全な plain-text fallback へ閉じるようにした。既存の provider permission、enhancer trace、usage summary、session semantics は維持した。関連 **2 test files / 26 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: peer messaging の envelope／保存レコード／HTTP 応答境界
+
+PI-03／SX-10 の peer messaging を継続レビューし、受信 JSON、inbox／outbox／event JSONL、送信先 HTTP response を unchecked cast／primitive のまま署名検証・responder dispatch・projection へ渡していた残存を検出した。`parsePeerMessageEnvelope` と保存レコード parser を追加し、version、tenant／peer identity、message type、timestamp、scope、optional principal／TTL／signature を検証してから処理するようにした。一覧は malformed／cross-tenant／cross-peer 行を除外し、送信応答も object root と known field の型を検証するようにした。既存の HMAC、recipient／tenant gate、append-only inbox／outbox semantics は維持した。関連 **1 test file / 21 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: media PDF bridge の外部 JSON／split projection 境界
+
+PI-03／SX-10 の media actuator を継続レビューし、Python PDF bridge の stdout JSON を root／`ok` 検証なしで `parsed`／`pages`／`count`／`out_dir` へ投影していた残存を検出した。`parseMediaBridgeResponse` と `parsePdfSplitBridgeResponse` を追加し、object root、boolean `ok`、error／code の文字列、split 成功時の正数 count・出力ディレクトリ・ページ配列・count 一致を検証してから path projection へ渡すようにした。既存の password stdin、PDF operation semantics、repo-relative output semantics は維持した。関連 **2 test files / 57 tests passed / 11 skipped**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: control-plane CLI の surface runtime subprocess response 境界
+
+PI-03／SX-10 の control-plane CLI を継続レビューし、surface runtime の subprocess stdout JSON を object／field 型検証なしで operator summary へ投影していた残存を検出した。`parseSurfaceRuntimeCommandOutput` を追加し、object root、status／id／detail の string、port の finite number または string を検証してから summary 化するようにした。非 JSON は従来どおり安全な tail fallback へ閉じ、surface restart／reconcile semantics は維持した。関連 **2 test files / 12 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: validation bundle の audit JSONL projection 境界
+
+PI-03／IP-13 の validation bundle exporter を継続レビューし、`active/audit` JSONL を parse 後に `any` のまま mission filter と bundle 出力へ渡していた残存を検出した。既存の `normalizePersistedAuditEntry` を読み取り境界へ接続し、shape-invalid 行を除外してから mission／override projection へ渡すようにした。legacy の top-level `mission_id`／`type` は検証済み原文の additive field として保持し、bundle の互換出力 semantics は維持した。関連 **2 test files / 7 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: peer conversation の返信 transcript projection 境界
+
+PI-03／SX-10 の peer conversation を継続レビューし、送信先 peer の response／reply を `any`／`Partial<TranscriptEntry>` のまま inbound transcript へ投影していた残存を検出した。`parsePeerConversationTranscriptEntry` を追加し、message identity、kind／direction、text、timestamp、related work item、metadata／payload の型を検証し、responder／sender／recipient identity の一致を確認してから session へ append するようにした。既存の session schema、HMAC transport、inbound／outbound transcript semantics は維持した。関連 **2 test files / 26 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: meeting intelligence の model JSON projection 境界
+
+PI-03／SX-10 の meeting actuator を継続レビューし、delegate／model の JSON block を `any[]`／`any` のまま action item、facilitation script、self-execution plan、reminder text へ投影していた残存を検出した。`parseMeetingModelObject`／`parseMeetingModelObjectArray` を追加し、object／array root と array item shape を検証してから既存の field-level enum／string projection へ渡すようにした。assignee kind、priority、due date、facilitation next action も typed narrowing に統一し、既存の restricted-action、pending review、fallback semantics は維持した。関連 **1 test file / 4 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: browser CDP version response の外部 JSON 境界
+
+PI-03／SX-10 の browser actuator を継続レビューし、Chrome の `/json/version` response を object 型として受け取った後に `any` で `Browser`／`webSocketDebuggerUrl` を参照していた残存を検出した。`parseChromeCdpVersionResponse` を追加し、object root、任意の非空 string marker を検証してから CDP endpoint の発見結果へ投影するようにした。malformed／primitive／空文字 response は従来どおり候補外として扱い、CDP attach／process discovery semantics は維持した。関連 **2 test files / 38 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: automation blueprint の input JSON 境界
+
+PI-03／SX-10 の automation blueprint helper を継続レビューし、`values` JSON を parse 後に `Record<string, unknown>` へ直接 cast していた残存を検出した。`parseAutomationBlueprintValues` を追加し、object root（配列・null・primitive を除外）を検証してから blueprint の placeholder／parameter projection へ渡すようにした。既存の placeholder 解決と blueprint 生成 semantics は維持した。関連 **1 test file / 5 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Concierge voice response／browser bundle の境界
+
+PI-03／SX-08B／SX-10 の Concierge voice 経路を継続レビューし、voice-hub の status／listen-once response と browser hook の payload を型アサーションのまま Tier 判定、音声状態、transcript／reply UI へ投影していた残存を検出した。`parseVoiceStatusResponse`、`parseVoiceInputDevices`、`parseVoiceSpeechState`、`parseVoiceListenOnceResponse` を追加し、proxy／client の双方で object root、boolean／string／finite number、device／STT nested shape、intent-resolution contract を検証するようにした。併せて parser の pure subpath を分離し、Node 専用依存を含む intent resolution compiler が Concierge client bundle へ混入する build boundary を解消した。既存の Tier 0 fallback、server TTS indicator、voice consent／conversation semantics は維持した。関連 parser **1 test file / 7 tests passed**、core package build、Concierge `next build`（Turbopack NFT tracing warning は既存）を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface query weather response の shape 境界
+
+PI-03／SX-08B の surface query を継続レビューし、geocoding／forecast の外部 JSON を `any` のまま座標・現在値へ投影していた残存を検出した。`parseSurfaceWeatherGeocodeResponse` と `parseSurfaceWeatherForecastResponse` を追加し、object root、有限な latitude／longitude、既知の現在値 scalar だけを weather summary へ渡すようにした。malformed／配列／型違いの候補は除外し、既存の ipapi／ipwho fallback と weather summary semantics は維持した。task-session fastpath の mock も `TaskSession.control` を含む canonical shape に揃えた。関連 **2 test files / 28 tests passed** を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: OCR provider response の text projection 境界
+
+PI-03／SX-10 の OCR bridge を継続レビューし、Gemini／Claude／OpenAI／local VLM の JSON response を `any` のまま候補 text へ投影していた残存を検出した。provider ごとの parser を追加し、object root、配列階層、message／part／response の string shape を検証してから成功結果へ渡すようにした。malformed／primitive／型違いの応答は `invalid_response` として fail-closed にし、router の既存 fallback と egress policy は維持した。関連 **1 test file / 22 tests passed** を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Chronos proposal／audit-log の persisted shape 境界
+
+PI-03／SX-04／SX-10 の Chronos gateway を継続レビューし、mission proposal state と audit-log JSONL を parse 成功だけで mission issuance／監査表示へ投影していた残存を検出した。proposal の surface／channel、mission intent、tier、日時、routing decision を検証する parser と、audit event の object root・識別文字列・routing summary の parser を追加し、shape-invalid 行／state は fail-closed で除外するようにした。既存の localadmin／all-tenant gate、proposal confirmation、監査表示 semantics は維持した。関連 **2 test files / 11 tests passed**、typecheck、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Concierge ingest CLI verdict の JSON 境界
+
+PI-03／SX-10 の Concierge ingest を継続レビューし、ingest subprocess の stdout JSON を `Record<string, unknown>` へ直接 cast して dry-run／target path の UI projection へ渡していた残存を検出した。`parseIngestCliVerdict` を追加し、object root と `dry_run`／`would_commit`／`target_path` の field type を検証してから summary を作るようにした。malformed／配列／型違いの verdict は既存の 502 failure へ閉じ、tenant registry、secure temp、PII gate、commit semantics は維持した。関連 **1 test file / 1 test passed**、対象 ESLint、Prettier を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: onboarding apply の外部 JSON input 境界
+
+オンボーディング適用 CLI の identity file／stdin input を再監査し、JSON parse 後に `ApplyInput` へ直接 cast していた残存を修正した。
+`parseApplyInput`／`validateInput` を読み取り直後へ接続し、identity、persona、tenant、tutorial、reasoning backend の shape／enum／
+required string を検証してから profile／tenant／onboarding state の write path へ進むようにした。malformed root、配列、型違い、
+不正 tenant／tutorial は fail-closed とし、既存の onboarding／tenant isolation semantics は維持した。関連 **1 test file / 9 tests passed**、
+typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、
+provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Terminal HUD の persisted trace JSONL 境界
+
+Terminal HUD の persisted trace JSONL tail を再監査し、generic `tailJsonl<T>` が JSON parse 結果を unchecked cast してから
+Stats projection へ渡していた残存を修正した。tail helper に parser contract を導入し、trace schema の strict replay validation を
+通過した object だけを `TraceLine` へ投影するようにした。malformed／shape-invalid JSONL は従来どおり表示から除外し、tail の byte cap、
+symlink guard、poll watcher semantics は維持した。関連 **2 files / 6 tests passed**、typecheck、Prettier、`git diff --check` を確認済み。
+残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は
+継続課題である。
+
+## 2026-09-01 再レビュー修正: Concierge config-mission の persisted JSON 境界
+
+Concierge の config-mission route を再監査し、preset／brief JSON を `Record<string, unknown>` に直接 cast して UI／成功判定へ
+渡していた残存を修正した。`parseConfigMissionPreset`／`parseConfigMissionBrief` を追加し、preset input type／enum values／default、
+write target、brief identity／tenant／status／created_at を検証してから表示・作成結果へ投影するようにした。malformed preset／brief は
+黙って補完せず除外し、config-mission の draft-only／tenant／approval semantics は維持した。関連 **2 files / 3 tests passed**、
+Concierge `next build`（既存 Turbopack NFT tracing warnings のみ）、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／
+外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Terminal HUD build alias の整理
+
+`build:tui` が package 内部からしか参照されない script-level alias であることを確認し、root `build` script の実装を
+`pnpm --filter @presence/terminal-hud run build` へ直接接続した。`build:tui` と CLI registry entry を削除し、package script 数の
+現時点を **189** とした。script integrity／CLI manifest、Terminal HUD build、typecheck、`git diff --check` を確認済み。残る全 script
+harness／generator 移行、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: process actuator direct input 境界
+
+process actuator の直接 CLI／catalog adapter input を再監査し、JSON parse 結果を `ProcessAction` として unchecked cast していた
+残存を修正した。`parseProcessAction` を共有し、action、params、steps、context の object／array shape を検証してから preflight／
+process lifecycle へ渡すようにした。直接 entrypoint と catalog adapter の双方を同じ parser に接続し、既存の process action semantics は
+維持した。併せて package-wide actuator build で露出した simctl device の optional `isAvailable` narrowing を fail-closed に統一した。
+関連 **2 files / 5 tests passed**、actuator package build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答
+inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: service actuator persisted PID registry 境界
+
+service actuator の `services-pids.json` を再監査し、persisted process state を JSON parse 後にそのまま PID map として
+reconcile／cleanup へ渡していた残存を修正した。`parseServicePidRegistry` を追加し、object root、service id、positive safe integer
+PID を検証してから process probe／runtime registration／cleanup へ進むようにした。malformed registry は空 registry として fail-closed にし、
+既存の service lifecycle／recovery semantics は維持した。関連 **2 files / 6 tests passed**、typecheck、Prettier、`git diff --check` を確認済み。
+残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は
+継続課題である。
+
+## 2026-09-01 再レビュー修正: orchestrator intent mapping の YAML projection 境界
+
+orchestrator の `intent_detect` を再監査し、YAML parse 結果を `any` として `intents`／`trigger_phrases`／`chain` へ投影していた
+残存を修正した。`parseIntentMapping` を追加し、mapping root、intent 名、trigger phrase、capability chain の string shape を検証して
+から intent routing へ渡すようにした。malformed mapping は明示的に fail-closed とし、既存の query matching／chain semantics は維持した。
+関連 **2 files / 27 tests passed**、orchestrator package build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／
+外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: orchestrator request archetype catalog の JSON 境界
+
+orchestrator の request-to-execution-brief を再監査し、`actuator-request-archetypes.json` の loader が JSON parse 成功だけで
+`any` catalog を archetype detection／required input projection へ渡していた残存を修正した。`parseActuatorRequestArchetypeCatalog` を追加し、
+default archetype、archetype id、keyword、summary、scope、target actuator、deliverable、required input の string shape を検証してから
+実行 brief へ渡すようにした。malformed catalog は明示的に fail-closed とし、既存の keyword matching／default fallback semantics は維持した。
+関連 **2 files / 32 tests passed**、orchestrator package build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／
+外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: voice actuator resume session の JSON 境界
+
+voice actuator の `record_verify_repair_voice_sample` resume session を再監査し、persisted JSON を parse 成功後に `any` のまま
+request identity、verification、repair attempt、replacement range へ投影していた残存を修正した。`parseVoiceRepairSession` を追加し、
+session version／identity／nested object、attempt の positive safe integer、replacement の finite range／path を検証してから再開処理へ渡すようにした。
+malformed session は明示的に fail-closed とし、voice consent、raw audio retention、部分置換の既存 semantics は変更していない。関連 **2 files / 21 tests passed**、
+voice package build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、
+provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: preference adapter の個人設定 JSON 境界
+
+personal user preferences の JSON loader を再監査し、parse 成功後の値を unchecked な mutable map としてドットパス走査へ渡していた残存を修正した。
+`parseUserPreferences`、`readUserPreference`、`writeUserPreference` を追加し、object root、unknown のネスト走査、scalar collision、
+`__proto__`／`constructor`／`prototype` path を検証してから preference adapter の get／set へ渡すようにした。malformed root は default／false に閉じ、
+既存の任意ネスト値と personal tier の保存先は維持した。関連 **1 test file / 8 tests passed**、core package build、Prettier、`git diff --check` を確認済み。
+残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: media diagram の graph／icon map JSON 境界
+
+media actuator の `drawio_from_graph`／icon map loader を再監査し、JSON parse 成功だけで graph／resource map を描画へ渡していた残存を修正した。
+`parseDiagramGraph`／`parseDrawioIconMap` を追加し、graph の node／edge 必須識別子、node id の一意性、icon resource の optional field／asset 配列を検証してから
+描画へ渡すようにした。context／inline／input path の全 graph 経路と repository／custom icon map の両方を同じ境界へ接続し、malformed input は fail-closed、
+既存の renderer hints／icon fallback semantics は維持した。関連 **1 test file / 14 tests passed**、media actuator package build、関連描画 **2 files / 19 tests passed**、
+Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: operator／computer surface の intent contract 描画
+
+12 surface の契約描画を再監査し、operator-surface の intent snapshot と computer-surface の A2UI mirror に
+`IntentResolutionContract` の authority／next action が明示されていない残存を修正した。operator-surface は snapshot の
+tier／tenant scope で表示用契約を解決し、computer-surface は A2UI の camel／legacy snake key を server-side parser で
+canonicalize してから表示へ渡す。malformed contract は除外し、契約を認可・実行判断へ使わない境界を維持した。
+併せて operator-surface の既存 package export／型 import 不整合を修正した。関連 **Computer Surface 3 files / 16 tests、operator-surface 5 files / 23 tests passed**、
+operator-surface `next build`（既存 Turbopack NFT tracing warnings のみ）、core build、typecheck、Prettier、`git diff --check` を確認済み。
+残る自由文入口 7→1、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: system actuator の focused-target store 境界
+
+system actuator の `focused-targets.json` を再監査し、JSON parse 後の `Record<string, any>` を focus guard／application activation へ直接渡していた残存を修正した。`parseFocusTargetStore` を追加し、root、store key と target id の一致、既知の string／boolean field、`__proto__`／`constructor`／`prototype` を検証してから focus target として利用するようにした。primitive／配列／型不正・ID不一致のエントリは fail-closed で除外し、既存の focus guard／保存先／remember semantics は維持した。関連 **2 test files / 3 tests passed**、system actuator typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: Slack typing reaction の lifecycle 境界
+
+Slack の処理中リアクションを `runChannelTurn` の typing lifecycle 内へ移し、thread context 解決前に provider 側の状態を開始しないようにした。履歴取得失敗時にユーザーのメッセージへ 👀 が残る orphaned reaction を防ぎ、reaction add 失敗時は remove を試みない fail-safe semantics を追加した。関連 **1 test file / 7 tests passed**、Slack bridge typecheck、Prettier、`git diff --check` を確認済み。残る自由文入口 7→1、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: browser passkey provider catalog の shape 境界
+
+browser actuator の `browser-passkey-providers.json` loader を再監査し、JSON parse 後の provider catalog を `any` のまま URL／selector として Playwright へ渡していた残存を修正した。`parsePasskeyProviderCatalog` を追加し、catalog root、default provider、provider key、必須 URL／selector、optional post-auth marker の shape を検証してから passkey flow へ渡すようにした。malformed／dangerous key／empty catalog は既定 provider へ fail-closed し、既存の navigation policy／provider preset semantics は維持した。関連 **2 test files / 3 tests passed**、browser actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: service manifest の reconcile 入力境界
+
+service actuator の reconcile を再監査し、任意 JSON を service manifest として `Object.entries`／`service.path`／`service.env` へ直接渡していた残存を修正した。`parseServiceManifest` を追加し、manifest root、service id、path、optional preset path、string-only environment、危険キーを検証してから process lifecycle へ渡すようにした。malformed manifest は cleanup・spawn・PID state 更新の前に fail-closed で拒否し、既存の auth validation、service start、reconcile semantics は維持した。関連 **2 test files / 7 tests passed**、service actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: wisdom persisted JSON の decision boundary
+
+wisdom actuator の意思決定系を再監査し、仮説木・dissent log・readiness・simulation などの persisted JSON が parse 成功だけで
+`any` として処理へ流れる残存を修正した。`parseWisdomJsonObject`／`readWisdomJsonObject` と record／string array accessors を追加し、object root、危険キー、宣言済み配列の要素型を検証してから pure decision ops、stakeholder readiness、simulation／cross-critique の loader へ渡すようにした。互換的な `hypotheses`／`items` 入力は維持し、malformed root／配列／文字列配列は明示的に fail-closed とした。関連 **3 test files / 84 tests passed**、wisdom actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: canonical intent packet の contextual frame 再利用
+
+free-text resolver を再監査し、同一ターンの intent packet、intent contract、execution brief、schedule query が contextual frame を個別に再推論していた残存を修正した。`IntentResolutionPacket.contextual_frame` を canonical packet に追加し、schedule candidate の同一 pass 共有、contract/compiler/schedule execution への再利用、packet schema／README の同期を行った。既存の手動注入 packet は optional frame の fallback を維持し、selected intent／authority／clarification semantics は変更していない。関連 **4 files / 67 tests passed**、packet schema validation、typecheck、Prettier、`git diff --check` を確認済み。残る全 surface の全面 contract 描画、scripts **≤120**、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: wisdom reconcile strategy の実行前 shape 境界
+
+wisdom reconcile の strategy loader を再監査し、persisted JSON を parse 成功後に strategy／pipeline／control nested step として直接実行していた残存を修正した。`parseWisdomReconcileStrategy` を追加し、strategy root、pipeline step の type／op／params、control の再帰 nested pipeline、for_each の shape、危険キーを検証してから reconcile へ渡すようにした。malformed strategy は pipeline 実行前に fail-closed とし、既存の reconcile allowlist と operation semantics は維持した。関連 **3 files / 85 tests passed**、wisdom actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: wisdom YAML frontmatter の shape 境界
+
+wisdom の `yaml_update` を再監査し、YAML frontmatter の parse 結果を任意値のまま既存ドキュメントへマージしていた残存を修正した。`parseWisdomJsonObject` を共有し、frontmatter root、空値、危険キーを検証してから document metadata として更新するようにした。配列・primitive・危険キーを含む frontmatter は更新前に fail-closed とし、既存の markdown 本文と metadata merge semantics は維持した。関連 **3 files / 45 tests passed**、wisdom actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: wisdom persisted pipeline context の shape 境界
+
+wisdom pipeline の `context_path` loader を再監査し、persisted JSON の parse 結果を任意の record として現在の context へ直接 merge していた残存を修正した。`parseWisdomJsonObject` を通して object root と危険キーを検証してから pipeline context に取り込むようにし、配列・primitive・危険キーを含む状態は実行前に fail-closed とした。既存の context path scope、retry、保存 semantics は維持した。関連 **3 files / 46 tests passed**、wisdom actuator build、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: CLI interaction packet の shape 境界
+
+operator CLI の packet file loader を再監査し、JSON parse 後に `kind` だけを確認して operator packet／status report／response preview を型アサーションで表示・次アクション実行へ渡していた残存を修正した。`parseInteractionPacket` を追加し、root、必須 string、enum、confidence／count の範囲、questions／actions／findings の要素 shape、危険キーを検証してから利用するようにした。invalid JSON／malformed packet は表示・実行前に fail-closed とし、既存の packet path allowlist、表示、approved command／pipeline semantics は維持した。関連 **3 files / 5 tests passed**、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: surface actor allowlist の JSON shape 境界
+
+surface access policy の共通 allowlist を再監査し、JSON 配列の要素を `String()` 化し、object root／nested actor map を型アサーションで認可判定へ渡していた残存を修正した。safe-key な object root、string-only actor ids、nested `actors`／`ids` 配列を検証してから allowlist として利用するようにし、数値 actor・危険キー・不正 shape は invalid configuration として fail-closed にした。legacy environment、Telegram の deny-by-default、既存の surface／actor semantics は維持した。関連 **1 test file / 6 tests passed**、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: work coordination CLI JSON 入力の shape 境界
+
+`work_coordination` CLI の `--context`／`--metadata`／`--filters`／`--payload` を再監査し、JSON parse 後の値を `Record` として各 governed facade へ直接渡していた残存を修正した。object root、nested JSON の危険キーを検証してから入力へ渡す共通 parser を追加し、配列・primitive・prototype 系キーは実行前に拒否するようにした。既存の typed context mapping、metadata／filter／event payload semantics は維持した。関連 **1 test file / 2 tests passed**、typecheck、Prettier、`git diff --check` を確認済み。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: format:check:ci alias の削除
+
+package scripts を再監査し、`format:check:ci` が固定された4 workflow／package JSON の Prettier 実行を包むだけの開発用 alias であることを確認した。CI workflow と pre-PR checklist を同じ `pnpm exec prettier --check` へ移行し、command registry と package script から alias を削除した。CI の対象ファイル、整形 semantics、既存の開発用 `format`／`format:check` は維持した。package scripts は **189 → 188** となり、focused boundary **3 files / 10 tests passed**、Prettier、`git diff --check` を確認済み。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: 未参照の開発用 eval／benchmark／soak alias 削減
+
+package scripts と command registry を再監査し、`eval:facets`、`eval:japanese-contextual-intent`、`bench:memory`、`check:backend-conformance`、`soak:endurance`、`soak:restart-e2e` が repo 内の active workflow／documentation から参照されない開発用 alias であることを確認した。各 TypeScript entrypoint と harness は保持したまま、package scripts と registry の重複入口だけを削除した。package scripts は **188 → 182** となり、CLI manifest、script-integrity、関連 **2 files / 11 tests passed**、Prettier、`git diff --check` を確認済み。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正: build 内部 clean alias の削除
+
+package scripts を再監査し、`clean` が `build` の先頭からしか呼ばれない内部 alias であることを確認した。`build` に governed clean entrypoint を直接接続し、package script／command registry から内部 alias を削除した。clean の対象範囲、build 順序、fresh checkout の source-side import semantics は維持した。package scripts は **182 → 181** となり、CLI manifest、script-integrity、Prettier、`git diff --check` を確認済み。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 71
+
+peer conversation／peer messaging の CLI JSON 入力を再監査し、`metadata`／`payload` を JSON parse 成功だけで
+会話保存・署名付き envelope 作成へ渡していた残存を修正した。共通 `scripts/lib/json-input.ts` を追加し、JSON value の
+再帰 shape と `__proto__`／`constructor`／`prototype` を検証し、conversation metadata は object に限定してから下流へ渡すようにした。
+既存の peer message payload の型、会話 transcript、送信 semantics は維持した。
+
+検証: peer JSON input／peer CLI **3 files / 5 tests passed**、typecheck、Prettier、`git diff --check`。残る全 direct JSONL／
+外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 72
+
+realtime voice の固定秒数 recorder bridge 応答を再監査し、外部 stdout の JSON parse 結果を `any` のまま
+`status`／`path` へ投影していた残存を修正した。`parseRecorderBridgeResponse` を追加し、JSON object、status enum、
+文字列 field、危険キーを検証してから録音結果を利用するようにした。成功時の返却 path は要求した turn の録音先と
+一致することを operation-time に再検証し、別ファイルを STT へ渡さないようにした。既存の recorder fallback／voice
+conversation semantics は維持した。
+
+検証: realtime voice CLI **1 file / 8 tests passed**、typecheck、Prettier、`git diff --check`。残る全 direct JSONL／
+外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 73
+
+service procedure の `--inputs` を再監査し、JSON parse 成功後に object として型アサーションし、service dispatch／
+外部 effect へ渡していた残存を修正した。peer CLI と共有する `parseSafeJsonObjectInput` を接続し、object root と
+再帰的な `__proto__`／`constructor`／`prototype` を検証してから procedure input として利用するようにした。
+既存の procedure／recording validation、approval gate、dispatch semantics は維持した。
+
+検証: peer JSON boundary **1 file / 3 tests passed**、typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答
+inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 74
+
+`google_workspace_meet` の create payload を再監査し、JSON parse 後の任意値を object として Google Workspace
+CLI へ渡していた残存を修正した。共通 `parseSafeJsonObjectInput` を payload file／inline JSON の双方へ接続し、
+object root と再帰的な危険キーを外部呼び出し前に検証するようにした。既存の repository path allowlist と gws
+呼び出し semantics は維持した。
+
+検証: Google Workspace Meet **1 file / 2 tests passed**、typecheck、Prettier、`git diff --check`。残る全 direct JSONL／
+外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 75
+
+Concierge の `/api/voice/stop` endpoint result を再監査し、voice-hub の JSON response を
+`Record<string, unknown>` としてそのまま返していた残存を修正した。共有 voice contract に
+`parseVoiceStopResponse` を追加し、`ok`／`stopped`／`reason` の shape を検証してから返却するようにした。
+malformed response は success status へ通さず 502 の fail-closed response とし、daemon unreachable 時の
+既存の「already stopped」fallback は維持した。
+
+検証: Concierge voice parser **1 file / 2 tests passed**、Concierge build（既存 Turbopack NFT tracing warnings のみ）、
+typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、
+scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 76
+
+Concierge の `/api/message` voice-hub 応答を再監査し、JSON root と `reply`／`replyText`／`text`／`response` の
+field shape を検証せず、任意値の候補から返信を選択していた残存を修正した。`parseVoiceHubConversationResponse` を
+共有 conversation contract に追加し、root、reply string、intent-resolution contract を検証してから surface delivery へ
+渡すようにした。malformed response は voice-hub 経路の成功結果にせず、既存の orchestrator fallback へ閉じた。
+
+検証: Concierge conversation／voice parser **2 files / 4 tests passed**、typecheck、Prettier、`git diff --check`。
+残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 77
+
+Chronos の Cloudflare OS panel を再監査し、`/api/os/control-plane` response を型アサーション後に
+配列 fallback していた残存を修正した。client-safe な `parseCloudflareOsResponse` を追加し、root、error、held action／
+observation の必須 field、status／tier enum を検証してから表示モデルへ渡すようにした。server-side の viewer／tenant／tier
+認可と read-only surface の責務は変更していない。
+
+検証: Cloudflare OS response／panel **2 files / 3 tests passed**、Chronos `next build --webpack`（既存 middleware／Browserslist warning のみ）、
+typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、scripts **≤120**、
+12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 78
+
+Chronos Trace Viewer の endpoint result を再監査し、`/api/traces` の feed／detail response を
+`as TraceFeedResponse`／`as TraceDetailResponse` でそのまま client state へ投影していた残存を修正した。
+client-safe な `parseTraceFeedResponse`／`parseTraceDetailResponse` を追加し、root、必須 string／number、status／tier／artifact enum、
+attribute scalar、recursive span／event／artifact shape、危険キーを検証してから表示へ渡すようにした。malformed response は
+表示状態へ取り込まず fail-closed とし、server-side の viewer／tenant／tier 認可、trace path の read-only semantics は変更していない。
+
+検証: trace response／trace feed **2 files / 14 tests passed**、Chronos `next build --webpack`（既存 middleware／Browserslist warning のみ）、
+typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、
+scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 79
+
+Chronos の headless A2UI workspace を再監査し、`/api/headless/a2ui/operator-home` の envelope／component／props を
+型アサーションだけで renderer へ渡していた残存を修正した。`parseHeadlessA2UIResponse` を追加し、success envelope、surface id、
+component id／type、JSON-safe props、children の shape、危険キーを検証してから renderer の allowlist へ渡すようにした。
+malformed response は空の表示状態へ fail-closed とし、server-side の headless operation authorization と既存 A2UI component allowlist は維持した。
+
+検証: headless A2UI response／projection **2 files / 4 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 80
+
+Presence Studio の voice-hub `/api/speech/state` poll を再監査し、外部 response を型アサーション後に
+`String()` 化して SSE へ流していた残存を修正した。`parseVoiceHubSpeechStateResponse` を追加し、root、`ok`、speech status、
+optional text／timestamp／pid／engine id、危険キーを検証してから latest state と SSE payload へ渡すようにした。malformed response は
+当該 poll を無視し、既存の best-effort polling と表示 semantics は維持した。
+
+検証: Presence Studio voice state **2 files / 3 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 81
+
+Chronos の Organization Operating Model を再監査し、`/api/organization-operating-model` の `view`／tenant response を
+型アサーションだけで client state へ投影していた残存を修正した。`parseOrganizationOperatingModelResponse` を追加し、organization purpose、
+domain／capability／service／operation／incident／decision、reconciliation、control-plane accounting、readiness、tenant identity の shape と
+enum／数値／文字列配列、危険キーを検証してから表示へ渡すようにした。malformed response は表示 state へ入れず fail-closed とし、server-side の
+viewer／tenant authorization と read-only semantics は変更していない。
+
+検証: organization response／presentation **2 files / 4 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 82
+
+Chronos の tenant-design bridge を再監査し、`/api/tenant-design` response の `css_vars` を型アサーション後に
+style object へ直接 spread していた残存を修正した。`parseTenantDesignResponse` を追加し、source、nullable brand name、CSS custom property
+key／string value を検証してから表示へ渡すようにした。custom property 以外の key、型不正、malformed response は適用せず、既存の
+tenant viewer guard と design resolution semantics は維持した。
+
+検証: tenant-design response／route **2 files / 4 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 83
+
+Chronos の Deliverables Workspace を再監査し、`/api/deliverables` の artifact list／access role を `any[]`／型アサーションのまま
+preview URL と review state へ渡していた残存を修正した。`parseDeliverablesResponse` を追加し、artifact identity、storage／scope fields、
+path／external ref、timestamp／size、missing／review fields、access role、危険キーを検証してから表示へ渡すようにした。malformed response は
+表示 state へ入れず fail-closed とし、server-side の viewer／tenant／project authorization と preview path mediation は変更していない。
+
+検証: deliverables response／inbox／route **2 files / 9 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 84
+
+Presence Studio の `/api/stimuli/tail` を再監査し、stimuli JSONL の各行を `JSON.parse` したまま、malformed 行を
+`{ raw }` として client projection へ返していた残存を修正した。既存の GUSP canonical parser を共有する
+`parseStimuliTailContent` を追加し、bounded tail の各行を stimulus／origin／signal／control shape 検証後に返すようにした。
+不正行は projection から除外し、既存の tail 上限と read-only semantics は維持した。
+
+検証: Presence Studio stimuli tail／voice state／resource boundary **3 files / 5 tests passed**、typecheck、Prettier、`git diff --check`。
+残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、
+12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 85
+
+`intent` CLI の snapshot／delta／trace JSONL loader を再監査し、shared secure path の後でも各行を直接 `JSON.parse` し、
+任意 object を typed snapshot／delta／trace projection へ渡していた残存を修正した。foundation の `readJsonLines` と安全な object／
+再帰危険キー検証を接続し、malformed／配列／prototype 系キーを含む行を fail-closed で除外してから既存の trace replay validator／
+redaction／correlation filter へ渡すようにした。既存の mission scope、redaction、read-only report semantics は維持した。
+
+検証: intent trace **2 files / 5 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／
+外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、
+provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 86
+
+`egress:report` の audit JSONL loader を再監査し、secure path の後で各行を直接 parse し、任意値を egress host 集計へ流していた残存を修正した。
+foundation の `readJsonLines` と egress audit domain parser を接続し、action／timestamp／result／hostname と再帰的な危険キーを検証してから
+集計するようにした。malformed／異種 event／symlink file は従来どおり除外し、warn／deny の集計と enforce readiness の recommendation semantics は維持した。
+
+検証: egress report **2 files / 4 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、
+script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 87
+
+portal inbox の JSON loader を再監査し、secure path の後で request root を直接 parse し、任意 object を
+portal 処理へ渡していた残存を修正した。peer／procedure／Meet CLI と共有する安全 JSON object parser を接続し、
+object root、再帰的な危険キー、intent／status の shape を検証してから処理するようにした。不正 request は既存どおり
+無視し、portal の出力・処理 semantics は維持した。
+
+検証: portal inbox **1 file / 8 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 88
+
+meeting participation の reasoning backend 応答を再監査し、JSON parse 後の任意値と truthy 値を speech／leave として
+会議中の発話制御へ渡していた残存を修正した。共有安全 JSON object parser と fenced JSON 対応の `extractFirstJson` を接続し、
+危険キー・非 object root を除外し、leave は boolean の `true` のみを採用するようにした。既存の silence／leave semantics は維持した。
+
+検証: meeting participation／portal inbox **2 files / 17 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 89
+
+peer tenant runtime migration の persisted plan loader を再監査し、format だけを確認した任意 plan を `--apply` の
+ファイル移動・書き込み先へ渡していた残存を修正した。migration plan parser を追加し、root／source／quarantine／destination path、
+tenant slug、migration state／action／disposition、件数、危険キーを検証してから適用するようにした。既存の source hash、destination conflict、
+quarantine、tenant partition semantics は維持した。
+
+検証: migration／lifecycle hook／meeting／portal **4 files / 40 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 90
+
+lifecycle hook の command stdout を再監査し、JSON parse 後の任意 object を permission decision／result patch へ投影していた
+残存を修正した。command hook output parser を追加し、object root、decision／permission fields の string shape、result patch の object shape、
+危険キーを検証してから hook outcome へ反映するようにした。不正 stdout は既存の fail-open／exit-code 判定へ戻し、valid な ask／deny と
+post-tool patch semantics は維持した。
+
+検証: lifecycle hook **1 file / 20 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、
+script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、
+provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 91
+
+mission CLI の `--relationships-json` と file input を再監査し、JSON parse 後の任意 object を relationship projection へ渡していた残存を
+共有安全 JSON object parser に統合した。object root、再帰的な危険キーを検証し、配列・primitive・prototype 系キーは fail-closed で拒否するようにした。
+
+検証: mission controller／peer JSON resource boundary **2 files / 79 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 92
+
+pipeline の inline onboarding input と actuator playground の `--params`／interactive JSON input を再監査し、JSON parse 後の任意値を
+effect boundary へ流していた残存を共有 parser へ接続した。object root と再帰的な危険キーを検証し、invalid input は既存の入力エラー／fallback semantics
+へ戻すようにした。
+
+検証: pipeline domain／actuator playground **2 files / 10 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 93
+
+portal inbox、meeting participation、peer tenant migration、lifecycle hook command stdout の外部応答を再監査し、JSON parse 後の任意 object／truthy 値が
+処理・permission decision・migration effect へ投影される残存を修正した。各 domain の parser で object root、必須 field の型、列挙値、path／件数、
+再帰的な危険キーを検証し、不正値は既存の ignore／fail-open／fallback semantics に戻すようにした。
+
+検証: portal／meeting／migration／lifecycle hook **4 files / 40 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、
+全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、
+voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 94
+
+MCP server の pipeline catalog、actuator manifest、tool text payload を再監査し、JSON parse 後の任意 object／capability shape を一覧・structured content へ
+投影していた残存を修正した。再帰的な危険キーと object root、pipeline metadata、actuator capability の shape を検証し、不正な persisted data は
+既存の空／fallback projection へ戻すようにした。MCP の認可、allowlist、pipeline 実行経路は変更していない。
+
+検証: MCP server engine **1 file / 39 tests passed**、typecheck、Prettier、`git diff --check`。残る endpoint result の全件 inventory、全 direct JSONL／外部応答 inventory、
+script-level command の全 harness／generator 移行、scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、
+provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 95
+
+SX-06 の直接入口を再監査し、programmatic tool runner に残っていた `main().catch` の専用起動境界を shared `defineScript` harness へ移行した。
+stdin/stdout の native protocol と socket cleanup は専用実行関数へ保持し、失敗時の wire-safe JSON response と exit code の扱いを変えずに
+entrypoint guard と error boundary を統一した。併せて RPC frame が1 callにつき1回だけ送信されることを回帰テストで固定した。
+
+検証: 関連 **12 files / 196 tests passed**、typecheck、`git diff --check`。package script alias は利用箇所を確認した未参照13件を
+削除し、`package.json`／CLI registry は **168 entries** で一致、`cli-manifest`／`script-integrity`／`catalogs` を再通過、canonical full gate **68/68 passed**。
+残る scripts **≤120**、全 script harness／generator 移行、
+12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 96
+
+SX-05 の check alias を再レビューし、full／PR／release の canonical gate が既に executable として `ci-gates.json` に登録されている重複入口を整理した。
+`check:first-win-smoke`、`check:esm`、`check:packaging-contract`、`check:pipeline-shell-independence`、`check:contract-schemas`、
+`check:catalogs`、`check:script-integrity`、`check:max-file-lines`、`check:module-boundaries`、`check:production-evidence-complete` の10 package script／registry entryを削除し、workflow・docs・契約テストを
+`pnpm run check -- --scope <scope> --only <gate>` へ統一した。workflow exception からも不要な旧 alias 4件を削除し、削除済み alias を再び有効扱いしないよう parity／script-integrity で固定した。
+package scripts は実測 **168 → 158 件**（累計23件削減）、package と CLI registry は **158/158 entries** で一致した。
+
+検証: focused contract **7 files / 60 tests passed**、`cli-manifest`、`ci-gate-parity`、`script-integrity`、typecheck、knowledge index、canonical full gate **68/68 passed**。
+残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 97
+
+SX-05 の onboarding 入口を再レビューし、`onboard:apply`／`onboard:reset` は独立した処理ではなく、既存の `onboard` facade が安全に委譲できる重複 alias であることを確認した。`onboard apply` と `onboard reset` を unified facade の subcommand として実装し、`kyberion onboard apply|reset` も default script command の longest-prefix 解決で同じ実装へ到達するようにした。旧 package script／CLI registry entry は削除し、README、QUICKSTART、INITIALIZATION、onboarding governance docs、reference-drift contract を canonical namespace へ同期した。
+
+package scripts は実測 **168 → 156 件**（累計25件削減）、package と CLI registry は **156/156 entries** で一致した。`onboard apply --identity ... --dry-run --json` は `status: validated` を返し、非TTYの reset／不正 identity は既存の fail-closed semantics を維持する。
+
+検証: onboarding/router/registry/reference suite **5 files / 34 tests passed**、source dry-run、`cli-manifest`、typecheck、knowledge index、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 98
+
+TaskScenario を再レビューし、既存の `kyberion task`（自由記述の productivity task）と `task:list`／`task:init`／`task:run`／`task:smoke`（反復シナリオ）が別 namespace のまま残っているため、operator CLI からの発見性と入口の一貫性が不足していることを確認した。`kyberion task scenario <list|init|run|smoke>` を追加し、既存の TaskScenario 実装へ委譲する unified facade とした。自由記述の `task plan/start`、既存の `pnpm task:*` 互換入口、profile の `knowledge/personal/` 境界、run の dry-run／approval boundary は変更していない。TaskScenario ルートはローカル処理のみのため provider／voice runtime bootstrap を抑止した。
+
+検証: TaskScenario／operator CLI／router／manifest／help **8 files / 76 tests passed**、`task scenario list --json` の source 実行、`cli-manifest`、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 99
+
+voice setup の入口を再レビューし、primary registry の `voice setup` が同じ `scripts/voice_setup.ts` を実行する一方、package／script registry の `voice:setup` が同名 command を重複登録し、docs・preflight・actuator の復旧 hint も旧 alias を案内していた残存を修正した。package script／script registry の重複 entry を削除し、docs、meeting preflight、dependency resolver、voice upgrade、voice actuator の install hint を `pnpm kyberion voice setup` へ同期した。canonical route の `--json` が旧 `flags: []` のため text を返していたため、shared harness の JSON／quiet flags と structured report を追加し、`voice setup --json` の machine-readable contract を固定した。voice runtime の install／approval semantics は変更していない。
+
+package scripts は実測 **156 → 155 件**（累計26件削減）。検証: voice setup／router／manifest／help **4 files / 36 tests passed**、source `voice setup --json`、`cli-manifest`、script-integrity、Prettier、typecheck、`git diff --check`。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 100
+
+readiness の `vital:json` shortcut を再レビューし、package／script registry の `vital json` が primary `kyberion vital --format=json` と同じ `vital_check` 実装を固定引数で呼ぶだけの重複入口であることを確認した。active docs、verification report、voice／operations readiness の参照と `vital_check` の usage を canonical command へ同期し、package script／registry entry を削除した。primary route の structured report と missing readiness の exit code は維持し、router test で旧 duplicate command が再登録されないことを固定した。
+
+package scripts は実測 **155 → 154 件**（累計27件削減）。検証: vital／router／manifest／help **4 files / 36 tests passed**、source `kyberion vital --format=json`（現環境は identity 未設定のため exit 3、report は有効 JSON）、script-integrity、Prettier、`git diff --check`。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 101
+
+calendar workflow を再レビューし、`kyberion calendar` が同じ calendar operation（認証状態、calendar 一覧、agenda、freebusy、event 作成）を既に提供しているため、package／script registry の重複公開入口を削除した。直接実行される内部スクリプトの shared output／provider 境界テストは維持し、help と内部 harness 名だけを canonical `pnpm kyberion calendar ...` に同期した。router test で旧 workflow command が registry に再登録されないことを固定した。併せて canonical handler の未知 provider fallback を拒否し、`--json`／`--quiet` が banner を混ぜない machine-readable／silent contract を追加した。
+
+package scripts は実測 **154 → 153 件**（累計28件削減）。検証: calendar／router／manifest／help **3 files / 64 tests passed**、source `calendar status --json` の stdout JSON parse、unsupported provider fail-closed、script-integrity、typecheck、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 102
+
+physical namespace migration の JSON／JSONL reader を再監査し、schedule／surface／feedback／intent／ledger／promotion の persisted record を parse 後に object として直接 cast していた残存を修正した。共通 safe JSON object parser を全 migration kind に接続し、root、nested dangerous key、intent entries、ledger `visible_to` の string array、promotion scope の object shape を scope 推論・tenant 移動前に検証するようにした。malformed／primitive／配列／型不正データは従来の quarantine／invalid disposition に閉じ、既存の tenant inference、hash、destination conflict、apply semantics は維持した。
+
+検証: physical namespace migration **1 file / 8 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 103
+
+A2A conversation history の JSONL reader を再監査し、各行を `ConversationTurn` に直接 parse して返却し、1 行の malformed record で履歴全体を空にする残存を修正した。行単位の typed parser を追加し、timestamp、sender／receiver／performative、optional prompt／result／provider session／mission、tier の shape と nested dangerous key を検証するようにした。不正行だけを除外し、valid な履歴行は保持して再 hydration に渡す。append／lock／MAX_TURNS／confidential mission の既存 semantics は変更していない。
+
+検証: A2A conversation store／bridge **2 files / 29 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 104
+
+mission alignment の approval surface を再監査し、`/decision` の HTTP body を `JSON.parse` 後にそのまま承認判断へ投影していた残存を修正した。共有 safe JSON object parser を接続し、配列／primitive root と nested dangerous key を 400 の fail-closed response として拒否する `parseDecisionRequestBody` を追加した。decision、requestId、decidedBy、reasonCategory、note の既存検証と server-side approval binding は維持した。
+
+検証: mission alignment input／render／decision boundary **2 files / 6 tests passed**、typecheck、Prettier、`git diff --check`。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 105
+
+browser native messaging bridge を再監査し、4-byte frame の JSON body を `JSON.parse` 後に `handle(any)` へ直接渡していた残存を修正した。専用入力 parser を追加し、frame dispatch 前に object root と nested dangerous key を検証するようにした。malformed／配列／primitive message は既存の wire error response へ fail-closed で閉じ、operation ごとの認証、allowlist、approval、lease 検証は既存 handler に委譲した。
+
+検証: browser bridge input／path boundary **2 files / 7 tests passed**、typecheck、Prettier、`git diff --check`。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 106
+
+CLI の JSON input boundary を再監査し、automation blueprint の `--values-json` と TaskScenario の `--answers-json` が `JSON.parse` 後の任意 object をそのまま resolution／profile persistence へ投影していた残存を修正した。共通 safe JSON parser を接続し、malformed／primitive／配列／nested dangerous key を domain parser の前段で fail-closed に検証するようにした。既存の blueprint resolution、TaskScenario の profile 出力先制約、schema／approval semantics は変更していない。
+
+検証: automation blueprint／TaskScenario **2 files / 17 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 107
+
+Telegram webhook の HTTP JSON body を再監査し、root が object であることだけを確認して nested dangerous key を bridge dispatch へ渡していた残存を修正した。safe JSON parser を foundation の共有 API として昇格し、scripts 側の重複実装を re-export に整理したうえで、Telegram の malformed／primitive／配列／nested dangerous key を request boundary で fail-closed にした。既存の Telegram update／send field validation、provider response parser、surface access／approval semantics は変更していない。build-order 上、foundation package を再 build して consumer の型定義を更新した。
+
+検証: foundation JSON／scripts parser／Telegram bridge **5 files / 37 tests passed**、`@agent/core` build、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 108
+
+共通 JSONL reader を再監査し、`readJsonLines` が各行を `JSON.parse` 後に無検証で返すため、map を持たない利用者へ dangerous key を含む persisted record が伝播する残存を修正した。foundation reader が safe JSON tree を検証し、malformed／dangerous row を既存の `throw`／`skip`／callback 方針へ渡すようにした。Telegram／Discord の thread history は個別 JSON.parse から共通 reader へ移行し、valid row を保持しつつ不正 row のみ除外する既存 semantics を維持した。
+
+検証: foundation JSON／Telegram／Discord **4 files / 26 tests passed**、`@agent/core` build、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 109
+
+外部 voice/provider JSON 応答を再監査し、voice-hub の bridge 出力、voice actuator の STT bridge 出力、AGY CLI の structured／prompt output が response shape parser の前に直接 `JSON.parse` されていた残存を修正した。foundation の safe parser を先行させ、malformed／primitive／配列／nested dangerous key を provider response boundary で fail-closed にした。既存の response schema、provider error、fallback、permission profile semantics は変更していない。
+
+検証: AGY CLI／voice runtime **2 files / 35 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 110
+
+汎用 JSONL／native event reader を再監査し、`jsonl-tail` と macOS desktop event feed が各行を直接 `JSON.parse` してから domain parser へ渡していた残存を修正した。foundation の safe JSON parser を先行させ、malformed／dangerous row は既存の malformed count／ignore semantics へ閉じるようにした。rotation、partial line、event allowlist、privacy-safe field validation は変更していない。
+
+検証: foundation JSON／jsonl-tail／desktop recording **3 files / 39 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 111
+
+persisted execution data を再監査し、pipeline run journal と ingest asset ledger が JSONL 行を直接 `JSON.parse` していた残存を修正した。safe JSON parser を接続し、journal は corrupt／dangerous record を従来どおり resume 拒否、ledger は不正行を従来どおりスキップする fail-closed semantics を維持した。sequence／run-id、tenant path、asset normalization、lineage semantics は変更していない。
+
+検証: pipeline journal／ingest ledger **2 files / 19 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 112
+
+外部 actuator bridge 応答を再監査し、voice STT、PDF 操作、PDF split が response shape parser の前に `JSON.parse` していた残存を修正した。foundation の safe JSON parser を先行させ、malformed／primitive／配列／nested dangerous key を既存の provider／bridge failure path へ閉じるようにした。PDF の path／password、voice の fallback、bridge schema、error message semantics は変更していない。
+
+検証: voice／media actuator **3 files / 30 tests passed**、`@agent/core` build、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。scripts 配下の入口は再監査で全件 shared harness／generator 接続済み。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 113
+
+presence bridge の JSON 境界を再監査し、Nexus stimulus の永続 JSONL と actuator dispatch の外部 stdout が domain parser の前に直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を接続し、malformed／primitive／配列／nested dangerous key は既存の ignore／error path へ閉じるようにした。stimulus normalization、TTL、reflex dispatch、channel routing、response envelope semantics は変更していない。
+
+検証: Nexus stimulus／daemon **2 files / 9 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 114
+
+platform actuator の JSON 境界を再監査し、voice TTS bridge の trailing response、iOS／Android の `read_json`、iOS simctl response が直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を接続し、malformed／primitive／配列／nested dangerous key を既存の parser／retry／failure semantics へ閉じるようにした。voice artifact、mobile profile validation、simctl device selection、platform runtime の権限境界は変更していない。
+
+検証: voice／iOS／Android actuator **3 files / 65 tests passed**、`@agent/core` build、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 115
+
+terminal bridge の JSON 境界を再監査し、watcher の persisted control request、session state、WebSocket message が直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を domain parser の前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の ignore／error path へ閉じるようにした。terminal の field allowlist、session ID、PTY routing、authentication semantics は変更していない。
+
+検証: terminal bridge／session boundary **3 files / 16 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 116
+
+core の persisted JSONL／IPC 境界を再監査し、supervisor response、PTC runner／RPC、stimulus journal、improvement queue、trigger receipt、worker journal、share-grant ledger が直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を domain／schema parser の前段へ接続し、malformed／primitive／配列／nested dangerous key は既存の reject／skip／ledger-integrity failure semantics へ閉じるようにした。RPC token、idempotency、journal migration、hash chain、retry／timeout semantics は変更していない。
+
+検証: core JSONL／IPC **7 files / 83 tests passed**（PTC UNIX socket 実行を含む）、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 117
+
+core の provider／service／mission protocol JSONL を再監査し、iMessage の database／history response、Codex app-server、AGY SDK、protocol service receipt、mission coordination bus、lifecycle hook、ops alert log が直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を既存の schema／normalizer／fail-open・fail-closed policy の前段へ接続し、malformed／primitive／配列／nested dangerous key が既存の fallback／reject semantics を越えて投影されないようにした。provider transport、mission scope、hook decision、alert dedupe／redelivery semantics は変更していない。
+
+検証: core protocol／provider JSON **6 files / 59 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 118
+
+core の identity／orchestration journal を再監査し、agent identity、orchestrator session、mission orchestration journal、A2A conversation の JSONL 行が直接 `JSON.parse` されていた残存を修正した。foundation の safe JSON parser を schema／normalizer の前段へ接続し、corrupt／dangerous row は既存の replay skip／corruption error semantics へ閉じるようにした。identity uniqueness、session ownership、mission scope、A2A history semantics は変更していない。
+
+検証: identity／orchestration journal **4 files / 70 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 119
+
+core の audit／ledger／mission event JSONL を再監査し、ledger、audit chain、mesh delivery、mission task event、artifact index、dashboard event、mesh peer message の直接 `JSON.parse` を safe parser 前段へ移行した。safe parser が I/O bootstrap の `secure-io` と循環しないよう `foundation/safe-json.ts` を分離し、audit chain の typed normalizer を維持した。hash chain、scope filter、artifact retention、mesh／dashboard projection semantics は変更していない。
+
+検証: audit／ledger／mission event **8 files / 63 tests passed**、safe-json 分離後の関連 core／protocol **23 files / 257 tests passed**、typecheck、module-boundaries、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 120
+
+provider／browser／Cloudflare の外部 JSON response を再監査し、agent adapter、browser conversation、governed code、OpenAI-compatible、OpenRouter、Gemini API の response が直接 `JSON.parse` されていた残存を safe parser 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の provider failure／fallback／schema validation path へ閉じ、egress、sandbox、tool loop、browser session semantics は変更していない。
+
+検証: provider／browser response **8 files / 95 tests passed**、typecheck、Prettier、`git diff --check`、canonical full gate **68/68 passed**。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01 再レビュー修正 121
+
+platform actuator の file／config／bridge JSON を再監査し、iOS／Android の session handoff・simctl／CLI 出力、Browser の session handoff、Service の PID registry、Blockchain の mock chain JSONL、Calendar の外部応答が直接 `JSON.parse` されていた残存を safe parser 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の platform failure／registry fallback／chain read／calendar response path へ閉じ、runtime handoff、device selection、service reconciliation、mock anchor、calendar provider semantics は変更していない。追加された foundation export に合わせて Blockchain behavior test の secure-io／foundation partial mock も更新した。
+
+検証: iOS／Android／Browser／Service／Blockchain／Calendar actuator **11 files / 132 tests passed**、typecheck、module-boundaries、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 参照
 

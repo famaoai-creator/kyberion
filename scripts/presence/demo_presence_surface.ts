@@ -1,4 +1,6 @@
-import { buildPresenceSurfaceFrame, dispatchA2UI } from '@agent/core';
+import { dispatchA2UI } from '@agent/core/a2ui';
+import { buildPresenceSurfaceFrame } from '@agent/core/presence-surface';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 async function main() {
   const messages = buildPresenceSurfaceFrame({
@@ -22,7 +24,14 @@ async function main() {
   console.log('Presence surface demo dispatched.');
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+const runPresenceSurfaceDemo = defineScript({
+  name: 'presence-demo-surface',
+  flags: [],
+  run: main,
 });
+
+if (
+  isDirectScript(import.meta.url, 'presence/demo_presence_surface.ts') ||
+  isDirectScript(import.meta.url, 'presence/demo_presence_surface.js')
+)
+  void runPresenceSurfaceDemo();

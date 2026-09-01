@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { safeExistsSync, safeRmSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
@@ -32,7 +34,10 @@ describe('artifact-bundle', () => {
       trackRequiredArtifactKinds: ['markdown'],
     });
 
-    const pendingReview = applyBundleApproval(bundle, { verdict: 'approved', reviewer: 'reviewer-1' });
+    const pendingReview = applyBundleApproval(bundle, {
+      verdict: 'approved',
+      reviewer: 'reviewer-1',
+    });
     expect(pendingReview.status).toBe('approved');
     expect(pendingReview.approval.status).toBe('approved');
   });
@@ -58,13 +63,42 @@ describe('artifact-bundle', () => {
       fulfills_outcome_id: 'outcome-1',
       fulfills_track_requirement: 'markdown',
     });
-    const approved = applyBundleApproval(assembled, { verdict: 'approved', reviewer: 'reviewer-1' });
+    const approved = applyBundleApproval(assembled, {
+      verdict: 'approved',
+      reviewer: 'reviewer-1',
+    });
     const filePath = saveArtifactBundle(approved, missionPath);
     expect(safeExistsSync(filePath)).toBe(true);
 
     const loaded = loadArtifactBundle(missionId, approved.bundle_id, missionPath);
     expect(loaded?.bundle_id).toBe(approved.bundle_id);
-    expect(loadLatestArtifactBundleForMission(missionId, missionPath)?.bundle_id).toBe(approved.bundle_id);
+    expect(loadLatestArtifactBundleForMission(missionId, missionPath)?.bundle_id).toBe(
+      approved.bundle_id
+    );
     expect(checkArtifactBundleFulfillment(approved)).toMatchObject({ fulfilled: true });
+  });
+
+  it('rejects a symlinked explicit mission path before saving a bundle', () => {
+    const boundaryRoot = pathResolver.sharedTmp('artifact-bundle-boundary');
+    const targetMissionPath = path.join(boundaryRoot, 'target-mission');
+    const linkedMissionPath = path.join(boundaryRoot, 'linked-mission');
+    fs.mkdirSync(targetMissionPath, { recursive: true });
+    fs.symlinkSync(targetMissionPath, linkedMissionPath, 'dir');
+    const bundle = buildBundleFromOutcomeContract({
+      missionId,
+      outcomeContract: {
+        outcome_id: 'outcome-symlink',
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'artifact_store' }],
+      },
+    });
+
+    try {
+      expect(() => saveArtifactBundle(bundle, linkedMissionPath)).toThrow(
+        'Unable to resolve mission directory'
+      );
+      expect(fs.existsSync(targetMissionPath)).toBe(true);
+    } finally {
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
   });
 });

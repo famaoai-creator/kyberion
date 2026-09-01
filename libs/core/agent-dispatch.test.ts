@@ -21,19 +21,23 @@ import {
 } from './worker-event-stream.js';
 import { registerOpPreflightListener, resetOpPreflight } from './op-preflight.js';
 
+const a2aRoute = vi.hoisted(() =>
+  vi.fn(async () => ({ payload: { content: 'sub-agent-result' } }))
+);
+
 vi.mock('./a2a-bridge.js', () => ({
   a2aBridge: {
-    route: vi.fn(async () => ({ payload: { content: 'sub-agent-result' } })),
+    route: a2aRoute,
   },
 }));
 
+vi.mock('./a2a-route-port.js', () => ({
+  getA2ARoute: () => a2aRoute,
+}));
+
 const recordGovernanceAction = vi.fn();
-vi.mock('./kill-switch.js', () => ({
+vi.mock('./governance-action-recorder.js', () => ({
   recordGovernanceAction: (...args: unknown[]) => recordGovernanceAction(...args),
-  // XP-06: delegation-concurrency.ts dynamic-imports this at the top of
-  // every dispatch to wire kill-switch cascade termination; a no-op
-  // unsubscribe keeps that wiring quiet in tests that don't care about it.
-  onKillSwitchTermination: vi.fn(() => () => {}),
 }));
 
 afterEach(() => resetOpPreflight());
@@ -86,6 +90,22 @@ describe('agent-dispatch', () => {
     expect(out).toBe('no-tool-result');
     expect((backend as any).generateWithTools).toHaveBeenCalledTimes(1);
     expect(backend.delegateTask).not.toHaveBeenCalled();
+  });
+
+  it('forwards role and deferred-tool options through tool-capable dispatch wrappers', async () => {
+    const backend = makeFakeBackend({ withTools: true });
+    const options = { role: 'planner', deferred_tool_names: ['capability_read'] };
+
+    await new InSessionDispatcher().dispatch('do scoped Z', undefined, backend, options);
+    expect(backend.generateWithTools).toHaveBeenLastCalledWith(
+      expect.stringContaining('Task: do scoped Z'),
+      expect.any(Array),
+      options
+    );
+
+    const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
+    await wrapped.generateWithTools('direct scoped prompt', [], options);
+    expect(backend.generateWithTools).toHaveBeenLastCalledWith('direct scoped prompt', [], options);
   });
 
   it('DispatchingReasoningBackend routes delegateTask through the dispatcher and forwards cognition to base', async () => {

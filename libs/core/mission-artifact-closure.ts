@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 /**
  * AL-03: mission finish / task completion artifact closure.
  *
@@ -29,6 +29,7 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -42,6 +43,7 @@ import {
 } from './storage-retention-catalog.js';
 import {
   SCOPED_ARTIFACT_INDEX_FILENAME,
+  parseScopedArtifactIndexEntry,
   scopedTaskArtifactDirName,
   type ScopedArtifactIndexEntry,
 } from './artifact-store.js';
@@ -114,6 +116,27 @@ function toRepoRelativePosix(absolutePath: string): string {
   return pathResolver.toRepoRelative(absolutePath).split(path.sep).join('/');
 }
 
+function safeMissionRoot(missionDir: string): string {
+  return assertSafeRepositoryPath(missionDir);
+}
+
+function safeMissionArtifactPath(missionDir: string, relativePath: string): string {
+  const safeRoot = safeMissionRoot(missionDir);
+  return assertSafeRepositoryPath(path.join(safeRoot, relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function isPathInside(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
+
 function readIndexLines(indexPath: string): IndexLine[] {
   if (!safeExistsSync(indexPath)) return [];
   return String(safeReadFile(indexPath, { encoding: 'utf8' }))
@@ -121,8 +144,10 @@ function readIndexLines(indexPath: string): IndexLine[] {
     .filter((line) => line.trim().length > 0)
     .map((raw) => {
       try {
-        const parsed = JSON.parse(raw) as ScopedArtifactIndexEntry;
-        return { raw, parsed: parsed && typeof parsed === 'object' ? parsed : null };
+        const parsed = parseScopedArtifactIndexEntry(
+          parseSafeJsonInput(raw, 'scoped artifact index entry')
+        );
+        return { raw, parsed };
       } catch {
         // Corrupt lines are preserved verbatim on rewrite — closure reclaims
         // storage, it never silently drops records it cannot understand.
@@ -145,8 +170,14 @@ function isDisposableClass(value: unknown): value is RetentionArtifactClass {
  */
 function deleteIndexEntryFile(missionDir: string, entry: ScopedArtifactIndexEntry): void {
   const resolved = pathResolver.rootResolve(entry.path);
-  if (!resolved.startsWith(missionDir + path.sep)) return;
-  if (safeExistsSync(resolved)) safeRmSync(resolved, { recursive: true, force: true });
+  let safeResolved: string;
+  try {
+    safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  } catch {
+    return;
+  }
+  if (!isPathInside(missionDir, safeResolved)) return;
+  if (safeExistsSync(safeResolved)) safeRmSync(safeResolved, { recursive: true, force: true });
 }
 
 function appendClosureAudit(record: Record<string, unknown>): string | undefined {
@@ -169,8 +200,17 @@ function appendClosureAudit(record: Record<string, unknown>): string | undefined
  * failure keeps `.git` — the history is never lost to a failed bundle.
  */
 function bundleMissionGitRepo(missionDir: string): MissionClosureBundleOutcome {
-  const gitDir = path.join(missionDir, '.git');
-  const bundleAbs = path.join(missionDir, ...MISSION_REPO_BUNDLE_RELPATH.split('/'));
+  let gitDir: string;
+  let bundleAbs: string;
+  try {
+    gitDir = safeMissionArtifactPath(missionDir, '.git');
+    bundleAbs = safeMissionArtifactPath(missionDir, MISSION_REPO_BUNDLE_RELPATH);
+  } catch (err) {
+    return {
+      status: 'failed',
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
   if (!safeExistsSync(gitDir)) {
     return safeExistsSync(bundleAbs)
       ? { status: 'already_bundled', bundle_path: MISSION_REPO_BUNDLE_RELPATH }
@@ -215,11 +255,12 @@ export function closeMissionArtifacts(input: {
     kept_index_entries: 0,
   };
   try {
-    const missionDir = input.missionDir ?? findMissionPath(missionId);
-    if (!missionDir || !safeExistsSync(missionDir)) {
+    const missionDirCandidate = input.missionDir ?? findMissionPath(missionId);
+    if (!missionDirCandidate || !safeExistsSync(missionDirCandidate)) {
       return { ...base, status: 'mission_not_found' };
     }
-    const markerPath = path.join(missionDir, ...MISSION_CLOSURE_MARKER_RELPATH.split('/'));
+    const missionDir = safeMissionRoot(missionDirCandidate);
+    const markerPath = safeMissionArtifactPath(missionDir, MISSION_CLOSURE_MARKER_RELPATH);
     if (safeExistsSync(markerPath)) {
       return {
         ...base,
@@ -229,8 +270,18 @@ export function closeMissionArtifacts(input: {
       };
     }
 
-    const artifactsRoot = path.join(missionDir, 'artifacts');
-    const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
+    const indexPath = safeMissionArtifactPath(
+      missionDir,
+      `artifacts/${SCOPED_ARTIFACT_INDEX_FILENAME}`
+    );
+    const disposableClassDirs = MISSION_CLOSURE_DELETE_CLASSES.map((artifactClass) =>
+      safeMissionArtifactPath(missionDir, `artifacts/${artifactClass}`)
+    );
+    // Validate every destructive target before deleting any index entry. This
+    // keeps a symlinked class directory from causing a partially applied
+    // closure after an earlier class was already reclaimed.
+    safeMissionArtifactPath(missionDir, '.git');
+    safeMissionArtifactPath(missionDir, MISSION_REPO_BUNDLE_RELPATH);
     const indexLines = readIndexLines(indexPath);
     const keptLines: IndexLine[] = [];
     const deletedIndexEntries: MissionClosureDeletedIndexEntry[] = [];
@@ -247,8 +298,7 @@ export function closeMissionArtifacts(input: {
     }
 
     const deletedDirectories: string[] = [];
-    for (const artifactClass of MISSION_CLOSURE_DELETE_CLASSES) {
-      const classDir = path.join(artifactsRoot, artifactClass);
+    for (const classDir of disposableClassDirs) {
       if (safeExistsSync(classDir)) {
         safeRmSync(classDir, { recursive: true, force: true });
         deletedDirectories.push(toRepoRelativePosix(classDir));
@@ -343,23 +393,28 @@ export function closeTaskArtifacts(
     deleted_index_entries: [],
   };
   try {
-    const missionDir = options.missionDir ?? findMissionPath(upperMission);
-    if (!missionDir || !safeExistsSync(missionDir)) {
+    const missionDirCandidate = options.missionDir ?? findMissionPath(upperMission);
+    if (!missionDirCandidate || !safeExistsSync(missionDirCandidate)) {
       return { ...base, status: 'mission_not_found' };
     }
+    const missionDir = safeMissionRoot(missionDirCandidate);
     const taskDirName = scopedTaskArtifactDirName(taskId);
-    const artifactsRoot = path.join(missionDir, 'artifacts');
-
+    const disposableTaskDirs = MISSION_CLOSURE_DELETE_CLASSES.map((artifactClass) =>
+      safeMissionArtifactPath(missionDir, `artifacts/${artifactClass}/${taskDirName}`)
+    );
+    // Preflight both deletion targets before reclaiming either class.
+    const indexPath = safeMissionArtifactPath(
+      missionDir,
+      `artifacts/${SCOPED_ARTIFACT_INDEX_FILENAME}`
+    );
     const deletedDirectories: string[] = [];
-    for (const artifactClass of MISSION_CLOSURE_DELETE_CLASSES) {
-      const taskDir = path.join(artifactsRoot, artifactClass, taskDirName);
+    for (const taskDir of disposableTaskDirs) {
       if (safeExistsSync(taskDir)) {
         safeRmSync(taskDir, { recursive: true, force: true });
         deletedDirectories.push(toRepoRelativePosix(taskDir));
       }
     }
 
-    const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
     const indexLines = readIndexLines(indexPath);
     const keptLines: IndexLine[] = [];
     const deletedIndexEntries: MissionClosureDeletedIndexEntry[] = [];

@@ -2,7 +2,7 @@ import { appendJsonLine } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-journal.js';
@@ -35,7 +35,13 @@ function ensureDirs(): void {
 
 export function getMissionOrchestrationEventPath(eventId: string): string {
   ensureDirs();
-  return `${EVENTS_DIR}/${eventId}.json`;
+  const normalized = String(eventId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[mission-orchestration-events] invalid event id: ${eventId}`);
+  }
+  return assertSafeRepositoryPath(path.join(EVENTS_DIR, `${normalized}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function emitMissionOrchestrationObservation(event: Record<string, unknown>): void {
@@ -73,7 +79,9 @@ function missionPayloadPath(
     (scopeTenantSlug
       ? pathResolver.tenantMissionDir(missionId, scopeTenantSlug, tier)
       : pathResolver.missionDir(missionId, tier));
-  return path.join(missionPath, PAYLOAD_SUBDIR, `${eventId}.json`);
+  return assertSafeRepositoryPath(path.join(missionPath, PAYLOAD_SUBDIR, `${eventId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unknown>>(input: {

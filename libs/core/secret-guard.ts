@@ -4,13 +4,14 @@ import { ledger } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import { resolveSecretSync } from './secret-resolver.js';
-import { readJson } from './foundation/json.js';
 import {
   decryptConnectionDocument,
   encryptConnectionDocument,
   isEncryptedConnectionEnvelope,
   resolveSecretEncryptionMode,
 } from './secret-encryption.js';
+import { requireRiskyApproval } from './risky-op-approval-port.js';
+import { RISKY_OPS } from './risky-op-ids.js';
 
 /**
  * Sovereign Secret Guard v1.5 [AUTHORITY ENABLED]
@@ -30,12 +31,18 @@ const safeWriteFile = (...args: Parameters<typeof secureIo.safeWriteFile>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeWriteFile(...args));
 const safeReaddir = (...args: Parameters<typeof secureIo.safeReaddir>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeReaddir(...args));
-const safeStat = (...args: Parameters<typeof secureIo.safeStat>) =>
-  secureIo.withSensitivePathMediation(() => secureIo.safeStat(...args));
+const safeLstat = (...args: Parameters<typeof secureIo.safeLstat>) =>
+  secureIo.withSensitivePathMediation(() => secureIo.safeLstat(...args));
 const safeFsyncFile = (...args: Parameters<typeof secureIo.safeFsyncFile>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeFsyncFile(...args));
 const safeExistsSync = (...args: Parameters<typeof secureIo.safeExistsSync>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeExistsSync(...args));
+
+function safeSecretPath(filePath: string, allowMissingLeaf = true): string {
+  return secureIo.withSensitivePathMediation(() =>
+    secureIo.assertSafeRepositoryPath(filePath, { allowMissingLeaf })
+  );
+}
 
 interface AuthGrant {
   missionId: string;
@@ -49,21 +56,26 @@ interface AuthGrant {
  */
 const _loadPersonalSecrets = () => {
   try {
-    const items = safeReaddir(PERSONAL_CONNECTIONS_DIR);
+    const connectionsDir = safeSecretPath(PERSONAL_CONNECTIONS_DIR);
+    if (!safeExistsSync(connectionsDir)) return;
+    const items = safeReaddir(connectionsDir);
     for (const item of items) {
-      const fullPath = path.join(PERSONAL_CONNECTIONS_DIR, item);
-      const stat = safeStat(fullPath);
+      const fullPath = safeSecretPath(path.join(connectionsDir, item));
+      const stat = safeLstat(fullPath);
+      if (stat.isSymbolicLink()) continue;
 
       if (stat.isDirectory()) {
         const serviceName = item.toUpperCase();
         const subFiles = safeReaddir(fullPath).filter((f) => f.endsWith('.json'));
         for (const subFile of subFiles) {
+          const subPath = safeSecretPath(path.join(fullPath, subFile), false);
+          if (!safeLstat(subPath).isFile()) continue;
           const content = secureIo.withSensitivePathMediation(() =>
-            readJson<unknown>(path.join(fullPath, subFile))
+            secureIo.loadJson<unknown>(subPath)
           );
           _mapContentToSecrets(serviceName, content);
         }
-      } else if (item.endsWith('.json')) {
+      } else if (stat.isFile() && item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
         let content = secureIo.loadJson<unknown>(fullPath);
         if (isEncryptedConnectionEnvelope(content)) {
@@ -109,7 +121,9 @@ function _sanitizeServiceId(serviceId: string): string {
 }
 
 function _connectionPath(serviceId: string): string {
-  return path.join(PERSONAL_CONNECTIONS_DIR, `${_sanitizeServiceId(serviceId)}.json`);
+  return safeSecretPath(
+    path.join(PERSONAL_CONNECTIONS_DIR, `${_sanitizeServiceId(serviceId)}.json`)
+  );
 }
 
 function _loadConnectionDocument(serviceId: string): Record<string, any> {
@@ -180,21 +194,20 @@ export const grantAccessGuarded = async (
     agentId?: string;
     correlationId?: string;
     channel?: string;
+    hasHuman?: boolean;
+    hasUI?: boolean;
+    nonInteractive?: boolean;
   } = {}
 ): Promise<void> => {
-  // Dynamic import to avoid circular dependency between secret-guard and
-  // risky-op-registry/approval-gate (which imports governance readers that
-  // indirectly import secret-guard).
-  const [{ requireApprovalForOp, RISKY_OPS }] = await Promise.all([
-    import('./risky-op-registry.js'),
-  ]);
-
   const opId = isAuthority ? RISKY_OPS.AUTH_GRANT_AUTHORITY : RISKY_OPS.SECRET_GRANT_ACCESS;
-  const decision = requireApprovalForOp({
+  const decision = requireRiskyApproval({
     opId,
     agentId: options.agentId ?? 'mission_controller',
     correlationId: options.correlationId ?? `${missionId}:${serviceIdOrAuth}`,
     channel: options.channel ?? 'system',
+    ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
+    ...(options.hasUI !== undefined ? { hasUI: options.hasUI } : {}),
+    ...(options.nonInteractive !== undefined ? { nonInteractive: options.nonInteractive } : {}),
     payload: {
       missionId,
       target: serviceIdOrAuth,
@@ -271,7 +284,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
-      const secrets = secureIo.loadJson<unknown>(SECRETS_FILE);
+      const secrets = secureIo.loadJson<unknown>(safeSecretPath(SECRETS_FILE));
       value = secrets[key];
     } catch (_) {
       /* secrets file absent or corrupt: fall back to env-only resolution */
@@ -301,7 +314,7 @@ export const storeConnectionDocument = (
   if (safeExistsSync(fullPath) && options.backup !== false) {
     // Back up the raw previous bytes: an encrypted document must never gain
     // a plaintext .bak sibling.
-    const backupPath = `${fullPath}.bak`;
+    const backupPath = safeSecretPath(`${fullPath}.bak`);
     safeWriteFile(backupPath, safeReadFile(fullPath, { encoding: 'utf8' }) as string);
     try {
       safeFsyncFile(backupPath);
@@ -341,9 +354,10 @@ export const storeConnectionDocument = (
 };
 
 function _loadGrants(): AuthGrant[] {
-  if (!safeExistsSync(GRANTS_FILE)) return [];
+  const grantsPath = safeSecretPath(GRANTS_FILE);
+  if (!safeExistsSync(grantsPath)) return [];
   try {
-    const content = safeReadFile(GRANTS_FILE, { encoding: 'utf8' }) as string;
+    const content = safeReadFile(grantsPath, { encoding: 'utf8' }) as string;
     return JSON.parse(content);
   } catch (_) {
     return [];
@@ -352,9 +366,10 @@ function _loadGrants(): AuthGrant[] {
 
 function _saveGrants(grants: AuthGrant[]) {
   const freshGrants = grants.filter((g) => g.expiresAt > Date.now());
-  safeWriteFile(GRANTS_FILE, JSON.stringify(freshGrants, null, 2));
+  const grantsPath = safeSecretPath(GRANTS_FILE);
+  safeWriteFile(grantsPath, JSON.stringify(freshGrants, null, 2));
   try {
-    safeFsyncFile(GRANTS_FILE);
+    safeFsyncFile(grantsPath);
   } catch (_) {
     /* best-effort fsync */
   }

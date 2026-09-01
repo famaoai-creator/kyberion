@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import {
+  loadRestrictedActionRules,
   matchRestrictedAction,
   type RestrictedActionRule,
 } from './restricted-action-policy.js';
@@ -8,10 +12,7 @@ const RULES: RestrictedActionRule[] = [
   {
     id: 'rest.financial-transfer',
     label: 'Financial transfer / payment / wire',
-    patterns: [
-      '\\bwire\\s+(transfer|money|funds|payment)',
-      '送金|振込|支払い|決済',
-    ],
+    patterns: ['\\bwire\\s+(transfer|money|funds|payment)', '送金|振込|支払い|決済'],
   },
   {
     id: 'rest.contract-binding',
@@ -27,34 +28,25 @@ const RULES: RestrictedActionRule[] = [
 
 describe('matchRestrictedAction', () => {
   it('matches the first hit in pattern order across rules', () => {
-    const m = matchRestrictedAction(
-      { title: 'Wire transfer to vendor X this Friday' },
-      RULES,
-    );
+    const m = matchRestrictedAction({ title: 'Wire transfer to vendor X this Friday' }, RULES);
     expect(m).toMatchObject({ id: 'rest.financial-transfer', pattern_index: 0 });
   });
 
   it('respects word boundaries — "rewire the dashboard" does NOT match "wire transfer"', () => {
     const m = matchRestrictedAction(
       { title: 'rewire the dashboard component to use the new theme' },
-      RULES,
+      RULES
     );
     expect(m).toBeNull();
   });
 
   it('supports CJK patterns without explicit word boundaries', () => {
-    const m = matchRestrictedAction(
-      { title: '来週までに送金手続きを完了する' },
-      RULES,
-    );
+    const m = matchRestrictedAction({ title: '来週までに送金手続きを完了する' }, RULES);
     expect(m).toMatchObject({ id: 'rest.financial-transfer' });
   });
 
   it('case-insensitive across the haystack', () => {
-    const m = matchRestrictedAction(
-      { title: 'SIGN THE CONTRACT before the kickoff' },
-      RULES,
-    );
+    const m = matchRestrictedAction({ title: 'SIGN THE CONTRACT before the kickoff' }, RULES);
     expect(m).toMatchObject({ id: 'rest.contract-binding' });
   });
 
@@ -64,16 +56,13 @@ describe('matchRestrictedAction', () => {
         title: 'Tidy the dashboard feature',
         summary: 'while we are at it, drop the table that nobody uses',
       },
-      RULES,
+      RULES
     );
     expect(m).toMatchObject({ id: 'rest.data-destructive' });
   });
 
   it('returns null when no rule matches', () => {
-    const m = matchRestrictedAction(
-      { title: 'Schedule a sync with the design team' },
-      RULES,
-    );
+    const m = matchRestrictedAction({ title: 'Schedule a sync with the design team' }, RULES);
     expect(m).toBeNull();
   });
 
@@ -84,5 +73,43 @@ describe('matchRestrictedAction', () => {
     ];
     const m = matchRestrictedAction({ title: 'wire transfer to X' }, broken);
     expect(m).toMatchObject({ id: 'rest.financial-transfer' });
+  });
+});
+
+describe('loadRestrictedActionRules', () => {
+  const tmpDir = pathResolver.sharedTmp('restricted-action-policy-tests');
+
+  afterEach(() => {
+    safeRmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('loads schema-valid policy records', () => {
+    const file = path.join(tmpDir, 'valid.json');
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        version: '2026-08-29',
+        rules: [{ id: 'rest.example', label: 'Example', patterns: ['example'] }],
+      })
+    );
+
+    expect(loadRestrictedActionRules({ path: file })).toEqual([
+      { id: 'rest.example', label: 'Example', patterns: ['example'] },
+    ]);
+  });
+
+  it('returns an empty rule set for schema-invalid policy records', () => {
+    const file = path.join(tmpDir, 'invalid.json');
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(file, JSON.stringify({ version: '2026-08-29', rules: [{ id: 'broken' }] }));
+
+    expect(loadRestrictedActionRules({ path: file })).toEqual([]);
+  });
+
+  it('rejects an override outside the repository before it can disable restrictions', () => {
+    expect(() =>
+      loadRestrictedActionRules({ path: '/tmp/kyberion-restricted-actions.json' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

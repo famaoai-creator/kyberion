@@ -8,6 +8,7 @@ import {
   resolveClaudeCliFallbackCandidates,
   ShellClaudeCliBackend,
 } from './shell-claude-cli-backend.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -244,6 +245,23 @@ describe('shell-claude-cli-backend', () => {
       const [, argv] = spawnMock.mock.calls[0];
       const permissionModeIndex = argv.indexOf('--permission-mode');
       expect(argv[permissionModeIndex + 1]).toBe('plan');
+    });
+
+    it('ambient read-only sandbox applies the explorer mapping to an unprofiled delegation', async () => {
+      spawnMock.mockReturnValueOnce(createChild('ok'));
+      const policy = resolveSandboxPolicy({
+        provider: 'claude',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+      const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+
+      await withSandboxPolicy(policy, () => backend.delegateTask('inspect the thing'));
+
+      const [, argv] = spawnMock.mock.calls[0];
+      expect(argv).toContain('--allowedTools');
+      expect(argv).not.toContain('bypassPermissions');
+      expect(argv).not.toContain('--dangerously-skip-permissions');
     });
   });
 

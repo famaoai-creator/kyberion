@@ -1,30 +1,43 @@
 import * as path from 'node:path';
+import { buildCompanyVisionRef, resolveCompany } from '@agent/core/company';
 import {
-  buildCompanyVisionRef,
   summarizeApprovalAuditDrilldown,
   summarizeApprovalAuditTrail,
-  resolveFinanceControllerDecision,
-  resolveCompany,
-  resolveActiveProfileRoot,
+} from '@agent/core/approval-audit';
+import { resolveFinanceControllerDecision } from '@agent/core/finance-controller';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-  listSurfaceOutboxMessages,
-  discoverProviders,
-  loadSurfaceManifest,
-  pathResolver,
+} from '@agent/core/agent-runtime-supervisor';
+import { listSurfaceOutboxMessages } from '@agent/core/surface-coordination-store';
+import { discoverProviders } from '@agent/core/provider-discovery';
+import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-  renderStatus,
-  formatDateTime,
-  resolveOperatorLocale,
-  resolveTimeZone,
+} from '@agent/core/secure-io';
+import { renderStatus } from '@agent/core/ux-vocabulary';
+import { formatDateTime, resolveTimeZone } from '@agent/core/format';
+import {
   isServiceConnectionReady,
-  readCanonicalWorkGraph,
-} from '@agent/core';
+  loadServiceConnectionReadinessConfig,
+} from '@agent/core/service-connection-readiness';
+import { loadPersistedTrustLedger } from '@agent/core/trust-engine';
+import { loadSkillIndex } from '@agent/core/skill-index';
+import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
+import {
+  parseDashboardOrchestrationLine,
+  parseDashboardOwnerSummaryLine,
+} from '@agent/core/dashboard-event-parser';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
 import { readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
@@ -35,6 +48,9 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 const PACKAGE_JSON_PATH = pathResolver.rootResolve('package.json');
 
 type DashboardFocus = 'all' | 'onboarding' | 'capabilities' | 'skills';
+type DashboardLog = (...values: unknown[]) => void;
+
+let dashboardLog: DashboardLog = (...values) => console.log(...values);
 
 function resolveDashboardTenantSlug(): string | null {
   const onboardingState = readJsonIfExists<{
@@ -68,6 +84,40 @@ function getDashboardVersion(): string {
 
 type DashboardDoctorFinding = { severity: 'critical' | 'warning'; agentId: string; reason: string };
 
+type DashboardMissionState = {
+  mission_id: string;
+  status: 'active';
+  tier?: 'personal' | 'confidential' | 'public';
+  mission_type?: string;
+  tenant_slug?: string;
+};
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function readMissionDashboardState(statePath: string): DashboardMissionState | null {
+  try {
+    const value = readJson<unknown>(statePath);
+    if (!isJsonRecord(value) || value.status !== 'active' || typeof value.mission_id !== 'string') {
+      return null;
+    }
+    const tier =
+      value.tier === 'personal' || value.tier === 'confidential' || value.tier === 'public'
+        ? value.tier
+        : undefined;
+    return {
+      mission_id: value.mission_id,
+      status: 'active',
+      ...(tier ? { tier } : {}),
+      ...(typeof value.mission_type === 'string' ? { mission_type: value.mission_type } : {}),
+      ...(typeof value.tenant_slug === 'string' ? { tenant_slug: value.tenant_slug } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function collectRuntimeDoctorFindings(): DashboardDoctorFinding[] {
   const missions = new Set<string>();
   const missionDirs = [
@@ -77,10 +127,18 @@ function collectRuntimeDoctorFindings(): DashboardDoctorFinding[] {
   ];
   for (const dir of missionDirs) {
     for (const item of safeListDir(dir)) {
-      const statePath = path.join(dir, item, 'mission-state.json');
+      let statePath: string;
+      try {
+        const missionPath = assertSafeRepositoryPath(path.join(dir, item));
+        statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        continue;
+      }
       if (!safeExistsSync(statePath)) continue;
-      const state = readJson<any>(statePath);
-      if (state.status === 'active' && typeof state.mission_id === 'string') {
+      const state = readMissionDashboardState(statePath);
+      if (state) {
         missions.add(state.mission_id);
       }
     }
@@ -140,17 +198,17 @@ function drawHeader() {
     path.join(resolveActiveProfileRoot(), 'my-identity.json')
   );
   const status = getDashboardHealthStatus();
-  console.log(
+  dashboardLog(
     chalk.bold.cyan(` 🌌 KYBERION SOVEREIGN ECOSYSTEM | CEO DASHBOARD v${getDashboardVersion()} `)
   );
-  console.log(chalk.dim(' --------------------------------------------------- '));
-  console.log(
+  dashboardLog(chalk.dim(' --------------------------------------------------- '));
+  dashboardLog(
     ` Status: ${status === 'OPERATIONAL' ? chalk.green(renderStatus('connection', 'connected', 'en').toUpperCase()) : chalk.yellow(renderStatus('connection', 'degraded', 'en').toUpperCase())} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${formatDateTime(new Date(), { locale: resolveOperatorLocale(), timeZone: resolveTimeZone(), style: 'time' })}\n`
   );
 }
 
 function drawCompanyOverview() {
-  console.log(chalk.bold.blue(' 🏢 COMPANY OVERVIEW'));
+  dashboardLog(chalk.bold.blue(' 🏢 COMPANY OVERVIEW'));
 
   const tenantSlug = resolveDashboardTenantSlug();
   const company = resolveCompany(tenantSlug);
@@ -199,45 +257,46 @@ function drawCompanyOverview() {
       }
     : null;
 
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Company: ${chalk.cyan(company.name)} ${chalk.dim(`(${company.company_id})`)}`
   );
-  console.log(`  ${chalk.gray('•')} Sovereign: ${chalk.white(company.sovereign || 'unknown')}`);
-  console.log(`  ${chalk.gray('•')} Vision ref: ${chalk.white(expectedVisionRef)}`);
-  console.log(`  ${chalk.gray('•')} Vision: ${chalk.white(visionSource)}`);
-  console.log(
+  dashboardLog(`  ${chalk.gray('•')} Sovereign: ${chalk.white(company.sovereign || 'unknown')}`);
+  dashboardLog(`  ${chalk.gray('•')} Vision ref: ${chalk.white(expectedVisionRef)}`);
+  dashboardLog(`  ${chalk.gray('•')} Vision: ${chalk.white(visionSource)}`);
+  dashboardLog(
     `  ${chalk.gray('•')} Org chart: ${company.org_chart_ref.data?.positions.length || 0} positions / ${company.org_chart_ref.data?.domains.length || 0} domains`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Top-level roles: ${topRoles.length > 0 ? chalk.green(topRoles.join(', ')) : chalk.dim('none')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Financial: ${company.financial_ref.exists ? chalk.green('available') : chalk.dim('missing')} | Decision rights: ${company.decision_rights_ref.exists ? chalk.green('available') : chalk.dim('missing')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Finance controller: ${chalk.white(financeController.mode)}${financeController.shouldCutCosts ? chalk.red(' (cost cutting)') : ''}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} OKR: ${okrSummary ? chalk.green(`${okrSummary.objectiveCount} objectives / ${okrSummary.keyResultCount} KRs / ${okrSummary.progressPercent}%`) : chalk.dim('missing')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Approval audit: ${chalk.white(`${approvalAudit.total} entries (${approvalAudit.allowed} allowed / ${approvalAudit.denied} denied)`)}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Audit drill-down: ${chalk.white(`${approvalAuditDrilldown.byDecisionType.length} decision types / ${approvalAuditDrilldown.byCorrelationId.length} correlation chains`)}`
   );
   if (company.decision_rights_ref.data) {
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} Decision policy: ${chalk.white(`${decisionRightsCount} rules from ${company.decision_rights_ref.data.source_kind}`)}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function readJsonIfExists<T>(logicalPath: string): T | null {
   try {
-    if (!safeExistsSync(logicalPath)) return null;
-    return readJson<T>(logicalPath);
+    const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return readJson<T>(safePath);
   } catch {
     return null;
   }
@@ -265,21 +324,39 @@ type ProviderCapabilitySnapshot = {
   }>;
 };
 
-function listJsonFiles(dir: string): string[] {
+export function listJsonFiles(dir: string): string[] {
   try {
-    if (!safeExistsSync(dir)) return [];
-    return safeReaddir(dir)
+    const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return [];
+    return safeReaddir(safeDir)
       .filter((entry) => entry.endsWith('.json'))
-      .map((entry) => path.join(dir, entry));
+      .flatMap((entry) => {
+        try {
+          const safeFile = assertSafeRepositoryPath(path.join(safeDir, entry));
+          return safeLstat(safeFile).isFile() ? [safeFile] : [];
+        } catch {
+          return [];
+        }
+      });
   } catch {
     return [];
   }
 }
 
-function safeListDir(dir: string): string[] {
+export function safeListDir(dir: string): string[] {
   try {
-    if (!safeExistsSync(dir)) return [];
-    return safeReaddir(dir);
+    const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return [];
+    return safeReaddir(safeDir).filter((entry) => {
+      try {
+        const child = assertSafeRepositoryPath(path.join(safeDir, entry), {
+          allowMissingLeaf: true,
+        });
+        return safeLstat(child).isDirectory();
+      } catch {
+        return false;
+      }
+    });
   } catch {
     return [];
   }
@@ -287,12 +364,7 @@ function safeListDir(dir: string): string[] {
 
 function readConnectionReview() {
   const connectionDir = path.join(resolveActiveProfileRoot(), 'connections');
-  const readinessPath = pathResolver.knowledge(
-    'product/governance/service-connection-readiness.json'
-  );
-  const readiness = readJsonIfExists<{
-    required_services?: Record<string, { required_keys_any?: string[] }>;
-  }>(readinessPath);
+  const readiness = loadServiceConnectionReadinessConfig();
   const files = listJsonFiles(connectionDir);
 
   const services = files.map((file) => {
@@ -328,7 +400,7 @@ function readConnectionReview() {
 }
 
 function drawTenantContext() {
-  console.log(chalk.bold.cyan(' 🧩 TENANT CONTEXT'));
+  dashboardLog(chalk.bold.cyan(' 🧩 TENANT CONTEXT'));
 
   const onboardingState = readJsonIfExists<{
     identity?: { name?: string };
@@ -339,21 +411,23 @@ function drawTenantContext() {
   const tenants = onboardingState?.tenants?.entries || [];
 
   if (tenants.length === 0) {
-    console.log(chalk.dim('  (No tenant registered yet)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No tenant registered yet)'));
+    dashboardLog('');
     return;
   }
 
   const activeTenant = tenants[0];
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Active: ${chalk.cyan(activeTenant.tenant_slug)} ${chalk.dim(activeTenant.display_name || '')}`
   );
-  console.log(`  ${chalk.gray('•')} Role: ${chalk.white(activeTenant.assigned_role || 'unknown')}`);
-  console.log(
+  dashboardLog(
+    `  ${chalk.gray('•')} Role: ${chalk.white(activeTenant.assigned_role || 'unknown')}`
+  );
+  dashboardLog(
     `  ${chalk.gray('•')} Owner: ${chalk.white(onboardingState?.identity?.name || 'Sovereign')}`
   );
   if (tenants.length > 1) {
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} Other tenants: ${chalk.dim(
         tenants
           .slice(1)
@@ -362,11 +436,11 @@ function drawTenantContext() {
       )}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawConnectionReview() {
-  console.log(chalk.bold.magenta(' 🔍 CONNECTION REVIEW'));
+  dashboardLog(chalk.bold.magenta(' 🔍 CONNECTION REVIEW'));
 
   const review = readConnectionReview();
   const services = review.services;
@@ -376,13 +450,13 @@ function drawConnectionReview() {
   );
   const pending = services.filter((entry) => entry.status === 'pending');
 
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Ready: ${ready.length > 0 ? chalk.green(ready.length) : chalk.dim(0)}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Blocked: ${blocked.length > 0 ? chalk.yellow(blocked.length) : chalk.dim(0)}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Pending: ${pending.length > 0 ? chalk.yellow(pending.length) : chalk.dim(0)}`
   );
 
@@ -392,7 +466,7 @@ function drawConnectionReview() {
       : pending.length > 0
         ? `capture ${pending[0].serviceId}`
         : 'all required connection drafts are available';
-  console.log(`  ${chalk.gray('•')} Review cue: ${chalk.white(recommended)}`);
+  dashboardLog(`  ${chalk.gray('•')} Review cue: ${chalk.white(recommended)}`);
 
   for (const entry of services.slice(0, 5)) {
     const renderedStatus = renderStatus('connection', entry.status, 'en').toUpperCase();
@@ -406,13 +480,13 @@ function drawConnectionReview() {
             : chalk.dim(renderedStatus);
     const requirements =
       entry.requirements.length > 0 ? chalk.dim(` needs=${entry.requirements.join('|')}`) : '';
-    console.log(`  ${chalk.gray('•')} ${entry.serviceId.padEnd(16)} [${label}]${requirements}`);
+    dashboardLog(`  ${chalk.gray('•')} ${entry.serviceId.padEnd(16)} [${label}]${requirements}`);
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawStarterMissionSuggestion() {
-  console.log(chalk.bold.yellow(' 🎯 STARTER MISSION'));
+  dashboardLog(chalk.bold.yellow(' 🎯 STARTER MISSION'));
 
   const onboardingState = readJsonIfExists<{
     status?: string;
@@ -461,29 +535,29 @@ function drawStarterMissionSuggestion() {
                 why: 'The environment is ready for reusable preference capture.',
               };
 
-  console.log(`  ${chalk.gray('•')} Intent: ${chalk.cyan(suggestion.intentId)}`);
-  console.log(`  ${chalk.gray('•')} Suggestion: ${chalk.white(suggestion.title)}`);
-  console.log(`  ${chalk.gray('•')} Why: ${chalk.dim(suggestion.why)}`);
-  console.log(
+  dashboardLog(`  ${chalk.gray('•')} Intent: ${chalk.cyan(suggestion.intentId)}`);
+  dashboardLog(`  ${chalk.gray('•')} Suggestion: ${chalk.white(suggestion.title)}`);
+  dashboardLog(`  ${chalk.gray('•')} Why: ${chalk.dim(suggestion.why)}`);
+  dashboardLog(
     `  ${chalk.gray('•')} Ready services: ${readyServices.length > 0 ? chalk.green(readyServices.join(', ')) : chalk.dim('none')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Next action: ${chalk.white(`create a mission from ${suggestion.intentId} in the current tenant context`)}`
   );
-  console.log('');
+  dashboardLog('');
 }
 
 function drawCapabilityLandscape() {
-  console.log(chalk.bold.cyan(' 🧰 PROVIDER CAPABILITY LANDSCAPE'));
+  dashboardLog(chalk.bold.cyan(' 🧰 PROVIDER CAPABILITY LANDSCAPE'));
 
   const snapshotPath = pathResolver.rootResolve('active/shared/runtime/provider-capabilities.json');
   const snapshot = readJsonIfExists<ProviderCapabilitySnapshot>(snapshotPath);
   const discovery = discoverProviders();
 
   if (!snapshot) {
-    console.log(chalk.dim('  (No capability snapshot yet)'));
-    console.log(chalk.dim('  Run `pnpm provider-capabilities:scan` to capture one.'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No capability snapshot yet)'));
+    dashboardLog(chalk.dim('  Run `pnpm provider-capabilities:scan` to capture one.'));
+    dashboardLog('');
     return;
   }
 
@@ -494,87 +568,82 @@ function drawCapabilityLandscape() {
   const missingProviders = snapshot.missing_providers;
   const previewCapabilities = snapshot.capabilities.slice(0, 5);
 
-  console.log(`  ${chalk.gray('•')} Generated: ${chalk.white(snapshot.generated_at)}`);
-  console.log(
+  dashboardLog(`  ${chalk.gray('•')} Generated: ${chalk.white(snapshot.generated_at)}`);
+  dashboardLog(
     `  ${chalk.gray('•')} Registered: ${chalk.cyan(snapshot.registered_capabilities)} capabilities`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Available: ${chalk.green(snapshot.available_capabilities)} capabilities`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Providers: ${activeProviders.length > 0 ? chalk.green(activeProviders.length) : chalk.dim(0)} healthy / ${installedProviders.length} installed`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Available providers: ${snapshot.available_providers.length > 0 ? chalk.green(snapshot.available_providers.join(', ')) : chalk.dim('none')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Missing providers: ${missingProviders.length > 0 ? chalk.yellow(missingProviders.join(', ')) : chalk.dim('none')}`
   );
 
   if (previewCapabilities.length > 0) {
-    console.log(chalk.dim('  Top capabilities:'));
+    dashboardLog(chalk.dim('  Top capabilities:'));
     for (const capability of previewCapabilities) {
       const status =
         capability.discovery_status === 'available'
           ? chalk.green(renderStatus('provider', 'available', 'en'))
           : chalk.yellow(renderStatus('provider', 'missing', 'en'));
-      console.log(
+      dashboardLog(
         `    ${chalk.gray('•')} ${capability.capability_id.padEnd(38)} ${chalk.dim(capability.provider)} ${status}`
       );
     }
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawSkillLandscape() {
-  console.log(chalk.bold.green(' 🧠 GOVERNED SKILL LANDSCAPE'));
+  dashboardLog(chalk.bold.green(' 🧠 GOVERNED SKILL LANDSCAPE'));
 
-  const skillIndex = readJsonIfExists<{
-    v?: string;
-    t?: number;
-    u?: string;
-    s?: Array<{
-      n: string;
-      path: string;
-      d: string;
-      s: string;
-      version?: string;
-      capability_count?: number;
-    }>;
-  }>(pathResolver.knowledge('product/orchestration/global_skill_index.json'));
+  let skillIndex: ReturnType<typeof loadSkillIndex> | null = null;
+  try {
+    skillIndex = loadSkillIndex();
+  } catch {
+    // Preserve the dashboard's safe, actionable empty-state behavior when
+    // the generated catalog is absent or invalid.
+    skillIndex = null;
+  }
 
   if (!skillIndex || !Array.isArray(skillIndex.s) || skillIndex.s.length === 0) {
-    console.log(chalk.dim('  (No governed skill catalog found)'));
-    console.log(chalk.dim('  Run `pnpm run sync:component-inventory` to refresh the index.'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No governed skill catalog found)'));
+    dashboardLog(chalk.dim('  Run `pnpm run sync:component-inventory` to refresh the index.'));
+    dashboardLog('');
     return;
   }
 
   const implemented = skillIndex.s.filter((entry) => entry.s === 'implemented');
   const preview = skillIndex.s.slice(0, 5);
 
-  console.log(`  ${chalk.gray('•')} Version: ${chalk.white(skillIndex.v || 'unknown')}`);
-  console.log(`  ${chalk.gray('•')} Last updated: ${chalk.white(skillIndex.u || 'unknown')}`);
-  console.log(
+  dashboardLog(`  ${chalk.gray('•')} Version: ${chalk.white(skillIndex.v || 'unknown')}`);
+  dashboardLog(`  ${chalk.gray('•')} Last updated: ${chalk.white(skillIndex.u || 'unknown')}`);
+  dashboardLog(
     `  ${chalk.gray('•')} Skills: ${implemented.length > 0 ? chalk.green(implemented.length) : chalk.dim(0)} implemented / ${skillIndex.s.length}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Catalog: ${chalk.cyan(pathResolver.knowledge('product/orchestration/global_skill_index.json'))}`
   );
 
   if (preview.length > 0) {
-    console.log(chalk.dim('  Top skills:'));
+    dashboardLog(chalk.dim('  Top skills:'));
     for (const skill of preview) {
-      console.log(
+      dashboardLog(
         `    ${chalk.gray('•')} ${skill.n.padEnd(28)} ${chalk.dim(skill.version || 'unknown')} ${chalk.white(skill.d.slice(0, 56))}`
       );
     }
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawOnboardingHome() {
-  console.log(chalk.bold.green(' 🏠 ONBOARDING HOME'));
+  dashboardLog(chalk.bold.green(' 🏠 ONBOARDING HOME'));
 
   const onboardingStatePath = path.join(
     resolveActiveProfileRoot(),
@@ -604,9 +673,7 @@ function drawOnboardingHome() {
   const tenantDir = path.join(resolveActiveProfileRoot(), 'tenants');
   const connectionFiles = listJsonFiles(connectionDir);
   const tenantFiles = listJsonFiles(tenantDir);
-  const readiness = readJsonIfExists<{
-    required_services?: Record<string, { required_keys_any?: string[] }>;
-  }>(pathResolver.knowledge('product/governance/service-connection-readiness.json'));
+  const readiness = loadServiceConnectionReadinessConfig();
 
   const serviceMap = new Map<string, Record<string, unknown>>();
   for (const file of connectionFiles) {
@@ -630,19 +697,19 @@ function drawOnboardingHome() {
   const tenantEntries = onboardingState?.tenants?.entries || [];
   const tutorial = onboardingState?.tutorial;
 
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} State: ${onboardingComplete ? chalk.green('complete') : chalk.yellow('draft')} ${chalk.dim(`phase=${phaseLabel}`)}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Identity: ${chalk.cyan(identity?.name || 'Sovereign')} ${chalk.dim(`/${identity?.agent_id || 'KYBERION-PRIME'}`)}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Services: ${readyServices.length > 0 ? chalk.green(`${readyServices.length} ready`) : chalk.dim('0 ready')} / ${blockedServices.length > 0 ? chalk.yellow(`${blockedServices.length} blocked`) : chalk.dim('0 blocked')}`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Tenants: ${tenantFiles.length > 0 ? chalk.green(tenantFiles.length) : chalk.dim(0)} registered`
   );
-  console.log(
+  dashboardLog(
     `  ${chalk.gray('•')} Tutorial: ${tutorial?.mode ? chalk.cyan(tutorial.mode) : chalk.dim('not started')}`
   );
 
@@ -654,22 +721,22 @@ function drawOnboardingHome() {
         ? 'Register the first tenant and then choose a starter mission.'
         : 'Pick a starter mission from the current tenant context.';
 
-  console.log(`  ${chalk.gray('•')} Next: ${chalk.white(recommendedNextAction)}`);
+  dashboardLog(`  ${chalk.gray('•')} Next: ${chalk.white(recommendedNextAction)}`);
 
   if (connectionFiles.length > 0) {
-    console.log(chalk.dim('  Connections:'));
+    dashboardLog(chalk.dim('  Connections:'));
     for (const file of connectionFiles.slice(0, 4)) {
       const serviceId = path.basename(file, '.json');
       const status =
         serviceMap.has(serviceId) && isServiceConnectionReady(serviceId, serviceMap.get(serviceId)!)
           ? chalk.green(renderStatus('connection', 'connected', 'en'))
           : chalk.yellow(renderStatus('connection', 'pending', 'en'));
-      console.log(`    ${chalk.gray('•')} ${serviceId.padEnd(16)} ${status}`);
+      dashboardLog(`    ${chalk.gray('•')} ${serviceId.padEnd(16)} ${status}`);
     }
   } else {
-    console.log(chalk.dim('  Connections: none captured yet'));
+    dashboardLog(chalk.dim('  Connections: none captured yet'));
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawMissions() {
@@ -679,17 +746,34 @@ function drawMissions() {
     pathResolver.knowledge('personal/missions'),
   ];
 
-  console.log(chalk.bold.yellow(' 📋 ACTIVE MISSIONS'));
+  dashboardLog(chalk.bold.yellow(' 📋 ACTIVE MISSIONS'));
   let count = 0;
   for (const dir of missionDirs) {
     for (const item of safeListDir(dir)) {
-      const statePath = path.join(dir, item, 'mission-state.json');
+      let missionPath: string;
+      let statePath: string;
+      try {
+        missionPath = assertSafeRepositoryPath(path.join(dir, item));
+        statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        continue;
+      }
       if (safeExistsSync(statePath)) {
-        const state = readJson<any>(statePath);
-        if (state.status === 'active') {
+        const state = readMissionDashboardState(statePath);
+        if (state) {
           const color = state.tier === 'personal' ? chalk.magenta : chalk.blue;
-          const missionPath = path.join(dir, item);
-          const planReady = safeExistsSync(path.join(missionPath, 'PLAN.md'));
+          let planReady = false;
+          try {
+            planReady = safeExistsSync(
+              assertSafeRepositoryPath(path.join(missionPath, 'PLAN.md'), {
+                allowMissingLeaf: true,
+              })
+            );
+          } catch {
+            continue;
+          }
           const nextTaskCount = (() => {
             try {
               return readCanonicalWorkGraph(state.mission_id, {
@@ -700,7 +784,7 @@ function drawMissions() {
             }
           })();
           const planning = planReady ? chalk.green('PLAN READY') : chalk.yellow('PLANNING');
-          console.log(
+          dashboardLog(
             `  ${chalk.gray('•')} ${color(state.mission_id.padEnd(25))} [${chalk.green(renderStatus('mission', state.status, 'en').toUpperCase())}] ${chalk.dim(state.mission_type || 'development')} ${chalk.gray(`next=${nextTaskCount}`)} ${planning}`
           );
           count++;
@@ -708,8 +792,8 @@ function drawMissions() {
       }
     }
   }
-  if (count === 0) console.log(chalk.dim('  (No active missions)'));
-  console.log('');
+  if (count === 0) dashboardLog(chalk.dim('  (No active missions)'));
+  dashboardLog('');
 }
 
 function drawMissionOrchestration() {
@@ -718,7 +802,7 @@ function drawMissionOrchestration() {
   );
   const slackMissionsPath = pathResolver.shared('observability/channels/slack/missions.jsonl');
 
-  console.log(chalk.bold.cyan(' 🧭 MISSION ORCHESTRATION'));
+  dashboardLog(chalk.bold.cyan(' 🧭 MISSION ORCHESTRATION'));
 
   const events: Array<{ ts: string; decision: string; mission?: string; why?: string }> = [];
   for (const file of [eventsPath, slackMissionsPath]) {
@@ -726,107 +810,91 @@ function drawMissionOrchestration() {
     const raw = readTextFile(file);
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
-      try {
-        const event = JSON.parse(line);
-        events.push({
-          ts: event.ts || new Date().toISOString(),
-          decision: event.decision || event.event_type || 'event',
-          mission: event.mission_id || event.resource_id,
-          why: event.why,
-        });
-      } catch {
-        // Ignore malformed lines.
-      }
+      const event = parseDashboardOrchestrationLine(line);
+      if (event) events.push(event);
     }
   }
 
   if (events.length === 0) {
-    console.log(chalk.dim('  (No orchestration events yet)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No orchestration events yet)'));
+    dashboardLog('');
     return;
   }
 
   const latest = events.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
   for (const event of latest) {
     const ts = event.ts.replace('T', ' ').slice(5, 16);
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${chalk.dim(ts)} ${chalk.white(event.decision.padEnd(30))} ${chalk.cyan((event.mission || 'system').slice(0, 32))}`
     );
     if (event.why) {
-      console.log(`    ${chalk.dim(event.why.slice(0, 96))}`);
+      dashboardLog(`    ${chalk.dim(event.why.slice(0, 96))}`);
     }
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawOwnerSummaries() {
   const slackMissionsPath = pathResolver.shared('observability/channels/slack/missions.jsonl');
-  console.log(chalk.bold.yellow(' 👑 OWNER SUMMARIES'));
+  dashboardLog(chalk.bold.yellow(' 👑 OWNER SUMMARIES'));
 
   if (!safeExistsSync(slackMissionsPath)) {
-    console.log(chalk.dim('  (No owner summaries yet)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No owner summaries yet)'));
+    dashboardLog('');
     return;
   }
 
   const summaries = readTextFile(slackMissionsPath)
     .split('\n')
     .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    })
-    .filter((event): event is Record<string, unknown> => Boolean(event))
-    .filter((event) => (event.decision || event.event_type) === 'mission_owner_notified')
+    .map(parseDashboardOwnerSummaryLine)
+    .filter((event) => event !== undefined)
     .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')))
     .slice(0, 4);
 
   if (summaries.length === 0) {
-    console.log(chalk.dim('  (No owner summaries yet)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No owner summaries yet)'));
+    dashboardLog('');
     return;
   }
 
   for (const summary of summaries) {
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${chalk.cyan(String(summary.mission_id || 'unknown').slice(0, 32))} ${chalk.dim(`accepted=${summary.accepted_count || 0} reviewed=${summary.reviewed_count || 0} completed=${summary.completed_count || 0} requested=${summary.requested_count || 0}`)}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawRuntimeLeaseDoctor() {
-  console.log(chalk.bold.red(' 🩺 RUNTIME LEASE DOCTOR'));
+  dashboardLog(chalk.bold.red(' 🩺 RUNTIME LEASE DOCTOR'));
   const findings = collectRuntimeDoctorFindings();
 
   if (findings.length === 0) {
-    console.log(chalk.dim('  (No runtime doctor findings)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (No runtime doctor findings)'));
+    dashboardLog('');
     return;
   }
 
   for (const finding of findings) {
     const severity =
       finding.severity === 'critical' ? chalk.red('CRITICAL') : chalk.yellow('WARNING');
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${finding.agentId.padEnd(24)} [${severity}] ${chalk.dim(finding.reason)}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawBackupStatus() {
-  console.log(chalk.bold.cyan(' 💾 BACKUP STATUS'));
+  dashboardLog(chalk.bold.cyan(' 💾 BACKUP STATUS'));
   const status = summarizeBackupStatus();
   if (status.status === 'missing') {
-    console.log(chalk.yellow('  No backup archives found.'));
-    console.log(
+    dashboardLog(chalk.yellow('  No backup archives found.'));
+    dashboardLog(
       chalk.dim('  Run: KYBERION_BACKUP_PASSPHRASE=... pnpm backup create --scope all --encrypt')
     );
-    console.log('');
+    dashboardLog('');
     return;
   }
   const color =
@@ -834,49 +902,49 @@ function drawBackupStatus() {
   const age = status.latestAgeHours?.toFixed(1) ?? 'unknown';
   const sizeMb =
     status.latestSizeBytes === null ? 'unknown' : (status.latestSizeBytes / 1024 / 1024).toFixed(1);
-  console.log(`  Status: ${color(status.status.toUpperCase())}`);
-  console.log(
+  dashboardLog(`  Status: ${color(status.status.toUpperCase())}`);
+  dashboardLog(
     `  Latest: ${chalk.white(status.latestName || 'unknown')} ${chalk.dim(`${age}h ago`)}`
   );
-  console.log(`  Archives: ${status.count} ${chalk.dim(`latest=${sizeMb}MB`)}`);
-  console.log(`  Dir: ${chalk.dim(status.backupDir)}`);
-  console.log('');
+  dashboardLog(`  Archives: ${status.count} ${chalk.dim(`latest=${sizeMb}MB`)}`);
+  dashboardLog(`  Dir: ${chalk.dim(status.backupDir)}`);
+  dashboardLog('');
 }
 
 function drawSlackOutbox() {
-  console.log(chalk.bold.green(' 📬 SURFACE OUTBOX'));
+  dashboardLog(chalk.bold.green(' 📬 SURFACE OUTBOX'));
   const slackMessages = listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true });
   const chronosMessages = listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true });
-  console.log(
+  dashboardLog(
     `  Slack pending:   ${slackMessages.length > 0 ? chalk.bold.yellow(slackMessages.length) : chalk.dim(0)}`
   );
-  console.log(
+  dashboardLog(
     `  Chronos pending: ${chronosMessages.length > 0 ? chalk.bold.yellow(chronosMessages.length) : chalk.dim(0)}`
   );
   for (const message of slackMessages.slice(0, 4)) {
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${chalk.cyan(`slack/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`
     );
   }
   for (const message of chronosMessages.slice(0, 2)) {
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${chalk.cyan(`chronos/${message.source}`.padEnd(14))} ${chalk.dim(message.channel)} ${chalk.white(message.text.slice(0, 64))}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawA2ATraffic() {
   const inbox = pathResolver.rootResolve('active/shared/runtime/a2a/inbox');
   const outbox = pathResolver.rootResolve('active/shared/runtime/a2a/outbox');
 
-  console.log(chalk.bold.magenta(' 📡 A2A TRAFFIC'));
+  dashboardLog(chalk.bold.magenta(' 📡 A2A TRAFFIC'));
 
   const inCount = safeExistsSync(inbox) ? safeReaddir(inbox).length : 0;
   const outCount = safeExistsSync(outbox) ? safeReaddir(outbox).length : 0;
 
-  console.log(`  Inbox:  ${inCount > 0 ? chalk.bold.green(inCount) : chalk.dim(0)} pending`);
-  console.log(`  Outbox: ${outCount > 0 ? chalk.bold.yellow(outCount) : chalk.dim(0)} sending\n`);
+  dashboardLog(`  Inbox:  ${inCount > 0 ? chalk.bold.green(inCount) : chalk.dim(0)} pending`);
+  dashboardLog(`  Outbox: ${outCount > 0 ? chalk.bold.yellow(outCount) : chalk.dim(0)} sending\n`);
 }
 
 function drawRuntimeSurfaces() {
@@ -884,11 +952,11 @@ function drawRuntimeSurfaces() {
   const snapshotPath = pathResolver.knowledge('product/governance/active-surfaces.json');
   const surfacesDir = pathResolver.knowledge('product/governance/surfaces');
 
-  console.log(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
+  dashboardLog(chalk.bold.blue(' 🛰️ RUNTIME SURFACES'));
 
   if (!safeExistsSync(snapshotPath) && !safeExistsSync(surfacesDir)) {
-    console.log(chalk.dim('  (Surface manifest not found)'));
-    console.log('');
+    dashboardLog(chalk.dim('  (Surface manifest not found)'));
+    dashboardLog('');
     return;
   }
   const manifest = loadSurfaceManifest();
@@ -902,33 +970,39 @@ function drawRuntimeSurfaces() {
       ? chalk.green(renderStatus('runtime', 'running', 'en').toUpperCase())
       : chalk.dim(renderStatus('runtime', 'stopped', 'en').toUpperCase());
     const pid = record?.pid ? chalk.gray(` pid=${record.pid}`) : '';
-    console.log(
+    dashboardLog(
       `  ${chalk.gray('•')} ${surface.id.padEnd(20)} [${status}] ${chalk.dim(surface.kind)}${pid}`
     );
   }
-  console.log('');
+  dashboardLog('');
 }
 
 function drawTrustBoard() {
-  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-  console.log(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
-  const raw = readJsonIfExists<any>(ledgerPath);
-  if (raw) {
-    const ledger = raw?.agents ?? raw ?? {};
-    Object.keys(ledger).forEach((a) => {
-      const score = ledger[a].current_score / 100;
+  dashboardLog(chalk.bold.green(' 🤝 AGENT TRUST BOARD'));
+  let ledger: ReturnType<typeof loadPersistedTrustLedger> = null;
+  try {
+    ledger = loadPersistedTrustLedger();
+  } catch {
+    ledger = null;
+  }
+  if (ledger) {
+    Object.entries(ledger).forEach(([agentId, record]) => {
+      const score = record.current_score / 100;
       const bar = '█'.repeat(Math.floor(score)) + '░'.repeat(10 - Math.floor(score));
-      console.log(`  ${a.padEnd(15)} [${chalk.cyan(bar)}] ${score.toFixed(1)}`);
+      dashboardLog(`  ${agentId.padEnd(15)} [${chalk.cyan(bar)}] ${score.toFixed(1)}`);
     });
   } else {
-    console.log(chalk.dim('  (Trust ledger not found)'));
+    dashboardLog(chalk.dim('  (Trust ledger not found)'));
   }
-  console.log('');
+  dashboardLog('');
 }
 
-function render(argv: string[] = []) {
+function render(
+  argv: string[] = [],
+  options: { clear?: boolean; interactive?: boolean } = {}
+): void {
   const focus = getDashboardFocus(argv);
-  clearScreen();
+  if (options.clear !== false) clearScreen();
   drawHeader();
   drawCompanyOverview();
   drawOnboardingHome();
@@ -937,23 +1011,23 @@ function render(argv: string[] = []) {
   drawStarterMissionSuggestion();
   if (focus === 'capabilities') {
     drawCapabilityLandscape();
-    console.log(chalk.dim(' Focused view: provider capability snapshot and provider health.'));
-    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    dashboardLog(chalk.dim(' Focused view: provider capability snapshot and provider health.'));
+    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
     return;
   }
   if (focus === 'skills') {
     drawSkillLandscape();
-    console.log(chalk.dim(' Focused view: governed skill catalog.'));
-    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    dashboardLog(chalk.dim(' Focused view: governed skill catalog.'));
+    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
     return;
   }
   if (focus === 'onboarding') {
-    console.log(
+    dashboardLog(
       chalk.dim(
         ' Focused view: onboarding setup, connection review, tenant context, starter mission.'
       )
     );
-    console.log(chalk.dim(' Press Ctrl+C to exit.'));
+    dashboardLog(chalk.dim(' Press Ctrl+C to exit.'));
     return;
   }
   drawMissions();
@@ -967,12 +1041,35 @@ function render(argv: string[] = []) {
   drawSlackOutbox();
   drawA2ATraffic();
   drawTrustBoard();
-  console.log(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));
+  if (options.interactive !== false) {
+    dashboardLog(chalk.dim(' Press Ctrl+C to exit. Refreshing every 5s...'));
+  }
+}
+
+/**
+ * Render one read-only dashboard snapshot through the shared script boundary.
+ * The interactive ANSI view remains unchanged; JSON callers receive the same
+ * snapshot as a single structured value instead of a stream of log lines.
+ */
+export function renderDashboardSnapshot(argv: string[] = []): {
+  ok: true;
+  focus: DashboardFocus;
+  output: string;
+} {
+  const lines: string[] = [];
+  const previousLog = dashboardLog;
+  dashboardLog = (...values) => lines.push(values.map((value) => String(value)).join(' '));
+  try {
+    render(argv, { clear: false, interactive: false });
+  } finally {
+    dashboardLog = previousLog;
+  }
+  return { ok: true, focus: getDashboardFocus(argv), output: lines.join('\n') };
 }
 
 export function main(argv: string[] = []): void {
   if (argv.includes('--once')) {
-    render(argv);
+    render(argv, { interactive: false });
   } else {
     render(argv);
     setInterval(() => render(argv), 5000);
@@ -983,4 +1080,23 @@ if (
   isDirectScript(import.meta.url, 'sovereign_dashboard.ts') ||
   isDirectScript(import.meta.url, 'sovereign_dashboard.js')
 )
-  void defineScript({ name: 'dashboard', flags: [], run: ({ argv }) => main(argv) })();
+  void defineScript({
+    name: 'dashboard',
+    run: ({ argv, json, quiet, dryRun, check, print }) => {
+      const bounded = json || quiet || dryRun || check || argv.includes('--once');
+      if (json) {
+        const snapshot = renderDashboardSnapshot(argv);
+        print(snapshot);
+        return snapshot;
+      }
+      if (quiet) {
+        renderDashboardSnapshot(argv);
+        return;
+      }
+      if (bounded) {
+        render(argv, { interactive: false });
+        return;
+      }
+      main(argv);
+    },
+  })();

@@ -10,7 +10,9 @@ vi.mock('@agent/core', async (importOriginal) => {
     ...actual,
     safeExistsSync: vi.fn().mockReturnValue(false), // reflexes directory does not exist
     safeReaddir: vi.fn().mockReturnValue([]),
+    safeLstat: vi.fn().mockReturnValue({ isFile: () => true }),
     safeReadFile: vi.fn().mockReturnValue('{}'),
+    assertSafeRepositoryPath: vi.fn((p: string) => p),
     logger: {
       info: vi.fn(),
       warn: vi.fn(),
@@ -24,6 +26,18 @@ vi.mock('@agent/core', async (importOriginal) => {
       sharedTmp: vi.fn((p: string) => `/mock/tmp/${p}`),
       knowledge: vi.fn((p: string) => `/mock/knowledge/${p}`),
     },
+  };
+});
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  return {
+    ...actual,
+    safeExistsSync: vi.fn().mockReturnValue(false),
+    safeReaddir: vi.fn().mockReturnValue([]),
+    safeLstat: vi.fn().mockReturnValue({ isFile: () => true }),
+    safeReadFile: vi.fn().mockReturnValue('{}'),
+    assertSafeRepositoryPath: vi.fn((p: string) => p),
   };
 });
 
@@ -97,6 +111,10 @@ function installPassthroughRunner(): { keys: string[] } {
   return { keys };
 }
 
+function loadedReflexes(): ReflexADF[] {
+  return (reflexEngine as unknown as { reflexes: ReflexADF[] }).reflexes;
+}
+
 describe('ReflexEngine', () => {
   const mockDispatcher = vi.fn().mockResolvedValue(undefined);
 
@@ -107,6 +125,32 @@ describe('ReflexEngine', () => {
     (reflexEngine as any).dispatcher = undefined;
     reflexEngine.setDispatcher(mockDispatcher);
     installPassthroughRunner();
+  });
+
+  it('skips reflex definitions rejected by the repository or symlink boundary', async () => {
+    const secure = await import('@agent/core/secure-io');
+    vi.mocked(secure.safeExistsSync).mockReturnValue(true);
+    vi.mocked(secure.safeReaddir).mockReturnValue(['safe.adf.json', 'linked.adf.json']);
+    vi.mocked(secure.safeReadFile).mockReturnValue(JSON.stringify(makeReflex('safe-intent')));
+    vi.mocked(secure.assertSafeRepositoryPath).mockImplementation((candidate: string) => {
+      if (candidate.endsWith('linked.adf.json')) {
+        throw new Error('[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link');
+      }
+      return candidate;
+    });
+
+    try {
+      reflexEngine.reloadReflexes();
+      expect(loadedReflexes()).toHaveLength(1);
+      expect(loadedReflexes()[0]?.trigger.intent).toBe('safe-intent');
+    } finally {
+      vi.mocked(secure.safeExistsSync).mockReturnValue(false);
+      vi.mocked(secure.safeReaddir).mockReturnValue([]);
+      vi.mocked(secure.safeReadFile).mockReturnValue('{}');
+      vi.mocked(secure.assertSafeRepositoryPath).mockImplementation(
+        (candidate: string) => candidate
+      );
+    }
   });
 
   // -------------------------------------------------------------------------

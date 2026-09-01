@@ -1,16 +1,15 @@
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
   safeExistsSync,
   safeExecResult,
   safeMkdir,
   safeReadFile,
-  safeJsonParse,
-  type PatchDecision,
-  decidePatchAction,
-} from '@agent/core';
-import { safeReaddir, safeLstat } from '@agent/core';
+  safeReaddir,
+  safeLstat,
+} from '@agent/core/secure-io';
+import { safeJsonParse } from '@agent/core/validators';
+import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
 import { appendJsonLine } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -229,6 +228,57 @@ interface PreviousLedgerState {
   patched: Set<string>;
 }
 
+const PATCH_DECISIONS: PatchDecision[] = [
+  'auto_apply',
+  'urgent_approval',
+  'scheduled',
+  'defer',
+  'approval',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseLedgerFinding(value: unknown): DependencyVulnerabilityFinding | undefined {
+  if (
+    !isRecord(value) ||
+    !nonEmptyString(value.package_name) ||
+    !nonEmptyString(value.severity) ||
+    !PATCH_DECISIONS.includes(value.decision as PatchDecision) ||
+    typeof value.reachability !== 'number' ||
+    !Number.isInteger(value.reachability) ||
+    value.reachability < 0 ||
+    value.reachability > 2 ||
+    !nonEmptyString(value.reason) ||
+    !nonEmptyString(value.reevaluate_when)
+  ) {
+    return undefined;
+  }
+  if (
+    (value.current_version !== undefined && !nonEmptyString(value.current_version)) ||
+    (value.latest_version !== undefined && !nonEmptyString(value.latest_version))
+  ) {
+    return undefined;
+  }
+  const currentVersion = value.current_version as string | undefined;
+  const latestVersion = value.latest_version as string | undefined;
+  return {
+    package_name: value.package_name,
+    severity: value.severity,
+    ...(currentVersion ? { current_version: currentVersion } : {}),
+    ...(latestVersion ? { latest_version: latestVersion } : {}),
+    reachability: value.reachability as 0 | 1 | 2,
+    decision: value.decision as PatchDecision,
+    reason: value.reason,
+    reevaluate_when: value.reevaluate_when,
+  };
+}
+
 export function readPreviousLedgerState(ledgerPath: string): PreviousLedgerState {
   const state: PreviousLedgerState = { findings: new Map(), patched: new Set() };
   if (!safeExistsSync(ledgerPath)) return state;
@@ -236,15 +286,17 @@ export function readPreviousLedgerState(ledgerPath: string): PreviousLedgerState
     .split('\n')
     .filter((line) => line.trim().length > 0);
   for (const line of lines) {
-    let record: Record<string, unknown>;
+    let record: unknown;
     try {
-      record = JSON.parse(line) as Record<string, unknown>;
+      record = JSON.parse(line) as unknown;
     } catch {
       continue;
     }
+    if (!isRecord(record)) continue;
     if (Array.isArray(record.findings)) {
-      for (const finding of record.findings as DependencyVulnerabilityFinding[]) {
-        if (finding?.package_name) state.findings.set(finding.package_name, finding);
+      for (const candidate of record.findings) {
+        const finding = parseLedgerFinding(candidate);
+        if (finding) state.findings.set(finding.package_name, finding);
       }
       continue;
     }
@@ -391,37 +443,37 @@ export async function runDependencyVulnerabilityScanOnce(): Promise<DependencyVu
   });
 }
 
-export async function runScan(): Promise<number> {
-  const result = await runDependencyVulnerabilityScanOnce();
-
-  logger.info(
-    `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`
-  );
-  logger.info(
+export function formatDependencyVulnerabilityScanSummary(
+  result: DependencyVulnerabilityScanResult
+): string {
+  const lines = [
+    `[vuln-scan] scanned ${result.scanned_packages} package(s), findings=${result.findings.length}`,
     `[vuln-scan] unresolved: ${result.unresolved_summary.open} open, ` +
       `${result.unresolved_summary.deferred} deferred, ` +
-      `${result.unresolved_summary.patched} patched to date`
-  );
-  if (result.findings.length > 0) {
-    logger.warn('[vuln-scan] findings appended to vuln ledger');
-  }
+      `${result.unresolved_summary.patched} patched to date`,
+  ];
+  if (result.findings.length > 0) lines.push('[vuln-scan] findings appended to vuln ledger');
   for (const reevaluation of result.reevaluations) {
-    logger.warn(
+    lines.push(
       `[vuln-scan] deferred finding needs re-review: ${reevaluation.package_name} — ` +
         `${reevaluation.trigger} (${reevaluation.detail})`
     );
   }
-  console.log(JSON.stringify(result, null, 2));
-  return 0;
+  return lines.join('\n');
+}
+
+export async function runScan(): Promise<DependencyVulnerabilityScanResult> {
+  const result = await runDependencyVulnerabilityScanOnce();
+  return result;
 }
 
 export const runDependencyVulnerabilityScan = defineScript({
   name: 'dependency-vulnerability-scan',
-  flags: [],
-  async run() {
-    const code = await runScan();
-    if (code !== 0) throw new Error(`dependency vulnerability scan failed with exit code ${code}`);
-    return code;
+  flags: ['json', 'quiet'],
+  async run({ print, json }) {
+    const result = await runScan();
+    print(json ? result : formatDependencyVulnerabilityScanSummary(result));
+    return result;
   },
 });
 

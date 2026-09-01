@@ -28,7 +28,7 @@ last_updated: 2026-08-15
 ### Stage 2: Sync (アイデンティティの調和)
 
 - **役割**: 主権者の属性と好みを把握する。
-- **アクション**: `pnpm onboard` または reviewed JSON を使った `pnpm onboard:apply` で identity を設定する。active customer がある場合も、customer は stance overlay であり tenant registry の正本ではない。
+- **アクション**: `pnpm onboard` または reviewed JSON を使った `pnpm onboard apply` で identity を設定する。active customer がある場合も、customer は stance overlay であり tenant registry の正本ではない。
 - **成果物**: `my-identity.json` の永続化と、3-Tier ディレクトリ構造の確立。
 
 ### Stage 3: Provision (環境と capability overlay の配備)

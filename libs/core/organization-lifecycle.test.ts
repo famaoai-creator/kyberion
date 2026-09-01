@@ -1,16 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { auditChain } from './audit-chain.js';
+import { buildOrganizationOperationRecord } from './organization-operating-model-management.js';
 import {
-  auditChain,
-  buildOrganizationOperationRecord,
-  loadOrganizationOperationalState,
-  pathResolver,
   removeOrganizationEntity,
   retireOrganizationEntity,
-  safeRmSync,
+} from './organization-operating-model.js';
+import {
+  loadOrganizationOperationalState,
   saveOrganizationOperationalState,
-  saveOrganizationOperation,
   transitionOrganizationLifecycle,
-} from '@agent/core';
+} from './organization-operating-model-persistence.js';
+import { saveOrganizationOperation } from './organization-operating-model-operations.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeRmSync } from '@agent/core/secure-io';
 
 const organizationId = 'ORG-EG-LIFECYCLE-TEST';
 const tenantSlug = 'tenant-acme';

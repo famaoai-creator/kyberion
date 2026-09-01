@@ -1,0 +1,19 @@
+import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+
+describe('reasoning auth check entrypoint', () => {
+  it('keeps auth status output behind the shared script harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/reasoning_auth_check.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain("flags: ['json', 'quiet']");
+    expect(source).toContain("context.argv.includes('--probe')");
+    expect(source).toContain('context.print(');
+    expect(source).not.toContain('console.log(');
+    expect(source).not.toContain("context.argv, '--json'");
+  });
+});

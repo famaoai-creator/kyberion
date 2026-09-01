@@ -6,9 +6,12 @@
  */
 
 import * as readline from 'node:readline';
-import { getReasoningBackend, installReasoningBackends, logger } from '@agent/core';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { logger } from '@agent/core/core';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-async function main() {
+async function main(_args: string[] = []) {
   logger.info('🚀 Initializing Kyberion Local Chat...');
 
   const success = installReasoningBackends({ mode: 'local', force: true });
@@ -55,7 +58,22 @@ async function main() {
   });
 }
 
-main().catch((err) => {
-  logger.error(err.message);
-  process.exitCode = 1;
+const runLocalChat = defineScript({
+  name: 'chat:local',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (err: any) {
+      logger.error(err.message);
+      process.exitCode = 1;
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'chat_local.ts') ||
+  isDirectScript(import.meta.url, 'chat_local.js')
+) {
+  void runLocalChat();
+}

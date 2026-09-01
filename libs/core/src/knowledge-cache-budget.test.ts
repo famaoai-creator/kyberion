@@ -25,6 +25,7 @@ vi.mock('../secure-io.js', () => ({
   safeMkdir: (p: string, opts: any) => fs.mkdirSync(p, opts),
   safeStat: (p: string) => fs.statSync(p),
   safeUnlinkSync: (p: string) => fs.unlinkSync(p),
+  assertSafeRepositoryPath: (p: string) => p,
   loadJson: <T>(p: string): T => JSON.parse(fs.readFileSync(p, 'utf8')) as T,
   loadJsonIfPresent: <T>(p: string): T | null => {
     if (!fs.existsSync(p)) return null;
@@ -34,6 +35,10 @@ vi.mock('../secure-io.js', () => ({
       return null;
     }
   },
+}));
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 
 import { enforceKnowledgeCacheBudget } from './knowledge-index.js';
@@ -111,5 +116,12 @@ describe('enforceKnowledgeCacheBudget (KM-02)', () => {
     for (const h of HASHES) {
       expect(fs.existsSync(path.join(dir, `ki-${h}.json`))).toBe(false);
     }
+  });
+
+  it('ignores a non-object usage sidecar and falls back to file metadata', () => {
+    fs.writeFileSync(usagePath(), '[]');
+    process.env.KYBERION_KI_CACHE_MAX_MB = String(2100 / (1024 * 1024));
+
+    expect(() => enforceKnowledgeCacheBudget()).not.toThrow();
   });
 });

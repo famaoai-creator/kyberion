@@ -1,6 +1,9 @@
-import { timingSafeEqual } from 'node:crypto';
 import type { Request } from 'express';
-import { isValidTenantSlug, type SurfaceAuthorizationContext } from '@agent/core';
+import {
+  resolveSurfaceViewerScope,
+  SurfaceViewerScopeError,
+} from '@agent/core/surface-mutation-guard';
+import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
 
 type ComputerSurfaceRequest = Pick<Request, 'headers' | 'socket'>;
 
@@ -12,13 +15,6 @@ export class ComputerSurfaceViewerError extends Error {
     super(message);
     this.name = 'ComputerSurfaceViewerError';
   }
-}
-
-function tokenMatches(candidate: string, configured: string | undefined): boolean {
-  if (!candidate || !configured) return false;
-  const left = Buffer.from(candidate);
-  const right = Buffer.from(configured);
-  return left.length === right.length && timingSafeEqual(left, right);
 }
 
 function bearerToken(req: ComputerSurfaceRequest): string {
@@ -38,33 +34,7 @@ export function isComputerSurfaceLoopbackRequest(req: ComputerSurfaceRequest): b
 function serverTenant(env: NodeJS.ProcessEnv): string | undefined {
   const raw = String(env.KYBERION_TENANT || '').trim();
   if (!raw) return undefined;
-  if (!isValidTenantSlug(raw)) {
-    throw new ComputerSurfaceViewerError(403, 'Computer Surface server tenant scope is invalid.');
-  }
   return raw;
-}
-
-function defaultTierAccess(role: 'readonly' | 'localadmin'): string[] {
-  return role === 'localadmin'
-    ? ['personal', 'confidential', 'public']
-    : ['confidential', 'public'];
-}
-
-function contextFor(
-  role: 'readonly' | 'localadmin',
-  source: 'token' | 'loopback',
-  tenant: string | undefined,
-  principalId: string
-): SurfaceAuthorizationContext {
-  return {
-    role,
-    tenantSlugs: tenant ? [tenant] : 'all',
-    organizationIds: 'all',
-    projectIds: 'all',
-    tierAccess: defaultTierAccess(role),
-    principalId,
-    source,
-  };
 }
 
 /**
@@ -82,40 +52,48 @@ export function resolveComputerSurfaceViewerContext(
   const apiToken = env.KYBERION_API_TOKEN;
   const local = isComputerSurfaceLoopbackRequest(req);
   const tenant = serverTenant(env);
+  const principalId = String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL || '');
 
-  if (token) {
-    const role = tokenMatches(token, localadminToken)
-      ? 'localadmin'
-      : tokenMatches(token, apiToken)
-        ? 'readonly'
-        : null;
-    if (!role) throw new ComputerSurfaceViewerError(401, 'Unknown Computer Surface viewer token.');
-    if (!local && !tenant) {
+  try {
+    const scope = resolveSurfaceViewerScope({
+      token,
+      local,
+      serverTenant: tenant,
+      apiToken,
+      localadminToken,
+      allowLoopback: env.KYBERION_LOCALHOST_AUTOADMIN !== 'false',
+      loopbackRole: 'localadmin',
+      loopbackUsesServerTenant: true,
+      principalIds: {
+        localadmin: principalId.startsWith('human:')
+          ? principalId
+          : 'human:computer-surface-localadmin',
+        readonly: 'human:computer-surface-viewer',
+      },
+    });
+    // Preserve Computer Surface's existing wire order while the shared core
+    // resolver remains the sole authority for the allowed tier set.
+    const tierOrder = ['personal', 'confidential', 'public'] as const;
+    return {
+      ...scope,
+      tierAccess: tierOrder.filter((tier) => scope.tierAccess.includes(tier)),
+    };
+  } catch (error) {
+    if (!(error instanceof SurfaceViewerScopeError)) throw error;
+    if (error.status === 401 && error.message === 'Unknown viewer token.') {
+      throw new ComputerSurfaceViewerError(401, 'Unknown Computer Surface viewer token.');
+    }
+    if (error.status === 403 && error.message.includes('Remote viewer access requires')) {
       throw new ComputerSurfaceViewerError(
         403,
         'Remote Computer Surface access requires server-side KYBERION_TENANT scope.'
       );
     }
-    return contextFor(
-      role,
-      'token',
-      tenant,
-      role === 'localadmin' ? 'human:computer-surface-localadmin' : 'human:computer-surface-viewer'
-    );
+    if (error.status === 403 && error.message === 'server tenant scope is invalid.') {
+      throw new ComputerSurfaceViewerError(403, 'Computer Surface server tenant scope is invalid.');
+    }
+    throw new ComputerSurfaceViewerError(error.status, error.message);
   }
-
-  if (local && env.KYBERION_LOCALHOST_AUTOADMIN !== 'false') {
-    return contextFor(
-      'localadmin',
-      'loopback',
-      tenant,
-      String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL || '').startsWith('human:')
-        ? String(env.KYBERION_COMPUTER_SURFACE_PRINCIPAL)
-        : 'human:computer-surface-localadmin'
-    );
-  }
-
-  throw new ComputerSurfaceViewerError(401, 'A Computer Surface viewer principal is required.');
 }
 
 export function computerSurfaceServerTenantResource(context: SurfaceAuthorizationContext): {

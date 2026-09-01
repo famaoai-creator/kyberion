@@ -5,6 +5,7 @@ import {
   buildApplySummary,
   buildState,
   buildSummary,
+  parseApplyInput,
   readInput,
   validateInput,
 } from './onboarding_apply.js';
@@ -54,6 +55,20 @@ describe('onboarding_apply', () => {
         tenants: [{ ...FIXTURE_INPUT.tenants[0], tenant_slug: 'INVALID_SLUG' }],
       })
     ).toThrow('Invalid tenant_slug');
+  });
+
+  it('rejects malformed external JSON shapes before onboarding writes', () => {
+    expect(() => parseApplyInput(null)).toThrow('identity block is required');
+    expect(() => parseApplyInput({ identity: { name: 'Famao' } })).toThrow('identity requires');
+    expect(() =>
+      parseApplyInput({
+        ...FIXTURE_INPUT,
+        tenants: [{ tenant_slug: 'alpha-team', display_name: 'Alpha Team' }],
+      })
+    ).toThrow('tenant entries require');
+    expect(() => parseApplyInput({ ...FIXTURE_INPUT, tutorial: { mode: 'unknown' } })).toThrow(
+      'tutorial.mode'
+    );
   });
 
   it('accepts a catalog reasoning_backend and rejects unknown ones (LC-05)', () => {

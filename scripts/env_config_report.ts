@@ -6,8 +6,12 @@
  * to attach to a doctor result or scheduled maintenance packet.
  */
 
-import { formatEnvValidationReport, loadEnvRegistryEntries, validateEnv } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import {
+  formatEnvValidationReport,
+  loadEnvRegistryEntries,
+  validateEnv,
+} from '@agent/core/env-validator';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface EnvConfigReport {
   generated_at: string;
@@ -23,6 +27,9 @@ export interface EnvConfigReport {
     required_errors: Array<{ name: string; issue: string }>;
   };
 }
+
+export const ENV_CONFIG_REPORT_USAGE =
+  'Usage: pnpm config:report [--json] [--fail-on-undocumented]';
 
 export function buildEnvConfigReport(): EnvConfigReport {
   const entries = loadEnvRegistryEntries();
@@ -50,27 +57,35 @@ function parseArgs(argv: string[]): { json: boolean; failOnUndocumented: boolean
   };
 }
 
-export function main(argv: string[] = []): number {
-  const options = parseArgs(argv);
-  const report = buildEnvConfigReport();
-  if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(
-      `Configuration registry: ${report.registry.documented}/${report.registry.registered} documented; ` +
-        `${report.runtime.set_registered} registered variable(s) set`
-    );
-    for (const line of formatEnvValidationReport({
+export function formatEnvConfigReport(report: EnvConfigReport): string {
+  return [
+    `Configuration registry: ${report.registry.documented}/${report.registry.registered} documented; ` +
+      `${report.runtime.set_registered} registered variable(s) set`,
+    ...formatEnvValidationReport({
       errors: report.runtime.required_errors,
       warnings: report.runtime.type_warnings,
       unknown: report.runtime.unknown,
       undocumented: [],
       checked: report.runtime.set_registered,
-    })) {
-      console.log(line);
-    }
+    }),
+  ].join('\n');
+}
+
+export function main(argv: string[] = []): {
+  report?: EnvConfigReport;
+  status: number;
+  help?: string;
+} {
+  if (argv.includes('--help') || argv.includes('-h')) {
+    return { status: 0, help: ENV_CONFIG_REPORT_USAGE };
   }
-  return options.failOnUndocumented && report.registry.undocumented > 0 ? 1 : 0;
+
+  const options = parseArgs(argv);
+  const report = buildEnvConfigReport();
+  return {
+    report,
+    status: options.failOnUndocumented && report.registry.undocumented > 0 ? 1 : 0,
+  };
 }
 
 if (
@@ -79,9 +94,12 @@ if (
 )
   void defineScript({
     name: 'config:report',
-    flags: [],
+    flags: ['json'],
     run(context) {
-      const status = main(context.argv);
-      if (status !== 0) throw new Error(`config:report failed with exit code ${status}`);
+      const result = main(context.argv);
+      if (result.help) context.print(context.json ? result : result.help);
+      else if (result.report)
+        context.print(context.json ? result.report : formatEnvConfigReport(result.report));
+      if (result.status !== 0) throw new ScriptExitError(result.status, '', true, result);
     },
   })();

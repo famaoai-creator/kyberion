@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readValidatedPipelineAdf } from './refactor/adf-input.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface SmokeRule {
   file: string;
@@ -35,7 +36,7 @@ const RULES: SmokeRule[] = [
     file: 'docs/user/TROUBLESHOOTING.md',
     required: [
       'pnpm setup:report --persona first-time-user',
-      'pnpm surfaces:repair',
+      'pnpm surfaces repair',
       'pnpm doctor',
     ],
   },
@@ -75,10 +76,9 @@ const RULES: SmokeRule[] = [
   },
 ];
 
-function readJson(file: string): any | null {
-  const abs = pathResolver.rootResolve(file);
+function readValidatedPipeline(file: string): any | null {
   try {
-    return readFoundationJson<unknown>(abs);
+    return readValidatedPipelineAdf(file);
   } catch {
     return null;
   }
@@ -194,13 +194,13 @@ export function checkFirstWinSmoke(): string[] {
       }
     }
   }
-  const verifySession = readJson('pipelines/verify-session.json');
+  const verifySession = readValidatedPipeline('pipelines/verify-session.json');
   if (!verifySession) {
     violations.push('pipelines/verify-session.json: invalid JSON');
   } else {
     violations.push(...validateVerifySessionPipeline(verifySession));
   }
-  const lifecycle = readJson('pipelines/first-win-lifecycle-weekly.json');
+  const lifecycle = readValidatedPipeline('pipelines/first-win-lifecycle-weekly.json');
   if (!lifecycle) {
     violations.push('pipelines/first-win-lifecycle-weekly.json: invalid JSON');
   } else {
@@ -215,13 +215,13 @@ export const runCheckFirstWinSmoke = defineScript({
   run(context) {
     const violations = checkFirstWinSmoke();
     if (violations.length > 0) {
-      console.error('[check:first-win-smoke] violations detected:');
-      for (const violation of violations) {
-        console.error(`- ${violation}`);
-      }
-      throw new Error(`${violations.length} first-win smoke violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
     context.print('[check:first-win-smoke] OK');
+    return { violations };
   },
 });
 

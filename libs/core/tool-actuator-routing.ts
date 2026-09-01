@@ -1,7 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge(
   'product/governance/tool-actuator-routing-policy.json'
@@ -45,36 +45,35 @@ const FALLBACK_POLICY: ToolActuatorRoutingPolicy = {
   tool_routes: [],
 };
 
+const toolActuatorRoutingCatalog = defineCatalog<ToolActuatorRoutingPolicy>({
+  id: 'tool-actuator-routing-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/tool-actuator-routing-policy.schema.json'),
+  fallback: FALLBACK_POLICY,
+});
+
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: ToolActuatorRoutingPolicy | null = null;
 
 function getPolicyPath(): string {
-  return (
+  return assertSafeRepositoryPath(
     getRegisteredEnvText('KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH')?.trim() ||
-    DEFAULT_POLICY_PATH
+      DEFAULT_POLICY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-export function resetToolActuatorRoutingPolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
-}
-
 export function getToolActuatorRoutingPolicy(): ToolActuatorRoutingPolicy {
-  const policyPath = getPolicyPath();
-  if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
-
-  if (!safeExistsSync(policyPath)) {
+  try {
+    const policyPath = toolActuatorRoutingCatalog.path();
+    if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
+    const parsed = toolActuatorRoutingCatalog.load();
     cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
+    cachedPolicy = parsed;
+    return parsed;
+  } catch {
+    return FALLBACK_POLICY;
   }
-
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  const parsed = safeJsonParse<ToolActuatorRoutingPolicy>(raw, 'tool actuator routing policy');
-  cachedPolicyPath = policyPath;
-  cachedPolicy = parsed;
-  return parsed;
 }
 
 export function resolveToolActuatorRoute(input: {

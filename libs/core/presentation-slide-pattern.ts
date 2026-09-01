@@ -122,7 +122,7 @@ function loadPackFromPath(packPath: string): SlidePatternPack {
   return loadJson<SlidePatternPack>(packPath);
 }
 
-export function resetSlidePatternPackCache(): void {
+export function _resetSlidePatternPackCacheForTests(): void {
   cachedPack = null;
 }
 

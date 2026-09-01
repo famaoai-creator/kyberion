@@ -116,7 +116,3 @@ export function resolveDrawioEdgeRoutingStyleParts(input: {
   }
   return [];
 }
-
-export function resetMediaDrawioEdgePolicyCatalogCache(): void {
-  catalog.reset();
-}

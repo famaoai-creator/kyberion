@@ -108,7 +108,11 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
 
   it('anthropic requires ANTHROPIC_API_KEY', async () => {
     await expect(
-      probeExplicitReasoningBackend('anthropic', { ANTHROPIC_API_KEY: 'k' })
+      probeExplicitReasoningBackend(
+        'anthropic',
+        { ANTHROPIC_API_KEY: 'k' },
+        { anthropicProbe: async () => ({ available: true }) }
+      )
     ).resolves.toEqual({ available: true });
     const missing = await probeExplicitReasoningBackend('anthropic', {});
     expect(missing.available).toBe(false);

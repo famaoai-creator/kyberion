@@ -1,14 +1,11 @@
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import path from 'node:path';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { loadJson, safeExistsSync, safeLstat } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 let validator: ValidateFunction | null = null;
 
 export interface DesktopPipelineStep {
@@ -39,10 +36,7 @@ export interface DesktopPipelineValidationResult {
 
 function getValidator(): ValidateFunction {
   if (!validator) {
-    const ajv = createAjv();
-    addFormats(ajv);
-    validator = compileSchemaFromPath(
-      ajv,
+    validator = compileSchema(
       pathResolver.knowledge('product/schemas/desktop-pipeline.schema.json')
     );
   }
@@ -71,6 +65,31 @@ export function resolveDesktopPipelineRef(ref: string | undefined): string | nul
   return absolute.startsWith(`${root}${path.sep}`) ? absolute : null;
 }
 
+/** Reject symlink traversal even after the caller has resolved project trust. */
+export function assertDesktopPipelineResourcePath(
+  filePath: string,
+  rootDir = pathResolver.rootResolve('pipelines/desktop')
+): void {
+  const root = path.resolve(rootDir);
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[DESKTOP_PIPELINE_SCOPE] pipeline path is outside the allowlisted root: ${filePath}`
+    );
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) break;
+    if (safeLstat(current).isSymbolicLink()) {
+      throw new Error(
+        `[DESKTOP_PIPELINE_SCOPE] pipeline path cannot traverse a symbolic link: ${relative}`
+      );
+    }
+  }
+}
+
 export function loadDesktopPipeline(
   ref: string | undefined,
   options: { trustResolved?: boolean } = {}
@@ -78,7 +97,7 @@ export function loadDesktopPipeline(
   const absolute = resolveDesktopPipelineRef(ref);
   if (!absolute) return { valid: false, errors: ['desktop pipeline_ref is not allowlisted'] };
   const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
-  if (options.trustResolved === false && requiresProjectTrust(relative)) {
+  if (options.trustResolved !== true && requiresProjectTrust(relative)) {
     return {
       valid: false,
       errors: [
@@ -87,6 +106,7 @@ export function loadDesktopPipeline(
     };
   }
   try {
+    assertDesktopPipelineResourcePath(absolute);
     const raw = loadJson<unknown>(absolute);
     return validateDesktopPipeline(raw);
   } catch (error) {

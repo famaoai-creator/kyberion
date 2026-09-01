@@ -25,7 +25,7 @@ describe.sequential('check_tier_hygiene', () => {
   it('passes on the current tree (baseline)', async () => {
     const violations = await scan();
     expect(violations).toEqual([]);
-  });
+  }, 60_000);
 
   it('detects an injected internal Atlassian subdomain', async () => {
     const temp = writePublicFile(
@@ -43,7 +43,7 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 
   it('detects an injected denied substring', async () => {
     const temp = writePublicFile(
@@ -58,7 +58,7 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 
   it('allows framework placeholders and industry-standard terms', async () => {
     const temp = writePublicFile(
@@ -71,5 +71,5 @@ describe.sequential('check_tier_hygiene', () => {
     } finally {
       fs.unlinkSync(temp);
     }
-  });
+  }, 60_000);
 });

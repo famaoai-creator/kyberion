@@ -56,7 +56,12 @@ async function main(argv: string[]): Promise<void> {
     ),
     { mkdir: true, encoding: 'utf8' }
   );
-  const result = await executePipelineFile(pipePath, { quiet: true });
+  const result = await executePipelineFile(pipePath, {
+    quiet: true,
+    // The converter creates this pipeline itself and owns the operator
+    // request that executes it; do not leave the trust decision implicit.
+    trustResolved: true,
+  });
   if (result.status === 'failed') {
     throw new Error(
       `pipeline failed: ${result.results.find((entry) => entry.status === 'failed')?.error || 'unknown error'}`

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   type BrowserExtensionAction,
   type BrowserExtensionRecording,
@@ -35,15 +37,21 @@ function deltaId(createdAt: string): string {
  */
 export function classifyFailure(
   error: unknown,
-  step?: Pick<CompiledBrowserStep, 'op' | 'summary'>,
+  step?: Pick<CompiledBrowserStep, 'op' | 'summary'>
 ): ProcedureDelta['reason'] {
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
   const ctx = (step?.summary ?? '').toLowerCase();
   const combined = `${msg} ${ctx}`;
 
   if (/mfa|otp|one.time.pass|authenticat|認証コード|二段階|ワンタイム/.test(combined)) return 'mfa';
-  if (/popup|modal|dialog|overlay|alert|ポップアップ|ダイアログ|モーダル/.test(combined)) return 'new_popup';
-  if (/handoff|navigation|origin.changed|tab.changed|別.*origin|ページ遷移|クロスオリジン/.test(combined)) return 'handoff';
+  if (/popup|modal|dialog|overlay|alert|ポップアップ|ダイアログ|モーダル/.test(combined))
+    return 'new_popup';
+  if (
+    /handoff|navigation|origin.changed|tab.changed|別.*origin|ページ遷移|クロスオリジン/.test(
+      combined
+    )
+  )
+    return 'handoff';
   return 'ambiguity';
 }
 
@@ -91,9 +99,7 @@ export function saveProcedureDelta(delta: ProcedureDelta): string {
   const id = deltaId(delta.created_at);
   const filePath = `${dir}/${id}.json`;
   safeWriteFile(filePath, JSON.stringify(delta, null, 2));
-  logger.info(
-    `[procedure-self-repair] saved delta "${id}" for procedure "${delta.procedure_id}"`,
-  );
+  logger.info(`[procedure-self-repair] saved delta "${id}" for procedure "${delta.procedure_id}"`);
   return filePath;
 }
 
@@ -145,7 +151,9 @@ export function applyProcedureDelta(input: {
       decisions: mergedActions.map((a) => ({
         action_id: a.action_id,
         status: a.op === 'sensitive_input_omitted' ? ('rejected' as const) : ('pending' as const),
-        ...(a.op === 'sensitive_input_omitted' ? { reason: 'Sensitive input is never replayed.' } : {}),
+        ...(a.op === 'sensitive_input_omitted'
+          ? { reason: 'Sensitive input is never replayed.' }
+          : {}),
       })),
     },
   };
@@ -154,8 +162,12 @@ export function applyProcedureDelta(input: {
 /** Load a delta by its full file path (as returned by saveProcedureDelta). */
 export function loadProcedureDelta(filePath: string): ProcedureDelta | null {
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(raw) as ProcedureDelta;
+    const absolute = path.resolve(filePath);
+    const deltaRoot = path.resolve(DELTA_BASE);
+    if (absolute === deltaRoot || !absolute.startsWith(`${deltaRoot}${path.sep}`)) return null;
+    const safeFilePath = assertSafeRepositoryPath(absolute, { allowMissingLeaf: false });
+    if (!safeLstat(safeFilePath).isFile()) return null;
+    return readJson<ProcedureDelta>(safeFilePath);
   } catch {
     return null;
   }
@@ -172,7 +184,7 @@ export function loadProcedureDelta(filePath: string): ProcedureDelta | null {
  */
 export function suggestRepairAnchor(
   failedStep: CompiledBrowserStep,
-  error: unknown,
+  error: unknown
 ): {
   stepIndex: number;
   snapshotHash?: string;

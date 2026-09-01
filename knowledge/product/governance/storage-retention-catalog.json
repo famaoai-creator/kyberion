@@ -379,7 +379,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm cli offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered."
+      "note": "DA-08: governed tenant knowledge, including each tenant's append-only information-asset ledger (knowledge/confidential/{tenant}/_ledger/assets.jsonl, DA-05) — NEVER auto-deletable. Removal happens only through the audited tenant offboarding ceremony (scope-offboarding.ts, `pnpm kyberion offboard tenant <slug> --execute`), which exports before purging. Declared so the ledger's retention decision is explicit rather than silently uncovered."
     },
     {
       "path": "active/shared/observability/mission-control",

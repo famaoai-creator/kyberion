@@ -1,5 +1,7 @@
-import * as path from 'node:path';
-import { generateImage, type ImageGenerationMode, safeExistsSync } from '@agent/core';
+import { generateImage } from '@agent/core/image-generation-bridge';
+import type { ImageGenerationMode } from '@agent/core/image-generation-types';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 function parseArgs(argv: string[]): Record<string, string | boolean> {
@@ -44,7 +46,24 @@ function deriveAutoPreference(requireHostBridge: boolean): string[] {
   return [...bridgePreference, 'local_flux', 'comfyui', 'gemini_service', 'llm_api'];
 }
 
-async function main(argv: string[] = []) {
+export function resolveAvatarGenerationPaths(
+  inputPhoto: string,
+  outputPath: string
+): {
+  inputPhoto: string;
+  outputPath: string;
+} {
+  return {
+    inputPhoto: assertSafeRepositoryPath(pathResolver.resolve(inputPhoto), {
+      allowMissingLeaf: true,
+    }),
+    outputPath: assertSafeRepositoryPath(pathResolver.resolve(outputPath), {
+      allowMissingLeaf: true,
+    }),
+  };
+}
+
+export async function main(argv: string[] = [], print: (value: unknown) => void = () => undefined) {
   const args = parseArgs(argv);
   const inputPhoto =
     typeof args['input-photo'] === 'string'
@@ -63,15 +82,16 @@ async function main(argv: string[] = []) {
     deriveAutoPreference(requireHostBridge)
   );
 
-  const resolvedInput = path.resolve(inputPhoto);
-  const resolvedOutput = path.resolve(outputPath);
+  const resolvedPaths = resolveAvatarGenerationPaths(inputPhoto, outputPath);
+  const resolvedInput = resolvedPaths.inputPhoto;
+  const resolvedOutput = resolvedPaths.outputPath;
 
   if (!safeExistsSync(resolvedInput)) {
     throw new ScriptExitError(1, `Input face photo not found at: ${resolvedInput}`);
   }
 
-  console.log(`Generating avatar based on: ${resolvedInput}`);
-  console.log(`Provider preference: ${preference.join(' -> ')}`);
+  print(`Generating avatar based on: ${resolvedInput}`);
+  print(`Provider preference: ${preference.join(' -> ')}`);
 
   try {
     const result = await generateImage({
@@ -82,7 +102,7 @@ async function main(argv: string[] = []) {
       providerPreference: preference,
     });
 
-    console.log(`Avatar generated successfully at: ${result.path}`);
+    print(`Avatar generated successfully at: ${result.path}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     if (
@@ -98,7 +118,7 @@ async function main(argv: string[] = []) {
 export const runGenerateAvatar = defineScript({
   name: 'avatar:generate',
   flags: [],
-  run: async ({ argv }) => main(argv),
+  run: async ({ argv, print }) => main(argv, print),
 });
 
 if (

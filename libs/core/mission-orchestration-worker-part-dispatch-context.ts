@@ -11,13 +11,14 @@ import {
   getMissionDynamicInjectionRegistry,
   renderInjectionsAsSystemReminders,
 } from './dynamic-injection.js';
-import { missionDir } from './path-resolver.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { type MissionContextPackPruningSummary } from './mission-context-pack.js';
 import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext } from './src/trace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import {
   buildArtifactReviewLines,
@@ -52,9 +53,21 @@ import {
 } from './mission-orchestration-worker-part-context.js';
 import type { DispatchMissionTaskOutcome } from './mission-orchestration-worker-part-context.js';
 
+function resolvedMissionDir(
+  missionId: string,
+  fallbackTier: 'personal' | 'confidential' | 'public' = 'public',
+  tenantSlug?: string
+): string {
+  return tenantSlug?.trim()
+    ? missionDir(missionId, fallbackTier, tenantSlug.trim())
+    : findMissionPath(missionId) || missionDir(missionId, fallbackTier);
+}
+
 export interface DispatchPlannedMissionTaskInput {
   missionId: string;
   task: PlannedNextTask;
+  /** Explicit mission-resume ceremony; never inferred from a normal dispatch. */
+  resumeGoalDriven?: boolean;
   teamRole: string;
   assignment: {
     agent_id: string;
@@ -118,11 +131,16 @@ export async function buildTaskDispatchContext(input: {
   // KP-01: single provisioning entry point (resolve + persist + render) —
   // `form: 'pack'` reproduces the pre-KP-01 inline resolve/save/render
   // sequence byte-for-byte.
+  const missionTier = (missionState.tier as 'personal' | 'confidential' | 'public') || 'public';
+  const missionTenantSlug =
+    typeof (missionState as Record<string, unknown>).tenant_slug === 'string'
+      ? String((missionState as Record<string, unknown>).tenant_slug)
+      : undefined;
   const provisionedContext = await provisionTaskKnowledge({
     form: 'pack',
-    missionPath: missionDir(input.missionId, 'public'),
+    missionPath: resolvedMissionDir(input.missionId, missionTier, missionTenantSlug),
     missionId: input.missionId,
-    tier: (missionState.tier as 'personal' | 'confidential' | 'public') || 'public',
+    tier: missionTier,
     recipientKind: 'agent',
     teamRole: input.teamRole,
     assigneePeerId: input.agentId,
@@ -248,6 +266,7 @@ export async function buildTaskDispatchContext(input: {
     256;
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
+    tenantSlug: missionTenantSlug,
     task: input.task,
     teamRole: input.teamRole,
     agentId: input.agentId,
@@ -289,7 +308,17 @@ export let warnedMissionTaskTraceFailureOnce = false;
 
 export function missionTaskTraceDirOverride(): string | undefined {
   const override = getRegisteredEnvText('KYBERION_MISSION_TASK_TRACE_DIR')?.trim();
-  return override ? pathResolver.rootResolve(override) : undefined;
+  if (!override) return undefined;
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+      allowMissingLeaf: true,
+    });
+  } catch (error) {
+    logger.warn(
+      `[MISSION_WORKER][KP-05] ignoring unsafe trace directory override: ${String(error)}`
+    );
+    return undefined;
+  }
 }
 
 export function warnMissionTaskTraceFailureOnce(context: string, error: unknown): void {

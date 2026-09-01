@@ -66,8 +66,11 @@ export function getRegisteredEnv<T = string>(
  * legacy call sites. Boolean registry values preserve the historical `1`/`0`
  * convention while numeric values remain parseable by existing callers.
  */
-export function getRegisteredEnvText(name: string): string | undefined {
-  const value = getRegisteredEnv(name);
+export function getRegisteredEnvText(
+  name: string,
+  options: { env?: Record<string, string | undefined>; strict?: boolean } = {}
+): string | undefined {
+  const value = getRegisteredEnv(name, options);
   if (value === undefined) return undefined;
   return typeof value === 'boolean' ? (value ? '1' : '0') : String(value);
 }

@@ -1,11 +1,11 @@
+import { assertObservationOpMappingsValid, chooseNativeOps } from '@agent/core/native-op-mapping';
+import { buildDesktopRecording } from '@agent/core/desktop-recording';
+import { prepareDistillationEgress } from '@agent/core/frame-redaction';
 import {
-  assertObservationOpMappingsValid,
-  buildDesktopRecording,
-  chooseNativeOps,
-  prepareDistillationEgress,
   reconstructDesktopIntent,
   validateDesktopIntentDraft,
-} from '@agent/core';
+} from '@agent/core/desktop-intent-reconstruction';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface EvalResult {
   id: string;
@@ -33,7 +33,15 @@ const fixture = (op: string, summary: string) =>
     { targetName: summary }
   );
 
-function run(): number {
+export interface DistillEvaluationReport {
+  schema_version: 'distill-eval.v1';
+  score: number;
+  hard_failures: number;
+  results: EvalResult[];
+  overmask_warning: 'soft' | null;
+}
+
+export function run(): DistillEvaluationReport {
   const results: EvalResult[] = [];
   try {
     assertObservationOpMappingsValid();
@@ -133,20 +141,33 @@ function run(): number {
 
   const hardFailures = results.filter((result) => !result.passed);
   const score = results.reduce((sum, result) => sum + result.score, 0) / results.length;
-  console.log(
-    JSON.stringify(
-      {
-        schema_version: 'distill-eval.v1',
-        score,
-        hard_failures: hardFailures.length,
-        results,
-        overmask_warning: redaction.redaction?.regions.length ? 'soft' : null,
-      },
-      null,
-      2
-    )
-  );
-  return hardFailures.length === 0 && score >= 0.8 ? 0 : 1;
+  return {
+    schema_version: 'distill-eval.v1',
+    score,
+    hard_failures: hardFailures.length,
+    results,
+    overmask_warning: redaction.redaction?.regions.length ? 'soft' : null,
+  };
 }
 
-process.exitCode = run();
+export const runEvalDistill = defineScript({
+  name: 'eval:distill',
+  flags: [],
+  run(context) {
+    const report = run();
+    context.print(report);
+    if (report.hard_failures > 0 || report.score < 0.8) {
+      throw new ScriptExitError(
+        1,
+        `distill evaluation failed: score=${report.score}, hard_failures=${report.hard_failures}`
+      );
+    }
+    return report;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'eval_distill.ts') ||
+  isDirectScript(import.meta.url, 'eval_distill.js')
+)
+  void runEvalDistill();

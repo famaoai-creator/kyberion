@@ -1,9 +1,7 @@
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
-import {
-  resolveDocumentContentsLabel,
-  resolveReportSectionTitle,
-  resolveThemeColorRole as resolveThemeColorRolePolicy,
-} from '@agent/core';
+import { resolveDocumentContentsLabel } from '@agent/core/document-contents-policy';
+import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
+import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
 import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import * as readline from 'node:readline';
-import { resolveActiveProfileRoot, safeExistsSync, safeRmSync } from '@agent/core';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { safeExistsSync, safeRmSync } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface OnboardingResetOptions {
@@ -66,7 +67,7 @@ export async function resetOnboardingArtifacts(
       console.log(formatPathList(profileRoot, existingTargets));
       proceed = await createPrompt();
     } else {
-      throw new Error('onboard:reset requires a TTY confirmation or --force');
+      throw new Error('onboard reset requires a TTY confirmation or --force');
     }
   }
 
@@ -93,7 +94,7 @@ export function formatResetSummary(result: OnboardingResetResult): string {
     'Removed:',
     formatPathList(result.profileRoot, result.removed),
     '',
-    'Next step: run `pnpm onboard` or `pnpm onboard:apply --identity <path>` to start again.',
+    'Next step: run `pnpm onboard` or `pnpm onboard apply --identity <path>` to start again.',
   ].join('\n');
 }
 
@@ -102,7 +103,7 @@ export async function main(args: string[] = []): Promise<void> {
   const json = args.includes('--json');
 
   if (args.includes('--help') || args.includes('-h')) {
-    console.log('Usage: pnpm onboard:reset [--force] [--json]');
+    console.log('Usage: pnpm onboard reset [--force] [--json]');
     return;
   }
 
@@ -119,7 +120,7 @@ if (
   isDirectScript(import.meta.url, 'onboarding_reset.js')
 )
   void defineScript({
-    name: 'onboard:reset',
+    name: 'onboard reset',
     flags: [],
     run(context) {
       return main(context.argv);

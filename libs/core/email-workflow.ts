@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeExec,
   safeMkdir,
@@ -167,19 +168,31 @@ const GMAIL_AUTOMATED_SENDER_RE =
 const GMAIL_INBOX_ARCHIVE_LABEL = 'INBOX';
 
 export function resolveEmailDraftDir(): string {
-  return pathResolver.shared('runtime/presence-studio/email-drafts');
+  return assertSafeRepositoryPath(pathResolver.shared('runtime/presence-studio/email-drafts'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function resolveEmailTriagePath(): string {
-  return pathResolver.sharedTmp('email-inbox-triage.md');
+  return assertSafeRepositoryPath(pathResolver.sharedTmp('email-inbox-triage.md'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function resolveLatestEmailDraftPaths(): { markdown: string; json: string } {
   const dir = resolveEmailDraftDir();
   return {
-    markdown: path.join(dir, 'latest.md'),
-    json: path.join(dir, 'latest.json'),
+    markdown: assertSafeRepositoryPath(path.join(dir, 'latest.md'), { allowMissingLeaf: true }),
+    json: assertSafeRepositoryPath(path.join(dir, 'latest.json'), { allowMissingLeaf: true }),
   };
+}
+
+function emailRequestId(value: string): string {
+  const normalized = value.trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[email-workflow] invalid request id: ${value}`);
+  }
+  return normalized;
 }
 
 export function extractFirstJsonBlock(text: string): Record<string, unknown> | null {
@@ -743,13 +756,21 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
   const fallbackId = `gws-fallback-${randomUUID()}`;
-  const artifactDir = path.join(draftDir, fallbackId);
+  const artifactDir = assertSafeRepositoryPath(path.join(draftDir, fallbackId), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(artifactDir, { recursive: true });
 
   const subject = request.subject?.trim() || 'Re: Inbox update';
   const to = request.to?.trim() || '';
-  const draftPath = path.join(artifactDir, `email-draft-${fallbackId}.md`);
-  const jsonPath = path.join(artifactDir, `email-draft-${fallbackId}.json`);
+  const draftPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${fallbackId}.md`),
+    { allowMissingLeaf: true }
+  );
+  const jsonPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${fallbackId}.json`),
+    { allowMissingLeaf: true }
+  );
   const draftMarkdown = [
     `To: ${to || 'TBD'}`,
     `Subject: ${subject}`,
@@ -821,7 +842,7 @@ function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
 export async function generateEmailReplyDraft(
   input: EmailDraftGenerationInput
 ): Promise<EmailDraftGenerationResult> {
-  const requestId = input.requestId?.trim() || randomUUID();
+  const requestId = input.requestId?.trim() ? emailRequestId(input.requestId) : randomUUID();
   const recipient = input.recipient?.trim() || '';
   const subjectInput = input.subjectInput?.trim() || '';
   const tone = input.tone?.trim() || 'clear and concise';
@@ -841,10 +862,14 @@ export async function generateEmailReplyDraft(
 
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
-  const artifactDir = path.join(draftDir, requestId);
+  const artifactDir = assertSafeRepositoryPath(path.join(draftDir, requestId), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(artifactDir, { recursive: true });
 
-  const triagePath = path.join(artifactDir, `triage-${requestId}.md`);
+  const triagePath = assertSafeRepositoryPath(path.join(artifactDir, `triage-${requestId}.md`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(triagePath, `${triageText}\n`, { encoding: 'utf8' });
 
   const defaultSubject = subjectInput || `Re: ${summarizeEmailSubject(triageText, 'Inbox update')}`;
@@ -902,8 +927,14 @@ export async function generateEmailReplyDraft(
     draft_markdown = fallback.draft_markdown;
   }
 
-  const draftPath = path.join(artifactDir, `email-draft-${requestId}.md`);
-  const jsonPath = path.join(artifactDir, `email-draft-${requestId}.json`);
+  const draftPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${requestId}.md`),
+    { allowMissingLeaf: true }
+  );
+  const jsonPath = assertSafeRepositoryPath(
+    path.join(artifactDir, `email-draft-${requestId}.json`),
+    { allowMissingLeaf: true }
+  );
   safeWriteFile(draftPath, draft_markdown, { encoding: 'utf8' });
   safeWriteFile(
     jsonPath,

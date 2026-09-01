@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import * as secureIo from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string) =>
+    JSON.parse(String(secureIo.safeReadFile(filePath, { encoding: 'utf8' }))) as T,
+}));
+
 import {
   applyProcedureDelta,
   classifyFailure,
@@ -20,8 +29,17 @@ function rec(actions: Array<{ action_id: string; op: string }>): BrowserExtensio
     created_at: '2026-06-24T00:00:00.000Z',
     tab: { origin: 'https://x.example', origin_hash: 'h', title: 't' },
     extension: { version: '1.0.0' },
-    actions: actions.map((a) => ({ ...a, summary: a.op, risk: 'low', captured_at: '2026-06-24T00:00:00.000Z' })) as any,
-    risk_summary: { requires_manual_review: true, sensitive_input_omitted: 0, approval_required_count: 0 },
+    actions: actions.map((a) => ({
+      ...a,
+      summary: a.op,
+      risk: 'low',
+      captured_at: '2026-06-24T00:00:00.000Z',
+    })) as any,
+    risk_summary: {
+      requires_manual_review: true,
+      sensitive_input_omitted: 0,
+      approval_required_count: 0,
+    },
     review: { status: 'approved', decisions: [] },
   };
 }
@@ -46,7 +64,7 @@ describe('classifyFailure', () => {
     '"%s" → %s',
     (errorMsg, _step, expected) => {
       expect(classifyFailure(new Error(errorMsg))).toBe(expected);
-    },
+    }
   );
 
   it('uses step summary for classification when error is generic', () => {
@@ -158,8 +176,26 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
       created_at: '2026-06-24T00:00:00Z',
     };
     vi.spyOn(secureIo, 'safeReadFile').mockReturnValue(JSON.stringify(delta));
-    const loaded = loadProcedureDelta('/some/path.json');
-    expect(loaded).toEqual(delta);
+    const filePath = pathResolver.shared('runtime/procedure-deltas/p1/delta.json');
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, '{}');
+    try {
+      const loaded = loadProcedureDelta(filePath);
+      expect(loaded).toEqual(delta);
+    } finally {
+      fs.rmSync(pathResolver.shared('runtime/procedure-deltas/p1'), {
+        recursive: true,
+        force: true,
+      });
+    }
+  });
+
+  it('rejects a delta path outside the governed delta store', () => {
+    vi.spyOn(secureIo, 'safeReadFile').mockReturnValue('{}');
+    expect(
+      loadProcedureDelta(pathResolver.rootResolve('knowledge/personal/other.json'))
+    ).toBeNull();
+    expect(secureIo.safeReadFile).not.toHaveBeenCalled();
   });
 
   it('returns null when file is missing', () => {

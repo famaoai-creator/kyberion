@@ -16,14 +16,13 @@ import * as path from 'node:path';
 import {
   computeManifestSignature,
   listEnvironmentManifestIds,
-  logger,
-  pathResolver,
-  safeJsonParse,
-  safeReadFile,
-  safeWriteFile,
   verifyManifestSignature,
   type EnvironmentManifest,
-} from '@agent/core';
+} from '@agent/core/environment-capability';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeJsonParse } from '@agent/core/validators';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

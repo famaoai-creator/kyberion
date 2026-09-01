@@ -26,6 +26,19 @@ describe('virtual office surface', () => {
       path.join(tmpRoot, 'knowledge', 'product', 'schemas'),
       { recursive: true }
     );
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge', 'product', 'governance'), { recursive: true });
+    fs.copyFileSync(
+      fileURLToPath(
+        new URL('../knowledge/product/governance/process-definition-registry.json', import.meta.url)
+      ),
+      path.join(tmpRoot, 'knowledge', 'product', 'governance', 'process-definition-registry.json')
+    );
+    fs.copyFileSync(
+      fileURLToPath(
+        new URL('../knowledge/product/governance/agent-policies.yaml', import.meta.url)
+      ),
+      path.join(tmpRoot, 'knowledge', 'product', 'governance', 'agent-policies.yaml')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
     process.env.KYBERION_CUSTOMER = 'acme';
 
@@ -524,6 +537,12 @@ describe('virtual office surface', () => {
     expect(html.indexOf('MSN-OFFICE-OLD')).toBeGreaterThan(html.indexOf('Archive'));
   });
 
+  it('keeps generated HTML inside the repository', async () => {
+    await expect(mod.generateOnce('/tmp/kyberion-office.html')).rejects.toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('narrows to a registered tenant and fails closed for an unknown tenant', () => {
     const previousTenant = process.env.KYBERION_TENANT;
     try {
@@ -553,6 +572,29 @@ describe('virtual office surface', () => {
     } finally {
       if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
       else process.env.KYBERION_TENANT = previousTenant;
+    }
+  });
+
+  it('does not ingest a symlinked mission directory', () => {
+    const linkedMission = path.join(tmpRoot, 'active', 'missions', 'MSN-OFFICE-LINKED');
+    const outsideMission = path.join(tmpRoot, 'outside-mission');
+    fs.mkdirSync(outsideMission, { recursive: true });
+    fs.writeFileSync(
+      path.join(outsideMission, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-OFFICE-LINKED',
+        status: 'active',
+        tenant_slug: 'acme-prod',
+      })
+    );
+    fs.symlinkSync(outsideMission, linkedMission, 'dir');
+
+    try {
+      const snapshot = mod.collectOfficeSnapshot();
+      expect(snapshot.rooms.map((room) => room.mission_id)).not.toContain('MSN-OFFICE-LINKED');
+    } finally {
+      fs.unlinkSync(linkedMission);
+      fs.rmSync(outsideMission, { recursive: true, force: true });
     }
   });
 

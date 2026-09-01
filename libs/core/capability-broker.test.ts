@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProviderInfo } from './provider-discovery.js';
 
@@ -23,6 +24,13 @@ vi.mock('./path-resolver.js', () => ({
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (p: string) => {
+    const resolved = path.resolve(p);
+    if (resolved !== '/repo' && !resolved.startsWith('/repo/')) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${p}`);
+    }
+    return resolved;
+  },
   safeExistsSync: (p: string) => files.has(p),
   safeReadFile: (p: string) => {
     if (!files.has(p)) throw new Error('ENOENT');
@@ -170,5 +178,26 @@ describe('capability-broker', () => {
     );
     expect(decision.provider).toBe('codex');
     expect(decision.pinned).toBe(false);
+  });
+
+  it('rejects a mission-derived pin path that escapes the repository', async () => {
+    process.env.MISSION_ID = '../../../../outside';
+    const { pinProviderDecision } = await import('./capability-broker.js');
+
+    expect(() =>
+      pinProviderDecision('role-escape', {
+        provider: 'codex',
+        modelId: 'codex',
+        instance: null,
+        strategy: 'preferred',
+        orchestration: 'leaf',
+        availableProviders: [],
+        requiredCapabilities: [],
+        unmetCapabilities: [],
+        rationale: 'test',
+        pinned: false,
+        decisionKey: 'role-escape',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

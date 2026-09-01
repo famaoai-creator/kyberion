@@ -118,8 +118,8 @@ describe('plugin_install CLI', () => {
     expect(output).toContain('Trust: third-party');
     expect(output).toContain('Activation status: pending_approval');
     expect(output).toContain('Approval request id:');
-    expect(output).toContain('pnpm cli -- approvals');
-    expect(output).toMatch(/pnpm cli -- approve \S+ \S+/);
+    expect(output).toContain('pnpm kyberion approvals');
+    expect(output).toMatch(/pnpm kyberion approve \S+ \S+/);
   });
 
   it('reports a broken manifest as never-activatable and exits non-zero', () => {

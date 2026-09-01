@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
 import {
-  createStandardYargs,
-  isSurfaceAsyncChannel,
   listSurfaceDeadLetters,
   replaySurfaceDeadLetter,
-} from '@agent/core';
+} from '@agent/core/surface-coordination-store';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type SurfaceOutboxCommand = 'list' | 'replay';

@@ -87,6 +87,7 @@ import {
   resolveChronosThemeMode,
   type ChronosThemeMode,
 } from '../lib/chronos-theme';
+import { parseTenantDesignResponse } from '../lib/tenant-design-response';
 export default function ChronosMirrorV2() {
   return (
     <Suspense fallback={null}>
@@ -1290,15 +1291,11 @@ function TenantDesignBridge({
     void fetch(`/api/tenant-design?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) return null;
-        return (await response.json()) as {
-          source?: string;
-          brand_name?: string | null;
-          css_vars?: Record<string, string>;
-        };
+        return parseTenantDesignResponse(await response.json().catch(() => null));
       })
       .then((payload) => {
         if (!payload) return;
-        onResolveRef.current(payload.css_vars || {}, payload.brand_name || payload.source || null);
+        onResolveRef.current(payload.css_vars, payload.brand_name || payload.source || null);
       })
       .catch(() => {});
     return () => controller.abort();

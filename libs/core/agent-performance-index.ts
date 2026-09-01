@@ -1,7 +1,7 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 /**
  * Agent×role performance index — the deterministic data path from mission
@@ -35,11 +35,11 @@ const OUTCOMES_PATH = 'observability/retrospectives/agent-role-outcomes.jsonl';
 const INDEX_PATH = 'observability/retrospectives/agent-performance.json';
 
 export function agentRoleOutcomesPath(): string {
-  return pathResolver.shared(OUTCOMES_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(OUTCOMES_PATH), { allowMissingLeaf: true });
 }
 
 export function agentPerformanceIndexPath(): string {
-  return pathResolver.shared(INDEX_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(INDEX_PATH), { allowMissingLeaf: true });
 }
 
 function keyFor(agentId: string, teamRole: string): string {
@@ -70,16 +70,15 @@ export function rebuildAgentPerformanceIndex(): Record<string, AgentRolePerforma
   const outcomesPath = agentRoleOutcomesPath();
   const byKey: Record<string, AgentRolePerformance> = {};
   if (safeExistsSync(outcomesPath)) {
-    const lines = String(safeReadFile(outcomesPath, { encoding: 'utf8' }))
-      .split('\n')
-      .filter((line) => line.trim());
-    for (const line of lines) {
-      let outcome: AgentRoleOutcome;
-      try {
-        outcome = JSON.parse(line) as AgentRoleOutcome;
-      } catch {
-        continue;
-      }
+    const outcomes = readJsonLines<AgentRoleOutcome | null>(outcomesPath, {
+      onMalformed: 'skip',
+      map: (value) =>
+        value && typeof value === 'object' && !Array.isArray(value)
+          ? (value as AgentRoleOutcome)
+          : null,
+    });
+    for (const outcome of outcomes) {
+      if (!outcome) continue;
       if (!outcome.assignee || !outcome.team_role) continue;
       const key = keyFor(outcome.assignee, outcome.team_role);
       const bucket = (byKey[key] ||= {
@@ -109,6 +108,10 @@ export function rebuildAgentPerformanceIndex(): Record<string, AgentRolePerforma
 let cachedIndex: { loadedAt: number; byKey: Record<string, AgentRolePerformance> } | null = null;
 const INDEX_CACHE_TTL_MS = 30_000;
 
+export function resetAgentPerformanceIndexCache(): void {
+  cachedIndex = null;
+}
+
 export function getAgentRolePerformance(
   agentId: string,
   teamRole: string
@@ -129,10 +132,6 @@ export function getAgentRolePerformance(
     cachedIndex = { loadedAt: now, byKey };
   }
   return cachedIndex.byKey[keyFor(agentId, teamRole)] || null;
-}
-
-export function resetAgentPerformanceIndexCache(): void {
-  cachedIndex = null;
 }
 
 /**

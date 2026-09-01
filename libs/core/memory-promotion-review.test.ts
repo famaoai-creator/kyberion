@@ -104,6 +104,28 @@ describe('memory-promotion-review', () => {
     expect(reviews[0].blockers.map((blocker) => blocker.code)).toContain('duplicate_records');
   });
 
+  it('treats external evidence paths as missing without reading them', () => {
+    const candidate = createMemoryPromotionCandidate({
+      candidateId: 'MEM-REVIEW-EXTERNAL-EVIDENCE-1',
+      sourceType: 'mission',
+      sourceRef: 'mission:MSN-REVIEW-EXTERNAL-EVIDENCE-1',
+      proposedMemoryKind: 'heuristic',
+      summary: 'A candidate with an out-of-scope evidence path.',
+      evidenceRefs: ['/tmp/external-memory-evidence.md'],
+      sensitivityTier: 'public',
+    });
+    enqueueMemoryPromotionCandidate({ ...candidate, audit_ref: 'audit:AUD-MISSING-EXTERNAL-1' });
+
+    const [review] = reviewMemoryPromotionCandidate(candidate.candidate_id);
+    expect(review.evidence).toEqual([
+      expect.objectContaining({
+        ref: '/tmp/external-memory-evidence.md',
+        status: 'missing',
+      }),
+    ]);
+    expect(review.blockers.map((blocker) => blocker.code)).toContain('missing_evidence');
+  });
+
   it('does not hide conflicting duplicate content behind the first physical row', () => {
     const candidate = createMemoryPromotionCandidate({
       candidateId: 'MEM-REVIEW-CONFLICT-1',

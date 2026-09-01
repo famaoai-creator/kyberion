@@ -17,9 +17,11 @@ const mocks = vi.hoisted(() => ({
   safeMkdir: vi.fn(),
   safeExecResult: vi.fn(),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
+  schema: undefined as unknown,
 }));
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeReadFile: mocks.safeReadFile,
   safeWriteFile: mocks.safeWriteFile,
   safeExistsSync: mocks.safeExistsSync,
@@ -27,11 +29,31 @@ vi.mock('./secure-io.js', () => ({
   safeExecResult: mocks.safeExecResult,
 }));
 
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) =>
+    String(filePath).endsWith('provider-capability-registry.schema.json')
+      ? mocks.schema
+      : JSON.parse(String(mocks.safeReadFile(filePath))),
+}));
+
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
+    rootDir: () => '/repo',
     shared: mocks.shared,
+    knowledge: (relPath: string) => `/repo/knowledge/${relPath}`,
     rootResolve: (relPath: string) => `/repo/${relPath}`,
   },
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    exists: (filePath: string) => mocks.safeExistsSync(filePath),
+    stat: (filePath: string) => ({
+      mtimeMs: 1,
+      size: String(mocks.safeReadFile(filePath)).length,
+    }),
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 // loadProviderCapabilityCatalog reads knowledge files via secure-io; with
@@ -42,6 +64,7 @@ vi.mock('./provider-discovery.js', () => ({
 }));
 
 function resetMocks() {
+  mocks.schema = providerCapabilityRegistrySchema;
   mocks.safeReadFile.mockReset();
   mocks.safeWriteFile.mockReset();
   mocks.safeExistsSync.mockReset();
@@ -188,6 +211,53 @@ describe('provider-capability-registry', () => {
     });
   });
 
+  it('records help-flag sandbox evidence without claiming OS-level enforcement', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'gemini' && args[0] === '--version') {
+        return { ok: true, stdout: '0.46.0', stderr: '' };
+      }
+      return {
+        ok: true,
+        stdout: '--sandbox --approval-mode default|auto_edit|yolo|plan',
+        stderr: '',
+      };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['gemini'], exec });
+
+    expect(results[0]?.sandbox_probe).toEqual({
+      status: 'supported',
+      method: 'help-flag',
+      command: 'gemini',
+      args: ['--help'],
+      expected_flags: ['--sandbox', '--approval-mode'],
+      evidence: 'gemini help output advertises --sandbox, --approval-mode',
+    });
+  });
+
+  it('keeps missing sandbox flags explicitly unsupported', async () => {
+    resetMocks();
+    const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
+
+    const exec: ProbeExecFn = (command, args) => {
+      if (command === 'codex' && args[0] === '--help') {
+        return { ok: true, stdout: 'codex help without sandbox option', stderr: '' };
+      }
+      return { ok: true, stdout: 'codex 1.0.0', stderr: '' };
+    };
+    const results = probeProviderCapabilities({ providerIds: ['codex'], exec });
+
+    expect(results[0]).toMatchObject({
+      binary_found: true,
+      sandbox_probe: {
+        status: 'unsupported',
+        evidence: 'missing advertised flags: --sandbox',
+      },
+    });
+  });
+
   it('probe command failure marks the provider unavailable without throwing', async () => {
     resetMocks();
     const { probeProviderCapabilities } = await import('./provider-capability-registry.js');
@@ -212,6 +282,20 @@ describe('provider-capability-registry', () => {
   it('peekProviderCapabilityRegistry returns null when no snapshot file exists', async () => {
     resetMocks();
     mocks.safeExistsSync.mockReturnValue(false);
+    const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
+
+    expect(peekProviderCapabilityRegistry()).toBeNull();
+  });
+
+  it('treats a schema-invalid snapshot as no opinion', async () => {
+    resetMocks();
+    const stored = {
+      computed_at: '2026-07-25T00:00:00.000Z',
+      ttl_ms: -1,
+      value: [],
+    };
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue(JSON.stringify(stored));
     const { peekProviderCapabilityRegistry } = await import('./provider-capability-registry.js');
 
     expect(peekProviderCapabilityRegistry()).toBeNull();

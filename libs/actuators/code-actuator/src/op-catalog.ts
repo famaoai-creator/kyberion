@@ -2,7 +2,8 @@
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const CODE_CONTROL_SCHEMA: InputSchema = {
@@ -173,14 +174,14 @@ export const CODE_ACTUATOR_APPLY_OPS = ['log', 'write_artifact', 'write_file'] a
 
 export const CODE_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 
-const toSpec = (op: string, kind: OpSpecKind) => {
+const toSpec = (op: string, kind: PipelineStepType) => {
   const schema = CODE_CONTRACTS[op];
   return schema
     ? { op, kind, input_schema: schema, examples: CODE_EXAMPLES[op] || [{}] }
     : { op, kind };
 };
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...CODE_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...CODE_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

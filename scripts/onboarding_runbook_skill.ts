@@ -1,11 +1,7 @@
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 
 export interface OnboardingRunbookSkillResult {
   skillPath: string;
@@ -50,7 +46,7 @@ export function generateOnboardingRunbookSkill(
     '',
     '## Execute',
     '',
-    '1. Run `pnpm vital --format=json` and resolve any `needs_onboarding` or `needs_attention` result.',
+    '1. Run `pnpm pipeline vital-check --format=json` and resolve any `needs_onboarding` or `needs_attention` result.',
     '2. Run `pnpm pipeline --input pipelines/baseline-check.json` and keep the result as the session health receipt.',
     '3. Review connection drafts under the active profile before enabling any external service.',
     '4. Create a governed mission for the first real task; do not turn the tutorial into work implicitly.',

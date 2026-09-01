@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJsonIfPresent } from './foundation/json.js';
 
 import { discoverProviders } from './provider-discovery.js';
 import {
@@ -9,7 +10,7 @@ import {
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 
 export type LlmSelectionStatus = 'ready' | 'needs_setup' | 'unsupported';
 
@@ -43,16 +44,17 @@ const DEFAULT_SELECTION: LlmSelectionPreferences = {
 };
 
 function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
+  return assertSafeRepositoryPath(
+    path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function readSelection(): LlmSelectionPreferences | null {
   const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) return null;
+  const parsed = readJsonIfPresent<Partial<LlmSelectionPreferences>>(filePath);
+  if (!parsed) return null;
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<LlmSelectionPreferences>;
     if (typeof parsed.provider !== 'string' || !parsed.provider.trim()) return null;
     return {
       version: '1.0.0',

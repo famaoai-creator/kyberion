@@ -37,32 +37,31 @@ import * as path from 'node:path';
 import {
   appendAssetRecord,
   assetProvenanceRef,
-  auditChain,
-  checkIngestQuota,
   COMMON_TENANT_SLUG,
   deriveAssetId,
   findAssetBySource,
-  logger,
-  pathResolver,
-  recordIngestUsage,
-  safeMkdir,
-  safeWriteFile,
-  scanForInjection,
-  scrubContent,
-  shouldEnforceIngestQuota,
   tenantIngestKnowledgeRoot,
-  updateMemoryPromotionCandidateStatus,
-  verifyStewardApproval,
-  withExecutionContext,
-  wrapUntrusted,
   type IngestAssetRecord,
-  type IngestLedgerPathOptions,
-  type IngestQuotaCheck,
-  type IngestQuotaLevel,
-  type MemoryCandidate,
-  type PiiScrubApplication,
-  type TierPromotionTargetRoot,
-} from '@agent/core';
+} from '@agent/core/ingest-asset-ledger';
+import { logger } from '@agent/core/core';
+import {
+  checkIngestQuota,
+  recordIngestUsage,
+  shouldEnforceIngestQuota,
+} from '@agent/core/ingest-quota';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { scanForInjection, wrapUntrusted } from '@agent/core/untrusted-content';
+import { scrubContent } from '@agent/core/pii-scrubber';
+import { updateMemoryPromotionCandidateStatus } from '@agent/core/memory-promotion-queue';
+import { verifyStewardApproval } from '@agent/core/ingest-tier-gate';
+import { withExecutionContext } from '@agent/core/authority';
+import type { IngestLedgerPathOptions } from '@agent/core/ingest-asset-ledger';
+import type { IngestQuotaCheck, IngestQuotaLevel } from '@agent/core/ingest-quota';
+import type { MemoryCandidate } from '@agent/core/memory-promotion-queue';
+import type { PiiScrubApplication } from '@agent/core/pii-scrubber';
+import type { TierPromotionTargetRoot } from '@agent/core/ingest-tier-gate';
+import { auditChain } from '@agent/core/audit-chain';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { DedupResult, IngestRegistryRecord } from './dedup.js';
 import type { NormalizeCardResult } from './normalize-card.js';
@@ -171,7 +170,8 @@ export function assertTargetInsideTenantRoot(
   if (absTarget !== absRoot && !absTarget.startsWith(absRoot + path.sep)) {
     fail(`resolved target '${absTarget}' escapes the tenant knowledge root '${absRoot}'`);
   }
-  return absTarget;
+  assertSafeRepositoryPath(absRoot, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(absTarget, { allowMissingLeaf: true });
 }
 
 function resolveIngestedBy(input: IngestCommitInput): string {

@@ -3,7 +3,7 @@
  */
 
 import AdmZip from 'adm-zip';
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 
 export interface ThemePalette {
   [key: number]: string;

@@ -1,10 +1,13 @@
+import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { readJson as readFoundationJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync, safeLstat } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
 import { compileSchema } from './foundation/ajv.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
+import { loadIntentRoutingMap } from './router-contract.js';
 
 type JsonObject = Record<string, unknown>;
 
@@ -84,14 +87,52 @@ export interface ResolveIntentTrackGateInput {
   confirmationReason?: string;
 }
 
-interface IntentRoutingMap {
-  track_intent_policy_map?: Record<string, TrackIntentPolicyMapping>;
-}
+const TRACK_CREATION_POLICY_PATH = pathResolver.knowledge(
+  'product/governance/track-creation-policy.json'
+);
+const TRACK_CREATION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/track-creation-policy.schema.json'
+);
+const trackCreationPolicyCatalog = defineCatalog<JsonObject>({
+  id: 'track-creation-policy',
+  path: TRACK_CREATION_POLICY_PATH,
+  schema: TRACK_CREATION_POLICY_SCHEMA_PATH,
+});
 
 let overrideValidator: ValidateFunction | null = null;
 
 function readJson(filePath: string): JsonObject {
   return readFoundationJson<JsonObject>(filePath);
+}
+
+function isSafeOverridePath(filePath: string): boolean {
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    return false;
+  }
+
+  let current = root;
+  const segments = relative.split(path.sep);
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) return false;
+    try {
+      const stat = safeLstat(current);
+      if (stat.isSymbolicLink() || (index === segments.length - 1 && !stat.isFile())) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 function ensureOverrideValidator(): ValidateFunction {
@@ -196,12 +237,6 @@ function sanitizeIdFragment(value: string, fallback: string): string {
   return normalized || fallback;
 }
 
-function loadRoutingMap(): IntentRoutingMap {
-  return readJson(
-    pathResolver.knowledge('product/governance/intent-routing-map.json')
-  ) as IntentRoutingMap;
-}
-
 export async function resolveIntentToTrackPolicy(
   intentId: string,
   tenantId?: string,
@@ -211,20 +246,28 @@ export async function resolveIntentToTrackPolicy(
   const normalizedIntentId = String(intentId || '').trim();
   if (!normalizedIntentId) throw new Error('intentId is required');
 
-  const routing = loadRoutingMap();
+  const routing = loadIntentRoutingMap();
   const mapping = routing.track_intent_policy_map?.[normalizedIntentId];
   if (!mapping) {
     throw new Error(`No track intent policy mapping for intent: ${normalizedIntentId}`);
   }
 
-  const globalPath = pathResolver.knowledge('product/governance/track-creation-policy.json');
-  const globalPolicy = readJson(globalPath);
+  const globalPath = TRACK_CREATION_POLICY_PATH;
+  const globalPolicy = trackCreationPolicyCatalog.load();
   assertTrackPolicyShape(globalPolicy, globalPath);
+
+  for (const candidate of overridePaths) {
+    if (!isSafeOverridePath(candidate)) {
+      throw new Error(
+        `[TRACK_POLICY_SCOPE] override path must be an existing non-symlink file inside the repository: ${candidate}`
+      );
+    }
+  }
 
   let effectivePolicy: JsonObject = globalPolicy;
   const appliedOverridePaths: string[] = [];
   for (const candidate of collectOverridePaths(tenantId, targetTier, overridePaths)) {
-    if (!safeExistsSync(candidate)) continue;
+    if (!isSafeOverridePath(candidate)) continue;
     const override = readJson(candidate);
     assertTrackPolicyShape(override, candidate);
     effectivePolicy = mergeJson(effectivePolicy, override) as JsonObject;

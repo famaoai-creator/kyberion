@@ -1,14 +1,15 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './service-actuator-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 
 // Slack streaming ingress belongs to the Slack gateway.
 
 const main = async () => {
   await runActuatorCli({
     name: 'service-actuator',
+    args: process.argv,
     handleAction,
   });
 };

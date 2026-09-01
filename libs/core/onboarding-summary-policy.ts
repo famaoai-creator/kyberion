@@ -50,7 +50,3 @@ export function loadOnboardingSummaryPolicyCatalog(): OnboardingSummaryPolicyCat
 export function resolveOnboardingSummaryPolicy(): OnboardingSummaryPolicyCatalog {
   return loadOnboardingSummaryPolicyCatalog();
 }
-
-export function resetOnboardingSummaryPolicyCatalogCache(): void {
-  catalog.reset();
-}

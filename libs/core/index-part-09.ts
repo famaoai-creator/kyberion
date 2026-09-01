@@ -18,6 +18,8 @@ export * from './mission-graph-run-journal.js';
 
 export * from './pipeline-run-journal.js';
 
+export * from './pipeline-approval-resume.js';
+
 export * from './graph-run-artifact.js';
 
 export * from './realtime-voice-conversation.js';

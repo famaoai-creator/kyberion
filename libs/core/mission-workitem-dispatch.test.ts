@@ -34,6 +34,8 @@ import {
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
+import { parseIndependentReviewerVerdict } from './mission-workitem-dispatch-review.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 import { buildMissionHandoffPacket } from './handoff-packet.js';
 import { projectWorkGraphToNextTasks } from './work-graph-projection.js';
 import {
@@ -244,6 +246,28 @@ afterEach(() => {
 });
 
 describe('mission work item dispatch', () => {
+  it('fails closed for malformed independent reviewer verdict shapes', () => {
+    expect(parseIndependentReviewerVerdict('{"approved":[],"refuted":false}')).toMatchObject({
+      approved: false,
+      refuted: false,
+      findings: [],
+    });
+    expect(
+      parseIndependentReviewerVerdict('{"approved":true,"findings":[{"text":"bad"}]}')
+    ).toMatchObject({
+      approved: false,
+      refuted: false,
+      findings: [],
+    });
+    expect(
+      parseIndependentReviewerVerdict('{"approved":"true","refuted":"false","findings":[" ok "]}')
+    ).toMatchObject({
+      approved: true,
+      refuted: false,
+      findings: ['ok'],
+    });
+  });
+
   it('binds a canonical reviewer dispatch to the reconciled artifact hash', async () => {
     safeMkdir(`${missionPath}/deliverables`, { recursive: true });
     safeWriteFile(`${missionPath}/deliverables/reconciled.ts`, 'export const value = 1;\n');
@@ -805,6 +829,28 @@ describe('mission work item dispatch', () => {
     expect(response.prompt).toContain('Fast-tier enforcement:');
     expect(response.response_text).toContain('agent completed the outline');
     expect(safeExistsSync(`${missionPath}/coordination/events/workitem-dispatch.jsonl`)).toBe(true);
+    const itemId = manifest.records[0].item_id;
+    const receiptTargets = loadProvisionedEntryRecords(missionId).map(
+      (record) => record.target_path
+    );
+    const expectedTargets = [
+      `evidence/workitem-dispatch-${itemId}.json`,
+      'evidence/workitem-dispatch-manifest.json',
+      'coordination/tickets/replies/task-1.json',
+    ];
+    expect(receiptTargets).toEqual(expect.arrayContaining(expectedTargets));
+    for (const targetPath of expectedTargets) {
+      const records = loadProvisionedEntryRecords(missionId).filter(
+        (record) => record.target_path === targetPath
+      );
+      expect(records).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ phase: 'provisioned' }),
+          expect.objectContaining({ phase: 'verified' }),
+        ])
+      );
+      expect(records.at(-1)?.phase).toBe('verified');
+    }
   });
 
   it('treats fast-tier work as incomplete when verification evidence is missing', async () => {

@@ -5,6 +5,7 @@ import { safeExistsSync, safeStat, safeUnlinkSync, safeWriteFile } from './secur
 import {
   TriggerRunner,
   assertNoEscalation,
+  normalizeTriggerRecord,
   resolveCurrentTriggerAuthority,
   runWakeTrigger,
 } from './trigger-runner.js';
@@ -218,5 +219,26 @@ describe('QM-02 trigger runner', () => {
       async () => 'delivery-new'
     );
     expect(safeStat(store).size).toBeLessThan(64 * 1024);
+  });
+
+  it('rejects a delivery store outside the repository', () => {
+    expect(() => new TriggerRunner({ storePath: '/tmp/trigger-deliveries.jsonl' })).toThrow(
+      /outside the repository root/
+    );
+  });
+
+  it('skips malformed persisted receipts before idempotency evaluation', () => {
+    const valid = {
+      idempotencyKey: 'qm02:persisted',
+      source: 'wake',
+      status: 'delivered',
+      createdBy: authority,
+      recordedAt: '2026-09-01T00:00:00.000Z',
+    };
+    expect(normalizeTriggerRecord(valid)).toMatchObject({ idempotencyKey: 'qm02:persisted' });
+    expect(normalizeTriggerRecord([])).toBeNull();
+    expect(normalizeTriggerRecord({ ...valid, status: 'unknown' })).toBeNull();
+    expect(normalizeTriggerRecord({ ...valid, createdBy: [] })).toBeNull();
+    expect(normalizeTriggerRecord({ ...valid, recordedAt: 'not-a-date' })).toBeNull();
   });
 });

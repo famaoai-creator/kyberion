@@ -46,6 +46,34 @@ async function installTestIoSeams(): Promise<void> {
       fs.mkdirSync(path.dirname(resolved), { recursive: true });
       fs.appendFileSync(resolved, content, 'utf8');
     },
+    assertSafePath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}): string => {
+      const resolved = testPath(filePath);
+      // The audit-chain tenant suite uses a fixture root under the system temp
+      // directory. On macOS `/var` itself is commonly a symlink, so start the
+      // seam at that fixture root rather than treating OS aliases as a repo
+      // path violation.
+      const fixtureRoot = resolved.match(
+        new RegExp(`^(.+${path.sep}kyberion-audit-tenant-[^${path.sep}]+)`)
+      )?.[1];
+      const scopeRoot = fixtureRoot ?? path.parse(resolved).root;
+      let current = scopeRoot;
+      const relative = path.relative(scopeRoot, resolved);
+      for (const segment of relative.split(path.sep).filter(Boolean)) {
+        current = path.join(current, segment);
+        try {
+          if (fs.lstatSync(current).isSymbolicLink()) {
+            throw new Error(`[RESOURCE_PATH_SYMLINK] ${resolved}`);
+          }
+        } catch (error: any) {
+          if (error?.code === 'ENOENT') break;
+          throw error;
+        }
+      }
+      if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+        throw new Error(`[RESOURCE_PATH_MISSING] ${resolved}`);
+      }
+      return resolved;
+    },
   };
   // Foundation JSON is never globally replaced by a raw filesystem adapter.
   // Production foundation imports bootstrap secure-io; isolated suites own an

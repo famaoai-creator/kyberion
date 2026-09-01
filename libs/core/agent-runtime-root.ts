@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export type AgentWorkspaceMode = 'conversation' | 'mission' | 'operator' | 'default';
 
@@ -15,7 +15,10 @@ export interface AgentRuntimeRootOptions {
 }
 
 function providerMemoryFile(provider: string): string | null {
-  const normalized = provider.trim().replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+  const normalized = provider
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .toUpperCase();
   if (!normalized) return null;
   return `${normalized}.md`;
 }
@@ -55,11 +58,7 @@ function buildProjectedMemory(options: AgentRuntimeRootOptions): string {
   ];
 
   if (options.systemPrompt) {
-    lines.push(
-      '',
-      'Projected role guidance:',
-      options.systemPrompt.trim(),
-    );
+    lines.push('', 'Projected role guidance:', options.systemPrompt.trim());
   }
 
   return `${lines.join('\n')}\n`;
@@ -67,6 +66,7 @@ function buildProjectedMemory(options: AgentRuntimeRootOptions): string {
 
 export function ensureAgentRuntimeRoot(options: AgentRuntimeRootOptions): string {
   const base = pathResolver.sharedTmp('agent-runtime-roots');
+  assertSafeRepositoryPath(base, { allowMissingLeaf: true });
   safeMkdir(base, { recursive: true });
 
   const parts: string[] = [options.mode];
@@ -76,11 +76,14 @@ export function ensureAgentRuntimeRoot(options: AgentRuntimeRootOptions): string
   parts.push(options.agentId.replace(/[^\w.-]+/g, '_'));
 
   const root = path.join(base, ...parts);
+  assertSafeRepositoryPath(root, { allowMissingLeaf: true });
   safeMkdir(root, { recursive: true });
 
   const memoryFile = providerMemoryFile(options.provider);
   if (memoryFile) {
-    safeWriteFile(path.join(root, memoryFile), buildProjectedMemory(options));
+    const memoryPath = path.join(root, memoryFile);
+    assertSafeRepositoryPath(memoryPath, { allowMissingLeaf: true });
+    safeWriteFile(memoryPath, buildProjectedMemory(options));
   }
 
   return root;

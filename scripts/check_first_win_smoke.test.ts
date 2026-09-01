@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import {
   checkFirstWinSmoke,
   validateFirstWinLifecyclePipeline,
@@ -82,6 +83,16 @@ describe('check_first_win_smoke', () => {
         ],
       })
     ).toEqual([]);
+  });
+
+  it('uses the validated ADF reader for pipeline files', async () => {
+    const source = String(
+      safeReadFile(path.join(ROOT, 'scripts/check_first_win_smoke.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain("import { readValidatedPipelineAdf } from './refactor/adf-input.js'");
+    expect(source).toContain('return readValidatedPipelineAdf(file)');
+    expect(source).not.toContain('readFoundationJson');
+    expect(source).not.toContain('function readJson(');
   });
 
   it('rejects a shell wrapper in place of the typed lifecycle smoke op', () => {

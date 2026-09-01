@@ -1,38 +1,23 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  getRegisteredEnv,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-type TaskScenario = {
-  id: string;
-  title: string;
-  description: string;
-  trigger: {
-    type: 'schedule' | 'event' | 'manual';
-    cron?: string;
-    timezone?: string;
-    event_name?: string;
-    source?: string;
-    prompt?: string;
-  };
-  input: { sources: string[]; required_params: string[]; optional_params?: string[] };
-  first_run: { reasoning_required: boolean; questions: string[]; profile_output: string };
-  repeat_run: { pipeline_template: string; params_from_profile: boolean; profile_input?: string };
-  result: { artifacts: string[]; summary_format: 'markdown' | 'json' | 'text' };
-  approval_boundary: {
-    required_for: string[];
-    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
-  };
-};
+import {
+  loadTaskRecord,
+  loadTaskScenario,
+  parseTaskRecord,
+  type TaskScenario,
+} from './lib/task-scenario.js';
+import { parseSafeJsonInput } from './lib/json-input.js';
 
 const DEFAULT_SCENARIO_DIR = pathResolver.rootResolve('knowledge/product/task-scenarios');
 
@@ -84,21 +69,25 @@ function resolveScenarioDir(): string {
   const override = (
     getRegisteredEnv<string>('KYBERION_TASK_SCENARIO_DIR') as string | undefined
   )?.trim();
-  return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
+  return override
+    ? assertSafeRepositoryPath(path.resolve(override), { allowMissingLeaf: true })
+    : DEFAULT_SCENARIO_DIR;
 }
 
 function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
-  if (!safeExistsSync(scenarioDir) || !safeLstat(scenarioDir).isDirectory()) {
+  const safeScenarioDir = assertSafeRepositoryPath(scenarioDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeScenarioDir) || !safeLstat(safeScenarioDir).isDirectory()) {
     return [];
   }
-  return safeReaddir(scenarioDir)
+  return safeReaddir(safeScenarioDir)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => path.join(scenarioDir, entry))
+    .map((entry) => assertSafeRepositoryPath(path.join(safeScenarioDir, entry)))
+    .filter((filePath) => safeLstat(filePath).isFile())
     .sort((left, right) => left.localeCompare(right));
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return readJson<TaskScenario>(filePath);
+  return loadTaskScenario(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
@@ -109,10 +98,19 @@ function loadScenarioById(scenarioId: string): TaskScenario | undefined {
 
 function loadAnswers(args: TaskInitArgs): Record<string, unknown> {
   if (args.answersFile) {
-    return readJson<Record<string, unknown>>(pathResolver.rootResolve(args.answersFile));
+    const answersPath = assertSafeRepositoryPath(pathResolver.resolve(args.answersFile));
+    if (!safeExistsSync(answersPath) || !safeLstat(answersPath).isFile()) {
+      throw new Error(
+        `[task:init] answers file must be an existing regular file: ${args.answersFile}`
+      );
+    }
+    return loadTaskRecord(answersPath, 'TaskScenario answers');
   }
   if (args.answersJson) {
-    return JSON.parse(args.answersJson) as Record<string, unknown>;
+    return parseTaskRecord(
+      parseSafeJsonInput(args.answersJson, 'TaskScenario answers'),
+      'TaskScenario answers'
+    );
   }
   return args.answers || {};
 }
@@ -129,10 +127,7 @@ function assertProfilePathAllowed(profileOutput: string): void {
   if (!normalized.startsWith('knowledge/personal/')) {
     throw new Error(`Profile output must stay under knowledge/personal/: ${profileOutput}`);
   }
-  const resolved = pathResolver.rootResolve(profileOutput);
-  if (!resolved.startsWith(pathResolver.rootDir())) {
-    throw new Error(`Profile output resolved outside the workspace: ${profileOutput}`);
-  }
+  assertSafeRepositoryPath(pathResolver.rootResolve(profileOutput), { allowMissingLeaf: true });
 }
 
 function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) {
@@ -176,7 +171,10 @@ export async function main(argv: string[] = []): Promise<void> {
   assertProfilePathAllowed(scenario.first_run.profile_output);
   const answers = loadAnswers(args);
   const profile = buildProfile(scenario, answers);
-  const profilePath = pathResolver.rootResolve(scenario.first_run.profile_output);
+  const profilePath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(scenario.first_run.profile_output),
+    { allowMissingLeaf: true }
+  );
 
   safeMkdir(path.dirname(profilePath), { recursive: true });
   safeWriteFile(profilePath, `${JSON.stringify(profile, null, 2)}\n`);

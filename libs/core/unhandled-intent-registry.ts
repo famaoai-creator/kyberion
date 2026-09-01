@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unhandled-intent-registry');
@@ -36,6 +37,14 @@ const REGISTRY_RELATIVE = nodePath.join(
 const UTTERANCE_EXCERPT_LEN = 100;
 const MAX_UTTERANCE_SAMPLES = 3;
 
+const registryCatalog = defineCatalog<UnhandledIntentRegistry>({
+  id: 'unhandled-intent-registry',
+  path: registryPath,
+  schema: pathResolver.knowledge('product/schemas/unhandled-intent-registry.schema.json'),
+  fallback: { version: '1.0.0', entries: [] },
+  fallbackOnInvalid: true,
+});
+
 // 60 s in-process cooldown per dedup key to avoid disk churn on bursty traffic.
 const _recentWrites = new Map<string, number>();
 const COOLDOWN_MS = 60_000;
@@ -46,9 +55,7 @@ function registryPath(): string {
 
 function readRegistry(): UnhandledIntentRegistry {
   try {
-    const p = registryPath();
-    if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<UnhandledIntentRegistry>(p);
+    return registryCatalog.load();
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -56,6 +63,7 @@ function readRegistry(): UnhandledIntentRegistry {
 
 function writeRegistry(registry: UnhandledIntentRegistry): void {
   try {
+    registryCatalog.validate(registry, registryPath());
     safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
   } catch {
     /* observability must never break the caller */

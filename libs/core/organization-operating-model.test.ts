@@ -1,32 +1,12 @@
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import {
   buildOrganizationDomainRecord,
   buildOrganizationLearningCandidate,
-  buildOrganizationManagementView,
   buildOrganizationObjectiveAddition,
-  buildOrganizationOperationRecord,
-  buildOrganizationProjectLink,
   buildOrganizationScaffold,
-  buildOrganizationCadence,
-  buildOrganizationDecision,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,
-  saveProjectRecord,
-  loadOrganizationCatalog,
-  loadOrganizationOperatingModelCatalog,
-  loadOrganizationOperationalState,
-  listOrganizationOperationRuns,
-  listOrganizationOperationStates,
-  listOrganizationOperations,
-  reconcileOrganizationCatalog,
-  reconcileOrganizationState,
-  resolveOrganizationWork,
-  saveOrganizationCapability,
-  saveOrganizationDomain,
-  saveOrganizationOperationalState,
-  saveOrganizationPurpose,
-  saveOrganizationService,
-  saveOrganizationServiceState,
   saveOrganizationOperation,
   saveOrganizationOperationRun,
   saveOrganizationOperationState,
@@ -34,7 +14,36 @@ import {
   saveOrganizationIncident,
   saveOrganizationCadence,
   saveOrganizationDecision,
-  t,
+} from './organization-operating-model-operations.js';
+import {
+  buildOrganizationManagementView,
+  buildOrganizationOperationRecord,
+  buildOrganizationProjectLink,
+  buildOrganizationCadence,
+  buildOrganizationDecision,
+  loadOrganizationCatalog,
+  reconcileOrganizationCatalog,
+  reconcileOrganizationState,
+} from './organization-operating-model-management.js';
+import {
+  loadOrganizationOperatingModelCatalog,
+  loadOrganizationOperationalState,
+  resolveOrganizationWork,
+  saveOrganizationCapability,
+  saveOrganizationDomain,
+  saveOrganizationOperationalState,
+  saveOrganizationPurpose,
+  saveOrganizationService,
+  saveOrganizationServiceState,
+  organizationRecordFiles,
+} from './organization-operating-model-persistence.js';
+import {
+  listOrganizationOperationRuns,
+  listOrganizationOperationStates,
+  listOrganizationOperations,
+} from './organization-operating-model-operations.js';
+import { saveProjectRecord } from './project-registry.js';
+import {
   type OrganizationCapabilityRecord,
   type OrganizationDomainRecord,
   type OrganizationOperationalState,
@@ -45,8 +54,10 @@ import {
   type OrganizationPurposeRecord,
   type OrganizationServiceRecord,
   type OrganizationServiceState,
-} from '@agent/core';
-import { pathResolver, safeRmSync } from '@agent/core';
+} from './organization-operating-model.js';
+import { t } from './t.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeSymlinkSync } from '@agent/core/secure-io';
 
 const organizationId = 'org-operating-model-test';
 const tenantSlug = 'tenant-acme';
@@ -159,6 +170,26 @@ describe('organization operating model', () => {
       expect(view.purpose?.purpose).toBe('Verify root-aware management views.');
     } finally {
       safeRmSync(rootDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects symlinked organization records during recursive discovery', () => {
+    const rootDir = pathResolver.sharedTmp('organization-record-symlink-test');
+    const outsideDir = pathResolver.sharedTmp('organization-record-symlink-target');
+    const linkPath = path.join(rootDir, 'tenant-acme', 'domain.json');
+    safeRmSync(rootDir, { recursive: true, force: true });
+    safeRmSync(outsideDir, { recursive: true, force: true });
+    try {
+      safeMkdir(path.dirname(linkPath), { recursive: true });
+      safeMkdir(outsideDir, { recursive: true });
+      safeSymlinkSync(outsideDir, linkPath, 'dir');
+
+      expect(() => organizationRecordFiles(rootDir, 'domain.json')).toThrow(
+        /RESOURCE_PATH_SYMLINK|symlink/i
+      );
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+      safeRmSync(outsideDir, { recursive: true, force: true });
     }
   });
 

@@ -12,6 +12,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
   writeEngineeringArtifactBundle,
 } from './index.js';
@@ -133,6 +134,21 @@ describe('source-analysis compiler', () => {
     expect(bundle.iac_proposal.status).toBe('blocked-no-target-provider');
     expect(bundle.iac_proposal.validation_commands).toEqual([]);
     expect(bundle.iac_proposal.terraform).toContain('No target_provider');
+  });
+
+  it('does not load dependencies from a symlinked package manifest', () => {
+    prepareFixture();
+    const packagePath = path.join(FIXTURE, 'package.json');
+    const targetPath = path.join(FIXTURE, 'package-target.json');
+    safeRmSync(packagePath, { force: true });
+    safeWriteFile(targetPath, JSON.stringify({ dependencies: { should_not_be_loaded: '^1.0.0' } }));
+    safeSymlinkSync(targetPath, packagePath);
+
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+
+    expect(analysis.dependencies).not.toContain('should_not_be_loaded');
   });
 
   it('requires approval for tests with external side-effect signals', () => {

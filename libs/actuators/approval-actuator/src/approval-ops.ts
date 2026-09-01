@@ -1,11 +1,7 @@
-import {
-  createApprovalRequest,
-  enforceApprovalGate,
-  evaluateDecisionRights,
-  resolveDecisionRightsMatrix,
-  listApprovalRequests,
-  type GovernedArtifactRole,
-} from '@agent/core';
+import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
+import { enforceApprovalGate } from '@agent/core/approval-gate';
+import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
+import type { GovernedArtifactRole } from '@agent/core/artifacts';
 
 export interface EvaluateDecisionRightsInput {
   operation_id: string;

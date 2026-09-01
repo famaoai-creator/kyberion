@@ -1,5 +1,10 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadJson, safeExistsSync } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 
 import { collectTraceFeed } from './trace-feed';
 
@@ -43,9 +48,10 @@ export function collectProviderDemotions(
   now: number = Date.now(),
   statePath: string = pathResolver.active('shared/runtime/provider-health.json')
 ): ProviderDemotionStatus[] {
-  if (!safeExistsSync(statePath)) return [];
   try {
-    const parsed = loadJson<{ demotions?: ProviderDemotionStatus[] }>(statePath);
+    const safePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return [];
+    const parsed = loadJson<{ demotions?: ProviderDemotionStatus[] }>(safePath);
     return (parsed.demotions || []).filter(
       (entry) => entry?.provider && Number.isFinite(entry.until) && entry.until > now
     );
@@ -115,7 +121,7 @@ export function buildSystemStatusReport(input: {
 
 export function collectSystemStatus(now: number = Date.now()): SystemStatusReport {
   const demoted = collectProviderDemotions(now);
-  const feed = collectTraceFeed({ limit: 200 });
+  const feed = collectTraceFeed({ limit: 200, strictUnknownSpans: true });
   const traces = summarizeTraceWindow(
     feed.map((entry) => ({ startedAt: entry.startedAt, status: entry.status })),
     now

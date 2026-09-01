@@ -4,10 +4,12 @@ import { auditChain } from './audit-chain.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
   safeExecResult,
 } from './secure-io.js';
@@ -26,6 +28,19 @@ export type HeldActionStatus =
 export type ResourceScope = 'read' | 'write';
 export type IntroductionMode = 'warn' | 'enforce';
 export type OsKnowledgeTier = 'personal' | 'confidential' | 'public';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Validate the execution envelope without pretending to know generic `T`. */
+export function normalizeGovernedCodeEnvelope(value: unknown): { value: unknown } | undefined {
+  if (!isRecord(value) || !Object.prototype.hasOwnProperty.call(value, 'value')) return undefined;
+  if (value.value_undefined !== undefined && typeof value.value_undefined !== 'boolean') {
+    return undefined;
+  }
+  return { value: value.value_undefined === true ? undefined : value.value };
+}
 
 export interface SimulatedResult {
   provisionalRefs: string[];
@@ -337,8 +352,12 @@ export class CloudflareOsControlPlane {
   constructor(options: CloudflareOsControlPlaneOptions = {}) {
     this.persist = options.persist !== false;
     this.auditRestoreFailures = options.auditRestoreFailures !== false;
-    this.statePath =
-      options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json');
+    this.statePath = this.persist
+      ? assertSafeRepositoryPath(
+          options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json'),
+          { allowMissingLeaf: true }
+        )
+      : options.statePath || pathResolver.shared('runtime/cloudflare-os/control-plane.json');
     if (this.persist) this.restoreState();
   }
 
@@ -660,7 +679,7 @@ export class CloudflareOsControlPlane {
       `const bindings = Object.freeze(${JSON.stringify(bindings)});`,
       `const value = (${code});`,
       "if (value && typeof value.then === 'function') throw new Error('async governed code is not supported');",
-      'process.stdout.write(JSON.stringify({ value }));',
+      'process.stdout.write(JSON.stringify(value === undefined ? { value: null, value_undefined: true } : { value }));',
     ].join('\n');
     const result = safeExecResult(
       process.execPath,
@@ -673,7 +692,11 @@ export class CloudflareOsControlPlane {
       );
     }
     try {
-      return (JSON.parse(result.stdout) as { value: T }).value;
+      const envelope = normalizeGovernedCodeEnvelope(
+        parseSafeJsonInput(result.stdout, 'governed code response')
+      );
+      if (!envelope) throw new Error('missing value envelope');
+      return envelope.value as T;
     } catch (error) {
       throw new Error(
         `[POLICY_VIOLATION] Governed Code Mode returned invalid data: ${error instanceof Error ? error.message : String(error)}`
@@ -1164,9 +1187,7 @@ export class CloudflareOsControlPlane {
   private restoreState(): void {
     if (!safeExistsSync(this.statePath)) return;
     try {
-      const state = JSON.parse(
-        String(safeReadFile(this.statePath, { encoding: 'utf8' }))
-      ) as PersistedControlPlaneState;
+      const state = readJson<PersistedControlPlaneState>(this.statePath);
       if (state.version !== 1) return;
       for (const raw of state.held || []) {
         const record = raw as unknown as HeldActionRecord;
@@ -1228,9 +1249,7 @@ export class CloudflareOsControlPlane {
   private refreshPersistedObservations(): void {
     if (!this.persist || !safeExistsSync(this.statePath)) return;
     try {
-      const state = JSON.parse(
-        String(safeReadFile(this.statePath, { encoding: 'utf8' }))
-      ) as PersistedControlPlaneState;
+      const state = readJson<PersistedControlPlaneState>(this.statePath);
       if (state.version !== 1 || !Array.isArray(state.observations)) return;
       this.observations.splice(0, this.observations.length, ...state.observations);
     } catch (error) {

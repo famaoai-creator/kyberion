@@ -1,11 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
   createAssistantCompilerRequest,
+  getAssistantCompilerRequestPath,
+  getAssistantCompilerResultPath,
   normalizeAssistantCompilerResult,
   validateAssistantCompilerRequest,
 } from './assistant-compiler-request.js';
 
 describe('assistant compiler request', () => {
+  it('rejects request ids that could escape the governed temporary stores', () => {
+    expect(() => getAssistantCompilerRequestPath('../escape')).toThrow(
+      '[ASSISTANT_COMPILER_REQUEST_ID]'
+    );
+    expect(() => getAssistantCompilerResultPath('nested/result')).toThrow(
+      '[ASSISTANT_COMPILER_REQUEST_ID]'
+    );
+  });
+
   it('creates a raw compiler request without local contract generation', () => {
     const { request, requestPath } = createAssistantCompilerRequest({
       source: { origin: 'cli', channel: 'run_intent' },

@@ -14,8 +14,9 @@ import {
   resolveWorkItemContext,
   type WorkVisibilityViewer,
 } from './work-visibility.js';
-import { findMissionPath } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertMissionIdArgument, findMissionPath } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
@@ -159,13 +160,14 @@ export function composeAgentActivityBoard(input: {
   };
 }
 
-function readTenantSlug(missionId: string): string | undefined {
-  const missionDir = findMissionPath(missionId);
-  if (!missionDir) return undefined;
-  const statePath = path.join(missionDir, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return undefined;
+export function readMissionTenantSlug(missionId: string): string | undefined {
   try {
-    const state = loadJson<{
+    assertMissionIdArgument(missionId);
+    const missionDir = findMissionPath(missionId);
+    if (!missionDir) return undefined;
+    const statePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'));
+    if (!safeExistsSync(statePath)) return undefined;
+    const state = readJson<{
       tenant_slug?: string;
       tenant_id?: string;
     }>(statePath);
@@ -185,7 +187,7 @@ export function buildAgentActivityBoard(
   for (const item of items) {
     const missionId = resolveWorkItemContext(item).mission_id;
     if (missionId && !(missionId in tenantByMission)) {
-      tenantByMission[missionId] = readTenantSlug(missionId);
+      tenantByMission[missionId] = readMissionTenantSlug(missionId);
     }
   }
   return composeAgentActivityBoard({

@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadApprovalRequest } from '@agent/core/approval-store';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-  loadApprovalRequest,
-} from '@agent/core';
+  loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
+  loadTeamRoleIndex as loadGovernedTeamRoleIndex,
+} from '@agent/core/mission-team-index';
+import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import { readJson as readFoundationJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
@@ -184,8 +183,8 @@ const DOMAIN_TEMPLATES: Record<
 function helpText(): string {
   return [
     'Usage:',
-    '  pnpm org role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
-    '  pnpm org role promote --role <role-id> --authority <authority-role-id>',
+    '  pnpm organization role create --name <display-name> --domain <domain> [--authority <authority-role-id>]',
+    '  pnpm organization role promote --role <role-id> --authority <authority-role-id>',
     '',
     'Options:',
     '  --name <name>                 Display name for the new role.',
@@ -252,7 +251,7 @@ function parseArgs(argv: string[]): OrgCommand {
         },
       };
     }
-    throw new Error('Unsupported command. Use: pnpm org role create ...');
+    throw new Error('Unsupported command. Use: pnpm organization role create ...');
   }
 
   const options: Record<string, unknown> = {
@@ -566,28 +565,10 @@ function loadAuthorityRoleDirectory(rootDir: string): Record<string, AuthorityRo
     'governance',
     'authority-role-index.json'
   );
-  if (safeExistsSync(directory)) {
-    const files = safeReaddir(directory)
-      .filter((entry) => entry.endsWith('.json'))
-      .sort();
-    if (files.length) {
-      const roles: Record<string, AuthorityRoleRecord> = {};
-      for (const file of files) {
-        const payload = readJson<AuthorityRoleRecord & { role: string }>(
-          path.join(directory, file)
-        );
-        roles[payload.role] = (() => {
-          const { role: _role, ...record } = payload;
-          return record;
-        })();
-      }
-      return roles;
-    }
-  }
-  const snapshotPayload = readJsonIfExists<{
-    authority_roles?: Record<string, AuthorityRoleRecord>;
-  }>(snapshot);
-  return snapshotPayload?.authority_roles ? { ...snapshotPayload.authority_roles } : {};
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
+  return loadGovernedAuthorityRoleIndex(rootDir);
 }
 
 function writeAuthorityRoleBundle(
@@ -629,26 +610,10 @@ function loadTeamRoleDirectory(rootDir: string): Record<string, TeamRoleRecord> 
     'orchestration',
     'team-role-index.json'
   );
-  if (safeExistsSync(directory)) {
-    const files = safeReaddir(directory)
-      .filter((entry) => entry.endsWith('.json'))
-      .sort();
-    if (files.length) {
-      const roles: Record<string, TeamRoleRecord> = {};
-      for (const file of files) {
-        const payload = readJson<TeamRoleRecord & { role: string }>(path.join(directory, file));
-        roles[payload.role] = (() => {
-          const { role: _role, ...record } = payload;
-          return record;
-        })();
-      }
-      return roles;
-    }
-  }
-  const snapshotPayload = readJsonIfExists<{ team_roles?: Record<string, TeamRoleRecord> }>(
-    snapshot
-  );
-  return snapshotPayload?.team_roles ? { ...snapshotPayload.team_roles } : {};
+  const hasDirectoryEntries =
+    safeExistsSync(directory) && safeReaddir(directory).some((entry) => entry.endsWith('.json'));
+  if (!hasDirectoryEntries && !safeExistsSync(snapshot)) return {};
+  return loadGovernedTeamRoleIndex(rootDir);
 }
 
 function writeTeamRoleBundle(rootDir: string, roleId: string, record: TeamRoleRecord): void {
@@ -852,7 +817,7 @@ function writePromotionNotes(
     `- Allowed actuators: ${updatedAuthority.allowed_actuators.join(', ') || '(none)'}`,
     `- Tier access: ${updatedAuthority.tier_access.join(', ') || '(none)'}`,
     ``,
-    `This file records the explicit advise-to-act promotion applied by \`pnpm org role promote\`.`,
+    `This file records the explicit advise-to-act promotion applied by \`pnpm organization role promote\`.`,
   ].join('\n');
   safeWriteFile(path.join(roleDir, 'PROMOTION.md'), `${promotionNotes}\n`);
 }

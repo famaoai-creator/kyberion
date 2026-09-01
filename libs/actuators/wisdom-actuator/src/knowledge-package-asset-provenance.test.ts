@@ -12,14 +12,9 @@
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-  appendAssetRecord,
-  deriveAssetId,
-  pathResolver,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-} from '@agent/core';
+import { appendAssetRecord, deriveAssetId } from '@agent/core/ingest-asset-ledger';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   createKnowledgePackage,
   resolveIngestAssetProvenance,

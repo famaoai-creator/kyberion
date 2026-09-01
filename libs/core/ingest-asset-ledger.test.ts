@@ -15,13 +15,21 @@ import {
   findAssetByContentHash,
   findAssetBySource,
   listAssets,
+  normalizeIngestAssetRecord,
   readAssetLedger,
   stalenessReport,
   tenantIngestKnowledgeRoot,
   type IngestAssetRecord,
 } from './ingest-asset-ledger.js';
 import * as pathResolver from './path-resolver.js';
-import { safeAppendFile, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeAppendFile,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 const EMPTY_ENV = {} as NodeJS.ProcessEnv; // no KYBERION_CUSTOMER → personal tenants dir
 const HASH_V1 = 'a'.repeat(64);
@@ -52,6 +60,7 @@ function makeRecord(overrides: Partial<IngestAssetRecord> = {}): IngestAssetReco
 
 describe('ingest-asset-ledger (DA-05)', () => {
   let fixtureRoot = '';
+  let symlinkFixtureRoot = '';
   let options: { rootDir: string; env: NodeJS.ProcessEnv };
 
   beforeAll(() => {
@@ -61,6 +70,13 @@ describe('ingest-asset-ledger (DA-05)', () => {
       'shared',
       'tmp',
       `ingest-ledger-da05-${randomUUID()}`
+    );
+    symlinkFixtureRoot = path.join(
+      pathResolver.rootDir(),
+      'active',
+      'shared',
+      'tmp',
+      `ingest-ledger-symlink-${randomUUID()}`
     );
     options = { rootDir: fixtureRoot, env: EMPTY_ENV };
     const tenantDir = path.join(fixtureRoot, 'knowledge', 'personal', 'tenants');
@@ -82,6 +98,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
 
   afterAll(() => {
     if (fixtureRoot) safeRmSync(fixtureRoot, { recursive: true, force: true });
+    if (symlinkFixtureRoot) safeRmSync(symlinkFixtureRoot, { recursive: true, force: true });
   });
 
   it('derives a stable asset_id from source_system::source_id', () => {
@@ -111,6 +128,18 @@ describe('ingest-asset-ledger (DA-05)', () => {
     expect(() => appendAssetRecord('acme-corp', makeRecord({ visible_to: [] }), options)).toThrow(
       /visible_to must be a non-empty array/
     );
+    expect(() =>
+      appendAssetRecord(
+        'acme-corp',
+        makeRecord({
+          target_path: path.relative(
+            options.rootDir,
+            path.join(pathResolver.rootDir(), '..', 'outside-knowledge.md')
+          ),
+        }),
+        options
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
     expect(readAssetLedger('acme-corp', options)).toHaveLength(1);
   });
 
@@ -246,8 +275,45 @@ describe('ingest-asset-ledger (DA-05)', () => {
   });
 
   it('skips corrupt ledger lines instead of failing reads', () => {
-    safeAppendFile(assetLedgerPath('acme-corp', options), 'not-json\n');
+    safeAppendFile(
+      assetLedgerPath('acme-corp', options),
+      ['not-json', '[]', JSON.stringify({ ...makeRecord(), visible_to: ['acme-corp', 42] })].join(
+        '\n'
+      ) + '\n'
+    );
     expect(readAssetLedger('acme-corp', options)).toHaveLength(4);
     expect(listAssets('acme-corp', options)).toHaveLength(2);
+  });
+
+  it('skips dangerous ledger lines instead of projecting them', () => {
+    const options = { rootDir: fixtureRoot };
+    const ledger = assetLedgerPath('acme-corp', options);
+    safeMkdir(path.dirname(ledger), { recursive: true });
+    safeWriteFile(ledger, '{"nested":{"constructor":{}}}\n');
+
+    expect(readAssetLedger('acme-corp', options)).toEqual([]);
+  });
+
+  it('normalizes only complete, tenant-contained asset records', () => {
+    expect(normalizeIngestAssetRecord({ asset_id: 'ing-1' }, options)).toBeNull();
+    expect(normalizeIngestAssetRecord(makeRecord(), options)).toMatchObject({
+      asset_id: deriveAssetId('confluence', 'PAGE-1'),
+      status: 'active',
+    });
+    expect(
+      normalizeIngestAssetRecord(makeRecord({ target_path: '../outside.md' }), options)
+    ).toBeNull();
+  });
+
+  it('rejects a symlinked tenant ledger directory before reading or appending', () => {
+    const ledgerDir = path.join(symlinkFixtureRoot, 'knowledge/confidential/common/_ledger');
+    const targetDir = path.join(symlinkFixtureRoot, 'ledger-target');
+    safeMkdir(path.dirname(ledgerDir), { recursive: true });
+    safeMkdir(targetDir, { recursive: true });
+    safeSymlinkSync(targetDir, ledgerDir, 'dir');
+
+    const symlinkOptions = { rootDir: symlinkFixtureRoot, env: EMPTY_ENV };
+    expect(() => assetLedgerPath('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(() => readAssetLedger('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 });

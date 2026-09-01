@@ -4,17 +4,17 @@
  * Run: node dist/scripts/scenario_storage_governance.js
  */
 
-import { auditChain } from '@agent/core';
+import { auditChain } from '@agent/core/audit-chain';
 import {
   fetchWithVaultCache,
   getVaultEntry,
   invalidateVaultEntry,
   listVaultEntries,
-} from '@agent/core';
-import { createProcessLogger } from '@agent/core';
-import { runJanitor } from '@agent/core';
-import { sharedLogsAudit, sharedLogsProcess } from '@agent/core';
-import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
+} from '@agent/core/data-vault';
+import { createProcessLogger } from '@agent/core/process-logger';
+import { runJanitor } from '@agent/core/storage-janitor';
+import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 function hr(label: string) {

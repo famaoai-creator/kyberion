@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => {
   const ensureMissionTeamRuntime = vi.fn();
@@ -51,6 +53,12 @@ describe('agent-runtime-supervisor', () => {
     });
     expect(reloaded.team_roles).toEqual(['planner']);
     expect(reloaded.requested_by).toBe('test');
+  });
+
+  it('rejects request artifacts outside the supervisor request queue', async () => {
+    const { loadMissionTeamPrewarmRequest } = await import('./agent-runtime-supervisor.js');
+    const outsidePath = pathResolver.shared('coordination/agent-runtime/other/request.json');
+    expect(() => loadMissionTeamPrewarmRequest(outsidePath)).toThrow('[AGENT_RUNTIME_QUEUE_SCOPE]');
   });
 
   it('processes a queued request and writes a result artifact', async () => {

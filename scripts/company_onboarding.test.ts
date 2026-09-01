@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   pathResolver,
   safeExistsSync,
@@ -7,13 +7,20 @@ import {
   safeRmSync,
   writeTenantProfile,
 } from '@agent/core';
-import { onboardAiCompany } from './company_onboarding.js';
+import { main, onboardAiCompany } from './company_onboarding.js';
 
 const rootDir = pathResolver.sharedTmp('company-onboarding-test');
 
 afterEach(() => safeRmSync(rootDir, { recursive: true, force: true }));
 
 describe('AI company onboarding', () => {
+  it('emits help through the supplied harness printer', () => {
+    const print = vi.fn();
+
+    expect(main(['--help'], print)).toBe(0);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('pnpm onboard company'));
+  });
+
   it('dry-runs without writing and shows the complete next path', () => {
     const result = onboardAiCompany({
       vertical: 'saas-product-company',

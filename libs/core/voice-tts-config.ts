@@ -1,8 +1,8 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export interface VoiceTtsLanguageConfig {
   voice: string;
@@ -31,20 +31,45 @@ const FALLBACK_REGISTRY: {
   },
 };
 
+const voiceTtsConfigCatalog = defineCatalog<VoiceTtsConfigRegistry>({
+  id: 'voice-tts-config',
+  path: getRegistryPath,
+  schema: pathResolver.knowledge('product/schemas/voice-tts-config.schema.json'),
+  fallback: () => FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    if (!String(error).includes('missing')) {
+      logger.warn(`[VOICE_TTS_CONFIG] Failed to load registry: ${String(error)}`);
+    }
+  },
+});
+
 let cachedRegistryPath: string | null = null;
 let cachedDefaultLanguage: string | null = null;
 let cachedLanguages: Record<string, VoiceTtsLanguageConfig> | null = null;
 
 function getRegistryPath(): string {
   const overridePath = getRegisteredEnvText('KYBERION_VOICE_HUB_TTS_CONFIG_PATH')?.trim();
-  return overridePath || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(overridePath || DEFAULT_REGISTRY_PATH, {
+    allowMissingLeaf: true,
+  });
 }
 
 function loadRegistry(): {
   defaultLanguage: string;
   languages: Record<string, VoiceTtsLanguageConfig>;
 } {
-  const registryPath = getRegistryPath();
+  let registryPath: string;
+  try {
+    registryPath = getRegistryPath();
+  } catch (error) {
+    logger.warn(
+      `[VOICE_TTS_CONFIG] Unsafe registry path; using fallback: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return FALLBACK_REGISTRY;
+  }
   if (cachedRegistryPath === registryPath && cachedDefaultLanguage && cachedLanguages) {
     return {
       defaultLanguage: cachedDefaultLanguage,
@@ -52,45 +77,30 @@ function loadRegistry(): {
     };
   }
 
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedDefaultLanguage = FALLBACK_REGISTRY.defaultLanguage;
-    cachedLanguages = FALLBACK_REGISTRY.languages;
-    return FALLBACK_REGISTRY;
-  }
-
-  try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<VoiceTtsConfigRegistry>(raw, 'voice tts config registry');
-    const languages = {
-      ...FALLBACK_REGISTRY.languages,
-      ...(parsed.languages || {}),
-    };
-    const firstLanguage = Object.keys(languages)[0];
-    const defaultLanguage =
-      typeof parsed.defaultLanguage === 'string' && parsed.defaultLanguage in languages
-        ? parsed.defaultLanguage
-        : firstLanguage || FALLBACK_REGISTRY.defaultLanguage;
-    cachedRegistryPath = registryPath;
-    cachedDefaultLanguage = defaultLanguage;
-    cachedLanguages = languages;
-    return {
-      defaultLanguage,
-      languages,
-    };
-  } catch (error: any) {
-    logger.warn(`[VOICE_TTS_CONFIG] Failed to load registry at ${registryPath}: ${error.message}`);
-    cachedRegistryPath = registryPath;
-    cachedDefaultLanguage = FALLBACK_REGISTRY.defaultLanguage;
-    cachedLanguages = FALLBACK_REGISTRY.languages;
-    return FALLBACK_REGISTRY;
-  }
+  const parsed = voiceTtsConfigCatalog.load();
+  const languages = {
+    ...FALLBACK_REGISTRY.languages,
+    ...(parsed.languages || {}),
+  };
+  const firstLanguage = Object.keys(languages)[0];
+  const defaultLanguage =
+    typeof parsed.defaultLanguage === 'string' && parsed.defaultLanguage in languages
+      ? parsed.defaultLanguage
+      : firstLanguage || FALLBACK_REGISTRY.defaultLanguage;
+  cachedRegistryPath = registryPath;
+  cachedDefaultLanguage = defaultLanguage;
+  cachedLanguages = languages;
+  return {
+    defaultLanguage,
+    languages,
+  };
 }
 
-export function resetVoiceTtsConfigCache(): void {
+export function _resetVoiceTtsConfigCacheForTests(): void {
   cachedRegistryPath = null;
   cachedDefaultLanguage = null;
   cachedLanguages = null;
+  voiceTtsConfigCatalog.reset();
 }
 
 export function getVoiceTtsLanguageConfig(language?: string): VoiceTtsLanguageConfig {

@@ -1,16 +1,17 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
 import {
   getToolRuntimePolicy,
   resolveToolRuntimeRoot,
@@ -123,6 +124,9 @@ export interface ToolRuntimeInventory {
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/tool-runtime-registry.json'
+);
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tool-runtime-registry.schema.json'
 );
 const STATE_VERSION = '1.0.0';
 
@@ -588,18 +592,47 @@ const FALLBACK_REGISTRY: ToolRuntimeRegistry = {
   ],
 };
 
-let cachedRegistryPath: string | null = null;
-let cachedRegistry: ToolRuntimeRegistry | null = null;
-
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
-  );
+  const configured =
+    getRegisteredEnvText('KYBERION_TOOL_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
-function loadRegistryFromPath(registryPath: string): ToolRuntimeRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<ToolRuntimeRegistry>(raw, 'tool runtime registry');
+const toolRuntimeRegistryCatalog = defineCatalog<ToolRuntimeRegistry>({
+  id: 'tool-runtime-registry',
+  path: getRegistryPath,
+  schema: REGISTRY_SCHEMA_PATH,
+  fallback: FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback(error) {
+    try {
+      const registryPath = getRegistryPath();
+      if (safeExistsSync(registryPath)) {
+        logger.warn(
+          `[TOOL_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    } catch (pathError) {
+      logger.warn(
+        `[TOOL_RUNTIME_REGISTRY] Unsafe registry path; using fallback: ${
+          pathError instanceof Error ? pathError.message : String(pathError)
+        }`
+      );
+    }
+  },
+});
+
+function readJsonWithLabel<T>(filePath: string, label: string): T {
+  try {
+    return readJson<T>(filePath);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(`Invalid ${label}: ${error.message}`);
+    }
+    throw error;
+  }
 }
 
 function isSupportedPlatform(record: ToolRuntimeRecord, platform: NodeJS.Platform): boolean {
@@ -634,8 +667,19 @@ function backendIsAvailable(
 }
 
 function resolveManagedEnvPath(tool: ToolRuntimeRecord): string {
+  const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
   const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return path.join(resolveToolRuntimeRoot(getToolRuntimePolicy()), subPath);
+  return assertManagedRuntimePath(root, path.join(root, subPath));
+}
+
+function assertManagedRuntimePath(root: string, candidate: string): string {
+  const resolvedRoot = path.resolve(root);
+  const resolved = assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  const relative = path.relative(resolvedRoot, resolved).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[TOOL_RUNTIME_PATH_SCOPE] path escapes managed runtime root: ${candidate}`);
+  }
+  return resolved;
 }
 
 function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
@@ -654,39 +698,26 @@ function normalizeToolId(toolId?: string): string {
 }
 
 function getRegistry(): ToolRuntimeRegistry {
-  const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
-
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
-
   try {
-    const parsed = loadRegistryFromPath(registryPath);
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
-  } catch (error: any) {
+    return toolRuntimeRegistryCatalog.load();
+  } catch (error) {
     logger.warn(
-      `[TOOL_RUNTIME_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
+      `[TOOL_RUNTIME_REGISTRY] Failed to resolve registry; using fallback: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
+    return FALLBACK_REGISTRY;
   }
 }
 
 function statePathForTool(tool: ToolRuntimeRecord): string {
   const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
   const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return path.join(root, subPath, 'state.json');
+  return assertManagedRuntimePath(root, path.join(root, subPath, 'state.json'));
 }
 
-export function resetToolRuntimeRegistryCache(): void {
-  cachedRegistryPath = null;
-  cachedRegistry = null;
+export function _resetToolRuntimeRegistryCacheForTests(): void {
+  toolRuntimeRegistryCatalog.reset();
 }
 
 export function getToolRuntimeRegistry(): ToolRuntimeRegistry {
@@ -716,11 +747,7 @@ export function readToolRuntimeState(toolId?: string): ToolRuntimeState | null {
   const statePath = getToolRuntimeStatePath(toolId);
   if (!safeExistsSync(statePath)) return null;
   try {
-    const parsed = safeJsonParse<ToolRuntimeState>(
-      safeReadFile(statePath, { encoding: 'utf8' }) as string,
-      'tool runtime state'
-    );
-    return parsed;
+    return readJsonWithLabel<ToolRuntimeState>(statePath, 'tool runtime state');
   } catch (error: any) {
     logger.warn(`[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${error.message}`);
     return null;

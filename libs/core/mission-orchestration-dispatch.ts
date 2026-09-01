@@ -1,5 +1,5 @@
 import { buildExecutionEnv } from './authority.js';
-import { missionDir } from './path-resolver.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { logger } from './core.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from './agent-runtime-supervisor.js';
@@ -44,6 +44,7 @@ export interface DispatchCoreDeps {
   resolveTaskDispatchTimeoutMs: (task: PlannedNextTask) => number;
   withTaskDispatchTimeout: AnyCallback;
   dispatchPlannedMissionTask: AnyCallback;
+  isGoalDrivenTaskResumable: (missionId: string, task: PlannedNextTask) => boolean;
   loadPlannedNextTasks: (missionId: string) => PlannedNextTask[];
   buildUnassignedRoleSummary: (task: PlannedNextTask, teamRole?: string) => string;
   cascadeBlockedDependents: (tasks: PlannedNextTask[]) => string[];
@@ -55,15 +56,23 @@ export async function dispatchMissionNextTasksCore(
 
   missionId: string,
   missionRunTrace?: TraceContext,
-  graphRunId?: string
+  graphRunId?: string,
+  options: { resumeGoalDriven?: boolean } = {}
 ): Promise<Array<{ task_id: string; team_role: string; agent_id: string }>> {
   deps.ensureWorkerBackendsInstalled();
-  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+  // A mission may live under personal/confidential or a tenant overlay. The
+  // recovery ceremony must inspect the same resolved mission root as the
+  // progress controller; a public-only probe would silently turn a valid
+  // paused goal into a no-op.
+  const resolvedMissionPath = findMissionPath(missionId) || missionDir(missionId, 'public');
+  const nextTasksPath = `${resolvedMissionPath}/NEXT_TASKS.json`;
   if (!safeExistsSync(nextTasksPath)) return [];
   const allTasks = deps.loadAllNextTasks(missionId);
+  const resumeGoalDriven = options.resumeGoalDriven === true;
   let plannedTasks = allTasks.filter((task) => {
     const status = String(task.status || 'planned');
-    return status === 'planned' || status === 'rework';
+    if (status !== 'planned' && status !== 'rework') return false;
+    return !resumeGoalDriven || deps.isGoalDrivenTaskResumable(missionId, task);
   });
   if (plannedTasks.length === 0) return [];
 
@@ -76,7 +85,8 @@ export async function dispatchMissionNextTasksCore(
   deps.restoreMissionGraphRunTaskSnapshots(allTasks, graphRunJournal);
   plannedTasks = allTasks.filter((task) => {
     const status = String(task.status || 'planned');
-    return status === 'planned' || status === 'rework';
+    if (status !== 'planned' && status !== 'rework') return false;
+    return !resumeGoalDriven || deps.isGoalDrivenTaskResumable(missionId, task);
   });
   if (plannedTasks.length === 0) {
     deps.writeNextTasks(missionId, allTasks);
@@ -376,6 +386,7 @@ export async function dispatchMissionNextTasksCore(
             deps.dispatchPlannedMissionTask({
               missionId,
               task,
+              ...(resumeGoalDriven ? { resumeGoalDriven: true } : {}),
               teamRole,
               assignment,
               allTasks,

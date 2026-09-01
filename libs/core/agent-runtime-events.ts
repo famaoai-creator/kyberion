@@ -1,7 +1,8 @@
 import { appendJsonLine } from './foundation/json.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
+import * as path from 'node:path';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('agent-runtime-supervisor');
@@ -13,11 +14,17 @@ export function appendSupervisorEvent(event: Record<string, unknown>): void {
   try {
     const obsDir = resolveSharedObservabilityDir(EVENTS_DIR);
     if (!obsDir) return;
-    safeMkdir(obsDir);
-    appendJsonLine(`${obsDir}/agent-runtime-supervisor-events.jsonl`, {
-      ts: new Date().toISOString(),
-      ...event,
-    });
+    const safeObsDir = assertSafeRepositoryPath(obsDir, { allowMissingLeaf: true });
+    safeMkdir(safeObsDir);
+    appendJsonLine(
+      assertSafeRepositoryPath(path.join(safeObsDir, 'agent-runtime-supervisor-events.jsonl'), {
+        allowMissingLeaf: true,
+      }),
+      {
+        ts: new Date().toISOString(),
+        ...event,
+      }
+    );
   } catch (error: any) {
     // Runtime control must still succeed when a narrow authority cannot write
     // the optional observability stream.

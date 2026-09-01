@@ -1,8 +1,9 @@
-import { appendJsonLine } from './foundation/json.js';
+import * as path from 'node:path';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 
 export interface ArtifactOwnershipRecord {
   artifact_id: string;
@@ -37,6 +38,10 @@ const ARTIFACT_OWNERSHIP_SCHEMA_PATH = pathResolver.rootResolve(
 );
 const ARTIFACT_REGISTRY_PATH = pathResolver.shared('runtime/artifacts/registry.jsonl');
 
+function artifactRegistryPath(): string {
+  return assertSafeRepositoryPath(ARTIFACT_REGISTRY_PATH, { allowMissingLeaf: true });
+}
+
 let artifactOwnershipValidateFn: ValidateFunction | null = null;
 
 function ensureValidator(): ValidateFunction {
@@ -47,14 +52,6 @@ function ensureValidator(): ValidateFunction {
 
 function hasOwnership(record: ArtifactOwnershipRecord): boolean {
   return Boolean(record.project_id || record.mission_id || record.task_session_id);
-}
-
-function parseJsonl(raw: string): ArtifactOwnershipRecord[] {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as ArtifactOwnershipRecord);
 }
 
 function normalizeStorageClasses(
@@ -131,24 +128,26 @@ export function appendArtifactOwnershipRecord(
     throw new Error(`Invalid artifact ownership record: ${validation.errors.join('; ')}`);
   }
 
-  const registryDir = pathResolver.shared('runtime/artifacts');
+  const registryPath = artifactRegistryPath();
+  const registryDir = assertSafeRepositoryPath(path.dirname(registryPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(registryDir)) safeMkdir(registryDir, { recursive: true });
-  appendJsonLine(ARTIFACT_REGISTRY_PATH, record);
-  return ARTIFACT_REGISTRY_PATH;
+  appendJsonLine(registryPath, record);
+  return registryPath;
 }
 
 export function listArtifactOwnershipRecords(): ArtifactOwnershipRecord[] {
-  if (!safeExistsSync(ARTIFACT_REGISTRY_PATH)) return [];
-  let raw: string;
+  const registryPath = artifactRegistryPath();
+  if (!safeExistsSync(registryPath)) return [];
   try {
-    raw = safeReadFile(ARTIFACT_REGISTRY_PATH, { encoding: 'utf8' }) as string;
+    return readJsonLines<ArtifactOwnershipRecord>(registryPath);
   } catch (error) {
     // The registry is shared runtime state. A concurrent cleanup can remove it
     // after the existence check; treat that race like an empty registry.
     if (error instanceof Error && error.message.startsWith('File not found:')) return [];
     throw error;
   }
-  return parseJsonl(raw);
 }
 
 export function listArtifactOwnershipRecordsByQuery(
@@ -184,5 +183,5 @@ export function findReusableArtifactOwnershipRecord(
 }
 
 export function artifactOwnershipRegistryPath(): string {
-  return ARTIFACT_REGISTRY_PATH;
+  return artifactRegistryPath();
 }

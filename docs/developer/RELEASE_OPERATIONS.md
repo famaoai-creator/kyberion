@@ -56,6 +56,20 @@ Pre-releases use `-alpha.N`, `-beta.N`, `-rc.N` suffixes.
 
 ## Release runbook
 
+The CI/release workflow also creates a deterministic source archive and
+verifies its sibling `SHA256SUMS`. It extracts that archive into a governed
+clean staging directory and runs
+`pnpm install --frozen-lockfile --ignore-scripts`; a release is not published
+when this smoke fails.
+
+```bash
+pnpm run release:source-archive -- --ref HEAD \
+  --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
+pnpm run release:source-archive -- --check \
+  --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
+pnpm run release:install-smoke -- --ref HEAD
+```
+
 ```bash
 # 1. On main, ensure CI is green.
 git fetch && git checkout main && git pull
@@ -125,7 +139,7 @@ If the release introduces a schema or path change, add a migration script under 
 Release prep is not complete until the migration state is explicit:
 
 - If no migration is required, the release changelog section must say `Migration required: None`.
-- If a migration is required, add `migration/<sequence>-<slug>.ts`, document operator impact and rollback expectations in the changelog, and run `pnpm migration:run -- --dry-run` before tagging.
+- If a migration is required, add `migration/<sequence>-<slug>.ts`, document operator impact and rollback expectations in the changelog, and run `pnpm migration -- --dry-run` before tagging.
 - If actuator contract surfaces changed, update manifest versions and commit the refreshed `scripts/contract-baseline.json` produced by `pnpm run check:contract-semver -- --rebaseline`.
 
 ## Hotfix branch policy

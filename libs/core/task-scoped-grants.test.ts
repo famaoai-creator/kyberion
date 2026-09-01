@@ -114,6 +114,12 @@ describe('task-scoped grants: issuance', () => {
     ).toThrow(TaskGrantGovernedError);
   });
 
+  it('rejects an external store override before reading grants', () => {
+    process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
+
+    expect(() => listActiveGrants()).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('refuses the governed default store path under vitest', () => {
     delete process.env[TASK_GRANTS_PATH_ENV];
     expect(() => issueGoverned()).toThrow(/refusing to write the governed default store/);
@@ -388,6 +394,18 @@ describe('task-scoped grants: authority.resolveIdentityContext integration', () 
     };
     safeAppendFileSync(storePath, `${JSON.stringify(expired)}\n`);
     expect(resolveIdentityContext().authorities).not.toContain('NETWORK_FETCH');
+  });
+
+  it('fails closed when the authority read-side override is external', () => {
+    issueGoverned({ scope: { capabilities: ['GIT_WRITE'] } });
+    process.env.MISSION_ID = 'MSN-A';
+    process.env.TASK_ID = 'task-1';
+    process.env.KYBERION_NHI_ID = GRANTEE;
+    process.env.KYBERION_PERSONA = 'worker';
+    process.env.MISSION_ROLE = 'software_developer';
+    process.env[TASK_GRANTS_PATH_ENV] = '/tmp/task-grants-external.jsonl';
+
+    expect(resolveIdentityContext().authorities).not.toContain('GIT_WRITE');
   });
 
   it('never translates SUDO from a grant capability', () => {

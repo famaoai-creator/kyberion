@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { safeExec, safeMkdir, safeExistsSync, safeReadFile } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
@@ -298,7 +298,7 @@ export function parseOpsAlertLog(rawContent: string): ParsedOpsAlertRecord[] {
     if (!trimmed) continue;
     let raw: Record<string, unknown>;
     try {
-      const parsed = JSON.parse(trimmed);
+      const parsed = parseSafeJsonInput(trimmed, 'ops alert log entry');
       raw =
         parsed && typeof parsed === 'object' && !Array.isArray(parsed)
           ? (parsed as Record<string, unknown>)

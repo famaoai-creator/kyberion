@@ -1,0 +1,53 @@
+{
+  "$id": "https://kyberion.internal/schemas/surface-roles.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Surface role catalog",
+  "description": "Governed role, responsibility, and write posture for operator surfaces.",
+  "type": "object",
+  "required": ["version", "roles"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "roles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/role" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "role": {
+      "type": "object",
+      "required": [
+        "id",
+        "name_ja",
+        "name_en",
+        "role_ja",
+        "tagline_ja",
+        "metaphor",
+        "dir",
+        "port",
+        "writes"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name_ja": { "type": "string", "minLength": 1 },
+        "name_en": { "type": "string", "minLength": 1 },
+        "role_ja": { "type": "string", "minLength": 1 },
+        "tagline_ja": { "type": "string", "minLength": 1 },
+        "metaphor": { "type": "string", "minLength": 1 },
+        "dir": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "writes": { "enum": ["full", "scoped", "none", "orchestrator"] },
+        "tagline_key": { "type": "string", "minLength": 1 },
+        "enabled": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

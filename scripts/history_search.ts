@@ -11,17 +11,17 @@
  *   MISSION_ID=MSN-... pnpm history:search -- --mission-id MSN-... --query "復旧"
  */
 
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import {
-  createStandardYargs,
-  logger,
   rebuildPublicHistorySearchIndexFromLocalSources,
-  searchMissionHistory,
   searchHistory,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+  searchMissionHistory,
+} from '@agent/core/history-search-index';
+import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
-export function runHistorySearch(): number {
-  const argv = createStandardYargs()
+export function runHistorySearch(args: string[] = currentProcessArgv().slice(2)): number {
+  const argv = createStandardYargs(['node', 'history_search', ...args])
     .scriptName('history_search')
     .option('query', { type: 'string', describe: 'Japanese or free-text query' })
     .option('mode', {
@@ -79,13 +79,16 @@ export function runHistorySearch(): number {
   return 0;
 }
 
+const runHistorySearchScript = defineScript({
+  name: 'history:search',
+  flags: [],
+  run({ argv }) {
+    return runHistorySearch(argv);
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'history_search.ts') ||
   isDirectScript(import.meta.url, 'history_search.js')
 )
-  try {
-    process.exitCode = runHistorySearch();
-  } catch (error) {
-    logger.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  }
+  void runHistorySearchScript();

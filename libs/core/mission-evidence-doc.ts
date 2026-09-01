@@ -17,8 +17,9 @@ import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile, loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, loadJson } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 
 export interface MissionEvidenceDocOptions<T> {
   /** Mission id whose evidence directory holds this document. */
@@ -46,7 +47,18 @@ export class MissionEvidenceDoc<T> {
     const evidenceDir =
       pathResolver.missionEvidenceDir(this.options.mission_id) ??
       pathResolver.rootResolve(`active/missions/confidential/${this.options.mission_id}/evidence`);
-    return path.join(evidenceDir, this.options.filename);
+    const safeEvidenceDir = assertSafeRepositoryPath(evidenceDir, { allowMissingLeaf: true });
+    const candidate = path.resolve(safeEvidenceDir, this.options.filename);
+    const relative = path.relative(safeEvidenceDir, candidate);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error('[MISSION_EVIDENCE_DOC_SCOPE] filename must stay inside evidence directory');
+    }
+    return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
   }
 
   exists(): boolean {
@@ -87,8 +99,20 @@ export class MissionEvidenceDoc<T> {
       tier?: 'personal' | 'confidential' | 'public';
     }
   ): { audit_event_id: string } {
-    safeMkdir(path.dirname(this.filePath), { recursive: true });
-    safeWriteFile(this.filePath, JSON.stringify(record, null, 2));
+    const filePath = this.filePath;
+    const missionPath = assertSafeRepositoryPath(
+      pathResolver.findMissionPath(this.options.mission_id) ||
+        pathResolver.missionDir(this.options.mission_id, 'confidential'),
+      { allowMissingLeaf: true }
+    );
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    writeProvisionedJson({
+      missionId: this.options.mission_id,
+      filePath,
+      targetPath: path.relative(missionPath, filePath).split(path.sep).join('/'),
+      missionPathHint: missionPath,
+      provisioned: provisionMissionEntry(record),
+    });
     if (!audit) return { audit_event_id: '' };
     const agentId = this.options.agent_id ?? this.options.filename.replace(/\.[^.]+$/, '');
     try {
@@ -107,7 +131,10 @@ export class MissionEvidenceDoc<T> {
           const tier = audit.tier ?? 'confidential';
           const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
           const date = new Date().toISOString().slice(0, 10);
-          appendJsonLine(path.join(auditDir, `audit-${date}.jsonl`), entry);
+          const auditPath = assertSafeRepositoryPath(path.join(auditDir, `audit-${date}.jsonl`), {
+            allowMissingLeaf: true,
+          });
+          appendJsonLine(auditPath, entry);
         } catch (err: any) {
           logger.warn(`[mission-evidence-doc] mission audit write failed: ${err?.message ?? err}`);
         }

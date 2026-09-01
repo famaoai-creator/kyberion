@@ -25,7 +25,10 @@ import { logger } from './core.js';
 import { recordReasoningTierDeclaration } from './reasoning-tier-declaration.js';
 import type { AgentHandle } from './agent-lifecycle.js';
 import { triggerBackgroundReviewFork } from './background-review-runner.js';
-import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
+import {
+  checkAndRepairSurfaceUxContract,
+  validateSurfaceUxContract,
+} from './surface-ux-contract.js';
 import {
   buildMissionTeamView,
   loadMissionTeamPlan,
@@ -54,6 +57,7 @@ import {
   type SurfaceRuntimeRouteContext,
 } from './surface-runtime-router.js';
 import { resolveSurfaceIntent } from './router-contract.js';
+import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import {
   resolveIntentResolutionContract,
   type IntentResolutionContract,
@@ -98,7 +102,13 @@ export {
 async function handleGovernedExecutionHint(
   context: SurfaceRuntimeRouteContext
 ): Promise<SurfaceConversationResult> {
-  const resolved = resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery);
+  const resolved =
+    context.resolvedIntent ||
+    resolveSurfaceIntent(context.input.surfaceText || context.structuredQuery, {
+      tier: context.input.scope?.tier,
+      tenantId: context.input.scope?.tenant_slug,
+      packet: context.resolutionPacket,
+    });
   const intentId = resolved.intentId;
   const candidates = intentId ? selectContractCandidates(intentId, 3, currentScope()) : [];
   const routingDecisionArgs = context.compiledFlow?.routingDecision
@@ -573,24 +583,11 @@ async function escalateSurfaceTextIfNeeded(
   if (!text.trim()) return text;
 
   const allowConversationalReply = isSimpleGreetingText(prompt);
-  const verdict = validateSurfaceUxContract({
-    text,
+  const check = checkAndRepairSurfaceUxContract(text, {
     allow_conversational_reply: allowConversationalReply,
     approval_required: approvalRequired,
   });
-  if (verdict.valid) return text;
-
-  const repairedText = repairSurfaceUxContractText(text);
-  if (
-    repairedText !== text &&
-    validateSurfaceUxContract({
-      text: repairedText,
-      allow_conversational_reply: allowConversationalReply,
-      approval_required: approvalRequired,
-    }).valid
-  ) {
-    return repairedText;
-  }
+  if (check.verdict.valid || check.repaired) return check.text;
 
   const escalationReason = 'ux_contract_validation_failed';
   recordSurfaceReasoningTierDeclaration({
@@ -995,7 +992,12 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
       );
       return (
         hasActiveSlotFilling ||
-        Boolean(classifyTaskSessionIntent(structuredSurfaceQueryText(context)))
+        Boolean(
+          classifyTaskSessionIntent(structuredSurfaceQueryText(context), context.resolutionPacket, {
+            tier: context.input.scope?.tier,
+            tenantId: context.input.scope?.tenant_slug,
+          })
+        )
       );
     },
     handle: async (context) => {
@@ -1053,11 +1055,19 @@ export async function runSurfaceConversation(
   const resolutionText = [pendingIntent?.source_text, originalText]
     .filter((part): part is string => Boolean(part?.trim()))
     .join('\n');
+  const originalResolutionPacket = resolveIntentResolutionPacket(originalText, {
+    tier: input.scope?.tier,
+    tenantId: input.scope?.tenant_slug,
+  });
   const intentResolution: IntentResolutionContract = resolveIntentResolutionContract(
     resolutionText,
     {
       tier: input.scope?.tier,
       tenantId: input.scope?.tenant_slug,
+      // A normal turn has identical resolution text and can reuse the packet
+      // already computed for routing. Pending clarification intentionally
+      // keeps its separate combined-text resolution semantics.
+      packet: pendingIntent ? undefined : originalResolutionPacket,
     }
   );
   const withIntentResolution = (result: SurfaceConversationResult): SurfaceConversationResult => ({
@@ -1074,13 +1084,17 @@ export async function runSurfaceConversation(
   ].filter((part): part is string => typeof part === 'string' && part.trim().length > 0);
   const routingText = routingTextParts.join('\n\n');
   const ruleBasedReceiver = forcedReceiver || deriveSurfaceDelegationReceiver(routingText, surface);
-  const preResolvedIntent = resolveSurfaceIntent(originalText);
+  const preResolvedIntent = resolveSurfaceIntent(originalText, {
+    tier: input.scope?.tier,
+    tenantId: input.scope?.tenant_slug,
+    packet: originalResolutionPacket,
+  });
   const isDirectDelegationIntent = preResolvedIntent.intentId === 'delegate-mission-task';
   const compiledFlow: UserIntentFlow | null =
     !forcedReceiver &&
     !ruleBasedReceiver &&
     !isDirectDelegationIntent &&
-    shouldCompileSurfaceIntent(input, routingText, ruleBasedReceiver)
+    shouldCompileSurfaceIntent(input, routingText, ruleBasedReceiver, originalResolutionPacket)
       ? await (() => {
           recordSurfaceReasoningTierDeclaration({
             callSite: 'surface_intent_compile',
@@ -1097,6 +1111,7 @@ export async function runSurfaceConversation(
                 ...surfaceRuntimeData.buildPendingRuntimeContext(pendingIntent, input),
                 ...(input.scope ? { surface_scope: input.scope } : {}),
               },
+              resolutionPacket: originalResolutionPacket,
             },
             { model_tier: 'fast' }
           );
@@ -1164,7 +1179,8 @@ export async function runSurfaceConversation(
   const routeContext: SurfaceRuntimeRouteContext = {
     input,
     compiledFlow,
-    resolvedIntent: resolveSurfaceIntent(originalText),
+    resolutionPacket: originalResolutionPacket,
+    resolvedIntent: preResolvedIntent,
     computedReceiver,
     structuredQuery,
     parsedSlackPrompt,
@@ -1415,21 +1431,17 @@ export async function runSurfaceMessageConversation(
         approval_required: approvalRequired,
       });
       if (!verdict.valid) {
-        const repairedText = repairSurfaceUxContractText(text);
-        if (repairedText !== text) {
-          const repairedVerdict = validateSurfaceUxContract({
-            text: repairedText,
-            allow_conversational_reply: allowConversationalReply,
-            approval_required: approvalRequired,
-          });
-          if (repairedVerdict.valid) {
-            (result as { text?: string }).text = repairedText;
-            (result as { uxContract?: unknown }).uxContract = repairedVerdict;
-            logger.info(
-              `[UX_CONTRACT] surface response repaired before delivery: ${verdict.violations.join('; ')}`
-            );
-            return result;
-          }
+        const check = checkAndRepairSurfaceUxContract(text, {
+          allow_conversational_reply: allowConversationalReply,
+          approval_required: approvalRequired,
+        });
+        if (check.repaired) {
+          (result as { text?: string }).text = check.text;
+          (result as { uxContract?: unknown }).uxContract = check.verdict;
+          logger.info(
+            `[UX_CONTRACT] surface response repaired before delivery: ${verdict.violations.join('; ')}`
+          );
+          return result;
         }
         logger.warn(
           `[UX_CONTRACT] surface response violates contract: ${verdict.violations.join('; ')}`

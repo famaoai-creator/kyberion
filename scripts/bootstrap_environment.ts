@@ -20,11 +20,11 @@ import {
   bootstrapManifest,
   listEnvironmentManifestIds,
   loadEnvironmentManifest,
-  logger,
   probeManifest,
   verifyReady,
-} from '@agent/core';
+} from '@agent/core/environment-capability';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
 import { isDirectScript } from './lib/harness.js';
 import { defineScript, ScriptExitError } from './lib/harness.js';
 import { formatDoctorSummary, summarizeManifestDoctor } from './environment-doctor.js';
@@ -110,8 +110,8 @@ async function processManifest(
   return { ok: missingRequired === 0, unsatisfied: missingRequired };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'bootstrap_environment', ...args])
     .option('manifest', { type: 'string' })
     .option('all', { type: 'boolean', default: false })
     .option('list', { type: 'boolean', default: false })
@@ -178,8 +178,8 @@ if (
   void defineScript({
     name: 'env:bootstrap',
     flags: [],
-    run() {
-      return main();
+    run({ argv }) {
+      return main(argv);
     },
   })();
 }

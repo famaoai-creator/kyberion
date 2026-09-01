@@ -5,10 +5,12 @@ import {
   collectFailedSchedules,
   extractHintsFromTrace,
   persistHints,
+  checkScheduleHealth,
+  recordPipelineResult,
   sweepFailedSchedules,
 } from './feedback-loop.js';
 import type { Trace } from './trace.js';
-import type { PipelineScheduleRegistry } from './pipeline-scheduler.js';
+import { loadScheduleRegistry, type PipelineScheduleRegistry } from './pipeline-scheduler.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeWriteFile } from '../secure-io.js';
 
@@ -226,5 +228,26 @@ describe('failed-schedule sweep (LC-01c)', () => {
     expect(result.failed).toEqual([]);
     expect(result.alert).toBeNull();
     expect(emitAlert).not.toHaveBeenCalled();
+  });
+
+  it('records and auto-disables failures through the governed scheduler registry', () => {
+    const rootDir = seedRegistryRoot(
+      makeRegistry([{ id: 'broken', lastStatus: 'succeeded' } as never])
+    );
+
+    recordPipelineResult('broken', 'failed', undefined, { rootDir });
+    expect(loadScheduleRegistry({ rootDir }).schedules[0]).toMatchObject({
+      consecutiveFailures: 1,
+      lastStatus: 'failed',
+    });
+
+    expect(checkScheduleHealth('broken', 1, { rootDir })).toMatchObject({
+      healthy: false,
+      action: 'disabled',
+    });
+    expect(loadScheduleRegistry({ rootDir }).schedules[0]).toMatchObject({
+      enabled: false,
+      disabledReason: 'Auto-disabled after 1 consecutive failures',
+    });
   });
 });

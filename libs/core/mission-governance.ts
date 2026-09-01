@@ -6,6 +6,7 @@ import { appendJsonLine, readJson } from './foundation/json.js';
 
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   evaluateArtifactReviews,
   inferArtifactReviewKind,
@@ -17,6 +18,7 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeReaddir,
@@ -35,12 +37,41 @@ import { trustEngine } from './trust-engine.js';
 import { validateOutcomeContractAtCompletion } from './outcome-contract.js';
 import { evaluateArtifactBundleGate } from './mission-review-gates.js';
 import { loadLatestArtifactBundleForMission } from './artifact-bundle.js';
-import { readJsonFile, readTextFile } from './cli-input.js';
+import { readTextFile } from './foundation/text.js';
 import { loadState } from './mission-state.js';
+import { loadPersistedTrustLedger } from './trust-engine.js';
+
+const SECURITY_POLICY_QUALITY_CATALOG = defineCatalog<{
+  quality_requirements?: Record<string, unknown>;
+}>({
+  id: 'security-policy-quality-requirements',
+  path: pathResolver.knowledge('product/governance/security-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/security-policy.schema.json'),
+});
+
+function safeMissionRoot(missionPath: string): string {
+  return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+}
+
+function safeMissionArtifactPath(missionPath: string, relativePath: string): string {
+  return assertSafeRepositoryPath(path.join(safeMissionRoot(missionPath), relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function isPathInside(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
 
 export function syncRoleProcedure(missionId: string, persona: string): void {
   const roleSlug = persona.toLowerCase().replace(/\s+/g, '_');
-  const sourcePath = pathResolver.knowledge(`product/roles/${roleSlug}/PROCEDURE.md`);
+  let sourcePath: string;
   const targetDir = findMissionPath(missionId);
 
   if (!targetDir) {
@@ -48,15 +79,26 @@ export function syncRoleProcedure(missionId: string, persona: string): void {
     return;
   }
 
-  const targetPath = path.join(targetDir, 'ROLE_PROCEDURE.md');
+  try {
+    sourcePath = assertSafeRepositoryPath(
+      pathResolver.knowledge(`product/roles/${roleSlug}/PROCEDURE.md`),
+      { allowMissingLeaf: true }
+    );
+    const safeTargetDir = safeMissionRoot(targetDir);
+    const targetPath = safeMissionArtifactPath(safeTargetDir, 'ROLE_PROCEDURE.md');
 
-  if (safeExistsSync(sourcePath)) {
-    const procedure = readTextFile(sourcePath);
-    safeWriteFile(targetPath, procedure);
-    logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
-  } else {
+    if (safeExistsSync(sourcePath)) {
+      const procedure = readTextFile(sourcePath);
+      safeWriteFile(targetPath, procedure);
+      logger.info(`📋 [Governance] Mirrored procedure for role "${persona}" to mission context.`);
+    } else {
+      logger.warn(
+        `⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`
+      );
+    }
+  } catch (error) {
     logger.warn(
-      `⚠️ [Governance] No specific procedure found for role "${persona}" at ${sourcePath}. Using default.`
+      `⚠️ [Governance] Refusing unsafe role procedure path for "${persona}": ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -79,10 +121,7 @@ export function updateTrustScore(agentId: string, result: 'verified' | 'rejected
 }
 
 export function readTrustLedger(): Record<string, any> {
-  const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-  if (!safeExistsSync(ledgerPath)) return {};
-  const raw = readJsonFile<Record<string, unknown>>(ledgerPath);
-  return raw?.agents ?? raw ?? {};
+  return loadPersistedTrustLedger() ?? {};
 }
 
 export async function validateMissionQuality(
@@ -91,7 +130,18 @@ export async function validateMissionQuality(
   const state = loadState(id);
   if (!state) return { ok: false, reason: 'Mission state not found.' };
 
-  const missionPath = findMissionPath(id);
+  const missionPathCandidate = findMissionPath(id);
+  let missionPath: string | null = missionPathCandidate;
+  if (missionPathCandidate) {
+    try {
+      missionPath = safeMissionRoot(missionPathCandidate);
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `Mission path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
   const artifactReviewGate = validateMissionArtifactReviewGate({
     missionId: id,
     missionPath,
@@ -101,7 +151,7 @@ export async function validateMissionQuality(
   const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
   if (!safeExistsSync(policyPath)) return { ok: true };
 
-  const policy = readJsonFile<{ quality_requirements?: Record<string, unknown> }>(policyPath);
+  const policy = SECURITY_POLICY_QUALITY_CATALOG.load();
   const reqs = policy.quality_requirements;
   if (!reqs) return { ok: true };
 
@@ -112,12 +162,22 @@ export async function validateMissionQuality(
   if (!marketingCompletion.ok) return marketingCompletion;
 
   if (state.outcome_contract) {
-    const evidenceRefs =
-      missionPath && safeExistsSync(path.join(missionPath, 'evidence'))
-        ? safeReaddir(path.join(missionPath, 'evidence'))
-            .filter((entry) => entry !== '.gitkeep')
-            .map((entry) => path.join(missionPath, 'evidence', entry))
-        : [];
+    let evidenceRefs: string[] = [];
+    if (missionPath) {
+      try {
+        const evidenceDir = safeMissionArtifactPath(missionPath, 'evidence');
+        evidenceRefs = safeExistsSync(evidenceDir)
+          ? safeReaddir(evidenceDir)
+              .filter((entry) => entry !== '.gitkeep')
+              .map((entry) => safeMissionArtifactPath(missionPath, `evidence/${entry}`))
+          : [];
+      } catch (error) {
+        return {
+          ok: false,
+          reason: `Mission evidence path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
+    }
     const outcomeCheck = validateOutcomeContractAtCompletion(state.outcome_contract, {
       artifactRefs: evidenceRefs,
     });
@@ -199,7 +259,17 @@ export function validateMissionArtifactReviewGate(input: {
   missionPath: string | null;
 }): { ok: boolean; reason?: string; reviewTaskIds?: string[] } {
   if (!input.missionPath) return { ok: true };
-  const taskPath = path.join(input.missionPath, 'NEXT_TASKS.json');
+  let missionPath: string;
+  let taskPath: string;
+  try {
+    missionPath = safeMissionRoot(input.missionPath);
+    taskPath = safeMissionArtifactPath(missionPath, 'NEXT_TASKS.json');
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Artifact review gate could not use mission path: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
   if (!safeExistsSync(taskPath)) return { ok: true };
 
   let tasks: ArtifactReviewPlannedTask[];
@@ -233,9 +303,8 @@ export function validateMissionArtifactReviewGate(input: {
         reviewTaskIds: [taskId],
       };
     }
-    const receiptPath = path.resolve(input.missionPath, receiptReference);
-    const relativeReceiptPath = path.relative(input.missionPath, receiptPath);
-    if (relativeReceiptPath.startsWith('..') || path.isAbsolute(relativeReceiptPath)) {
+    const receiptPath = path.resolve(missionPath, receiptReference);
+    if (!isPathInside(missionPath, receiptPath)) {
       return {
         ok: false,
         reason: `Artifact review gate failed for ${taskId}: receipt must remain inside the mission directory.`,
@@ -244,7 +313,8 @@ export function validateMissionArtifactReviewGate(input: {
     }
 
     try {
-      const receipt = loadArtifactReviewReceipt(receiptPath);
+      const safeReceiptPath = assertSafeRepositoryPath(receiptPath, { allowMissingLeaf: true });
+      const receipt = loadArtifactReviewReceipt(safeReceiptPath);
       const identityReasons: string[] = [];
       if (receipt.mission_id.toUpperCase() !== input.missionId.toUpperCase()) {
         identityReasons.push(`receipt mission_id is ${receipt.mission_id}`);
@@ -261,7 +331,12 @@ export function validateMissionArtifactReviewGate(input: {
       if (profile.artifact_sha256 && receipt.artifact.sha256 !== profile.artifact_sha256) {
         identityReasons.push('receipt artifact hash does not match the review profile');
       }
-      const artifactPath = pathResolver.rootResolve(receipt.artifact.path);
+      const artifactPath = assertSafeRepositoryPath(
+        pathResolver.rootResolve(receipt.artifact.path),
+        {
+          allowMissingLeaf: true,
+        }
+      );
       const inferredArtifactKind = inferArtifactReviewKind(receipt.artifact.path);
       if (receipt.artifact.kind !== inferredArtifactKind) {
         identityReasons.push(
@@ -313,15 +388,31 @@ export function validateMarketingMissionCompletionGate(input: {
 }): { ok: boolean; reason?: string } {
   if (!/marketing|campaign|publication/i.test(input.missionType || '')) return { ok: true };
   if (!input.missionPath) return { ok: false, reason: 'Marketing mission path not found.' };
-  const evidenceRoot = path.join(input.missionPath, 'evidence');
+  let missionPath: string;
+  let evidenceRoot: string;
+  try {
+    missionPath = safeMissionRoot(input.missionPath);
+    evidenceRoot = safeMissionArtifactPath(missionPath, 'evidence');
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Marketing mission path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
   const candidates: string[] = [];
   const visit = (directory: string, depth: number): void => {
     if (depth > 5 || !safeExistsSync(directory)) return;
     for (const entry of safeReaddir(directory)) {
-      const candidate = path.join(directory, entry);
-      const stat = safeStat(candidate);
-      if (stat.isDirectory()) visit(candidate, depth + 1);
-      else if (entry === 'completion-evidence.json') candidates.push(candidate);
+      try {
+        const candidate = assertSafeRepositoryPath(path.join(directory, entry), {
+          allowMissingLeaf: false,
+        });
+        const stat = safeStat(candidate);
+        if (stat.isDirectory()) visit(candidate, depth + 1);
+        else if (entry === 'completion-evidence.json') candidates.push(candidate);
+      } catch {
+        // Unsafe or symlinked evidence entries are not eligible completion evidence.
+      }
     }
   };
   visit(evidenceRoot, 0);
@@ -333,9 +424,14 @@ export function validateMarketingMissionCompletionGate(input: {
     const evidence = readJson<MarketingCompletionEvidence>(candidates[0]);
     const currentArtifacts = Object.fromEntries(
       Object.entries(evidence.artifact_bindings || {}).map(([name, binding]) => {
-        const artifactPath = path.isAbsolute(binding.path)
-          ? binding.path
-          : pathResolver.rootResolve(binding.path);
+        let artifactPath: string;
+        try {
+          artifactPath = assertSafeRepositoryPath(pathResolver.rootResolve(binding.path), {
+            allowMissingLeaf: true,
+          });
+        } catch {
+          return [name, { path: binding.path, sha256: '' }];
+        }
         if (!safeExistsSync(artifactPath)) return [name, { path: binding.path, sha256: '' }];
         return [name, { path: binding.path, sha256: sha256(safeReadFile(artifactPath) as Buffer) }];
       })
@@ -356,7 +452,8 @@ export function recordAgentRuntimeEvent(
   agentRuntimeEventPath: string,
   event: Record<string, unknown>
 ): void {
-  const dir = path.dirname(agentRuntimeEventPath);
-  if (!safeExistsSync(dir)) safeWriteFile(agentRuntimeEventPath, '');
-  appendJsonLine(agentRuntimeEventPath, { ts: new Date().toISOString(), ...event });
+  const safeEventPath = assertSafeRepositoryPath(agentRuntimeEventPath, { allowMissingLeaf: true });
+  const dir = assertSafeRepositoryPath(path.dirname(safeEventPath), { allowMissingLeaf: true });
+  if (!safeExistsSync(dir)) safeWriteFile(safeEventPath, '');
+  appendJsonLine(safeEventPath, { ts: new Date().toISOString(), ...event });
 }

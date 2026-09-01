@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
@@ -21,7 +20,7 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { missionEvidenceDir } from './path-resolver.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import {
   evaluateArchitectureReadyGate,
   evaluateQaReadyGate,
@@ -90,7 +89,8 @@ describe('sdlc-artifact-store', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sdlc-'));
+    tmpDir = pathResolver.sharedTmp(`sdlc-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
     (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(tmpDir);
   });
 
@@ -152,6 +152,20 @@ describe('sdlc-artifact-store', () => {
 
     it('ARCHITECTURE_READY fails when no spec exists', () => {
       expect(evaluateArchitectureReadyGate('MSN-NONE').passed).toBe(false);
+    });
+
+    it('rejects a schema-invalid persisted design spec', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'design-spec.json'),
+        JSON.stringify({
+          version: 'v1',
+          project_name: 'Broken',
+          generated_at: 'bad',
+          components: [],
+        })
+      );
+
+      expect(() => readDesignSpec('MSN-D-INVALID')).toThrow(/Invalid catalog sdlc-design-spec/);
     });
 
     it('emits design specs that satisfy the schema', () => {

@@ -38,7 +38,3 @@ export function resolveReportSummaryTitle(): string {
 export function resolveReportSectionTitle(): string {
   return loadDocumentOutlineLabelPolicyCatalog().report_section_title || 'Section';
 }
-
-export function resetDocumentOutlineLabelPolicyCatalogCache(): void {
-  catalog.reset();
-}

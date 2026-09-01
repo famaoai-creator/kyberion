@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
 import { queryKnowledgeHybrid } from './src/knowledge-index.js';
 
 import { pathResolver } from './path-resolver.js';
 import { secureFetch } from './network.js';
-import { safeExec, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeWriteFile } from './secure-io.js';
 import { writeIntentGoalHandoff } from './intent-handoff.js';
 import { a2aBridge } from './a2a-bridge.js';
 import { logger } from './core.js';
@@ -20,6 +21,7 @@ import {
   getActiveTaskSession,
 } from './task-session.js';
 import type { TaskSession } from './task-session.js';
+import type { ApprovalRequestDraft } from './approval-store.js';
 import { loadPendingIntent } from './pending-intent-store.js';
 import { executeCapturePhotoTaskSession } from './capture-photo-task-session-executor.js';
 import { executeApprovedClaudeTaskSession } from './claude-task-session-executor.js';
@@ -31,6 +33,7 @@ import { isCorrectionUtterance } from './correction-detection.js';
 import { type SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
 import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
 import { recordIntentContractOutcome } from './intent-contract-learning.js';
+import { t } from './t.js';
 import type { WorkScopeDecision } from './work-scope-decision.js';
 import {
   registerService,
@@ -58,6 +61,52 @@ export {
 } from './surface-runtime-helpers.js';
 
 export const surfaceRuntimeContextStore = new AsyncLocalStorage<SurfaceConversationInput>();
+
+function buildTaskSessionApprovalRequest(
+  session: TaskSession,
+  queryText: string
+): ApprovalRequestDraft | undefined {
+  const missing = session.requirements?.missing || [];
+  const unresolvedInputs = missing.filter(
+    (input) => input !== 'approval_confirmation' && input !== 'dual_key_confirmation'
+  );
+  if (!session.control.requires_approval || unresolvedInputs.length > 0) return undefined;
+  return {
+    title: t('dock.intent_resolution.approval_title', { summary: session.goal.summary }, 'ja'),
+    summary: t('dock.intent_resolution.approval_summary', { request: queryText }, 'ja'),
+    details: session.goal.success_condition,
+    severity: 'high',
+  };
+}
+
+function buildTaskSessionApprovalResult(
+  session: TaskSession,
+  queryText: string
+): ReturnType<typeof emptySurfaceResult> {
+  const result = emptySurfaceResult(
+    buildTaskSessionReply({
+      session,
+      status: 'pending',
+      intentId: String(session.payload?.intent_id || ''),
+      missingInputs: session.requirements?.missing || [],
+      approvalRequired: session.control.requires_approval,
+    })
+  );
+  const approvalRequest = buildTaskSessionApprovalRequest(session, queryText);
+  if (approvalRequest) result.approvalRequests = [approvalRequest];
+  return result;
+}
+
+function sessionRuntimePath(namespace: string, sessionId: string, fileName: string): string {
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[SURFACE_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`${namespace}/${fileName.replace('{session_id}', normalized)}`),
+    { allowMissingLeaf: true }
+  );
+}
 
 import type {
   SurfaceConversationInput,
@@ -215,7 +264,7 @@ export async function handleSurfaceQueryRoute(
   }
 
   if (resolved.intentId === 'schedule-read-agenda') {
-    const answer = await readScheduleAgenda(queryText);
+    const answer = await readScheduleAgenda(queryText, context.resolutionPacket?.contextual_frame);
     const completionAction = buildDirectReplyCompletionAction({
       request: queryText,
       response: answer,
@@ -389,6 +438,13 @@ export async function handleTaskSessionRoute(
     const missingList = activeSession.requirements.missing;
     const nextSlot = missingList[0];
 
+    const approvalOnly = missingList.every(
+      (input) => input === 'approval_confirmation' || input === 'dual_key_confirmation'
+    );
+    if (approvalOnly && activeSession.control.requires_approval) {
+      return buildTaskSessionApprovalResult(activeSession, queryText);
+    }
+
     let slotValue = queryText;
     let extraPayload: Record<string, any> = {};
 
@@ -494,7 +550,10 @@ export async function handleTaskSessionRoute(
         }
       }
     }
-    const freshIntent = classifyTaskSessionIntent(queryText);
+    const freshIntent = classifyTaskSessionIntent(queryText, context.resolutionPacket, {
+      tier: context.input.scope?.tier,
+      tenantId: context.input.scope?.tenant_slug,
+    });
     if (!freshIntent?.intentId) {
       return emptySurfaceResult('No task-session intent could be resolved.');
     }
@@ -762,7 +821,7 @@ export async function handleTaskSessionRoute(
         status: 'completed',
         artifact: {
           kind: 'external_data_fetch_result',
-          output_path: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+          output_path: sessionRuntimePath('external-data', session.session_id, '{session_id}.txt'),
           preview_text: preview.text,
           omitted_count: preview.omitted_count,
           storage_class: 'tmp',
@@ -770,7 +829,7 @@ export async function handleTaskSessionRoute(
       });
 
       safeWriteFile(
-        pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+        sessionRuntimePath('external-data', session.session_id, '{session_id}.txt'),
         `topic: ${dataTopic}\nurl: ${sourceUrl}\n\n${plainText}`,
         { mkdir: true, encoding: 'utf8' }
       );
@@ -778,7 +837,7 @@ export async function handleTaskSessionRoute(
       const completionAction = buildTaskSessionCompletionAction({
         session: updated || session,
         output: summary,
-        outputPath: pathResolver.sharedTmp(`external-data/${session.session_id}.txt`),
+        outputPath: sessionRuntimePath('external-data', session.session_id, '{session_id}.txt'),
         satisfied: true,
       });
       recordLearningOutcomeSafely({
@@ -856,12 +915,18 @@ export async function handleTaskSessionRoute(
     sessionIntentId === 'stop-service' ||
     sessionIntentId === 'enable-voice-input';
 
-  if (session.requirements?.missing?.length === 0 && isRunnableServiceTask) {
+  if (
+    session.requirements?.missing?.length === 0 &&
+    !session.control.requires_approval &&
+    isRunnableServiceTask
+  ) {
     try {
       let output = '';
       if (sessionIntentId === 'resolve-approval' || sessionIntentId === 'request-approval') {
-        const tempFile = pathResolver.sharedTmp(
-          `approval-actuator-inputs/input-${session.session_id}.json`
+        const tempFile = sessionRuntimePath(
+          'approval-actuator-inputs',
+          session.session_id,
+          'input-{session_id}.json'
         );
         const actionInput = {
           action: sessionIntentId === 'resolve-approval' ? 'decide' : 'create',
@@ -894,7 +959,7 @@ export async function handleTaskSessionRoute(
           }
         );
 
-        const resultJson = JSON.parse(execRes);
+        const resultJson = parseSurfaceActuatorResult(execRes, 'approval-actuator');
         output = `[Approval-Actuator] 承認アクション [${actionInput.action}] が正常に完了しました。\n結果: ${JSON.stringify(resultJson, null, 2)}`;
       } else if (sessionIntentId === 'setup-messaging-bridge') {
         const platformId = session.payload?.platform_id || 'slack';
@@ -943,8 +1008,10 @@ export async function handleTaskSessionRoute(
         output = `サービス [${serviceName}] を停止しました。\n\n${controlOutput}`;
       } else if (sessionIntentId === 'enable-voice-input') {
         const serviceName = session.payload?.service_name || 'voice-hub';
-        const tempFile = pathResolver.sharedTmp(
-          `system-actuator-inputs/input-${session.session_id}.json`
+        const tempFile = sessionRuntimePath(
+          'system-actuator-inputs',
+          session.session_id,
+          'input-{session_id}.json'
         );
         const actionInput = {
           version: '0.1',
@@ -966,7 +1033,7 @@ export async function handleTaskSessionRoute(
             cwd: pathResolver.rootDir(),
           }
         );
-        const resultJson = JSON.parse(execRes);
+        const resultJson = parseSurfaceActuatorResult(execRes, 'system-actuator');
         output = `[System-Actuator] 音声入力を有効化しました。対象: ${serviceName}\n結果: ${JSON.stringify(resultJson, null, 2)}`;
       } else {
         output = `サービスオペレーション [${sessionIntentId}] を正常に実行しました。`;
@@ -976,14 +1043,18 @@ export async function handleTaskSessionRoute(
         status: 'completed',
         artifact: {
           kind: `${sessionIntentId}_result`,
-          output_path: pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`),
+          output_path: sessionRuntimePath(
+            'service-operations',
+            session.session_id,
+            '{session_id}.txt'
+          ),
           ...truncateTextWithCount(output, 500),
           storage_class: 'tmp',
         },
       });
 
       safeWriteFile(
-        pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`),
+        sessionRuntimePath('service-operations', session.session_id, '{session_id}.txt'),
         output,
         { mkdir: true, encoding: 'utf8' }
       );
@@ -991,7 +1062,11 @@ export async function handleTaskSessionRoute(
       const completionAction = buildTaskSessionCompletionAction({
         session: updated || session,
         output: output,
-        outputPath: `${pathResolver.sharedTmp(`service-operations/${session.session_id}.txt`)}`,
+        outputPath: sessionRuntimePath(
+          'service-operations',
+          session.session_id,
+          '{session_id}.txt'
+        ),
         satisfied: true,
       });
       if (intent.intentId) {
@@ -1079,7 +1154,8 @@ export async function handleTaskSessionRoute(
       ? String(session.payload['handoff_intent_id'])
       : '';
 
-  return emptySurfaceResult(
+  const approvalRequest = buildTaskSessionApprovalRequest(session, queryText);
+  const result = emptySurfaceResult(
     buildTaskSessionReply({
       session,
       status: 'pending',
@@ -1107,8 +1183,11 @@ export async function handleTaskSessionRoute(
               ? (session.payload?.service_choices as string[])
               : undefined,
       handoffIntentId: handoffIntentId || undefined,
+      approvalRequired: session.control.requires_approval,
     })
   );
+  if (approvalRequest) result.approvalRequests = [approvalRequest];
+  return result;
 }
 
 export function ensureMissionId(context: SurfaceRuntimeRouteContext): string {

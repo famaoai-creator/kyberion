@@ -23,38 +23,39 @@
  *     --max-minutes 30
  */
 
+import { EnergyVad } from '@agent/core/voice-activity-detector';
+import { MeetingParticipationCoordinator } from '@agent/core/meeting-participation-coordinator';
 import {
-  EnergyVad,
-  MeetingParticipationCoordinator,
   StubMeetingJoinDriver,
   getMeetingJoinDriver,
-  installInRoomMeetingJoinDriver,
-  installChromeExtensionMeetingJoinDriver,
-  getStreamingSttBridge,
-  getStreamingTtsBridge,
-  getVoiceProfileRegistry,
-  installShellStreamingSttBridgeFromEnv,
-  installShellStreamingTtsBridgeFromEnv,
-  loadEnvironmentManifest,
-  logger,
   registerMeetingJoinDriver,
-  resolveAudioBus,
-  verifyReady,
-  TraceContext,
-  finalizeAndPersist,
-  pathResolver,
-  type AudioFormat,
-  type ConversationAgent,
-  type MeetingJoinDriver,
-  type MeetingTarget,
-  type TranscriptChunk,
-  getReasoningBackend,
-  resolveMeetingParticipationRuntimePlan,
   validateMeetingTarget,
-} from '@agent/core';
+  type MeetingJoinDriver,
+} from '@agent/core/meeting-join-driver';
+import { installInRoomMeetingJoinDriver } from '@agent/core/in-room-meeting-driver';
+import { installChromeExtensionMeetingJoinDriver } from '@agent/core/chrome-extension-meeting-driver';
+import { getStreamingSttBridge } from '@agent/core/streaming-stt-bridge';
+import { getStreamingTtsBridge } from '@agent/core/streaming-tts-bridge';
+import { getVoiceProfileRegistry } from '@agent/core/voice-profile-registry';
+import { installShellStreamingSttBridgeFromEnv } from '@agent/core/shell-streaming-stt-bridge';
+import { installShellStreamingTtsBridgeFromEnv } from '@agent/core/shell-streaming-tts-bridge';
+import { loadEnvironmentManifest, verifyReady } from '@agent/core/environment-capability';
+import { resolveAudioBus } from '@agent/core/audio-bus-resolver';
+import { resolveMeetingParticipationRuntimePlan } from '@agent/core/meeting-participation-runtime-plan';
+import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
+import { pathResolver } from '@agent/core/path-resolver';
+import { logger } from '@agent/core/core';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import type {
+  AudioFormat,
+  MeetingTarget,
+  TranscriptChunk,
+} from '@agent/core/meeting-session-types';
+import type { ConversationAgent } from '@agent/core/meeting-participation-coordinator';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathToFileURL } from 'node:url';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 // Side-effect imports register the audio-bus capability probes so the
 // participation-runtime manifest can resolve `audio-bus.blackhole` etc.
 import '@agent/core/blackhole-audio-bus';
@@ -91,7 +92,7 @@ class ReasoningBackendAgent implements ConversationAgent {
       const raw = await this.backend.delegateTask(prompt, `meeting:${this.missionId}`);
       const json = extractFirstJson(raw);
       const speech = typeof json?.speech === 'string' ? json.speech : '';
-      const leave = Boolean(json?.leave);
+      const leave = json?.leave === true;
       return speech || leave ? { ...(speech ? { speech } : {}), leave } : {};
     } catch (err: any) {
       logger.warn(`[participate-cli] backend.delegateTask failed: ${err?.message ?? err}`);
@@ -100,12 +101,12 @@ class ReasoningBackendAgent implements ConversationAgent {
   }
 }
 
-function extractFirstJson(text: string): any {
+export function extractFirstJson(text: string): Record<string, unknown> | null {
   const trimmed = text.trim();
   const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
   const raw = fenced ? fenced[1] : trimmed;
   try {
-    return JSON.parse(raw);
+    return parseSafeJsonObjectInput(raw, 'meeting agent response') || null;
   } catch {
     return null;
   }
@@ -333,8 +334,8 @@ export function shouldResolveMeetingParticipationVoiceProfile(input: {
   return input.runtimePlan.require_voice_profile || Boolean(input.voiceProfileId?.trim());
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'meeting_participate', ...args])
     .option('mission', { type: 'string', demandOption: true })
     .option('meeting-url', { type: 'string' })
     .option('platform', { type: 'string', default: 'auto' })
@@ -589,14 +590,17 @@ async function main(): Promise<void> {
   }
 }
 
+const runMeetingParticipateScript = defineScript({
+  name: 'meeting:participate',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'meeting_participate.ts') ||
   isDirectScript(import.meta.url, 'meeting_participate.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runMeetingParticipateScript();
 }
 
 export { main as runMeetingParticipate };

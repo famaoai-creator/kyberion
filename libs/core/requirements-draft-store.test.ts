@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
 
 vi.mock('./path-resolver.js', async () => {
   const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
@@ -57,7 +57,8 @@ describe('requirements-draft-store', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'req-draft-'));
+    tmpDir = pathResolver.sharedTmp(`req-draft-${process.pid}-${Date.now()}`);
+    fs.mkdirSync(tmpDir, { recursive: true });
     (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(tmpDir);
   });
 
@@ -96,6 +97,43 @@ describe('requirements-draft-store', () => {
     it('returns null when no draft exists', () => {
       expect(readRequirementsDraft('MSN-MISSING')).toBeNull();
     });
+
+    it('rejects a schema-invalid persisted draft', () => {
+      fs.writeFileSync(
+        path.join(tmpDir, 'requirements-draft.json'),
+        JSON.stringify({ version: 'v1', project_name: 'X', functional_requirements: [] })
+      );
+
+      expect(() => readRequirementsDraft('MSN-INVALID')).toThrow(
+        /Invalid catalog requirements-draft/
+      );
+    });
+
+    it('preserves the parse error contract for malformed drafts', () => {
+      fs.writeFileSync(path.join(tmpDir, 'requirements-draft.json'), '{ malformed');
+
+      expect(() => readRequirementsDraft('MSN-MALFORMED')).toThrow(SyntaxError);
+    });
+
+    it('rejects a symlinked mission evidence directory before reading', () => {
+      const boundaryRoot = pathResolver.sharedTmp('requirements-draft-boundary');
+      const targetDir = path.join(boundaryRoot, 'target');
+      const linkedDir = path.join(boundaryRoot, 'linked');
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(targetDir, 'requirements-draft.json'),
+        JSON.stringify({ version: 'v1', project_name: 'outside' })
+      );
+      fs.symlinkSync(targetDir, linkedDir, 'dir');
+      (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(linkedDir);
+
+      try {
+        expect(() => readRequirementsDraft('MSN-SYMLINK')).toThrow('[RESOURCE_PATH_SYMLINK]');
+        expect(fs.existsSync(path.join(targetDir, 'requirements-draft.json'))).toBe(true);
+      } finally {
+        fs.rmSync(boundaryRoot, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('recordCustomerSignoff', () => {
@@ -117,7 +155,7 @@ describe('requirements-draft-store', () => {
           missionId: 'MSN-NOPE',
           signedBy: 'x',
           channel: 'email',
-        }),
+        })
       ).toThrow(/no draft found/);
     });
   });
@@ -136,9 +174,7 @@ describe('requirements-draft-store', () => {
         projectName: 'X',
         extracted: {
           ...sampleExtracted,
-          functional_requirements: [
-            { id: 'FR-1', description: '必須機能', priority: 'must' },
-          ],
+          functional_requirements: [{ id: 'FR-1', description: '必須機能', priority: 'must' }],
         },
       });
       const result = evaluateRequirementsCompletenessGate('MSN-G2');

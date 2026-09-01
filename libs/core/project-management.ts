@@ -39,7 +39,7 @@ import { listMissionsInSearchDirs, loadState, saveState } from './mission-state.
 import type { MissionState } from './mission-types.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { validateWritePermission } from './tier-guard.js';
 import {
   removeMissionFromProjectLedger,
@@ -47,6 +47,7 @@ import {
   syncProjectLedger,
 } from './mission-project-ledger.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -511,6 +512,46 @@ const PROJECT_OS_PHASE_DIRS: Record<string, string> = {
   transfer_run: '06_transfer_run',
 };
 
+function assertProjectOsPathSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(normalized)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid project OS ${label}: ${value}`);
+  }
+  return normalized;
+}
+
+export interface ProjectOperatingSystemArtifactMap {
+  concept: string;
+  layers: Array<{
+    id: string;
+    name: string;
+    scope: 'project' | 'track' | 'mixed';
+    artifacts: string[];
+  }>;
+  lifecycle: Array<{
+    phase: string;
+    scope: 'project' | 'track' | 'mixed';
+    required: string[];
+  }>;
+  dependencies: string[][];
+}
+
+const PROJECT_OS_ARTIFACT_MAP_PATH = pathResolver.knowledge(
+  'product/orchestration/project-operating-system-artifact-map.json'
+);
+const PROJECT_OS_ARTIFACT_MAP_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/project-operating-system-artifact-map.schema.json'
+);
+const projectOsArtifactMapCatalog = defineCatalog<ProjectOperatingSystemArtifactMap>({
+  id: 'project-operating-system-artifact-map',
+  path: PROJECT_OS_ARTIFACT_MAP_PATH,
+  schema: PROJECT_OS_ARTIFACT_MAP_SCHEMA_PATH,
+});
+
+export function loadProjectOperatingSystemArtifactMap(): ProjectOperatingSystemArtifactMap {
+  return projectOsArtifactMapCatalog.load();
+}
+
 export function ensureProjectOsScaffold(
   projectId: string,
   projectName: string,
@@ -518,17 +559,32 @@ export function ensureProjectOsScaffold(
   tenantSlug = 'shared',
   rootDir = pathResolver.rootDir()
 ): string {
-  const targetDir = pathResolver.projectOsDir(projectId, tier, tenantSlug, rootDir);
-  const artifactMap = readJson<{
-    lifecycle?: Array<{ phase: string; required?: string[] }>;
-  }>(pathResolver.knowledge('product/orchestration/project-operating-system-artifact-map.json'));
+  const targetDir = assertSafeRepositoryPath(
+    pathResolver.projectOsDir(projectId, tier, tenantSlug, rootDir),
+    { allowMissingLeaf: true, rootDir }
+  );
+  const artifactMap = loadProjectOperatingSystemArtifactMap();
   const blueprintsRoot = pathResolver.knowledge('public/templates/blueprints');
   for (const phase of artifactMap.lifecycle || []) {
-    const phaseDir = path.join(targetDir, PROJECT_OS_PHASE_DIRS[phase.phase] || phase.phase);
+    const phaseSegment = assertProjectOsPathSegment(
+      PROJECT_OS_PHASE_DIRS[phase.phase] || phase.phase,
+      'phase'
+    );
+    const phaseDir = assertSafeRepositoryPath(path.join(targetDir, phaseSegment), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
     safeMkdir(phaseDir, { recursive: true });
     for (const artifact of phase.required || []) {
-      const sourcePath = path.join(blueprintsRoot, `${artifact}.md`);
-      const targetPath = path.join(phaseDir, `${artifact}.md`);
+      const artifactSegment = assertProjectOsPathSegment(artifact, 'artifact');
+      const sourcePath = assertSafeRepositoryPath(
+        path.join(blueprintsRoot, `${artifactSegment}.md`),
+        { allowMissingLeaf: true }
+      );
+      const targetPath = assertSafeRepositoryPath(path.join(phaseDir, `${artifactSegment}.md`), {
+        allowMissingLeaf: true,
+        rootDir,
+      });
       if (!safeExistsSync(sourcePath) || safeExistsSync(targetPath)) continue;
       const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
       safeWriteFile(
@@ -537,7 +593,10 @@ export function ensureProjectOsScaffold(
       );
     }
   }
-  const readmePath = path.join(targetDir, 'README.md');
+  const readmePath = assertSafeRepositoryPath(path.join(targetDir, 'README.md'), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
   if (!safeExistsSync(readmePath)) {
     safeWriteFile(
       readmePath,

@@ -2,28 +2,67 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { handleAction } from './index.js';
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+const mocks = vi.hoisted(() => ({
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  safeReadFile: vi.fn().mockReturnValue('{}'),
+  safeWriteFile: vi.fn(),
+  safeMkdir: vi.fn(),
+  safeExistsSync: vi.fn().mockReturnValue(false),
+  safeReaddir: vi.fn().mockReturnValue([]),
+  safeLstat: vi.fn().mockReturnValue({ isDirectory: () => false }),
+  assertSafeRepositoryPath: vi.fn((candidate: string) => {
+    if (!candidate.startsWith('/mock/root/')) {
+      throw new Error('[RESOURCE_PATH_SCOPE] test path is outside the repository root');
+    }
+    return candidate;
+  }),
+  safeExec: vi.fn().mockReturnValue(''),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
+  rootDir: vi.fn().mockReturnValue('/mock/root'),
+  resolve: vi.fn((p: string) => `/mock/root/${p}`),
+  rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
+  knowledge: vi.fn((p: string) => `/mock/root/knowledge/${p}`),
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {
     ...actual,
-    retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
-    safeReadFile: vi.fn().mockReturnValue('{}'),
-    safeWriteFile: vi.fn(),
-    safeMkdir: vi.fn(),
-    safeExistsSync: vi.fn().mockReturnValue(false),
-    safeReaddir: vi.fn().mockReturnValue([]),
-    safeLstat: vi.fn().mockReturnValue({ isDirectory: () => false }),
-    safeExec: vi.fn().mockReturnValue(''),
-    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
-    derivePipelineStatus: actual.derivePipelineStatus,
-    resolveVars: actual.resolveVars,
-    evaluateCondition: actual.evaluateCondition,
-    resolveWriteArtifactSpec: actual.resolveWriteArtifactSpec,
+    safeReadFile: mocks.safeReadFile,
+    safeWriteFile: mocks.safeWriteFile,
+    safeMkdir: mocks.safeMkdir,
+    safeExistsSync: mocks.safeExistsSync,
+    safeReaddir: mocks.safeReaddir,
+    safeLstat: mocks.safeLstat,
+    assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
+    safeExec: mocks.safeExec,
+  };
+});
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
+  return { ...actual, retry: mocks.retry };
+});
+
+vi.mock('@agent/core/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/core')>();
+  return { ...actual, logger: mocks.logger };
+});
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  return {
+    ...actual,
+    rootDir: mocks.rootDir,
+    resolve: mocks.resolve,
+    rootResolve: mocks.rootResolve,
+    knowledge: mocks.knowledge,
     pathResolver: {
-      rootDir: vi.fn().mockReturnValue('/mock/root'),
-      resolve: vi.fn((p: string) => `/mock/root/${p}`),
-      rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
-      knowledge: vi.fn((p: string) => `/mock/root/knowledge/${p}`),
+      ...actual.pathResolver,
+      rootDir: mocks.rootDir,
+      resolve: mocks.resolve,
+      rootResolve: mocks.rootResolve,
+      knowledge: mocks.knowledge,
     },
   };
 });
@@ -36,7 +75,7 @@ describe('code-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { safeReadFile, safeExistsSync, safeReaddir, safeLstat, safeExec } =
-      await import('@agent/core');
+      await import('@agent/core/secure-io');
     vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
       if (String(filePath).includes('manifest.json')) {
         return JSON.stringify({ recovery_policy: {} });
@@ -59,7 +98,7 @@ describe('code-actuator', () => {
 
     // Error case: reconcile action throws when strategy_path does not exist
     it('reconcile actionでstrategy_pathが存在しない場合エラーをスロー', async () => {
-      const { safeExistsSync } = await import('@agent/core');
+      const { safeExistsSync } = await import('@agent/core/secure-io');
       vi.mocked(safeExistsSync).mockReturnValue(false);
 
       await expect(
@@ -67,13 +106,10 @@ describe('code-actuator', () => {
       ).rejects.toThrow('Strategy not found');
     });
 
-    // Error case: unsupported action falls through to executePipeline (does not throw)
-    // The implementation routes any non-'reconcile' action to executePipeline,
-    // so an unsupported action with empty steps returns succeeded.
-    it('サポートされていないactionはpipelineとして処理される（エラーなし）', async () => {
-      const result = await handleAction({ action: 'invalid' as any, steps: [] });
-      // Falls through to executePipeline with empty steps → succeeded
-      expect(result.status).toBe('succeeded');
+    it('サポートされていないactionを拒否する', async () => {
+      await expect(handleAction({ action: 'invalid' as any, steps: [] })).rejects.toThrow(
+        'Unsupported action: invalid'
+      );
     });
 
     // Error case: when KYBERION_ALLOW_UNSAFE_SHELL=false, the shell operator returns an error with [SECURITY] prefix
@@ -108,7 +144,7 @@ describe('code-actuator', () => {
     });
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
-      const { safeReadFile } = await import('@agent/core');
+      const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json')) {
           return JSON.stringify({ recovery_policy: {} });
@@ -131,7 +167,7 @@ describe('code-actuator', () => {
 
     describe('capture ops', () => {
       it('read_file でファイルを読み込む', async () => {
-        const { safeReadFile } = await import('@agent/core');
+        const { safeReadFile } = await import('@agent/core/secure-io');
         vi.mocked(safeReadFile).mockReturnValueOnce('code file content');
 
         const result = await handleAction({
@@ -147,6 +183,22 @@ describe('code-actuator', () => {
 
         expect(result.status).toBe('succeeded');
         expect(result.context.source_code).toBe('code file content');
+      });
+
+      it('read_file はリポジトリ外のパスを拒否する', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'read_file',
+              params: { path: '../../etc/passwd' },
+            },
+          ],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0]?.error).toContain('[RESOURCE_PATH_SCOPE]');
       });
 
       it('glob_files でファイル一覧を取得する', async () => {
@@ -173,7 +225,7 @@ describe('code-actuator', () => {
       });
 
       it('discover_skills で governed skill index を読み込む', async () => {
-        const { safeExistsSync, safeReadFile } = await import('@agent/core');
+        const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
         vi.mocked(safeExistsSync).mockImplementation((filePath: string) =>
           String(filePath).includes('global_skill_index.json')
         );
@@ -221,7 +273,7 @@ describe('code-actuator', () => {
 
     describe('apply ops', () => {
       it('log オペレーターはメッセージをログに記録する', async () => {
-        const { logger } = await import('@agent/core');
+        const { logger } = await import('@agent/core/core');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -241,7 +293,7 @@ describe('code-actuator', () => {
       });
 
       it('write_file でファイルを書き込む', async () => {
-        const { safeWriteFile, safeExistsSync } = await import('@agent/core');
+        const { safeWriteFile, safeExistsSync } = await import('@agent/core/secure-io');
         vi.mocked(safeExistsSync).mockReturnValue(true);
 
         const result = await handleAction({
@@ -304,7 +356,7 @@ describe('code-actuator', () => {
 
     describe('context_path', () => {
       it('context_pathが指定された場合、コンテキストを保存する', async () => {
-        const { safeWriteFile } = await import('@agent/core');
+        const { safeWriteFile } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',

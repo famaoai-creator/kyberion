@@ -1,5 +1,6 @@
-import type { OrganizationWorkLoopSummary } from '@agent/core';
+import type { OrganizationWorkLoopSummary } from '@agent/core/work-design';
 import type { RuntimeTopologySnapshot } from '../lib/runtime-topology';
+import { optionalStringField, parseJsonRecord } from '../lib/json-record';
 
 export interface MissionSummary {
   missionId: string;
@@ -165,8 +166,8 @@ function loadMissionIntelligenceSelectedMissionId(): string | null {
   try {
     const raw = window.localStorage.getItem(MISSION_INTELLIGENCE_PREFS_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<{ selectedMissionId: string | null }>;
-    return typeof parsed.selectedMissionId === 'string' ? parsed.selectedMissionId : null;
+    const parsed = parseJsonRecord(raw);
+    return parsed ? optionalStringField(parsed, 'selectedMissionId') || null : null;
   } catch {
     return null;
   }
@@ -618,6 +619,7 @@ export type {
   WorkLoopPreview,
 };
 interface IntelligencePayload {
+  revision: number;
   accessRole: 'readonly' | 'localadmin';
   company?: CompanySnapshot;
   activeMissions: MissionSummary[];

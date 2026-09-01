@@ -124,8 +124,8 @@ The use case implies authority that the operator must explicitly delegate:
   malformed, wrong-mission, or wrong-tenant consent fails closed before
   audio capture or speech proceeds.
 - **Dry-run before real meeting** — use
-  `pnpm cli preview pipelines/meeting-proxy-workflow.json` and
-  `pnpm run test:meeting-dry-run` to validate workflow structure,
+  `pnpm kyberion preview pipelines/meeting-proxy-workflow.json` and
+  `pnpm test -- --suite meeting-dry-run` to validate workflow structure,
   consent gates, host allowlist, and redaction without opening a call.
 - **Voice profile registration** — the synthesized voice itself must be
   a `voice-profile-registry.json` entry whose source samples were

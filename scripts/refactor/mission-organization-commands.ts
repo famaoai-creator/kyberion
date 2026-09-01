@@ -1,15 +1,13 @@
 import * as path from 'node:path';
+import * as customerResolver from '@agent/core/customer-resolver';
 import {
-  customerResolver,
   listOrganizationMissionTeamTemplateCatalogSummariesForOrganization,
-  loadOrganizationProfile,
-  logger,
-  pathResolver,
   resolveOrganizationMissionTeamTemplateCatalogId,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-} from '@agent/core';
+} from '@agent/core/mission-team-index';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { getOptionValue } from './mission-cli-args.js';
 import { withOrganizationContext } from './organization-context.js';
 

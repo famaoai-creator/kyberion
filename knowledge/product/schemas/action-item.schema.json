@@ -76,6 +76,10 @@
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" },
     "completed_at": { "type": "string", "format": "date-time" },
+    "blocked_reason": {
+      "type": "string",
+      "description": "Human-readable reason when status is blocked."
+    },
     "tenant_slug": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,30}$",

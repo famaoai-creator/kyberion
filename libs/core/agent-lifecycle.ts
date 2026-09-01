@@ -48,11 +48,18 @@ export interface SpawnOptions {
   scope?: EventScopeInput;
   trustRequired?: number;
   turnTimeoutMs?: number;
+  /** Trusted execution-boundary presence forwarded to ACP risky approvals. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   runtimeMetadata?: Record<string, unknown>;
   restartPolicy?: {
     maxRestarts: number;
     windowMs: number;
   };
+  /** Durable supervisor ownership propagated before the runtime is registered. */
+  runtimeOwnerId?: string;
+  runtimeOwnerType?: string;
 }
 
 export interface AgentHandleAskOptions {
@@ -497,8 +504,9 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: resolvedOptions.missionId || agentId,
-        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.runtimeOwnerId || resolvedOptions.missionId || agentId,
+        ownerType:
+          resolvedOptions.runtimeOwnerType || (resolvedOptions.missionId ? 'mission' : 'agent'),
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
         metadata: {
@@ -569,6 +577,11 @@ class AgentLifecycleManagerImpl {
       systemPrompt: resolvedOptions.systemPrompt,
       cwd: resolvedOptions.cwd || PROJECT_ROOT,
       turnTimeoutMs: resolvedOptions.turnTimeoutMs,
+      ...(resolvedOptions.hasHuman !== undefined ? { hasHuman: resolvedOptions.hasHuman } : {}),
+      ...(resolvedOptions.hasUI !== undefined ? { hasUI: resolvedOptions.hasUI } : {}),
+      ...(resolvedOptions.nonInteractive !== undefined
+        ? { nonInteractive: resolvedOptions.nonInteractive }
+        : {}),
       onCrash: async ({ agentId: crashedAgentId }) => {
         const policy = resolvedOptions.restartPolicy;
         if (!policy) return;
@@ -596,8 +609,9 @@ class AgentLifecycleManagerImpl {
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
-        ownerId: resolvedOptions.missionId || agentId,
-        ownerType: resolvedOptions.missionId ? 'mission' : 'agent',
+        ownerId: resolvedOptions.runtimeOwnerId || resolvedOptions.missionId || agentId,
+        ownerType:
+          resolvedOptions.runtimeOwnerType || (resolvedOptions.missionId ? 'mission' : 'agent'),
         idleTimeoutMs: AGENT_IDLE_TIMEOUT_MS,
         shutdownPolicy: 'idle',
         metadata: {

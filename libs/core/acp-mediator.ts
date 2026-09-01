@@ -15,6 +15,7 @@ import { Readable, Writable, PassThrough } from 'node:stream';
 import { pathResolver } from './path-resolver.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
+import { requireRiskyApproval } from './risky-op-approval-port.js';
 
 /** Whitelist environment variables passed to child agent processes */
 const ENV_WHITELIST = [
@@ -86,6 +87,10 @@ export interface ACPMediatorOptions {
   turnTimeoutMs?: number;
   /** Set to null for ACP providers that authenticate before spawning the client. */
   authenticateMethod?: string | null;
+  /** Trusted execution-boundary presence forwarded to risky tool approvals. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   onCrash?: (info: {
     agentId: string;
     exitCode?: number | null;
@@ -527,10 +532,14 @@ export class ACPMediator {
           // SA-05 Task 3.3: single approval decision source — file a pending
           // request the operator can approve; deny (fail-closed) until then.
           try {
-            const { requireApprovalForOp } = await import('./risky-op-registry.js');
-            const approval = requireApprovalForOp({
+            const approval = requireRiskyApproval({
               opId: 'acp:tool',
               agentId: getRegisteredEnvText('KYBERION_PERSONA') || 'acp-session',
+              ...(this.options.hasHuman !== undefined ? { hasHuman: this.options.hasHuman } : {}),
+              ...(this.options.hasUI !== undefined ? { hasUI: this.options.hasUI } : {}),
+              ...(this.options.nonInteractive !== undefined
+                ? { nonInteractive: this.options.nonInteractive }
+                : {}),
               payload: { title },
               draft: {
                 title: 'ACP tool approval required',

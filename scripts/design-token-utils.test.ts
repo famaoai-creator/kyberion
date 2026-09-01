@@ -4,6 +4,7 @@ import {
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
   replaceTokenBlock,
+  updateThemesJson,
 } from './design-token-utils.js';
 
 describe('canonical design-token generation', () => {
@@ -48,5 +49,13 @@ describe('canonical design-token generation', () => {
     const replaced = replaceTokenBlock(legacy, block);
     expect(replaced.match(/\[data-theme='light'\]/gu)).toHaveLength(1);
     expect(replaced).toContain('body { color: var(--kb-text-primary); }');
+  });
+
+  it('rejects a non-object themes root and ignores an array themes value', () => {
+    const tokens = readKyberionDesignTokens();
+    expect(() => updateThemesJson('[]', tokens)).toThrow('root must be a JSON object');
+    const output = updateThemesJson('{"themes":["malformed"]}', tokens);
+    expect(JSON.parse(output).themes['0']).toBeUndefined();
+    expect(JSON.parse(output).themes['kyberion-standard']).toBeDefined();
   });
 });

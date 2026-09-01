@@ -22,6 +22,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -502,11 +503,12 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * provider-permission-profiles.ts) throws before any spawn is attempted.
    */
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
-    if (!profile) return [];
-    const resolution = resolveProviderPermissionArgs(profile, 'claude');
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('claude', profile);
+    if (!effectiveProfile) return [];
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'claude');
     if (resolution.kind === 'refused') {
       throw new Error(
-        `[shell-claude-cli] permission profile "${profile}" refused: ${resolution.reason}`
+        `[shell-claude-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
       );
     }
     return [...resolution.args];
@@ -655,7 +657,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       .join('\n\n');
 
     const args = [
-      '--dangerously-skip-permissions',
+      ...(resolveEffectiveProviderPermissionProfile('claude')
+        ? this.resolvePermissionArgs()
+        : ['--dangerously-skip-permissions']),
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
@@ -676,7 +680,9 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       .join('\n\n');
 
     const args = [
-      '--dangerously-skip-permissions',
+      ...(resolveEffectiveProviderPermissionProfile('claude')
+        ? this.resolvePermissionArgs()
+        : ['--dangerously-skip-permissions']),
       '-p',
       prompt,
       ...(input.maxTurns !== undefined ? ['--max-turns', String(input.maxTurns)] : []),
@@ -800,9 +806,10 @@ function resolveClaudeSubagentProfile(
 ): ProviderPermissionProfileName {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    const profile = getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    return resolveEffectiveProviderPermissionProfile('claude', profile) ?? profile;
   } catch {
-    return 'implementer';
+    return resolveEffectiveProviderPermissionProfile('claude', 'implementer') ?? 'implementer';
   }
 }
 

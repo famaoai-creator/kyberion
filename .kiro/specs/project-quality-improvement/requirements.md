@@ -110,8 +110,8 @@
 
 #### 受入基準
 
-1. WHEN `pnpm test:coverage` が実行される場合、THE Test_Coverage_System SHALL アクチュエータ全体でlines・functions・branches・statementsの各指標が60%以上であることを検証する
-2. WHEN `pnpm test:coverage` が実行される場合、THE Test_Coverage_System SHALL 共有パッケージ全体でlines・functions・branches・statementsの各指標が70%以上であることを検証する
+1. WHEN `pnpm test -- --suite coverage` が実行される場合、THE Test_Coverage_System SHALL アクチュエータ全体でlines・functions・branches・statementsの各指標が60%以上であることを検証する
+2. WHEN `pnpm test -- --suite coverage` が実行される場合、THE Test_Coverage_System SHALL 共有パッケージ全体でlines・functions・branches・statementsの各指標が70%以上であることを検証する
 3. WHEN カバレッジが設定済み閾値（`vitest.config.mts` の `coverage.lines/functions/branches/statements: 60`）を下回る場合、THE Test_Coverage_System SHALL テスト実行を非ゼロの終了コードで終了する
 4. THE Test_Coverage_System SHALL カバレッジレポートをHTML形式（`./coverage/` ディレクトリ）で出力する
 5. THE Test_Coverage_System SHALL カバレッジレポートをJSON形式（`./coverage/coverage-summary.json`）で出力する（CIでのPRコメント投稿に使用）

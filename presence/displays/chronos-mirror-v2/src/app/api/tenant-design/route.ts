@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { resolveTenantDesign } from '@agent/core/tenant-design-resolver';
-import { webThemePackToCssVars } from '@agent/core/web-design-system';
+import { isWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { guardRequest } from '../../../lib/api-guard';
 import {
@@ -34,10 +34,9 @@ export async function GET(request: NextRequest) {
       designSystemId,
     });
 
-    const cssVars =
-      resolution.themePack && typeof resolution.themePack === 'object'
-        ? webThemePackToCssVars(resolution.themePack as any)
-        : {};
+    const cssVars = isWebThemePack(resolution.themePack)
+      ? webThemePackToCssVars(resolution.themePack)
+      : {};
 
     return NextResponse.json({
       source: resolution.source,

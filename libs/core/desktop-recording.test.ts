@@ -7,6 +7,7 @@ import {
   listDesktopObservationSources,
   validateDesktopRecording,
 } from './desktop-recording.js';
+import { parseDesktopEventLine } from './desktop-event-feed.js';
 import { reconstructDesktopIntent, reviewDesktopIntent } from './desktop-intent-reconstruction.js';
 import { assertObservationOpMappingsValid, chooseNativeOps } from './native-op-mapping.js';
 import { compileDesktopRecording } from './desktop-recording-compiler.js';
@@ -26,6 +27,36 @@ const snapshot = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('desktop recording and distillation', () => {
+  it('normalizes native desktop events before they enter the recording queue', () => {
+    expect(parseDesktopEventLine({ op: 'click_at', x: 10, y: 20, click_count: 2 })).toEqual({
+      op: 'click_at',
+      x: 10,
+      y: 20,
+      click_count: 2,
+    });
+    expect(parseDesktopEventLine({ op: 'press_key', params: { key_code: 36 } })).toEqual({
+      op: 'press_key',
+      params: { key_code: 36 },
+    });
+  });
+
+  it('rejects malformed or privacy-unsafe native event shapes', () => {
+    expect(parseDesktopEventLine([])).toBeUndefined();
+    expect(parseDesktopEventLine({ op: 'click_at', x: '10', y: 20 })).toBeUndefined();
+    expect(
+      parseDesktopEventLine({ op: 'click_at', x: 10, y: 20, params: { text: 'secret' } })
+    ).toBe(undefined);
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { key_code: 36, key: 'return' } })
+    ).toBe(undefined);
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { key_code: 70_000 } })
+    ).toBeUndefined();
+    expect(
+      parseDesktopEventLine({ op: 'press_key', params: { constructor: { polluted: true } } })
+    ).toBeUndefined();
+  });
+
   it('keeps observation tier separate and explains unavailable permissions', () => {
     expect(listDesktopObservationSources().map((source) => source.id)).toEqual([
       'active_window',

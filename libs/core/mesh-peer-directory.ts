@@ -1,7 +1,9 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJsonLines } from './foundation/json.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import type {
   MeshCapabilityAdvertisement,
@@ -97,13 +99,9 @@ function normalizeIso(value?: string | Date): string {
 }
 
 function readJsonlRecords<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) ?? '');
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  return readJsonLines<T>(
+    assertSafeRepositoryPath(pathResolver.resolve(logicalPath), { allowMissingLeaf: true })
+  );
 }
 
 function latestByPeerId<T extends { peer_id: string }>(records: T[]): Map<string, T> {

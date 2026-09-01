@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   getPersonalVoiceProfileRegistryPath,
   getVoiceProfileRegistry,
@@ -49,11 +50,23 @@ export interface PromoteVoiceProfileResult {
   promoted_status: 'active' | 'shadow';
 }
 
+const REGISTRATION_RECEIPT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-profile-registration-receipt.schema.json'
+);
+const VOICE_PROFILE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-profile-registry.schema.json'
+);
+
 function loadRegistrationReceipt(receiptPath: string): VoiceProfileRegistrationReceipt {
-  if (!safeExistsSync(receiptPath)) {
+  const safeReceiptPath = assertSafeRepositoryPath(receiptPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeReceiptPath)) {
     throw new Error(`Voice profile registration receipt not found: ${receiptPath}`);
   }
-  const parsed = loadJson<VoiceProfileRegistrationReceipt>(receiptPath);
+  const parsed = defineCatalog<VoiceProfileRegistrationReceipt>({
+    id: 'voice-profile-registration-receipt',
+    path: safeReceiptPath,
+    schema: REGISTRATION_RECEIPT_SCHEMA_PATH,
+  }).load();
   if (parsed.kind !== 'voice_profile_registration_receipt') {
     throw new Error(
       `Unsupported voice profile receipt kind: ${String((parsed as { kind?: string }).kind || 'unknown')}`
@@ -102,14 +115,17 @@ function appendProfileToRegistry(input: {
 }
 
 function loadRegistryForPromotion(targetPath: string): VoiceProfileRegistry {
-  if (!safeExistsSync(targetPath)) {
-    return {
+  const safeTargetPath = assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
+  return defineCatalog<VoiceProfileRegistry>({
+    id: 'voice-profile-registry',
+    path: safeTargetPath,
+    schema: VOICE_PROFILE_REGISTRY_SCHEMA_PATH,
+    fallback: {
       version: '1.0.0',
       default_profile_id: getVoiceProfileRegistry().default_profile_id,
       profiles: [],
-    };
-  }
-  return loadJson<VoiceProfileRegistry>(targetPath);
+    },
+  }).load();
 }
 
 function resolvePromotionRegistryPath(tier: VoiceProfileRecord['tier']): string {
@@ -129,8 +145,15 @@ function writePromotionReceipt(input: {
   registryPath: string;
 }): string {
   const targetDir = pathResolver.sharedTmp('voice-profile-promotion');
-  safeMkdir(targetDir, { recursive: true });
-  const targetPath = path.join(targetDir, `${input.receipt.request_id}.json`);
+  const safeTargetDir = assertSafeRepositoryPath(targetDir, { allowMissingLeaf: true });
+  safeMkdir(safeTargetDir, { recursive: true });
+  const requestId = String(input.receipt.request_id || '').trim();
+  if (!requestId || requestId === '.' || requestId === '..' || /[\\/]/u.test(requestId)) {
+    throw new Error('Voice profile receipt request_id must be a single safe path segment');
+  }
+  const targetPath = assertSafeRepositoryPath(path.join(safeTargetDir, `${requestId}.json`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(
     targetPath,
     JSON.stringify(

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeCreateExclusiveFileSync,
   safeExistsSync,
   safeMkdir,
@@ -30,20 +31,24 @@ const LOCK_PATH = pathResolver.shared('runtime/state/desktop-promotion.lock');
 
 function transactionPath(procedureId: string): string {
   const safeId = procedureId.replace(/[^a-zA-Z0-9._-]/g, '_');
-  return path.join(TRANSACTION_DIR, `${safeId}.json`);
+  return assertSafeRepositoryPath(path.join(TRANSACTION_DIR, `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function backupPath(procedureId: string, target: 'pipeline' | 'catalog'): string {
-  return path.join(
-    TRANSACTION_DIR,
-    `${procedureId.replace(/[^a-zA-Z0-9._-]/g, '_')}.${target}.bak`
+  return assertSafeRepositoryPath(
+    path.join(TRANSACTION_DIR, `${procedureId.replace(/[^a-zA-Z0-9._-]/g, '_')}.${target}.bak`),
+    { allowMissingLeaf: true }
   );
 }
 
 function fileHash(filePath: string): string | null {
-  if (!safeExistsSync(filePath)) return null;
+  if (!filePath) return null;
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) return null;
   return createHash('sha256')
-    .update(safeReadFile(filePath, { encoding: null }) as Buffer)
+    .update(safeReadFile(safeFilePath, { encoding: null }) as Buffer)
     .digest('hex');
 }
 
@@ -123,11 +128,20 @@ export function reconcileDesktopPromotionTransaction(
     backup: string | undefined,
     existed: boolean | undefined
   ): boolean => {
-    if (!targetPath || fileHash(targetPath) !== expectedHash) return true;
-    if (backup && safeExistsSync(backup)) {
-      safeWriteFile(targetPath, safeReadFile(backup, { encoding: null }) as Buffer);
+    if (!targetPath) return true;
+    const safeTargetPath = assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
+    if (fileHash(safeTargetPath) !== expectedHash) return true;
+    if (backup) {
+      const safeBackupPath = assertSafeRepositoryPath(backup, { allowMissingLeaf: true });
+      if (safeExistsSync(safeBackupPath)) {
+        safeWriteFile(safeTargetPath, safeReadFile(safeBackupPath, { encoding: null }) as Buffer);
+      } else if (existed === false) {
+        safeRmSync(safeTargetPath, { force: true });
+      } else {
+        return false;
+      }
     } else if (existed === false) {
-      safeRmSync(targetPath, { force: true });
+      safeRmSync(safeTargetPath, { force: true });
     } else {
       return false;
     }

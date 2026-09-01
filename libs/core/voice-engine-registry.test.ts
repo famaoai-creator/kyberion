@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
-  resetVoiceEngineRegistryCache,
+  _resetVoiceEngineRegistryCacheForTests,
   resolveVoiceEngineForPlatform,
 } from './voice-engine-registry.js';
 
@@ -16,7 +17,7 @@ describe('voice engine registry', () => {
   beforeEach(() => {
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR;
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
   });
 
   afterEach(() => {
@@ -33,7 +34,7 @@ describe('voice engine registry', () => {
     if (safeExistsSync(tmpDir)) {
       safeRmSync(tmpDir, { recursive: true, force: true });
     }
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
   });
 
   it('loads the governed registry and resolves default engine', () => {
@@ -129,7 +130,7 @@ describe('voice engine registry', () => {
     );
 
     process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = dir;
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
 
     const registry = getVoiceEngineRegistry();
     expect(registry.default_engine_id).toBe('local_say');
@@ -202,5 +203,23 @@ describe('voice engine registry', () => {
     expect(registry.version).toBe('fallback');
     expect(registry.default_engine_id).toBe('local_say');
     expect(registry.engines).toHaveLength(1);
+  });
+
+  it('uses the governed fallback when a configured snapshot is outside the repository', () => {
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH = '/tmp/voice-engine-external.json';
+
+    const registry = getVoiceEngineRegistry();
+
+    expect(registry.version).toBe('fallback');
+    expect(registry.default_engine_id).toBe('local_say');
+  });
+
+  it('uses the governed fallback when a configured registry directory is outside the repository', () => {
+    process.env.KYBERION_VOICE_ENGINE_REGISTRY_DIR = '/tmp/voice-engines-external';
+
+    const registry = getVoiceEngineRegistry();
+
+    expect(registry.version).toBe('fallback');
+    expect(registry.default_engine_id).toBe('local_say');
   });
 });

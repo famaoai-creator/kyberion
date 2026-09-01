@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import ts from 'typescript';
-import { pathResolver, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
@@ -48,6 +49,7 @@ function isGeneratedFile(repoRelativePath: string): boolean {
   const segments = repoRelativePath.split('/');
   return (
     /^libs\/core\/index-part-\d+\.ts$/u.test(repoRelativePath) ||
+    repoRelativePath === 'libs/core/vocabulary-keys.generated.ts' ||
     segments.some((segment) =>
       new Set(['.next', '.turbo', 'coverage', 'dist', 'node_modules', 'test-results']).has(segment)
     ) ||
@@ -208,15 +210,16 @@ export const runCheckTypeRatchet = defineScript({
     const report = checkTypeRatchet({ writeBaseline });
 
     if (report.violations.length > 0) {
-      console.error('[check:type-ratchet] violations detected:');
-      for (const violation of report.violations) {
-        console.error(`- ${violation}`);
-      }
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
 
     context.print('[check:type-ratchet] OK');
+    return { report };
   },
 });
 

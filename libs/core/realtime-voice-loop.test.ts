@@ -249,4 +249,16 @@ describe('realtime voice loop', () => {
       else process.env.KYBERION_SUDO = previousSudo;
     }
   });
+
+  it('rejects a recording directory outside the repository', async () => {
+    await expect(
+      startRealtimeVoiceLoop({
+        recordingDir: '/tmp/kyberion-realtime-recordings',
+        consent: { requireRecordingConsent: false },
+        transcribe: async () => 'unused',
+        reply: async () => 'unused',
+        synthesizeSegment: async () => '/tmp/fake.wav',
+      })
+    ).rejects.toThrow(/outside the repository root/);
+  });
 });

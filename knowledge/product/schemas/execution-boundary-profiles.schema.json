@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "execution-boundary-profiles.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "profiles"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "profiles": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/profile" }
+    }
+  },
+  "$defs": {
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowed": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "forbidden": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "owns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "responsibilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "minProperties": 1
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["llm_zone", "knowledge_zone", "compiler_zone", "executor_zone", "rule"],
+      "properties": {
+        "llm_zone": { "$ref": "#/$defs/zone" },
+        "knowledge_zone": { "$ref": "#/$defs/zone" },
+        "compiler_zone": { "$ref": "#/$defs/zone" },
+        "executor_zone": { "$ref": "#/$defs/zone" },
+        "rule": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

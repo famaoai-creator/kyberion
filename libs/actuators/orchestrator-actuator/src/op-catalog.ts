@@ -1,4 +1,4 @@
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // AR-02: self-described op catalog replacing the hand-curated registry
 // entry, which listed ops this actuator never dispatched (list/read/log/
@@ -7,7 +7,8 @@ import { withCatalogInputContract } from '@agent/core';
 // kind, so step-type inference is unchanged; the added ops were previously
 // unclassifiable (pipelines reach them via explicit role today).
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const EMPTY_SCHEMA: InputSchema = { type: 'object', properties: {}, additionalProperties: false };
@@ -91,7 +92,7 @@ export const ORCHESTRATOR_ACTUATOR_APPLY_OPS = [
   'task_plan_to_next_tasks',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = ORCHESTRATOR_CONTRACTS[op];
   const description = schema
     ? { op, kind, input_schema: schema, examples: ORCHESTRATOR_EXAMPLES[op] || [{}] }
@@ -99,7 +100,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   return withCatalogInputContract('orchestrator', op, kind, description);
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...ORCHESTRATOR_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...ORCHESTRATOR_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

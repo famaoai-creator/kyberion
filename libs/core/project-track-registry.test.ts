@@ -39,9 +39,15 @@ describe('project-track-registry', () => {
     expect(loadProjectTrackRecord('TRK-TEST-REL1')?.name).toBe('Release 1');
     expect(listProjectTrackRecords().some((item) => item.track_id === 'TRK-TEST-REL1')).toBe(true);
     expect(listProjectTracksForProject('PRJ-TEST-WEB').length).toBe(1);
-    expect(resolveProjectTrackRecordForText({
-      projectId: 'PRJ-TEST-WEB',
-      utterance: 'Release 1 のテスト計画を更新して',
-    })?.track_id).toBe('TRK-TEST-REL1');
+    expect(
+      resolveProjectTrackRecordForText({
+        projectId: 'PRJ-TEST-WEB',
+        utterance: 'Release 1 のテスト計画を更新して',
+      })?.track_id
+    ).toBe('TRK-TEST-REL1');
+  });
+
+  it('rejects a track id that escapes the track directory', () => {
+    expect(() => loadProjectTrackRecord('../outside')).toThrow(/escapes its directory/);
   });
 });

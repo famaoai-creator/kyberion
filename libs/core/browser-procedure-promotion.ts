@@ -1,9 +1,19 @@
 import path from 'node:path';
-import { readJson } from './foundation/json.js';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
-import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
+import {
+  invalidateProcedureCache,
+  readProcedureCatalog,
+  resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
+} from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { validateBrowserExtensionRecording } from './browser-extension-bridge.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
@@ -63,10 +73,12 @@ export function promoteBrowserProcedure(
     recordingRef: options.recordingRef,
     status: options.status ?? 'active',
   });
-  const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
+  const catalogPath = assertSafeRepositoryPath(options.catalogPath ?? PERSONAL_CATALOG_PATH, {
+    allowMissingLeaf: true,
+  });
   let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
   try {
-    catalog = readJson<ProcedureCatalog>(catalogPath);
+    catalog = readProcedureCatalog(catalogPath);
   } catch (error) {
     if (safeExistsSync(catalogPath)) {
       throw new Error(
@@ -81,6 +93,7 @@ export function promoteBrowserProcedure(
   }
 
   catalog.procedures.push(compiled.procedureEntry);
+  validateProcedureCatalog(catalog, catalogPath);
   safeMkdir(path.dirname(catalogPath), { recursive: true });
   safeWriteFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
   invalidateProcedureCache();

@@ -8,6 +8,7 @@ import { pathResolver } from '../path-resolver.js';
 import {
   clamp,
   getRegisteredEnv,
+  getRegisteredEnvText,
   normalizeText,
   parseIso,
   readTextFile,
@@ -80,6 +81,7 @@ describe('foundation helpers', () => {
     const environment: Record<string, string | undefined> = {};
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', 'enabled', environment);
     expect(getRegisteredEnv('KYBERION_FOUNDATION_TEST', { env: environment })).toBe('enabled');
+    expect(getRegisteredEnvText('KYBERION_FOUNDATION_TEST', { env: environment })).toBe('enabled');
     expect(environment.KYBERION_FOUNDATION_TEST).toBe('enabled');
     setRegisteredEnv('KYBERION_FOUNDATION_TEST', undefined, environment);
     expect(environment.KYBERION_FOUNDATION_TEST).toBeUndefined();

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, validateUrl } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { validateUrl } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   evaluateShellCommandPolicy,
   loadShellCommandPolicy,
@@ -11,6 +11,7 @@ import { evaluateEgressPolicy } from './egress-policy.js';
 import type { PipelineAdf, PipelineAdfStep, StepHook } from './pipeline-contract.js';
 import { deriveExecutionGraph } from './graph-scheduler.js';
 import { resolveMaxRouteHops } from './judge-route.js';
+import { type SandboxPolicy, requireSandboxEnforcement } from './sandbox-policy.js';
 
 export interface AdfGuardrailFinding {
   code: string;
@@ -33,6 +34,8 @@ export interface AdfScriptWrapperBaselineEntry {
 export interface AdfGuardrailOptions {
   /** Explicit, exact migration exceptions. New wrappers remain blocking. */
   scriptWrapperBaseline?: readonly AdfScriptWrapperBaselineEntry[];
+  /** Optional resolved policy used to preflight network-bearing ADF hooks. */
+  sandboxPolicy?: SandboxPolicy;
 }
 
 function normalizeGuardrailSourcePath(sourcePath: string): string {
@@ -83,52 +86,43 @@ const DEFAULT_POLICY: AdfExecutionPolicy = {
 };
 
 const POLICY_PATH = pathResolver.knowledge('product/governance/adf-execution-policy.json');
-
-let cachedPolicy: AdfExecutionPolicy | null = null;
-
-export function resetAdfGuardrailPolicyCache(): void {
-  cachedPolicy = null;
-}
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/adf-execution-policy.schema.json'
+);
+const adfExecutionPolicyCatalog = defineCatalog<Partial<AdfExecutionPolicy>>({
+  id: 'adf-execution-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+  fallback: {},
+  fallbackOnInvalid: true,
+});
 
 function loadAdfExecutionPolicy(): AdfExecutionPolicy {
-  if (cachedPolicy) return cachedPolicy;
-
-  if (!safeExistsSync(POLICY_PATH)) {
-    cachedPolicy = DEFAULT_POLICY;
-    return cachedPolicy;
-  }
-
-  try {
-    const parsed = readJson<Partial<AdfExecutionPolicy>>(POLICY_PATH);
-    cachedPolicy = {
-      limits: {
-        max_steps: coercePositiveInt(parsed?.limits?.max_steps, DEFAULT_POLICY.limits.max_steps),
-        max_hooks_per_step: coercePositiveInt(
-          parsed?.limits?.max_hooks_per_step,
-          DEFAULT_POLICY.limits.max_hooks_per_step
-        ),
-        max_foreach_items: coercePositiveInt(
-          parsed?.limits?.max_foreach_items,
-          DEFAULT_POLICY.limits.max_foreach_items
-        ),
-        max_branch_depth: coercePositiveInt(
-          parsed?.limits?.max_branch_depth,
-          DEFAULT_POLICY.limits.max_branch_depth
-        ),
-        max_transform_script_chars: coercePositiveInt(
-          parsed?.limits?.max_transform_script_chars,
-          DEFAULT_POLICY.limits.max_transform_script_chars
-        ),
-      },
-      network: {
-        allow_local_network: parsed?.network?.allow_local_network === true,
-      },
-    };
-  } catch {
-    cachedPolicy = DEFAULT_POLICY;
-  }
-
-  return cachedPolicy;
+  const parsed = adfExecutionPolicyCatalog.load();
+  return {
+    limits: {
+      max_steps: coercePositiveInt(parsed?.limits?.max_steps, DEFAULT_POLICY.limits.max_steps),
+      max_hooks_per_step: coercePositiveInt(
+        parsed?.limits?.max_hooks_per_step,
+        DEFAULT_POLICY.limits.max_hooks_per_step
+      ),
+      max_foreach_items: coercePositiveInt(
+        parsed?.limits?.max_foreach_items,
+        DEFAULT_POLICY.limits.max_foreach_items
+      ),
+      max_branch_depth: coercePositiveInt(
+        parsed?.limits?.max_branch_depth,
+        DEFAULT_POLICY.limits.max_branch_depth
+      ),
+      max_transform_script_chars: coercePositiveInt(
+        parsed?.limits?.max_transform_script_chars,
+        DEFAULT_POLICY.limits.max_transform_script_chars
+      ),
+    },
+    network: {
+      allow_local_network: parsed?.network?.allow_local_network === true,
+    },
+  };
 }
 
 function getShellPolicy(): ShellCommandPolicyFile {
@@ -155,20 +149,32 @@ export function forbiddenGitCoexecutionMutation(command: string): string | undef
   return checks.find(([pattern]) => pattern.test(command))?.[1];
 }
 
-function isScriptWrapperCommand(command: string, args: readonly string[]): boolean {
+export function isScriptWrapperCommand(command: string, args: readonly string[]): boolean {
   const normalizedCommand = [command, ...args].join(' ');
+  const executable = command.trim().split(/[\\/]/).pop()?.toLowerCase();
   const typedWrapper =
-    (command.trim() === 'node' && args[0]?.startsWith('dist/')) ||
-    (command.trim() === 'npx' && args[0] === 'tsx') ||
-    (command.trim() === 'pnpm' && (args[0] === 'exec' || args[0] === 'dlx'));
+    (executable === 'node' &&
+      (args.some(
+        (arg) =>
+          /(?:^|\.?\/?)(?:dist|scripts|libs\/actuators|presence|src|tests?)\//i.test(arg) ||
+          /\.(?:[cm]?js|mjs|cjs|ts|tsx)$/i.test(arg)
+      ) ||
+        args.some((arg) => arg === '-e' || arg === '--eval'))) ||
+    (executable === 'npx' && args[0]?.toLowerCase() === 'tsx') ||
+    (executable === 'pnpm' && ['exec', 'dlx'].includes(args[0]?.toLowerCase() ?? '')) ||
+    executable === 'tsx';
 
   // Keep the existing raw command-string behavior in addition to the typed
   // command/args shape above.
   return (
     typedWrapper ||
-    /(?:^|[;&|]\s*|\s)(?:node\s+dist\/|npx\s+tsx\b|pnpm\s+(?:exec|dlx)\b)/iu.test(
+    /(?:^|[;&|]\s*|\s)node\s+(?:(?:--import|--require)\s+[^;&|]+\s+)?(?:\.\/)?(?:dist|scripts|libs\/actuators|presence|src|tests?)\/[^;&|\s]+/iu.test(
       normalizedCommand
     ) ||
+    /(?:^|[;&|]\s*|\s)node\s+(?:-e|--eval)\b/iu.test(normalizedCommand) ||
+    /(?:^|[;&|]\s*|\s)npx\s+tsx\b/iu.test(normalizedCommand) ||
+    /(?:^|[;&|]\s*|\s)pnpm\s+(?:exec|dlx)\b/iu.test(normalizedCommand) ||
+    /(?:^|[;&|]\s*|\s)tsx\s+(?:\.\/)?scripts\//iu.test(normalizedCommand) ||
     /dist\/libs\/actuators\//iu.test(normalizedCommand)
   );
 }
@@ -179,6 +185,18 @@ export function validatePipelineGuardrails(
   options: AdfGuardrailOptions = {}
 ): AdfGuardrailReport {
   const findings: AdfGuardrailFinding[] = [];
+  if (options.sandboxPolicy) {
+    try {
+      requireSandboxEnforcement(options.sandboxPolicy);
+    } catch (error) {
+      findings.push({
+        code: 'sandbox-enforcement-partial',
+        severity: 'error',
+        message: error instanceof Error ? error.message : String(error),
+        path: sourcePath,
+      });
+    }
+  }
   const policy = loadAdfExecutionPolicy();
   let totalSteps = 0;
 
@@ -619,6 +637,11 @@ export function validatePipelineGuardrails(
       const url = String(hook.url ?? '');
       if (!url.includes('{{')) {
         try {
+          if (options.sandboxPolicy && !options.sandboxPolicy.networkAccess) {
+            throw new Error(
+              `[SANDBOX_NETWORK_DENIED] ${options.sandboxPolicy.provider ?? 'unknown'} sandbox denies network access.`
+            );
+          }
           validateUrl(url, { allowLocalNetwork: policy.network.allow_local_network });
           const egressDecision = evaluateEgressPolicy(url);
           if (egressDecision.verdict !== 'allow') {
@@ -630,10 +653,13 @@ export function validatePipelineGuardrails(
             });
           }
         } catch (err: any) {
+          const message = err?.message || `Invalid URL: ${url}`;
           findings.push({
-            code: 'http-url-invalid',
+            code: message.includes('[SANDBOX_NETWORK_DENIED]')
+              ? 'sandbox-network-denied'
+              : 'http-url-invalid',
             severity: 'error',
-            message: err?.message || `Invalid URL: ${url}`,
+            message,
             path: `${hookPath}.url`,
           });
         }

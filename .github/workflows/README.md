@@ -59,11 +59,11 @@ Local warnings such as `Waited for background terminal` should not be conflated 
 
 - GitHub Actions runs clean ephemeral runners and does not reuse Codex unified exec sessions.
 - Local development can still accumulate residual CLI processes from `tsx`, `mission_controller`, or one-shot diagnostics if the terminal host retains exec sessions.
-- Kyberion-managed long-lived runtimes must be inspected through `pnpm surfaces:status`, not by inferring from editor terminal warnings alone.
+- Kyberion-managed long-lived runtimes must be inspected through `pnpm surfaces status`, not by inferring from editor terminal warnings alone.
 
 When investigating local residue:
 
-1. Check surface lifecycle status with `pnpm surfaces:status`
+1. Check surface lifecycle status with `pnpm surfaces status`
 2. Compare with local process listings such as `ps -axo pid,ppid,etime,command`
 3. Distinguish Kyberion-managed surfaces from external terminal host session retention
 

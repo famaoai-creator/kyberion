@@ -22,19 +22,19 @@
  */
 
 import * as path from 'node:path';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { safeJsonParse } from '@agent/core/validators';
 import {
-  createStandardYargs,
-  logger,
-  pathResolver,
-  safeExecResult,
-  safeJsonParse,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 import { appendJsonLine } from '@agent/core/foundation';
-import { runDegradationWatch, type DegradationReport } from '@agent/core';
+import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
 
 export interface PatchCommandResult {
@@ -315,8 +315,8 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   return outcome;
 }
 
-async function main(): Promise<number> {
-  const argv = createStandardYargs()
+async function main(args: string[] = currentProcessArgv().slice(2)): Promise<number> {
+  const argv = createStandardYargs(['node', 'apply_dependency_patch', ...args])
     .option('package', { type: 'string', demandOption: true, describe: 'Direct dependency name' })
     .option('to', {
       type: 'string',
@@ -353,15 +353,19 @@ async function main(): Promise<number> {
   return 1;
 }
 
+const runApplyDependencyPatch = defineScript({
+  name: 'patch:dependency',
+  flags: [],
+  async run({ argv }) {
+    const code = await main(argv);
+    if (code !== 0) throw new ScriptExitError(code, '', true);
+    return code;
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'apply_dependency_patch.ts') ||
   isDirectScript(import.meta.url, 'apply_dependency_patch.js')
 ) {
-  main().then(
-    (code) => (process.exitCode = code),
-    (error) => {
-      logger.error(`[patch] failed: ${(error as Error).message || error}`);
-      process.exitCode = 1;
-    }
-  );
+  void runApplyDependencyPatch();
 }

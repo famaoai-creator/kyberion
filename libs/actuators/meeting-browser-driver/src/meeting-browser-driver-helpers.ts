@@ -1,4 +1,5 @@
-import { buildGovernedRetryOptions, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 
 const MEETING_BROWSER_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/meeting-browser-driver/manifest.json'
@@ -11,14 +12,11 @@ const DEFAULT_MEETING_BROWSER_RETRY = {
   jitter: true,
 };
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEETING_BROWSER_MANIFEST_PATH,
-    defaults: DEFAULT_MEETING_BROWSER_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEETING_BROWSER_MANIFEST_PATH,
+  defaults: DEFAULT_MEETING_BROWSER_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function loadPlaywright(): Promise<any> {
   return new Function('specifier', 'return import(specifier)')('playwright');

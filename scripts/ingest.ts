@@ -26,14 +26,11 @@
  */
 
 import * as path from 'node:path';
-import {
-  deriveAssetId,
-  findAssetBySource,
-  pathResolver,
-  proposeTierPlacement,
-  safeExistsSync,
-  scanContent,
-} from '@agent/core';
+import { deriveAssetId, findAssetBySource } from '@agent/core/ingest-asset-ledger';
+import { proposeTierPlacement } from '@agent/core/ingest-tier-gate';
+import { scanContent } from '@agent/core/pii-scrubber';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {

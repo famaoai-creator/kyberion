@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/voice-profile-registration-receipt.schema.json",
+  "title": "Voice Profile Registration Receipt",
+  "type": "object",
+  "required": ["kind", "created_at", "status", "request_id", "profile", "samples"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": { "const": "voice_profile_registration_receipt" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "status": { "enum": ["validated_pending_promotion", "promoted"] },
+    "request_id": { "type": "string", "minLength": 1 },
+    "profile": {
+      "type": "object",
+      "required": ["profile_id", "display_name", "tier", "languages", "default_engine_id"],
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": { "type": "string", "minLength": 1 },
+        "display_name": { "type": "string", "minLength": 1 },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "languages": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "default_engine_id": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" }
+      }
+    },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["sample_id", "path"],
+        "additionalProperties": false,
+        "properties": {
+          "sample_id": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "language": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["sample_count", "total_sample_bytes", "strict_personal_voice"],
+      "additionalProperties": false,
+      "properties": {
+        "sample_count": { "type": "integer", "minimum": 0 },
+        "total_sample_bytes": { "type": "integer", "minimum": 0 },
+        "strict_personal_voice": { "type": "boolean" }
+      }
+    },
+    "policy_version": { "type": "string" }
+  }
+}

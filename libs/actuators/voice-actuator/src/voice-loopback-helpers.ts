@@ -1,17 +1,10 @@
-import {
-  getVoiceProfileRecord,
-  getVoiceTtsLanguageConfig,
-  pathResolver,
-  resolveVoiceEngineForPlatform,
-  safeExec,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  type AudioChunk,
-  type AudioFormat,
-  type TtsLoopbackVerificationRequest,
-  type TtsSource,
-} from '@agent/core';
+import { getVoiceProfileRecord } from '@agent/core/voice-profile-registry';
+import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVoiceEngineForPlatform } from '@agent/core/voice-engine-registry';
+import { safeExec, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import type { AudioChunk, AudioFormat } from '@agent/core/meeting-session-types';
+import type { TtsLoopbackVerificationRequest, TtsSource } from '@agent/core/tts-loopback-verifier';
 import { isRecord } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { renderNativeArtifact } from './voice-runtime-helpers.js';

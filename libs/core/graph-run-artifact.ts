@@ -1,4 +1,5 @@
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import * as path from 'node:path';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type {
   ExecutionGraph,
@@ -62,12 +63,17 @@ export function recordGraphRunNode<T, C>(
 
 export function graphRunArtifactPath(runId?: string): string {
   const safe = String(runId || 'run').replace(/[^a-zA-Z0-9._-]+/g, '-');
-  return pathResolver.shared(`runtime/run-graphs/${safe}.json`);
+  return assertSafeRepositoryPath(pathResolver.shared(`runtime/run-graphs/${safe}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function persistGraphRunArtifact(artifact: GraphRunArtifact, filePath?: string): string {
-  const target = filePath || graphRunArtifactPath(artifact.run_id);
-  const dir = target.replace(/[/\\][^/\\]+$/, '');
+  const target = assertSafeRepositoryPath(filePath || graphRunArtifactPath(artifact.run_id), {
+    allowMissingLeaf: true,
+  });
+  const dir = path.dirname(target);
+  assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   artifact.artifact_path = target;
   safeWriteFile(target, `${JSON.stringify(artifact, null, 2)}\n`);

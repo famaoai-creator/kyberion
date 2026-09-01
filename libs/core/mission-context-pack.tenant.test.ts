@@ -17,7 +17,7 @@ import {
   loadKnowledgeUsageAggregate,
 } from './src/knowledge-feedback-loop.js';
 import {
-  resetProviderEgressPolicyCache,
+  _resetProviderEgressPolicyCacheForTests,
   type ProviderEgressPolicyFile,
 } from './provider-egress-gate.js';
 import type { WorkItem } from './work-coordination.js';
@@ -186,7 +186,7 @@ afterEach(() => {
   ]) {
     if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
   }
-  resetProviderEgressPolicyCache();
+  _resetProviderEgressPolicyCacheForTests();
 });
 
 describe('DA-07 (1)(2): tenant knowledge reaches the pack; other tenants never do', () => {
@@ -450,7 +450,7 @@ describe('DA-07 (1)(5) E2E: provisionTaskKnowledge delivers and records tenant d
     safeMkdir(egressPolicyDir, { recursive: true });
     safeWriteFile(egressPolicyPath, JSON.stringify(policy));
     process.env.KYBERION_PROVIDER_EGRESS_POLICY_PATH = egressPolicyPath;
-    resetProviderEgressPolicyCache();
+    _resetProviderEgressPolicyCacheForTests();
   });
 
   afterEach(() => {

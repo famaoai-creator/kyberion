@@ -12,14 +12,20 @@ const mocks = vi.hoisted(() => ({
     JSON.stringify(payload ?? {})
   ),
   safeExistsSync: vi.fn<(p: string) => boolean>(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   safeReadFile: vi.fn<(p: string, opts?: unknown) => string>(),
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/approval-store', () => ({
   findMissionPath: mocks.findMissionPath,
   listApprovalRequests: mocks.listApprovalRequests,
   computeApprovalPayloadHash: mocks.computeApprovalPayloadHash,
 }));
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
+  return { ...actual, findMissionPath: mocks.findMissionPath };
+});
 
 // The assessor reads the brief through the foundation JSON facade, so the
 // stub has to sit on that module — mocking secure-io alone is not enough,
@@ -29,7 +35,9 @@ vi.mock('@agent/core/foundation', () => ({
 }));
 
 vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
   safeReadFile: mocks.safeReadFile,
 }));
 

@@ -167,6 +167,49 @@ describe('metrics core', () => {
     expect(history[1].type).toBe('intervention');
   });
 
+  it('fails closed when metrics history contains malformed JSONL', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-malformed');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    const mc = new MetricsCollector({
+      metricsDir,
+      metricsFile: 'history.jsonl',
+      persist: true,
+    });
+
+    mc.record('valid-before-corruption', 1, 'success');
+    fs.appendFileSync(path.join(metricsDir, 'history.jsonl'), '{not-json}\n', 'utf8');
+
+    expect(mc.loadHistory()).toEqual([]);
+  });
+
+  it('does not read or append through a symlinked metrics history file', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-symlink');
+    const externalPath = path.join(
+      process.cwd(),
+      'active/shared/tmp/metrics-test-symlink-external.jsonl'
+    );
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.rmSync(externalPath, { force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const externalContents = JSON.stringify({ component: 'external-only' }) + '\n';
+    fs.writeFileSync(externalPath, externalContents, 'utf8');
+    fs.symlinkSync(externalPath, path.join(metricsDir, 'history.jsonl'));
+
+    try {
+      const mc = new MetricsCollector({
+        metricsDir,
+        metricsFile: 'history.jsonl',
+        persist: true,
+      });
+      expect(mc.loadHistory()).toEqual([]);
+      mc.record('must-not-append', 1, 'success');
+      expect(fs.readFileSync(externalPath, 'utf8')).toBe(externalContents);
+    } finally {
+      fs.rmSync(metricsDir, { recursive: true, force: true });
+      fs.rmSync(externalPath, { force: true });
+    }
+  });
+
   it('persists a normalized usage cause for backward-compatible ledgers', () => {
     const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-cause');
     fs.rmSync(metricsDir, { recursive: true, force: true });

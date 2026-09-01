@@ -1,12 +1,11 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
@@ -110,19 +109,39 @@ export interface ProjectOperationalStateMissionContext {
   };
 }
 
-const ajv = createAjv();
 const STATE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/project-operational-state.schema.json'
 );
 const STATE_ROOT = pathResolver.active('projects');
 const STATE_FILE_NAME = 'project-state.json';
-let stateValidateFn: ValidateFunction | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (stateValidateFn) return stateValidateFn;
-  const raw = safeReadFile(STATE_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  stateValidateFn = ajv.compile(JSON.parse(raw));
-  return stateValidateFn!;
+const projectOperationalStateCatalog = defineCatalog<ProjectOperationalState>({
+  id: 'project-operational-state',
+  path: STATE_ROOT,
+  schema: STATE_SCHEMA_PATH,
+});
+
+const projectOperationalStateFileCatalogs = new Map<
+  string,
+  GovernedCatalog<ProjectOperationalState>
+>();
+
+function projectOperationalStateFileCatalog(
+  filePath: string
+): GovernedCatalog<ProjectOperationalState> {
+  const cached = projectOperationalStateFileCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<ProjectOperationalState>({
+    id: 'project-operational-state',
+    path: filePath,
+    schema: STATE_SCHEMA_PATH,
+  });
+  projectOperationalStateFileCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function isInvalidProjectOperationalState(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith('Invalid catalog ');
 }
 
 function missionStatusToPhase(
@@ -154,9 +173,12 @@ export function projectOperationalStateDir(
   tenantSlug?: string,
   rootDir = pathResolver.rootDir()
 ): string {
-  return path.join(
-    pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug || 'shared', rootDir),
-    'state'
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.projectWorkspaceDir(projectId, tier, tenantSlug || 'shared', rootDir),
+      'state'
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -166,14 +188,19 @@ export function projectOperationalStatePath(
   tenantSlug?: string,
   rootDir = pathResolver.rootDir()
 ): string {
-  return path.join(
-    projectOperationalStateDir(projectId, tier, tenantSlug, rootDir),
-    STATE_FILE_NAME
+  return assertSafeRepositoryPath(
+    path.join(projectOperationalStateDir(projectId, tier, tenantSlug, rootDir), STATE_FILE_NAME),
+    { allowMissingLeaf: true }
   );
 }
 
 export function validateProjectOperationalState(value: unknown): value is ProjectOperationalState {
-  return Boolean(ensureValidator()(value));
+  try {
+    projectOperationalStateCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function normalizeProjectOperationalState(
@@ -240,7 +267,10 @@ function projectStateFilesForQuery(query: ProjectOperationalStateQuery = {}): st
     if (direct.length > 0) return direct;
   }
   return recursiveProjectStateFiles(
-    path.resolve(query.rootDir || pathResolver.rootDir(), 'active/projects')
+    assertSafeRepositoryPath(
+      path.resolve(query.rootDir || pathResolver.rootDir(), 'active/projects'),
+      { allowMissingLeaf: true }
+    )
   );
 }
 
@@ -249,11 +279,12 @@ export function saveProjectOperationalState(
   options: { rootDir?: string } = {}
 ): string {
   const normalized = normalizeProjectOperationalState(record);
-  if (!validateProjectOperationalState(normalized)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  try {
+    projectOperationalStateCatalog.validate(normalized);
+  } catch (error) {
+    throw new Error(
+      `Invalid project operational state: ${error instanceof Error ? error.message : String(error)}`
     );
-    throw new Error(`Invalid project operational state: ${errors.join('; ')}`);
   }
   const filePath = projectOperationalStatePath(
     normalized.project_id,
@@ -273,14 +304,16 @@ export function loadProjectOperationalState(
 ): ProjectOperationalState | null {
   const files = projectStateFilesForQuery({ projectId, ...query });
   for (const filePath of files) {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as ProjectOperationalState;
-    if (
-      validateProjectOperationalState(parsed) &&
-      parsed.project_id === projectId &&
-      stateRecordMatchesQuery(parsed, { projectId, ...query })
-    ) {
-      return parsed;
+    try {
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (
+        parsed.project_id === projectId &&
+        stateRecordMatchesQuery(parsed, { projectId, ...query })
+      ) {
+        return parsed;
+      }
+    } catch (error) {
+      if (!isInvalidProjectOperationalState(error)) throw error;
     }
   }
   return null;
@@ -293,9 +326,8 @@ export function listProjectOperationalStates(
   const states: ProjectOperationalState[] = [];
   for (const filePath of files) {
     try {
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as ProjectOperationalState;
-      if (validateProjectOperationalState(parsed) && stateRecordMatchesQuery(parsed, query)) {
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (stateRecordMatchesQuery(parsed, query)) {
         states.push(parsed);
       }
     } catch (_) {
@@ -323,9 +355,7 @@ function readProjectStateIfExists(
   const statePath = projectOperationalStatePath(projectId, tier, tenantSlug);
   if (!safeExistsSync(statePath)) return null;
   try {
-    const raw = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as ProjectOperationalState;
-    return validateProjectOperationalState(parsed) ? parsed : null;
+    return projectOperationalStateFileCatalog(statePath).load();
   } catch (_) {
     return null;
   }
@@ -361,9 +391,8 @@ function loadAllProjectStateRecords(projectId: string): Array<{
   }> = [];
   for (const filePath of files) {
     try {
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as ProjectOperationalState;
-      if (!validateProjectOperationalState(parsed) || parsed.project_id !== projectId) continue;
+      const parsed = projectOperationalStateFileCatalog(filePath).load();
+      if (parsed.project_id !== projectId) continue;
       records.push({ tier: parsed.tier, tenant_slug: parsed.tenant_slug, record: parsed });
     } catch (_) {
       continue;

@@ -3,11 +3,55 @@ import {
   buildGeminiApiBackendFromEnv,
   GeminiApiBackend,
   GEMINI_API_DEFAULT_MODEL,
+  normalizeGeminiGenerateContentResponse,
 } from './gemini-api-backend.js';
 
 describe('GeminiApiBackend', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('normalizes only supported response shapes', () => {
+    expect(
+      normalizeGeminiGenerateContentResponse({
+        candidates: [
+          {
+            content: {
+              parts: [{ functionCall: { name: 'read_file', args: { path: 'README.md' } } }],
+            },
+            finishReason: 'STOP',
+          },
+        ],
+      })
+    ).toEqual({
+      candidates: [
+        {
+          content: {
+            parts: [{ functionCall: { name: 'read_file', args: { path: 'README.md' } } }],
+          },
+          finishReason: 'STOP',
+        },
+      ],
+    });
+    expect(normalizeGeminiGenerateContentResponse({ error: { message: 'bad key' } })).toEqual({
+      error: { message: 'bad key' },
+    });
+  });
+
+  it('rejects malformed response roots and parts', () => {
+    expect(normalizeGeminiGenerateContentResponse(null)).toBeNull();
+    expect(normalizeGeminiGenerateContentResponse([])).toBeNull();
+    expect(normalizeGeminiGenerateContentResponse({ candidates: {} })).toBeNull();
+    expect(
+      normalizeGeminiGenerateContentResponse({
+        candidates: [{ content: { parts: [{ text: 42 }] } }],
+      })
+    ).toBeNull();
+    expect(
+      normalizeGeminiGenerateContentResponse({
+        candidates: [{ content: { parts: [{ functionCall: { name: 'x', args: [] } }] } }],
+      })
+    ).toBeNull();
   });
 
   it('builds from a Google AI Studio key without exposing the key in the model route', () => {
@@ -45,6 +89,16 @@ describe('GeminiApiBackend', () => {
     expect(call.headers['x-goog-api-key']).toBe('test-gemini-key');
     expect(call.data.contents[0].parts[0].text).toBe('Explain AI in a few words');
     expect(call.authenticateRequest).toBe(true);
+  });
+
+  it('rejects malformed transport responses before projecting text', async () => {
+    const backend = new GeminiApiBackend({
+      apiKey: 'test-gemini-key',
+      model: 'gemini-flash-latest',
+      request: vi.fn().mockResolvedValue({ candidates: [{ content: { parts: [{ text: 42 }] } }] }),
+    });
+
+    await expect(backend.prompt('Explain AI in a few words')).rejects.toThrow(/invalid shape/);
   });
 
   it('accepts GOOGLE_API_KEY as the compatibility fallback', () => {

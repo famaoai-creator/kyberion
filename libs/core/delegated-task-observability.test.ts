@@ -1,6 +1,12 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   buildDelegatedTaskWorkerProcessSpec,
   completeDelegatedTaskTrace,
@@ -109,6 +115,34 @@ describe('KC-06 delegated-task-observability store', () => {
     const active = listActiveDelegatedTaskRecords(8);
     expect(active.map((record) => record.delegation_id)).toEqual([running.trace_id]);
     expect(listActiveDelegatedTaskRecords(0)).toEqual([]);
+  });
+
+  it('rejects an observability trace override outside the repository', () => {
+    const originalTrace = process.env.KYBERION_DELEGATION_TRACE_PATH;
+    process.env.KYBERION_DELEGATION_TRACE_PATH = '/tmp/delegations-external.jsonl';
+    try {
+      expect(() =>
+        startDelegatedTaskTrace({ owner: 'path-owner', instruction: 'must not write outside' })
+      ).toThrow('[RESOURCE_PATH_SCOPE]');
+    } finally {
+      process.env.KYBERION_DELEGATION_TRACE_PATH = originalTrace;
+    }
+  });
+
+  it('rejects an observability store override traversing a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp(`delegations-target-${process.pid}`);
+    const linkPath = pathResolver.sharedTmp(`delegations-link-${process.pid}`);
+    safeWriteFile(`${targetPath}/placeholder.json`, '{}');
+    safeSymlinkSync(targetPath, linkPath, 'dir');
+    const originalStore = process.env.KYBERION_DELEGATION_STORE_DIR;
+    process.env.KYBERION_DELEGATION_STORE_DIR = linkPath;
+    try {
+      expect(() => delegatedTaskStoreDir()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      process.env.KYBERION_DELEGATION_STORE_DIR = originalStore;
+      safeUnlinkSync(linkPath);
+      safeRmSync(targetPath, { recursive: true, force: true });
+    }
   });
 
   it('enqueues a claim-based notification when a background delegation completes', () => {

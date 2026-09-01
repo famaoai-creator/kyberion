@@ -19,7 +19,6 @@ import {
   countWords as countWordsFromDispatchIO,
   ensureDirectory,
   readJsonFile,
-  writeJsonFile,
 } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { recordTask } from './mission-maintenance.js';
@@ -409,7 +408,7 @@ export async function dispatchMissionTickets(
       draft: false,
     };
     if (status !== 'failed' && targets.includes('github')) {
-      writeDispatchArtifact(githubArtifactPath, githubPayload);
+      writeDispatchArtifact(githubArtifactPath, githubPayload, { missionId, missionPath });
       ticketFiles.push(githubArtifactPath);
       if (liveTargets.includes('github')) {
         if (!options.github?.owner || !options.github?.repo) {
@@ -479,7 +478,7 @@ export async function dispatchMissionTickets(
       },
     };
     if (status !== 'failed' && targets.includes('jira')) {
-      writeDispatchArtifact(jiraArtifactPath, jiraPayload);
+      writeDispatchArtifact(jiraArtifactPath, jiraPayload, { missionId, missionPath });
       ticketFiles.push(jiraArtifactPath);
       if (liveTargets.includes('jira')) {
         if (!options.jira?.projectKey || !options.jira?.domain) {
@@ -604,8 +603,8 @@ export async function dispatchMissionTickets(
   const manifestFilePath = manifestPath(missionPath);
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = ticketEventPath(missionPath);
-  writeJsonFile(manifestFilePath, manifest);
-  writeJsonFile(nextTasksPath, allTasks);
+  writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
+  writeDispatchArtifact(nextTasksPath, allTasks, { missionId, missionPath });
 
   ledger.record('MISSION_TICKETS_REGISTERED', {
     mission_id: missionId,

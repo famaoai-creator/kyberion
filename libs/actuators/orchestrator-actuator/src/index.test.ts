@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const mocks = vi.hoisted(() => ({
   loadJson: vi.fn((filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath)))),
@@ -26,25 +26,42 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
-  return {
-    ...actual,
-    loadJson: mocks.loadJson,
-    safeReadFile: mocks.safeReadFile,
-    safeWriteFile: mocks.safeWriteFile,
-    safeExec: mocks.safeExec,
-    safeMkdir: mocks.safeMkdir,
-    safeExistsSync: mocks.safeExistsSync,
-    safeUnlinkSync: mocks.safeUnlinkSync,
-    safeSymlinkSync: mocks.safeSymlinkSync,
-    resolveVars: mocks.resolveVars,
-    evaluateCondition: mocks.evaluateCondition,
-    retry: mocks.retry,
-    derivePipelineStatus: mocks.derivePipelineStatus,
-    buildCostReportFromHistory: mocks.buildCostReportFromHistory,
-  };
-});
+vi.mock('@agent/core/foundation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation')>()),
+  loadJson: mocks.loadJson,
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeReadFile: mocks.safeReadFile,
+  safeWriteFile: mocks.safeWriteFile,
+  safeExec: mocks.safeExec,
+  safeMkdir: mocks.safeMkdir,
+  safeExistsSync: mocks.safeExistsSync,
+  safeUnlinkSync: mocks.safeUnlinkSync,
+  safeSymlinkSync: mocks.safeSymlinkSync,
+}));
+
+vi.mock('@agent/core/src/logic-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/src/logic-utils')>()),
+  resolveVars: mocks.resolveVars,
+  evaluateCondition: mocks.evaluateCondition,
+}));
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
+
+vi.mock('@agent/core/pipeline-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/pipeline-contract')>()),
+  derivePipelineStatus: mocks.derivePipelineStatus,
+}));
+
+vi.mock('@agent/core/cost-report', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/cost-report')>()),
+  buildCostReportFromHistory: mocks.buildCostReportFromHistory,
+}));
 
 vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn(() => []),
@@ -216,6 +233,64 @@ describe('orchestrator-actuator', () => {
     const error = result.results.find((entry: any) => entry.error)?.error || '';
     expect(error).toContain('[UNKNOWN_OP]');
     expect(error).toContain('Did you mean: read_file');
+  });
+
+  it('rejects an orchestrator strategy outside the repository before reading it', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: '/tmp/kyberion-outside-strategy.json',
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[ORCHESTRATOR_SCOPE]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
+  });
+
+  it('rejects legacy pipeline write paths outside the repository', async () => {
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'apply',
+          op: 'write_file',
+          params: { path: '../../external-orchestrator-output.json', content: '{}' },
+        },
+      ],
+    } as any);
+    expect(result.results.find((entry: any) => entry.error)?.status).toBe('failed');
+    expect(result.results.find((entry: any) => entry.error)?.error).toContain(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a pipeline bundle template outside the repository before reading it', async () => {
+    const { renderPipelineBundleJob } = await import('./orchestrator-execution-brief-helpers.js');
+
+    expect(() =>
+      renderPipelineBundleJob(
+        {
+          id: 'unsafe-template',
+          title: 'Unsafe template',
+          actuator: 'artifact-actuator',
+          template_path: '../outside-template.json',
+        },
+        {},
+        'active/shared/tmp/orchestrator-tests'
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
+  });
+
+  it('requires project trust before reading a project-local strategy', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'reconcile',
+        strategy_path: 'roles/PROCEDURE.md',
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[TRUST_REQUIRED]');
+    expect(mocks.loadJson).not.toHaveBeenCalled();
   });
 
   it('renders an image pipeline bundle into an execution plan set', async () => {

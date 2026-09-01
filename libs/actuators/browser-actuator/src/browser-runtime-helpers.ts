@@ -1,6 +1,7 @@
+import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
 import {
-  loadJson,
-  logger,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -8,12 +9,12 @@ import {
   safeReaddir,
   safeRmSync,
   safeExec,
-  secureFetch,
-  pathResolver,
-  normalizeBrowserPipelineOp,
-  getOpInputContract,
-  validateOpInput,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { secureFetch } from '@agent/core/network';
+import { pathResolver } from '@agent/core/path-resolver';
+import { normalizeBrowserPipelineOp } from '@agent/core/op-vocabulary';
+import { getOpInputContract, validateOpInput } from '@agent/core/op-input-contracts';
 import {
   chromium,
   type Browser,
@@ -24,6 +25,7 @@ import {
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
+import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
 
 export interface BrowserSnapshotElement {
   ref: string;
@@ -180,6 +182,27 @@ const BROWSER_SNAPSHOT_DIR = path.join(BROWSER_RUNTIME_DIR, 'snapshots');
 const BROWSER_ACTION_TRAIL_DIR = path.join(BROWSER_RUNTIME_DIR, 'action-trails');
 const BROWSER_APPROVAL_DIR = path.join(BROWSER_RUNTIME_DIR, 'approvals');
 const browserRuntimeLeases = new Map<string, BrowserRuntimeLease>();
+
+function safeBrowserRuntimePath(
+  filePath: string,
+  options: { allowMissingLeaf?: boolean } = { allowMissingLeaf: true }
+): string {
+  return assertSafeRepositoryPath(filePath, options);
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function browserSessionArtifactPath(directory: string, sessionId: string, suffix: string): string {
+  const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
+  return safeBrowserRuntimePath(path.join(directory, `${safeSessionId}${suffix}`));
+}
 
 function createBrowserRuntime(
   context: BrowserContext,
@@ -340,9 +363,10 @@ function assertNavigationAllowed(
 }
 
 function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | null {
-  if (!safeExistsSync(filePath)) return null;
+  const safePath = safeBrowserRuntimePath(filePath);
+  if (!isExistingRegularFile(safePath)) return null;
   try {
-    return loadJson<BrowserSessionMetadata>(filePath);
+    return loadJson<BrowserSessionMetadata>(safePath);
   } catch {
     return null;
   }
@@ -354,11 +378,12 @@ async function waitForCdpEndpoint(
 ): Promise<{ cdpUrl: string; cdpPort: number } | null> {
   if (process.env.VITEST) return null;
   const filePath = path.join(userDataDir, 'DevToolsActivePort');
+  const safeFilePath = safeBrowserRuntimePath(filePath);
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (safeExistsSync(filePath)) {
+    if (isExistingRegularFile(safeFilePath)) {
       try {
-        const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '').trim();
+        const raw = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '').trim();
         const [portLine] = raw.split(/\r?\n/);
         const cdpPort = Number(portLine);
         if (Number.isFinite(cdpPort) && cdpPort > 0) {
@@ -395,16 +420,13 @@ async function probeChromeCdpPort(
   timeoutMs = 600
 ): Promise<ChromeCdpEndpoint | null> {
   try {
-    const payload = await secureFetch<Record<string, unknown>>({
+    const payload = await secureFetch<unknown>({
       method: 'GET',
       url: `http://127.0.0.1:${port}/json/version`,
       timeout: timeoutMs,
       kyberion_allow_local_network: true,
     });
-    if (!payload || typeof payload !== 'object') return null;
-    const webSocketDebuggerUrl = (payload as any).webSocketDebuggerUrl;
-    const browser = (payload as any).Browser;
-    if (typeof webSocketDebuggerUrl === 'string' || typeof browser === 'string') {
+    if (parseChromeCdpVersionResponse(payload)) {
       return {
         cdpUrl: `http://127.0.0.1:${port}`,
         cdpPort: port,
@@ -496,25 +518,22 @@ async function resetBrowserRuntimeLeasesForTest(): Promise<void> {
 }
 
 function saveBrowserSessionMetadata(filePath: string, metadata: BrowserSessionMetadata): void {
-  safeWriteFile(filePath, JSON.stringify(metadata, null, 2));
+  safeWriteFile(safeBrowserRuntimePath(filePath), JSON.stringify(metadata, null, 2));
 }
 
 function trailPath(sessionId: string): string {
-  return path.join(
-    BROWSER_ACTION_TRAIL_DIR,
-    `${String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
-  );
+  return browserSessionArtifactPath(BROWSER_ACTION_TRAIL_DIR, sessionId, '.json');
 }
 function saveBrowserActionTrail(sessionId: string, trail: unknown[]): string {
-  if (!safeExistsSync(BROWSER_ACTION_TRAIL_DIR))
-    safeMkdir(BROWSER_ACTION_TRAIL_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_ACTION_TRAIL_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   const filePath = trailPath(sessionId);
   safeWriteFile(filePath, JSON.stringify(Array.isArray(trail) ? trail.slice(-200) : [], null, 2));
   return filePath;
 }
 function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
-  if (!safeExistsSync(filePath)) return [];
+  if (!isExistingRegularFile(filePath)) return [];
   try {
     const value = loadJson<unknown>(filePath);
     return Array.isArray(value) ? value.slice(-200) : [];
@@ -528,18 +547,18 @@ function saveFailureBundle(
   requestedPath?: string
 ): string {
   const safeSessionId = String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_');
-  const outPath = pathResolver.rootResolve(
-    requestedPath || `active/shared/tmp/browser/${safeSessionId}-failure-bundle.json`
+  const outPath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      requestedPath || `active/shared/tmp/browser/${safeSessionId}-failure-bundle.json`
+    ),
+    { allowMissingLeaf: true }
   );
   if (!safeExistsSync(path.dirname(outPath))) safeMkdir(path.dirname(outPath), { recursive: true });
   safeWriteFile(outPath, JSON.stringify(bundle, null, 2));
   return outPath;
 }
 function approvalPath(sessionId: string): string {
-  return path.join(
-    BROWSER_APPROVAL_DIR,
-    `${String(sessionId || 'default').replace(/[^a-zA-Z0-9._-]/g, '_')}.json`
-  );
+  return browserSessionArtifactPath(BROWSER_APPROVAL_DIR, sessionId, '.json');
 }
 function beginOperatorApproval(options: {
   sessionId: string;
@@ -547,7 +566,8 @@ function beginOperatorApproval(options: {
   continueFile: string;
   timeoutMs?: number;
 }) {
-  if (!safeExistsSync(BROWSER_APPROVAL_DIR)) safeMkdir(BROWSER_APPROVAL_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_APPROVAL_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   const request = {
     request_id: randomUUID(),
     session_id: options.sessionId,
@@ -567,7 +587,7 @@ function completeOperatorApproval(
 ): void {
   const filePath = approvalPath(sessionId);
   let current: Record<string, unknown> = {};
-  if (safeExistsSync(filePath)) {
+  if (isExistingRegularFile(filePath)) {
     try {
       current = loadJson<Record<string, unknown>>(filePath);
     } catch {
@@ -581,9 +601,10 @@ function completeOperatorApproval(
 }
 
 function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot): void {
-  if (!safeExistsSync(BROWSER_SNAPSHOT_DIR)) safeMkdir(BROWSER_SNAPSHOT_DIR, { recursive: true });
+  const safeDirectory = safeBrowserRuntimePath(BROWSER_SNAPSHOT_DIR);
+  if (!safeExistsSync(safeDirectory)) safeMkdir(safeDirectory, { recursive: true });
   safeWriteFile(
-    path.join(BROWSER_SNAPSHOT_DIR, `${sessionId}.json`),
+    browserSessionArtifactPath(BROWSER_SNAPSHOT_DIR, sessionId, '.json'),
     JSON.stringify(snapshot, null, 2)
   );
 }
@@ -801,9 +822,14 @@ async function resolveSessionHandoff(
   }
 
   if (params.path) {
-    const filePath = pathResolver.rootResolve(resolve(params.path));
+    const filePath = assertSafeRepositoryPath(pathResolver.rootResolve(resolve(params.path)), {
+      allowMissingLeaf: true,
+    });
+    if (!isExistingRegularFile(filePath)) {
+      throw new Error(`import_session_handoff path must be an existing regular file: ${filePath}`);
+    }
     const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(content);
+    return parseSafeJsonInput(content, 'browser session handoff');
   }
 
   if (params.handoff && typeof params.handoff === 'object') {
@@ -1195,8 +1221,10 @@ async function waitForOperatorContinue(options: {
     return;
   }
 
-  const continueFile =
-    options.continueFile || path.join(BROWSER_RUNTIME_DIR, `${options.sessionId}.continue`);
+  const continueFile = safeBrowserRuntimePath(
+    options.continueFile ||
+      browserSessionArtifactPath(BROWSER_RUNTIME_DIR, options.sessionId, '.continue')
+  );
   logger.info(`⏸️ [BROWSER] ${options.message}`);
   logger.info(`📄 [BROWSER] Waiting for continue file: ${continueFile}`);
   while (true) {

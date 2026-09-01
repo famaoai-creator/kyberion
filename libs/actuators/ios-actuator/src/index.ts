@@ -1,4 +1,4 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import {
@@ -8,7 +8,7 @@ import {
   type IOSAction,
   type PipelineStep,
 } from './ios-runtime-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 
 async function handleAction(input: IOSAction) {
   if (input.action !== 'pipeline') {
@@ -20,6 +20,7 @@ async function handleAction(input: IOSAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'ios-actuator',
+    args: process.argv,
     handleAction,
   });
 };
@@ -34,7 +35,7 @@ if (entrypoint && modulePath === entrypoint) {
   });
 }
 
-export { handleAction, buildRetryOptions, DEFAULT_IOS_RETRY, executePipeline };
+export { handleAction, buildRetryOptions, DEFAULT_IOS_RETRY };
 export type { IOSAction, PipelineStep };
 
 export const actuator = defineCatalogBackedActuator({

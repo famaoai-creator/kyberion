@@ -6,8 +6,10 @@ import {
   clearPeerRuntime,
   createPeerMessagingServer,
   loadPeerNetworkCatalog,
+  listPeerEvents,
   listPeerInboxRecords,
   listPeerOutboxRecords,
+  parsePeerMessageEnvelope,
   registerPeerNetworkPeer,
   peerNetworkCatalogPath,
   resolvePeerRecord,
@@ -18,6 +20,7 @@ import {
 } from './peer-messaging.js';
 import { safeRmSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 
 const SHARED_SECRET = 'peer-message-test-secret';
 // Keep this file's physical runtime namespace isolated from peer-conversation
@@ -99,6 +102,20 @@ describe('peer messaging', () => {
     ).toBe(false);
   });
 
+  it('rejects traversal-shaped peer identifiers before building an envelope', () => {
+    expect(() =>
+      buildPeerMessageEnvelope({
+        senderPeerId: '../outside',
+        recipientPeerId: 'peer-b-test',
+        tenantId: TENANT_ID,
+        subject: 'invalid-peer',
+        type: 'request',
+        payload: {},
+        sharedSecret: SHARED_SECRET,
+      })
+    ).toThrow('invalid_peer_network_peer_id');
+  });
+
   it('rejects an envelope scope that does not match its tenant binding', () => {
     expect(() =>
       buildPeerMessageEnvelope({
@@ -116,6 +133,23 @@ describe('peer messaging', () => {
         sharedSecret: SHARED_SECRET,
       })
     ).toThrow('peer_message_scope_tenant_mismatch');
+  });
+
+  it('rejects malformed envelopes before signature verification', async () => {
+    expect(() => parsePeerMessageEnvelope({})).toThrow('invalid_peer_envelope_version');
+    const server = createPeerMessagingServer({
+      peerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      sharedSecret: SHARED_SECRET,
+    });
+
+    const result = await server.processEnvelope({
+      version: '1',
+      tenant_id: TENANT_ID,
+      sender_peer_id: 'peer-a-test',
+      recipient_peer_id: 'peer-b-test',
+    } as never);
+    expect(result).toEqual({ status: 400, body: { ok: false, error: 'invalid_envelope' } });
   });
 
   it('rejects a correctly signed envelope from another tenant', async () => {
@@ -207,6 +241,75 @@ describe('peer messaging', () => {
     fetchSpy.mockRestore();
   });
 
+  it('skips malformed and cross-peer persisted records at read boundaries', () => {
+    const envelope = buildPeerMessageEnvelope({
+      senderPeerId: 'peer-a-test',
+      recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      subject: 'persisted',
+      type: 'notification',
+      payload: { ok: true },
+      sharedSecret: SHARED_SECRET,
+    });
+    const inboxPath = pathResolver.resolve(
+      `active/shared/runtime/peer-messaging/tenants/${TENANT_ID}/peers/peer-b-test/inbox.jsonl`
+    );
+    const eventPath = pathResolver.resolve(
+      `active/shared/observability/peer-messaging/tenants/${TENANT_ID}/peers/peer-b-test/events.jsonl`
+    );
+    withExecutionContext('surface_runtime', () =>
+      safeWriteFile(
+        inboxPath,
+        [
+          JSON.stringify({ received_at: new Date().toISOString(), envelope }),
+          JSON.stringify({
+            received_at: new Date().toISOString(),
+            envelope: { ...envelope, tenant_id: 'tenant-other' },
+          }),
+          JSON.stringify({ received_at: 42, envelope }),
+          '{not-json',
+        ].join('\n')
+      )
+    );
+    withExecutionContext('infrastructure_sentinel', () =>
+      safeWriteFile(
+        eventPath,
+        [
+          JSON.stringify({ ts: new Date().toISOString(), peer_id: 'peer-b-test', type: 'ok' }),
+          JSON.stringify({ ts: new Date().toISOString(), peer_id: 'peer-other', type: 'leak' }),
+          JSON.stringify({ ts: 'not-a-date', peer_id: 'peer-b-test' }),
+        ].join('\n')
+      )
+    );
+
+    expect(listPeerInboxRecords(TENANT_ID, 'peer-b-test')).toHaveLength(1);
+    expect(listPeerEvents(TENANT_ID, 'peer-b-test')).toHaveLength(1);
+  });
+
+  it('rejects non-object dispatch responses before recording a successful send', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify('unexpected'), { status: 200 }));
+    const envelope = buildPeerMessageEnvelope({
+      senderPeerId: 'peer-a-test',
+      recipientPeerId: 'peer-b-test',
+      tenantId: TENANT_ID,
+      subject: 'response-shape',
+      type: 'request',
+      payload: {},
+      sharedSecret: SHARED_SECRET,
+    });
+
+    await expect(
+      sendPeerMessage(envelope, {
+        destinationUrl: 'http://127.0.0.1:4555',
+        allowLocalNetwork: true,
+      })
+    ).rejects.toThrow('invalid_peer_response');
+    expect(listPeerOutboxRecords(TENANT_ID, 'peer-a-test')).toHaveLength(1);
+    fetchSpy.mockRestore();
+  });
+
   it('resolves peer catalog entries that point at LAN endpoints', () => {
     const catalogPath = pathResolver.sharedTmp('peer-network-catalog.test.json');
     safeWriteFile(
@@ -266,6 +369,43 @@ describe('peer messaging', () => {
     const target = resolvePeerDispatchTarget('peer-b-test', catalog);
     expect(target.allowLocalNetwork).toBe(true);
     expect(target.sharedSecret).toBe(SHARED_SECRET);
+  });
+
+  it('rejects malformed catalog entries before registration writes', () => {
+    safeWriteFile(
+      REGISTRY_TEST_CATALOG,
+      JSON.stringify({
+        version: '1',
+        tenant_id: REGISTRY_TENANT,
+        peers: [{ peer_id: 'peer-b-test', base_url: 42 }],
+      })
+    );
+
+    expect(() =>
+      registerPeerNetworkPeer({
+        tenantId: REGISTRY_TENANT,
+        peerId: 'peer-a-test',
+        baseUrl: 'http://127.0.0.1:4555',
+        sharedSecret: SHARED_SECRET,
+        exposure: 'same_host',
+        catalogPath: REGISTRY_TEST_CATALOG,
+      })
+    ).toThrow(/Invalid catalog/u);
+  });
+
+  it('rejects malformed peer fields before creating a catalog', () => {
+    expect(() =>
+      registerPeerNetworkPeer({
+        tenantId: REGISTRY_TENANT,
+        peerId: 'peer-b-test',
+        baseUrl: 'http://127.0.0.1:4555',
+        sharedSecret: SHARED_SECRET,
+        exposure: 'same_host',
+        catalogPath: REGISTRY_TEST_CATALOG,
+        capabilities: [42 as unknown as string],
+      })
+    ).toThrow(/Invalid catalog/u);
+    expect(loadPeerNetworkCatalog({ catalogPath: REGISTRY_TEST_CATALOG })).toBeNull();
   });
 
   it('rejects a private endpoint when the registered exposure is public_network', () => {

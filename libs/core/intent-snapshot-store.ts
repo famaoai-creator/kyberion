@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 /**
  * Intent Snapshot Store — append-only per-mission snapshot persistence
  * plus drift-gate helpers for origin-baseline management.
@@ -11,7 +11,7 @@ import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { missionEvidenceDir } from './path-resolver.js';
-import { safeReadFile, safeExistsSync, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
 import {
   classifyDrift,
   computeIntentDelta,
@@ -38,28 +38,23 @@ export interface EmitSnapshotParams {
 function snapshotPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, SNAPSHOT_FILE);
+  return assertSafeRepositoryPath(path.join(dir, SNAPSHOT_FILE), { allowMissingLeaf: true });
 }
 
 function deltaPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, DELTA_FILE);
+  return assertSafeRepositoryPath(path.join(dir, DELTA_FILE), { allowMissingLeaf: true });
 }
 
 function scopeChangePath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, SCOPE_CHANGE_FILE);
+  return assertSafeRepositoryPath(path.join(dir, SCOPE_CHANGE_FILE), { allowMissingLeaf: true });
 }
 
 function readJsonl<T>(filePath: string): T[] {
-  if (!safeExistsSync(filePath)) return [];
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return raw
-    .split(/\r?\n/u)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as T);
+  return readJsonLines<T>(filePath);
 }
 
 function appendJsonl(filePath: string, record: unknown): void {

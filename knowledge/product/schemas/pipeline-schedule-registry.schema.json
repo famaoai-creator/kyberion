@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/pipeline-schedule-registry.schema.json",
+  "title": "Pipeline schedule registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "schedules"],
+  "properties": {
+    "version": { "const": "1.0" },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "pipelinePath", "actuator", "trigger", "enabled"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "pipelinePath": { "type": "string" },
+          "actuator": { "type": "string", "minLength": 1 },
+          "trigger": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "cron"],
+                "properties": {
+                  "type": { "const": "cron" },
+                  "cron": { "type": "string", "minLength": 1 },
+                  "timezone": { "type": "string", "minLength": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "intervalMs"],
+                "properties": {
+                  "type": { "const": "interval" },
+                  "intervalMs": { "type": "integer", "minimum": 1 },
+                  "timezone": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          },
+          "enabled": { "type": "boolean" },
+          "lastRun": { "type": "string", "format": "date-time" },
+          "lastStatus": { "enum": ["succeeded", "failed"] },
+          "consecutiveFailures": { "type": "integer", "minimum": 0 },
+          "disabledReason": { "type": "string", "minLength": 1 },
+          "disabledAt": { "type": "string", "format": "date-time" },
+          "context": { "type": "object" },
+          "deliver_to": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["surface", "channel"],
+            "properties": {
+              "surface": { "type": "string", "minLength": 1 },
+              "channel": { "type": "string", "minLength": 1 },
+              "thread_ts": { "type": "string", "minLength": 1 },
+              "template": { "type": "string", "minLength": 1 }
+            }
+          },
+          "runLock": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["token", "acquiredAt", "expiresAt"],
+            "properties": {
+              "token": { "type": "string", "minLength": 1 },
+              "acquiredAt": { "type": "string", "format": "date-time" },
+              "expiresAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

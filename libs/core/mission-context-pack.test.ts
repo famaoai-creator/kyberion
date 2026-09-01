@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -881,6 +882,51 @@ describe('mission-context-pack', () => {
         mission_id: missionId,
       },
     });
+
+    const receiptPath = `${missionPath}/coordination/provisioned-entries.jsonl`;
+    const receipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }) || '')
+      .split(/\r?\n/u)
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as { phase: string; target_path: string });
+    expect(receipts).toContainEqual(
+      expect.objectContaining({
+        phase: 'verified',
+        target_path: `coordination/context-packs/${pack.context_pack_id}.json`,
+      })
+    );
+  });
+
+  it('rejects symlinked mission roots before reading or writing context artifacts', () => {
+    const boundaryRoot = pathResolver.sharedTmp('mission-context-pack-boundary');
+    const targetPath = `${boundaryRoot}/target`;
+    const linkedPath = `${boundaryRoot}/linked-mission`;
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.symlinkSync(targetPath, linkedPath, 'dir');
+
+    try {
+      expect(() =>
+        buildMissionContextPack({
+          missionPath: linkedPath,
+          missionState: {
+            mission_id: `${missionId}-SYMLINK`,
+            tier: 'public',
+            status: 'active',
+            assigned_persona: 'worker',
+            execution_mode: 'local',
+            priority: 3,
+            confidence_score: 1,
+            git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+            history: [],
+          },
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+
+      const pack = makePack();
+      expect(() => saveMissionContextPack(linkedPath, pack)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(linkedPath, { force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
   });
 
   it('injects reusable artifact hints without binding the artifact to the mission', () => {
@@ -905,6 +951,22 @@ describe('mission-context-pack', () => {
         expect.stringContaining('Prior artifact: knowledge/product/architecture/prior-slice.md'),
       ])
     );
+  });
+
+  it('does not expose an external prior response path through the context seed', () => {
+    seedPriorWorkItemDispatchManifest();
+    const manifestPath = `${missionPath}/evidence/workitem-dispatch-manifest.json`;
+    const manifest = JSON.parse(safeReadFile(manifestPath, { encoding: 'utf8' }) as string) as {
+      records: Array<Record<string, unknown>>;
+    };
+    manifest.records[0].response_path = pathResolver.rootResolve('../external-response.json');
+    safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const pack = makePack();
+
+    expect(
+      pack.task_guidance?.seed?.some((entry) => entry.includes('Prior work item response:'))
+    ).toBe(false);
   });
 
   it('prefers higher quality reusable artifacts over newer lower quality ones', () => {
@@ -1036,6 +1098,29 @@ describe('loadKnowledgeHintsIfPossible (KP-03 knowledge slices)', () => {
     expect(hints.length).toBeGreaterThan(0);
     expect(hints[0].path).toBe('knowledge/product/governance/working-philosophy.md');
     expect(hints[0].title).toContain('Working Philosophy');
+  });
+
+  it('drops pinned paths that escape the knowledge root', async () => {
+    const slicesPath = writeSlices('escape-pinned.json', {
+      version: '0.1.0',
+      slices: [
+        {
+          id: 'escape-pinned',
+          match: { team_role: 'implementer', phase: 'execution' },
+          pinned: ['knowledge/../package.json'],
+        },
+      ],
+    });
+    vi.mocked(findRelevantDistilledKnowledge).mockResolvedValue([]);
+
+    const hints = await loadKnowledgeHintsIfPossible({
+      missionState: baseMissionState(),
+      teamRole: 'implementer',
+      phase: 'execution',
+      knowledgeSlicesPath: slicesPath,
+    });
+
+    expect(hints).toEqual([]);
   });
 
   it('(b) excludes distill_* results even when the search returns them', async () => {

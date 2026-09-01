@@ -1,12 +1,12 @@
-import {
-  safeWriteFile,
-  executeAdfSteps,
-  pathResolver,
-  resolveRef,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-} from '@agent/core';
-import type { TraceContext } from '@agent/core';
+import { safeWriteFile } from '@agent/core/secure-io';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveRef } from '@agent/core/src/pipeline-engine';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import type { TraceContext } from '@agent/core/src/trace';
 import * as path from 'node:path';
 
 export interface MediaPipelineStep {
@@ -36,6 +36,33 @@ export interface MediaPipelineDeps {
 
 export async function handleMediaAction(input: MediaAction, deps: MediaPipelineDeps) {
   if (input.action !== 'pipeline') throw new Error('Unsupported action');
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: 'media:pipeline',
+    params: {
+      steps: input.steps,
+      ...(input.context ? { context: input.context } : {}),
+      ...(input.options ? { options: input.options } : {}),
+    },
+    context: input.context,
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || 'Operation media:pipeline was not admitted.'}`
+    );
+  }
+  const admitted = preflight.input;
+  input = {
+    ...input,
+    ...(Array.isArray(admitted.steps) ? { steps: admitted.steps as MediaPipelineStep[] } : {}),
+    ...(admitted.context && typeof admitted.context === 'object'
+      ? { context: admitted.context as Record<string, any> }
+      : {}),
+    ...(admitted.options && typeof admitted.options === 'object'
+      ? { options: admitted.options as MediaAction['options'] }
+      : {}),
+  };
   const stepCount = Array.isArray(input.steps) ? input.steps.length : 0;
 
   // When called from the pipeline runner with a live TraceContext, record media steps as
@@ -101,7 +128,7 @@ function normalizeMediaSteps(list: MediaPipelineStep[]): any[] {
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
-// (executeAdfSteps). on_error recovery is the engine's native path now.
+// (runAdfActuatorPipeline). on_error recovery is the engine's native path now.
 // Deliberate semantic changes: nested ref failures propagate (AR-06
 // no-silent-failure), non-ref control ops throw instead of being silently
 // ignored, and the step/timeout budget is actually enforced (media renders
@@ -130,11 +157,15 @@ export async function executeMediaPipeline(
     },
   };
 
-  const result = await executeAdfSteps(
-    normalizeMediaSteps(steps) as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: options.max_steps || 1000, timeoutMs: options.timeout_ms || 600000 },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'media',
+    steps: normalizeMediaSteps(steps),
+    context: ctx,
+    options: {
+      maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options.timeout_ms || 600000,
+    },
+    handlers: {
       capture: (op, params, stepCtx, resolve) => deps!.opCapture(op, params, stepCtx, resolve),
       transform: (op, params, stepCtx, resolve) => deps!.opTransform(op, params, stepCtx, resolve),
       apply: (op, params, stepCtx, resolve) => deps!.opApply(op, params, stepCtx, resolve),
@@ -164,8 +195,8 @@ export async function executeMediaPipeline(
         return { ...stepCtx, ...subCtxClean };
       },
     },
-    hooks
-  );
+    hooks,
+  });
   ctx = result.context;
 
   if (initialCtx.context_path) {

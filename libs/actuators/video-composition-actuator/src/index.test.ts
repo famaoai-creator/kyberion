@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -12,6 +13,15 @@ const mocks = vi.hoisted(() => ({
   safeStat: vi.fn(() => ({ size: 4096 })),
   safeMkdir: vi.fn(),
   safeWriteFile: vi.fn(),
+  assertSafeRepositoryPath: vi.fn((candidate: string) => {
+    const normalized = path.resolve(String(candidate));
+    if (normalized !== '/tmp' && !normalized.startsWith('/tmp/')) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${candidate}`
+      );
+    }
+    return normalized;
+  }),
   retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   getVideoCompositionTemplateRegistry: vi.fn(() => ({
     version: 'test',
@@ -139,40 +149,76 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
-  return {
-    ...actual,
-    compileSchemaFromPath: mocks.compileSchemaFromPath,
-    safeExec: mocks.safeExec,
-    safeExecResult: mocks.safeExecResult,
-    safeExistsSync: mocks.safeExistsSync,
-    safeStat: mocks.safeStat,
-    safeMkdir: mocks.safeMkdir,
-    safeWriteFile: mocks.safeWriteFile,
-    retry: mocks.retry,
-    getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
-    getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
-    compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
-    compileVideoCompositionADF: mocks.compileVideoCompositionADF,
-    compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
-    compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
-    safeReadFile: mocks.safeReadFile,
-    renderNarratedFallbackVideo: mocks.renderNarratedFallbackVideo,
-    renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
-    writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
-  };
-});
-
 vi.mock('@agent/core/foundation', () => ({
   compileSchema: mocks.compileSchemaFromPath,
   getRegisteredEnvText: (name: string) => process.env[name],
 }));
 
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeExec: mocks.safeExec,
+  safeExecResult: mocks.safeExecResult,
+  safeExistsSync: mocks.safeExistsSync,
+  safeStat: mocks.safeStat,
+  safeMkdir: mocks.safeMkdir,
+  safeReadFile: mocks.safeReadFile,
+  safeWriteFile: mocks.safeWriteFile,
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
+}));
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
+vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),
+  pathResolver: {
+    rootDir: vi.fn(() => '/tmp'),
+    rootResolve: vi.fn((p: string) => `/tmp/${String(p).replace(/^\/+/, '')}`),
+    shared: vi.fn((p = '') => `/tmp/${String(p).replace(/^\/+/, '')}`),
+    sharedTmp: vi.fn((p = '') => `/tmp/${String(p).replace(/^\/+/, '')}`),
+    knowledge: vi.fn((p = '') => `/tmp/${String(p).replace(/^\/+/, '')}`),
+    active: vi.fn((p = '') => `/tmp/active/${String(p).replace(/^\/+/, '')}`),
+    vault: vi.fn((p = '') => `/tmp/.vault/${String(p).replace(/^\/+/, '')}`),
+    resolve: vi.fn((p = '') => (String(p).startsWith('/') ? String(p) : `/tmp/${p}`)),
+    toRepoRelative: vi.fn((p = '') => String(p).replace(/^\/tmp\//, '')),
+  },
+}));
+vi.mock('@agent/core/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/core')>()),
+  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+}));
+vi.mock('@agent/core/video-composition-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video-composition-compiler')>()),
+  compileVideoCompositionADF: mocks.compileVideoCompositionADF,
+  writeVideoCompositionBundle: mocks.writeVideoCompositionBundle,
+}));
+vi.mock('@agent/core/narrated-video-brief-compiler', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/narrated-video-brief-compiler')>()),
+  compileNarratedVideoBriefToCompositionADF: mocks.compileNarratedVideoBriefToCompositionADF,
+}));
+vi.mock('@agent/core/video-content-brief-contract', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video-content-brief-contract')>()),
+  compileVideoContentBriefToStoryboard: mocks.compileVideoContentBriefToStoryboard,
+  compileVideoStoryboardToNarratedVideoBrief: mocks.compileVideoStoryboardToNarratedVideoBrief,
+}));
+vi.mock('@agent/core/video-composition-template-registry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video-composition-template-registry')>()),
+  getVideoCompositionTemplateRegistry: mocks.getVideoCompositionTemplateRegistry,
+}));
+vi.mock('@agent/core/video-render-runtime-policy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video-render-runtime-policy')>()),
+  getVideoRenderRuntimePolicy: mocks.getVideoRenderRuntimePolicy,
+}));
+vi.mock('@agent/core/video-render-backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/video-render-backend')>()),
+  renderNarratedFallbackVideo: mocks.renderNarratedFallbackVideo,
+  renderVideoCompositionBundleAsync: mocks.renderVideoCompositionBundleAsync,
+}));
+
 describe('video-composition-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { safeReadFile } = await import('@agent/core');
+    const { safeReadFile } = await import('@agent/core/secure-io');
     vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
       if (String(filePath).includes('manifest.json')) {
         return JSON.stringify({ recovery_policy: {} });
@@ -456,6 +502,16 @@ describe('video-composition-actuator', () => {
         has_video: true,
       })
     );
+  });
+
+  it('rejects video artifact paths outside the repository', async () => {
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({
+        action: 'verify_rendered_video_artifact',
+        params: { path: '../../external-video.mp4' },
+      } as any)
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('validates narrated video artifacts through the typed actuator contract', async () => {
@@ -958,7 +1014,7 @@ describe('video-composition-actuator', () => {
     };
 
     it('passes a deterministic bundle', async () => {
-      const { safeReadFile } = await import('@agent/core');
+      const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
           return JSON.stringify({ recovery_policy: {} });
@@ -980,7 +1036,7 @@ describe('video-composition-actuator', () => {
     });
 
     it('fails the step when scene HTML is non-deterministic', async () => {
-      const { safeReadFile } = await import('@agent/core');
+      const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
           return JSON.stringify({ recovery_policy: {} });
@@ -1000,7 +1056,7 @@ describe('video-composition-actuator', () => {
     });
 
     it('reports without failing when fail_on_error is false', async () => {
-      const { safeReadFile } = await import('@agent/core');
+      const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json'))
           return JSON.stringify({ recovery_policy: {} });

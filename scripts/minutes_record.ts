@@ -14,15 +14,15 @@
  */
 
 import {
-  installAppleSpeechFileToTextBridgeIfAvailable,
-  installAppleSpeechToTextBridgeIfAvailable,
   installFluidAudioSpeechToTextBridgeIfAvailable,
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
   installShellSpeechToTextBridgeIfAvailable,
-  logger,
-  probeMicCapture,
-  startInRoomMinutesSession,
-} from '@agent/core';
+} from '@agent/core/speech-to-text-bridge';
+import { installAppleSpeechToTextBridgeIfAvailable } from '@agent/core/apple-intelligence-bridge';
+import { installAppleSpeechFileToTextBridgeIfAvailable } from '@agent/core/apple-speech-file-stt-bridge';
+import { logger } from '@agent/core/core';
+import { probeMicCapture } from '@agent/core/mic-capture';
+import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

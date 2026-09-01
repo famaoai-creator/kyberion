@@ -3,39 +3,59 @@ import * as path from 'node:path';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import {
   applyBrowserOnboarding,
-  getInstalledReasoningMode,
   getBrowserOnboardingState,
-  listAgentIdentities,
-  listTenantProfileSlugs,
-  loadNotificationPreferences,
-  readTenantProfile,
-  resolveActiveProfileRoot,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
   saveBrowserOnboardingVoiceSample,
-  secureIo,
+} from '@agent/core/browser-onboarding';
+import { getInstalledReasoningMode } from '@agent/core/reasoning-bootstrap';
+import { listAgentIdentities } from '@agent/core/agent-identity';
+import {
+  listTenantProfileSlugs,
+  readTenantProfile,
   writeTenantProfile,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/tenant-registry';
+import { loadNotificationPreferences } from '@agent/core/operator-notifications';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { pathResolver } from '@agent/core/path-resolver';
+import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceRoleCatalog } from '@agent/core/surface-role-catalog';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import {
+  optionalSetupBoolean,
+  optionalSetupObject,
+  optionalSetupString,
+  optionalSetupStringArray,
+  requireSetupObject,
+  SetupInputError,
+  type SetupInputObject,
+} from './setup-input';
 
 export const dynamic = 'force-dynamic';
 
+function resolveExistingProfileFile(filePath: string): string | null {
+  try {
+    const safePath = secureIo.assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return secureIo.safeExistsSync(safePath) && secureIo.safeLstat(safePath).isFile()
+      ? safePath
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
-    const root = pathResolver.rootDir();
-    const roles = readJson<{ roles: Array<Record<string, unknown>> }>(
-      path.join(root, 'knowledge/product/governance/surface-roles.json')
-    );
-    const surfaces = readJson<{ surfaces: Array<Record<string, unknown>> }>(
-      path.join(root, 'knowledge/product/governance/active-surfaces.json')
-    );
+    const roles = loadSurfaceRoleCatalog();
+    const surfaces = loadSurfaceManifest();
     let reasoning = 'unknown';
     try {
       reasoning = String(getInstalledReasoningMode() || 'not-installed');
@@ -97,7 +117,9 @@ export function GET(req: NextRequest) {
 
     const onboardingComplete =
       (onboarding.onboarding as Record<string, unknown> | null)?.status === 'complete';
-    const avatarRegistered = secureIo.withSensitivePathMediation(() => safeExistsSync(avatarPath));
+    const avatarRegistered = secureIo.withSensitivePathMediation(
+      () => resolveExistingProfileFile(avatarPath) !== null
+    );
     const voiceProfileCount = Array.isArray(onboarding.voice_profiles)
       ? onboarding.voice_profiles.length
       : 0;
@@ -230,14 +252,19 @@ export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
 
+  const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
+  const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
+    conciergeText(key, locale, params);
+
   try {
-    const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
-    const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
-      conciergeText(key, locale, params);
     const contentType = req.headers.get('content-type') || '';
     if (contentType.includes('multipart/form-data')) {
       const form = await req.formData();
-      const action = String(form.get('action') || '');
+      const actionValue = form.get('action');
+      if (actionValue !== null && typeof actionValue !== 'string') {
+        return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
+      }
+      const action = actionValue || '';
       const file = form.get('file');
       if (!(file instanceof File)) {
         return NextResponse.json({ ok: false, error: t('api.file_required') }, { status: 400 });
@@ -246,7 +273,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: t('api.file_size') }, { status: 400 });
       }
       if (action === 'voice_sample') {
-        const profileId = String(form.get('profile_id') || 'my-voice');
+        const profileIdValue = form.get('profile_id');
+        if (profileIdValue !== null && typeof profileIdValue !== 'string') {
+          return NextResponse.json(
+            { ok: false, error: t('api.onboarding_input') },
+            { status: 400 }
+          );
+        }
+        const profileId = profileIdValue || 'my-voice';
         const result = saveBrowserOnboardingVoiceSample({
           profileId,
           contentType: file.type,
@@ -262,7 +296,14 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: false, error: t('api.image_type') }, { status: 400 });
         }
         const fileData = Buffer.from(await file.arrayBuffer());
-        const avatarSource = String(form.get('source') || 'upload');
+        const sourceValue = form.get('source');
+        if (sourceValue !== null && typeof sourceValue !== 'string') {
+          return NextResponse.json(
+            { ok: false, error: t('api.onboarding_input') },
+            { status: 400 }
+          );
+        }
+        const avatarSource = sourceValue || 'upload';
         const profileRoot = resolveActiveProfileRoot();
         const avatarPath = path.join(profileRoot, 'avatar.png');
         withExecutionContext('sovereign_concierge', () =>
@@ -270,8 +311,9 @@ export async function POST(req: NextRequest) {
             safeMkdir(profileRoot, { recursive: true });
             safeWriteFile(avatarPath, fileData);
             const identityPath = path.join(profileRoot, 'my-identity.json');
-            const identity = safeExistsSync(identityPath)
-              ? readJson<Record<string, unknown>>(identityPath)
+            const safeIdentityPath = resolveExistingProfileFile(identityPath);
+            const identity = safeIdentityPath
+              ? readJson<Record<string, unknown>>(safeIdentityPath)
               : { name: 'user', language: 'ja', interaction_style: 'Concierge' };
             identity.avatar_path = 'avatar.png';
             identity.avatar_source = avatarSource === 'camera' ? 'camera' : 'upload';
@@ -287,21 +329,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
+    let body: SetupInputObject;
+    try {
+      body = requireSetupObject(await req.json(), 'request body');
+    } catch {
+      return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
+    }
     if (body?.action === 'save_management') {
-      const tenantInput = body.tenant || {};
-      const agentInput = body.agent || {};
-      const activeSlug = String(
-        tenantInput.slug || getRegisteredEnvText('KYBERION_TENANT') || 'default'
+      const tenantInput = optionalSetupObject(body, 'tenant') || {};
+      const agentInput = optionalSetupObject(body, 'agent') || {};
+      const requestedSlug = optionalSetupString(tenantInput, 'slug');
+      const activeSlug = (
+        requestedSlug ||
+        getRegisteredEnvText('KYBERION_TENANT') ||
+        'default'
       ).trim();
+      const displayNameInput = optionalSetupString(tenantInput, 'display_name');
+      const assignedRoleInput = optionalSetupString(tenantInput, 'assigned_role');
+      const statusInput = optionalSetupString(tenantInput, 'status');
+      if (statusInput && !['active', 'suspended', 'archived'].includes(statusInput)) {
+        throw new SetupInputError('tenant.status must be active, suspended, or archived');
+      }
+      const visionInput = optionalSetupString(body, 'vision');
+      const nameInput = optionalSetupString(body, 'name');
+      const primaryDomainInput = optionalSetupString(body, 'primary_domain');
+      const agentIdInput = optionalSetupString(agentInput, 'agent_id');
+      const agentDisplayNameInput = optionalSetupString(agentInput, 'display_name');
+      const providerInput = optionalSetupString(agentInput, 'provider');
+      const modelIdInput = optionalSetupString(agentInput, 'model_id');
       const profileRoot = resolveActiveProfileRoot();
       const identityPath = path.join(profileRoot, 'my-identity.json');
       const visionPath = path.join(profileRoot, 'my-vision.md');
       const agentPath = path.join(profileRoot, 'agent-identity.json');
       const result = withExecutionContext('sovereign_concierge', () =>
         secureIo.withSensitivePathMediation(() => {
-          const currentIdentity = safeExistsSync(identityPath)
-            ? readJson<Record<string, unknown>>(identityPath)
+          const safeIdentityPath = resolveExistingProfileFile(identityPath);
+          const currentIdentity = safeIdentityPath
+            ? readJson<Record<string, unknown>>(safeIdentityPath)
             : {};
           const currentTenant = readTenantProfile(activeSlug) || {
             tenant_slug: activeSlug,
@@ -310,25 +374,33 @@ export async function POST(req: NextRequest) {
             status: 'active' as const,
             assigned_role: 'owner',
           };
+          const safeAgentPath = resolveExistingProfileFile(agentPath);
+          const currentAgent = safeAgentPath
+            ? readJson<Record<string, unknown>>(safeAgentPath)
+            : {};
+          const agentId = (
+            agentIdInput || String(currentAgent.agent_id || 'sovereign-agent')
+          ).trim();
+          if (!/^[A-Za-z][A-Za-z0-9._-]{2,63}$/.test(agentId)) {
+            throw new Error('agent_id must be 3-64 characters and start with a letter');
+          }
           const tenant = writeTenantProfile({
             ...currentTenant,
             tenant_slug: activeSlug,
-            display_name: String(
-              tenantInput.display_name || currentTenant.display_name || activeSlug
+            display_name: (
+              displayNameInput || String(currentTenant.display_name || activeSlug)
             ).trim(),
-            assigned_role: String(
-              tenantInput.assigned_role || currentTenant.assigned_role || 'owner'
+            assigned_role: (
+              assignedRoleInput || String(currentTenant.assigned_role || 'owner')
             ).trim(),
             status:
-              tenantInput.status === 'suspended' || tenantInput.status === 'archived'
-                ? tenantInput.status
-                : 'active',
+              statusInput === 'suspended' || statusInput === 'archived' ? statusInput : 'active',
           });
-          const vision = String(body.vision || currentIdentity.vision || '').trim();
+          const vision = (visionInput ?? String(currentIdentity.vision || '')).trim();
           const identity = {
             ...currentIdentity,
-            ...(body.name ? { name: String(body.name).trim() } : {}),
-            ...(body.primary_domain ? { primary_domain: String(body.primary_domain).trim() } : {}),
+            ...(nameInput ? { name: nameInput.trim() } : {}),
+            ...(primaryDomainInput ? { primary_domain: primaryDomainInput.trim() } : {}),
             tenant_slug: tenant.tenant_slug,
             vision,
             updated_at: new Date().toISOString(),
@@ -336,28 +408,18 @@ export async function POST(req: NextRequest) {
           safeMkdir(profileRoot, { recursive: true });
           safeWriteFile(identityPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
           safeWriteFile(visionPath, `# Sovereign Vision\n\n${vision}\n`, { encoding: 'utf8' });
-          const currentAgent = safeExistsSync(agentPath)
-            ? readJson<Record<string, unknown>>(agentPath)
-            : {};
-          const agentId = String(
-            agentInput.agent_id || currentAgent.agent_id || 'sovereign-agent'
-          ).trim();
-          if (!/^[A-Za-z][A-Za-z0-9._-]{2,63}$/.test(agentId)) {
-            throw new Error('agent_id must be 3-64 characters and start with a letter');
-          }
           safeWriteFile(
             agentPath,
             JSON.stringify(
               {
                 ...currentAgent,
                 agent_id: agentId,
-                display_name: String(
-                  agentInput.display_name || currentAgent.display_name || agentId
+                display_name: (
+                  agentDisplayNameInput || String(currentAgent.display_name || agentId)
                 ).trim(),
                 provider:
-                  String(agentInput.provider || currentAgent.provider || '').trim() || undefined,
-                model_id:
-                  String(agentInput.model_id || currentAgent.model_id || '').trim() || undefined,
+                  (providerInput || String(currentAgent.provider || '')).trim() || undefined,
+                model_id: (modelIdInput || String(currentAgent.model_id || '')).trim() || undefined,
                 owner: String(identity.name || currentAgent.owner || 'user'),
                 updated_at: new Date().toISOString(),
               },
@@ -374,19 +436,21 @@ export async function POST(req: NextRequest) {
     if (body?.action !== 'apply_onboarding' || !body?.draft) {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
     }
-    const draft = structuredClone(body.draft) as {
-      [key: string]: unknown;
-      voice?: { enabled?: boolean; sample_refs?: unknown[] };
-    };
-    if (draft.voice?.enabled && Array.isArray(draft.voice.sample_refs)) {
-      draft.voice.sample_refs = draft.voice.sample_refs.map((sampleRef: unknown) => {
-        const value = String(sampleRef || '');
+    const draft = structuredClone(requireSetupObject(body.draft, 'draft')) as SetupInputObject;
+    const voice = optionalSetupObject(draft, 'voice');
+    const voiceEnabled = voice ? optionalSetupBoolean(voice, 'enabled') : undefined;
+    const sampleRefs = voice ? optionalSetupStringArray(voice, 'sample_refs') : undefined;
+    if (voice && voiceEnabled && sampleRefs) {
+      voice.sample_refs = sampleRefs.map((value) => {
         return path.isAbsolute(value) ? value : pathResolver.rootResolve(value);
       });
     }
     const result = await secureIo.withSensitivePathMediation(() => applyBrowserOnboarding(draft));
     return NextResponse.json({ ok: true, onboarding: result });
   } catch (error) {
+    if (error instanceof SetupInputError) {
+      return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
+    }
     return NextResponse.json(
       { ok: false, error: error instanceof Error ? error.message : String(error) },
       { status: 500 }

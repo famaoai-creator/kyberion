@@ -14,9 +14,9 @@
  *    (commented or not) contains a high-confidence credential pattern.
  */
 
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ClauseFailure {
   clause: string;
@@ -81,6 +81,40 @@ const SECRET_NAME_HINT = /(TOKEN|SECRET|KEY|PASSWORD|PASSPHRASE|CREDENTIAL)/;
 const PLACEHOLDER_VALUE =
   /^(?:|["']{2}|<[^>]*>|\$\{[^}]*\}|your[-_].*|changeme.*|placeholder.*|xxx+|\.\.\.|0|1|true|false|none|dummy.*|example.*|redacted)$/i;
 
+/**
+ * JSON.parse keeps the last value when an object contains duplicate keys.
+ * That is particularly dangerous for package exports: a duplicate subpath
+ * can make the checked-in manifest and the effective Node resolution differ
+ * without producing a syntax error. The package manifest uses one export per
+ * indented line, so inspect only the `./...` keys inside its exports object.
+ */
+export function findDuplicatePackageExportKeys(raw: string): string[] {
+  const exportsStart = raw.indexOf('"exports"');
+  if (exportsStart < 0) return [];
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  const exportKeyPattern = /^    "(\.\/[^"\\]+)":\s*\{/gmu;
+  for (const match of raw.slice(exportsStart).matchAll(exportKeyPattern)) {
+    const key = match[1];
+    if (!key) continue;
+    if (seen.has(key)) duplicates.add(key);
+    else seen.add(key);
+  }
+  return [...duplicates].sort((left, right) => left.localeCompare(right));
+}
+
+function checkPackageExportKeys(): void {
+  const packageJson = String(
+    safeReadFile(pathResolver.rootResolve('libs/core/package.json'), { encoding: 'utf8' })
+  );
+  for (const key of findDuplicatePackageExportKeys(packageJson)) {
+    failures.push({
+      clause: 'package-export-keys.unique',
+      detail: `libs/core/package.json declares export subpath ${key} more than once; duplicate JSON keys are silently overwritten by the last entry.`,
+    });
+  }
+}
+
 function checkNoSecretValues(): void {
   const raw = String(
     safeReadFile(`${pathResolver.rootDir()}/docs/developer/env.example`, { encoding: 'utf8' })
@@ -110,30 +144,30 @@ function checkNoSecretValues(): void {
   });
 }
 
-function main(): number {
+export function checkPackagingContract(): ClauseFailure[] {
   failures.length = 0;
   checkImageTierIsolation();
+  checkPackageExportKeys();
   checkNoSecretValues();
-
-  if (failures.length > 0) {
-    for (const failure of failures) {
-      console.error(`[check:packaging-contract] ${failure.clause}: ${failure.detail}`);
-    }
-    console.error(
-      `[check:packaging-contract] FAILED — ${failures.length} clause violation(s). See docs/PACKAGING_CONTRACT.md §Distribution contract.`
-    );
-    return 1;
-  }
-  console.log('[check:packaging-contract] OK');
-  return 0;
+  return [...failures];
 }
 
 export const runCheckPackagingContract = defineScript({
   name: 'check:packaging-contract',
   flags: [],
-  run() {
-    const status = main();
-    if (status !== 0) throw new Error(`packaging contract check failed with exit code ${status}`);
+  run(context) {
+    const violations = checkPackagingContract();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        [
+          ...violations.map((failure) => `  ${failure.clause}: ${failure.detail}`),
+          `[check:packaging-contract] FAILED — ${violations.length} clause violation(s). See docs/PACKAGING_CONTRACT.md §Distribution contract.`,
+        ].join('\n')
+      );
+    }
+    context.print('[check:packaging-contract] OK');
+    return { violations };
   },
 });
 

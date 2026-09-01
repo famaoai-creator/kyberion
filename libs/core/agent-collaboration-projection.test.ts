@@ -1,7 +1,13 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
-import { composeAgentCollaborationProjection } from './agent-collaboration-projection.js';
+import {
+  buildAgentCollaborationProjection,
+  composeAgentCollaborationProjection,
+} from './agent-collaboration-projection.js';
 import { createAgentCollaborationEvent } from './agent-collaboration-events.js';
 
 function event(partial: Partial<Parameters<typeof createAgentCollaborationEvent>[0]>) {
@@ -279,5 +285,35 @@ describe('agent collaboration projection', () => {
     );
     expect(first.edges.length).toBeGreaterThanOrEqual(10);
     expect(first.status_flags).toEqual([]);
+  });
+
+  it('skips worker event symlinks that escape the repository boundary', () => {
+    const suffix = `agent-collaboration-${randomUUID()}`;
+    const workerEventsDir = pathResolver.shared('logs/worker-events');
+    const linkPath = path.join(workerEventsDir, `${suffix}.jsonl`);
+    const externalPath = path.join(pathResolver.shared('tmp'), `${suffix}.jsonl`);
+    fs.mkdirSync(workerEventsDir, { recursive: true });
+    fs.mkdirSync(path.dirname(externalPath), { recursive: true });
+    fs.writeFileSync(
+      externalPath,
+      `${JSON.stringify({
+        event_id: `${suffix}-external`,
+        type: 'progress',
+        mission_id: suffix.toUpperCase(),
+        summary: 'must not be projected',
+      })}\n`
+    );
+    fs.symlinkSync(externalPath, linkPath);
+    try {
+      const projection = buildAgentCollaborationProjection({
+        missionId: suffix,
+        now: '2026-08-31T00:00:00.000Z',
+      });
+      expect(projection.events).toEqual([]);
+      expect(fs.readFileSync(externalPath, 'utf8')).toContain('must not be projected');
+    } finally {
+      fs.unlinkSync(linkPath);
+      fs.unlinkSync(externalPath);
+    }
   });
 });

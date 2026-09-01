@@ -15,15 +15,14 @@
  *     [--mission-id MSN-123]
  */
 
-import {
-  dispatchProcedure,
-  validateServiceRecording,
-  withExecutionContext,
-  loadProcedures,
-  resolveAllowlistedRecordingRef,
-} from '@agent/core';
+import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { validateServiceRecording } from '@agent/core/service-recording';
+import { withExecutionContext } from '@agent/core/authority';
+import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
@@ -65,6 +64,9 @@ export const main = defineScript({
     const recordingAbs = resolveAllowlistedRecordingRef(entry!.adapter.recording_ref);
     if (!recordingAbs)
       throw new ScriptExitError(1, `procedure "${procedureId}" has no allowlisted recording_ref`);
+    if (!safeExistsSync(recordingAbs) || !safeLstat(recordingAbs).isFile()) {
+      throw new ScriptExitError(1, `procedure "${procedureId}" recording is not a regular file`);
+    }
 
     let raw: unknown;
     try {
@@ -82,9 +84,7 @@ export const main = defineScript({
     let inputs: Record<string, unknown> = {};
     if (args['inputs']) {
       try {
-        const parsed = JSON.parse(args['inputs']);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) inputs = parsed;
-        else throw new Error('must be a JSON object');
+        inputs = parseSafeJsonObjectInput(args['inputs'], '--inputs') || {};
       } catch (err) {
         throw new ScriptExitError(
           1,

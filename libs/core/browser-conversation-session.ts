@@ -1,13 +1,16 @@
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -169,6 +172,39 @@ export interface BrowserConversationExecutionResult {
   raw?: Record<string, unknown>;
 }
 
+const BROWSER_ACTUATOR_STATUSES = new Set(['succeeded', 'success', 'failed', 'blocked']);
+
+export function normalizeBrowserActuatorResult(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error('Browser actuator returned a non-object result.');
+  }
+  const result = value as Record<string, unknown>;
+  if (typeof result.status !== 'string' || !BROWSER_ACTUATOR_STATUSES.has(result.status)) {
+    throw new Error('Browser actuator returned an invalid status.');
+  }
+  if (Object.hasOwn(result, 'results') && !Array.isArray(result.results)) {
+    throw new Error('Browser actuator returned invalid results.');
+  }
+  if (Object.hasOwn(result, 'context')) {
+    if (
+      typeof result.context !== 'object' ||
+      result.context === null ||
+      Array.isArray(result.context)
+    ) {
+      throw new Error('Browser actuator returned invalid context.');
+    }
+  }
+  if (
+    Object.hasOwn(result, 'total_steps') &&
+    (typeof result.total_steps !== 'number' ||
+      !Number.isInteger(result.total_steps) ||
+      result.total_steps < 0)
+  ) {
+    throw new Error('Browser actuator returned invalid total_steps.');
+  }
+  return result;
+}
+
 function resolveConfirmationCandidateIndex(
   utterance: string,
   candidateCount: number
@@ -217,15 +253,12 @@ const SESSION_DIR = pathResolver.shared('runtime/browser/conversation-sessions')
 const BROWSER_SESSION_DIR = pathResolver.shared('runtime/browser/sessions');
 const BROWSER_SNAPSHOT_DIR = pathResolver.shared('runtime/browser/snapshots');
 
-const ajv = createAjv();
-
 let sessionValidateFn: ValidateFunction | null = null;
 let commandValidateFn: ValidateFunction | null = null;
 let feedbackValidateFn: ValidateFunction | null = null;
 
 function loadSchemaValidator(schemaPath: string): ValidateFunction {
-  const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
-  return ajv.compile(JSON.parse(raw));
+  return compileSchema(schemaPath);
 }
 
 function ensureSessionValidator(): ValidateFunction {
@@ -249,16 +282,47 @@ function errorsFrom(validate: ValidateFunction): string[] {
   );
 }
 
+function assertSessionPathSegment(value: string, label = 'session id'): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[BROWSER_CONVERSATION_SESSION] ${label} must be a single path segment`);
+  }
+  return normalized;
+}
+
 function sessionPath(sessionId: string): string {
-  return `${SESSION_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${SESSION_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function browserConversationSessionCatalog(filePath: string) {
+  return defineCatalog<BrowserConversationSession>({
+    id: 'browser-conversation-session',
+    path: filePath,
+    schema: SESSION_SCHEMA_PATH,
+  });
 }
 
 function browserSnapshotPath(sessionId: string): string {
-  return `${BROWSER_SNAPSHOT_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${BROWSER_SNAPSHOT_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
 }
 
 function browserRuntimeSessionPath(sessionId: string): string {
-  return `${BROWSER_SESSION_DIR}/${sessionId}.json`;
+  const safeSessionId = assertSessionPathSegment(sessionId);
+  return assertSafeRepositoryPath(`${BROWSER_SESSION_DIR}/${safeSessionId}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function browserConversationTempPath(fileName: string): string {
+  return assertSafeRepositoryPath(pathResolver.sharedTmp(`browser-conversation/${fileName}`), {
+    allowMissingLeaf: true,
+  });
 }
 
 interface BrowserSnapshotElementRecord {
@@ -295,8 +359,7 @@ interface BrowserRuntimeSessionRecord {
 function loadBrowserSnapshot(sessionId: string): BrowserSnapshotRecord | null {
   const filePath = browserSnapshotPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as BrowserSnapshotRecord;
+  return readJson<BrowserSnapshotRecord>(filePath);
 }
 
 function loadBrowserSnapshotForConversationSession(
@@ -319,8 +382,8 @@ function refreshBrowserSnapshotForConversationSession(
   if (!browserSessionId) return null;
 
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(
-    `browser-conversation/refresh-${session.session_id}-${Date.now().toString(36)}.json`
+  const tmpPath = browserConversationTempPath(
+    `refresh-${assertSessionPathSegment(session.session_id)}-${Date.now().toString(36)}.json`
   );
   const steps: Array<Record<string, unknown>> = [];
   if (session.target?.tab_id) {
@@ -375,8 +438,7 @@ function refreshBrowserSnapshotForConversationSession(
 function loadBrowserRuntimeSession(sessionId: string): BrowserRuntimeSessionRecord | null {
   const filePath = browserRuntimeSessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as BrowserRuntimeSessionRecord;
+  return readJson<BrowserRuntimeSessionRecord>(filePath);
 }
 
 function normalizeRegionHint(text?: string): string | undefined {
@@ -478,8 +540,8 @@ export function bootstrapBrowserConversationSession(params: {
   }
 
   if (!loadBrowserSnapshot(params.browserSessionId)) {
-    const tmpPath = pathResolver.sharedTmp(
-      `browser-conversation/bootstrap-${params.browserSessionId}.json`
+    const tmpPath = browserConversationTempPath(
+      `bootstrap-${assertSessionPathSegment(params.browserSessionId, 'browser session id')}.json`
     );
     safeWriteFile(
       tmpPath,
@@ -592,8 +654,16 @@ export function loadBrowserConversationSession(
 ): BrowserConversationSession | null {
   const filePath = sessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as BrowserConversationSession;
+  let parsed: BrowserConversationSession;
+  try {
+    parsed = browserConversationSessionCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
   const result = validateBrowserConversationSession(parsed);
   if (!result.valid) {
     logger.warn(
@@ -974,8 +1044,8 @@ export function executeBrowserConversationCandidateAction(
   if (!selected) return null;
   const browserSessionId = session.target?.browser_session_id || session.session_id;
   const browserRuntimeSession = loadBrowserRuntimeSession(browserSessionId);
-  const tmpPath = pathResolver.sharedTmp(
-    `browser-conversation/${sessionId}-${Date.now().toString(36)}.json`
+  const tmpPath = browserConversationTempPath(
+    `${assertSessionPathSegment(sessionId)}-${Date.now().toString(36)}.json`
   );
   const steps: Array<Record<string, unknown>> = [];
 
@@ -1089,7 +1159,11 @@ export function executeBrowserConversationCandidateAction(
         timeoutMs: 60_000,
       }
     );
-    const parsed = JSON.parse(stdout) as Record<string, unknown>;
+    const parsed: unknown = parseSafeJsonInput(stdout, 'browser actuator response');
+    const normalized = normalizeBrowserActuatorResult(parsed);
+    if (normalized.status !== 'succeeded' && normalized.status !== 'success') {
+      throw new Error(`Browser actuator did not complete the action: ${normalized.status}`);
+    }
     session.status = 'completed';
     session.active_step.status = 'completed';
     session.conversation_context.pending_confirmation = false;
@@ -1108,7 +1182,7 @@ export function executeBrowserConversationCandidateAction(
         status: 'completed',
         message: `「${selected.label || selected.text || selected.element_id}」を操作しました。`,
       }),
-      raw: parsed,
+      raw: normalized,
     };
   } catch (error: any) {
     const message = error?.message || String(error);

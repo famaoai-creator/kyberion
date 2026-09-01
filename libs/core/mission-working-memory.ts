@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   assertMemoryScope,
   memoryScopeAllowsRead,
@@ -29,7 +29,10 @@ function mwmPersistPath(missionId: string): string {
   const missionPath =
     pathResolver.findMissionPath(missionId.toUpperCase()) ??
     pathResolver.active(path.join('missions', 'confidential', missionId.toUpperCase()));
-  return path.join(missionPath, '.mwm-entries.json');
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+  return assertSafeRepositoryPath(path.join(safeMissionPath, '.mwm-entries.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function loadEntries(missionId: string): MissionWorkingMemoryEntry[] {

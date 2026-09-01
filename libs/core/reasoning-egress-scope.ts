@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createLogger } from './logger.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import { isLocalOnlyReasoningBackend } from './backend-capability-profile.js';
+import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
 
 /**
  * Tier context for reasoning-backend sends.
@@ -91,6 +92,7 @@ export class ReasoningEgressDeniedError extends Error {
  * into unrestricted external egress.
  */
 export function assertReasoningEgressAllowed(backendName: string): void {
+  assertSandboxNetworkAllowed(reasoningBackendEndpoint(backendName));
   // This overload has no endpoint information. The endpoint-aware path below
   // is the enforcement point for configurable adapters; preserve the
   // name-only local declaration for callers that only have a backend id.
@@ -103,6 +105,7 @@ export function assertReasoningEgressAllowedAtEndpoint(
   backendName: string,
   endpoint: string
 ): void {
+  assertSandboxNetworkAllowed(endpoint);
   const localEndpoint = isLocalReasoningEndpoint(endpoint);
   if (isLocalReasoningBackend(backendName) && !localEndpoint) {
     throw new ReasoningEgressDeniedError(

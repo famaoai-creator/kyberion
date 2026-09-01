@@ -4,6 +4,7 @@ import {
   collectUndefinedKeyReferenceViolations,
   collectVocabularyCatalogViolations,
   findUnusedVocabularyKeys,
+  findUnreferencedGovernanceCatalogs,
   type ThemeEntryShape,
 } from './check_catalog_integrity.js';
 
@@ -25,7 +26,7 @@ import {
  * That is a global-state assertion, and 36 test files legitimately write under
  * `knowledge/` during a run, so inside a parallel suite it measures transient
  * churn rather than the repository. It was flaky even with `retry: 2`. The claim
- * belongs where it can hold: CI runs `pnpm run check:catalogs` as its own
+ * belongs where it can hold: CI runs `pnpm run check -- --scope full --only catalogs` as its own
  * serial step ("Check knowledge catalogs & index freshness"), and `pnpm validate`
  * includes it. Removing it here moves the assertion to where it is valid instead
  * of dropping it.
@@ -53,6 +54,34 @@ function themeCatalog(overrides: Partial<Record<string, ThemeEntryShape>> = {}) 
 }
 
 describe('check_catalog_integrity', () => {
+  describe('governance catalog usage', () => {
+    it('requires an explicit documentation-only declaration for unreferenced catalogs', () => {
+      expect(
+        findUnreferencedGovernanceCatalogs({
+          catalogs: [
+            { fileName: 'used-policy.json', documentationOnly: false },
+            { fileName: 'unused-policy.json', documentationOnly: false },
+            { fileName: 'documented-policy.json', documentationOnly: true },
+          ],
+          sourceFiles: {
+            'libs/core/policy.ts': "pathResolver.knowledge('product/governance/used-policy.json')",
+          },
+        })
+      ).toEqual(['unused-policy.json']);
+    });
+
+    it('recognizes a catalog loaded from a path.join filename literal', () => {
+      expect(
+        findUnreferencedGovernanceCatalogs({
+          catalogs: [{ fileName: 'decision-rights.json', documentationOnly: false }],
+          sourceFiles: {
+            'libs/core/decision-rights.ts': "path.join(baseDir, 'decision-rights.json')",
+          },
+        })
+      ).toEqual([]);
+    });
+  });
+
   describe('theme catalog drift', () => {
     it('accepts a catalog that reproduces the generated tokens', () => {
       expect(

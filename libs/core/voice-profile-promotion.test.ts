@@ -42,7 +42,7 @@ describe('voice profile promotion', () => {
             status: 'active',
           },
         ],
-      }),
+      })
     );
     safeWriteFile(
       receiptPath,
@@ -63,7 +63,7 @@ describe('voice profile promotion', () => {
           { sample_id: 'sample-02', path: `${tmpDir}/me-ja-02.wav`, language: 'ja' },
           { sample_id: 'sample-03', path: `${tmpDir}/me-ja-03.wav`, language: 'ja' },
         ],
-      }),
+      })
     );
     safeWriteFile(`${tmpDir}/me-ja-01.wav`, Buffer.from('voice-sample-1'));
     safeWriteFile(`${tmpDir}/me-ja-01.wav.transcript.txt`, 'こんにちは。');
@@ -89,8 +89,15 @@ describe('voice profile promotion', () => {
     const promoted = registry.profiles.find((profile) => profile.profile_id === 'me-ja-live');
     expect(promoted?.status).toBe('active');
     expect(promoted?.sample_refs).toHaveLength(3);
-    expect(promoted?.sample_refs?.[0]).toBe(pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav'));
-    expect(safeReadFile(pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav.transcript.txt'), { encoding: 'utf8' })).toBe('こんにちは。');
+    expect(promoted?.sample_refs?.[0]).toBe(
+      pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav')
+    );
+    expect(
+      safeReadFile(
+        pathResolver.shared('runtime/voice-profiles/me-ja-live/sample-01.wav.transcript.txt'),
+        { encoding: 'utf8' }
+      )
+    ).toBe('こんにちは。');
   });
 
   it('rejects receipts that are not pending promotion', () => {
@@ -101,7 +108,7 @@ describe('voice profile promotion', () => {
         version: 'test',
         default_profile_id: 'operator-ja-default',
         profiles: [],
-      }),
+      })
     );
     safeWriteFile(
       receiptPath,
@@ -118,7 +125,7 @@ describe('voice profile promotion', () => {
           default_engine_id: 'open_voice_clone',
         },
         samples: [],
-      }),
+      })
     );
     process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH = registryPath;
 
@@ -126,8 +133,20 @@ describe('voice profile promotion', () => {
       promoteVoiceProfileFromReceipt({
         receiptPath,
         approvedBy: 'operator',
-      }),
+      })
     ).toThrow(/not pending promotion/u);
+  });
+
+  it('rejects schema-invalid registration receipts', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(receiptPath, JSON.stringify({ kind: 'voice_profile_registration_receipt' }));
+
+    expect(() =>
+      promoteVoiceProfileFromReceipt({
+        receiptPath,
+        approvedBy: 'operator',
+      })
+    ).toThrow(/Invalid catalog voice-profile-registration-receipt/u);
   });
 
   it('writes personal promotions to the personal overlay by default', () => {
@@ -149,7 +168,7 @@ describe('voice profile promotion', () => {
         samples: [
           { sample_id: 'sample-01', path: `${tmpDir}/me-ja-overlay-01.wav`, language: 'ja' },
         ],
-      }),
+      })
     );
     safeWriteFile(`${tmpDir}/me-ja-overlay-01.wav`, Buffer.from('voice-sample-overlay'));
     process.env.KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH = personalRegistryPath;
@@ -161,7 +180,9 @@ describe('voice profile promotion', () => {
     });
 
     expect(result.registry_path).toBe(personalRegistryPath);
-    const registry = JSON.parse(safeReadFile(personalRegistryPath, { encoding: 'utf8' }) as string) as {
+    const registry = JSON.parse(
+      safeReadFile(personalRegistryPath, { encoding: 'utf8' }) as string
+    ) as {
       default_profile_id: string;
       profiles: Array<{ profile_id: string }>;
     };

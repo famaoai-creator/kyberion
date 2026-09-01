@@ -1,17 +1,16 @@
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeLstat,
   safeReadFile,
   safeReaddir,
   safeStat,
   safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/governance';
 import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface ManifestEntry {
   path: string;
@@ -36,6 +35,8 @@ interface FrontmatterExclusionManifest {
 const FRONTMATTER_EXCLUSIONS_PATH = pathResolver.knowledge(
   'product/governance/frontmatter-exclusions.json'
 );
+const KNOWLEDGE_INDEX_PATH = pathResolver.knowledge('_index.md');
+const KNOWLEDGE_MANIFEST_PATH = pathResolver.knowledge('_integrity-manifest.json');
 
 function matchesExclusion(relativePath: string, pattern: string): boolean {
   const expression = new RegExp(
@@ -162,27 +163,22 @@ function walk(dir: string, baseDir: string, files: string[] = []): string[] {
   return files;
 }
 
-export function generateIndex(checkOnly = false): boolean {
+function withKnowledgeAccess<T>(operation: () => T): T {
   // Index generation is a governance tool that must see every tier and write
-  // the tier-root index files, so run it elevated (same pattern as scripts/clean.ts).
-  return withExecutionContext('mission_controller', () => {
-    const previousSudo = getRegisteredEnvText('KYBERION_SUDO');
-    setRegisteredEnv('KYBERION_SUDO', 'true');
-    try {
-      return generateIndexInner(checkOnly);
-    } finally {
-      setRegisteredEnv('KYBERION_SUDO', previousSudo);
-    }
-  });
+  // the tier-root index files. The security policy grants KNOWLEDGE_WRITE to
+  // ecosystem_architect; mission_controller and knowledge_steward do not own
+  // the committed product knowledge root.
+  return withExecutionContext('ecosystem_architect', operation, 'ecosystem_architect');
 }
 
-function generateIndexInner(checkOnly: boolean): boolean {
+function renderKnowledgeIndexFiles(): GeneratedFile[] {
   const kbRoot = pathResolver.knowledge('');
   const allFiles = walk(kbRoot, kbRoot);
   const exclusionFailures = validateFrontmatterExclusions(allFiles);
   if (exclusionFailures.length > 0) {
-    for (const failure of exclusionFailures) console.error(`[generate_knowledge_index] ${failure}`);
-    return false;
+    throw new Error(
+      exclusionFailures.map((failure) => `[generate_knowledge_index] ${failure}`).join('\n')
+    );
   }
 
   const manifestEntries: ManifestEntry[] = [];
@@ -254,56 +250,68 @@ function generateIndexInner(checkOnly: boolean): boolean {
   }
   const indexContent = md.trim() + '\n';
 
-  if (checkOnly) {
-    const existingManifest = safeReadFile(path.join(kbRoot, '_integrity-manifest.json'), {
-      encoding: 'utf8',
-    }) as string;
-    const existingIndex = safeReadFile(path.join(kbRoot, '_index.md'), {
-      encoding: 'utf8',
-    }) as string;
-
-    const normalizeManifest = (str: string) => {
-      try {
-        const parsed = JSON.parse(str) as { files?: unknown[] };
-        return JSON.stringify(parsed.files || []);
-      } catch {
-        return str.replace(/"generated": ".*?",\n/g, '');
-      }
-    };
-    const normalizeIndex = (str: string) =>
-      str
-        .split(/\r?\n/)
-        .map((line) => line.trimEnd())
-        .filter((line) => line.length > 0 && !line.startsWith('*SSoT Index Version:'))
-        .join('\n');
-    if (
-      normalizeManifest(existingManifest) !== normalizeManifest(manifestContent) ||
-      normalizeIndex(existingIndex) !== normalizeIndex(indexContent)
-    ) {
-      console.error(
-        '[generate_knowledge_index] Index or manifest is out of date. Run pnpm generate:knowledge-index to update.'
-      );
-      return false;
-    }
-    return true;
-  }
-
-  safeWriteFile(path.join(kbRoot, '_integrity-manifest.json'), manifestContent);
-  safeWriteFile(path.join(kbRoot, '_index.md'), indexContent);
-  return true;
+  return [
+    { path: KNOWLEDGE_MANIFEST_PATH, content: manifestContent },
+    { path: KNOWLEDGE_INDEX_PATH, content: indexContent },
+  ];
 }
 
-export const runGenerateKnowledgeIndex = defineScript({
-  name: 'generate:knowledge-index',
-  flags: [],
-  run: ({ argv }) => {
-    const checkOnly = argv.includes('--check');
-    const success = generateIndex(checkOnly);
-    if (!success && checkOnly) throw new ScriptExitError(1, '', true);
-    if (!checkOnly)
-      console.log('[generate_knowledge_index] Index and manifest updated successfully.');
-    else console.log('[generate_knowledge_index] Index and manifest are up-to-date.');
-  },
+function normalizeManifest(content: string): string {
+  try {
+    const parsed = JSON.parse(content) as { files?: unknown[] };
+    return JSON.stringify(parsed.files || []);
+  } catch {
+    return content.replace(/"generated": ".*?",\n/g, '');
+  }
+}
+
+function normalizeIndex(content: string): string {
+  return content
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0 && !line.startsWith('*SSoT Index Version:'))
+    .join('\n');
+}
+
+function generatedFilesAreCurrent(files: readonly GeneratedFile[]): boolean {
+  const expected = new Map(files.map((file) => [file.path, file.content]));
+  const existingManifest = safeReadFile(KNOWLEDGE_MANIFEST_PATH, {
+    encoding: 'utf8',
+  }) as string;
+  const existingIndex = safeReadFile(KNOWLEDGE_INDEX_PATH, {
+    encoding: 'utf8',
+  }) as string;
+  const expectedManifest = expected.get(KNOWLEDGE_MANIFEST_PATH);
+  const expectedIndex = expected.get(KNOWLEDGE_INDEX_PATH);
+  return (
+    expectedManifest !== undefined &&
+    expectedIndex !== undefined &&
+    normalizeManifest(existingManifest) === normalizeManifest(expectedManifest) &&
+    normalizeIndex(existingIndex) === normalizeIndex(expectedIndex)
+  );
+}
+
+export function generateIndex(checkOnly = false): boolean {
+  try {
+    return withKnowledgeAccess(() => {
+      const files = renderKnowledgeIndexFiles();
+      if (checkOnly) return generatedFilesAreCurrent(files);
+      for (const file of files) safeWriteFile(file.path, file.content);
+      return true;
+    });
+  } catch (error: unknown) {
+    console.error(
+      `[generate_knowledge_index] ${error instanceof Error ? error.message : String(error)}`
+    );
+    return false;
+  }
+}
+
+export const runGenerateKnowledgeIndex = defineGenerator({
+  id: 'knowledge-index',
+  outputs: [KNOWLEDGE_MANIFEST_PATH, KNOWLEDGE_INDEX_PATH],
+  executionContext: 'ecosystem_architect',
+  render: () => withKnowledgeAccess(() => renderKnowledgeIndexFiles()),
 });
 
 if (

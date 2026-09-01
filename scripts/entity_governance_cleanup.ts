@@ -6,19 +6,20 @@ import {
   createApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
-  missionEvidenceDir,
-  pathResolver,
+  validateHumanFinalDecision,
+  type ApprovalRequestRecord,
+} from '@agent/core/approval-store';
+import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
+import {
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
   safeReaddir,
   safeStat,
   safeWriteFile,
-  listProjectRecords,
-  validateHumanFinalDecision,
-  withExecutionContext,
-  type ApprovalRequestRecord,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { listProjectRecords } from '@agent/core/project-registry';
+import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const CLEANUP_APPROVAL_CHANNEL = 'terminal';

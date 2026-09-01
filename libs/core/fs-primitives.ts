@@ -75,6 +75,10 @@ export function rawStatSync(targetPath: string): fs.Stats {
   return fs.statSync(targetPath);
 }
 
+export function rawLstatSync(targetPath: string): fs.Stats {
+  return fs.lstatSync(targetPath);
+}
+
 export function rawReaddir(targetPath: string): string[] {
   return fs.readdirSync(targetPath);
 }

@@ -15,6 +15,11 @@ import type {
   SlackApprovalRequestDraft,
   SlackApprovalRequestRecord,
 } from './channel-surface-types.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 
 function emitSlackApprovalEvent(event: Record<string, unknown>): string {
   return appendGovernedArtifactJsonl(
@@ -63,7 +68,10 @@ export function loadSlackApprovalRequest(id: string): SlackApprovalRequestRecord
   return loadApprovalRequest('slack', id);
 }
 
-export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): any[] {
+export function buildSlackApprovalBlocks(
+  record: SlackApprovalRequestRecord,
+  intentResolution?: IntentResolutionContract
+): any[] {
   const severity = record.severity || 'medium';
   return [
     {
@@ -95,6 +103,22 @@ export function buildSlackApprovalBlocks(record: SlackApprovalRequestRecord): an
         },
       ],
     },
+    ...(intentResolution
+      ? [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: [
+                `*Authority:* ${renderIntentAuthorityLabel(intentResolution.authority_level)}`,
+                `*Next action:* ${intentResolution.next_action.label}`,
+                `*Consequence:* ${intentResolution.next_action.consequence}`,
+                `*Outcome:* ${renderIntentOutcomeLabel(intentResolution.outcome_kind)}`,
+              ].join('\n'),
+            },
+          },
+        ]
+      : []),
     {
       type: 'actions',
       elements: [

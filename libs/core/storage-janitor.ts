@@ -1,10 +1,9 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
   safeReaddir,
   safeExecResult,
-  safeReadFile,
   safeLstat,
   safeStat,
   safeUnlinkSync,
@@ -271,17 +270,12 @@ function readTrashIndex(): Map<string, number> {
   const trashedAt = new Map<string, number>();
   if (!safeExistsSync(indexPath)) return trashedAt;
   try {
-    for (const line of String(safeReadFile(indexPath, { encoding: 'utf8' })).split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const record = JSON.parse(trimmed) as { path?: unknown; trashed_at?: unknown };
-        const ms = Date.parse(String(record.trashed_at ?? ''));
-        if (typeof record.path === 'string' && Number.isFinite(ms)) {
-          trashedAt.set(record.path, ms);
-        }
-      } catch {
-        // torn line — the rest of the index still replays
+    for (const record of readJsonLines<{ path?: unknown; trashed_at?: unknown }>(indexPath, {
+      onMalformed: 'skip',
+    })) {
+      const ms = Date.parse(String(record.trashed_at ?? ''));
+      if (typeof record.path === 'string' && Number.isFinite(ms)) {
+        trashedAt.set(record.path, ms);
       }
     }
   } catch (err) {
@@ -513,9 +507,8 @@ export function scanDataVault(opts: ScanDataVaultOptions): ScanDataVaultResult {
     if (!filePath.endsWith('.json')) continue;
     try {
       if (!safeExistsSync(filePath)) continue;
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const entry = JSON.parse(raw);
-      if (entry.expiresAt && Date.parse(entry.expiresAt) <= Date.now()) {
+      const entry = readJson<Record<string, unknown>>(filePath);
+      if (typeof entry.expiresAt === 'string' && Date.parse(entry.expiresAt) <= Date.now()) {
         expired.push(filePath);
         if (!opts.dryRun) {
           safeUnlinkSync(filePath);
@@ -750,8 +743,7 @@ export function listUncoveredRuntimeDirs(catalog?: LoadedRetentionCatalog): stri
 function readDelegationChildrenRegistry(): DelegationChildRecord[] {
   const filePath = shared(DELEGATION_CHILDREN_REGISTRY_SUBPATH);
   if (!safeExistsSync(filePath)) return [];
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw);
+  const parsed = readJson<unknown>(filePath);
   return Array.isArray(parsed) ? parsed : [];
 }
 

@@ -2,7 +2,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import * as pathResolver from './path-resolver.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import {
   activateMissionOnGateProgress,
@@ -18,7 +25,9 @@ import {
   buildPlannerRetryPrompt,
   packetRequiresIndependentReview,
   parsePlanningReviewVerdict,
+  renderProcessTemplateSkeleton,
 } from './mission-planning-packet.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 
 const missionId = 'MSN-PROCESS-PLAN-001';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -75,6 +84,53 @@ afterEach(() => {
 });
 
 describe('mission process planning', () => {
+  it('rejects an external mission directory before writing a process plan', () => {
+    expect(() =>
+      applyProcessTemplatePlan({
+        missionId,
+        missionDir: '/tmp/kyberion-external-mission',
+        design: presentationDesign(),
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a symlinked mission artifact before reading or overwriting it', () => {
+    const outsidePath = pathResolver.rootResolve('active/shared/tmp/external-next-tasks.json');
+    safeWriteFile(outsidePath, JSON.stringify([{ task_id: 'external-task' }]));
+    safeSymlinkSync(outsidePath, `${missionPath}/NEXT_TASKS.json`);
+
+    try {
+      expect(() =>
+        applyProcessTemplatePlan({
+          missionId,
+          missionDir: missionPath,
+          design: presentationDesign(),
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(outsidePath, { force: true });
+    }
+  });
+
+  it('renders a process skeleton from an existing confidential mission root', () => {
+    const confidentialMissionId = 'MSN-PROCESS-CONFIDENTIAL';
+    const confidentialMissionPath = pathResolver.missionDir(confidentialMissionId, 'confidential');
+    safeMkdir(confidentialMissionPath, { recursive: true });
+    safeWriteFile(
+      `${confidentialMissionPath}/mission-state.json`,
+      JSON.stringify({
+        process_template: { workflow_id: 'confidential-workflow', phases: ['plan'] },
+      })
+    );
+    try {
+      expect(renderProcessTemplateSkeleton(confidentialMissionId)).toContain(
+        'Process template: confidential-workflow'
+      );
+    } finally {
+      safeRmSync(confidentialMissionPath, { recursive: true, force: true });
+    }
+  });
+
   it('expands the presentation process template into NEXT_TASKS.json, gates, and the task board', () => {
     const result = applyProcessTemplatePlan({
       missionId,
@@ -108,6 +164,26 @@ describe('mission process planning', () => {
     expect(board).toContain('## Process Phases');
     expect(board).toContain('audience_definition');
     expect(board).toContain('exit gate: `PRESENTATION_APPROVAL_GATE`');
+  });
+
+  it('records every process-plan artifact through the provisioned receipt contract', () => {
+    const result = applyProcessTemplatePlan({
+      missionId,
+      missionDir: missionPath,
+      design: presentationDesign(),
+    });
+
+    const records = loadProvisionedEntryRecords(missionId).filter(
+      (record) => record.phase === 'verified'
+    );
+    const targets = new Set(records.map((record) => record.target_path));
+
+    expect(targets).toContain('NEXT_TASKS.json');
+    expect(targets).toContain('TASK_BOARD.md');
+    for (const gatePath of result.gatePaths) {
+      expect(targets).toContain(gatePath.slice(`${missionPath}/`.length).replaceAll('\\', '/'));
+    }
+    expect(records).toHaveLength(result.gatePaths.length + 2);
   });
 
   it('refuses to overwrite a planner-authored NEXT_TASKS.json without --force', () => {

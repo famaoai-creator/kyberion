@@ -278,8 +278,18 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         getGitHash,
       }).then((result) => syncProjectOperationalStateIfLinked(missionId).then(() => result));
     },
-    reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
-      return _reconcileMissionExistingWork({ missionId, manifestPath, dryRun }).then((result) => {
+    reconcileExistingWork(
+      missionId: string,
+      manifestPath: string,
+      dryRun = false,
+      approvalRequestId?: string
+    ) {
+      return _reconcileMissionExistingWork({
+        missionId,
+        manifestPath,
+        dryRun,
+        approvalRequestId,
+      }).then((result) => {
         if (dryRun) return result;
         return syncProjectOperationalStateIfLinked(missionId).then(() => result);
       });

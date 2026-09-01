@@ -56,7 +56,3 @@ export function resolveThemeHexRole(role?: string, fallback = '#334155'): string
   const catalog = loadMediaThemeRolePolicyCatalog();
   return catalog.theme_hex_roles[normalized] || fallback;
 }
-
-export function resetMediaThemeRolePolicyCatalogCache(): void {
-  catalog.reset();
-}

@@ -15,6 +15,10 @@ vi.mock('./secure-io.js', () => ({
   safeReadFile: mockSafeReadFile,
 }));
 
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) => JSON.parse(String(mockSafeReadFile(filePath))),
+}));
+
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     rootDir: () => '/repo',

@@ -18,36 +18,43 @@
  * on demand or with `--watch <seconds>`.
  */
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { listApprovalRequests } from '@agent/core/approval-store';
+import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
+import { listDeals } from '@agent/core/deal-store';
+import { listInboxEntries } from '@agent/core/deliverable-inbox';
+import { listProcessImprovementProposals } from '@agent/core/mission-retrospective';
+import { listAgentRuntimeSnapshots } from '@agent/core/agent-runtime-supervisor';
 import {
-  createStandardYargs,
-  customerResolver,
-  listApprovalRequests,
-  listCustomerChannelBindings,
-  listDeals,
-  listInboxEntries,
-  listProcessImprovementProposals,
-  listAgentRuntimeSnapshots,
   composeOfficeSnapshot as composeChronosOfficeSnapshot,
   type OfficeSnapshot as ChronosOfficeSnapshot,
-  loadOrganizationProfile,
-  loadOnboardingContextBinding,
-  getProjectManagementView,
-  listProjectRecords,
-  listTenants,
-  listTaskSessions,
-  loadAgentProfileIndex,
-  resolveOrganizationOrgChart,
-  summarizeOrganizationOrgChart,
-  pathResolver,
+} from '@agent/core/ce-adoption';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import { loadOnboardingContextBinding } from '@agent/core/onboarding-context';
+import { getProjectManagementView } from '@agent/core/project-management';
+import { listProjectRecords } from '@agent/core/project-registry';
+import { listTenants } from '@agent/core/tenant-governance';
+import { listTaskSessions } from '@agent/core/task-session';
+import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
+import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
   safeReadFile,
   safeWriteFile,
-  isValidTenantSlug,
-  readCanonicalWorkGraph,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson as readFoundationJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
+import {
+  getRegisteredEnvText,
+  isRecord,
+  readJson as readFoundationJson,
+} from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -176,18 +183,32 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   ];
   const found: Array<{ missionPath: string; tier: string }> = [];
   for (const root of roots) {
-    if (!safeExistsSync(root.dir)) continue;
+    let safeRoot: string;
+    try {
+      safeRoot = assertSafeRepositoryPath(root.dir, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) continue;
+    } catch {
+      continue;
+    }
     let entries: string[] = [];
     try {
-      entries = safeReaddir(root.dir);
+      entries = safeReaddir(safeRoot);
     } catch {
       continue;
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
-      const missionPath = path.join(root.dir, entry);
-      if (safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
+      try {
+        const missionPath = assertSafeRepositoryPath(path.join(safeRoot, entry), {
+          allowMissingLeaf: true,
+        });
+        const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+        if (!safeLstat(missionPath).isDirectory() || !safeExistsSync(statePath)) continue;
         found.push({ missionPath, tier: root.tier });
+      } catch {
+        continue;
       }
     }
   }
@@ -599,10 +620,13 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const alerts = alertLines
     .map((line) => {
       try {
-        const parsed = JSON.parse(line) as { title?: string; severity?: string };
+        const parsed = JSON.parse(line) as unknown;
+        if (!isRecord(parsed)) return null;
+        const title = typeof parsed.title === 'string' ? parsed.title : '';
+        const severity = typeof parsed.severity === 'string' ? parsed.severity : 'info';
         return {
-          title: String(parsed.title || '').slice(0, 70),
-          severity: String(parsed.severity || 'info'),
+          title: title.slice(0, 70),
+          severity,
         };
       } catch {
         return null;
@@ -1271,13 +1295,15 @@ const DEFAULT_OUT = 'active/shared/exports/virtual-office/office.html';
 async function generateOnce(outPath: string, refreshSeconds?: number): Promise<string> {
   const snapshot = collectOfficeSnapshot();
   const html = renderOfficeHtml(snapshot, refreshSeconds);
-  const resolved = pathResolver.rootResolve(outPath);
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(outPath), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(resolved, html, { encoding: 'utf8', mkdir: true });
   return resolved;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'virtual_office', ...args])
     .option('out', { type: 'string', default: DEFAULT_OUT })
     .option('watch', {
       type: 'number',
@@ -1301,12 +1327,23 @@ async function main(): Promise<void> {
   }
 }
 
-const isDirectRun =
+export { generateOnce };
+
+export const runVirtualOffice = defineScript({
+  name: 'office',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error) {
+      console.error(error);
+      process.exitCode = 1;
+    }
+  },
+});
+
+if (
   isDirectScript(import.meta.url, 'virtual_office.ts') ||
-  isDirectScript(import.meta.url, 'virtual_office.js');
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
-}
+  isDirectScript(import.meta.url, 'virtual_office.js')
+)
+  void runVirtualOffice();

@@ -6,17 +6,11 @@ vi.mock('@actuator/system', () => ({
   handleAction: systemAction,
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
-  return {
-    ...actual,
-    executeServicePreset: vi.fn(),
-    pathResolver: {
-      ...actual.pathResolver,
-      rootResolve: (value: string) => `/repo/${value.replace(/^\/+/, '')}`,
-    },
-  };
-});
+vi.mock('@agent/core/path-resolver', () => ({
+  pathResolver: {
+    rootResolve: (value: string) => `/repo/${value.replace(/^\/+/, '')}`,
+  },
+}));
 
 import { handleCaptureAction } from './capture-actions.js';
 

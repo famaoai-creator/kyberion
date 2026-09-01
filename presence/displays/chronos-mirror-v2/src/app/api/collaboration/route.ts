@@ -9,6 +9,13 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+let collaborationSnapshotRevision = 0;
+
+function nextCollaborationSnapshotRevision(): number {
+  collaborationSnapshotRevision = Math.max(collaborationSnapshotRevision + 1, Date.now());
+  return collaborationSnapshotRevision;
+}
+
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
   if (denied) return denied;
@@ -45,7 +52,7 @@ export function GET(req: NextRequest) {
       ? { session_id: req.nextUrl.searchParams.get('session')! }
       : {}),
     ...(scopeKind && allowedScopeKinds.has(scopeKind)
-      ? { scope_kind: scopeKind as import('@agent/core').EventScopeKind }
+      ? { scope_kind: scopeKind as import('@agent/core/event-scope').EventScopeKind }
       : {}),
   };
   try {
@@ -57,7 +64,10 @@ export function GET(req: NextRequest) {
       scopeFilter,
       limit,
     });
-    return NextResponse.json({ ok: true, projection });
+    return NextResponse.json({
+      ok: true,
+      projection: { ...projection, revision: nextCollaborationSnapshotRevision() },
+    });
   } catch (error) {
     return viewerErrorResponse(error);
   }

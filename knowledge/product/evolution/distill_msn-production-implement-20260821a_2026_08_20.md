@@ -29,7 +29,7 @@ The mission implemented and verified a production-readiness improvement through 
 ## Failures & Recoveries
 
 - Finish gate rejected the mission because test-test-run and self_review-code-review remained pending despite checkpoints and evidence → the owner adopted the test report and approved review receipt through governed, hash-bound evidence, after which verification passed.
-- The agent-runtime test result lacked the required artifact → the owner reran and recorded pnpm lint and pnpm run test:core results, binding the evidence to the checkpoint.
+- The agent-runtime test result lacked the required artifact → the owner reran and recorded pnpm lint and pnpm test -- --suite core results, binding the evidence to the checkpoint.
 
 ## Reusable Artifacts
 

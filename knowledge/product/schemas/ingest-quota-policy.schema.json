@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ingest-quota-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "max_files_per_day": { "type": "number" },
+    "max_bytes_per_day": { "type": "number" },
+    "warn_ratio": { "type": "number" },
+    "tenant_overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "max_files_per_day": { "type": "number" },
+          "max_bytes_per_day": { "type": "number" },
+          "warn_ratio": { "type": "number" }
+        }
+      }
+    }
+  },
+  "required": [
+    "version",
+    "max_files_per_day",
+    "max_bytes_per_day",
+    "warn_ratio",
+    "tenant_overrides"
+  ]
+}

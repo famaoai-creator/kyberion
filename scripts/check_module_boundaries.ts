@@ -1,14 +1,10 @@
 import path from 'node:path';
 import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
@@ -380,13 +376,15 @@ export const runCheckModuleBoundaries = defineScript({
       return;
     }
     if (report.violations.length > 0) {
-      console.error('[check:module-boundaries] FAILED');
-      for (const violation of report.violations) console.error(`- ${violation}`);
-      throw new Error(`${report.violations.length} module boundary violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...report.violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
     context.print(
       `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
     );
+    return report;
   },
 });
 

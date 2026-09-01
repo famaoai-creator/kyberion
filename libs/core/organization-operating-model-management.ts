@@ -1,19 +1,10 @@
 import * as path from 'node:path';
-import addFormatsModule from 'ajv-formats';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { listProjectRecords, loadProjectRecord } from './project-registry.js';
 import { loadState } from './mission-state.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { createAjv } from './foundation/ajv.js';
 import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
-
-type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 
 import {
   validatorFor,

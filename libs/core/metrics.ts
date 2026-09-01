@@ -1,11 +1,12 @@
-import { appendJsonLine } from './foundation/json.js';
-import { loadJson, safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { assertSafeRepositoryPath, loadJson, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
 import { createLogger } from './logger.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 const logger = createLogger('metrics');
 
 /**
@@ -38,6 +39,13 @@ export interface ModelCostRegistry {
   default: ModelCostEntry;
 }
 
+interface ModelCostRegistryFile extends ModelCostRegistry {
+  version: string;
+  currency: string;
+  unit: string;
+  note?: string;
+}
+
 // Model pricing is data, not code: it lives in a knowledge-tier registry so models
 // can be added / repriced without a source change or redeploy. The file is the
 // source of truth; the fallback file keeps the runtime working when the primary
@@ -48,6 +56,9 @@ const COST_REGISTRY_PATH = pathResolver.resolve(
 const FALLBACK_COST_REGISTRY_PATH = pathResolver.resolve(
   'knowledge/product/governance/model-cost-registry.fallback.json'
 );
+const COST_REGISTRY_SCHEMA_PATH = pathResolver.resolve(
+  'knowledge/product/schemas/model-cost-registry.schema.json'
+);
 const EMPTY_COST_REGISTRY: ModelCostRegistry = {
   models: {},
   aliases: {},
@@ -56,58 +67,25 @@ const EMPTY_COST_REGISTRY: ModelCostRegistry = {
 
 let _cachedCostRegistry: ModelCostRegistry | null = null;
 
-function isOptionalRate(value: unknown): value is number | undefined {
-  return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
-}
+const primaryCostRegistryCatalog = defineCatalog<ModelCostRegistryFile>({
+  id: 'model-cost-registry',
+  path: COST_REGISTRY_PATH,
+  schema: COST_REGISTRY_SCHEMA_PATH,
+});
 
-function isCostRate(value: any): value is CostRate {
-  return (
-    value &&
-    typeof value.prompt === 'number' &&
-    Number.isFinite(value.prompt) &&
-    value.prompt >= 0 &&
-    typeof value.completion === 'number' &&
-    Number.isFinite(value.completion) &&
-    value.completion >= 0 &&
-    isOptionalRate(value.cache_read) &&
-    isOptionalRate(value.cache_write) &&
-    isOptionalRate(value.cache_write_1h)
-  );
-}
-
-function isCostEntry(value: any): value is ModelCostEntry {
-  const tiers = value?.tiers as unknown;
-  return (
-    isCostRate(value) &&
-    (tiers === undefined || (Array.isArray(tiers) && tiers.every((tier: any) => isCostTier(tier))))
-  );
-}
-
-function isCostTier(value: any): value is CostTier {
-  const threshold = value?.input_tokens_above;
-  return (
-    isCostRate(value) &&
-    typeof threshold === 'number' &&
-    Number.isFinite(threshold) &&
-    threshold >= 0
-  );
-}
+const fallbackCostRegistryCatalog = defineCatalog<ModelCostRegistryFile>({
+  id: 'model-cost-registry-fallback',
+  path: FALLBACK_COST_REGISTRY_PATH,
+  schema: COST_REGISTRY_SCHEMA_PATH,
+});
 
 function readCostRegistry(filePath: string): ModelCostRegistry | null {
   try {
     if (!safeExistsSync(filePath)) return null;
-    const parsed = loadJson<{
-      models?: Record<string, unknown>;
-      aliases?: Record<string, string>;
-      default?: unknown;
-    }>(filePath);
-    if (parsed && typeof parsed.models === 'object' && isCostEntry(parsed.default)) {
-      const models: Record<string, ModelCostEntry> = {};
-      for (const [id, rate] of Object.entries(parsed.models)) {
-        if (isCostEntry(rate)) models[id] = rate as ModelCostEntry;
-      }
-      return { models, aliases: parsed.aliases ?? {}, default: parsed.default as ModelCostEntry };
-    }
+    const catalog =
+      filePath === COST_REGISTRY_PATH ? primaryCostRegistryCatalog : fallbackCostRegistryCatalog;
+    const parsed = catalog.load();
+    return { models: parsed.models, aliases: parsed.aliases ?? {}, default: parsed.default };
   } catch {
     /* ignore */
   }
@@ -138,8 +116,10 @@ export function loadModelCostRegistry(): ModelCostRegistry {
 }
 
 /** Test/hot-reload hook: drop the cached registry so the next call re-reads the file. */
-export function resetModelCostRegistryCache(): void {
+export function _resetModelCostRegistryCacheForTests(): void {
   _cachedCostRegistry = null;
+  primaryCostRegistryCatalog.reset();
+  fallbackCostRegistryCatalog.reset();
 }
 
 function selectTier(entry: ModelCostEntry, inputTokens: number): CostRate {
@@ -240,13 +220,21 @@ export class MetricsCollector {
   private _aggregates: Map<string, any>;
 
   constructor(options: MetricsOptions = {}) {
-    this._metricsDir = options.metricsDir || DEFAULT_METRICS_DIR;
+    this._metricsDir = assertSafeRepositoryPath(options.metricsDir || DEFAULT_METRICS_DIR, {
+      allowMissingLeaf: true,
+    });
     this._metricsFile = options.metricsFile || DEFAULT_METRICS_FILE;
     this._persist = options.persist !== false;
     this._memoryBudgetMB = options.memoryBudgetMB || DEFAULT_MEMORY_BUDGET_MB;
     this._resourceUsageFile = options.resourceUsageFile || DEFAULT_RESOURCE_USAGE_FILE;
     this._costRegistry = options.costRegistry;
     this._aggregates = new Map();
+  }
+
+  private _metricsPath(fileName: string): string {
+    return assertSafeRepositoryPath(path.join(this._metricsDir, fileName), {
+      allowMissingLeaf: true,
+    });
   }
 
   /** Append a normalized, actor-neutral resource usage ledger entry. */
@@ -484,27 +472,20 @@ export class MetricsCollector {
   }
 
   loadHistory() {
-    const filePath = path.join(this._metricsDir, this._metricsFile);
-    if (!safeExistsSync(filePath)) return [];
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const lines = content.trim().split('\n').filter(Boolean);
-      return lines.map((line) => JSON.parse(line));
+      const filePath = this._metricsPath(this._metricsFile);
+      if (!safeExistsSync(filePath)) return [];
+      return readJsonLines<Record<string, any>>(assertSafeRepositoryPath(filePath));
     } catch (_) {
       return [];
     }
   }
 
   loadResourceUsageHistory(): ResourceUsageRecord[] {
-    const filePath = path.join(this._metricsDir, this._resourceUsageFile);
-    if (!safeExistsSync(filePath)) return [];
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      return content
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as ResourceUsageRecord);
+      const filePath = this._metricsPath(this._resourceUsageFile);
+      if (!safeExistsSync(filePath)) return [];
+      return readJsonLines<ResourceUsageRecord>(assertSafeRepositoryPath(filePath));
     } catch {
       return [];
     }
@@ -517,16 +498,23 @@ export class MetricsCollector {
       pathResolver.resolve('knowledge/product/orchestration/slo-targets.json'),
       pathResolver.resolve('knowledge/orchestration/slo-targets.json'),
     ];
-    const sloPath = sloPathCandidates.find((candidate) => safeExistsSync(candidate));
-    const sloTargets: {
+    let sloTargets: {
       critical_path?: Record<string, { latency_ms: number }>;
       default: { latency_ms: number };
-    } = sloPath
-      ? loadJson<{
+    } = { default: { latency_ms: 5000 } };
+    for (const candidate of sloPathCandidates) {
+      try {
+        const safeCandidate = assertSafeRepositoryPath(candidate);
+        if (!safeExistsSync(safeCandidate)) continue;
+        sloTargets = loadJson<{
           critical_path?: Record<string, { latency_ms: number }>;
           default: { latency_ms: number };
-        }>(sloPath)
-      : { default: { latency_ms: 5000 } };
+        }>(assertSafeRepositoryPath(safeCandidate));
+        break;
+      } catch {
+        // A malformed or symlinked optional SLO registry must not escape its scope.
+      }
+    }
 
     for (const entry of entries) {
       const componentName = entry.component || entry.skill || entry.capability;
@@ -645,10 +633,11 @@ export class MetricsCollector {
 
   private _appendToFile(entry: any) {
     try {
-      if (!safeExistsSync(this._metricsDir)) {
-        safeMkdir(this._metricsDir, { recursive: true });
+      const metricsDir = assertSafeRepositoryPath(this._metricsDir, { allowMissingLeaf: true });
+      if (!safeExistsSync(metricsDir)) {
+        safeMkdir(metricsDir, { recursive: true });
       }
-      const filePath = path.join(this._metricsDir, this._metricsFile);
+      const filePath = this._metricsPath(this._metricsFile);
       appendJsonLine(filePath, entry);
     } catch (err) {
       logger.warn(`suppressed error in _appendToFile: ${err}`);
@@ -657,8 +646,9 @@ export class MetricsCollector {
 
   private _appendResourceUsage(entry: ResourceUsageRecord) {
     try {
-      if (!safeExistsSync(this._metricsDir)) safeMkdir(this._metricsDir, { recursive: true });
-      appendJsonLine(path.join(this._metricsDir, this._resourceUsageFile), entry);
+      const metricsDir = assertSafeRepositoryPath(this._metricsDir, { allowMissingLeaf: true });
+      if (!safeExistsSync(metricsDir)) safeMkdir(metricsDir, { recursive: true });
+      appendJsonLine(this._metricsPath(this._resourceUsageFile), entry);
     } catch (_) {
       /* metrics are best-effort and must not block the operation */
     }

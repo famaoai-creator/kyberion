@@ -38,7 +38,3 @@ export function loadProductionEvidenceSummaryPolicyCatalog(): ProductionEvidence
 export function resolveProductionEvidenceSummaryPolicy(): ProductionEvidenceSummaryPolicyCatalog {
   return loadProductionEvidenceSummaryPolicyCatalog();
 }
-
-export function resetProductionEvidenceSummaryPolicyCatalogCache(): void {
-  catalog.reset();
-}

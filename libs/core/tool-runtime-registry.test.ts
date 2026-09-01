@@ -1,19 +1,20 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import {
   clearToolRuntimeState,
   getToolRuntimeRecord,
   getToolRuntimeInventoryItem,
   getToolRuntimeRegistry,
+  getToolRuntimeStatePath,
   markToolRuntimeInstalled,
   listToolRuntimeInventory,
   probeToolRuntime,
   resolveManagedToolPythonBin,
-  resetToolRuntimeRegistryCache,
+  _resetToolRuntimeRegistryCacheForTests,
 } from './tool-runtime-registry.js';
-import { resetToolRuntimePolicyCache } from './tool-runtime-policy.js';
+import { _resetToolRuntimePolicyCacheForTests } from './tool-runtime-policy.js';
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
@@ -323,15 +324,15 @@ describe('tool runtime registry', () => {
     );
     vi.stubEnv('KYBERION_TOOL_RUNTIME_POLICY_PATH', policyPath);
     vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', registryPath);
-    resetToolRuntimePolicyCache();
-    resetToolRuntimeRegistryCache();
+    _resetToolRuntimePolicyCacheForTests();
+    _resetToolRuntimeRegistryCacheForTests();
     clearToolRuntimeState('mflux');
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    resetToolRuntimePolicyCache();
-    resetToolRuntimeRegistryCache();
+    _resetToolRuntimePolicyCacheForTests();
+    _resetToolRuntimeRegistryCacheForTests();
   });
 
   it('loads the governed registry and defaults to mflux', () => {
@@ -383,7 +384,7 @@ describe('tool runtime registry', () => {
 
   it('keeps WinGet fallbacks available when the governed registry is missing', () => {
     vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', path.join(tmpRoot, 'missing-registry.json'));
-    resetToolRuntimeRegistryCache();
+    _resetToolRuntimeRegistryCacheForTests();
 
     const ollama = probeToolRuntime('ollama', 'approved_install', 'win32');
     expect(ollama.selected_backend?.command).toBe('winget');
@@ -392,6 +393,21 @@ describe('tool runtime registry', () => {
     const llamaCpp = probeToolRuntime('llamacpp', 'approved_install', 'win32');
     expect(llamaCpp.selected_backend?.command).toBe('winget');
     expect(llamaCpp.selected_backend?.args).toContain('ggml.llamacpp');
+  });
+
+  it('uses the fallback when the governed registry fails schema validation', () => {
+    safeWriteFile(registryPath, JSON.stringify({ version: 'invalid' }), { encoding: 'utf8' });
+    _resetToolRuntimeRegistryCacheForTests();
+
+    expect(getToolRuntimeRegistry().default_tool_id).toBe('mflux');
+    expect(getToolRuntimeRecord('llamacpp').installed_backend?.command).toBe('llama-server');
+  });
+
+  it('uses the fallback when the registry override is outside the repository', () => {
+    vi.stubEnv('KYBERION_TOOL_RUNTIME_REGISTRY_PATH', '/tmp/tool-runtime-registry-external.json');
+    _resetToolRuntimeRegistryCacheForTests();
+
+    expect(getToolRuntimeRegistry().version).toBe('fallback');
   });
 
   it('lists inventory items with lifecycle stages', () => {
@@ -473,5 +489,16 @@ describe('tool runtime registry', () => {
     safeWriteFile(path.join(runtimeRoot, pythonName), '', { encoding: 'utf8' });
 
     expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, pythonName));
+  });
+
+  it('rejects a registry managed environment path that escapes the repository', () => {
+    const registry = JSON.parse(String(safeReadFile(registryPath, { encoding: 'utf8' }))) as {
+      tools: Array<{ tool_id: string; managed_env_subpath?: string }>;
+    };
+    registry.tools[0].managed_env_subpath = 'tool-runtimes/../../outside-managed-root';
+    safeWriteFile(registryPath, JSON.stringify(registry), { encoding: 'utf8' });
+    _resetToolRuntimeRegistryCacheForTests();
+
+    expect(() => getToolRuntimeStatePath('mflux')).toThrow(/RESOURCE_PATH|repository|outside/i);
   });
 });

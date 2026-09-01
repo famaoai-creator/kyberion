@@ -2,7 +2,13 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 import { enqueueSurfaceOutboxMessage } from './surface-coordination-store.js';
 import { sendIMessage } from './imessage-bridge.js';
@@ -47,12 +53,14 @@ export interface OperatorNotificationPayload {
 const PREFERENCES_LOGICAL_PATH = 'personal/notification-preferences.json';
 
 export function notificationPreferencesPath(): string {
-  return pathResolver.knowledge(PREFERENCES_LOGICAL_PATH);
+  return assertSafeRepositoryPath(pathResolver.knowledge(PREFERENCES_LOGICAL_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function loadNotificationPreferences(): NotificationPreferences {
-  const filePath = notificationPreferencesPath();
   try {
+    const filePath = notificationPreferencesPath();
     if (!safeExistsSync(filePath)) return {};
     return readJson<NotificationPreferences>(filePath);
   } catch (err) {
@@ -121,7 +129,10 @@ function recordUndeliveredNotification(
   reason: string
 ): void {
   try {
-    const logPath = pathResolver.shared('observability/ops-alerts.jsonl');
+    const logPath = assertSafeRepositoryPath(
+      pathResolver.shared('observability/ops-alerts.jsonl'),
+      { allowMissingLeaf: true }
+    );
     safeMkdir(path.dirname(logPath), { recursive: true });
     safeAppendFileSync(
       logPath,

@@ -1,14 +1,16 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { matchesAnyTextRule, type TextMatchRule } from './text-rule-matcher.js';
 import {
   resolveCapabilityBundleForIntent,
   resolveCapabilityBundlesForUtterance,
 } from './capability-bundle-registry.js';
-import { buildContextualIntentFrame } from './contextual-intent-frame.js';
+import {
+  buildContextualIntentFrame,
+  type ContextualIntentFrame,
+} from './contextual-intent-frame.js';
 import { sanitizeIntentPathSegment } from './intent-path-utils.js';
 
 const STANDARD_INTENTS_SCHEMA_PATH = pathResolver.knowledge(
@@ -49,9 +51,34 @@ export type StandardIntentDefinition = {
   };
 };
 
-type IntentDomainOntologyEntry = {
+export type IntentDomainOntologyEntry = {
   intent_id: string;
+  category?: string;
+  legacy_category?: string;
+  target?: string;
+  action?: string;
+  object?: string;
   exposed_to_surface?: boolean;
+  execution_shape?: string;
+  mission_class?: string;
+  workflow_template?: string;
+  team_template?: string;
+  risk_profile?: string;
+  execution_profile_id?: string;
+  outcome_ids?: string[];
+  intake_requirements?: string[];
+  actuator_requirements?: string[];
+  readiness_required?: string[];
+  evidence_required?: string[];
+  reasoning_requirements?: Record<string, unknown>;
+};
+
+type StandardIntentCatalogFile = {
+  intents?: StandardIntentDefinition[];
+};
+
+export type IntentDomainOntologyFile = {
+  intents?: IntentDomainOntologyEntry[];
 };
 
 export interface IntentResolutionCandidate {
@@ -80,6 +107,7 @@ export interface IntentResolutionBundleCandidate {
 export interface IntentResolutionSelectedParameters {
   platform_id?: string;
   target_platform?: string;
+  service_name?: string;
 }
 
 export interface IntentResolutionPacket {
@@ -93,6 +121,7 @@ export interface IntentResolutionPacket {
     result_shape?: string;
   };
   selected_parameters?: IntentResolutionSelectedParameters;
+  contextual_frame?: ContextualIntentFrame;
   candidates: IntentResolutionCandidate[];
   bundle_candidates?: IntentResolutionBundleCandidate[];
 }
@@ -140,52 +169,53 @@ type IntentResolutionPolicyFile = {
 
 let standardIntentCache: StandardIntentDefinition[] | null = null;
 let intentDomainOntologyCache: Map<string, IntentDomainOntologyEntry> | null = null;
-let standardIntentValidateFn: ValidateFunction | null = null;
 let intentResolutionPolicyCache: IntentResolutionPolicyFile | null = null;
-let intentResolutionPolicyValidateFn: ValidateFunction | null = null;
 const resolvedIntentCatalogCache = new Map<string, StandardIntentDefinition[]>();
 
-function ensureStandardIntentValidator(): ValidateFunction {
-  if (standardIntentValidateFn) return standardIntentValidateFn;
-  standardIntentValidateFn = compileSchema(STANDARD_INTENTS_SCHEMA_PATH);
-  return standardIntentValidateFn;
-}
+const standardIntentCatalog = defineCatalog<StandardIntentCatalogFile>({
+  id: 'standard-intents',
+  path: () => pathResolver.knowledge('product/governance/standard-intents.json'),
+  schema: STANDARD_INTENTS_SCHEMA_PATH,
+});
 
-function ensureIntentResolutionPolicyValidator(): ValidateFunction {
-  if (intentResolutionPolicyValidateFn) return intentResolutionPolicyValidateFn;
-  intentResolutionPolicyValidateFn = compileSchema(INTENT_RESOLUTION_POLICY_SCHEMA_PATH);
-  return intentResolutionPolicyValidateFn;
+const intentResolutionPolicyCatalog = defineCatalog<IntentResolutionPolicyFile>({
+  id: 'intent-resolution-policy',
+  path: () => pathResolver.knowledge('product/governance/intent-resolution-policy.json'),
+  schema: INTENT_RESOLUTION_POLICY_SCHEMA_PATH,
+});
+
+const intentDomainOntologyCatalog = defineCatalog<IntentDomainOntologyFile>({
+  id: 'intent-domain-ontology',
+  path: () => pathResolver.knowledge('product/governance/intent-domain-ontology.json'),
+  schema: pathResolver.knowledge('product/schemas/intent-domain-ontology.schema.json'),
+});
+
+const intentCatalogOverlayCache = new Map<string, GovernedCatalog<StandardIntentCatalogFile>>();
+
+function getIntentCatalogOverlay(filePath: string): GovernedCatalog<StandardIntentCatalogFile> {
+  const safeFilePath = assertSafeRepositoryPath(filePath);
+  const cached = intentCatalogOverlayCache.get(safeFilePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<StandardIntentCatalogFile>({
+    id: 'intent-catalog-overlay',
+    path: safeFilePath,
+    schema: STANDARD_INTENTS_SCHEMA_PATH,
+  });
+  intentCatalogOverlayCache.set(safeFilePath, catalog);
+  return catalog;
 }
 
 export function loadStandardIntentCatalog(): StandardIntentDefinition[] {
   if (standardIntentCache) return standardIntentCache;
-  const filePath = pathResolver.knowledge('product/governance/standard-intents.json');
-  const parsed = loadJson<{
-    intents?: StandardIntentDefinition[];
-  }>(filePath);
-  const validate = ensureStandardIntentValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid standard-intents catalog: ${errors}`);
-  }
+  const parsed = standardIntentCatalog.load();
   standardIntentCache = Array.isArray(parsed.intents) ? parsed.intents : [];
   return standardIntentCache;
 }
 
 function loadIntentCatalogFromPath(filePath: string): StandardIntentDefinition[] {
-  if (!safeExistsSync(filePath)) return [];
-  const parsed = loadJson<{
-    intents?: StandardIntentDefinition[];
-  }>(filePath);
-  const validate = ensureStandardIntentValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid intent catalog overlay at ${filePath}: ${errors}`);
-  }
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) return [];
+  const parsed = getIntentCatalogOverlay(safeFilePath).load();
   return Array.isArray(parsed.intents) ? parsed.intents : [];
 }
 
@@ -305,25 +335,17 @@ export function loadResolvedStandardIntentCatalog(
 
 function loadIntentResolutionPolicy(): IntentResolutionPolicyFile {
   if (intentResolutionPolicyCache) return intentResolutionPolicyCache;
-  const filePath = pathResolver.knowledge('product/governance/intent-resolution-policy.json');
-  const parsed = loadJson<IntentResolutionPolicyFile>(filePath);
-  const validate = ensureIntentResolutionPolicyValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid intent-resolution-policy: ${errors}`);
-  }
-  intentResolutionPolicyCache = parsed;
+  intentResolutionPolicyCache = intentResolutionPolicyCatalog.load();
   return intentResolutionPolicyCache;
+}
+
+export function loadIntentDomainOntologyCatalog(): IntentDomainOntologyFile {
+  return intentDomainOntologyCatalog.load();
 }
 
 function loadIntentDomainOntology(): Map<string, IntentDomainOntologyEntry> {
   if (intentDomainOntologyCache) return intentDomainOntologyCache;
-  const filePath = pathResolver.knowledge('product/governance/intent-domain-ontology.json');
-  const parsed = loadJson<{
-    intents?: IntentDomainOntologyEntry[];
-  }>(filePath);
+  const parsed = loadIntentDomainOntologyCatalog();
   const mapped = new Map<string, IntentDomainOntologyEntry>();
   for (const entry of parsed.intents || []) {
     if (!entry.intent_id) continue;
@@ -443,8 +465,10 @@ function scoreCatalogIntent(
   };
 }
 
-function scoreScheduleReadAgendaIntent(utterance: string): IntentResolutionCandidate | null {
-  const frame = buildContextualIntentFrame(utterance);
+function scoreScheduleReadAgendaIntent(
+  utterance: string,
+  frame: ContextualIntentFrame = buildContextualIntentFrame(utterance)
+): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
   const calendarHint =
     /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|agenda|availability|calendar)/i.test(
@@ -486,8 +510,10 @@ function scoreScheduleReadAgendaIntent(utterance: string): IntentResolutionCandi
   };
 }
 
-function scoreScheduleCoordinationIntent(utterance: string): IntentResolutionCandidate | null {
-  const frame = buildContextualIntentFrame(utterance);
+function scoreScheduleCoordinationIntent(
+  utterance: string,
+  frame: ContextualIntentFrame = buildContextualIntentFrame(utterance)
+): IntentResolutionCandidate | null {
   const normalized = normalizeFreeText(utterance);
   const scheduleHint =
     /(予定|スケジュール|日程|空き時間|会議|ミーティング|打ち合わせ|アポイント|参加者|全員|合わせて|calendar|schedule)/i.test(
@@ -662,13 +688,26 @@ function inferSelectedParameters(
   intentId: string | undefined,
   utterance: string
 ): IntentResolutionSelectedParameters | undefined {
-  if (intentId !== 'setup-messaging-bridge') return undefined;
-  const platformId = inferMessagingBridgePlatformId(utterance);
-  if (!platformId) return undefined;
-  return {
-    platform_id: platformId,
-    target_platform: platformId,
-  };
+  const parameters: IntentResolutionSelectedParameters = {};
+  if (intentId === 'setup-messaging-bridge') {
+    const platformId = inferMessagingBridgePlatformId(utterance);
+    if (platformId) {
+      parameters.platform_id = platformId;
+      parameters.target_platform = platformId;
+    }
+  }
+
+  if (
+    ['inspect-service', 'start-service', 'stop-service', 'restart-service'].includes(intentId || '')
+  ) {
+    const serviceMatch =
+      utterance.match(
+        /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
+      ) || utterance.match(/service\s+([A-Za-z0-9._-]+)/i);
+    if (serviceMatch?.[1]) parameters.service_name = serviceMatch[1];
+  }
+
+  return Object.keys(parameters).length > 0 ? parameters : undefined;
 }
 
 export function resolveIntentResolutionPacket(
@@ -676,6 +715,7 @@ export function resolveIntentResolutionPacket(
   options: IntentResolutionOptions = {}
 ): IntentResolutionPacket {
   const trimmed = utterance.trim();
+  const contextualFrame = buildContextualIntentFrame(trimmed);
   const scoringPolicy = loadIntentResolutionPolicy().catalog_scoring;
   const ontology = loadIntentDomainOntology();
   const surfaceIntents = loadResolvedStandardIntentCatalog(options).filter((intent) => {
@@ -689,7 +729,7 @@ export function resolveIntentResolutionPacket(
     ...surfaceIntents
       .map((intent) => scoreCatalogIntent(trimmed, intent))
       .filter((candidate): candidate is IntentResolutionCandidate => Boolean(candidate)),
-    ...[scoreScheduleCoordinationIntent(trimmed)].filter(
+    ...[scoreScheduleCoordinationIntent(trimmed, contextualFrame)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
     ),
     ...[scoreApprovalWorkflowIntent(trimmed)].filter(
@@ -701,7 +741,7 @@ export function resolveIntentResolutionPacket(
     ...[scoreBrowserFillIntent(trimmed)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
     ),
-    ...[scoreScheduleReadAgendaIntent(trimmed)].filter(
+    ...[scoreScheduleReadAgendaIntent(trimmed, contextualFrame)].filter(
       (candidate): candidate is IntentResolutionCandidate => Boolean(candidate)
     ),
     ...buildLegacyCandidates(trimmed),
@@ -770,6 +810,7 @@ export function resolveIntentResolutionPacket(
     selected_confidence: selected?.confidence,
     selected_resolution: selected?.resolution,
     selected_parameters: selectedParameters,
+    contextual_frame: contextualFrame,
     candidates: sorted,
     bundle_candidates: [...bundleById.values()],
   };

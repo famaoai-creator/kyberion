@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  const personalThemePath = actual.pathResolver.rootResolve(
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  const { pathResolver } = await vi.importActual<typeof import('@agent/core/path-resolver')>(
+    '@agent/core/path-resolver'
+  );
+  const personalThemePath = pathResolver.rootResolve(
     'knowledge/personal/design-patterns/media-templates/themes.json'
   );
-  const personalThemeDir = actual.pathResolver.rootResolve(
+  const personalThemeDir = pathResolver.rootResolve(
     'knowledge/personal/design-patterns/media-templates/themes'
   );
   const personalTheme = {

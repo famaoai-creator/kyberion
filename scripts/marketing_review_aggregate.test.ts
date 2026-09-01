@@ -54,6 +54,19 @@ afterEach(() => {
 });
 
 describe('marketing review aggregation', () => {
+  it('keeps CLI output and failure handling behind the shared harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/marketing_review_aggregate.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('context.print(result)');
+    expect(source).toContain('new ScriptExitError(');
+    expect(source).not.toContain('process.exitCode');
+    expect(source).not.toContain('logger.success');
+  });
+
   it('allows suggestion-only review with the required role', () => {
     const input = fixture();
     const result = runMarketingReviewAggregation({
@@ -86,6 +99,34 @@ describe('marketing review aggregation', () => {
     expect(
       JSON.parse(safeReadFile(result.output_path, { encoding: 'utf8' }) as string).gate.reasons
     ).toContain('review review-1 was invalidated by artifact change');
+  });
+
+  it('rejects review artifacts outside the repository boundary', () => {
+    const input = fixture();
+    const reviewPackage = JSON.parse(
+      safeReadFile(input.packagePath, { encoding: 'utf8' }) as string
+    ) as { artifacts: Array<{ path: string }> };
+    reviewPackage.artifacts[0]!.path = '../package.json';
+    safeWriteFile(input.packagePath, JSON.stringify(reviewPackage));
+
+    expect(() =>
+      runMarketingReviewAggregation({
+        reviewPackagePath: input.packagePath,
+        reviewPaths: [input.reviewPath],
+        outputPath: path.join(input.root, 'result.json'),
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects review output outside the repository boundary', () => {
+    const input = fixture();
+    expect(() =>
+      runMarketingReviewAggregation({
+        reviewPackagePath: input.packagePath,
+        reviewPaths: [input.reviewPath],
+        outputPath: path.join(pathResolver.rootDir(), '..', 'kyberion-review-output.json'),
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('blocks when a policy-required reviewer role is absent', () => {

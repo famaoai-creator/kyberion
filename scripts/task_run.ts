@@ -1,30 +1,15 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeLstat, safeReaddir } from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-type TaskScenario = {
-  id: string;
-  title: string;
-  description: string;
-  trigger: {
-    type: 'schedule' | 'event' | 'manual';
-    cron?: string;
-    timezone?: string;
-    event_name?: string;
-    source?: string;
-    prompt?: string;
-  };
-  input: { sources: string[]; required_params: string[]; optional_params?: string[] };
-  first_run: { reasoning_required: boolean; questions: string[]; profile_output: string };
-  repeat_run: { pipeline_template: string; params_from_profile: boolean; profile_input?: string };
-  result: { artifacts: string[]; summary_format: 'markdown' | 'json' | 'text' };
-  approval_boundary: {
-    required_for: string[];
-    default_action: 'draft-only' | 'notify-only' | 'requires-human-approval';
-  };
-};
+import { loadTaskRecord, loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
 
 type TaskRunArgs = {
   scenarioId?: string;
@@ -42,19 +27,23 @@ const PERSONAL_TASK_PROFILE_DIR = pathResolver.rootResolve('knowledge/personal/t
 
 function resolveScenarioDir(): string {
   const override = getRegisteredEnvText('KYBERION_TASK_SCENARIO_DIR')?.trim();
-  return override ? path.resolve(override) : DEFAULT_SCENARIO_DIR;
+  return override
+    ? assertSafeRepositoryPath(path.resolve(override), { allowMissingLeaf: true })
+    : DEFAULT_SCENARIO_DIR;
 }
 
 function loadScenarioFiles(scenarioDir = resolveScenarioDir()): string[] {
-  if (!safeExistsSync(scenarioDir) || !safeLstat(scenarioDir).isDirectory()) return [];
-  return safeReaddir(scenarioDir)
+  const safeScenarioDir = assertSafeRepositoryPath(scenarioDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeScenarioDir) || !safeLstat(safeScenarioDir).isDirectory()) return [];
+  return safeReaddir(safeScenarioDir)
     .filter((entry) => entry.endsWith('.json'))
-    .map((entry) => path.join(scenarioDir, entry))
+    .map((entry) => assertSafeRepositoryPath(path.join(safeScenarioDir, entry)))
+    .filter((filePath) => safeLstat(filePath).isFile())
     .sort((left, right) => left.localeCompare(right));
 }
 
 function loadScenario(filePath: string): TaskScenario {
-  return readJson<TaskScenario>(filePath);
+  return loadTaskScenario(filePath);
 }
 
 function loadScenarioById(scenarioId: string): TaskScenario | undefined {
@@ -87,8 +76,8 @@ function parseArgs(argv: string[]): TaskRunArgs {
   return parsed;
 }
 
-function printUsage(): void {
-  console.log('Usage: pnpm task:run <scenario-id> [--profile <path>] [--dry-run]');
+export function taskRunUsage(): string {
+  return 'Usage: pnpm task:run <scenario-id> [--profile <path>] [--dry-run]';
 }
 
 function resolveProfilePath(
@@ -96,7 +85,10 @@ function resolveProfilePath(
   override?: string,
   options: TaskRunOptions = {}
 ): string {
-  const resolved = pathResolver.rootResolve(override || scenario.first_run.profile_output);
+  const resolved = assertSafeRepositoryPath(
+    pathResolver.rootResolve(override || scenario.first_run.profile_output),
+    { allowMissingLeaf: true }
+  );
   const relative = path.relative(pathResolver.rootDir(), resolved);
   if (relative.startsWith('..')) {
     throw new Error(
@@ -116,7 +108,7 @@ function resolveProfilePath(
 }
 
 function loadProfile(profilePath: string): Record<string, unknown> {
-  return readJson<Record<string, unknown>>(profilePath);
+  return loadTaskRecord(profilePath, 'TaskScenario profile');
 }
 
 function renderApprovalBoundary(boundary: TaskScenario['approval_boundary']): string {
@@ -142,7 +134,7 @@ export function describeTaskRun(
   }
 
   const profilePath = resolveProfilePath(scenario, profileOverride, options);
-  const profileLoaded = safeExistsSync(profilePath);
+  const profileLoaded = safeExistsSync(profilePath) && safeLstat(profilePath).isFile();
   const requiresProfile = scenario.repeat_run.params_from_profile;
 
   const profile = profileLoaded ? loadProfile(profilePath) : null;
@@ -180,19 +172,23 @@ export function describeTaskRun(
   ].join('\n');
 }
 
-export async function main(argv: string[] = []): Promise<void> {
+export async function main(
+  argv: string[] = [],
+  print: (value: unknown) => void = () => undefined,
+  json = false
+): Promise<void> {
   const args = parseArgs(argv);
   if (args.help) {
-    printUsage();
+    print(taskRunUsage());
     return;
   }
   if (!args.scenarioId) {
-    printUsage();
+    print(taskRunUsage());
     throw new Error('Missing scenario id');
   }
 
   const plan = describeTaskRun(args.scenarioId, args.profile);
-  console.log(plan);
+  print(json ? { status: 'ok', scenarioId: args.scenarioId, dryRun: true, plan } : plan);
 
   const scenario = loadScenarioById(args.scenarioId);
   if (!scenario) {
@@ -207,8 +203,8 @@ export async function main(argv: string[] = []): Promise<void> {
 
 const script = defineScript({
   name: 'task:run',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json', 'dry-run', 'quiet'],
+  run: ({ argv, print, json }) => main(argv, print, json),
 });
 if (
   isDirectScript(import.meta.url, 'task_run.ts') ||

@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeStat } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeStat } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 
@@ -333,7 +334,7 @@ export const runCheckScriptIntegrity = defineScript({
   run(context) {
     const violations = checkScriptIntegrity();
     if (violations.length > 0) {
-      throw new Error(violations.join('; '));
+      throw new ScriptExitError(1, violations.map((violation) => `- ${violation}`).join('\n'));
     }
     context.print('[check:script-integrity] OK');
   },

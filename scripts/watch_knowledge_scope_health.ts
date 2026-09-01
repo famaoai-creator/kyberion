@@ -1,19 +1,18 @@
 #!/usr/bin/env node
 /** KO-18: deterministic health report for registered tenant knowledge roots. */
 import * as path from 'node:path';
+import { buildTenantKnowledgeScopeSet } from '@agent/core/tenant-knowledge-retrieval';
+import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  buildTenantKnowledgeScopeSet,
-  listTenantProfileSlugs,
-  pathResolver,
-  resolveTenant,
   safeMkdir,
   safeWriteFile,
   safeExistsSync,
+  safeLstat,
   safeStat,
-  sendOpsAlert,
-  withExecutionContext,
-  type OpsAlertInput,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
+import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -46,6 +45,9 @@ export type KnowledgeScopeHealthReport = {
   }>;
   tenants: HealthRow[];
 };
+
+export const KNOWLEDGE_SCOPE_HEALTH_USAGE =
+  'Usage: pnpm knowledge:scope-health [--json] [--alert] [--fail] [--quiet]';
 
 export interface LegacyUnscopedFile {
   path: string;
@@ -114,7 +116,7 @@ function listLegacyUnscopedFiles(): LegacyUnscopedFile[] {
 
 function readPriorLegacyCount(): number | undefined {
   const filePath = healthHistoryPath();
-  if (!safeExistsSync(filePath)) return undefined;
+  if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return undefined;
   try {
     const value = readJson<{
       legacy_unscoped_file_count?: unknown;
@@ -256,24 +258,48 @@ function buildHealthAlert(report: KnowledgeScopeHealthReport): OpsAlertInput {
   };
 }
 
+function formatHealthReport(
+  report: KnowledgeScopeHealthReport,
+  alertReceipt?: { recorded_path: string; webhook_delivered: boolean }
+): string {
+  return [
+    `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`,
+    ...(alertReceipt
+      ? [
+          `[knowledge-scope-health] ops alert recorded at ${alertReceipt.recorded_path}; webhook=${alertReceipt.webhook_delivered ? 'delivered' : 'not-delivered'}`,
+        ]
+      : []),
+  ].join('\n');
+}
+
 export const runKnowledgeScopeHealth = defineScript({
   name: 'knowledge:scope-health',
-  flags: [],
-  run: ({ argv }) => {
-    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
-    if (argv.includes('--json')) console.log(JSON.stringify(report, null, 2));
-    else
-      console.log(
-        `${report.status}: ${report.summary.healthy}/${report.summary.registered_tenants} tenant knowledge roots healthy; legacy=${report.summary.legacy_unscoped_file_count} (growth=${report.summary.legacy_unscoped_growth})`
+  flags: ['json'],
+  run: ({ argv, json, quiet, print }) => {
+    if (argv.includes('--help') || argv.includes('-h')) {
+      print(
+        json
+          ? { status: 'help', usage: KNOWLEDGE_SCOPE_HEALTH_USAGE }
+          : KNOWLEDGE_SCOPE_HEALTH_USAGE
       );
-    if (argv.includes('--alert') && report.alerts.length > 0) {
-      const receipt = sendOpsAlert(buildHealthAlert(report));
-      if (!argv.includes('--quiet')) {
-        console.warn(
-          `[knowledge-scope-health] ops alert recorded at ${receipt.recorded_path}; webhook=${receipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
-        );
-      }
+      return;
     }
+
+    const report = scanKnowledgeScopeHealth({ persistHistory: argv.includes('--alert') });
+    let alertReceipt: ReturnType<typeof sendOpsAlert> | undefined;
+    if (argv.includes('--alert') && report.alerts.length > 0) {
+      alertReceipt = sendOpsAlert(buildHealthAlert(report));
+    }
+    const output = alertReceipt
+      ? {
+          ...report,
+          alert: {
+            recorded_path: alertReceipt.recorded_path,
+            webhook_delivered: alertReceipt.webhook_delivered,
+          },
+        }
+      : report;
+    print(json ? output : formatHealthReport(report, quiet ? undefined : alertReceipt));
     if (argv.includes('--fail') && report.status !== 'healthy') {
       throw new ScriptExitError(1, '', true);
     }

@@ -1,5 +1,15 @@
-import { buildSafeExecEnv, safeExec, safeExistsSync, safeReadFile } from '@agent/core';
+import * as path from 'node:path';
+import {
+  assertSafeRepositoryPath,
+  buildSafeExecEnv,
+  safeExec,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
 type ArgMap = Record<string, string | boolean>;
 
@@ -33,22 +43,29 @@ function getString(args: ArgMap, key: string, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-function readPayload(args: ArgMap): Record<string, unknown> {
+export function readPayload(args: ArgMap): Record<string, unknown> {
   const payloadFile = getString(args, '--payload-file');
   if (payloadFile) {
-    if (!safeExistsSync(payloadFile)) {
-      throw new Error(`payload file not found: ${payloadFile}`);
+    const resolvedPayloadFile = assertSafeRepositoryPath(
+      path.isAbsolute(payloadFile) ? payloadFile : pathResolver.resolve(payloadFile),
+      { allowMissingLeaf: false }
+    );
+    if (!safeExistsSync(resolvedPayloadFile)) {
+      throw new Error(`payload file not found: ${resolvedPayloadFile}`);
     }
-    const raw = String(safeReadFile(payloadFile, { encoding: 'utf8' }) || '').trim();
+    if (!safeLstat(resolvedPayloadFile).isFile()) {
+      throw new Error(`payload file must be a regular file: ${resolvedPayloadFile}`);
+    }
+    const raw = String(safeReadFile(resolvedPayloadFile, { encoding: 'utf8' }) || '').trim();
     if (!raw) {
-      throw new Error(`payload file is empty: ${payloadFile}`);
+      throw new Error(`payload file is empty: ${resolvedPayloadFile}`);
     }
-    return JSON.parse(raw);
+    return parseSafeJsonObjectInput(raw, 'Google Workspace Meet payload') || {};
   }
 
   const rawJson = getString(args, '--json', '{}').trim();
   if (!rawJson) return {};
-  return JSON.parse(rawJson);
+  return parseSafeJsonObjectInput(rawJson, 'Google Workspace Meet payload') || {};
 }
 
 async function main(argv: string[]): Promise<void> {

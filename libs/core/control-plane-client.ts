@@ -1,5 +1,7 @@
 import { validateNextActionContract } from './next-action-contract.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export type ControlPlaneSurface = 'presence' | 'chronos';
 
@@ -157,6 +159,201 @@ export interface ControlPlaneRemediationPlan {
   suggestedCommand: string;
 }
 
+function optionalString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function optionalFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) return undefined;
+  return value;
+}
+
+function recordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function normalizeProjectRecord(value: unknown): ControlPlaneProjectRecord | null {
+  if (!isRecord(value) || typeof value.project_id !== 'string' || !value.project_id) return null;
+  return {
+    project_id: value.project_id,
+    ...(optionalString(value.name) !== undefined ? { name: optionalString(value.name) } : {}),
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.tier) !== undefined ? { tier: optionalString(value.tier) } : {}),
+    ...(optionalString(value.primary_locale) !== undefined
+      ? { primary_locale: optionalString(value.primary_locale) }
+      : {}),
+    ...(stringArray(value.active_missions) !== undefined
+      ? { active_missions: stringArray(value.active_missions) }
+      : {}),
+    ...(stringArray(value.service_bindings) !== undefined
+      ? { service_bindings: stringArray(value.service_bindings) }
+      : {}),
+  };
+}
+
+function normalizeApprovalRecord(value: unknown): ControlPlaneApprovalRecord | null {
+  if (!isRecord(value) || typeof value.id !== 'string' || !value.id) return null;
+  return {
+    id: value.id,
+    ...(optionalString(value.title) !== undefined ? { title: optionalString(value.title) } : {}),
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.expected_outcome) !== undefined
+      ? { expected_outcome: optionalString(value.expected_outcome) }
+      : {}),
+    ...(optionalString(value.storageChannel) !== undefined
+      ? { storageChannel: optionalString(value.storageChannel) }
+      : {}),
+    ...(optionalString(value.channel) !== undefined
+      ? { channel: optionalString(value.channel) }
+      : {}),
+  };
+}
+
+function normalizeMissionSeedRecord(value: unknown): ControlPlaneMissionSeedRecord | null {
+  if (!isRecord(value) || typeof value.seed_id !== 'string' || !value.seed_id) return null;
+  return {
+    seed_id: value.seed_id,
+    ...(optionalString(value.title) !== undefined ? { title: optionalString(value.title) } : {}),
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.project_id) !== undefined
+      ? { project_id: optionalString(value.project_id) }
+      : {}),
+    ...(optionalString(value.track_id) !== undefined
+      ? { track_id: optionalString(value.track_id) }
+      : {}),
+    ...(optionalString(value.track_name) !== undefined
+      ? { track_name: optionalString(value.track_name) }
+      : {}),
+    ...(optionalString(value.specialist_id) !== undefined
+      ? { specialist_id: optionalString(value.specialist_id) }
+      : {}),
+    ...(optionalString(value.mission_type_hint) !== undefined
+      ? { mission_type_hint: optionalString(value.mission_type_hint) }
+      : {}),
+    ...(optionalString(value.promoted_mission_id) !== undefined
+      ? { promoted_mission_id: optionalString(value.promoted_mission_id) }
+      : {}),
+  };
+}
+
+function normalizeGateReadiness(
+  value: unknown
+): ControlPlaneProjectTrackRecord['gate_readiness'] | null {
+  if (!isRecord(value)) return null;
+  const artifacts = Array.isArray(value.next_required_artifacts)
+    ? value.next_required_artifacts.filter(isRecord).map((artifact) => ({
+        ...(optionalString(artifact.artifact_id) !== undefined
+          ? { artifact_id: optionalString(artifact.artifact_id) }
+          : {}),
+        ...(optionalString(artifact.template_ref) !== undefined
+          ? { template_ref: optionalString(artifact.template_ref) }
+          : {}),
+      }))
+    : undefined;
+  return {
+    ...(optionalFiniteNumber(value.ready_gate_count) !== undefined
+      ? { ready_gate_count: optionalFiniteNumber(value.ready_gate_count) }
+      : {}),
+    ...(optionalFiniteNumber(value.total_gate_count) !== undefined
+      ? { total_gate_count: optionalFiniteNumber(value.total_gate_count) }
+      : {}),
+    ...(optionalString(value.current_gate_id) !== undefined
+      ? { current_gate_id: optionalString(value.current_gate_id) }
+      : {}),
+    ...(optionalString(value.current_phase) !== undefined
+      ? { current_phase: optionalString(value.current_phase) }
+      : {}),
+    ...(optionalBoolean(value.ready) !== undefined ? { ready: optionalBoolean(value.ready) } : {}),
+    ...(artifacts !== undefined ? { next_required_artifacts: artifacts } : {}),
+  };
+}
+
+function normalizeProjectTrackRecord(value: unknown): ControlPlaneProjectTrackRecord | null {
+  if (!isRecord(value) || typeof value.track_id !== 'string' || !value.track_id) return null;
+  const gateReadiness = normalizeGateReadiness(value.gate_readiness);
+  return {
+    track_id: value.track_id,
+    ...(optionalString(value.project_id) !== undefined
+      ? { project_id: optionalString(value.project_id) }
+      : {}),
+    ...(optionalString(value.name) !== undefined ? { name: optionalString(value.name) } : {}),
+    ...(optionalString(value.summary) !== undefined
+      ? { summary: optionalString(value.summary) }
+      : {}),
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.track_type) !== undefined
+      ? { track_type: optionalString(value.track_type) }
+      : {}),
+    ...(optionalString(value.lifecycle_model) !== undefined
+      ? { lifecycle_model: optionalString(value.lifecycle_model) }
+      : {}),
+    ...(gateReadiness !== null ? { gate_readiness: gateReadiness } : {}),
+  };
+}
+
+function normalizeOutcomeRecord(value: unknown): ControlPlaneOutcomeRecord | null {
+  if (!isRecord(value) || typeof value.artifact_id !== 'string' || !value.artifact_id) return null;
+  return {
+    artifact_id: value.artifact_id,
+    ...(optionalString(value.kind) !== undefined ? { kind: optionalString(value.kind) } : {}),
+    ...(optionalString(value.preview_text) !== undefined
+      ? { preview_text: optionalString(value.preview_text) }
+      : {}),
+    ...(optionalString(value.project_id) !== undefined
+      ? { project_id: optionalString(value.project_id) }
+      : {}),
+    ...(optionalString(value.storage_class) !== undefined
+      ? { storage_class: optionalString(value.storage_class) }
+      : {}),
+    ...(stringArray(value.promoted_refs) !== undefined
+      ? { promoted_refs: stringArray(value.promoted_refs) }
+      : {}),
+  };
+}
+
+function normalizeTaskSessionRecord(value: unknown): ControlPlaneTaskSessionRecord | null {
+  if (!isRecord(value) || typeof value.session_id !== 'string' || !value.session_id) return null;
+  const goal = isRecord(value.goal)
+    ? {
+        ...(optionalString(value.goal.summary) !== undefined
+          ? { summary: optionalString(value.goal.summary) }
+          : {}),
+      }
+    : undefined;
+  const projectContext = isRecord(value.project_context)
+    ? {
+        ...(optionalString(value.project_context.project_id) !== undefined
+          ? { project_id: optionalString(value.project_context.project_id) }
+          : {}),
+      }
+    : undefined;
+  const artifact = isRecord(value.artifact)
+    ? {
+        ...(optionalString(value.artifact.preview_text) !== undefined
+          ? { preview_text: optionalString(value.artifact.preview_text) }
+          : {}),
+      }
+    : undefined;
+  return {
+    session_id: value.session_id,
+    ...(optionalString(value.status) !== undefined ? { status: optionalString(value.status) } : {}),
+    ...(optionalString(value.task_type) !== undefined
+      ? { task_type: optionalString(value.task_type) }
+      : {}),
+    ...(goal !== undefined ? { goal } : {}),
+    ...(projectContext !== undefined ? { project_context: projectContext } : {}),
+    ...(artifact !== undefined ? { artifact } : {}),
+  };
+}
+
 const DEFAULT_BASE_URLS: Record<ControlPlaneSurface, string> = {
   presence: String(process.env.PRESENCE_STUDIO_URL || 'http://127.0.0.1:3031').replace(/\/$/, ''),
   chronos: String(process.env.CHRONOS_URL || 'http://127.0.0.1:3000').replace(/\/$/, ''),
@@ -166,12 +363,12 @@ const DEFAULT_REMEDIATION_PLANS: Record<ControlPlaneSurface, ControlPlaneRemedia
   presence: {
     surface: 'presence',
     runtimeId: 'presence-studio',
-    suggestedCommand: 'pnpm surfaces:reconcile',
+    suggestedCommand: 'pnpm surfaces reconcile',
   },
   chronos: {
     surface: 'chronos',
     runtimeId: 'chronos-mirror-v2',
-    suggestedCommand: 'pnpm surfaces:reconcile',
+    suggestedCommand: 'pnpm surfaces reconcile',
   },
 };
 
@@ -266,7 +463,7 @@ export async function requestControlPlaneJson(
   pathname: string,
   init?: RequestInit,
   options?: ControlPlaneClientOptions
-): Promise<any> {
+): Promise<unknown> {
   const response = await requestControlPlane(
     surface,
     pathname,
@@ -280,16 +477,18 @@ export async function requestControlPlaneJson(
     options
   );
   const text = await response.text();
-  let body: any = null;
+  let body: unknown = null;
   try {
-    body = text ? JSON.parse(text) : null;
+    body = text ? parseSafeJsonInput(text, 'control-plane response') : null;
   } catch {
     body = { ok: response.ok, raw: text };
   }
   if (!response.ok) {
     const mismatch = inferSurfaceMismatchMessage(surface, pathname, text);
+    const errorMessage = isRecord(body) ? optionalString(body.error) : undefined;
+    const rawMessage = isRecord(body) ? optionalString(body.raw) : undefined;
     throw new ControlPlaneClientError(
-      mismatch || body?.error || body?.raw || `HTTP ${response.status}`,
+      mismatch || errorMessage || rawMessage || `HTTP ${response.status}`,
       {
         surface,
         pathname,
@@ -297,7 +496,7 @@ export async function requestControlPlaneJson(
       }
     );
   }
-  if (body && typeof body === 'object' && typeof body.raw === 'string') {
+  if (isRecord(body) && typeof body.raw === 'string') {
     const mismatch = inferSurfaceMismatchMessage(surface, pathname, body.raw);
     if (mismatch) {
       throw new ControlPlaneClientError(mismatch, {
@@ -360,76 +559,91 @@ export function createControlPlaneClient(
       return requestControlPlaneText(surface, pathname, undefined, options);
     },
     async listProjects(): Promise<ControlPlaneProjectRecord[]> {
-      const body = (await requestControlPlaneJson(
-        surface,
-        '/api/projects',
-        undefined,
-        options
-      )) as ControlPlaneListResponse<ControlPlaneProjectRecord>;
-      return Array.isArray(body?.items) ? body.items : [];
+      const body = await requestControlPlaneJson(surface, '/api/projects', undefined, options);
+      return isRecord(body)
+        ? recordArray(body.items)
+            .map(normalizeProjectRecord)
+            .filter((record): record is ControlPlaneProjectRecord => record !== null)
+        : [];
     },
     async listApprovals(): Promise<ControlPlaneApprovalRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/approvals';
-      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
-      if (surface === 'chronos') {
-        return Array.isArray(body?.pendingApprovals) ? body.pendingApprovals : [];
-      }
-      return Array.isArray(body?.items) ? body.items : [];
+      const body = await requestControlPlaneJson(surface, pathname, undefined, options);
+      if (!isRecord(body)) return [];
+      const records = surface === 'chronos' ? body.pendingApprovals : body.items;
+      return recordArray(records)
+        .map(normalizeApprovalRecord)
+        .filter((record): record is ControlPlaneApprovalRecord => record !== null);
     },
     async listMissionSeeds(): Promise<ControlPlaneMissionSeedRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/mission-seeds';
-      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
-      if (surface === 'chronos') {
-        return Array.isArray(body?.missionSeeds) ? body.missionSeeds : [];
-      }
-      return Array.isArray(body?.items) ? body.items : [];
+      const body = await requestControlPlaneJson(surface, pathname, undefined, options);
+      if (!isRecord(body)) return [];
+      const records = surface === 'chronos' ? body.missionSeeds : body.items;
+      return recordArray(records)
+        .map(normalizeMissionSeedRecord)
+        .filter((record): record is ControlPlaneMissionSeedRecord => record !== null);
     },
     async listProjectTracks(): Promise<ControlPlaneProjectTrackRecord[]> {
       const pathname = surface === 'chronos' ? '/api/intelligence' : '/api/project-tracks';
-      const body = (await requestControlPlaneJson(surface, pathname, undefined, options)) as any;
+      const body = await requestControlPlaneJson(surface, pathname, undefined, options);
+      if (!isRecord(body)) return [];
       if (surface === 'chronos') {
-        const tracks = Array.isArray(body?.projectTracks) ? body.projectTracks : [];
+        const tracks = recordArray(body.projectTracks)
+          .map(normalizeProjectTrackRecord)
+          .filter((record): record is ControlPlaneProjectTrackRecord => record !== null);
         const readiness = new Map(
-          (Array.isArray(body?.gateReadiness) ? body.gateReadiness : []).map((item: any) => [
-            String(item.track_id || ''),
-            item,
-          ])
+          recordArray(body.gateReadiness)
+            .map((item) => {
+              const trackId = optionalString(item.track_id);
+              const gateReadiness = normalizeGateReadiness(item);
+              return trackId && gateReadiness ? ([trackId, gateReadiness] as const) : null;
+            })
+            .filter(
+              (
+                item
+              ): item is readonly [
+                string,
+                NonNullable<ControlPlaneProjectTrackRecord['gate_readiness']>,
+              ] => item !== null
+            )
         );
-        return tracks.map((track: any) => ({
+        return tracks.map((track) => ({
           ...track,
-          gate_readiness: track?.gate_readiness || readiness.get(String(track?.track_id || '')),
+          gate_readiness: track.gate_readiness || readiness.get(track.track_id),
         }));
       }
-      return Array.isArray(body?.items) ? body.items : [];
+      return recordArray(body.items)
+        .map(normalizeProjectTrackRecord)
+        .filter((record): record is ControlPlaneProjectTrackRecord => record !== null);
     },
     async listOutcomes(): Promise<ControlPlaneOutcomeRecord[]> {
-      const body = (await requestControlPlaneJson(
-        surface,
-        '/api/outcomes',
-        undefined,
-        options
-      )) as ControlPlaneListResponse<ControlPlaneOutcomeRecord>;
-      return Array.isArray(body?.items) ? body.items : [];
+      const body = await requestControlPlaneJson(surface, '/api/outcomes', undefined, options);
+      return isRecord(body)
+        ? recordArray(body.items)
+            .map(normalizeOutcomeRecord)
+            .filter((record): record is ControlPlaneOutcomeRecord => record !== null)
+        : [];
     },
     async listTaskSessions(): Promise<ControlPlaneTaskSessionRecord[]> {
-      const body = (await requestControlPlaneJson(
-        surface,
-        '/api/task-sessions',
-        undefined,
-        options
-      )) as ControlPlaneListResponse<ControlPlaneTaskSessionRecord>;
-      return Array.isArray(body?.items) ? body.items : [];
+      const body = await requestControlPlaneJson(surface, '/api/task-sessions', undefined, options);
+      return isRecord(body)
+        ? recordArray(body.items)
+            .map(normalizeTaskSessionRecord)
+            .filter((record): record is ControlPlaneTaskSessionRecord => record !== null)
+        : [];
     },
     async getChronosOverview(): Promise<ChronosOverviewRecord> {
-      const body = (await requestControlPlaneJson(
+      const body = await requestControlPlaneJson(
         'chronos',
         '/api/intelligence',
         undefined,
         options
-      )) as ChronosOverviewRecord;
+      );
+      const normalizedBody = isRecord(body) ? body : {};
       return {
-        ...body,
-        nextActions: sanitizeNextActions(body?.nextActions),
+        ...normalizedBody,
+        nextActions: sanitizeNextActions(normalizedBody.nextActions),
       };
     },
   };

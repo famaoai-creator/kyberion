@@ -79,7 +79,7 @@ jobs:
         run: pnpm run typecheck
 
       - name: Contract schemas
-        run: pnpm run check:contract-schemas
+        run: pnpm run check -- --scope full --only contract-schemas
 
       # The full core suite is still Unix-oriented: it relies on POSIX path
       # assertions and host-only fixtures (sqlite3, ffmpeg, and macOS/Linux
@@ -90,7 +90,7 @@ jobs:
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
         if: runner.os != 'Windows'
-        run: pnpm run test:core
+        run: pnpm test -- --suite core
 
       - name: Unit tests (Windows native)
         if: runner.os == 'Windows'
@@ -108,19 +108,19 @@ jobs:
 
       - name: Meeting participation dry-run
         if: runner.os != 'Windows'
-        run: pnpm run test:meeting-dry-run
+        run: pnpm test -- --suite meeting-dry-run
 
       - name: Pipeline preview (baseline)
         if: runner.os != 'Windows'
-        run: pnpm run cli -- preview pipelines/baseline-check.json
+        run: pnpm run kyberion -- preview pipelines/baseline-check.json
 
       - name: Pipeline preview (meeting proxy)
         if: runner.os != 'Windows'
-        run: pnpm run cli -- preview pipelines/meeting-proxy-workflow.json
+        run: pnpm run kyberion -- preview pipelines/meeting-proxy-workflow.json
 
       - name: Pipeline shell independence
         if: runner.os != 'Windows'
-        run: pnpm run check:pipeline-shell-independence
+        run: pnpm run check -- --scope full --only pipeline-shell-independence
 
       - name: Customer aggregation smoke
         if: runner.os != 'Windows'

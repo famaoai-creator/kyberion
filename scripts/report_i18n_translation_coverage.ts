@@ -2,7 +2,7 @@
 /**
  * report_i18n_translation_coverage.ts — I18N-08: translation-ops instrument.
  *
- * **This is not a gate.** `pnpm check:catalogs`
+ * **This is not a gate.** `pnpm run check -- --scope full --only catalogs`
  * (`scripts/check_catalog_integrity.ts`) already FAILS the build the moment
  * a key is missing an entry for any `required_locales` member — that is the
  * enforcement path, and it stays exactly where it is. This script answers a
@@ -11,7 +11,7 @@
  * missing?" That is the instrument you read when deciding whether a
  * still-growing locale (e.g. a pseudo-locale being built out towards
  * promotion) is ready to move from merely *present* in the catalog to
- * *required* — never a substitute for `pnpm check:catalogs` itself.
+ * *required* — never a substitute for `pnpm run check -- --scope full --only catalogs` itself.
  *
  * The locale list is derived at runtime from the catalog (`required_locales`
  * unioned with every locale actually present in any entry) — never
@@ -35,19 +35,13 @@
  *     `pipelines/i18n-drift-audit.json` run, not routine local use.
  */
 import * as path from 'node:path';
+import { readJsonIfPresent } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
-import {
-  loadVocabularyCatalog,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-  sendOpsAlert,
-  type OpsAlertInput,
-  type VocabularyCatalogFile,
-} from '@agent/core';
+import { loadVocabularyCatalog, type VocabularyCatalogFile } from '@agent/core/vocabulary-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 
 export interface NamespaceCoverageStat {
   namespace: string;
@@ -68,7 +62,7 @@ export interface LocaleCoverageStat {
 
 export interface TranslationCoverageReport {
   /** Always `'ok'` — this report never fails a build. See the header
-   *  comment above: `pnpm check:catalogs` is the gate, this is the
+   *  comment above: `pnpm run check -- --scope full --only catalogs` is the gate, this is the
    *  instrument. Kept as a field (rather than omitted) so this report's
    *  shape still matches the neighbouring `check_*.ts` reports
    *  (`status` / `checked_at` / `violations`). */
@@ -168,29 +162,45 @@ export function computeTranslationCoverageReport(
   };
 }
 
-function printHumanReport(report: TranslationCoverageReport): void {
-  console.log(
+export function formatHumanReport(
+  report: TranslationCoverageReport,
+  regressions: readonly CoverageRegression[] = [],
+  alertOnRegression = false
+): string {
+  const lines = [
     `[report:i18n-coverage] ${report.total_keys} key(s) across ${report.locales.length} locale(s) seen ` +
-      `(default=${report.default_locale || 'n/a'}, required=${report.required_locales.join(', ') || 'none'})`
-  );
-  console.log(
-    '[report:i18n-coverage] this is a coverage instrument, not a gate — pnpm check:catalogs is the gate.'
-  );
+      `(default=${report.default_locale || 'n/a'}, required=${report.required_locales.join(', ') || 'none'})`,
+    '[report:i18n-coverage] this is a coverage instrument, not a gate — pnpm run check -- --scope full --only catalogs is the gate.',
+  ];
   for (const locale of report.locales) {
     const tag = locale.is_required ? 'required' : 'not required yet (candidate)';
-    console.log(
+    lines.push(
       `\n${locale.locale} (${tag}): ${locale.translated_count}/${locale.key_count} keys (${locale.coverage_pct}%)`
     );
     for (const ns of locale.namespaces) {
       if (ns.key_count === 0) continue;
-      console.log(
-        `  ${ns.namespace}: ${ns.translated_count}/${ns.key_count} (${ns.coverage_pct}%)`
-      );
-      for (const key of ns.missing_keys) {
-        console.log(`    missing: ${key}`);
-      }
+      lines.push(`  ${ns.namespace}: ${ns.translated_count}/${ns.key_count} (${ns.coverage_pct}%)`);
+      lines.push(...ns.missing_keys.map((key) => `    missing: ${key}`));
     }
   }
+
+  if (alertOnRegression) {
+    if (regressions.length === 0) {
+      lines.push('\n[report:i18n-coverage] no coverage regression since the last recorded run.');
+    } else {
+      lines.push(
+        `\n[report:i18n-coverage] ${regressions.length} regression(s) detected and alerted:`
+      );
+      lines.push(
+        ...regressions.map(
+          (regression) =>
+            `  ${regression.locale}: ${regression.previous_pct}% -> ${regression.current_pct}%`
+        )
+      );
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function defaultHistoryPath(): string {
@@ -210,14 +220,7 @@ function defaultHistoryPath(): string {
 }
 
 function loadHistory(historyPath: string): CoverageHistorySnapshot | null {
-  if (!safeExistsSync(historyPath)) return null;
-  try {
-    return JSON.parse(
-      String(safeReadFile(historyPath, { encoding: 'utf8' }))
-    ) as CoverageHistorySnapshot;
-  } catch {
-    return null;
-  }
+  return readJsonIfPresent<CoverageHistorySnapshot>(historyPath);
 }
 
 function writeHistory(historyPath: string, snapshot: CoverageHistorySnapshot): void {
@@ -304,41 +307,52 @@ export function runAlertOnRegression(
   return regressions;
 }
 
-export function main(argv: string[] = []): void {
-  const asJson = argv.includes('--json');
+export interface TranslationCoverageRunResult {
+  report: TranslationCoverageReport;
+  regressions: CoverageRegression[];
+  alert_on_regression: boolean;
+}
+
+export interface TranslationCoverageRunOptions {
+  writeSideEffects?: boolean;
+  historyPath?: string;
+}
+
+export function main(
+  argv: string[] = [],
+  options: TranslationCoverageRunOptions = {}
+): TranslationCoverageRunResult {
   const alertOnRegression = argv.includes('--alert-on-regression');
   const report = computeTranslationCoverageReport();
 
   let regressions: CoverageRegression[] = [];
   if (alertOnRegression) {
-    regressions = runAlertOnRegression(report);
-  }
-
-  if (asJson) {
-    console.log(JSON.stringify(alertOnRegression ? { ...report, regressions } : report, null, 2));
-  } else {
-    printHumanReport(report);
-    if (alertOnRegression) {
-      if (regressions.length === 0) {
-        console.log('\n[report:i18n-coverage] no coverage regression since the last recorded run.');
-      } else {
-        console.warn(
-          `\n[report:i18n-coverage] ${regressions.length} regression(s) detected and alerted:`
-        );
-        for (const regression of regressions) {
-          console.warn(
-            `  ${regression.locale}: ${regression.previous_pct}% -> ${regression.current_pct}%`
-          );
-        }
-      }
+    if (options.writeSideEffects === false) {
+      regressions = detectCoverageRegressions(
+        report,
+        loadHistory(options.historyPath ?? defaultHistoryPath())
+      );
+    } else {
+      regressions = runAlertOnRegression(report, options.historyPath);
     }
   }
+  return { report, regressions, alert_on_regression: alertOnRegression };
 }
 
 export const runReportI18nTranslationCoverage = defineScript({
   name: 'report:i18n-coverage',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  run: (context) => {
+    const result = main(context.argv, { writeSideEffects: !context.check && !context.dryRun });
+    const output = result.alert_on_regression
+      ? { ...result.report, regressions: result.regressions }
+      : result.report;
+    context.print(
+      context.json
+        ? output
+        : formatHumanReport(result.report, result.regressions, result.alert_on_regression)
+    );
+    return result;
+  },
 });
 
 if (

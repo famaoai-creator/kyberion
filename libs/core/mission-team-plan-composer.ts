@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
+import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import * as pathResolver from './path-resolver.js';
 import {
   selectAgentForTeamRole,
@@ -111,7 +112,14 @@ export interface ResolveMissionTeamOptions {
 function loadMissionTenantSlug(missionId: string): string | undefined {
   const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
   if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
+  let statePath: string;
+  try {
+    statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
+      allowMissingLeaf: false,
+    });
+  } catch {
+    return undefined;
+  }
   if (!safeExistsSync(statePath)) return undefined;
   try {
     const state = loadJson<{ tenant_slug?: unknown }>(statePath);
@@ -526,15 +534,26 @@ export function enrichMissionTeamPlanWithOrganizationProfile(
 }
 
 export function writeMissionTeamPlan(missionDir: string, plan: MissionTeamPlan): string {
-  const targetPath = path.join(missionDir, 'team-composition.json');
-  safeWriteFile(targetPath, JSON.stringify(plan, null, 2));
+  const targetPath = assertSafeRepositoryPath(path.join(missionDir, 'team-composition.json'), {
+    allowMissingLeaf: true,
+  });
+  const safeMissionPath = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: targetPath,
+    targetPath: path.relative(safeMissionPath, targetPath).split(path.sep).join('/'),
+    missionPathHint: safeMissionPath,
+    provisioned: provisionMissionEntry(plan),
+  });
   return targetPath;
 }
 
 export function getMissionTeamPlanPath(missionId: string): string | null {
   const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
   if (!missionPath) return null;
-  return path.join(missionPath, 'team-composition.json');
+  return assertSafeRepositoryPath(path.join(missionPath, 'team-composition.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {

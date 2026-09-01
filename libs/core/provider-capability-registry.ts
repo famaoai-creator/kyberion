@@ -23,12 +23,13 @@
 
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { loadProviderCapabilityCatalog } from './provider-discovery.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
@@ -47,6 +48,18 @@ export interface ProviderCapability {
   models: string[];
   probed_at: string;
   probe_error?: string;
+  /** Help-output flag evidence only; this is not an OS-level enforcement proof. */
+  sandbox_probe?: SandboxFlagProbeResult;
+}
+
+export interface SandboxFlagProbeResult {
+  status: 'supported' | 'unsupported' | 'unknown';
+  method: 'help-flag';
+  command: string;
+  args: string[];
+  expected_flags: string[];
+  evidence?: string;
+  error?: string;
 }
 
 /** Result shape the exec seam must return — deliberately CLI-tool agnostic. */
@@ -77,6 +90,12 @@ interface ProviderProbeSpec {
   /** Declared (not probed — no cheap runtime signal exists) adapter capabilities. */
   headless: boolean;
   structuredOutput: boolean;
+  /** Safe, non-model probe for provider-advertised sandbox/approval flags. */
+  sandboxProbe?: {
+    command: string;
+    args: string[];
+    expectedFlags: string[];
+  };
 }
 
 /**
@@ -99,30 +118,55 @@ export const PROVIDER_PROBE_TABLE: Readonly<Record<string, ProviderProbeSpec>> =
     authArgs: ['auth', 'status'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'claude',
+      args: ['--help'],
+      expectedFlags: ['--permission-mode'],
+    },
   },
   codex: {
     binaryCommand: 'codex',
     binaryArgs: ['--help'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'codex',
+      args: ['--help'],
+      expectedFlags: ['--sandbox'],
+    },
   },
   agy: {
     binaryCommand: 'agy',
     binaryArgs: ['--help'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'agy',
+      args: ['--help'],
+      expectedFlags: ['--sandbox'],
+    },
   },
   grok: {
     binaryCommand: 'grok',
     binaryArgs: ['--version'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'grok',
+      args: ['--help'],
+      expectedFlags: ['--allow', '--deny'],
+    },
   },
   gemini: {
     binaryCommand: 'gemini',
     binaryArgs: ['--version'],
     headless: true,
     structuredOutput: true,
+    sandboxProbe: {
+      command: 'gemini',
+      args: ['--help'],
+      expectedFlags: ['--sandbox', '--approval-mode'],
+    },
   },
   copilot: {
     binaryCommand: 'gh',
@@ -175,6 +219,53 @@ function runProbe(
   } catch (err) {
     return { ok: false, stdout: '', stderr: err instanceof Error ? err.message : String(err) };
   }
+}
+
+function probeSandboxFlags(
+  providerId: string,
+  spec: ProviderProbeSpec,
+  exec: ProbeExecFn,
+  timeoutMs: number,
+  resolvedBinaryCommand: string
+): SandboxFlagProbeResult | undefined {
+  const sandboxProbe = spec.sandboxProbe;
+  if (!sandboxProbe) return undefined;
+
+  const command =
+    sandboxProbe.command === spec.binaryCommand ? resolvedBinaryCommand : sandboxProbe.command;
+  const result = runProbe(exec, command, sandboxProbe.args, timeoutMs);
+  const output = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  const missingFlags = sandboxProbe.expectedFlags.filter(
+    (flag) => !output.includes(flag.toLowerCase())
+  );
+  if (!result.ok) {
+    return {
+      status: 'unknown',
+      method: 'help-flag',
+      command,
+      args: sandboxProbe.args,
+      expected_flags: sandboxProbe.expectedFlags,
+      ...(result.stderr.trim() ? { error: result.stderr.trim() } : {}),
+    };
+  }
+  if (missingFlags.length > 0) {
+    return {
+      status: 'unsupported',
+      method: 'help-flag',
+      command,
+      args: sandboxProbe.args,
+      expected_flags: sandboxProbe.expectedFlags,
+      evidence: `missing advertised flags: ${missingFlags.join(', ')}`,
+    };
+  }
+  return {
+    status: 'supported',
+    method: 'help-flag',
+    command,
+    args: sandboxProbe.args,
+    expected_flags: sandboxProbe.expectedFlags,
+    evidence: `${providerId} help output advertises ${sandboxProbe.expectedFlags.join(', ')}`,
+  };
 }
 
 function probeSingleProvider(
@@ -230,6 +321,10 @@ function probeSingleProvider(
     }
   }
 
+  const sandboxProbe = binaryFound
+    ? probeSandboxFlags(providerId, spec, exec, timeoutMs, binaryCommand)
+    : undefined;
+
   return {
     provider_id: providerId,
     binary_found: binaryFound,
@@ -239,6 +334,7 @@ function probeSingleProvider(
     models: binaryFound ? modelsFor(providerId) : [],
     probed_at: probedAt,
     ...(probeError ? { probe_error: probeError } : {}),
+    ...(sandboxProbe ? { sandbox_probe: sandboxProbe } : {}),
   };
 }
 
@@ -298,8 +394,16 @@ interface RegistryEnvelope {
 }
 
 function registryCachePath(): string {
-  return pathResolver.shared(REGISTRY_CACHE_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(REGISTRY_CACHE_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
 }
+
+const providerCapabilityRegistryCatalog = defineCatalog<RegistryEnvelope>({
+  id: 'provider-capability-registry',
+  path: registryCachePath,
+  schema: pathResolver.knowledge('product/schemas/provider-capability-registry.schema.json'),
+});
 
 /**
  * Read the persisted registry snapshot without ever (re-)probing. Returns
@@ -311,12 +415,8 @@ export function peekProviderCapabilityRegistry(
   opts: { now?: () => Date } = {}
 ): ProviderCapability[] | null {
   const now = opts.now ?? (() => new Date());
-  const filePath = registryCachePath();
   try {
-    if (!safeExistsSync(filePath)) return null;
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as RegistryEnvelope;
-    if (!parsed || !Array.isArray(parsed.value)) return null;
+    const parsed = providerCapabilityRegistryCatalog.load();
     const computedAt = new Date(parsed.computed_at).getTime();
     if (!Number.isFinite(computedAt)) return null;
     const ageMs = now().getTime() - computedAt;

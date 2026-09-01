@@ -2,23 +2,62 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  compileSchemaFromPath,
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeSymlinkSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { handleAction } from './index.js';
+import { extractDesignSpec, extractRequirements } from './sdlc-ops.js';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 const ROOT = pathResolver.rootDir();
 
 describe('modeling-actuator terraform_to_architecture_adf', () => {
+  it('rejects an external requirements source path before backend execution', async () => {
+    await expect(
+      extractRequirements({
+        mission_id: 'MSN-MODELING-PATH',
+        project_name: 'path-boundary',
+        source_path: '/tmp/external-requirements.md',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an external requirements draft path before backend execution', async () => {
+    await expect(
+      extractDesignSpec({
+        mission_id: 'MSN-MODELING-PATH',
+        project_name: 'path-boundary',
+        requirements_draft_path: '/tmp/external-requirements.json',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an unsupported action instead of running an empty pipeline', async () => {
+    await expect(
+      handleAction({ action: 'invalid', steps: [] } as unknown as Parameters<
+        typeof handleAction
+      >[0])
+    ).rejects.toThrow('Unsupported action: invalid');
+  });
+
+  it('rejects a context path outside the repository root', async () => {
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        context: { context_path: '../../outside-context.json' },
+        steps: [],
+      } as unknown as Parameters<typeof handleAction>[0])
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('loads and persists pipeline context via context_path', async () => {
     const fixtureRoot = path.join(
       ROOT,

@@ -4,7 +4,12 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { compileSchemaFromPath } from './schema-loader.js';
 import { safeExistsSync, safeReaddir, safeRmSync } from './secure-io.js';
-import { listMissionSeedRecords, loadMissionSeedRecord, saveMissionSeedRecord } from './mission-seed-registry.js';
+import {
+  listMissionSeedRecords,
+  loadMissionSeedRecord,
+  missionSeedRecordPath,
+  saveMissionSeedRecord,
+} from './mission-seed-registry.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -53,13 +58,18 @@ describe('mission-seed-registry', () => {
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.project_id).toBe('PRJ-TEST-WEB');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.track_id).toBe('TRK-TEST-REL1');
     expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.promoted_mission_id).toBe('MSN-TEST-ARCH');
-    expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.work_loop?.resolution.execution_shape).toBe('project_bootstrap');
+    expect(loadMissionSeedRecord('MSD-TEST-ARCH')?.work_loop?.resolution.execution_shape).toBe(
+      'project_bootstrap'
+    );
     expect(listMissionSeedRecords().some((item) => item.seed_id === 'MSD-TEST-ARCH')).toBe(true);
   });
 
   it('emits mission seed records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
-    const schemaPath = path.join(pathResolver.rootDir(), 'knowledge/product/schemas/mission-seed-record.schema.json');
+    const schemaPath = path.join(
+      pathResolver.rootDir(),
+      'knowledge/product/schemas/mission-seed-record.schema.json'
+    );
     const validate = compileSchemaFromPath(ajv, schemaPath);
     const record = {
       seed_id: 'MSD-TEST-SCHEMA',
@@ -72,5 +82,11 @@ describe('mission-seed-registry', () => {
     };
     const valid = validate(record);
     expect(valid, JSON.stringify(validate.errors || [])).toBe(true);
+  });
+
+  it('rejects a seed id that could escape the registry namespace', () => {
+    expect(() => missionSeedRecordPath('../outside')).toThrow(
+      '[mission-seed-registry] invalid seed id'
+    );
   });
 });

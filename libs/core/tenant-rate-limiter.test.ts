@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeWriteFile } from './secure-io.js';
 import {
   consumeTenantBudget,
   inspectTenantBudget,
@@ -6,6 +8,7 @@ import {
   TenantRateLimitExceededError,
   _resetTenantRateLimitStateForTests,
   _resetTenantRateLimitPolicyCacheForTests,
+  normalizeTenantRateLimitLockRecord,
 } from './tenant-rate-limiter.js';
 
 describe('tenant-rate-limiter (IP-29)', () => {
@@ -26,6 +29,20 @@ describe('tenant-rate-limiter (IP-29)', () => {
     else process.env.KYBERION_PERSONA = savedPersona;
     _resetTenantRateLimitStateForTests();
     _resetTenantRateLimitPolicyCacheForTests();
+  });
+
+  it('normalizes lock records and rejects unsafe PID shapes', () => {
+    expect(
+      normalizeTenantRateLimitLockRecord({ pid: 42, created_at: '2026-09-01T00:00:00Z' })
+    ).toEqual({
+      pid: 42,
+      created_at: '2026-09-01T00:00:00Z',
+    });
+    expect(normalizeTenantRateLimitLockRecord({ pid: 0 })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: 1.5 })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: Number.NaN })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord({ pid: '42' })).toBeNull();
+    expect(normalizeTenantRateLimitLockRecord([])).toBeNull();
   });
 
   it('passes through when no tenant slug is bound (tenant-agnostic)', () => {
@@ -113,5 +130,18 @@ describe('tenant-rate-limiter (IP-29)', () => {
       expect(caught.code).toBe('TENANT_RATE_LIMIT_EXCEEDED');
       expect(caught.retryAfterMs).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it('discards schema-invalid persisted state before enforcing a budget', () => {
+    safeWriteFile(
+      pathResolver.rootResolve('active/shared/runtime/tenant-rate-limit-state.json'),
+      JSON.stringify({ tenants: { 'acme-corp': { tokens: 'not-a-number', updated_at: 'bad' } } })
+    );
+    process.env.KYBERION_TENANT = 'acme-corp';
+    process.env.KYBERION_PERSONA = 'worker';
+
+    expect(consumeTenantBudget({ op: 'wisdom:a2a_fanout', cost: 1 })).toMatchObject({
+      allowed: true,
+    });
   });
 });

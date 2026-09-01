@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createApprovalRequest: vi.fn(),
@@ -14,13 +14,28 @@ vi.mock('./kill-switch.js', () => ({
   recordGovernanceAction: mocks.recordGovernanceAction,
 }));
 
-import { LifecycleHookEngine, fireLifecycleHooksWithApproval } from './lifecycle-hook-engine.js';
+import {
+  LifecycleHookEngine,
+  fireDefaultLifecycleHooks,
+  fireLifecycleHooksWithApproval,
+  getDefaultLifecycleHookEngine,
+  registerDefaultLifecycleHookApprovalSurface,
+  resetDefaultLifecycleHookApprovalSurface,
+  resetDefaultLifecycleHookEngine,
+} from './lifecycle-hook-engine.js';
 
 describe('lifecycle hook approval surface adapter', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetDefaultLifecycleHookApprovalSurface();
+    resetDefaultLifecycleHookEngine();
     mocks.listApprovalRequests.mockReturnValue([]);
     mocks.createApprovalRequest.mockReturnValue({ id: 'approval-1' });
+  });
+
+  afterEach(() => {
+    resetDefaultLifecycleHookApprovalSurface();
+    resetDefaultLifecycleHookEngine();
   });
 
   it('materializes an interactive ask into the shared approval store', async () => {
@@ -92,5 +107,57 @@ describe('lifecycle hook approval surface adapter', () => {
 
     expect(outcome.approvalRequestId).toBe('existing-approval');
     expect(mocks.createApprovalRequest).not.toHaveBeenCalled();
+  });
+
+  it('routes the default engine ask through the installed global surface', async () => {
+    const engine = getDefaultLifecycleHookEngine();
+    engine.register({
+      id: 'default-operator-check',
+      event: 'pre_tool_use',
+      handler: () => ({ decision: 'ask', block: false, reason: 'default review' }),
+    });
+    const dispose = registerDefaultLifecycleHookApprovalSurface(() => ({
+      channel: 'presence',
+      threadTs: 'thread-default',
+      correlationId: 'corr-default',
+      requestedBy: 'worker-default',
+    }));
+
+    const outcome = await fireDefaultLifecycleHooks('pre_tool_use', {
+      matcher_value: 'service:publish',
+    });
+
+    expect(outcome).toMatchObject({
+      decision: 'ask',
+      blocked: true,
+      approvalRequestId: 'approval-1',
+    });
+    expect(mocks.createApprovalRequest).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
+  it('keeps an ask blocked when no global surface is installed', async () => {
+    const engine = getDefaultLifecycleHookEngine();
+    engine.register({
+      id: 'unhandled-ask',
+      event: 'pre_tool_use',
+      handler: () => ({ decision: 'ask', block: false, reason: 'surface required' }),
+    });
+
+    const outcome = await fireDefaultLifecycleHooks('pre_tool_use');
+
+    expect(outcome).toMatchObject({ decision: 'ask', blocked: true });
+    expect(outcome.approvalRequestId).toBeUndefined();
+    expect(mocks.createApprovalRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects replacing an active global surface', () => {
+    const first = () => undefined;
+    const second = () => undefined;
+    const dispose = registerDefaultLifecycleHookApprovalSurface(first);
+    expect(() => registerDefaultLifecycleHookApprovalSurface(second)).toThrow(
+      '[HOOK_APPROVAL_SURFACE_ALREADY_REGISTERED]'
+    );
+    dispose();
   });
 });

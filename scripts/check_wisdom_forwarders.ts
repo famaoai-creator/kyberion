@@ -1,67 +1,64 @@
 import * as path from 'node:path';
 import { describeOps } from '../libs/actuators/wisdom-actuator/src/op-catalog.js';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type PipelineKind = 'capture' | 'transform' | 'apply' | 'control';
 type Registry = { domains: Record<string, Record<PipelineKind, string[]>> };
 
-const registry = readJson<Registry>(
-  pathResolver.knowledge('product/governance/actuator-op-registry.json')
-);
-const forwarders = describeOps()
-  .filter((entry) => entry.forward_to)
-  .map((entry) => ({
-    source: entry.op,
-    target: `${entry.forward_to!.actuator}:${entry.forward_to!.op}`,
-    actuator: entry.forward_to!.actuator,
-    op: entry.forward_to!.op,
-  }));
-const targets = new Map(forwarders.map((entry) => [`${entry.actuator}:${entry.op}`, entry]));
-const errors: string[] = [];
+export function checkWisdomForwarders(): string[] {
+  const registry = readJson<Registry>(
+    pathResolver.knowledge('product/governance/actuator-op-registry.json')
+  );
+  const forwarders = describeOps()
+    .filter((entry) => entry.forward_to)
+    .map((entry) => ({
+      source: entry.op,
+      target: `${entry.forward_to!.actuator}:${entry.forward_to!.op}`,
+      actuator: entry.forward_to!.actuator,
+      op: entry.forward_to!.op,
+    }));
+  const targets = new Map(forwarders.map((entry) => [`${entry.actuator}:${entry.op}`, entry]));
+  const errors: string[] = [];
 
-for (const target of forwarders) {
-  const domain = registry.domains[target.actuator];
-  const kind = domain
-    ? (Object.entries(domain).find(([, ops]) => ops.includes(target.op))?.[0] as
-        PipelineKind | undefined)
-    : undefined;
-  if (!kind) errors.push(`missing canonical target ${target.target} for wisdom:${target.source}`);
-}
-
-for (const root of ['pipelines', 'knowledge/product/pipeline-templates']) {
-  for (const file of getAllFiles(pathResolver.rootResolve(root)).filter((entry) =>
-    entry.endsWith('.json')
-  )) {
-    let document: unknown;
-    try {
-      document = readJson<unknown>(file);
-    } catch {
-      continue;
-    }
-    walkSteps(document, (step, location) => {
-      const target = targets.get(String(step.op || ''));
-      if (!target || (!step.role && !step.type)) return;
-      const expected = findTargetKind(target);
-      const actual = step.type || roleToKind(step.role);
-      if (expected && actual && expected !== actual) {
-        errors.push(
-          `${path.relative(pathResolver.rootDir(), file)}${location}: ${step.op} declares ${actual}, canonical target is ${expected}`
-        );
-      }
-    });
+  for (const target of forwarders) {
+    const kind = findTargetKind(registry, target);
+    if (!kind) errors.push(`missing canonical target ${target.target} for wisdom:${target.source}`);
   }
+
+  for (const root of ['pipelines', 'knowledge/product/pipeline-templates']) {
+    for (const file of getAllFiles(pathResolver.rootResolve(root)).filter((entry) =>
+      entry.endsWith('.json')
+    )) {
+      let document: unknown;
+      try {
+        document = readJson<unknown>(file);
+      } catch {
+        continue;
+      }
+      walkSteps(document, (step, location) => {
+        const target = targets.get(String(step.op || ''));
+        if (!target || (!step.role && !step.type)) return;
+        const expected = findTargetKind(registry, target);
+        const actual = step.type || roleToKind(step.role);
+        if (expected && actual && expected !== actual) {
+          errors.push(
+            `${path.relative(pathResolver.rootDir(), file)}${location}: ${step.op} declares ${actual}, canonical target is ${expected}`
+          );
+        }
+      });
+    }
+  }
+
+  return errors;
 }
 
-if (errors.length > 0) {
-  for (const error of errors) console.error(`[check:wisdom-forwarders] ${error}`);
-  process.exitCode = 1;
-} else {
-  console.log('[check:wisdom-forwarders] OK (targets exist and pipeline kinds agree)');
-}
-
-function findTargetKind(target: { actuator: string; op: string }): PipelineKind | undefined {
+function findTargetKind(
+  registry: Registry,
+  target: { actuator: string; op: string }
+): PipelineKind | undefined {
   const domain = registry.domains[target.actuator];
   return domain
     ? (Object.entries(domain).find(([, ops]) => ops.includes(target.op))?.[0] as
@@ -76,6 +73,26 @@ function roleToKind(role: unknown): PipelineKind | undefined {
   if (role === 'gate') return 'control';
   return undefined;
 }
+
+export const runCheckWisdomForwarders = defineScript({
+  name: 'check:wisdom-forwarders',
+  flags: [],
+  run(context) {
+    const errors = checkWisdomForwarders();
+    if (errors.length > 0) {
+      for (const error of errors) context.print(`[check:wisdom-forwarders] ${error}`);
+      throw new ScriptExitError(1);
+    }
+    context.print('[check:wisdom-forwarders] OK (targets exist and pipeline kinds agree)');
+    return { errors };
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'check_wisdom_forwarders.ts') ||
+  isDirectScript(import.meta.url, 'check_wisdom_forwarders.js')
+)
+  void runCheckWisdomForwarders();
 
 function walkSteps(
   value: unknown,

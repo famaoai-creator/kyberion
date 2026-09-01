@@ -1,4 +1,8 @@
-import { buildGovernedRetryOptions, pathResolver, retry, safeExec } from '@agent/core';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import * as pathResolver from '@agent/core/path-resolver';
+import { retry } from '@agent/core/async-utils';
+import { safeExec } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   createCalendarEvent,
   listCalendarAgenda,
@@ -123,13 +127,11 @@ function resolveDateRange(
   return { start, end };
 }
 
-function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: CALENDAR_MANIFEST_PATH,
-    defaults: DEFAULT_CALENDAR_RETRY,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: CALENDAR_MANIFEST_PATH,
+  defaults: DEFAULT_CALENDAR_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): Promise<T> {
   const paramsLiteral = JSON.stringify(JSON.stringify(params));
@@ -146,7 +148,7 @@ async function runJxa<T>(scriptBody: string, params: Record<string, unknown>): P
   const trimmed = String(output).trim();
   if (!trimmed) return undefined as unknown as T;
   try {
-    return JSON.parse(trimmed) as T;
+    return parseSafeJsonInput(trimmed, 'calendar osascript response') as T;
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`calendar-actuator: failed to parse osascript output: ${message}`);

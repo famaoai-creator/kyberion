@@ -6,6 +6,7 @@ The intent of this packet is to keep:
 - eventual LLM rerank pluggable
 - selected work shape replayable
 - reusable capability bundle candidates visible when an intent maps to a governed package
+- the contextual scheduling frame captured during the same resolution pass
 
 `bundle_candidates` is optional and only appears when Kyberion can map one
 or more intent candidates to a governed `capability bundle` or
@@ -14,3 +15,5 @@ It is a discovery aid, not a second execution contract.
 
 This packet is not the final execution contract.
 It is the governed resolution artifact that sits before task-session, browser-session, mission, or direct-reply execution.
+Consumers should reuse `contextual_frame` when present instead of re-running a
+second free-text contextual resolver for the same turn.

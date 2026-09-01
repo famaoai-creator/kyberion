@@ -40,7 +40,7 @@ def _check_health() -> dict:
         return {
             "status": "unavailable",
             "error": "mlx_whisper not installed",
-            "install_hint": "pnpm voice:setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
 
@@ -65,8 +65,8 @@ def _transcribe(params: dict) -> dict:
     except ImportError:
         return {
             "status": "error",
-            "error": "mlx_whisper not installed — run: pnpm voice:setup --apply",
-            "install_hint": "pnpm voice:setup --apply",
+            "error": "mlx_whisper not installed — run: pnpm kyberion voice setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
     try:

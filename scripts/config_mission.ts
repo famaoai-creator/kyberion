@@ -14,24 +14,30 @@
  */
 
 import * as nodePath from 'node:path';
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeExec,
-  safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-  auditChain,
+} from '@agent/core/secure-io';
+import { auditChain } from '@agent/core/audit-chain';
+import {
   assertConfigChangeApplyable,
   computeConfigChangeFingerprint,
   configChangeRequiresApproval,
   normalizeConfigChangeEnvelope,
+} from '@agent/core/config-change';
+import {
   createApprovalRequest,
   loadApprovalRequest,
   recordApprovalApplyResult,
-} from '@agent/core';
+} from '@agent/core/approval-store';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import * as pathResolver from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -56,7 +62,7 @@ interface ConfigMissionPreset {
   pipeline: string;
   write_targets: string[];
   authority_role: string;
-  target_kind?: import('@agent/core').ConfigChangeTargetKind;
+  target_kind?: import('@agent/core/config-change').ConfigChangeTargetKind;
   scope_kind?: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task';
   tier?: 'public' | 'confidential' | 'personal';
   notes?: string;
@@ -71,7 +77,7 @@ interface ConfigMissionBrief {
   created_at: string;
   applied_at?: string;
   error?: string;
-  change: import('@agent/core').ConfigChangeEnvelope;
+  change: import('@agent/core/config-change').ConfigChangeEnvelope;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,12 +86,48 @@ interface ConfigMissionBrief {
 
 const PRESET_DIR = 'knowledge/product/config-missions';
 
-function instanceDir(tenant: string, instanceId: string): string {
-  return `knowledge/confidential/${tenant}/config-missions/${instanceId}`;
+function requirePathSegment(value: string, label: string): string {
+  const segment = String(value || '').trim();
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$/u.test(segment) || segment.startsWith('.')) {
+    throw new Error(`[config-mission] invalid ${label}: ${value}`);
+  }
+  return segment;
+}
+
+function configMissionRoot(tenant: string): string {
+  if (!isValidTenantSlug(tenant)) {
+    throw new Error(`[config-mission] invalid tenant slug: ${tenant}`);
+  }
+  return assertSafeRepositoryPath(
+    nodePath.join('knowledge', 'confidential', tenant, 'config-missions'),
+    { allowMissingLeaf: true }
+  );
+}
+
+export function resolveConfigMissionBriefPath(tenant: string, instanceId: string): string {
+  return assertSafeRepositoryPath(
+    nodePath.join(
+      configMissionRoot(tenant),
+      requirePathSegment(instanceId, 'instance id'),
+      'brief.json'
+    ),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 function briefPath(tenant: string, instanceId: string): string {
-  return nodePath.join(instanceDir(tenant, instanceId), 'brief.json');
+  return resolveConfigMissionBriefPath(tenant, instanceId);
+}
+
+function instanceDir(tenant: string, instanceId: string): string {
+  return assertSafeRepositoryPath(
+    nodePath.join(configMissionRoot(tenant), requirePathSegment(instanceId, 'instance id')),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -93,16 +135,34 @@ function briefPath(tenant: string, instanceId: string): string {
 // ---------------------------------------------------------------------------
 
 function loadPreset(presetId: string): ConfigMissionPreset {
-  const p = nodePath.join(PRESET_DIR, `${presetId}.json`);
-  const raw = safeReadFile(p, { encoding: 'utf8' });
-  if (!raw) throw new Error(`Preset not found: ${presetId}`);
-  return JSON.parse(raw as string) as ConfigMissionPreset;
+  const p = assertSafeRepositoryPath(
+    nodePath.join(PRESET_DIR, `${requirePathSegment(presetId, 'preset id')}.json`)
+  );
+  if (!safeLstat(p).isFile()) {
+    throw new Error(`[config-mission] preset must be a regular file: ${p}`);
+  }
+  return readJson<ConfigMissionPreset>(p);
+}
+
+function requireBriefFile(filePath: string): string {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[config-mission] brief must be a regular file: ${filePath}`);
+  }
+  return filePath;
 }
 
 function listPresets(): ConfigMissionPreset[] {
-  const entries = safeReaddir(PRESET_DIR) as string[];
+  const presetDir = assertSafeRepositoryPath(PRESET_DIR);
+  const entries = safeReaddir(presetDir) as string[];
   return entries
-    .filter((f) => f.endsWith('.json'))
+    .filter((f) => {
+      if (!f.endsWith('.json')) return false;
+      try {
+        return safeLstat(assertSafeRepositoryPath(nodePath.join(presetDir, f))).isFile();
+      } catch {
+        return false;
+      }
+    })
     .map((f) => {
       try {
         return loadPreset(f.replace('.json', ''));
@@ -149,7 +209,7 @@ function getMultiOption(argv: string[], flag: string): string[] {
 function targetKindFor(
   preset: ConfigMissionPreset,
   value: string | undefined
-): import('@agent/core').ConfigChangeTargetKind {
+): import('@agent/core/config-change').ConfigChangeTargetKind {
   const targetKind = value || preset.target_kind || 'tenant';
   const allowed = new Set([
     'system',
@@ -163,12 +223,12 @@ function targetKindFor(
     'personal',
   ]);
   if (!allowed.has(targetKind)) throw new Error(`Invalid --target-kind: ${targetKind}`);
-  return targetKind as import('@agent/core').ConfigChangeTargetKind;
+  return targetKind as import('@agent/core/config-change').ConfigChangeTargetKind;
 }
 
 function scopeKindFor(
   preset: ConfigMissionPreset,
-  targetKind: import('@agent/core').ConfigChangeTargetKind
+  targetKind: import('@agent/core/config-change').ConfigChangeTargetKind
 ): 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task' {
   if (preset.scope_kind) return preset.scope_kind;
   if (targetKind === 'system') return 'system';
@@ -190,7 +250,9 @@ function tierFor(
   return preset.tier || (scopeKind === 'system' ? 'public' : 'confidential');
 }
 
-function riskFor(preset: ConfigMissionPreset): import('@agent/core').ConfigChangeRisk {
+function riskFor(
+  preset: ConfigMissionPreset
+): import('@agent/core/config-change').ConfigChangeRisk {
   if (
     preset.category === 'security' ||
     preset.category === 'surface' ||
@@ -351,7 +413,7 @@ function cmdRequestApproval(argv: string[]): void {
   if (!id) throw new Error('--id is required');
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
-  const brief = readJson<ConfigMissionBrief>(bPath);
+  const brief = readJson<ConfigMissionBrief>(requireBriefFile(bPath));
   const existing = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
@@ -396,7 +458,7 @@ function cmdStatus(argv: string[]): void {
   const id = getOpt('--id');
   if (!tenant) throw new Error('--tenant is required');
 
-  const missionsDir = `knowledge/confidential/${tenant}/config-missions`;
+  const missionsDir = configMissionRoot(tenant);
   if (!safeExistsSync(missionsDir)) {
     logger.info(`No config missions found for tenant: ${tenant}`);
     return;
@@ -420,8 +482,7 @@ function cmdStatus(argv: string[]): void {
 
   for (const entry of targets) {
     try {
-      const raw = safeReadFile(briefPath(tenant, entry), { encoding: 'utf8' }) as string;
-      const brief = JSON.parse(raw) as ConfigMissionBrief;
+      const brief = readJson<ConfigMissionBrief>(requireBriefFile(briefPath(tenant, entry)));
       const instanceCol = brief.instance_id.padEnd(26);
       const presetCol = brief.preset_id.padEnd(32);
       const statusCol = brief.status.padEnd(10);
@@ -442,8 +503,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
 
-  const raw = safeReadFile(bPath, { encoding: 'utf8' }) as string;
-  const brief = JSON.parse(raw) as ConfigMissionBrief;
+  const brief = readJson<ConfigMissionBrief>(requireBriefFile(bPath));
 
   const approval = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)

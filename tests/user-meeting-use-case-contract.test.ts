@@ -20,8 +20,8 @@ describe('User meeting use-case contract', () => {
     expect(guide).toContain('voice-consent.json');
     expect(guide).toContain('meeting:consent grant');
     expect(guide).toContain('meeting:participate');
-    expect(guide).toContain('pnpm cli preview pipelines/meeting-proxy-workflow.json');
-    expect(guide).toContain('pnpm run test:meeting-dry-run');
+    expect(guide).toContain('pnpm kyberion preview pipelines/meeting-proxy-workflow.json');
+    expect(guide).toContain('pnpm test -- --suite meeting-dry-run');
     expect(guide).toContain('pnpm doctor -- --runtime meeting --mission MSN-...');
     expect(guide).toContain('before recording/capture starts and again before TTS speech');
     expect(guide).toContain('Meeting URLs are logged as redacted host-only values');
@@ -33,6 +33,6 @@ describe('User meeting use-case contract', () => {
     expect(architecture).toContain('Participation consent (`meeting:participate`)');
     expect(architecture).toContain('meeting_participation.recording_denied');
     expect(architecture).toContain('meeting_participation.speak_denied');
-    expect(architecture).toContain('pnpm run test:meeting-dry-run');
+    expect(architecture).toContain('pnpm test -- --suite meeting-dry-run');
   });
 });

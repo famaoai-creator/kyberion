@@ -17,6 +17,7 @@ vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
     safeExistsSync: (p: string) => actual.existsSync(p),
+    assertSafeRepositoryPath: (p: string) => p,
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
     safeUnlinkSync: (p: string) => actual.unlinkSync(p),
@@ -26,6 +27,10 @@ vi.mock('./secure-io.js', async () => {
     },
   };
 });
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+}));
 
 import { writeIntentGoalHandoff, consumeIntentGoalHandoff } from './intent-handoff.js';
 
@@ -59,5 +64,11 @@ describe('intent-handoff', () => {
     const bad = path.join(tmpBase, 'bad.json');
     fs.writeFileSync(bad, '{not json');
     expect(consumeIntentGoalHandoff(bad)).toBeNull();
+  });
+
+  it('rejects mission identifiers that could escape the handoff directory', () => {
+    expect(() =>
+      writeIntentGoalHandoff('../escape', { source_text: 'should not be written' })
+    ).toThrow(/missionId must be a single safe path segment/u);
   });
 });

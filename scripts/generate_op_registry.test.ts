@@ -16,6 +16,39 @@ type DiscoveryDocument = {
   actuators: DiscoveryActuator[];
 };
 
+const SELF_DESCRIBED_CATALOGS = [
+  'agent',
+  'android',
+  'approval',
+  'artifact',
+  'blockchain',
+  'browser',
+  'build',
+  'calendar',
+  'code',
+  'deployment',
+  'email',
+  'file',
+  'ingest',
+  'ios',
+  'media',
+  'media-generation',
+  'meeting',
+  'modeling',
+  'network',
+  'orchestrator',
+  'presence',
+  'process',
+  'secret',
+  'service',
+  'terminal',
+  'video-composition',
+  'vision',
+  'voice',
+  'wisdom',
+  'working-memory',
+] as const;
+
 describe('generate_op_registry discovery output', () => {
   it('includes input schemas and examples for contract-backed ops', () => {
     const discovery = JSON.parse(
@@ -72,7 +105,7 @@ describe('generate_op_registry discovery output', () => {
       )
     ) as DiscoveryDocument;
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
-    expect(operations).toHaveLength(552);
+    expect(operations).toHaveLength(567);
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(
@@ -91,5 +124,32 @@ describe('generate_op_registry discovery output', () => {
         missionId: expect.any(Object),
       }),
     });
+  });
+
+  it('keeps self-described catalogs on the shared pipeline step type', () => {
+    for (const actuator of SELF_DESCRIBED_CATALOGS) {
+      const source = String(
+        safeReadFile(
+          pathResolver.rootResolve(`libs/actuators/${actuator}-actuator/src/op-catalog.ts`),
+          { encoding: 'utf8' }
+        ) || ''
+      );
+      expect(source, actuator).toContain('PipelineStepType');
+      expect(source, actuator).not.toContain('OpSpecKind');
+      expect(source, actuator).toMatch(
+        /export function describeOps\(\): ActuatorOpDescription\[\]/
+      );
+    }
+
+    const generator = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_op_registry.ts'), {
+        encoding: 'utf8',
+      }) || ''
+    );
+    expect(generator).not.toContain('PipelineOpKind');
+    expect(generator).toContain('ActuatorOpDescription');
+    expect(generator).toContain('loadActuatorOpRegistry()');
+    expect(generator).toContain('defineCatalog<MediaManifestFile>');
+    expect(generator).not.toContain('readJson<');
   });
 });

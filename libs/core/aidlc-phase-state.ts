@@ -15,7 +15,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 
 export type AiDlcPhase = 'alignment' | 'execution' | 'test' | 'self_review' | 'complete';
@@ -195,12 +195,15 @@ export function tripAiDlcCircuitBreaker(
 // ─── Persistence (mission evidence) ──────────────────────────────────────────
 
 export function aiDlcPhaseStatePath(missionId: string, baseDir?: string): string {
+  pathResolver.assertMissionIdArgument(missionId);
   // baseDir substitutes the missions root (tests); the per-mission evidence
   // namespace is preserved either way.
   const root = baseDir
     ? path.join(baseDir, missionId, 'evidence')
     : pathResolver.active(`missions/${missionId}/evidence`);
-  return path.join(root, 'aidlc-phase-state.json');
+  return assertSafeRepositoryPath(path.join(root, 'aidlc-phase-state.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function saveAiDlcPhaseState(state: AiDlcPhaseState, baseDir?: string): string {

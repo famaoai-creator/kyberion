@@ -1,8 +1,8 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
 import { probeAppleImageGeneration } from './apple-intelligence-bridge.js';
@@ -15,7 +15,7 @@ import {
 
 export type MediaBackendModality = 'image' | 'voice' | 'video' | 'music';
 export type MediaBackendStatus = 'active' | 'shadow' | 'disabled';
-export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local';
+export type MediaBackendKind = 'service_preset' | 'api' | 'cli' | 'local' | 'agent_tool';
 export type MediaBackendPlatform = 'any' | 'darwin' | 'linux' | 'win32';
 export type MediaBackendProbeKind =
   'service_runtime' | 'tool_runtime' | 'native_bridge' | 'registry';
@@ -84,6 +84,10 @@ let mediaBackendProbeSequence = 0;
 
 export function resetMediaBackendAvailabilityCache(): void {
   mediaBackendProbeCache.clear();
+}
+
+export function _resetMediaBackendAvailabilityCacheForTests(): void {
+  resetMediaBackendAvailabilityCache();
 }
 
 function defaultMediaBackendProbeTtlMs(): number {
@@ -203,15 +207,24 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: MediaBackendRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_MEDIA_BACKEND_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-function loadRegistryFromPath(registryPath: string): MediaBackendRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<MediaBackendRegistry>(raw, 'media backend registry');
-}
+const mediaBackendRegistryCatalog = defineCatalog<MediaBackendRegistry>({
+  id: 'media-backend-registry',
+  path: getRegistryPath,
+  schema: pathResolver.knowledge('product/schemas/media-backend-registry.schema.json'),
+  fallback: FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback(error) {
+    if (!/missing:/u.test(String(error))) {
+      logger.warn(`[MEDIA_BACKEND_REGISTRY] Invalid registry; using fallback: ${error}`);
+    }
+  },
+});
 
 function inferVoiceBackendRecords(): MediaBackendRecord[] {
   return getVoiceEngineRegistry().engines.map((engine) => mapVoiceEngineToBackend(engine));
@@ -261,20 +274,11 @@ function resolveVoiceBackendRecord(
 }
 
 function getRegistry(): MediaBackendRegistry {
-  const registryPath = getRegistryPath();
-  if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
-
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = {
-      ...FALLBACK_REGISTRY,
-      backends: mergeVoiceBackends(FALLBACK_REGISTRY.backends),
-    };
-    return cachedRegistry;
-  }
-
+  let registryPath = DEFAULT_REGISTRY_PATH;
   try {
-    const parsed = loadRegistryFromPath(registryPath);
+    registryPath = getRegistryPath();
+    if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
+    const parsed = mediaBackendRegistryCatalog.load();
     cachedRegistryPath = registryPath;
     cachedRegistry = {
       ...parsed,
@@ -291,13 +295,14 @@ function getRegistry(): MediaBackendRegistry {
   }
 }
 
+export function getMediaBackendRegistry(): MediaBackendRegistry {
+  return getRegistry();
+}
+
 export function resetMediaBackendRegistryCache(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
-}
-
-export function getMediaBackendRegistry(): MediaBackendRegistry {
-  return getRegistry();
+  mediaBackendRegistryCatalog.reset();
 }
 
 export function listMediaBackends(modality?: MediaBackendModality): MediaBackendRecord[] {

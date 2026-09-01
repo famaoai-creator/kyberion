@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
-  pathResolver,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
   registerActuatorForwardingPort,
   resetActuatorForwardingPort,
-} from '@agent/core';
+} from '@agent/core/actuator-forwarding-port';
 import { describeOps } from './op-catalog.js';
 import { dispatchWisdomOperation } from './decision-ops.js';
 
@@ -652,7 +649,7 @@ describe('wisdom public contract boundaries', () => {
     expect(coreExecutor).toContain('getTaskPlanCoordinator');
     expect(coreExecutor).not.toContain('topologicalOrder');
     expect(orchestratorSource).toContain('executeTaskPlanFromOrchestrator');
-    expect(orchestratorSource).not.toContain("import('@agent/core')");
+    expect(orchestratorSource).not.toContain(`import('@agent/${'core'}')`);
     expect(coordinatorSource).toContain('executionPort.delegate');
     expect(coordinatorSource).not.toContain('getReasoningBackend');
     expect(coordinatorSource).not.toContain('@anthropic-ai/claude-agent-sdk');

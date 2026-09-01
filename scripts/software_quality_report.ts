@@ -4,12 +4,17 @@ import * as path from 'node:path';
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
-  safeMkdir,
-  safeWriteFile,
   type SoftwareQualityContract,
   type TestExecutionRecord,
   type TestInventory,
-} from '@agent/core';
+} from '@agent/core/software-quality';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -24,9 +29,21 @@ export interface SoftwareQualityReportInput {
   now?: Date;
 }
 
+export function resolveQualityArtifactPath(filePath: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(filePath), { allowMissingLeaf });
+}
+
+function requireQualityInput(filePath: string, label: string): string {
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return filePath;
+}
+
 function writeJson(filePath: string, value: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8' });
+  const safePath = resolveQualityArtifactPath(filePath, true);
+  safeMkdir(path.dirname(safePath), { recursive: true });
+  safeWriteFile(safePath, `${JSON.stringify(value, null, 2)}\n`, { encoding: 'utf8' });
 }
 
 export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInput): {
@@ -35,9 +52,13 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   recommendation: string;
   defectCount: number;
 } {
-  const contract = readJson<SoftwareQualityContract>(input.contractPath);
-  const inventory = readJson<TestInventory>(input.inventoryPath);
-  const execution = readJson<TestExecutionRecord>(input.executionPath);
+  const contractPath = resolveQualityArtifactPath(input.contractPath);
+  const inventoryPath = resolveQualityArtifactPath(input.inventoryPath);
+  const executionPath = resolveQualityArtifactPath(input.executionPath);
+  const outputPath = resolveQualityArtifactPath(input.outputPath, true);
+  const contract = readJson<SoftwareQualityContract>(requireQualityInput(contractPath, 'contract'));
+  const inventory = readJson<TestInventory>(requireQualityInput(inventoryPath, 'inventory'));
+  const execution = readJson<TestExecutionRecord>(requireQualityInput(executionPath, 'execution'));
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,
@@ -46,8 +67,13 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
     now: input.now,
   });
   const defects = createDefectCandidates({ inventory, execution });
-  const defectsPath =
-    input.defectsPath ?? path.join(path.dirname(input.outputPath), 'defect-candidates.json');
+  const defectsPath = resolveQualityArtifactPath(
+    input.defectsPath ?? path.join(path.dirname(outputPath), 'defect-candidates.json'),
+    true
+  );
+  const safePublishSummaryPath = input.publishSummaryPath
+    ? resolveQualityArtifactPath(input.publishSummaryPath, true)
+    : undefined;
   const generatedAt = (input.now ?? new Date()).toISOString();
   const report = {
     version: '1.0.0',
@@ -57,8 +83,8 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
     generated_at: generatedAt,
     ...summary,
   };
-  writeJson(input.outputPath, report);
-  if (input.publishSummaryPath) writeJson(input.publishSummaryPath, report);
+  writeJson(outputPath, report);
+  if (safePublishSummaryPath) writeJson(safePublishSummaryPath, report);
   writeJson(defectsPath, {
     version: '1.0.0',
     project_id: contract.project_id,
@@ -66,7 +92,7 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
     defects,
   });
   return {
-    reportPath: input.outputPath,
+    reportPath: outputPath,
     defectsPath,
     recommendation: summary.recommendation,
     defectCount: defects.length,

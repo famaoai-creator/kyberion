@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "autonomous-ops-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "decision_thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auto_max_score": { "type": "number", "minimum": 0 },
+        "notify_max_score": { "type": "number", "minimum": 0 }
+      },
+      "required": ["auto_max_score", "notify_max_score"]
+    },
+    "axis_weights": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "type": "number", "minimum": 0 },
+        "reversibility": { "type": "number", "minimum": 0 },
+        "sensitivity": { "type": "number", "minimum": 0 },
+        "confidence": { "type": "number", "minimum": 0 }
+      },
+      "required": ["scope", "reversibility", "sensitivity", "confidence"]
+    },
+    "actions": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "tenant_overrides": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "actions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/actionOverride"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["version", "decision_thresholds", "axis_weights", "actions"],
+  "$defs": {
+    "axisScores": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "type": "number", "minimum": 0, "maximum": 3 },
+        "reversibility": { "type": "number", "minimum": 0, "maximum": 3 },
+        "sensitivity": { "type": "number", "minimum": 0, "maximum": 3 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 3 }
+      },
+      "required": ["scope", "reversibility", "sensitivity", "confidence"]
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "axis_scores": { "$ref": "#/$defs/axisScores" },
+        "budget_cap_tokens": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["title", "description", "axis_scores"]
+    },
+    "actionOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "axis_scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "scope": { "type": "number", "minimum": 0, "maximum": 3 },
+            "reversibility": { "type": "number", "minimum": 0, "maximum": 3 },
+            "sensitivity": { "type": "number", "minimum": 0, "maximum": 3 },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 3 }
+          }
+        },
+        "budget_cap_tokens": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

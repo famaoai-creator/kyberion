@@ -9,8 +9,9 @@
  */
 
 import * as path from 'node:path';
-import { missionEvidenceDir } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   ExtractedRequirements,
   FunctionalRequirement,
@@ -21,6 +22,7 @@ import type {
 } from './reasoning-backend.js';
 
 const DRAFT_FILE = 'requirements-draft.json';
+const DRAFT_SCHEMA_PATH = pathResolver.knowledge('product/schemas/requirements-draft.schema.json');
 
 export type SignoffChannel = 'in_meeting' | 'email' | 'docusign' | 'slack' | 'other';
 
@@ -61,13 +63,21 @@ export interface RequirementsDraft {
 function draftPath(missionId: string): string | null {
   const dir = missionEvidenceDir(missionId);
   if (!dir) return null;
-  return path.join(dir, DRAFT_FILE);
+  return assertSafeRepositoryPath(path.join(dir, DRAFT_FILE), { allowMissingLeaf: true });
+}
+
+function requirementsDraftCatalog(filePath: string) {
+  return defineCatalog<RequirementsDraft>({
+    id: 'requirements-draft',
+    path: filePath,
+    schema: DRAFT_SCHEMA_PATH,
+  });
 }
 
 export function readRequirementsDraft(missionId: string): RequirementsDraft | null {
   const file = draftPath(missionId);
   if (!file || !safeExistsSync(file)) return null;
-  return loadJson<RequirementsDraft>(file);
+  return requirementsDraftCatalog(file).load();
 }
 
 export interface SaveRequirementsDraftParams {
@@ -109,6 +119,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
+  requirementsDraftCatalog(file).validate(draft, file);
   safeWriteFile(file, `${JSON.stringify(draft, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
   return draft;
 }
@@ -148,6 +159,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
       `[requirements-draft-store] mission evidence dir not found for ${params.missionId}`
     );
   }
+  requirementsDraftCatalog(file).validate(existing, file);
   safeWriteFile(file, `${JSON.stringify(existing, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
   return existing;
 }

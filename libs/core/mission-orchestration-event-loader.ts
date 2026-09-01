@@ -1,7 +1,8 @@
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
   normalizeEventScope,
   resolveEventScopeAgainstAuthority,
@@ -13,6 +14,18 @@ import {
   type MissionOrchestrationEvent,
   type MissionOrchestrationEventType,
 } from './mission-orchestration-event-contract.js';
+
+const EVENT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-event.schema.json'
+);
+
+function missionOrchestrationEventCatalog(eventPath: string) {
+  return defineCatalog<Partial<MissionOrchestrationEvent>>({
+    id: 'mission-orchestration-event',
+    path: eventPath,
+    schema: EVENT_SCHEMA_PATH,
+  });
+}
 
 function resolveMissionOrchestrationScope(
   missionId: string,
@@ -27,10 +40,24 @@ function resolveMissionOrchestrationScope(
             supplied.tenant_slug,
             supplied.tier!
           );
-          return safeExistsSync(candidate) ? candidate : undefined;
+          try {
+            const safeCandidate = assertSafeRepositoryPath(candidate, { allowMissingLeaf: false });
+            return safeExistsSync(safeCandidate) ? safeCandidate : undefined;
+          } catch {
+            return undefined;
+          }
         })()
       : undefined);
-  const statePath = locatedMissionPath ? `${locatedMissionPath}/mission-state.json` : undefined;
+  let statePath: string | undefined;
+  try {
+    statePath = locatedMissionPath
+      ? assertSafeRepositoryPath(path.join(locatedMissionPath, 'mission-state.json'), {
+          allowMissingLeaf: false,
+        })
+      : undefined;
+  } catch {
+    statePath = undefined;
+  }
   try {
     const state = statePath ? readJson<Record<string, unknown>>(statePath) : {};
     const authority = normalizeEventScope({
@@ -76,7 +103,18 @@ function isSafePayloadReference(
 export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>>(
   eventPath: string
 ): MissionOrchestrationEvent<TPayload> {
-  const parsed = loadJson<Partial<MissionOrchestrationEvent<TPayload>>>(eventPath);
+  const safeEventPath = assertSafeRepositoryPath(eventPath, { allowMissingLeaf: false });
+  let parsed: Partial<MissionOrchestrationEvent<TPayload>>;
+  try {
+    parsed = missionOrchestrationEventCatalog(safeEventPath).load() as Partial<
+      MissionOrchestrationEvent<TPayload>
+    >;
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new Error(
+      `[MISSION_ORCHESTRATION_EVENT_INVALID] ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   if (
     typeof parsed.event_id !== 'string' ||
     typeof parsed.event_type !== 'string' ||
@@ -96,11 +134,14 @@ export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>
         '[MISSION_ORCHESTRATION_EVENT_INVALID] payload_ref is outside the mission payload store'
       );
     }
-    const payloadEnvelope = JSON.parse(
-      String(
-        safeReadFile(pathResolver.rootResolve(parsed.payload_ref), { encoding: 'utf8' }) || '{}'
-      )
-    ) as { event_id?: unknown; mission_id?: unknown; payload?: unknown };
+    const payloadPath = assertSafeRepositoryPath(pathResolver.rootResolve(parsed.payload_ref), {
+      allowMissingLeaf: false,
+    });
+    const payloadEnvelope = readJson<{
+      event_id?: unknown;
+      mission_id?: unknown;
+      payload?: unknown;
+    }>(payloadPath);
     if (
       payloadEnvelope.event_id !== parsed.event_id ||
       payloadEnvelope.mission_id !== parsed.mission_id.toUpperCase() ||

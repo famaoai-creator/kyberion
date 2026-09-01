@@ -1,41 +1,50 @@
 import * as net from 'node:net';
 import { timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import {
-  appendSupervisorEvent,
   askAgentRuntime,
-  enqueueDelegatedTaskInbox,
   ensureAgentRuntime,
-  hasPendingDelegatedTaskInbox,
   getAgentRuntimeLog,
   getAgentRuntimeSnapshot,
-  getRegisteredEnv,
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
-  loadDelegatedTaskRecord,
-  logger,
-  pathResolver,
-  recordDaemonHeartbeat,
-  recordDelegatedTaskActivationFailure,
   refreshAgentRuntime,
   restartAgentRuntime,
+  shutdownAllAgentRuntimes,
+  stopAgentRuntime,
+} from '@agent/core/agent-runtime-supervisor';
+import {
+  enqueueDelegatedTaskInbox,
+  hasPendingDelegatedTaskInbox,
+  loadDelegatedTaskRecord,
+  recordDelegatedTaskActivationFailure,
   spawnDelegatedTaskWorkerProcess,
-  rootDir,
-  runtimeSupervisor,
+} from '@agent/core/delegated-task-observability';
+import { appendSupervisorEvent } from '@agent/core/agent-runtime-events';
+import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { recordRuntimeHealthSample } from '@agent/core/runtime-health-history';
+import { sendOpsAlert } from '@agent/core/ops-alert';
+import {
+  computeSupervisorCodeStamp,
+  normalizeSupervisorResponse,
+  normalizeSupervisorResult,
+} from '@agent/core/agent-runtime-supervisor-client';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { isRecord } from '@agent/core/foundation/text';
+import { logger } from '@agent/core/core';
+import { pathResolver, rootDir } from '@agent/core/path-resolver';
+import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeUnlinkSync,
   safeCreateExclusiveFileSync,
   safeChmodSync,
-  sendOpsAlert,
-  shutdownAllAgentRuntimes,
-  stopAgentRuntime,
-  computeSupervisorCodeStamp,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import type { TaskModelHint } from '@agent/core/reasoning-model-routing';
-import { installProcessGuards, recordRuntimeHealthSample } from '@agent/core';
+import { installProcessGuards } from '@agent/core/process-guards';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('agent-runtime-supervisor');
@@ -81,7 +90,46 @@ interface SupervisorResponse {
   ok: boolean;
   result?: Record<string, unknown> | Array<Record<string, unknown>> | null;
   error?: string;
-  errorDetail?: Record<string, any>;
+  errorDetail?: Record<string, unknown>;
+}
+
+const SUPERVISOR_METHODS = [
+  'health',
+  'ensure',
+  'ask',
+  'status',
+  'list',
+  'touch',
+  'shutdown',
+  'refresh',
+  'restart',
+  'delegated_enqueue',
+  'terminate',
+] as const satisfies readonly SupervisorMethod[];
+
+function normalizeSupervisorRequest(value: unknown): SupervisorRequest {
+  if (!isRecord(value)) throw new Error('supervisor request must be a JSON object');
+  if (typeof value.id !== 'string' || !value.id.trim()) {
+    throw new Error('supervisor request.id must be a non-empty string');
+  }
+  if (
+    typeof value.method !== 'string' ||
+    !(SUPERVISOR_METHODS as readonly string[]).includes(value.method)
+  ) {
+    throw new Error('supervisor request.method is unsupported');
+  }
+  if (value.auth_token !== undefined && typeof value.auth_token !== 'string') {
+    throw new Error('supervisor request.auth_token must be a string');
+  }
+  if (value.payload !== undefined && !isRecord(value.payload)) {
+    throw new Error('supervisor request.payload must be a JSON object');
+  }
+  return {
+    id: value.id,
+    method: value.method as SupervisorMethod,
+    ...(typeof value.auth_token === 'string' ? { auth_token: value.auth_token } : {}),
+    ...(isRecord(value.payload) ? { payload: value.payload } : {}),
+  };
 }
 
 const SOCKET_DIR = pathResolver.shared('runtime/agent-supervisor');
@@ -702,8 +750,10 @@ async function probeDaemonHealth(target: ListenTarget, timeoutMs = 1000): Promis
       const line = String(chunk).trim();
       if (!line) return done(false);
       try {
-        const response = JSON.parse(line) as SupervisorResponse;
-        done(Boolean(response.ok));
+        const response = normalizeSupervisorResponse<unknown>(JSON.parse(line) as unknown);
+        if (!response.ok) return done(false);
+        normalizeSupervisorResult('health', response.result);
+        done(true);
       } catch {
         done(false);
       }
@@ -837,7 +887,7 @@ export async function startAgentRuntimeSupervisorDaemon(
         return writeResponse(socket, { id: 'invalid', ok: false, error: 'empty_request' });
       }
       try {
-        const request = JSON.parse(line) as SupervisorRequest;
+        const request = normalizeSupervisorRequest(JSON.parse(line) as unknown);
         if (
           (transport === 'tcp' && !socketIsLoopback(socket)) ||
           !supervisorTokenValid(request.auth_token)
@@ -1012,7 +1062,7 @@ export async function startAgentRuntimeSupervisorDaemon(
   };
 }
 
-async function main() {
+async function main(_args: string[] = []) {
   await startAgentRuntimeSupervisorDaemon();
   setInterval(() => {
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
@@ -1024,39 +1074,50 @@ async function main() {
 const isDirect =
   isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.ts') ||
   isDirectScript(import.meta.url, 'agent_runtime_supervisor_daemon.js');
-if (isDirect) {
-  main().catch((error: any) => {
-    if (error instanceof DaemonExit) {
-      process.exitCode = error.code;
-      return;
-    }
-    const message = error?.message || String(error);
-    logger.error(message);
-    recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
-      status: 'error',
-      details: { error: message },
-    });
-    appendSupervisorEvent({
-      decision: 'agent_runtime_supervisor_daemon_failed',
-      pid: process.pid,
-      error: message,
-    });
+
+const runAgentRuntimeSupervisorDaemon = defineScript({
+  name: 'agent-runtime:supervisor-daemon',
+  flags: [],
+  run: async ({ argv }) => {
     try {
-      sendOpsAlert({
-        severity: 'critical',
-        title: 'Agent runtime supervisor daemon fatal error',
-        context: {
-          daemon_id: 'agent-runtime-supervisor-daemon',
-          error: message,
-        },
-        recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
-        dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+      await main(argv);
+    } catch (error: any) {
+      if (error instanceof DaemonExit) {
+        process.exitCode = error.code;
+        return;
+      }
+      const message = error?.message || String(error);
+      logger.error(message);
+      recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {
+        status: 'error',
+        details: { error: message },
       });
-    } catch (alertError: any) {
-      logger.warn(
-        `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
-      );
+      appendSupervisorEvent({
+        decision: 'agent_runtime_supervisor_daemon_failed',
+        pid: process.pid,
+        error: message,
+      });
+      try {
+        sendOpsAlert({
+          severity: 'critical',
+          title: 'Agent runtime supervisor daemon fatal error',
+          context: {
+            daemon_id: 'agent-runtime-supervisor-daemon',
+            error: message,
+          },
+          recommendation: 'Restart the supervisor daemon and inspect startup configuration.',
+          dedupe_key: 'agent-runtime-supervisor-daemon:fatal',
+        });
+      } catch (alertError: any) {
+        logger.warn(
+          `[agent-runtime-supervisor-daemon] failed to write fatal ops alert: ${alertError?.message || alertError}`
+        );
+      }
+      process.exitCode = 1;
     }
-    process.exitCode = 1;
-  });
+  },
+});
+
+if (isDirect) {
+  void runAgentRuntimeSupervisorDaemon();
 }

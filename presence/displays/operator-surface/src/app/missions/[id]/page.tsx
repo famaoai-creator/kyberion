@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getMissionDetail, suggestedCommand } from '@/lib/data';
 import { emitMosRead } from '@/lib/audit-mos';
-import { formatNumber, resolveOperatorLocale } from '@agent/core';
+import { formatNumber } from '@agent/core/format';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
 
 export const dynamic = 'force-dynamic';
 

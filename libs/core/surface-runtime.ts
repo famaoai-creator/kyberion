@@ -4,14 +4,15 @@ import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('surface-runtime');
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeUnlinkSync,
   safeWriteFile,
@@ -75,8 +76,9 @@ export interface SurfacePortStatus {
 }
 
 export function readSurfaceLogTail(logPath: string, maxLines = 20): string[] {
-  if (!safeExistsSync(logPath)) return [];
-  const content = safeReadFile(logPath, { encoding: 'utf8' }) as string;
+  const safeLogPath = assertSafeRepositoryPath(logPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeLogPath)) return [];
+  const content = safeReadFile(safeLogPath, { encoding: 'utf8' }) as string;
   return content
     .split('\n')
     .map((line) => line.trimEnd())
@@ -90,6 +92,13 @@ const STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 const LOG_DIR = pathResolver.shared('logs/surfaces');
 let surfaceManifestValidateFn: ValidateFunction | null = null;
 
+function assertSurfaceId(surfaceId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(surfaceId)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid surface id: ${surfaceId}`);
+  }
+  return surfaceId;
+}
+
 function ensureSurfaceManifestValidator(): ValidateFunction {
   if (surfaceManifestValidateFn) return surfaceManifestValidateFn;
   surfaceManifestValidateFn = compileSchema(SURFACE_MANIFEST_SCHEMA_PATH);
@@ -102,24 +111,42 @@ function ensureParentDir(filePath: string): void {
 }
 
 export function surfaceManifestPath(): string {
-  return pathResolver.resolve(DEFAULT_MANIFEST_PATH);
+  return assertSafeRepositoryPath(pathResolver.resolve(DEFAULT_MANIFEST_PATH), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceManifestDirectoryPath(): string {
-  return pathResolver.resolve(DEFAULT_MANIFEST_DIR);
+  return assertSafeRepositoryPath(pathResolver.resolve(DEFAULT_MANIFEST_DIR), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceManifestFilePath(surfaceId: string): string {
-  return path.join(surfaceManifestDirectoryPath(), `${surfaceId}.json`);
+  return assertSafeRepositoryPath(
+    path.join(surfaceManifestDirectoryPath(), `${assertSurfaceId(surfaceId)}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+function surfaceManifestCatalog(filePath: string) {
+  return defineCatalog<SurfaceRuntimeManifest>({
+    id: 'surface-runtime-manifest',
+    path: filePath,
+    schema: SURFACE_MANIFEST_SCHEMA_PATH,
+  });
 }
 
 export function surfaceStatePath(): string {
-  return STATE_PATH;
+  return assertSafeRepositoryPath(STATE_PATH, { allowMissingLeaf: true });
 }
 
 export function surfaceLogPath(surfaceId: string): string {
-  if (!safeExistsSync(LOG_DIR)) safeMkdir(LOG_DIR, { recursive: true });
-  return path.join(LOG_DIR, `${surfaceId}.log`);
+  const safeLogDir = assertSafeRepositoryPath(LOG_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeLogDir)) safeMkdir(safeLogDir, { recursive: true });
+  return assertSafeRepositoryPath(path.join(safeLogDir, `${assertSurfaceId(surfaceId)}.log`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function surfaceResourceId(surfaceId: string): string {
@@ -127,13 +154,14 @@ export function surfaceResourceId(surfaceId: string): string {
 }
 
 function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
-  const value = readJson<SurfaceRuntimeManifest>(filePath);
-  const validate = ensureSurfaceManifestValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid surface manifest file "${filePath}": ${errors}`);
+  let value: SurfaceRuntimeManifest;
+  try {
+    value = surfaceManifestCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    throw new Error(
+      `Invalid surface manifest file "${filePath}": ${error instanceof Error ? error.message : String(error)}`
+    );
   }
   if (value.surfaces.length !== 1) {
     throw new Error(`Surface manifest file "${filePath}" must contain exactly one surface.`);
@@ -154,7 +182,9 @@ function readSurfaceManifestDirectory(
 }
 
 export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): SurfaceRuntimeManifest {
-  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  const resolvedManifestPath = assertSafeRepositoryPath(pathResolver.resolve(manifestPath), {
+    allowMissingLeaf: true,
+  });
   if (
     resolvedManifestPath === surfaceManifestPath() &&
     safeExistsSync(surfaceManifestDirectoryPath())
@@ -163,15 +193,14 @@ export function loadSurfaceManifest(manifestPath = surfaceManifestPath()): Surfa
     if (directoryManifest) return directoryManifest;
   }
   if (safeExistsSync(resolvedManifestPath)) {
-    const value = readJson<SurfaceRuntimeManifest>(resolvedManifestPath);
-    const validate = ensureSurfaceManifestValidator();
-    if (!validate(value)) {
-      const errors = (validate.errors || [])
-        .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-        .join('; ');
-      throw new Error(`Invalid surface manifest: ${errors}`);
+    try {
+      return surfaceManifestCatalog(resolvedManifestPath).load();
+    } catch (error) {
+      if (error instanceof SyntaxError) throw error;
+      throw new Error(
+        `Invalid surface manifest: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
-    return value;
   }
   const directoryManifest = readSurfaceManifestDirectory(resolvedManifestPath);
   if (directoryManifest) return directoryManifest;
@@ -190,7 +219,9 @@ export function saveSurfaceManifest(
     throw new Error(`Invalid surface manifest for saving: ${errors}`);
   }
   const surfaces = [...manifest.surfaces].sort((left, right) => left.id.localeCompare(right.id));
-  const resolvedManifestPath = pathResolver.resolve(manifestPath);
+  const resolvedManifestPath = assertSafeRepositoryPath(pathResolver.resolve(manifestPath), {
+    allowMissingLeaf: true,
+  });
   const writeDirectoryManifests = resolvedManifestPath === surfaceManifestPath();
 
   if (writeDirectoryManifests) {
@@ -224,15 +255,21 @@ export function saveSurfaceManifest(
 }
 
 export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntimeState {
-  if (!safeExistsSync(statePath)) {
+  const safeStatePath = assertSafeRepositoryPath(pathResolver.resolve(statePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeStatePath)) {
     return { version: 1, surfaces: {} };
   }
-  return loadJson<SurfaceRuntimeState>(statePath);
+  return readJson<SurfaceRuntimeState>(safeStatePath);
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {
-  ensureParentDir(statePath);
-  safeWriteFile(statePath, JSON.stringify(state, null, 2));
+  const safeStatePath = assertSafeRepositoryPath(pathResolver.resolve(statePath), {
+    allowMissingLeaf: true,
+  });
+  ensureParentDir(safeStatePath);
+  safeWriteFile(safeStatePath, JSON.stringify(state, null, 2));
 }
 
 export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {

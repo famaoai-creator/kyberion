@@ -7,6 +7,7 @@ import {
   probeShellGrokCliAvailability,
   ShellGrokCliBackend,
 } from './shell-grok-cli-backend.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const { spawnMock, withWallClockBudgetMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -116,6 +117,32 @@ describe('shell-grok-cli-backend', () => {
       schema: z.object({ answer: z.string() }),
     });
     expect(result).toEqual({ answer: 'pong' });
+  });
+
+  it('ambient read-only sandbox removes auto-approve and applies Grok read-only flags', async () => {
+    const envelope = JSON.stringify({
+      structuredOutput: { answer: 'pong' },
+      stopReason: 'EndTurn',
+    });
+    spawnMock.mockReturnValueOnce(createChild(envelope));
+    const policy = resolveSandboxPolicy({
+      provider: 'grok',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    const backend = new ShellGrokCliBackend({ bin: 'grok', model: 'grok-4.5' });
+    await withSandboxPolicy(policy, () =>
+      backend.runStructured({
+        systemPrompt: 'sys',
+        userPrompt: 'user',
+        schema: z.object({ answer: z.string() }),
+      })
+    );
+
+    const [, args] = spawnMock.mock.calls[0];
+    expect(args).not.toContain('--always-approve');
+    expect(args).toEqual(expect.arrayContaining(['--permission-mode', 'default']));
   });
 
   it('routes native delegation through the injected Grok ACP adopter session', async () => {

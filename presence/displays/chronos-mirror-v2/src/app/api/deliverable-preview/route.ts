@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
+import { listProjectRecords } from '@agent/core/project-registry';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { loadJson, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
+  strictViewerTier,
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 
 function artifactTenant(artifact: {
   tenant_slug?: string;
@@ -18,9 +27,11 @@ function artifactTenant(artifact: {
   if (!artifact.mission_id) return undefined;
   const missionPath = findMissionPath(artifact.mission_id);
   if (!missionPath) return undefined;
-  const statePath = `${missionPath}/mission-state.json`;
-  if (!safeExistsSync(statePath)) return undefined;
   try {
+    const statePath = assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
     const state = loadJson<{
       tenant_slug?: string;
       tenant_id?: string;
@@ -29,6 +40,37 @@ function artifactTenant(artifact: {
   } catch {
     return undefined;
   }
+}
+
+function missionTier(missionId?: string): OsKnowledgeTier | undefined {
+  if (!missionId) return undefined;
+  const missionPath = findMissionPath(missionId);
+  if (!missionPath) return undefined;
+  try {
+    const statePath = assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
+    const state = loadJson<{ tier?: unknown }>(statePath);
+    return state.tier === 'personal' || state.tier === 'confidential' || state.tier === 'public'
+      ? state.tier
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveDeliverablePreviewTier(
+  artifact: Parameters<typeof inferDeliverableTier>[0]
+): OsKnowledgeTier | undefined {
+  const projectTier = artifact.project_id
+    ? listProjectRecords().find((project) => project.project_id === artifact.project_id)?.tier
+    : undefined;
+  return inferDeliverableTier(
+    artifact,
+    artifact.path?.replace(/\\/g, '/'),
+    projectTier || missionTier(artifact.mission_id)
+  );
 }
 
 /**
@@ -68,6 +110,11 @@ export function GET(req: NextRequest) {
         { status: 403 }
       );
     }
+    const tier = resolveDeliverablePreviewTier(artifact);
+    if (!tier) {
+      return NextResponse.json({ error: 'Deliverable tier is unavailable' }, { status: 403 });
+    }
+    strictViewerTier(resolvedViewer.context, tier);
 
     const body = artifact.preview_text?.trim();
     if (!body) {

@@ -3154,9 +3154,9 @@
         "qps-ploc": "⟦ḓėŧȧïŀ ŀőř⟧"
       },
       "cli_help_usage": {
-        "en": "Usage: npm run cli -- <command> [arguments]",
-        "ja": "使い方: npm run cli -- <コマンド> [引数]",
-        "qps-ploc": "⟦Ůşȧɠė: ñṗɱ řůñ ƈŀï -- <ƈőɱɱȧñḓ> [ȧřɠůɱėñŧş] ŀőřėɱ ïṗşůɱ ḓő⟧"
+        "en": "Usage: pnpm kyberion <command> [arguments]",
+        "ja": "使い方: pnpm kyberion <コマンド> [引数]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ <ƈőɱɱȧñḓ> [ȧřɠůɱėñŧş] ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "cli_help_sec_actuators": {
         "en": "── Actuator Management ─────────────────────────────────────────────",
@@ -3254,9 +3254,9 @@
         "qps-ploc": "⟦  ŧȧşķ <ṗŀȧñ|şŧȧřŧ> \"<řėɋůėşŧ>\"  Ṗŀȧñ ȧ ƈřőşş-ŧőőŀ ŧȧşķ őř ƈřėȧŧė ȧ ɠőṽėřñėḓ ŧȧşķ şėşşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
       "cli_help_task_usage": {
-        "en": "Usage: npm run cli -- task <plan|start> \"<request>\" [--output <path>]",
-        "ja": "使い方: npm run cli -- task <plan|start> \"<依頼>\" [--output <path>]",
-        "qps-ploc": "⟦Ůşȧɠė: ñṗɱ řůñ ƈŀï -- ŧȧşķ <ṗŀȧñ|şŧȧřŧ> \"<řėɋůėşŧ>\" [--őůŧṗůŧ <ṗȧŧħ>] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+        "en": "Usage: pnpm kyberion task <plan|start> \"<request>\" [--output <path>]",
+        "ja": "使い方: pnpm kyberion task <plan|start> \"<依頼>\" [--output <path>]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ŧȧşķ <ṗŀȧñ|şŧȧřŧ> \"<řėɋůėşŧ>\" [--őůŧṗůŧ <ṗȧŧħ>] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_help_task_plan_short": {
         "en": "  plan   Preview domains, effects, approvals, missing inputs, and evidence without execution",
@@ -3309,9 +3309,9 @@
         "qps-ploc": "⟦── Ėɱȧïŀ Ẇőřķƒŀőẇ ─────────────────────────────────────────────────── ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_help_email_summary": {
-        "en": "  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `npm run cli -- email --help` for details)",
-        "ja": "  email <status|draft|latest-draft|deliver|archive-inbox>  メールワークフロー(詳細は `npm run cli -- email --help`)",
-        "qps-ploc": "⟦  ėɱȧïŀ <şŧȧŧůş|ḓřȧƒŧ|ŀȧŧėşŧ-ḓřȧƒŧ|ḓėŀïṽėř|ȧřƈħïṽė-ïñƀőẋ>  Ėɱȧïŀ ẇőřķƒŀőẇ (řůñ `ñṗɱ řůñ ƈŀï -- ėɱȧïŀ --ħėŀṗ` ƒőř ḓėŧȧïŀş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
+        "en": "  email <status|draft|latest-draft|deliver|archive-inbox>  Email workflow (run `pnpm kyberion email --help` for details)",
+        "ja": "  email <status|draft|latest-draft|deliver|archive-inbox>  メールワークフロー(詳細は `pnpm kyberion email --help`)",
+        "qps-ploc": "⟦  ėɱȧïŀ <şŧȧŧůş|ḓřȧƒŧ|ŀȧŧėşŧ-ḓřȧƒŧ|ḓėŀïṽėř|ȧřƈħïṽė-ïñƀőẋ>  Ėɱȧïŀ ẇőřķƒŀőẇ (řůñ `ṗñṗɱ ķẏƀėřïőñ ėɱȧïŀ --ħėŀṗ` ƒőř ḓėŧȧïŀş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓ⟧"
       },
       "cli_help_email_status": {
         "en": "  email status         Check Gmail auth readiness",
@@ -3339,9 +3339,9 @@
         "qps-ploc": "⟦  ėɱȧïŀ ȧřƈħïṽė-ïñƀőẋ  Ƈřėȧŧė ȧřƈħïṽė ƒïŀŧėřş ƒőř řėṗėȧŧėḓ ïñƀőẋ şėñḓėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_help_calendar_summary": {
-        "en": "  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `npm run cli -- calendar --help` for details)",
-        "ja": "  calendar <status|list-calendars|agenda|freebusy|create-event>  カレンダーワークフロー(詳細は `npm run cli -- calendar --help`)",
-        "qps-ploc": "⟦  ƈȧŀėñḓȧř <şŧȧŧůş|ŀïşŧ-ƈȧŀėñḓȧřş|ȧɠėñḓȧ|ƒřėėƀůşẏ|ƈřėȧŧė-ėṽėñŧ>  Ƈȧŀėñḓȧř ẇőřķƒŀőẇ (řůñ `ñṗɱ řůñ ƈŀï -- ƈȧŀėñḓȧř --ħėŀṗ` ƒőř ḓėŧȧïŀş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
+        "en": "  calendar <status|list-calendars|agenda|freebusy|create-event>  Calendar workflow (run `pnpm kyberion calendar --help` for details)",
+        "ja": "  calendar <status|list-calendars|agenda|freebusy|create-event>  カレンダーワークフロー(詳細は `pnpm kyberion calendar --help`)",
+        "qps-ploc": "⟦  ƈȧŀėñḓȧř <şŧȧŧůş|ŀïşŧ-ƈȧŀėñḓȧřş|ȧɠėñḓȧ|ƒřėėƀůşẏ|ƈřėȧŧė-ėṽėñŧ>  Ƈȧŀėñḓȧř ẇőřķƒŀőẇ (řůñ `ṗñṗɱ ķẏƀėřïőñ ƈȧŀėñḓȧř --ħėŀṗ` ƒőř ḓėŧȧïŀş) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïş⟧"
       },
       "cli_help_calendar_status": {
         "en": "  calendar status      Check calendar auth readiness",
@@ -3399,9 +3399,9 @@
         "qps-ploc": "⟦  ṗñṗɱ ɱïşşïőñ:ĵőůřñȧŀ Ïñşṗėƈŧ ɱïşşïőñ ħïşŧőřẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "cli_help_email_usage": {
-        "en": "Usage: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [options]",
-        "ja": "使い方: npm run cli -- email <status|draft|latest-draft|deliver|archive-inbox> [オプション]",
-        "qps-ploc": "⟦Ůşȧɠė: ñṗɱ řůñ ƈŀï -- ėɱȧïŀ <şŧȧŧůş|ḓřȧƒŧ|ŀȧŧėşŧ-ḓřȧƒŧ|ḓėŀïṽėř|ȧřƈħïṽė-ïñƀőẋ> [őṗŧïőñş] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+        "en": "Usage: pnpm kyberion email <status|draft|latest-draft|deliver|archive-inbox> [options]",
+        "ja": "使い方: pnpm kyberion email <status|draft|latest-draft|deliver|archive-inbox> [オプション]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ėɱȧïŀ <şŧȧŧůş|ḓřȧƒŧ|ŀȧŧėşŧ-ḓřȧƒŧ|ḓėŀïṽėř|ȧřƈħïṽė-ïñƀőẋ> [őṗŧïőñş] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
       },
       "cli_help_commands": {
         "en": "Commands:",
@@ -3434,9 +3434,9 @@
         "qps-ploc": "⟦  ȧřƈħïṽė-ïñƀőẋ Ƈřėȧŧė ȧřƈħïṽė ƒïŀŧėřş ƒőř řėṗėȧŧėḓ ïñƀőẋ şėñḓėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       },
       "cli_help_calendar_usage": {
-        "en": "Usage: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [options]",
-        "ja": "使い方: npm run cli -- calendar <status|list-calendars|agenda|freebusy|create-event> [オプション]",
-        "qps-ploc": "⟦Ůşȧɠė: ñṗɱ řůñ ƈŀï -- ƈȧŀėñḓȧř <şŧȧŧůş|ŀïşŧ-ƈȧŀėñḓȧřş|ȧɠėñḓȧ|ƒřėėƀůşẏ|ƈřėȧŧė-ėṽėñŧ> [őṗŧïőñş] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+        "en": "Usage: pnpm kyberion calendar <status|list-calendars|agenda|freebusy|create-event> [options]",
+        "ja": "使い方: pnpm kyberion calendar <status|list-calendars|agenda|freebusy|create-event> [オプション]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ ƈȧŀėñḓȧř <şŧȧŧůş|ŀïşŧ-ƈȧŀėñḓȧřş|ȧɠėñḓȧ|ƒřėėƀůşẏ|ƈřėȧŧė-ėṽėñŧ> [őṗŧïőñş] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       },
       "cli_help_calendar_status_short": {
         "en": "  status        Check calendar auth readiness",
@@ -3474,9 +3474,9 @@
         "qps-ploc": "⟦Ïñḓėẋėḓ ȧƈŧůȧŧőřş: ŀőřėɱ⟧"
       },
       "cli_error_unknown_command": {
-        "en": "Unknown command \"{command}\". Try `npm run cli -- help`.",
-        "ja": "不明なコマンド \"{command}\" です。`npm run cli -- help` を確認してください。",
-        "qps-ploc": "⟦Ůñķñőẇñ ƈőɱɱȧñḓ \"{command}\". Ŧřẏ `ñṗɱ řůñ ƈŀï -- ħėŀṗ`. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "Unknown command \"{command}\". Try `pnpm kyberion help`.",
+        "ja": "不明なコマンド \"{command}\" です。`pnpm kyberion help` を確認してください。",
+        "qps-ploc": "⟦Ůñķñőẇñ ƈőɱɱȧñḓ \"{command}\". Ŧřẏ `ṗñṗɱ ķẏƀėřïőñ ħėŀṗ`. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "cli_error_execution_failed": {
         "en": "❌ Execution failed: {message}",
@@ -3499,9 +3499,9 @@
         "qps-ploc": "⟦  őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ>  Ṗřėṽïėẇ (ḓėƒȧůŀŧ) őř řůñ ėẋṗőřŧ → ḓėŀėŧė ƒőř ȧ ƈŀőşïñɠ şƈőṗė ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
       },
       "cli_help_offboard_usage": {
-        "en": "Usage: npm run cli -- offboard <tenant|project> <id> [--execute --approved-by <who> --purpose \"<why>\"] [--json]",
-        "ja": "使い方: npm run cli -- offboard <tenant|project> <id> [--execute --approved-by <承認者> --purpose \"<理由>\"] [--json]",
-        "qps-ploc": "⟦Ůşȧɠė: ñṗɱ řůñ ƈŀï -- őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+        "en": "Usage: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <who> --purpose \"<why>\"] [--json]",
+        "ja": "使い方: pnpm kyberion offboard <tenant|project> <id> [--execute --approved-by <承認者> --purpose \"<理由>\"] [--json]",
+        "qps-ploc": "⟦Ůşȧɠė: ṗñṗɱ ķẏƀėřïőñ őƒƒƀőȧřḓ <ŧėñȧñŧ|ṗřőĵėƈŧ> <ïḓ> [--ėẋėƈůŧė --ȧṗṗřőṽėḓ-ƀẏ <ẇħő> --ṗůřṗőşė \"<ẇħẏ>\"] [--ĵşőñ] ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
       },
       "cli_help_offboard_dry_run_short": {
         "en": "  (default)  Dry run: list the active/ trees that would be exported and deleted. Writes nothing.",
@@ -4624,7 +4624,83 @@
         "qps-ploc": "⟦Şŧȧŧůş řėṗőřŧ ŀőřė⟧"
       }
     },
-    "bridge": {},
+    "bridge": {
+      "thread_context": {
+        "en": "Recent {channel} thread context:",
+        "ja": "{channel} スレッドの最近の文脈:",
+        "qps-ploc": "⟦Řėƈėñŧ {channel} ŧħřėȧḓ ƈőñŧėẋŧ: ŀőřėɱ ïṗşů⟧"
+      },
+      "thread_user": {
+        "en": "User ({author}): {text}",
+        "ja": "ユーザー（{author}）: {text}",
+        "qps-ploc": "⟦Ůşėř ({author}): {text} ŀőřėɱ ï⟧"
+      },
+      "thread_assistant": {
+        "en": "Assistant: {text}",
+        "ja": "アシスタント: {text}",
+        "qps-ploc": "⟦Ȧşşïşŧȧñŧ: {text} ŀőřėɱ⟧"
+      },
+      "contract_understanding": {
+        "en": "Understanding",
+        "ja": "理解",
+        "qps-ploc": "⟦Ůñḓėřşŧȧñḓïñɠ ŀőřė⟧"
+      },
+      "contract_missing_input": {
+        "en": "Missing input",
+        "ja": "不足入力",
+        "qps-ploc": "⟦Ɱïşşïñɠ ïñṗůŧ ŀőřė⟧"
+      },
+      "contract_next_action": {
+        "en": "Next action",
+        "ja": "次の操作",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ ŀőř⟧"
+      },
+      "contract_authority": {
+        "en": "Authority",
+        "ja": "権限",
+        "qps-ploc": "⟦Ȧůŧħőřïŧẏ ŀőř⟧"
+      },
+      "contract_consequence": {
+        "en": "Consequence",
+        "ja": "帰結",
+        "qps-ploc": "⟦Ƈőñşėɋůėñƈė ŀőř⟧"
+      },
+      "contract_outcome": {
+        "en": "Outcome",
+        "ja": "結果",
+        "qps-ploc": "⟦Őůŧƈőɱė ŀőř⟧"
+      },
+      "contract_none": {
+        "en": "none",
+        "ja": "なし",
+        "qps-ploc": "⟦ñőñė ŀőř⟧"
+      },
+      "automation_missing_bindings": {
+        "en": "Additional service connections are needed before the schedule can be registered.",
+        "ja": "スケジュール登録には追加のサービス連携が必要です。",
+        "qps-ploc": "⟦Ȧḓḓïŧïőñȧŀ şėřṽïƈė ƈőññėƈŧïőñş ȧřė ñėėḓėḓ ƀėƒőřė ŧħė şƈħėḓůŀė ƈȧñ ƀė řėɠïşŧėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "approval_approve_button": {
+        "en": "Approve",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "approval_reject_button": {
+        "en": "Reject",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧ ŀőř⟧"
+      },
+      "approval_required_fallback": {
+        "en": "Approval is required before continuing.",
+        "ja": "続行するには承認が必要です。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ïş řėɋůïřėḓ ƀėƒőřė ƈőñŧïñůïñɠ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "processing_note": {
+        "en": "Processing. Please wait…",
+        "ja": "処理中です。少々お待ちください…",
+        "qps-ploc": "⟦Ṗřőƈėşşïñɠ. Ṗŀėȧşė ẇȧïŧ… ŀőřėɱ ï⟧"
+      }
+    },
     "concierge": {
       "concierge_escalation_hold_reply": {
         "en": "We will confirm and get back to you shortly.",
@@ -5686,6 +5762,31 @@
         "ja": "見込みの成果",
         "qps-ploc": "⟦Ėẋṗėƈŧėḓ řėşůŀŧ ŀőřė⟧"
       },
+      "dock.intent_resolution.outcome_answer": {
+        "en": "Answer",
+        "ja": "回答",
+        "qps-ploc": "⟦Ȧñşẇėř ŀőř⟧"
+      },
+      "dock.intent_resolution.outcome_artifact": {
+        "en": "Artifact",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ȧřŧïƒȧƈŧ ŀőř⟧"
+      },
+      "dock.intent_resolution.outcome_approval_ready_plan": {
+        "en": "Approval-ready plan",
+        "ja": "承認可能な計画",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ-řėȧḓẏ ṗŀȧñ ŀőřėɱ ⟧"
+      },
+      "dock.intent_resolution.outcome_service_change": {
+        "en": "Service change",
+        "ja": "サービス変更",
+        "qps-ploc": "⟦Şėřṽïƈė ƈħȧñɠė ŀőřė⟧"
+      },
+      "dock.intent_resolution.outcome_status_report": {
+        "en": "Status report",
+        "ja": "状況レポート",
+        "qps-ploc": "⟦Şŧȧŧůş řėṗőřŧ ŀőřė⟧"
+      },
       "dock.intent_resolution.authority_autonomous": {
         "en": "Can proceed",
         "ja": "そのまま進められます",
@@ -5705,6 +5806,21 @@
         "en": "Waiting for your approval; nothing has been executed.",
         "ja": "承認待ちです。まだ実行していません。",
         "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ȧṗṗřőṽȧŀ; ñőŧħïñɠ ħȧş ƀėėñ ėẋėƈůŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "dock.intent_resolution.approval_summary": {
+        "en": "Human approval is required before executing \"{request}\".",
+        "ja": "「{request}」を実行する前に人間の承認が必要です。",
+        "qps-ploc": "⟦Ħůɱȧñ ȧṗṗřőṽȧŀ ïş řėɋůïřėḓ ƀėƒőřė ėẋėƈůŧïñɠ \"{request}\". ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "dock.intent_resolution.approval_title": {
+        "en": "Approval: {summary}",
+        "ja": "{summary}の承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ: {summary} ŀőřėɱ ⟧"
+      },
+      "dock.intent_resolution.approval_action": {
+        "en": "Next action: approve this plan to continue.",
+        "ja": "次のアクション: この計画を承認してください。",
+        "qps-ploc": "⟦Ñėẋŧ ȧƈŧïőñ: ȧṗṗřőṽė ŧħïş ṗŀȧñ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "dock.confirm_proceed": {
         "en": "Yes, please proceed.",
@@ -7232,6 +7348,31 @@
         "en": "Tenant scope",
         "ja": "テナントスコープ",
         "qps-ploc": "⟦Ŧėñȧñŧ şƈőṗė ŀőř⟧"
+      },
+      "chronos_tenant_scope_label": {
+        "en": "Tenant scope",
+        "ja": "テナントスコープ",
+        "qps-ploc": "⟦Ŧėñȧñŧ şƈőṗė ŀőř⟧"
+      },
+      "chronos_organization_scope_label": {
+        "en": "Organization scope",
+        "ja": "組織スコープ",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ şƈőṗė ŀőřėɱ⟧"
+      },
+      "chronos_project_scope_label": {
+        "en": "Project scope",
+        "ja": "プロジェクトスコープ",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ şƈőṗė ŀőřė⟧"
+      },
+      "chronos_all_organizations": {
+        "en": "All organizations",
+        "ja": "全組織",
+        "qps-ploc": "⟦Ȧŀŀ őřɠȧñïẑȧŧïőñş ŀőřėɱ⟧"
+      },
+      "chronos_all_projects": {
+        "en": "All projects",
+        "ja": "全プロジェクト",
+        "qps-ploc": "⟦Ȧŀŀ ṗřőĵėƈŧş ŀőř⟧"
       },
       "chronos_available_tenants": {
         "en": "Available tenants",

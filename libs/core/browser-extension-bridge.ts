@@ -1,24 +1,29 @@
 import { appendJsonLine } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { enforceApprovalGate, type ApprovalGateResult } from './approval-gate.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeMkdir, safeReadFile, safeStat, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeLstat,
+  safeMkdir,
+  safeExistsSync,
+  safeReadFile,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
 import { validateOpInput } from './op-input-contracts.js';
 import { resolveBrowserRecordingPipelineOp, normalizeBrowserPipelineOp } from './op-vocabulary.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 
 /** Approval-gate operation id for governed Chrome extension execution. */
 export const BROWSER_EXTENSION_EXECUTE_OP = 'browser:extension_execute';
 
 /** Default execution lease lifetime: short-lived to bound replay risk. */
 const DEFAULT_LEASE_TTL_MS = 5 * 60_000;
-
-const ajv = createAjv();
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-addFormats(ajv);
 
 const RECORDING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/browser-recording.schema.json'
@@ -196,7 +201,7 @@ let receiptValidator: ValidateFunction | null = null;
 
 function schemaValidator(schemaPath: string, cached: ValidateFunction | null): ValidateFunction {
   if (cached) return cached;
-  return ajv.compile(loadJson<Record<string, unknown>>(schemaPath));
+  return compileSchema(schemaPath);
 }
 
 function formatErrors(validate: ValidateFunction): string[] {
@@ -1100,8 +1105,15 @@ export function persistBrowserExtensionObservation(observation: unknown): {
     })),
   };
   try {
-    safeMkdir(OBSERVATION_STORE, { recursive: true });
-    const filePath = `${OBSERVATION_STORE}/${sanitizeObservationFileName(redacted.procedure_id)}.jsonl`;
+    const safeStore = assertSafeRepositoryPath(OBSERVATION_STORE, { allowMissingLeaf: true });
+    safeMkdir(safeStore, { recursive: true });
+    const filePath = assertSafeRepositoryPath(
+      path.join(safeStore, `${sanitizeObservationFileName(redacted.procedure_id)}.jsonl`),
+      { allowMissingLeaf: true }
+    );
+    if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+      return { errors: ['observation store entry is not a regular file'] };
+    }
     try {
       if (
         safeStat(filePath).size + Buffer.byteLength(`${JSON.stringify(redacted)}\n`, 'utf8') >
@@ -1137,7 +1149,17 @@ export function loadBrowserExtensionObservations(
     MAX_OBSERVATION_LIMIT,
     options.limit && options.limit > 0 ? Math.floor(options.limit) : MAX_OBSERVATION_LIMIT
   );
-  const filePath = `${OBSERVATION_STORE}/${sanitizeObservationFileName(procedureId)}.jsonl`;
+  let filePath: string;
+  try {
+    const safeStore = assertSafeRepositoryPath(OBSERVATION_STORE, { allowMissingLeaf: true });
+    filePath = assertSafeRepositoryPath(
+      path.join(safeStore, `${sanitizeObservationFileName(procedureId)}.jsonl`),
+      { allowMissingLeaf: true }
+    );
+    if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) return [];
+  } catch {
+    return [];
+  }
   let raw: string;
   try {
     if (safeStat(filePath).size > MAX_OBSERVATION_STORE_BYTES) return [];
@@ -1149,7 +1171,9 @@ export function loadBrowserExtensionObservations(
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
     try {
-      const parsed = validateBrowserExtensionObservation(JSON.parse(line));
+      const parsed = validateBrowserExtensionObservation(
+        parseSafeJsonInput(line, 'browser extension observation')
+      );
       if (parsed.value) observations.push(parsed.value);
     } catch {
       // skip corrupt lines

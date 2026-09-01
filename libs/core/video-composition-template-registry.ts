@@ -1,8 +1,8 @@
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import type {
   VideoCompositionTemplateRecord,
   VideoCompositionTemplateRegistry,
@@ -11,6 +11,9 @@ import type {
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/video-composition-template-registry.json'
+);
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-composition-template-registry.schema.json'
 );
 
 const FALLBACK_REGISTRY: VideoCompositionTemplateRegistry = {
@@ -33,44 +36,40 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: VideoCompositionTemplateRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
+  return assertSafeRepositoryPath(
     getRegisteredEnvText('KYBERION_VIDEO_COMPOSITION_TEMPLATE_REGISTRY_PATH')?.trim() ||
-    DEFAULT_REGISTRY_PATH
+      DEFAULT_REGISTRY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-export function resetVideoCompositionTemplateRegistryCache(): void {
+const registryCatalog = defineCatalog<VideoCompositionTemplateRegistry>({
+  id: 'video-composition-template-registry',
+  path: getRegistryPath,
+  schema: REGISTRY_SCHEMA_PATH,
+  fallback: FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    if (!/missing:/u.test(String(error))) {
+      logger.warn(
+        `[VIDEO_TEMPLATE_REGISTRY] Failed to load registry at ${getRegistryPath()}: ${String(error)}`
+      );
+    }
+  },
+});
+
+export function _resetVideoCompositionTemplateRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
+  registryCatalog.reset();
 }
 
 export function getVideoCompositionTemplateRegistry(): VideoCompositionTemplateRegistry {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
-
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
-
-  try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<VideoCompositionTemplateRegistry>(
-      raw,
-      'video composition template registry'
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[VIDEO_TEMPLATE_REGISTRY] Failed to load registry at ${registryPath}: ${error.message}`
-    );
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
+  cachedRegistryPath = registryPath;
+  cachedRegistry = registryCatalog.load();
+  return cachedRegistry;
 }
 
 export function listVideoCompositionTemplates(

@@ -85,7 +85,7 @@ import { auditChain } from './audit-chain.js';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModeFromPolicy,
-  resolveReasoningBackendModeFromContext,
+  resolveReasoningBackendSelectionFromContext,
   type ReasoningBackendMode,
 } from './reasoning-backend-policy.js';
 
@@ -114,6 +114,7 @@ let lastBrokerSelection: {
   provider: string;
   pinned: boolean;
 } | null = null;
+let lastModeSelectionReason: string | null = null;
 
 export function normalizeReasoningBackendMode(mode: ReasoningBackendMode): ReasoningBackendMode {
   return normalizeReasoningBackendModeFromPolicy(mode, loadReasoningBackendPolicy());
@@ -153,12 +154,14 @@ function resolveMode(options: InstallReasoningOptions): ReasoningBackendMode {
       configuredEndpoints.map((endpoint) => endpoint.runtime).join(', ') || 'none'
     }`
   );
-  return resolveReasoningBackendModeFromContext({
+  const selection = resolveReasoningBackendSelectionFromContext({
     requestedMode: options.mode,
     env: process.env,
     providers: discoveredProviders,
     policy: loadReasoningBackendPolicy(),
-  }) as ReasoningBackendMode;
+  });
+  lastModeSelectionReason = selection.reason;
+  return selection.mode;
 }
 
 function applyOperatorLlmSelection(options: InstallReasoningOptions): InstallReasoningOptions {
@@ -609,7 +612,19 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
         ? buildRoleAwareReasoningBackend(defaultBackend, roleBackends, profileBackends)
         : defaultBackend;
   }
-  registerReasoningBackend(activeBackend);
+  const bindingReason = [
+    lastModeSelectionReason,
+    lastBrokerSelection
+      ? `capability broker provider=${lastBrokerSelection.provider} pinned=${lastBrokerSelection.pinned}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('; ');
+  registerReasoningBackend(activeBackend, {
+    provenance: 'builtin',
+    source: activeBackend.name,
+    ...(bindingReason ? { reason: bindingReason } : {}),
+  });
   const intentCandidates = chain.flatMap((candidate) =>
     candidate.intentExtractor ? [candidate.intentExtractor] : []
   );
@@ -689,6 +704,7 @@ export function resetReasoningBootstrap(): void {
   installed = false;
   installedMode = null;
   lastBrokerSelection = null;
+  lastModeSelectionReason = null;
 }
 
 /** Which mode was selected on the last successful install, or null. */

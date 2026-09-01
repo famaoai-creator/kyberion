@@ -13,16 +13,16 @@
  */
 
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
   safeStat,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface ShellViolation {
   file: string;
@@ -270,15 +270,19 @@ export const runCheckPipelineShellIndependence = defineScript({
       );
     }
     if (violations.length > 0) {
-      console.error('[check:pipeline-shell-independence] violations detected:');
-      for (const violation of violations) {
-        console.error(
-          `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
-        );
-      }
-      throw new Error(`${violations.length} pipeline shell independence violation(s)`);
+      throw new ScriptExitError(
+        1,
+        [
+          'violations detected:',
+          ...violations.map(
+            (violation) =>
+              `- ${path.relative(ROOT, violation.file)} :: ${violation.pattern} :: ${JSON.stringify(violation.match)}`
+          ),
+        ].join('\n')
+      );
     }
     context.print('[check:pipeline-shell-independence] OK');
+    return { violations };
   },
 });
 

@@ -10,8 +10,7 @@
  * the next step.
  */
 
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import type { ScopeContext } from './scope-context.js';
 
@@ -98,19 +97,53 @@ export interface KnowledgeRankingWeights {
 
 export interface KnowledgeRankingWeightConfig {
   version?: string;
+  description?: string;
   defaults?: KnowledgeRankingWeights;
   tenant_overrides?: Record<string, KnowledgeRankingWeights>;
+}
+
+const KNOWLEDGE_WEIGHTS_PATH = pathResolver.knowledge('product/governance/knowledge-weights.json');
+const KNOWLEDGE_WEIGHTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-weights.schema.json'
+);
+const DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG: KnowledgeRankingWeightConfig = {
+  version: '1.0.0',
+  defaults: { proximity: 1, usage_yield: 4 },
+  tenant_overrides: {},
+};
+
+const knowledgeWeightsCatalog = defineCatalog<KnowledgeRankingWeightConfig>({
+  id: 'knowledge-weights',
+  path: KNOWLEDGE_WEIGHTS_PATH,
+  schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
+  fallback: DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG,
+  fallbackOnInvalid: true,
+});
+
+export function loadKnowledgeRankingWeightConfig(
+  rootPath = KNOWLEDGE_WEIGHTS_PATH,
+  fallbackOnInvalid = true
+): KnowledgeRankingWeightConfig {
+  if (rootPath === KNOWLEDGE_WEIGHTS_PATH && fallbackOnInvalid) {
+    return knowledgeWeightsCatalog.load();
+  }
+  return defineCatalog<KnowledgeRankingWeightConfig>({
+    id: 'knowledge-weights',
+    path: rootPath,
+    schema: KNOWLEDGE_WEIGHTS_SCHEMA_PATH,
+    fallback: DEFAULT_KNOWLEDGE_WEIGHTS_CONFIG,
+    fallbackOnInvalid,
+  }).load();
 }
 
 /** Load governed ranking knobs after the caller has resolved its scope. */
 export function loadKnowledgeRankingWeights(
   scope?: ScopeContext,
-  rootPath = pathResolver.knowledge('product/governance/knowledge-weights.json')
+  rootPath = KNOWLEDGE_WEIGHTS_PATH
 ): KnowledgeRankingWeights {
   const defaults: KnowledgeRankingWeights = { proximity: 1, usage_yield: 4 };
-  if (!safeExistsSync(rootPath)) return defaults;
   try {
-    const config = readJson<KnowledgeRankingWeightConfig>(rootPath);
+    const config = loadKnowledgeRankingWeightConfig(rootPath);
     return {
       ...defaults,
       ...(config.defaults || {}),

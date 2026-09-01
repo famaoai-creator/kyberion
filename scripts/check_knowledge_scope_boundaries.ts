@@ -1,8 +1,9 @@
 /** KS-16: semantic static checks for knowledge scope choke points. */
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { readJsonIfPresent } from '@agent/core/foundation';
+import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface KnowledgeScopeCheckConfig {
   max_direct_tenant_env_reads: number;
@@ -17,11 +18,9 @@ const DEFAULT_CONFIG: KnowledgeScopeCheckConfig = { max_direct_tenant_env_reads:
 const CONFIG_PATH = path.join(root, 'knowledge/product/governance/knowledge-scope-check.json');
 
 function loadConfig(): KnowledgeScopeCheckConfig {
-  if (!safeExistsSync(CONFIG_PATH)) return DEFAULT_CONFIG;
+  const parsed = readJsonIfPresent<Partial<KnowledgeScopeCheckConfig>>(CONFIG_PATH);
+  if (!parsed) return DEFAULT_CONFIG;
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(CONFIG_PATH, { encoding: 'utf8' }))
-    ) as Partial<KnowledgeScopeCheckConfig>;
     return {
       ...DEFAULT_CONFIG,
       ...parsed,
@@ -169,12 +168,13 @@ export const runCheckKnowledgeScopeBoundaries = defineScript({
   run(context) {
     const findings = scan();
     if (findings.length > 0) {
-      console.error('[check_knowledge_scope_boundaries] FAILED');
-      for (const finding of findings) console.error(`- ${finding}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...findings.map((finding) => `- ${finding}`)].join('\n')
+      );
     }
     context.print('[check_knowledge_scope_boundaries] OK');
+    return { findings };
   },
 });
 

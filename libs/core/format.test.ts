@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { getAllFiles } from './fs-utils.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -197,6 +204,15 @@ describe('resolveTimeZone', () => {
   it('tolerates a malformed identity file and falls through', () => {
     const identityPath = writeIdentityFixture('identity-malformed.json', '{not json');
     expect(resolveTimeZone({ identityPath })).toBe('Asia/Tokyo');
+  });
+
+  it('ignores an identity file reached through a symlink', () => {
+    const targetPath = writeIdentityFixture('identity-outside.json', {
+      timeZone: 'America/New_York',
+    });
+    const linkedPath = fixturePath('identity-linked.json');
+    safeSymlinkSync(targetPath, linkedPath);
+    expect(resolveTimeZone({ identityPath: linkedPath })).toBe('Asia/Tokyo');
   });
 });
 

@@ -57,6 +57,7 @@ import {
   buildExecutionEnv,
   buildTrackGateReadinessSummaries,
   buildTrackNextWorkProposal,
+  assertSafeRepositoryPath,
   clearSurfaceOutboxMessage,
   createDistillCandidateRecord,
   createNextActionContract,
@@ -94,6 +95,7 @@ import {
   restartAgentRuntime,
   safeExec,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   loadJson,
   safeReaddir,
@@ -109,28 +111,50 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
-import { getProjectManagementView } from '@agent/core';
+import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
 import * as intelligenceData from './intelligence-observation-data';
+import {
+  numberField,
+  optionalStringField,
+  parseJsonRecord,
+  recordField,
+  stringField,
+} from '../../../lib/json-record';
 
-export function collectRecentEvents(tenantSlugs: intelligenceData.TenantScope = 'all') {
+export function readSafeObservationFile(filePath: string): string | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return safeReadFile(safePath, { encoding: 'utf8' }) as string;
+  } catch {
+    return null;
+  }
+}
+
+export function collectRecentEvents(
+  tenantSlugs: intelligenceData.TenantScope = 'all',
+  tierAccess?: readonly string[]
+) {
   const files = [
     pathResolver.shared('observability/channels/slack/missions.jsonl'),
     pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
   ];
   const lines: Array<{ ts: string; decision: string; mission_id?: string; why?: string }> = [];
   for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
+    const raw = readSafeObservationFile(file);
+    if (raw === null) continue;
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       try {
-        const event = JSON.parse(line) as any;
+        const event = parseJsonRecord(line);
+        if (!event) continue;
         lines.push({
-          ts: event.ts || new Date().toISOString(),
-          decision: event.decision || event.event_type || 'event',
-          mission_id: event.mission_id || event.resource_id,
-          why: event.why,
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          decision: stringField(event, 'decision', stringField(event, 'event_type', 'event')),
+          mission_id:
+            optionalStringField(event, 'mission_id') || optionalStringField(event, 'resource_id'),
+          why: optionalStringField(event, 'why'),
         });
       } catch {
         // Ignore malformed lines.
@@ -138,47 +162,49 @@ export function collectRecentEvents(tenantSlugs: intelligenceData.TenantScope = 
     }
   }
   return lines
-    .filter((event) => intelligenceData.missionVisibleToTenant(event.mission_id, tenantSlugs))
+    .filter((event) =>
+      intelligenceData.observationVisibleToScope(event.mission_id, tenantSlugs, tierAccess)
+    )
     .sort((a, b) => b.ts.localeCompare(a.ts))
     .slice(0, 8);
 }
 export function collectControlActions(
-  tenantSlugs: intelligenceData.TenantScope = 'all'
+  tenantSlugs: intelligenceData.TenantScope = 'all',
+  tierAccess?: readonly string[]
 ): intelligenceData.ControlActionSummary[] {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  if (!safeExistsSync(file)) return [];
+  const raw = readSafeObservationFile(file);
+  if (raw === null) return [];
 
   const lifecycle = new Map<string, intelligenceData.ControlActionSummary>();
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
   for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
-      const event = JSON.parse(line) as any;
-      const decision = event.decision || event.event_type;
-      const eventId = typeof event.event_id === 'string' ? event.event_id : undefined;
+      const event = parseJsonRecord(line);
+      if (!event) continue;
+      const payload = recordField(event.payload);
+      const decision = stringField(event, 'decision', stringField(event, 'event_type'));
+      const eventType = stringField(event, 'event_type');
+      const eventId = optionalStringField(event, 'event_id');
 
       if (
         decision === 'mission_orchestration_event_enqueued' &&
-        (event.event_type === 'mission_control_requested' ||
-          event.event_type === 'surface_control_requested') &&
+        (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
         eventId
       ) {
         const queuedTarget =
-          event.event_type === 'surface_control_requested'
-            ? event.payload?.surfaceId || 'surface-runtime'
-            : event.mission_id || 'system';
+          eventType === 'surface_control_requested'
+            ? stringField(payload, 'surfaceId', 'surface-runtime')
+            : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === 'mission_control_requested' ? 'mission' : 'surface',
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: queuedTarget,
-          operation:
-            typeof event.payload?.operation === 'string'
-              ? event.payload.operation
-              : event.event_type,
+          operation: stringField(payload, 'operation', eventType),
           status: 'queued',
-          requested_by: event.requested_by || 'unknown',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
         });
         continue;
       }
@@ -186,73 +212,71 @@ export function collectControlActions(
       if (
         (decision === 'mission_control_action_applied' ||
           decision === 'surface_control_action_applied') &&
-        typeof event.operation === 'string'
+        stringField(event, 'operation').length > 0
       ) {
-        const syntheticId = `${decision}:${event.mission_id || event.resource_id || 'system'}:${event.operation}:${event.ts || ''}`;
+        const operation = stringField(event, 'operation');
+        const syntheticId = `${decision}:${stringField(event, 'mission_id', stringField(event, 'resource_id', 'system'))}:${operation}:${stringField(event, 'ts')}`;
         lifecycle.set(syntheticId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
+          ts: stringField(event, 'ts', new Date().toISOString()),
           kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
-          target: event.mission_id || event.resource_id || 'system',
-          operation: event.operation,
+          target: stringField(event, 'mission_id', stringField(event, 'resource_id', 'system')),
+          operation,
           status: 'completed',
-          requested_by: event.requested_by || 'unknown',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
         });
         continue;
       }
 
       if (decision === 'memory_promote_pending_applied') {
-        const syntheticId = `${decision}:${event.resource_id || 'memory-promotion-queue'}:${event.ts || ''}`;
+        const syntheticId = `${decision}:${stringField(event, 'resource_id', 'memory-promotion-queue')}:${stringField(event, 'ts')}`;
         lifecycle.set(syntheticId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
+          ts: stringField(event, 'ts', new Date().toISOString()),
           kind: 'surface',
-          target: event.resource_id || 'memory-promotion-queue',
+          target: stringField(event, 'resource_id', 'memory-promotion-queue'),
           operation: 'memory_promote_pending',
           status: 'completed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
+          requested_by: stringField(event, 'requested_by', 'unknown'),
+          error: optionalStringField(event, 'error'),
         });
         continue;
       }
 
       if (decision === 'next_action_executed') {
-        const syntheticId = `${decision}:${event.resource_id || 'next-actions'}:${event.operation || 'next_action_execute'}:${event.ts || ''}`;
+        const operation = stringField(event, 'operation', 'next_action_execute');
+        const syntheticId = `${decision}:${stringField(event, 'resource_id', 'next-actions')}:${operation}:${stringField(event, 'ts')}`;
         lifecycle.set(syntheticId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
+          ts: stringField(event, 'ts', new Date().toISOString()),
           kind: 'surface',
-          target: event.resource_id || 'next-actions',
-          operation: typeof event.operation === 'string' ? event.operation : 'next_action_execute',
-          status: event.outcome === 'failed' ? 'failed' : 'completed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
+          target: stringField(event, 'resource_id', 'next-actions'),
+          operation,
+          status: stringField(event, 'outcome') === 'failed' ? 'failed' : 'completed',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
+          error: optionalStringField(event, 'error'),
         });
         continue;
       }
 
       if (
         decision === 'mission_orchestration_event_failed' &&
-        (event.event_type === 'mission_control_requested' ||
-          event.event_type === 'surface_control_requested') &&
+        (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
         eventId
       ) {
         const failedTarget =
-          event.event_type === 'surface_control_requested'
-            ? event.payload?.surfaceId || 'surface-runtime'
-            : event.mission_id || 'system';
+          eventType === 'surface_control_requested'
+            ? stringField(payload, 'surfaceId', 'surface-runtime')
+            : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === 'mission_control_requested' ? 'mission' : 'surface',
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: failedTarget,
-          operation:
-            typeof event.payload?.operation === 'string'
-              ? event.payload.operation
-              : event.event_type,
+          operation: stringField(payload, 'operation', eventType),
           status: 'failed',
-          requested_by: event.requested_by || 'unknown',
-          error: typeof event.error === 'string' ? event.error : undefined,
+          requested_by: stringField(event, 'requested_by', 'unknown'),
+          error: optionalStringField(event, 'error'),
         });
       }
     } catch {
@@ -264,7 +288,7 @@ export function collectControlActions(
     .filter(
       (action) =>
         (action.kind === 'mission' &&
-          intelligenceData.missionVisibleToTenant(action.target, tenantSlugs)) ||
+          intelligenceData.missionVisibleToScope(action.target, tenantSlugs, tierAccess)) ||
         (action.kind === 'surface' && tenantSlugs === 'all')
     )
     .sort((a, b) => b.ts.localeCompare(a.ts))
@@ -527,30 +551,34 @@ export function collectControlActionAvailability(
 }
 
 export function collectControlActionDetails(
-  tenantSlugs: intelligenceData.TenantScope = 'all'
+  tenantSlugs: intelligenceData.TenantScope = 'all',
+  tierAccess?: readonly string[]
 ): Record<string, intelligenceData.ControlActionDetail[]> {
   const file = pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
-  if (!safeExistsSync(file)) return {};
+  const raw = readSafeObservationFile(file);
+  if (raw === null) return {};
 
   const details: Record<string, intelligenceData.ControlActionDetail[]> = {};
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
   for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
-      const event = JSON.parse(line) as any;
-      const eventId = typeof event.event_id === 'string' ? event.event_id : undefined;
+      const event = parseJsonRecord(line);
+      if (!event) continue;
+      const eventId = optionalStringField(event, 'event_id');
       if (!eventId) continue;
+      const eventType = stringField(event, 'event_type');
+      const decision = stringField(event, 'decision');
       if (
-        event.event_type !== 'mission_control_requested' &&
-        event.event_type !== 'surface_control_requested' &&
-        event.decision !== 'mission_control_action_applied' &&
-        event.decision !== 'surface_control_action_applied' &&
-        event.decision !== 'next_action_executed' &&
-        event.decision !== 'memory_promote_pending_applied' &&
-        event.decision !== 'mission_orchestration_event_started' &&
-        event.decision !== 'mission_orchestration_event_completed' &&
-        event.decision !== 'mission_orchestration_event_failed'
+        eventType !== 'mission_control_requested' &&
+        eventType !== 'surface_control_requested' &&
+        decision !== 'mission_control_action_applied' &&
+        decision !== 'surface_control_action_applied' &&
+        decision !== 'next_action_executed' &&
+        decision !== 'memory_promote_pending_applied' &&
+        decision !== 'mission_orchestration_event_started' &&
+        decision !== 'mission_orchestration_event_completed' &&
+        decision !== 'mission_orchestration_event_failed'
       ) {
         continue;
       }
@@ -559,16 +587,16 @@ export function collectControlActionDetails(
         details[eventId] = [];
       }
       details[eventId].push({
-        ts: event.ts || new Date().toISOString(),
-        decision: event.decision || 'event',
-        event_type: event.event_type,
-        mission_id: event.mission_id,
-        resource_id: event.resource_id,
-        operation: event.operation,
-        action_id: event.action_id,
-        outcome: event.outcome,
-        why: event.why,
-        error: event.error,
+        ts: stringField(event, 'ts', new Date().toISOString()),
+        decision: stringField(event, 'decision', 'event'),
+        event_type: optionalStringField(event, 'event_type'),
+        mission_id: optionalStringField(event, 'mission_id'),
+        resource_id: optionalStringField(event, 'resource_id'),
+        operation: optionalStringField(event, 'operation'),
+        action_id: optionalStringField(event, 'action_id'),
+        outcome: optionalStringField(event, 'outcome'),
+        why: optionalStringField(event, 'why'),
+        error: optionalStringField(event, 'error'),
       });
     } catch {
       // Ignore malformed lines.
@@ -579,10 +607,10 @@ export function collectControlActionDetails(
     details[key] = details[key].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
   }
 
-  if (tenantSlugs !== 'all') {
+  if (tenantSlugs !== 'all' || tierAccess) {
     for (const key of Object.keys(details)) {
       const scoped = details[key].filter((detail) =>
-        intelligenceData.missionVisibleToTenant(detail.mission_id, tenantSlugs)
+        intelligenceData.observationVisibleToScope(detail.mission_id, tenantSlugs, tierAccess)
       );
       if (scoped.length > 0) details[key] = scoped;
       else delete details[key];
@@ -593,7 +621,8 @@ export function collectControlActionDetails(
 }
 
 export function collectOwnerSummaries(
-  tenantSlugs: intelligenceData.TenantScope = 'all'
+  tenantSlugs: intelligenceData.TenantScope = 'all',
+  tierAccess?: readonly string[]
 ): intelligenceData.OwnerSummary[] {
   const summaries: intelligenceData.OwnerSummary[] = [];
   const files = [
@@ -602,21 +631,27 @@ export function collectOwnerSummaries(
   ];
 
   for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
+    const raw = readSafeObservationFile(file);
+    if (raw === null) continue;
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       try {
-        const event = JSON.parse(line) as any;
-        if ((event.decision || event.event_type) !== 'mission_owner_notified') continue;
-        if (!intelligenceData.missionVisibleToTenant(event.mission_id, tenantSlugs)) continue;
+        const event = parseJsonRecord(line);
+        if (!event) continue;
+        if (
+          stringField(event, 'decision', stringField(event, 'event_type')) !==
+          'mission_owner_notified'
+        )
+          continue;
+        const missionId = optionalStringField(event, 'mission_id');
+        if (!intelligenceData.missionVisibleToScope(missionId, tenantSlugs, tierAccess)) continue;
         summaries.push({
-          ts: event.ts || new Date().toISOString(),
-          mission_id: event.mission_id || 'unknown',
-          accepted_count: Number(event.accepted_count || 0),
-          reviewed_count: Number(event.reviewed_count || 0),
-          completed_count: Number(event.completed_count || 0),
-          requested_count: Number(event.requested_count || 0),
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          mission_id: missionId || 'unknown',
+          accepted_count: numberField(event, 'accepted_count'),
+          reviewed_count: numberField(event, 'reviewed_count'),
+          completed_count: numberField(event, 'completed_count'),
+          requested_count: numberField(event, 'requested_count'),
         });
       } catch {
         // Ignore malformed lines.
@@ -740,19 +775,38 @@ export function collectRecentSurfaceOutbox(): intelligenceData.SurfaceOutboxMess
     .slice(0, 8);
 }
 
+export function approvalVisibleToScope(
+  input: { tenantSlug?: string; missionId?: string },
+  tenantSlugs: intelligenceData.TenantScope,
+  tierAccess?: readonly string[]
+): boolean {
+  if (tenantSlugs !== 'all' && (!input.tenantSlug || !tenantSlugs.includes(input.tenantSlug))) {
+    return false;
+  }
+  if (!tierAccess) return true;
+  if (input.missionId) {
+    return intelligenceData.missionVisibleToScope(input.missionId, tenantSlugs, tierAccess);
+  }
+  return tierAccess.includes('confidential');
+}
+
 export function collectPendingSecretApprovals(
-  tenantSlugs: string[] | 'all'
+  tenantSlugs: string[] | 'all',
+  tierAccess?: readonly string[]
 ): intelligenceData.SecretApprovalSummary[] {
   const secretApprovals = listApprovalRequests({
     kind: 'secret_mutation',
     status: 'pending',
   })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
+    .filter((request) =>
+      approvalVisibleToScope(
+        {
+          tenantSlug: resolveApprovalTenant(request) || undefined,
+          missionId: request.requestedByContext?.missionId,
+        },
+        tenantSlugs,
+        tierAccess
+      )
     )
     .map((request) => ({
       id: request.id,
@@ -778,12 +832,15 @@ export function collectPendingSecretApprovals(
     kind: 'channel-approval',
     status: 'pending',
   })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
+    .filter((request) =>
+      approvalVisibleToScope(
+        {
+          tenantSlug: resolveApprovalTenant(request) || undefined,
+          missionId: request.requestedByContext?.missionId,
+        },
+        tenantSlugs,
+        tierAccess
+      )
     )
     .map((request) => ({
       id: request.id,
@@ -810,15 +867,19 @@ export function collectPendingSecretApprovals(
 }
 
 export function collectPendingApprovals(
-  tenantSlugs: string[] | 'all'
+  tenantSlugs: string[] | 'all',
+  tierAccess?: readonly string[]
 ): intelligenceData.PendingApprovalSummary[] {
   return listApprovalRequests({ status: 'pending' })
-    .filter(
-      (request) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          resolveApprovalTenant(request) && tenantSlugs.includes(resolveApprovalTenant(request)!)
-        )
+    .filter((request) =>
+      approvalVisibleToScope(
+        {
+          tenantSlug: resolveApprovalTenant(request) || undefined,
+          missionId: request.requestedByContext?.missionId,
+        },
+        tenantSlugs,
+        tierAccess
+      )
     )
     .map((request) => ({
       id: request.id,

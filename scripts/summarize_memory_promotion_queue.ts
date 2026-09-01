@@ -6,13 +6,26 @@
  * direct CLI use (`--status <s> --output <path> --json`).
  */
 
-import { pathResolver, safeWriteFile } from '@agent/core';
-import { formatMemoryPromotionQueueMarkdown, summarizeMemoryPromotionQueue } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeWriteFile } from '@agent/core/secure-io';
+import {
+  formatMemoryPromotionQueueMarkdown,
+  summarizeMemoryPromotionQueue,
+} from '@agent/core/report-ops';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { summarizeMemoryPromotionQueue };
 
-export function main(argv: string[] = []): void {
+export const MEMORY_PROMOTION_QUEUE_USAGE =
+  'Usage: pnpm memory:summarize-promotion-queue [--status <status>] [--output <path>] [--json]';
+
+export function main(argv: string[] = []): {
+  rows?: ReturnType<typeof summarizeMemoryPromotionQueue>;
+  output?: string;
+  help?: string;
+} {
+  if (argv.includes('--help') || argv.includes('-h')) return { help: MEMORY_PROMOTION_QUEUE_USAGE };
+
   const jsonOnly = argv.includes('--json');
   const statusArgIndex = argv.indexOf('--status');
   const outputArgIndex = argv.indexOf('--output');
@@ -21,7 +34,9 @@ export function main(argv: string[] = []): void {
   const rows = summarizeMemoryPromotionQueue(status);
 
   if (outputPath) {
-    const absPath = pathResolver.resolve(outputPath);
+    const absPath = assertSafeRepositoryPath(pathResolver.resolve(outputPath), {
+      allowMissingLeaf: true,
+    });
     safeWriteFile(
       absPath,
       jsonOnly
@@ -31,16 +46,20 @@ export function main(argv: string[] = []): void {
   }
 
   if (jsonOnly) {
-    console.log(JSON.stringify({ rows }, null, 2));
-    return;
+    return { rows, output: outputPath || JSON.stringify({ rows }, null, 2) };
   }
-  console.log(formatMemoryPromotionQueueMarkdown(rows));
+  return { rows, output: formatMemoryPromotionQueueMarkdown(rows) };
 }
 
 export const runSummarizeMemoryPromotionQueue = defineScript({
   name: 'memory:summarize-promotion-queue',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  flags: ['json'],
+  run: ({ argv, json, print }) => {
+    const result = main(argv);
+    if (result.help) print(json ? result : result.help);
+    else if (result.output !== undefined) print(result.output);
+    return result;
+  },
 });
 
 if (

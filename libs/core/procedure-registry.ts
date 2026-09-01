@@ -1,9 +1,11 @@
 import path from 'node:path';
 import { logger } from './core.js';
+import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { matchesAllowedOrigin } from './origin-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { delegateStructured, getReasoningBackend } from './reasoning-backend.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import {
   PROCEDURE_RESOLUTION_THRESHOLDS,
   type ProcedureCatalog,
@@ -26,6 +28,51 @@ const PERSONAL_BROWSER_PROCEDURES_PATH = pathResolver.knowledge('personal/browse
  */
 const RECORDINGS_STORE = pathResolver.shared('runtime/recordings');
 const PERSONAL_RECORDINGS_STORE = pathResolver.knowledge('personal/browser-recordings');
+const PROCEDURE_SCHEMA_PATH = pathResolver.knowledge('product/schemas/procedures.schema.json');
+
+const procedureCatalog = defineCatalog<ProcedureCatalog>({
+  id: 'procedures',
+  path: () => pathResolver.rootResolve(PROCEDURES_PATH),
+  schema: PROCEDURE_SCHEMA_PATH,
+});
+
+/** Validate a procedure catalog before it is persisted by a promotion flow. */
+export function validateProcedureCatalog(
+  value: unknown,
+  label = PROCEDURES_PATH
+): ProcedureCatalog {
+  return procedureCatalog.validate(value, label);
+}
+
+/** Read a procedure catalog with shared envelope validation and per-entry filtering. */
+export function readProcedureCatalog(filePath: string): ProcedureCatalog {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PROCEDURE_REGISTRY] catalog must be a regular file: ${filePath}`);
+  }
+  const parsed = readJson<unknown>(safeFilePath);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return validateProcedureCatalog(parsed, safeFilePath);
+  }
+  const candidate = parsed as Record<string, unknown>;
+  if (!Array.isArray(candidate.procedures)) {
+    return validateProcedureCatalog(parsed, safeFilePath);
+  }
+
+  // Keep the legacy registry behavior: one malformed entry must not hide
+  // otherwise usable procedures from the catalog.
+  const envelope = validateProcedureCatalog({ ...candidate, procedures: [] }, safeFilePath);
+  const entries = candidate.procedures.filter((entry) => {
+    try {
+      validateProcedureCatalog({ ...envelope, procedures: [entry] }, safeFilePath);
+      return true;
+    } catch (error) {
+      logger.warn(`[procedure-registry] dropping schema-invalid entry from ${filePath}: ${error}`);
+      return false;
+    }
+  }) as ProcedureEntry[];
+  return { ...envelope, procedures: entries };
+}
 
 let catalogCache: ProcedureEntry[] | null = null;
 
@@ -69,8 +116,7 @@ export function loadProcedures(forceRefresh = false): ProcedureEntry[] {
   for (const source of sources) {
     if (source.optional && !safeExistsSync(source.file)) continue;
     try {
-      const raw = safeReadFile(source.file, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw) as ProcedureCatalog;
+      const parsed = readProcedureCatalog(source.file);
       const entries = Array.isArray(parsed.procedures) ? parsed.procedures : [];
       loadedAny = true;
       for (const entry of entries) {
@@ -126,7 +172,12 @@ export function resolveAllowlistedRecordingRef(recordingRef: string | undefined)
   const abs = path.resolve(pathResolver.rootResolve(recordingRef));
   const stores = [RECORDINGS_STORE, PERSONAL_RECORDINGS_STORE].map((store) => path.resolve(store));
   // Must be strictly within a store (defends against ../ escape and prefix tricks).
-  return stores.some((store) => abs !== store && abs.startsWith(store + path.sep)) ? abs : null;
+  if (!stores.some((store) => abs !== store && abs.startsWith(store + path.sep))) return null;
+  try {
+    return assertSafeRepositoryPath(abs, { allowMissingLeaf: true });
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

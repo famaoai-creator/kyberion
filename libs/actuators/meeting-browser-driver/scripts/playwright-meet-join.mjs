@@ -2,7 +2,9 @@
 import * as path from 'node:path';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { StubAudioBus, pathResolver, logger } from '@agent/core';
+import { StubAudioBus } from '@agent/core/audio-bus';
+import { pathResolver } from '@agent/core/path-resolver';
+import { logger } from '@agent/core/core';
 import { createBrowserMeetingJoinDriver } from '../../../../dist/libs/actuators/meeting-browser-driver/src/index.js';
 
 function readPayload() {

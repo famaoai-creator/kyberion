@@ -15,7 +15,6 @@ import { findMissionPath } from './path-resolver.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import { issueTaskGrantBestEffort } from './task-scoped-grants.js';
 import type { MissionState } from './mission-types.js';
-import { writeJsonFile as writeJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
 import { recordTask } from './mission-maintenance.js';
@@ -209,6 +208,7 @@ async function dispatchMissionWorkItemsRound(
       });
       updateNextTasksReflection(
         missionPath,
+        missionId,
         artifactReviewContext.reviewTaskId,
         {
           result_status: 'blocked',
@@ -497,16 +497,20 @@ async function dispatchMissionWorkItemsRound(
       record.notes.push('needs_input');
     }
     if (clarificationPacket && clarificationPacketPath) {
-      writeDispatchArtifact(clarificationPacketPath, {
-        mission_id: missionId,
-        item_id: item.item_id,
-        task_result: response.taskResult,
-        clarification_packet: clarificationPacket,
-        clarification_packet_path: clarificationPacketPath,
-        needs: taskResultNeeds,
-        status: 'needs_input',
-        written_at: new Date().toISOString(),
-      });
+      writeDispatchArtifact(
+        clarificationPacketPath,
+        {
+          mission_id: missionId,
+          item_id: item.item_id,
+          task_result: response.taskResult,
+          clarification_packet: clarificationPacket,
+          clarification_packet_path: clarificationPacketPath,
+          needs: taskResultNeeds,
+          status: 'needs_input',
+          written_at: new Date().toISOString(),
+        },
+        { missionId, missionPath }
+      );
       record.clarification_packet = clarificationPacket;
       record.clarification_packet_path = clarificationPacketPath;
       record.notes.push(`clarification packet: ${clarificationPacketPath}`);
@@ -575,7 +579,7 @@ async function dispatchMissionWorkItemsRound(
       taskResultRepairs: response.repairs,
       taskResultRepairRequiresReview: response.repairRequiresReview,
     });
-    writeDispatchArtifact(artifact.filePath, artifact.payload);
+    writeDispatchArtifact(artifact.filePath, artifact.payload, { missionId, missionPath });
     record.response_path = artifact.filePath;
     record.response_excerpt = response.responseText.slice(0, 400);
     record.context_pack_id = dispatchContext.contextPackId;
@@ -781,7 +785,7 @@ async function dispatchMissionWorkItemsRound(
   const manifestFilePath = manifestPath(missionPath);
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = dispatchEventPath(missionPath);
-  writeJsonFileFromDispatchIO(manifestFilePath, manifest);
+  writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
 
   appendDispatchEvent(dispatchEventPath(missionPath), {
     event: 'dispatch_completed',

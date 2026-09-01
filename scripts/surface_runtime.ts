@@ -2,37 +2,37 @@
 import * as path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
-  createStandardYargs,
   loadSurfaceManifest,
-  saveSurfaceManifest,
-  readSurfaceLogTail,
   loadSurfaceState,
-  logger,
   normalizeSurfaceDefinition,
-  probeSurfacePort,
-  pathResolver,
   probeSurfaceHealth,
-  runtimeSupervisor,
+  probeSurfacePort,
+  readSurfaceLogTail,
+  saveSurfaceManifest,
   saveSurfaceState,
-  safeOpenAppendFile,
-  spawnManagedProcess,
-  inspectServiceAuth,
   surfaceLogPath,
   surfaceManifestDirectoryPath,
   surfaceManifestFilePath,
   surfaceManifestPath,
   surfaceResourceId,
   surfaceStatePath,
-  auditChain,
-  buildNextAction,
-  formatNextAction,
-  getProtocolServiceRegistryEntry,
-  recordProtocolServiceLifecycle,
-} from '@agent/core';
-import type { SurfaceRuntimeDefinition, SurfaceRuntimeKind } from '@agent/core';
+  type SurfaceRuntimeDefinition,
+  type SurfaceRuntimeKind,
+} from '@agent/core/surface-runtime';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { safeOpenAppendFile } from '@agent/core/secure-io';
+import { spawnManagedProcess } from '@agent/core/managed-process';
+import { inspectServiceAuth } from '@agent/core/service-validator';
+import { auditChain } from '@agent/core/audit-chain';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
+import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =
   | 'reconcile'
@@ -209,7 +209,7 @@ function buildSurfaceRepairHint(
   health: Awaited<ReturnType<typeof probeSurfaceHealth>>
 ): string {
   if (record && !isRunning(record.pid)) {
-    return 'stale state record: run pnpm surfaces:repair -- --surface <surface-id>';
+    return 'stale state record: run pnpm surfaces repair -- --surface <surface-id>';
   }
   if (health.status === 'healthy') {
     return 'healthy';
@@ -219,7 +219,7 @@ function buildSurfaceRepairHint(
       ? 'disabled surface: enable it before repair'
       : 'no health probe configured: inspect logs or add a health path';
   }
-  return `unhealthy (${health.detail}): run pnpm surfaces:repair -- --surface <surface-id>`;
+  return `unhealthy (${health.detail}): run pnpm surfaces repair -- --surface <surface-id>`;
 }
 
 function buildSurfaceNextAction(
@@ -232,14 +232,14 @@ function buildSurfaceNextAction(
       title: `Inspect surface ${surfaceId}`,
       reason: repairHint,
       next_action_type: 'inspect_artifact',
-      suggested_command: `pnpm surfaces:status -- --surface ${surfaceId}`,
+      suggested_command: `pnpm surfaces status -- --surface ${surfaceId}`,
     });
   }
   return buildNextAction({
     title: `Repair surface ${surfaceId}`,
     reason: repairHint,
     next_action_type: 'repair_surface',
-    suggested_command: `pnpm surfaces:repair -- --surface ${surfaceId}`,
+    suggested_command: `pnpm surfaces repair -- --surface ${surfaceId}`,
   });
 }
 
@@ -431,7 +431,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
       results.push(started);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(
+      logger.warn(
         `⚠️  [SURFACE] Failed to start "${definition.id}": ${message}. Continuing with the next surface.`
       );
       results.push({ id: definition.id, status: 'failed', reason: message });
@@ -546,51 +546,51 @@ async function listUnits() {
                 title: `Fix surface auth for ${d.id}`,
                 reason: auth.setupHint,
                 next_action_type: 'bootstrap_environment',
-                suggested_command: 'pnpm surfaces:setup',
+                suggested_command: 'pnpm surfaces setup',
               })
             : health.status !== 'healthy'
               ? buildNextAction({
                   title: `Repair surface ${d.id}`,
                   reason: health.detail,
                   next_action_type: 'repair_surface',
-                  suggested_command: `pnpm surfaces:repair -- --surface ${d.id}`,
+                  suggested_command: `pnpm surfaces repair -- --surface ${d.id}`,
                 })
               : buildNextAction({
                   title: `Inspect surface ${d.id}`,
                   reason: 'Surface is healthy.',
                   next_action_type: 'inspect_artifact',
-                  suggested_command: `pnpm surfaces:status -- --surface ${d.id}`,
+                  suggested_command: `pnpm surfaces status -- --surface ${d.id}`,
                 }),
         pid: record?.pid || '-',
       };
     })
   );
 
-  console.log('');
-  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
-  console.log(header);
-  console.log('-'.repeat(header.length + 5));
-
-  for (const r of results) {
-    const statusColor = r.status === 'running' ? '🟢' : '⚪';
-    const enabledColor = r.enabled === 'enabled' ? '✅' : '❌';
-    const authColor = r.auth === 'ready' ? '✅' : r.auth === 'missing' ? '⚠️' : '—';
-    console.log(
-      `${r.unit.padEnd(25)} ${r.kind.padEnd(10)} ${enabledColor} ${r.enabled.padEnd(8)} ${statusColor} ${r.status.padEnd(8)} ${authColor} ${r.auth.padEnd(8)} ${r.health.padEnd(10)} ${String(r.port).padEnd(6)} ${r.pid}`
-    );
-    if (
-      r.nextAction &&
-      (r.auth === 'missing' || r.health !== 'healthy' || r.enabled !== 'enabled')
-    ) {
-      for (const line of formatNextAction(r.nextAction)) {
-        console.log(`  ${line}`);
-      }
-    }
-  }
-  console.log('');
+  return { status: 'ok', units: results };
 }
 
-export async function setupSurfaces(options: { quiet?: boolean } = {}) {
+function formatListUnits(result: Awaited<ReturnType<typeof listUnits>>): string {
+  const header = `${'UNIT'.padEnd(25)} ${'KIND'.padEnd(10)} ${'ENABLED'.padEnd(10)} ${'STATUS'.padEnd(10)} ${'HEALTH'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'PORT'.padEnd(6)} PID`;
+  const lines = ['', header, '-'.repeat(header.length + 5)];
+  for (const row of result.units) {
+    const statusColor = row.status === 'running' ? '🟢' : '⚪';
+    const enabledColor = row.enabled === 'enabled' ? '✅' : '❌';
+    const authColor = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    lines.push(
+      `${row.unit.padEnd(25)} ${row.kind.padEnd(10)} ${enabledColor} ${row.enabled.padEnd(8)} ${statusColor} ${row.status.padEnd(8)} ${authColor} ${row.auth.padEnd(8)} ${row.health.padEnd(10)} ${String(row.port).padEnd(6)} ${row.pid}`
+    );
+    if (
+      row.nextAction &&
+      (row.auth === 'missing' || row.health !== 'healthy' || row.enabled !== 'enabled')
+    ) {
+      lines.push(...formatNextAction(row.nextAction).map((line) => `  ${line}`));
+    }
+  }
+  lines.push('');
+  return lines.join('\n');
+}
+
+export async function setupSurfaces(_options: { quiet?: boolean } = {}) {
   const manifest = loadSurfaceManifest();
   const rows = sortSurfaceSetupRows(
     await Promise.all(
@@ -624,26 +624,6 @@ export async function setupSurfaces(options: { quiet?: boolean } = {}) {
     { total: 0, enabled: 0, disabled: 0, ready: 0, missing: 0, hostManaged: 0 }
   );
 
-  if (!options.quiet) {
-    console.log('');
-    console.log(
-      `Setup summary: ${summary.missing} missing, ${summary.ready} ready, ${summary.hostManaged} host-managed, ${summary.disabled} disabled, ${summary.total} total`
-    );
-    const header = `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`;
-    console.log(header);
-    console.log('-'.repeat(header.length + 8));
-    for (const row of rows) {
-      const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
-      console.log(
-        `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
-      );
-      if (row.auth === 'missing' || row.auth === 'n/a') {
-        console.log(`  ↳ ${row.hint}`);
-      }
-    }
-    console.log('');
-  }
-
   return {
     status: 'ok',
     manifestPath: surfaceManifestPath(),
@@ -651,6 +631,25 @@ export async function setupSurfaces(options: { quiet?: boolean } = {}) {
     rows,
     summary,
   };
+}
+
+function formatSurfaceSetupReport(report: Awaited<ReturnType<typeof setupSurfaces>>): string {
+  const lines = [
+    '',
+    `Setup summary: ${report.summary.missing} missing, ${report.summary.ready} ready, ${report.summary.hostManaged} host-managed, ${report.summary.disabled} disabled, ${report.summary.total} total`,
+    `${'SURFACE'.padEnd(25)} ${'ENABLED'.padEnd(10)} ${'AUTH'.padEnd(10)} ${'STRATEGY'.padEnd(14)} ${'SECRETS'.padEnd(36)} CLI`,
+  ];
+  const header = lines[2];
+  lines.splice(3, 0, '-'.repeat(header.length + 8));
+  for (const row of report.rows) {
+    const authSymbol = row.auth === 'ready' ? '✅' : row.auth === 'missing' ? '⚠️' : '—';
+    lines.push(
+      `${row.surface.padEnd(25)} ${row.enabled.padEnd(10)} ${authSymbol} ${row.auth.padEnd(8)} ${row.strategy.padEnd(14)} ${row.secrets.slice(0, 36).padEnd(36)} ${row.cli}`
+    );
+    if (row.auth === 'missing' || row.auth === 'n/a') lines.push(`  ↳ ${row.hint}`);
+  }
+  lines.push('');
+  return lines.join('\n');
 }
 
 async function repairSurfaceById(surfaceId: string, manifestPath: string) {
@@ -863,8 +862,44 @@ async function reconcileHealth(manifestPath: string) {
   return restarted;
 }
 
-const main = async (args: string[] = []) => {
-  const argv = await createStandardYargs()
+const MUTATING_SURFACE_ACTIONS = new Set<SurfaceAction>([
+  'reconcile',
+  'start',
+  'stop',
+  'repair',
+  'enable',
+  'disable',
+  'register',
+  'unregister',
+]);
+
+const SURFACE_ACTIONS = new Set<SurfaceAction>([
+  'reconcile',
+  'start',
+  'stop',
+  'status',
+  'list-units',
+  'setup',
+  'repair',
+  'enable',
+  'disable',
+  'register',
+  'unregister',
+]);
+
+export function normalizeSurfaceRuntimeArgs(args: readonly string[]): string[] {
+  const normalized = stripSharedScriptFlags(args);
+  if (normalized.includes('--action')) return normalized;
+  const [command, ...rest] = normalized;
+  if (command && SURFACE_ACTIONS.has(command as SurfaceAction)) {
+    return ['--action', command, ...rest];
+  }
+  return normalized;
+}
+
+const main = async (args: string[] = [], options: { dryRun?: boolean; check?: boolean } = {}) => {
+  const normalizedArgs = normalizeSurfaceRuntimeArgs(args);
+  const argv = await createStandardYargs(['node', 'surface_runtime', ...normalizedArgs])
     .option('action', {
       type: 'string',
       choices: [
@@ -890,9 +925,16 @@ const main = async (args: string[] = []) => {
     .option('args', { type: 'string' })
     .option('port', { type: 'number' })
     .option('description', { type: 'string' })
-    .parseSync(args);
+    .parseSync();
 
   const action = argv.action as SurfaceAction;
+  if ((options.dryRun || options.check) && MUTATING_SURFACE_ACTIONS.has(action)) {
+    return {
+      status: 'dry_run',
+      action,
+      surface: argv.surface ? String(argv.surface) : null,
+    };
+  }
   const manifestPath = path.isAbsolute(argv.manifest as string)
     ? (argv.manifest as string)
     : pathResolver.resolve(argv.manifest as string);
@@ -915,7 +957,7 @@ const main = async (args: string[] = []) => {
       result = await statusSurfaces();
       break;
     case 'list-units':
-      await listUnits();
+      result = await listUnits();
       break;
     case 'setup':
       result = await setupSurfaces();
@@ -961,15 +1003,21 @@ const main = async (args: string[] = []) => {
       throw new Error(`Unsupported action: ${action}`);
   }
 
-  if (result !== undefined) {
-    console.log(JSON.stringify(result, null, 2));
-  }
+  return result;
 };
 
 export const runSurfaceRuntime = defineScript({
   name: 'surfaces:runtime',
-  flags: [],
-  run: ({ argv }) => main(argv),
+  run: async ({ argv, json, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    if (result === undefined) return result;
+    if (!json && typeof result === 'object' && result !== null && 'units' in result)
+      print(formatListUnits(result as Awaited<ReturnType<typeof listUnits>>));
+    else if (!json && typeof result === 'object' && result !== null && 'rows' in result)
+      print(formatSurfaceSetupReport(result as Awaited<ReturnType<typeof setupSurfaces>>));
+    else print(result);
+    return result;
+  },
 });
 
 if (

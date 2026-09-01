@@ -3,13 +3,13 @@ import * as path from 'node:path';
 import {
   applyOnboardingContextBinding,
   applyOnboardingFirstWork,
-  customerResolver,
   loadOnboardingContextBinding,
   loadOnboardingFirstWorkRecord,
   resolveOnboardingContext,
   resolveOnboardingFirstWork,
-  type OrganizationTier,
-} from '@agent/core';
+} from '@agent/core/onboarding-context';
+import * as customerResolver from '@agent/core/customer-resolver';
+import type { OrganizationTier } from '@agent/core/organization-operating-model';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type ParsedArgs = {

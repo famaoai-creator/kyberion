@@ -49,7 +49,7 @@ def _check_health() -> dict:
         return {
             "status": "unavailable",
             "error": "mlx_audio not installed",
-            "install_hint": "pnpm voice:setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
 
@@ -73,8 +73,8 @@ def _generate(params: dict) -> dict:
     except ImportError:
         return {
             "status": "error",
-            "error": "mlx_audio not installed — run: pnpm voice:setup --apply",
-            "install_hint": "pnpm voice:setup --apply",
+            "error": "mlx_audio not installed — run: pnpm kyberion voice setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
 
     out = Path(output_path)

@@ -1,8 +1,16 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeRmSync } from './secure-io.js';
-import { missionDir } from './path-resolver.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeMoveSync,
+  safeReadFile,
+  safeRmSync,
+} from './secure-io.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
 
 export type MissionCoordinationChannel = 'task_contract' | 'handoff' | 'review' | 'runtime_notice';
 
@@ -32,6 +40,105 @@ type MissionCoordinationEvent =
       agent_id: string;
       created_at: string;
     };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const COORDINATION_CHANNELS: readonly MissionCoordinationChannel[] = [
+  'task_contract',
+  'handoff',
+  'review',
+  'runtime_notice',
+];
+
+function requiredString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return value === undefined ? undefined : requiredString(value);
+}
+
+function parseAcknowledgedBy(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const values = value.map(requiredString);
+  return values.every((entry): entry is string => entry !== undefined) ? values : undefined;
+}
+
+export function parseMissionCoordinationMessage(
+  value: unknown
+): MissionCoordinationMessage | undefined {
+  if (!isRecord(value)) return undefined;
+  const messageId = requiredString(value.message_id);
+  const missionId = requiredString(value.mission_id);
+  const channel = value.channel;
+  const normalizedChannel =
+    typeof channel === 'string' &&
+    COORDINATION_CHANNELS.includes(channel as MissionCoordinationChannel)
+      ? (channel as MissionCoordinationChannel)
+      : undefined;
+  const fromAgent = requiredString(value.from_agent);
+  const content = requiredString(value.content);
+  const createdAt = requiredString(value.created_at);
+  const acknowledgedBy = parseAcknowledgedBy(value.acknowledged_by);
+  if (
+    !messageId ||
+    !missionId ||
+    normalizedChannel === undefined ||
+    !fromAgent ||
+    !content ||
+    !createdAt ||
+    !Number.isFinite(Date.parse(createdAt)) ||
+    !acknowledgedBy
+  ) {
+    return undefined;
+  }
+  const fromRole = optionalString(value.from_role);
+  const toAgent = optionalString(value.to_agent);
+  const toRole = optionalString(value.to_role);
+  const correlationId = optionalString(value.correlation_id);
+  const taskId = optionalString(value.task_id);
+  if (
+    (value.from_role !== undefined && !fromRole) ||
+    (value.to_agent !== undefined && !toAgent) ||
+    (value.to_role !== undefined && !toRole) ||
+    (value.correlation_id !== undefined && !correlationId) ||
+    (value.task_id !== undefined && !taskId)
+  ) {
+    return undefined;
+  }
+  return {
+    message_id: messageId,
+    mission_id: missionId,
+    channel: normalizedChannel,
+    from_agent: fromAgent,
+    ...(fromRole ? { from_role: fromRole } : {}),
+    ...(toAgent ? { to_agent: toAgent } : {}),
+    ...(toRole ? { to_role: toRole } : {}),
+    ...(correlationId ? { correlation_id: correlationId } : {}),
+    ...(taskId ? { task_id: taskId } : {}),
+    content,
+    created_at: createdAt,
+    acknowledged_by: acknowledgedBy,
+  };
+}
+
+export function parseMissionCoordinationEvent(
+  value: unknown
+): MissionCoordinationEvent | MissionCoordinationMessage | undefined {
+  if (!isRecord(value)) return undefined;
+  if (value.kind === 'ack') {
+    const messageId = requiredString(value.message_id);
+    const agentId = requiredString(value.agent_id);
+    const createdAt = requiredString(value.created_at);
+    return messageId && agentId && createdAt && Number.isFinite(Date.parse(createdAt))
+      ? { kind: 'ack', message_id: messageId, agent_id: agentId, created_at: createdAt }
+      : undefined;
+  }
+  if (value.kind === 'message') return parseMissionCoordinationMessage(value.message);
+  return parseMissionCoordinationMessage(value);
+}
 
 const DEFAULT_BUS_MAX_LINES = 10_000;
 const DEFAULT_BUS_ARCHIVE_COUNT = 5;
@@ -63,16 +170,24 @@ export class MissionCoordinationBus {
   }
 
   private busPath(missionId: string): string {
-    return `${missionDir(missionId, 'public')}/coordination/bus.jsonl`;
+    const missionPath = assertSafeRepositoryPath(
+      findMissionPath(missionId) || missionDir(missionId, 'public'),
+      { allowMissingLeaf: true }
+    );
+    return assertSafeRepositoryPath(`${missionPath}/coordination/bus.jsonl`, {
+      allowMissingLeaf: true,
+    });
   }
 
   private busArchivePath(missionId: string, index: number): string {
-    return `${this.busPath(missionId)}.${index}`;
+    return assertSafeRepositoryPath(`${this.busPath(missionId)}.${index}`, {
+      allowMissingLeaf: true,
+    });
   }
 
   private ensureMissionDir(missionId: string): void {
     withExecutionContext('mission_controller', () => {
-      safeMkdir(`${missionDir(missionId, 'public')}/coordination`);
+      safeMkdir(path.dirname(this.busPath(missionId)));
     });
   }
 
@@ -94,26 +209,23 @@ export class MissionCoordinationBus {
           const trimmed = line.trim();
           if (!trimmed) continue;
           try {
-            const event = JSON.parse(trimmed) as
-              MissionCoordinationEvent | MissionCoordinationMessage;
-            if ((event as MissionCoordinationEvent).kind === 'ack') {
-              const ack = event as Extract<MissionCoordinationEvent, { kind: 'ack' }>;
+            const event = parseMissionCoordinationEvent(
+              parseSafeJsonInput(trimmed, 'mission coordination event')
+            );
+            if (!event) continue;
+            if ('kind' in event && event.kind === 'ack') {
+              const ack = event;
               const message = messages.get(ack.message_id);
               if (message && !message.acknowledged_by.includes(ack.agent_id)) {
                 message.acknowledged_by.push(ack.agent_id);
               }
               continue;
             }
-            const message =
-              'message' in event
-                ? (event as MissionCoordinationEvent & { message: MissionCoordinationMessage })
-                    .message
-                : (event as MissionCoordinationMessage);
+            const message = 'kind' in event ? event.message : event;
+            if (message.mission_id.toUpperCase() !== normalizedMissionId) continue;
             messages.set(message.message_id, {
               ...message,
-              acknowledged_by: Array.isArray(message.acknowledged_by)
-                ? [...message.acknowledged_by]
-                : [],
+              acknowledged_by: [...message.acknowledged_by],
             });
           } catch {
             // Ignore malformed legacy lines; the bus is append-only and should preserve subsequent records.

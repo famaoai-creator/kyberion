@@ -1,7 +1,13 @@
 import { logger } from './core.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeReadFile,
+  safeExistsSync,
+  safeReaddir,
+  safeStat,
+} from './secure-io.js';
 import * as path from 'node:path';
 import type { AgentProvider } from './agent-registry.js';
 
@@ -182,7 +188,9 @@ function readDirMtime(dir: string): number {
  */
 export function loadAgentManifests(rootDir?: string): AgentManifest[] {
   const root = rootDir || findProjectRoot();
-  const agentsDir = path.join(root, 'knowledge', 'product', 'agents');
+  const agentsDir = assertSafeRepositoryPath(path.join(root, 'knowledge', 'product', 'agents'), {
+    allowMissingLeaf: true,
+  });
 
   const cached = manifestCache.get(agentsDir);
   const now = Date.now();
@@ -212,13 +220,7 @@ export function loadAgentManifests(rootDir?: string): AgentManifest[] {
       continue;
     }
     try {
-      const filePath = path.join(agentsDir, file);
-      // Verify resolved path stays within agents directory
-      const resolved = path.resolve(filePath);
-      if (!resolved.startsWith(path.resolve(agentsDir))) {
-        logger.warn(`[AGENT_MANIFEST] Path traversal detected: ${file}`);
-        continue;
-      }
+      const filePath = assertSafeRepositoryPath(path.join(agentsDir, file));
       const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       const { meta, body } = parseFrontmatter(content);
 

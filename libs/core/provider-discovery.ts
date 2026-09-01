@@ -1,15 +1,11 @@
 /* eslint-disable no-restricted-imports -- IP-08 で safeExec へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeUnlinkSync,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
 
@@ -44,8 +40,7 @@ const DISK_CACHE_PATH = pathResolver.rootResolve('active/shared/runtime/provider
 function readDiskCache(): ProviderInfo[] | null {
   try {
     if (!safeExistsSync(DISK_CACHE_PATH)) return null;
-    const raw = safeReadFile(DISK_CACHE_PATH, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as { ts: number; providers: ProviderInfo[] };
+    const parsed = readJson<{ ts: number; providers: ProviderInfo[] }>(DISK_CACHE_PATH);
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
   } catch {
     /* cache miss — non-fatal */
@@ -90,8 +85,25 @@ interface ProviderCapabilityCatalog {
 const CAPABILITY_CATALOG_PATH = 'knowledge/product/orchestration/provider-capabilities.json';
 const FALLBACK_CAPABILITY_CATALOG_PATH =
   'knowledge/product/orchestration/provider-capabilities.fallback.json';
+const CAPABILITY_CATALOG_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/provider-capabilities.schema.json'
+);
 
 let catalogCache: Record<string, ProviderCapabilityEntry> | null = null;
+const capabilityCatalogs = new Map<string, GovernedCatalog<ProviderCapabilityCatalog>>();
+
+function capabilityCatalogFor(filePath: string): GovernedCatalog<ProviderCapabilityCatalog> {
+  const resolvedPath = pathResolver.rootResolve(filePath);
+  const existing = capabilityCatalogs.get(resolvedPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<ProviderCapabilityCatalog>({
+    id: `provider-capabilities:${filePath}`,
+    path: resolvedPath,
+    schema: CAPABILITY_CATALOG_SCHEMA_PATH,
+  });
+  capabilityCatalogs.set(resolvedPath, catalog);
+  return catalog;
+}
 
 function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
   if (!value || typeof value !== 'object') return false;
@@ -106,9 +118,7 @@ function isCapabilityEntry(value: unknown): value is ProviderCapabilityEntry {
 
 function readCapabilityCatalog(filePath: string): ProviderCapabilityCatalog | null {
   try {
-    const raw = safeReadFile(pathResolver.rootResolve(filePath), { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
-    if (parsed && parsed.providers && typeof parsed.providers === 'object') return parsed;
+    return capabilityCatalogFor(filePath).load();
   } catch {
     /* ignore */
   }
@@ -201,11 +211,7 @@ export function mergeProbedCapabilitiesIntoCatalog(
   // Read the raw on-disk catalog (NOT merged with fallback) so we preserve its exact structure.
   let catalog: ProviderCapabilityCatalog = { version: '1.0', providers: {} };
   try {
-    const raw = safeReadFile(pathResolver.rootResolve(CAPABILITY_CATALOG_PATH), {
-      encoding: 'utf8',
-    }) as string;
-    const parsed = JSON.parse(raw) as ProviderCapabilityCatalog;
-    if (parsed && parsed.providers && typeof parsed.providers === 'object') catalog = parsed;
+    catalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).load();
   } catch {
     /* start from an empty catalog */
   }
@@ -246,19 +252,24 @@ export function mergeProbedCapabilitiesIntoCatalog(
   };
 
   const filePath = pathResolver.rootResolve(CAPABILITY_CATALOG_PATH);
+  const validatedCatalog = capabilityCatalogFor(CAPABILITY_CATALOG_PATH).validate(
+    catalog,
+    filePath
+  );
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(catalog, null, 2), { encoding: 'utf8' });
+  safeWriteFile(filePath, JSON.stringify(validatedCatalog, null, 2), { encoding: 'utf8' });
 
   // Invalidate caches so the next discovery reflects the freshly-written catalog.
   catalogCache = null;
+  capabilityCatalogs.forEach((catalog) => catalog.reset());
   cachedProviders = null;
   cacheTimestamp = 0;
 
   logger.info(
     `[PROVIDER_DISCOVERY] Merged probe results into ${CAPABILITY_CATALOG_PATH} for: ${Object.keys(probed).join(', ')}`
   );
-  return catalog;
+  return validatedCatalog;
 }
 
 function run(cmd: string, args: string[], timeoutMs = 10000): { ok: boolean; stdout: string } {
@@ -483,6 +494,22 @@ export function discoverProviders(forceRefresh = false): ProviderInfo[] {
   cacheTimestamp = Date.now();
   writeDiskCache(providers);
   return providers;
+}
+
+/**
+ * Read provider discovery evidence without starting a new probe or writing the
+ * cache. Inspection commands use this so a diagnostic dump remains read-only.
+ */
+export function peekProviderDiscovery(): {
+  providers: ProviderInfo[];
+  source: 'memory' | 'disk' | 'unavailable';
+} {
+  if (!cachedProviders || Date.now() - cacheTimestamp >= CACHE_TTL) {
+    const disk = readDiskCache();
+    if (disk) return { providers: disk, source: 'disk' };
+    return { providers: [], source: 'unavailable' };
+  }
+  return { providers: cachedProviders, source: 'memory' };
 }
 
 export function refreshProviderDiscoveryCache(): ProviderInfo[] {

@@ -1,10 +1,11 @@
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import {
   modelRegistrySnapshotFromDirectory,
   readModelRegistryDirectory,
 } from './model-registry-directory.js';
 import { validateModelRegistrySnapshot } from './model-registry-contract.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type {
   ReasoningLevel,
   ReasoningLevelDecision,
@@ -19,6 +20,9 @@ export type { TaskModelEffort, TaskModelTier } from './reasoning-level-policy.js
 
 const MODEL_REGISTRY_PATH = pathResolver.knowledge('product/governance/model-registry.json');
 const MODEL_REGISTRY_DIRECTORY = pathResolver.knowledge('product/governance/model-registry');
+const MODEL_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-registry.schema.json'
+);
 
 type ModelRoleFit = 'primary' | 'secondary' | 'not_recommended';
 type ModelStatus = 'approved' | 'candidate' | 'deprecated' | 'blocked';
@@ -83,12 +87,15 @@ export interface TaskModelHintInput {
 let cachedRegistry: ModelRegistryFile | null = null;
 let cachedRegistryPath: string | null = null;
 
+const modelRegistryCatalog = defineCatalog<ModelRegistryFile>({
+  id: 'model-registry',
+  path: MODEL_REGISTRY_PATH,
+  schema: MODEL_REGISTRY_SCHEMA_PATH,
+});
+
 function loadRegistryFile(): ModelRegistryFile | null {
   if (!safeExistsSync(MODEL_REGISTRY_PATH)) return null;
-  return validateModelRegistrySnapshot<ModelRegistryEntry>(
-    loadJson<unknown>(MODEL_REGISTRY_PATH),
-    MODEL_REGISTRY_PATH
-  );
+  return modelRegistryCatalog.load();
 }
 
 function loadRegistryDirectory(): ModelRegistryFile | null {
@@ -510,4 +517,5 @@ export function resolveReasoningModelRoute(
 export function resetReasoningModelRoutingCache(): void {
   cachedRegistry = null;
   cachedRegistryPath = null;
+  modelRegistryCatalog.reset();
 }

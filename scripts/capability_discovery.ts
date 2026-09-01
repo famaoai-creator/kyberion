@@ -1,7 +1,16 @@
 import * as path from 'node:path';
-import { logger, pathResolver, safeExistsSync, safeReaddir, safeExec } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
 import chalk from 'chalk';
 import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
 
@@ -21,6 +30,51 @@ interface ActuatorManifest {
   capabilities: Capability[];
 }
 
+export interface CapabilityDiscoveryCapability {
+  op: string;
+  platforms: string[];
+  platformMatch: boolean;
+  missingBins: string[];
+  available: boolean;
+}
+
+export interface CapabilityDiscoveryActuator {
+  actuatorId: string;
+  version: string;
+  description: string;
+  capabilities: CapabilityDiscoveryCapability[];
+}
+
+export interface CapabilityDiscoveryReport {
+  platform: NodeJS.Platform;
+  rootDir: string;
+  actuators: CapabilityDiscoveryActuator[];
+  errors: string[];
+}
+
+export interface CapabilityDiscoveryOptions {
+  actuatorsDir?: string;
+  rootDir?: string;
+  platform?: NodeJS.Platform;
+  binaryAvailable?: (bin: string) => boolean;
+}
+
+export function evaluateCapability(
+  capability: Capability,
+  platform: NodeJS.Platform,
+  binaryAvailable: (bin: string) => boolean
+): CapabilityDiscoveryCapability {
+  const platformMatch = capability.platforms.includes(platform);
+  const missingBins = (capability.requirements?.bin ?? []).filter((bin) => !binaryAvailable(bin));
+  return {
+    op: capability.op,
+    platforms: capability.platforms,
+    platformMatch,
+    missingBins,
+    available: platformMatch && missingBins.length === 0,
+  };
+}
+
 function checkBinary(bin: string): boolean {
   try {
     safeExec('command', ['-v', bin]);
@@ -30,52 +84,91 @@ function checkBinary(bin: string): boolean {
   }
 }
 
-function discoverCapabilities() {
-  const actuatorsDir = pathResolver.rootResolve('libs/actuators');
+export function discoverCapabilities(
+  options: CapabilityDiscoveryOptions = {}
+): CapabilityDiscoveryReport {
+  const rootDir = options.rootDir ?? ROOT_DIR;
+  const actuatorsDir = assertSafeRepositoryPath(
+    options.actuatorsDir ?? pathResolver.rootResolve('libs/actuators'),
+    { allowMissingLeaf: false, rootDir }
+  );
   const items = safeReaddir(actuatorsDir);
-  const currentPlatform = process.platform;
-
-  console.log(chalk.bold.cyan('\n🔍 [KYBERION] Dynamic Capability Discovery\n'));
-  console.log(`Current Platform: ${chalk.yellow(currentPlatform)}`);
-  console.log(`Environment Root: ${ROOT_DIR}\n`);
+  const currentPlatform = options.platform ?? process.platform;
+  const binaryAvailable = options.binaryAvailable ?? checkBinary;
+  const actuators: CapabilityDiscoveryActuator[] = [];
+  const errors: string[] = [];
 
   for (const item of items) {
-    const manifestPath = path.join(actuatorsDir, item, 'manifest.json');
-    if (!safeExistsSync(manifestPath)) continue;
+    let manifestPath: string;
+    try {
+      manifestPath = assertSafeRepositoryPath(path.join(actuatorsDir, item, 'manifest.json'), {
+        allowMissingLeaf: false,
+        rootDir,
+      });
+    } catch {
+      continue;
+    }
+    if (!safeExistsSync(manifestPath) || !safeLstat(manifestPath).isFile()) continue;
 
     try {
       const manifest: ActuatorManifest = readJson<ActuatorManifest>(manifestPath);
-      console.log(`${chalk.bold.white(manifest.actuator_id)} (${manifest.version})`);
-      console.log(`${chalk.dim(manifest.description)}`);
-
-      manifest.capabilities.forEach((cap) => {
-        const platformMatch = cap.platforms.includes(currentPlatform);
-        let requirementsMet = true;
-        const missingBins: string[] = [];
-
-        if (cap.requirements?.bin) {
-          cap.requirements.bin.forEach((bin) => {
-            if (!checkBinary(bin)) {
-              requirementsMet = false;
-              missingBins.push(bin);
-            }
-          });
-        }
-
-        const statusIcon = platformMatch && requirementsMet ? chalk.green('✅') : chalk.red('❌');
-        const platformInfo = platformMatch
-          ? ''
-          : chalk.red(` [OS Mismatch: ${cap.platforms.join('/')}]`);
-        const binInfo =
-          missingBins.length > 0 ? chalk.red(` [Missing: ${missingBins.join(', ')}]`) : '';
-
-        console.log(`  ${statusIcon} ${cap.op.padEnd(20)} ${platformInfo}${binInfo}`);
+      actuators.push({
+        actuatorId: manifest.actuator_id,
+        version: manifest.version,
+        description: manifest.description,
+        capabilities: manifest.capabilities.map((cap) =>
+          evaluateCapability(cap, currentPlatform, binaryAvailable)
+        ),
       });
-      console.log('');
-    } catch (err: any) {
-      logger.error(`Failed to parse manifest for ${item}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const error = `Failed to parse manifest for ${item}: ${message}`;
+      errors.push(error);
+      logger.error(error);
     }
   }
+
+  return { platform: currentPlatform, rootDir, actuators, errors };
 }
 
-discoverCapabilities();
+export function formatCapabilityDiscovery(report: CapabilityDiscoveryReport): string {
+  const lines = [
+    '\n🔍 [KYBERION] Dynamic Capability Discovery\n',
+    `Current Platform: ${chalk.yellow(report.platform)}`,
+    `Environment Root: ${report.rootDir}\n`,
+  ];
+
+  for (const actuator of report.actuators) {
+    lines.push(`${chalk.bold.white(actuator.actuatorId)} (${actuator.version})`);
+    lines.push(chalk.dim(actuator.description));
+    for (const capability of actuator.capabilities) {
+      const statusIcon = capability.available ? chalk.green('✅') : chalk.red('❌');
+      const platformInfo = capability.platformMatch
+        ? ''
+        : chalk.red(` [OS Mismatch: ${capability.platforms.join('/')}]`);
+      const binInfo =
+        capability.missingBins.length > 0
+          ? chalk.red(` [Missing: ${capability.missingBins.join(', ')}]`)
+          : '';
+      lines.push(`  ${statusIcon} ${capability.op.padEnd(20)} ${platformInfo}${binInfo}`);
+    }
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
+export const runCapabilityDiscovery = defineScript({
+  name: 'capabilities',
+  run(context) {
+    const report = discoverCapabilities();
+    context.print(context.json ? report : formatCapabilityDiscovery(report));
+    return report;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'capability_discovery.ts') ||
+  isDirectScript(import.meta.url, 'capability_discovery.js')
+)
+  void runCapabilityDiscovery();

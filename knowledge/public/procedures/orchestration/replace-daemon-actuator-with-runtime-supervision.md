@@ -32,7 +32,7 @@ That model is now legacy. Kyberion has two explicit runtime ownership models:
 Use [`knowledge/product/governance/surfaces/`](/Users/famao/kyberion/knowledge/product/governance/surfaces/) as the declaration source, then reconcile with:
 
 ```bash
-pnpm surfaces:reconcile
+pnpm surfaces reconcile
 ```
 
 ## Process Ownership Pattern

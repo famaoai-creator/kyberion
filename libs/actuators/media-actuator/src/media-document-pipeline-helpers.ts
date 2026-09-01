@@ -1,12 +1,13 @@
 import {
+  assertSafeRepositoryPath,
   loadJson,
   safeExistsSync,
   safeMkdir,
   safeWriteFile,
-  pathResolver,
-  retry,
-  designDefaultsFromMediaTheme,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { retry } from '@agent/core/async-utils';
+import { designDefaultsFromMediaTheme } from '@agent/core/src/native-pptx-engine/design-cascade';
 import {
   generateNativeDocx,
   generateNativePdf,
@@ -336,7 +337,12 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       title: brief.payload.title || brief.title || 'Diagram',
       theme: activeTheme,
       iconMap,
-      iconRoot: params.icon_root ? path.resolve(rootDir, resolve(params.icon_root)) : undefined,
+      iconRoot: params.icon_root
+        ? assertSafeRepositoryPath(
+            path.resolve(rootDir, String(resolve(params.icon_root) || '').trim()),
+            { allowMissingLeaf: true }
+          )
+        : undefined,
     });
     safeWriteFile(outPath, document);
   }
@@ -364,9 +370,12 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     rootDir: string,
     brief: any
   ): { templateId: string; template: any } {
-    const catalogPath = path.resolve(
-      rootDir,
-      'knowledge/public/design-patterns/media-templates/document-layouts.json'
+    const catalogPath = assertSafeRepositoryPath(
+      path.resolve(
+        rootDir,
+        'knowledge/public/design-patterns/media-templates/document-layouts.json'
+      ),
+      { allowMissingLeaf: true }
     );
     if (!safeExistsSync(catalogPath)) {
       throw new Error(`Document layout catalog not found: ${catalogPath}`);

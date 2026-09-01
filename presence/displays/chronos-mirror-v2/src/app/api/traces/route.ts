@@ -47,8 +47,10 @@ export async function GET(req: NextRequest) {
   return withViewerExecutionContext(resolvedViewer.context, () => {
     if (traceId) {
       const trace = collectTraceDetail(traceId, {
+        strictUnknownSpans: true,
         limit: Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 24,
         tenantSlugs: resolvedViewer.context.tenantSlugs,
+        tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
         organizationIds,
         projectIds,
       });
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest) {
     }
 
     const traces = collectTraceFeed({
+      strictUnknownSpans: true,
       limit: Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 24,
       status:
         status === 'ok' || status === 'error' || status === 'in_progress' ? status : undefined,
@@ -68,6 +71,7 @@ export async function GET(req: NextRequest) {
       actuator: actuator || undefined,
       query: query || undefined,
       tenantSlugs: resolvedViewer.context.tenantSlugs,
+      tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
       organizationIds,
       projectIds,
     });

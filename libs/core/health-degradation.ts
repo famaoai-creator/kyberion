@@ -13,6 +13,7 @@
  */
 
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { metrics } from './metrics.js';
 import {
   evaluateRuntimeHealthTrends,
@@ -23,7 +24,6 @@ import { sendOpsAlert, type OpsAlertReceipt } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
 import { discoverProviders } from './provider-discovery.js';
 import { listDemotedProviders } from './provider-health-registry.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
 import type { FinanceControllerDecision } from './finance-controller.js';
 
 export interface HealthThresholds {
@@ -80,51 +80,51 @@ const DEFAULT_THRESHOLDS: HealthThresholds = {
   trend_window_ms: 24 * 60 * 60 * 1000,
 };
 
+const thresholdsCatalog = defineCatalog<HealthThresholds>({
+  id: 'health-thresholds',
+  path: THRESHOLDS_PATH,
+  schema: pathResolver.knowledge('product/schemas/health-thresholds.schema.json'),
+  fallback: DEFAULT_THRESHOLDS,
+  fallbackOnInvalid: true,
+});
+
 function positiveOr(value: unknown, fallback: number, min = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > min ? parsed : fallback;
 }
 
 export function loadHealthThresholds(): HealthThresholds {
-  if (!safeExistsSync(THRESHOLDS_PATH)) return DEFAULT_THRESHOLDS;
-  try {
-    const parsed = JSON.parse(
-      String(safeReadFile(THRESHOLDS_PATH, { encoding: 'utf8' }) || '{}')
-    ) as Partial<HealthThresholds>;
-    return {
-      regression_multiplier:
-        Number(parsed.regression_multiplier) > 1
-          ? Number(parsed.regression_multiplier)
-          : DEFAULT_THRESHOLDS.regression_multiplier,
-      red_regressions:
-        Number(parsed.red_regressions) > 0
-          ? Number(parsed.red_regressions)
-          : DEFAULT_THRESHOLDS.red_regressions,
-      red_demoted_providers:
-        Number(parsed.red_demoted_providers) > 0
-          ? Number(parsed.red_demoted_providers)
-          : DEFAULT_THRESHOLDS.red_demoted_providers,
-      rss_growth_warning_ratio: positiveOr(
-        parsed.rss_growth_warning_ratio,
-        DEFAULT_THRESHOLDS.rss_growth_warning_ratio,
-        1
-      ),
-      rss_growth_red_ratio: positiveOr(
-        parsed.rss_growth_red_ratio,
-        DEFAULT_THRESHOLDS.rss_growth_red_ratio,
-        1
-      ),
-      restart_warning_count: positiveOr(
-        parsed.restart_warning_count,
-        DEFAULT_THRESHOLDS.restart_warning_count
-      ),
-      restart_red_count: positiveOr(parsed.restart_red_count, DEFAULT_THRESHOLDS.restart_red_count),
-      trend_window_ms: positiveOr(parsed.trend_window_ms, DEFAULT_THRESHOLDS.trend_window_ms),
-    };
-  } catch {
-    // A broken thresholds file must not silence degradation detection.
-    return DEFAULT_THRESHOLDS;
-  }
+  const parsed = thresholdsCatalog.load();
+  return {
+    regression_multiplier:
+      Number(parsed.regression_multiplier) > 1
+        ? Number(parsed.regression_multiplier)
+        : DEFAULT_THRESHOLDS.regression_multiplier,
+    red_regressions:
+      Number(parsed.red_regressions) > 0
+        ? Number(parsed.red_regressions)
+        : DEFAULT_THRESHOLDS.red_regressions,
+    red_demoted_providers:
+      Number(parsed.red_demoted_providers) > 0
+        ? Number(parsed.red_demoted_providers)
+        : DEFAULT_THRESHOLDS.red_demoted_providers,
+    rss_growth_warning_ratio: positiveOr(
+      parsed.rss_growth_warning_ratio,
+      DEFAULT_THRESHOLDS.rss_growth_warning_ratio,
+      1
+    ),
+    rss_growth_red_ratio: positiveOr(
+      parsed.rss_growth_red_ratio,
+      DEFAULT_THRESHOLDS.rss_growth_red_ratio,
+      1
+    ),
+    restart_warning_count: positiveOr(
+      parsed.restart_warning_count,
+      DEFAULT_THRESHOLDS.restart_warning_count
+    ),
+    restart_red_count: positiveOr(parsed.restart_red_count, DEFAULT_THRESHOLDS.restart_red_count),
+    trend_window_ms: positiveOr(parsed.trend_window_ms, DEFAULT_THRESHOLDS.trend_window_ms),
+  };
 }
 
 export function evaluateDegradation(input: {

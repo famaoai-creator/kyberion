@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import * as path from 'node:path';
 /**
  * Worker event stream (KC-02).
  *
@@ -14,7 +15,7 @@ import { z } from 'zod';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
-import { safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
 import { currentTriggerDeliveryId } from './trigger-correlation.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
 
@@ -188,25 +189,21 @@ export class WorkerEventStream {
 
 /** Append every envelope to a jsonl file; returns the detach function. */
 export function attachJsonlRecorder(stream: WorkerEventStream, filePath: string): () => void {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   return stream.subscribe((event) => {
-    appendJsonLine(filePath, event);
+    appendJsonLine(safeFilePath, event);
   });
 }
 
 /** Parse a recorded jsonl file back into validated envelopes (replay). */
 export function readWorkerEventStreamJsonl(filePath: string): WorkerEventEnvelope[] {
-  const raw = String(safeReadFile(filePath, { encoding: 'utf-8' }));
-  const events: WorkerEventEnvelope[] = [];
-  for (const line of raw.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      events.push(workerEventEnvelopeSchema.parse(JSON.parse(trimmed)));
-    } catch {
-      // A torn/corrupt line must not poison replay of the rest.
+  return readJsonLines<WorkerEventEnvelope>(
+    assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }),
+    {
+      onMalformed: 'skip',
+      map: (value) => workerEventEnvelopeSchema.parse(value),
     }
-  }
-  return events;
+  ).filter((event) => Boolean(event));
 }
 
 const GLOBAL_KEY = Symbol.for('kyberion.workerEventStream');
@@ -237,7 +234,10 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
     // default_allow path, so every persona can record its own events without
     // a security-policy registration.
     const realDir = pathResolver.shared('logs/worker-events');
-    const dir = resolveSharedObservabilityDir(realDir);
+    const resolvedDir = resolveSharedObservabilityDir(realDir);
+    const dir = resolvedDir
+      ? assertSafeRepositoryPath(resolvedDir, { allowMissingLeaf: true })
+      : undefined;
     if (!dir) return;
     safeMkdir(dir);
     const day = new Date().toISOString().slice(0, 10);
@@ -261,12 +261,24 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
         // select an empty confidential directory. The mission id still gives
         // consumers a physically separated replay stream without mutating
         // mission lifecycle state.
-        const missionEventDir = `${dir}/missions/${missionId}`;
+        const missionEventDir = assertSafeRepositoryPath(path.join(dir, 'missions', missionId), {
+          allowMissingLeaf: true,
+        });
         safeMkdir(missionEventDir, { recursive: true });
-        appendJsonLine(`${missionEventDir}/worker-events-${day}.jsonl`, sharedEvent);
+        appendJsonLine(
+          assertSafeRepositoryPath(path.join(missionEventDir, `worker-events-${day}.jsonl`), {
+            allowMissingLeaf: true,
+          }),
+          sharedEvent
+        );
         return;
       }
-      appendJsonLine(`${dir}/worker-events-${day}.jsonl`, sharedEvent);
+      appendJsonLine(
+        assertSafeRepositoryPath(path.join(dir, `worker-events-${day}.jsonl`), {
+          allowMissingLeaf: true,
+        }),
+        sharedEvent
+      );
     });
   } catch {
     // Observability wiring is best-effort; never block stream creation.

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
   safeUnlinkSync: vi.fn(),
+  rootDir: vi.fn(() => '/repo'),
   rootResolve: vi.fn((relPath: string) => `/repo/${relPath}`),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
 }));
@@ -23,8 +24,13 @@ vi.mock('./secure-io.js', () => ({
   safeUnlinkSync: mocks.safeUnlinkSync,
 }));
 
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath))),
+}));
+
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
+    rootDir: mocks.rootDir,
     rootResolve: mocks.rootResolve,
     shared: mocks.shared,
   },
@@ -59,7 +65,7 @@ describe('provider-discovery', () => {
     expect(mocks.safeWriteFile).toHaveBeenCalledWith(
       '/repo/active/shared/runtime/provider-cache.json',
       expect.any(String),
-      { encoding: 'utf8' },
+      { encoding: 'utf8' }
     );
   });
 });

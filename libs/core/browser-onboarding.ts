@@ -17,7 +17,13 @@ import {
   validateLlmSelectionPreferences,
 } from './llm-selection-preferences.js';
 import { listServiceBindingRecords } from './service-binding-registry.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { withLock } from './src/lock-utils.js';
 import { getToolRuntimePolicy } from './tool-runtime-policy.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -38,22 +44,24 @@ const allowedServices = [
   'browser',
 ] as const;
 
-const identitySchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  language: z.string().trim().min(2).max(16),
-  interaction_style: z.enum(interactionStyles),
-  primary_domain: z.string().trim().min(1).max(200),
-  vision: z.string().trim().min(1).max(4000),
-  agent_id: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z][A-Za-z0-9._-]{2,63}$/),
-  tenant_slug: z
-    .string()
-    .trim()
-    .refine(isValidTenantSlug, 'tenant slug is reserved or invalid')
-    .optional(),
-});
+const identitySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    language: z.string().trim().min(2).max(16),
+    interaction_style: z.enum(interactionStyles),
+    primary_domain: z.string().trim().min(1).max(200),
+    vision: z.string().trim().min(1).max(4000),
+    agent_id: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z][A-Za-z0-9._-]{2,63}$/),
+    tenant_slug: z
+      .string()
+      .trim()
+      .refine(isValidTenantSlug, 'tenant slug is reserved or invalid')
+      .optional(),
+  })
+  .strict();
 
 const voiceSchema = z
   .object({
@@ -68,6 +76,7 @@ const voiceSchema = z
     engine_id: z.string().trim().min(1).max(120).default('mlx_audio_qwen3'),
     sample_refs: z.array(z.string().trim().min(1)).max(3).default([]),
   })
+  .strict()
   .superRefine((value, context) => {
     if (!value.enabled) return;
     if (!value.profile_id)
@@ -78,11 +87,13 @@ const voiceSchema = z
       context.addIssue({ code: 'custom', message: 'at least one voice sample is required' });
   });
 
-const serviceSchema = z.object({
-  service_id: z.enum(allowedServices),
-  auth_mode: z.enum(['none', 'oauth', 'secret-guard', 'session']),
-  required: z.boolean().default(false),
-});
+const serviceSchema = z
+  .object({
+    service_id: z.enum(allowedServices),
+    auth_mode: z.enum(['none', 'oauth', 'secret-guard', 'session']),
+    required: z.boolean().default(false),
+  })
+  .strict();
 
 export const browserOnboardingDraftSchema = z
   .object({
@@ -95,35 +106,44 @@ export const browserOnboardingDraftSchema = z
       sample_refs: [],
     }),
     services: z.array(serviceSchema).max(16).default([]),
-    providers: z.object({
-      priority: z.array(z.string().trim().min(1).max(80)).min(1).max(12),
-      default_models: z.record(z.string(), z.string().trim().min(1).max(160)).default({}),
-    }),
+    providers: z
+      .object({
+        priority: z.array(z.string().trim().min(1).max(80)).min(1).max(12),
+        default_models: z.record(z.string(), z.string().trim().min(1).max(160)).default({}),
+      })
+      .strict(),
     reasoning: z
       .object({
         provider: z.string().trim().min(1).max(80),
         model_id: z.string().trim().min(1).max(160).optional(),
       })
+      .strict()
       .optional(),
     adapter_defaults: z
       .record(z.string().trim().min(1).max(120), z.string().trim().min(1).max(200))
       .optional(),
-    tools: z.object({
-      mode_preference: z.object({
-        python: z.enum(toolModes),
-        node: z.enum(toolModes),
-        system: z.enum(toolModes),
-      }),
-      install_requires_approval: z.boolean().default(true),
-      pin_requires_approval: z.boolean().default(true),
-    }),
+    tools: z
+      .object({
+        mode_preference: z
+          .object({
+            python: z.enum(toolModes),
+            node: z.enum(toolModes),
+            system: z.enum(toolModes),
+          })
+          .strict(),
+        install_requires_approval: z.boolean().default(true),
+        pin_requires_approval: z.boolean().default(true),
+      })
+      .strict(),
     tutorial: z
       .object({
         mode: z.enum(['simulate', 'apply', 'skipped']).default('simulate'),
         summary: z.string().trim().max(1000).default('Run the first governed tutorial.'),
       })
+      .strict()
       .default({ mode: 'simulate', summary: 'Run the first governed tutorial.' }),
   })
+  .strict()
   .superRefine((value, context) => {
     if (new Set(value.providers.priority).size !== value.providers.priority.length) {
       context.addIssue({
@@ -152,31 +172,38 @@ export interface BrowserOnboardingPreview {
 }
 
 function profileRoot(): string {
-  return resolveActiveProfileRoot();
+  return assertSafeRepositoryPath(resolveActiveProfileRoot(), { allowMissingLeaf: true });
 }
 
 function onboardingPath(name: string): string {
-  return path.join(profileRoot(), 'onboarding', name);
+  return assertSafeRepositoryPath(path.join(profileRoot(), 'onboarding', name), {
+    allowMissingLeaf: true,
+  });
 }
 
 function readJson<T>(filePath: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
-  return readFoundationJson<T>(filePath);
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath)) return null;
+  return readFoundationJson<T>(safePath);
 }
 
 function writeJson(filePath: string, value: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(value, null, 2));
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  safeMkdir(path.dirname(safePath), { recursive: true });
+  safeWriteFile(safePath, JSON.stringify(value, null, 2));
 }
 
 function assertVoiceSampleRefs(sampleRefs: string[]): void {
-  const sampleRoot = path.resolve(profileRoot(), 'voice', 'samples');
+  const sampleRoot = assertSafeRepositoryPath(path.resolve(profileRoot(), 'voice', 'samples'), {
+    allowMissingLeaf: true,
+  });
   for (const sampleRef of sampleRefs) {
     const resolved = path.resolve(sampleRef);
     if (resolved !== sampleRoot && !resolved.startsWith(`${sampleRoot}${path.sep}`)) {
       throw new Error(`voice sample is outside the active profile: ${sampleRef}`);
     }
-    if (!safeExistsSync(resolved)) throw new Error(`voice sample does not exist: ${sampleRef}`);
+    const safeResolved = assertSafeRepositoryPath(resolved);
+    if (!safeExistsSync(safeResolved)) throw new Error(`voice sample does not exist: ${sampleRef}`);
   }
 }
 
@@ -262,7 +289,9 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
         });
         artifacts.push(identityPath);
 
-        const visionPath = path.join(profileRoot(), 'my-vision.md');
+        const visionPath = assertSafeRepositoryPath(path.join(profileRoot(), 'my-vision.md'), {
+          allowMissingLeaf: true,
+        });
         safeWriteFile(visionPath, `# Sovereign Vision\n\n${draft.identity.vision}\n`);
         artifacts.push(visionPath);
 
@@ -402,8 +431,14 @@ export function saveBrowserOnboardingVoiceSample(input: {
   if (!input.data.length || input.data.length > 12 * 1024 * 1024) {
     throw new Error('voice sample must be between 1 byte and 12 MiB');
   }
-  const sampleDir = path.join(profileRoot(), 'voice', 'samples', profileId);
-  const samplePath = path.join(sampleDir, `sample-${randomUUID()}.${extension}`);
+  const sampleDir = assertSafeRepositoryPath(
+    path.join(profileRoot(), 'voice', 'samples', profileId),
+    { allowMissingLeaf: true }
+  );
+  const samplePath = assertSafeRepositoryPath(
+    path.join(sampleDir, `sample-${randomUUID()}.${extension}`),
+    { allowMissingLeaf: true }
+  );
   withExecutionContext(
     'sovereign_concierge',
     () => {

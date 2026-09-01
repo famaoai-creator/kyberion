@@ -1,7 +1,9 @@
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExec,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeReaddir,
   safeStat,
@@ -383,7 +385,7 @@ function createProvidedToolDefinitions(
 
 function safeJsonParse(text: string): unknown {
   try {
-    return JSON.parse(text);
+    return parseSafeJsonInput(text, 'OpenAI-compatible response');
   } catch {
     return null;
   }
@@ -687,15 +689,19 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     try {
       switch (name) {
         case 'read_file':
-          return String(safeReadFile(String(args.path ?? '')));
-        case 'write_file':
-          safeWriteFile(String(args.path ?? ''), String(args.content ?? ''), {
+          return String(safeReadFile(assertSafeRepositoryPath(String(args.path ?? ''))));
+        case 'write_file': {
+          const filePath = assertSafeRepositoryPath(String(args.path ?? ''), {
+            allowMissingLeaf: true,
+          });
+          safeWriteFile(filePath, String(args.content ?? ''), {
             mkdir: true,
             encoding: 'utf8',
           });
           return 'Success: File written.';
+        }
         case 'list_directory':
-          return JSON.stringify(safeReaddir(String(args.path ?? '')));
+          return JSON.stringify(safeReaddir(assertSafeRepositoryPath(String(args.path ?? ''))));
         case 'shell_exec':
           return safeExec('bash', ['-lc', String(args.command ?? '')], {
             cwd: pathResolver.rootDir(),

@@ -43,7 +43,3 @@ export function loadProviderCliCapabilityReportPolicyCatalog(): ProviderCliCapab
 export function resolveProviderCliCapabilityReportPolicy(): ProviderCliCapabilityReportPolicyCatalog {
   return loadProviderCliCapabilityReportPolicyCatalog();
 }
-
-export function resetProviderCliCapabilityReportPolicyCatalogCache(): void {
-  catalog.reset();
-}

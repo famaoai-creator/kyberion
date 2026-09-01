@@ -4,12 +4,12 @@ import {
   createChronosWebThemePack,
   createCompanionWebThemePack,
   createConciergeWebThemePack,
-  pathResolver,
   webThemePackToCssVars,
   type WebThemePack,
-} from '@agent/core';
+} from '@agent/core/web-design-system';
+import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Palette = Record<string, string>;
 
@@ -181,7 +181,7 @@ function checkDerivedWebThemePacks(): string[] {
   return violations;
 }
 
-function main(): number {
+export function checkDesignContrast(): string[] {
   const brandTokens = parseJson<{ tokens: { colors: { light: Palette; dark: Palette } } }>(
     pathResolver.rootResolve('knowledge/public/design-patterns/brand-tokens/kyberion.json')
   );
@@ -248,22 +248,22 @@ function main(): number {
     ...checkDerivedWebThemePacks(),
   ];
 
-  if (violations.length > 0) {
-    console.error('[check:design-contrast] violations detected:');
-    for (const violation of violations) console.error(`- ${violation}`);
-    return 1;
-  }
-
-  console.log('[check:design-contrast] OK');
-  return 0;
+  return violations;
 }
 
 export const runCheckDesignContrast = defineScript({
   name: 'check:design-contrast',
   flags: [],
-  run() {
-    const status = main();
-    if (status !== 0) throw new Error(`design contrast check failed with exit code ${status}`);
+  run(context) {
+    const violations = checkDesignContrast();
+    if (violations.length > 0) {
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
+    }
+    context.print('[check:design-contrast] OK');
+    return { violations };
   },
 });
 

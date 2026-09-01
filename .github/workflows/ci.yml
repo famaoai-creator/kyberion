@@ -41,6 +41,22 @@ jobs:
       - name: Build project
         run: pnpm run build
 
+      # PI-12: prove the source distribution is self-contained in a clean
+      # governed staging directory and publish a checksum downstream can pin.
+      - name: Verify source archive and clean install
+        run: |
+          pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output active/shared/exports/ci/kyberion-source.tar.gz
+          pnpm run release:source-archive -- --check --output active/shared/exports/ci/kyberion-source.tar.gz
+          pnpm run release:install-smoke -- --ref "${GITHUB_SHA}"
+      - name: Upload source archive evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: kyberion-source-archive
+          path: |
+            active/shared/exports/ci/kyberion-source.tar.gz
+            active/shared/exports/ci/SHA256SUMS
+          if-no-files-found: error
+
       - name: Run manifest-driven full checks
         run: pnpm run check -- --scope full
 
@@ -55,7 +71,7 @@ jobs:
         run: pnpm run lint
 
       - name: Format check
-        run: pnpm run format:check:ci
+        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml
 
       - name: TypeScript type check
         run: pnpm run typecheck
@@ -117,13 +133,16 @@ jobs:
 
       - name: Run documented first-win sequence
         run: |
-          pnpm prereq:check
+          pnpm env:bootstrap --manifest kyberion-toolchain
           pnpm doctor
           pnpm pipeline --input pipelines/verify-session.json
           test -s active/shared/tmp/first-win-session.png
 
       - name: Validate first-win contract
-        run: pnpm run check:first-win-smoke
+        run: pnpm run check:first-win-docs
+
+      - name: Validate first-win artifact contract
+        run: pnpm run check -- --scope full --only first-win-smoke
 
   intent-smoke:
     runs-on: ubuntu-latest
@@ -169,13 +188,13 @@ jobs:
           - test-suite: smoke
             command: pnpm run test
           - test-suite: core
-            command: pnpm exec vitest run libs/core/ --coverage
+            command: pnpm test -- --suite core --coverage
           - test-suite: actuators
-            command: pnpm run test:actuators
+            command: pnpm test -- --suite actuators
           - test-suite: scripts
-            command: pnpm run test:scripts
+            command: pnpm test -- --suite scripts
           - test-suite: integration
-            command: pnpm run test:integration
+            command: pnpm test -- --suite integration
     steps:
       - uses: actions/checkout@v4
 

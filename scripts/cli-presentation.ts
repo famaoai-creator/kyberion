@@ -1,13 +1,10 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
-import {
-  pathResolver,
-  resolveLocale as resolveUnifiedLocale,
-  safeExistsSync,
-  type SupportedLocale,
-} from '@agent/core';
+import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { t as coreT } from '@agent/core/t';
-import type { VocabularyKey } from '@agent/core';
+import type { VocabularyKey } from '@agent/core/t';
 
 const rootDir = pathResolver.rootDir();
 
@@ -80,6 +77,7 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   console.log(t('cli_help_approvals', locale));
   console.log(t('cli_help_approve', locale));
   console.log(t('cli_help_reject', locale));
+  console.log('  pnpm kyberion project-trust request <pipeline-path>');
   console.log('');
   console.log(t('cli_help_sec_email', locale));
   console.log(t('cli_help_email_summary', locale));
@@ -96,19 +94,19 @@ export function printHelp(actuators: { length: number }, locale = resolveLocale(
   console.log(t('cli_help_calendar_create', locale));
   console.log('');
   console.log(t('cli_help_examples', locale));
-  console.log('  npm run cli -- list');
-  console.log('  npm run cli -- search browser');
-  console.log('  npm run cli -- run file-actuator -- --help');
-  console.log('  npm run cli -- preview pipelines/verify-session.json');
-  console.log('  npm run cli -- approvals');
-  console.log('  npm run cli -- approve <request-id>');
-  console.log('  npm run cli -- email status');
-  console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
-  console.log('  npm run cli -- calendar status');
-  console.log('  npm run cli -- calendar list-calendars');
-  console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
-  console.log('  npm run cli -- task plan "明日の会議資料とメール下書きを作って"');
-  console.log('  npm run cli -- offboard tenant acme');
+  console.log('  pnpm kyberion list');
+  console.log('  pnpm kyberion search browser');
+  console.log('  pnpm kyberion run file-actuator -- --help');
+  console.log('  pnpm kyberion preview pipelines/verify-session.json');
+  console.log('  pnpm kyberion approvals');
+  console.log('  pnpm kyberion approve <request-id>');
+  console.log('  pnpm kyberion email status');
+  console.log('  pnpm kyberion email draft --triage-file active/shared/tmp/email-inbox-triage.md');
+  console.log('  pnpm kyberion calendar status');
+  console.log('  pnpm kyberion calendar list-calendars');
+  console.log('  pnpm kyberion calendar agenda --calendar-id primary --days 7');
+  console.log('  pnpm kyberion task plan "明日の会議資料とメール下書きを作って"');
+  console.log('  pnpm kyberion offboard tenant acme');
   console.log('');
   console.log(t('cli_help_first_run', locale));
   console.log(t('cli_help_onboard', locale));

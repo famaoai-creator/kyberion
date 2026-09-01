@@ -7,11 +7,38 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const realFsSecureIo = vi.hoisted(() => ({
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
+  assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${filePath}`);
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`[RESOURCE_PATH_SYMLINK] ${filePath}`);
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error(`[RESOURCE_PATH_MISSING] ${filePath}`);
+    }
+    return resolved;
+  },
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
   loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
+vi.mock('./foundation/json.js', () => ({
+  readJson: realFsSecureIo.loadJson,
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
@@ -150,5 +177,30 @@ describe('mission hygiene', () => {
     expect(mod.formatMissionHygieneLine(mod.collectMissionHygieneReport()).length).toBeGreaterThan(
       10
     );
+  });
+
+  it('skips a mission directory that is replaced by a symlink', () => {
+    const externalMissionPath = path.join(os.tmpdir(), `kyb-hygiene-external-${randomUUID()}`);
+    const linkedMissionPath = path.join(tmpRoot, 'active', 'missions', 'MSN-SYMLINKED');
+    fs.mkdirSync(externalMissionPath, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalMissionPath, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-SYMLINKED',
+        status: 'planned',
+        history: [{ ts: new Date(0).toISOString() }],
+      })
+    );
+    fs.symlinkSync(externalMissionPath, linkedMissionPath, 'dir');
+    try {
+      const report = mod.collectMissionHygieneReport();
+      expect(report.stale.some((finding) => finding.mission_id === 'MSN-SYMLINKED')).toBe(false);
+      expect(report.abandoned.some((finding) => finding.mission_id === 'MSN-SYMLINKED')).toBe(
+        false
+      );
+    } finally {
+      fs.unlinkSync(linkedMissionPath);
+      fs.rmSync(externalMissionPath, { recursive: true, force: true });
+    }
   });
 });

@@ -1,9 +1,10 @@
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { getReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -157,31 +158,15 @@ export interface ResolvedReasoningRoute {
   failover: ReasoningRoutePolicy['fallback'];
 }
 
-let validatePolicyFn: ValidateFunction | null = null;
 let validateUserConfigFn: ValidateFunction | null = null;
-let cachedPolicy: ReasoningRoutePolicy | null = null;
-
-function validator(): ValidateFunction {
-  if (!validatePolicyFn) validatePolicyFn = compileSchema(SCHEMA_PATH);
-  return validatePolicyFn;
-}
-
-function validatePolicy(value: unknown, label: string): ReasoningRoutePolicy {
-  if (!validator()(value)) {
-    const errors = (validator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'invalid'}`
-    );
-    throw new Error(`Invalid reasoning route policy at ${label}: ${errors.join('; ')}`);
-  }
-  return value as ReasoningRoutePolicy;
-}
+const reasoningRoutePolicyCatalog = defineCatalog<ReasoningRoutePolicy>({
+  id: 'reasoning-route-policy',
+  path: POLICY_PATH,
+  schema: SCHEMA_PATH,
+});
 
 export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
-  if (cachedPolicy) return cachedPolicy;
-  if (!safeExistsSync(POLICY_PATH))
-    throw new Error(`Missing reasoning route policy: ${POLICY_PATH}`);
-  cachedPolicy = validatePolicy(loadJson(POLICY_PATH), POLICY_PATH);
-  return cachedPolicy;
+  return reasoningRoutePolicyCatalog.load();
 }
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
@@ -256,9 +241,12 @@ function requestedBinding(role: ReasoningRole, env: NodeJS.ProcessEnv): string |
 }
 
 function loadOperatorLlmSelection(): { provider: string; model_id?: string } | null {
-  const filePath = path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json');
-  if (!safeExistsSync(filePath)) return null;
   try {
+    const filePath = assertSafeRepositoryPath(
+      path.join(resolveActiveProfileRoot(), 'onboarding', 'llm-selection.json'),
+      { allowMissingLeaf: true }
+    );
+    if (!safeExistsSync(filePath)) return null;
     const value = loadJson<{
       provider?: unknown;
       model_id?: unknown;
@@ -803,8 +791,7 @@ export function resolveStepReasoningRoute(input: {
   };
 }
 
-export function resetReasoningRoutePolicyCache(): void {
-  cachedPolicy = null;
-  validatePolicyFn = null;
+export function _resetReasoningRoutePolicyCacheForTests(): void {
+  reasoningRoutePolicyCatalog.reset();
   validateUserConfigFn = null;
 }

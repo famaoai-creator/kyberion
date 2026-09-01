@@ -46,7 +46,3 @@ export function loadMissionLedgerPolicyCatalog(): MissionLedgerPolicyCatalog {
 export function resolveMissionLedgerPolicy(): MissionLedgerPolicyCatalog {
   return loadMissionLedgerPolicyCatalog();
 }
-
-export function resetMissionLedgerPolicyCatalogCache(): void {
-  catalog.reset();
-}

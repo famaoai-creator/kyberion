@@ -5,9 +5,11 @@ import { listArtifactRecords } from './artifact-record.js';
 import { buildNextAction, type NextAction } from './next-action.js';
 import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbox.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
+import { loadMissionManagementConfig } from './mission-management-config.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -178,10 +180,18 @@ function collectNhiLedgerSummary(): OperatorHomeNhiLedgerSummary | undefined {
 }
 
 function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
-  const reportPath = pathResolver.shared('runtime/qa/latest-quality-report.json');
+  let reportPath: string;
+  try {
+    reportPath = assertSafeRepositoryPath(
+      pathResolver.shared('runtime/qa/latest-quality-report.json'),
+      { allowMissingLeaf: true }
+    );
+  } catch {
+    return undefined;
+  }
   if (!safeExistsSync(reportPath)) return undefined;
   try {
-    const report = loadJson<{
+    const report = readJson<{
       report_id?: string;
       project_id?: string;
       subject_ref?: string;
@@ -210,21 +220,22 @@ function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
   }
 }
 
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 function readMissionManagementDirs(): string[] {
-  const configPath = pathResolver.knowledge('product/governance/mission-management-config.json');
-  if (safeExistsSync(configPath)) {
-    try {
-      const raw = loadJson<{
-        directories?: Record<string, string>;
-      }>(configPath);
-      const dirs = raw.directories || {};
-      return ['personal', 'confidential', 'public']
-        .map((tier) => dirs[tier])
-        .filter((value): value is string => Boolean(value))
-        .map((value) => pathResolver.rootResolve(value));
-    } catch {
-      // fall back to defaults
-    }
+  const config = loadMissionManagementConfig();
+  if (config) {
+    return ['personal', 'confidential', 'public']
+      .map((tier) => config.directories[tier])
+      .filter((value): value is string => Boolean(value))
+      .map((value) => safeOptionalRepositoryPath(pathResolver.rootResolve(value)))
+      .filter((value): value is string => Boolean(value));
   }
 
   return [
@@ -232,7 +243,9 @@ function readMissionManagementDirs(): string[] {
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
     pathResolver.active('archive/missions'),
-  ];
+  ]
+    .map(safeOptionalRepositoryPath)
+    .filter((value): value is string => Boolean(value));
 }
 
 function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMissionItem[] {
@@ -242,10 +255,11 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
     if (!safeExistsSync(root)) continue;
     try {
       for (const entry of safeReaddir(root)) {
-        const statePath = path.join(root, entry, 'mission-state.json');
+        const statePath = safeOptionalRepositoryPath(path.join(root, entry, 'mission-state.json'));
+        if (!statePath) continue;
         if (!safeExistsSync(statePath)) continue;
         try {
-          const state = loadJson<{
+          const state = readJson<{
             mission_id: string;
             status: string;
             tier: 'personal' | 'confidential' | 'public';

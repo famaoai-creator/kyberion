@@ -70,7 +70,3 @@ export function resolveMediaDrawioTypeRank(type?: string): number {
   const index = catalog.type_order.indexOf(normalized);
   return index >= 0 ? index : catalog.type_order.length;
 }
-
-export function resetMediaDrawioSortPolicyCatalogCache(): void {
-  catalog.reset();
-}

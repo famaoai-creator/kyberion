@@ -3,6 +3,7 @@ import {
   buildFallbackEmailDraft,
   extractBodyMarkdownFromDraft,
   extractFirstJsonBlock,
+  generateEmailReplyDraft,
   summarizeEmailSubject,
 } from './email-workflow.js';
 
@@ -21,14 +22,9 @@ describe('email-workflow shared helpers', () => {
       'Kyberion',
     ].join('\n');
 
-    expect(extractBodyMarkdownFromDraft(draft)).toBe([
-      'Hi team,',
-      '',
-      'Here is the reply body.',
-      '',
-      'Best,',
-      'Kyberion',
-    ].join('\n'));
+    expect(extractBodyMarkdownFromDraft(draft)).toBe(
+      ['Hi team,', '', 'Here is the reply body.', '', 'Best,', 'Kyberion'].join('\n')
+    );
   });
 
   it('builds a fallback draft with a subject envelope', () => {
@@ -51,5 +47,11 @@ describe('email-workflow shared helpers', () => {
   it('extracts a JSON object from a fenced block', () => {
     const parsed = extractFirstJsonBlock('before\n```json\n{"to":"team@example.com"}\n```\nafter');
     expect(parsed).toEqual({ to: 'team@example.com' });
+  });
+
+  it('rejects a request id that escapes the draft artifact directory', async () => {
+    await expect(
+      generateEmailReplyDraft({ requestId: '../outside', triageText: 'safe triage' })
+    ).rejects.toThrow(/invalid request id/);
   });
 });

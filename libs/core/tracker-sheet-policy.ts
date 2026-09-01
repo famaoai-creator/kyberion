@@ -34,7 +34,3 @@ const catalog = defineCatalog<TrackerSheetPolicyCatalog>({
 export function loadTrackerSheetPolicyCatalog(): TrackerSheetPolicyCatalog {
   return catalog.load();
 }
-
-export function resetTrackerSheetPolicyCatalogCache(): void {
-  catalog.reset();
-}

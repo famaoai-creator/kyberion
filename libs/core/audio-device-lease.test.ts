@@ -38,4 +38,10 @@ describe('AudioDeviceLeaseManager', () => {
     expect(lease.record.expires_at).not.toBe(originalExpiry);
     lease.release();
   });
+
+  it('rejects a lease directory outside the repository', () => {
+    expect(() => new AudioDeviceLeaseManager({ lease_dir: '/tmp/audio-device-leases' })).toThrow(
+      /outside the repository root/
+    );
+  });
 });

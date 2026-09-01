@@ -1,7 +1,7 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { describe, expect, it } from 'vitest';
 import { compileMusicGenerationADF } from './music-workflow-compiler.js';
 

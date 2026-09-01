@@ -22,6 +22,7 @@ vi.mock('./acp-mediator.js', () => ({
 }));
 
 import { CopilotAcpReasoningBackend } from './copilot-acp-reasoning-backend.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 describe('CopilotAcpReasoningBackend', () => {
   beforeEach(() => {
@@ -43,6 +44,20 @@ describe('CopilotAcpReasoningBackend', () => {
     });
     expect(mediatorInstances[0]?.options.bootArgs).not.toContain('--allow-all');
     expect(mediatorInstances[0]?.instance.boot).toHaveBeenCalledOnce();
+  });
+
+  it('refuses before boot when an active sandbox policy has no ACP projection', async () => {
+    const backend = new CopilotAcpReasoningBackend({ command: 'gh' });
+    const policy = resolveSandboxPolicy({
+      provider: 'kyberion',
+      mode: 'read-only',
+      networkAccess: true,
+    });
+
+    await expect(
+      withSandboxPolicy(policy, () => backend.prompt('inspect the task'))
+    ).rejects.toThrow('[SANDBOX_POLICY_UNSUPPORTED]');
+    expect(mediatorInstances[0]?.instance.boot).not.toHaveBeenCalled();
   });
 
   it('reuses a booted ACP session for repeated prompts', async () => {

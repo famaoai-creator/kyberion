@@ -1,8 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { createDistillCandidateRecord, listDistillCandidateRecords, loadDistillCandidateRecord, saveDistillCandidateRecord, updateDistillCandidateRecord } from './distill-candidate-registry.js';
+import {
+  createDistillCandidateRecord,
+  listDistillCandidateRecords,
+  loadDistillCandidateRecord,
+  saveDistillCandidateRecord,
+  updateDistillCandidateRecord,
+} from './distill-candidate-registry.js';
 import { buildOrganizationWorkLoopSummary } from './work-design.js';
 
 describe('distill-candidate-registry', () => {
+  it('returns null for a missing candidate', () => {
+    expect(loadDistillCandidateRecord('DSC-MISSING-REGRESSION')).toBeNull();
+  });
+
   it('creates and persists distill candidates', () => {
     const workLoop = buildOrganizationWorkLoopSummary({
       intentId: 'generate-presentation',
@@ -34,7 +44,9 @@ describe('distill-candidate-registry', () => {
     expect(loaded?.title).toBe('Promote reusable deck pattern');
     expect(loaded?.track_id).toBe('TRK-TEST-REL1');
     expect(loaded?.work_loop?.resolution.execution_shape).toBe('task_session');
-    expect(listDistillCandidateRecords().some((item) => item.candidate_id === record.candidate_id)).toBe(true);
+    expect(
+      listDistillCandidateRecords().some((item) => item.candidate_id === record.candidate_id)
+    ).toBe(true);
   });
 
   it('updates promotion state and ref', () => {

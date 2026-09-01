@@ -4,7 +4,7 @@ import { readJson } from './foundation/json.js';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface WorkGraphProjectionOptions {
   missionId: string;
@@ -245,13 +245,8 @@ function mergedTasks(existing: NextTask[], projected: NextTask[]): NextTask[] {
   ];
 }
 
-function assertMissionPathWithinRoot(missionPath: string): void {
-  const root = nodePath.resolve(pathResolver.rootDir());
-  const resolved = nodePath.resolve(missionPath);
-  const relative = nodePath.relative(root, resolved);
-  if (relative.startsWith('..') || nodePath.isAbsolute(relative)) {
-    throw new Error(`mission path must remain inside the repository: ${missionPath}`);
-  }
+function assertMissionPathWithinRoot(missionPath: string): string {
+  return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
 }
 
 /** Read dispatch/reconciliation state from canonical WorkItems, never NEXT_TASKS. */
@@ -293,8 +288,11 @@ export function projectWorkGraphToNextTasks(
     input.missionPath ||
     findMissionPath(missionId) ||
     pathResolver.missionDir(missionId, 'confidential', input.tenantSlug);
-  assertMissionPathWithinRoot(missionPath);
-  const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
+  const safeMissionPath = assertMissionPathWithinRoot(missionPath);
+  const nextTasksPath = assertSafeRepositoryPath(
+    nodePath.join(safeMissionPath, 'NEXT_TASKS.json'),
+    { allowMissingLeaf: true }
+  );
   const canonical = readCanonicalWorkGraph(projectId, {
     ...(input.tenantSlug?.trim() ? { tenantSlug: input.tenantSlug.trim() } : {}),
   });
@@ -317,7 +315,7 @@ export function projectWorkGraphToNextTasks(
     withExecutionContext(
       'mission_controller',
       () => {
-        safeMkdir(missionPath, { recursive: true });
+        safeMkdir(safeMissionPath, { recursive: true });
         safeWriteFile(
           nextTasksPath,
           JSON.stringify(mergedTasks(existingTasks, projectedTasks), null, 2)

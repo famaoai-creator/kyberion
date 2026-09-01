@@ -1,13 +1,14 @@
 import * as path from 'node:path';
+import { readModelRegistryDirectory } from '@agent/core/model-registry-directory';
+import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
-  readModelRegistryDirectory,
-  pathResolver,
-  safeExistsSync,
-  safeReaddir,
-  assertProcessDefinitionRegistry,
-} from '@agent/core';
-import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+  compileSchema,
+  defineCatalog,
+  readJson as readFoundationJson,
+} from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   validateActuatorCatalogDirectoryConsistency,
   validateAgentProfileDirectoryConsistency,
@@ -31,6 +32,14 @@ type GovernanceRuleCheck = {
 };
 
 const GOVERNANCE_DIR = 'knowledge/product/governance';
+
+const voiceEngineRegistrySnapshotCatalog = defineCatalog<{
+  engines?: Array<{ engine_id?: string }>;
+}>({
+  id: 'voice-engine-registry-snapshot',
+  path: pathResolver.knowledge('product/governance/voice-engine-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
+});
 
 const CHECKS: GovernanceRuleCheck[] = [
   {
@@ -1100,9 +1109,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
       violations.push('voice-profile-registry: at least one active profile is required');
     }
 
-    const engineRegistry = readJson<{ engines?: Array<{ engine_id?: string }> }>(
-      'knowledge/product/governance/voice-engine-registry.json'
-    );
+    const engineRegistry = voiceEngineRegistrySnapshotCatalog.load();
     const engineIds = new Set(
       (engineRegistry.engines || []).map((engine) => String(engine.engine_id || ''))
     );
@@ -1436,15 +1443,16 @@ export const runCheckGovernanceRules = defineScript({
     }
 
     if (violations.length > 0) {
-      console.error('[check:governance-rules] violations detected:');
-      for (const violation of violations.sort()) {
-        console.error(`- ${violation}`);
-      }
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.sort().map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
 
     context.print('[check:governance-rules] OK');
+    return { violations };
   },
 });
 

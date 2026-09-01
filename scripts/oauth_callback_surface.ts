@@ -4,17 +4,14 @@ import {
   toPersistedOAuthCallbackResult,
   type OAuthCallbackResult,
 } from './oauth-callback-result.js';
-import {
-  completeOAuthCallback,
-  escapeHtml,
-  logger,
-  pathResolver,
-  safeMkdir,
-  safeWriteFile,
-  safeExistsSync,
-} from '@agent/core';
+import { completeOAuthCallback } from '@agent/core/oauth-broker';
+import { escapeHtml } from '@agent/core/text-escaping';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import * as path from 'node:path';
 
 const app = express();
@@ -148,15 +145,46 @@ app.get(CALLBACK_PATH, async (req, res) => {
   }
 });
 
-withExecutionContext('surface_runtime', () => {
-  server.listen(PORT, HOST, () => {
-    logger.info(`[oauth-callback-surface] listening on http://${HOST}:${PORT}${CALLBACK_PATH}`);
-  });
+export const runOAuthCallbackSurface = defineScript({
+  name: 'oauth:callback-surface',
+  flags: ['json', 'dry-run', 'check'],
+  run({ dryRun, check, print }) {
+    const result = {
+      operation: 'oauth-callback-surface.listen',
+      host: HOST,
+      port: PORT,
+      callback_path: CALLBACK_PATH,
+    };
+    if (dryRun || check) {
+      print({ dry_run: true, ...result });
+      return { dry_run: true, ...result };
+    }
+
+    return new Promise((resolve, reject) => {
+      const onError = (error: NodeJS.ErrnoException) => {
+        logger.error(
+          `[oauth-callback-surface] failed to listen on http://${HOST}:${PORT}${CALLBACK_PATH}: ${error.message}`
+        );
+        reject(new ScriptExitError(1, error.message));
+      };
+      server.once('error', onError);
+      withExecutionContext('surface_runtime', () => {
+        server.listen(PORT, HOST, () => {
+          server.removeListener('error', onError);
+          logger.info(
+            `[oauth-callback-surface] listening on http://${HOST}:${PORT}${CALLBACK_PATH}`
+          );
+          const started = { ok: true as const, ...result };
+          print(started);
+          resolve(started);
+        });
+      });
+    });
+  },
 });
 
-server.on('error', (error: NodeJS.ErrnoException) => {
-  logger.error(
-    `[oauth-callback-surface] failed to listen on http://${HOST}:${PORT}${CALLBACK_PATH}: ${error.message}`
-  );
-  process.exitCode = 1;
-});
+if (
+  isDirectScript(import.meta.url, 'oauth_callback_surface.ts') ||
+  isDirectScript(import.meta.url, 'oauth_callback_surface.js')
+)
+  void runOAuthCallbackSurface();

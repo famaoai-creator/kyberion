@@ -1,10 +1,15 @@
+import * as fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { hashArtifactForReview } from './artifact-review.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExec, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { createArtifactRecord, saveArtifactRecord } from './artifact-record.js';
-import { validateMissionQuality } from './mission-governance.js';
+import {
+  validateMarketingMissionCompletionGate,
+  validateMissionArtifactReviewGate,
+  validateMissionQuality,
+} from './mission-governance.js';
 
 const previousPersona = process.env.KYBERION_PERSONA;
 const previousRole = process.env.MISSION_ROLE;
@@ -54,6 +59,34 @@ afterEach(() => {
 });
 
 describe('mission-governance quality validation', () => {
+  it('rejects symlinked mission paths before artifact review or marketing reads', () => {
+    const boundaryRoot = pathResolver.sharedTmp('mission-governance-boundary');
+    const targetPath = `${boundaryRoot}/target`;
+    const linkedPath = `${boundaryRoot}/linked-mission`;
+    fs.mkdirSync(targetPath, { recursive: true });
+    fs.symlinkSync(targetPath, linkedPath, 'dir');
+
+    try {
+      const review = validateMissionArtifactReviewGate({
+        missionId: 'MSN-GOVERNANCE-SYMLINK',
+        missionPath: linkedPath,
+      });
+      expect(review.ok).toBe(false);
+      expect(review.reason).toContain('[RESOURCE_PATH_SYMLINK]');
+
+      const marketing = validateMarketingMissionCompletionGate({
+        missionType: 'marketing',
+        missionPath: linkedPath,
+      });
+      expect(marketing.ok).toBe(false);
+      expect(marketing.reason).toContain('[RESOURCE_PATH_SYMLINK]');
+      expect(fs.existsSync(targetPath)).toBe(true);
+    } finally {
+      fs.rmSync(linkedPath, { force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
+  });
+
   it('blocks finish when a mission artifact fails deliverable quality', async () => {
     const missionId = 'MSN-GOVERNANCE-QUALITY-FAIL';
     const missionPath = prepareMission(missionId);

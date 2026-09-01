@@ -27,6 +27,28 @@ describe('work-design', () => {
     expect(specialists['document-specialist']?.team_roles).toContain('planner');
   });
 
+  it('loads schema-valid execution and runtime design profiles', () => {
+    const resolved = resolveWorkDesign({
+      intentId: 'generate-presentation',
+      taskType: 'presentation_deck',
+      shape: 'task_session',
+      outcomeIds: ['artifact:pptx'],
+    });
+
+    expect(resolved).toMatchObject({
+      primary_specialist: { id: 'document-specialist' },
+    });
+    const summary = buildOrganizationWorkLoopSummary({
+      intentId: 'generate-presentation',
+      taskType: 'presentation_deck',
+      shape: 'task_session',
+      outcomeIds: ['artifact:pptx'],
+      tier: 'confidential',
+    });
+    expect(summary.execution_boundary.rule).toContain('knowledge defines process');
+    expect(summary.runtime_design.owner_model).toBe('single_actor');
+  });
+
   it('resolves a document-specialist team for presentation work', () => {
     const resolved = resolveWorkDesign({
       intentId: 'generate-presentation',

@@ -1,4 +1,5 @@
 {
+  "$schema": "../../../product/schemas/visual-review-rubric.schema.json",
   "version": "1.0.0",
   "_meta": "MP-04 visual review rubric. Criteria are data, not code, so an operator can tune what a review looks for without touching the actuator. `weight` orders the summary; `severity` decides whether a finding blocks delivery. Anti-pattern checks are weighted above craft on purpose: a deck that is merely tidy but looks machine-made is the failure mode this loop exists to catch.",
 

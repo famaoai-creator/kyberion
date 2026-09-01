@@ -1,10 +1,7 @@
-import {
-  loadJson,
-  safeExistsSync,
-  pathResolver,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+import { assertSafeRepositoryPath, loadJson, safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import { randomUUID } from 'node:crypto';
 import { createApprovalRequest, loadApprovalRequest } from '@agent/core/governance';
 import {
@@ -21,7 +18,7 @@ import {
   revealFinderPath,
   openFinderPath,
 } from '@agent/core/os-automation';
-import { emitComputerSurfacePatch } from '@agent/core';
+import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 
@@ -798,8 +795,11 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
 }
 
 async function performReconcile(input: SystemAction) {
-  const strategyPath = pathResolver.rootResolve(
-    input.strategy_path || 'knowledge/product/governance/system-strategy.json'
+  const strategyPath = assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      input.strategy_path || 'knowledge/product/governance/system-strategy.json'
+    ),
+    { allowMissingLeaf: true }
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = loadJson<{

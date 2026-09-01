@@ -246,8 +246,8 @@ def _health() -> dict:
             "macos_say": shutil.which("say") is not None,
         },
         "install_hints": {
-            "cosyvoice2": "pnpm voice:setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",
-            "fish_speech": "pnpm voice:setup --apply  # governed mlx-audio runtime; Fish Speech assets download on first use",
+            "cosyvoice2": "pnpm kyberion voice setup --apply  # governed mlx-audio runtime; CosyVoice2 assets download on first use",
+            "fish_speech": "pnpm kyberion voice setup --apply  # governed mlx-audio runtime; Fish Speech assets download on first use",
         },
     }
 

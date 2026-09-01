@@ -42,7 +42,3 @@ export function loadMissionJournalPolicyCatalog(): MissionJournalPolicyCatalog {
 export function resolveMissionJournalPolicy(): MissionJournalPolicyCatalog {
   return loadMissionJournalPolicyCatalog();
 }
-
-export function resetMissionJournalPolicyCatalogCache(): void {
-  catalog.reset();
-}

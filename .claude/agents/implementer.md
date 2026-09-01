@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, NotebookRead, Write, Edit, MultiEdit, NotebookEdit, Bas
 <!--
 GENERATED FILE — DO NOT EDIT BY HAND.
 Regenerate with: pnpm agents:generate
-Check drift with: pnpm check:subagent-definitions
+Check drift with: pnpm agents:generate -- --check
 Sources (SSoT):
   - knowledge/product/orchestration/team-roles/implementer.json
   - knowledge/product/roles/software_developer/PROCEDURE.md

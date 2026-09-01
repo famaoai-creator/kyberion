@@ -212,7 +212,3 @@ export function resolveDrawioBoundaryIconCandidates(input: {
   );
   return matched?.icons || [];
 }
-
-export function resetMediaDrawioBoundaryPolicyCatalogCache(): void {
-  catalog.reset();
-}

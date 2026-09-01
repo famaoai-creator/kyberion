@@ -12,7 +12,7 @@ import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import {
   resolveVoiceEngineForPlatform,
@@ -92,13 +92,26 @@ export const REALTIME_VOICE_REPLY_STREAM_FLUSH_CHARS = 120;
 export type RealtimeVoiceReplySegmentHandler = (segment: string) => void | Promise<void>;
 
 function sessionPath(sessionId: string): string {
-  return path.join(SESSION_DIR, `${sessionId}.json`);
+  return assertSafeRepositoryPath(path.join(SESSION_DIR, `${normalizeSessionId(sessionId)}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function normalizeSessionId(sessionId: string): string {
   const normalized = sessionId.trim();
-  if (!normalized) {
-    throw new Error('Realtime voice conversation requires sessionId');
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(
+      'Realtime voice conversation requires a sessionId that is a single path segment'
+    );
+  }
+  return normalized;
+}
+
+function normalizeRequestTag(requestTag: string | undefined): string | undefined {
+  if (!requestTag) return undefined;
+  const normalized = requestTag.trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('Realtime voice conversation requestTag must be a single path segment');
   }
   return normalized;
 }
@@ -290,9 +303,11 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
   payload: Record<string, unknown>;
   artifactPath: string;
 } {
+  const sessionId = normalizeSessionId(input.sessionId);
+  const requestTag = normalizeRequestTag(input.requestTag);
   const requestId = [
-    input.sessionId,
-    ...(input.requestTag ? [input.requestTag] : []),
+    sessionId,
+    ...(requestTag ? [requestTag] : []),
     Date.now().toString(36),
     randomUUID().slice(0, 8),
   ].join('-');
@@ -303,8 +318,9 @@ export function buildRealtimeVoiceGenerationPayload(input: RealtimeVoiceSynthesi
     engine.supports.artifact_formats,
     policy.delivery.default_format
   );
-  const resolvedArtifactPath = pathResolver.sharedTmp(
-    `realtime-voice-conversation/${requestId}.${format}`
+  const resolvedArtifactPath = assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`realtime-voice-conversation/${requestId}.${format}`),
+    { allowMissingLeaf: true }
   );
 
   return {

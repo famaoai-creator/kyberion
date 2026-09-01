@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { listHygieneInquiries } from '../../../lib/hygiene-server';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,13 +11,12 @@ export const dynamic = 'force-dynamic';
  * remediation commands never leave the server. Deciding start/cancel is a
  * separate, guarded POST (api/hygiene/[id]) fired only by an explicit click.
  */
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
-    return NextResponse.json({ ok: true, inquiries: listHygieneInquiries() });
+    return NextResponse.json({ ok: true, inquiries: listHygieneInquiries(resolved.context) });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error);
   }
 }

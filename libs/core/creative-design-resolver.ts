@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -434,11 +434,23 @@ interface TenantDesignData {
 }
 
 function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
-  for (const dir of tenantDesignDirCandidates(tenantSlug)) {
-    const override = readJsonIfPresent(path.join(dir, 'tenant-override.json'));
-    if (!override) continue;
-    const themePack = readJsonIfPresent(path.join(dir, 'theme.json'));
-    return { override, themePack, matchedDir: dir };
+  for (const candidateDir of tenantDesignDirCandidates(tenantSlug)) {
+    try {
+      const dir = assertSafeRepositoryPath(candidateDir, { allowMissingLeaf: true });
+      const overridePath = assertSafeRepositoryPath(path.join(dir, 'tenant-override.json'), {
+        allowMissingLeaf: true,
+      });
+      const override = readJsonIfPresent(overridePath);
+      if (!override) continue;
+      const themePath = assertSafeRepositoryPath(path.join(dir, 'theme.json'), {
+        allowMissingLeaf: true,
+      });
+      const themePack = readJsonIfPresent(themePath);
+      return { override, themePack, matchedDir: dir };
+    } catch {
+      // An invalid or symlinked tenant design overlay is not trusted input.
+      // Continue with the next governed candidate or brand defaults.
+    }
   }
   return null;
 }

@@ -4,8 +4,9 @@ import { createLogger } from './logger.js';
 const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
+import { resolveRepositoryPathToken } from './path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJson } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 
@@ -31,11 +32,23 @@ function isPlainObject(value: unknown): value is Record<string, any> {
 
 export { isPlainObject };
 
+function assertServiceIdPathSegment(serviceId: string): string {
+  const normalized = String(serviceId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[SERVICE_ID_INVALID] service id must be a single path segment: ${serviceId}`);
+  }
+  return normalized;
+}
+
 export function loadConnectionWithFallback(serviceId: string): Record<string, any> {
-  const connectionPath = customerResolver.resolveOverlay(`connections/${serviceId}.json`);
+  const normalizedServiceId = assertServiceIdPathSegment(serviceId);
+  const connectionPath = customerResolver.resolveOverlay(`connections/${normalizedServiceId}.json`);
   if (connectionPath) {
     try {
-      const primary = loadJson<Record<string, unknown>>(connectionPath);
+      const safeConnectionPath = assertSafeRepositoryPath(connectionPath, {
+        allowMissingLeaf: true,
+      });
+      const primary = loadJson<Record<string, unknown>>(safeConnectionPath);
       if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
     } catch (err) {
       logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
@@ -44,8 +57,11 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
   // Keep the legacy fallback observable to callers/tests, but let secure-io's
   // deny layer reject personal credential paths before any filesystem access.
   // The mediated secret-guard read below is the only permitted recovery path.
-  const fallbackPath = pathResolver.resolve(`knowledge/personal/connections/${serviceId}.json`);
   try {
+    const fallbackPath = assertSafeRepositoryPath(
+      pathResolver.resolve(`knowledge/personal/connections/${normalizedServiceId}.json`),
+      { allowMissingLeaf: true }
+    );
     const fallback = loadJson<Record<string, unknown>>(fallbackPath);
     if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
       return fallback;
@@ -87,27 +103,7 @@ export function mergeParamsWithConnection(
  * (or `pathResolver.toRepoRelative`) before storing a path.
  */
 function resolvePathToken(token: string): string | undefined {
-  const trimmed = token.slice(1).trim(); // drop leading '@'
-  const sepIdx = trimmed.indexOf(':');
-  const domain = (sepIdx >= 0 ? trimmed.slice(0, sepIdx) : trimmed).trim();
-  const subPath = sepIdx >= 0 ? trimmed.slice(sepIdx + 1).trim() : '';
-  switch (domain) {
-    case 'root':
-      return subPath ? pathResolver.rootResolve(subPath) : pathResolver.rootDir();
-    case 'knowledge':
-      return pathResolver.knowledge(subPath);
-    case 'active':
-      return pathResolver.active(subPath);
-    case 'shared':
-      return pathResolver.shared(subPath);
-    case 'tmp':
-      // Build under shared/tmp without triggering sharedTmp()'s mkdir side effect.
-      return pathResolver.shared(subPath ? `tmp/${subPath}` : 'tmp');
-    case 'vault':
-      return pathResolver.vault(subPath);
-    default:
-      return undefined;
-  }
+  return resolveRepositoryPathToken(token);
 }
 
 /**

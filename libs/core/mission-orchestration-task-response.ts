@@ -108,8 +108,8 @@ export async function obtainTaskResultResponse(
       intent: 'mission_task_execution',
       text: input.prompt,
       objective: input.task.description || input.task.task_id,
-      acceptance_criteria: Array.isArray((input.task as any).acceptance_criteria)
-        ? (input.task as any).acceptance_criteria.filter(
+      acceptance_criteria: Array.isArray(input.task.acceptance_criteria)
+        ? input.task.acceptance_criteria.filter(
             (criterion: unknown) => typeof criterion === 'string' && criterion.trim()
           )
         : undefined,
@@ -120,9 +120,8 @@ export async function obtainTaskResultResponse(
         ? `Deliver ${input.task.deliverable} for ${input.task.task_id}`
         : `Complete task ${input.task.task_id}`,
       prior_decisions:
-        Array.isArray((input.task as any).dependencies) &&
-        (input.task as any).dependencies.length > 0
-          ? [`Dependencies: ${(input.task as any).dependencies.join(', ')}`]
+        Array.isArray(input.task.dependencies) && input.task.dependencies.length > 0
+          ? [`Dependencies: ${input.task.dependencies.join(', ')}`]
           : undefined,
       context: {
         mission_id: input.missionId,
@@ -197,8 +196,8 @@ export async function obtainTaskResultResponse(
         intent: 'mission_task_execution',
         text: retryPrompt,
         objective: input.task.description || input.task.task_id,
-        acceptance_criteria: Array.isArray((input.task as any).acceptance_criteria)
-          ? (input.task as any).acceptance_criteria.filter(
+        acceptance_criteria: Array.isArray(input.task.acceptance_criteria)
+          ? input.task.acceptance_criteria.filter(
               (criterion: unknown) => typeof criterion === 'string' && criterion.trim()
             )
           : undefined,
@@ -209,9 +208,8 @@ export async function obtainTaskResultResponse(
           ? `Deliver ${input.task.deliverable} for ${input.task.task_id}`
           : `Complete task ${input.task.task_id}`,
         prior_decisions:
-          Array.isArray((input.task as any).dependencies) &&
-          (input.task as any).dependencies.length > 0
-            ? [`Dependencies: ${(input.task as any).dependencies.join(', ')}`]
+          Array.isArray(input.task.dependencies) && input.task.dependencies.length > 0
+            ? [`Dependencies: ${input.task.dependencies.join(', ')}`]
             : undefined,
         context: {
           mission_id: input.missionId,

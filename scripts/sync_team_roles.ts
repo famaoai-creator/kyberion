@@ -1,7 +1,9 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
+import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { loadTeamRoleDirectory, loadTeamRoleSnapshot } from '@agent/core/mission-team-index';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 type TeamRoleRecord = {
   description: string;
@@ -24,8 +26,7 @@ const DIRECTORY = pathResolver.knowledge('product/orchestration/team-roles');
 const SNAPSHOT = pathResolver.knowledge('product/orchestration/team-role-index.json');
 
 function loadSnapshotRoles(): Record<string, TeamRoleRecord> {
-  const snapshot = readJson<{ team_roles?: Record<string, TeamRoleRecord> }>(SNAPSHOT);
-  return snapshot.team_roles || {};
+  return loadTeamRoleSnapshot();
 }
 
 function loadDirectoryRoles(): Record<string, TeamRoleRecord> | null {
@@ -40,37 +41,35 @@ function loadDirectoryRoles(): Record<string, TeamRoleRecord> | null {
     return null;
   }
 
-  const roles: Record<string, TeamRoleRecord> = {};
-  for (const file of files) {
-    const filePath = path.join(DIRECTORY, file);
-    const payload = readJson<TeamRoleFile>(filePath);
-    const role = String(payload.role || '').trim();
-    if (!role) {
-      throw new Error(`Team role file ${file} must declare a role id`);
-    }
-    if (file.replace(/\.json$/i, '') !== role) {
-      throw new Error(`Team role file ${file} must match its role id (${role})`);
-    }
-    const { role: _role, ...record } = payload;
-    roles[role] = record;
-  }
-
-  return roles;
+  return loadTeamRoleDirectory();
 }
 
-function writeDirectoryRoles(roles: Record<string, TeamRoleRecord>) {
-  safeMkdir(DIRECTORY, { recursive: true });
+async function renderDirectoryRoles(
+  roles: Record<string, TeamRoleRecord>,
+  prettierConfig: Record<string, unknown>
+): Promise<GeneratedFile[]> {
   const entries = Object.entries(roles).sort(([left], [right]) => left.localeCompare(right));
-  for (const [role, record] of entries) {
-    const payload: TeamRoleFile = {
-      role,
-      ...record,
-    };
-    safeWriteFile(path.join(DIRECTORY, `${role}.json`), `${JSON.stringify(payload, null, 2)}\n`);
-  }
+  return Promise.all(
+    entries.map(async ([role, record]) => {
+      const payload: TeamRoleFile = {
+        role,
+        ...record,
+      };
+      return {
+        path: path.join(DIRECTORY, `${role}.json`),
+        content: await prettierFormat(JSON.stringify(payload, null, 2), {
+          ...prettierConfig,
+          parser: 'json',
+        }),
+      };
+    })
+  );
 }
 
-function writeSnapshot(roles: Record<string, TeamRoleRecord>) {
+async function renderSnapshot(
+  roles: Record<string, TeamRoleRecord>,
+  prettierConfig: Record<string, unknown>
+): Promise<GeneratedFile> {
   const team_roles: Record<string, TeamRoleRecord> = {};
   for (const [role, record] of Object.entries(roles).sort(([left], [right]) =>
     left.localeCompare(right)
@@ -78,37 +77,46 @@ function writeSnapshot(roles: Record<string, TeamRoleRecord>) {
     team_roles[role] = record;
   }
 
-  safeWriteFile(
-    SNAPSHOT,
-    `${JSON.stringify(
-      {
-        version: '1.0.0',
-        team_roles,
-      },
-      null,
-      2
-    )}\n`
-  );
+  const payload = {
+    version: '1.0.0',
+    team_roles,
+  };
+  return {
+    path: SNAPSHOT,
+    content: await prettierFormat(JSON.stringify(payload, null, 2), {
+      ...prettierConfig,
+      parser: 'json',
+    }),
+  };
 }
 
-function main() {
-  return withExecutionContext('ecosystem_architect', () => {
-    const roles = loadDirectoryRoles() || loadSnapshotRoles();
-    writeDirectoryRoles(roles);
-    writeSnapshot(roles);
-    console.log(
-      JSON.stringify(
-        {
-          status: 'ok',
-          role_count: Object.keys(roles).length,
-          canonical_directory: path.relative(pathResolver.rootDir(), DIRECTORY),
-          snapshot_path: path.relative(pathResolver.rootDir(), SNAPSHOT),
-        },
-        null,
-        2
-      )
-    );
-  });
+function loadRoles(): Record<string, TeamRoleRecord> {
+  return loadDirectoryRoles() || loadSnapshotRoles();
 }
 
-main();
+async function render(): Promise<GeneratedFile[]> {
+  const roles = loadRoles();
+  const prettierConfig = (await resolvePrettierConfig(SNAPSHOT)) ?? {};
+  return [
+    ...(await renderDirectoryRoles(roles, prettierConfig)),
+    await renderSnapshot(roles, prettierConfig),
+  ];
+}
+
+const outputPaths = [
+  ...Object.keys(loadRoles()).map((role) => path.join(DIRECTORY, `${role}.json`)),
+  SNAPSHOT,
+];
+
+export const runSyncTeamRoles = defineGenerator({
+  id: 'team-roles',
+  outputs: outputPaths,
+  normalize: (content) => JSON.stringify(JSON.parse(content)),
+  render,
+});
+
+if (
+  isDirectScript(import.meta.url, 'sync_team_roles.ts') ||
+  isDirectScript(import.meta.url, 'sync_team_roles.js')
+)
+  void runSyncTeamRoles();

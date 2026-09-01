@@ -3,7 +3,13 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 
 /**
  * AA-03 Task 1: one signing module for host-internal A2A envelopes.
@@ -26,7 +32,7 @@ const SECRET_RELATIVE_PATH = 'active/shared/runtime/agent-supervisor/a2a-secret'
 let cachedSecret: string | null = null;
 
 /** Test hook: forget the cached secret so key-resolution paths can be exercised. */
-export function resetA2ASecretCache(): void {
+export function _resetA2ASecretCacheForTests(): void {
   cachedSecret = null;
 }
 
@@ -39,7 +45,9 @@ export function resolveA2ASecret(): string {
     return cachedSecret;
   }
 
-  const secretPath = pathResolver.rootResolve(SECRET_RELATIVE_PATH);
+  const secretPath = assertSafeRepositoryPath(pathResolver.rootResolve(SECRET_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
   try {
     if (safeExistsSync(secretPath)) {
       const persisted = String(safeReadFile(secretPath, { encoding: 'utf8' }) || '').trim();

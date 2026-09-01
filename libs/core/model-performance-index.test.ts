@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockFiles = vi.hoisted(() => new Map<string, string>());
 
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeAppendFileSync: (filePath: string, data: string) =>
     mockFiles.set(filePath, `${mockFiles.get(filePath) || ''}${data}`),
   safeExistsSync: (filePath: string) => mockFiles.has(filePath),

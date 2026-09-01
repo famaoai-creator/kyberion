@@ -91,7 +91,3 @@ export function resolveMediaSignalEntryPolicy(
   const catalog = loadMediaSignalEntryPolicyCatalog();
   return catalog.entry_types.find((entry) => entry.source_key === normalized) || null;
 }
-
-export function resetMediaSignalEntryPolicyCatalogCache(): void {
-  catalog.reset();
-}

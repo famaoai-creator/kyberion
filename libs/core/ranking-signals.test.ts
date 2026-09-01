@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   DEFAULT_SCOPE_AFFINITY,
   docAuthorityScore,
@@ -96,6 +98,30 @@ describe('ranking-signals (KM-02)', () => {
       proximity: expect.any(Number),
       usage_yield: expect.any(Number),
     });
+  });
+
+  it('loads a custom ranking catalog through schema validation and falls back when invalid', () => {
+    const catalogPath = pathResolver.sharedTmp(
+      `ranking-signals-invalid/${process.pid}/knowledge-weights.json`
+    );
+    safeWriteFile(
+      catalogPath,
+      JSON.stringify({ version: '1.0.0', defaults: { proximity: 'bad' } }),
+      {
+        mkdir: true,
+      }
+    );
+    try {
+      expect(loadKnowledgeRankingWeights(undefined, catalogPath)).toEqual({
+        proximity: 1,
+        usage_yield: 4,
+      });
+    } finally {
+      safeRmSync(pathResolver.sharedTmp(`ranking-signals-invalid/${process.pid}`), {
+        recursive: true,
+        force: true,
+      });
+    }
   });
 });
 

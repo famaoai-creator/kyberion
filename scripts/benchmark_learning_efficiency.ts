@@ -1,4 +1,8 @@
-import { compileUserIntentFlow, logger, safeUnlinkSync, pathResolver } from '@agent/core';
+import { compileUserIntentFlow } from '@agent/core/intent-contract';
+import { logger } from '@agent/core/core';
+import { safeUnlinkSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const CACHE_FILE = pathResolver.shared('runtime/intent-flow-cache.json');
 
@@ -236,7 +240,14 @@ async function main() {
   logger.success('=== BENCHMARK COMPLETED SUCCESSFULLY ===');
 }
 
-main().catch((err) => {
-  logger.error(`Benchmark failed: ${err.message}`);
-  process.exitCode = 1;
+export const runLearningEfficiencyBenchmark = defineScript({
+  name: 'benchmark:learning-efficiency',
+  flags: [],
+  run: () => main(),
 });
+
+if (
+  isDirectScript(import.meta.url, 'benchmark_learning_efficiency.ts') ||
+  isDirectScript(import.meta.url, 'benchmark_learning_efficiency.js')
+)
+  void runLearningEfficiencyBenchmark();

@@ -25,9 +25,11 @@
  */
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -65,6 +67,28 @@ const DEFAULT_SLO_CONFIG: CurationSloConfig = {
   },
   default_freshness_days: 180,
 };
+
+const CURATION_SLO_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-curation-slo.schema.json'
+);
+const curationSloCatalogs = new Map<
+  string,
+  GovernedCatalog<CurationSloConfig & { version: string }>
+>();
+const TAXONOMY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-taxonomy.schema.json'
+);
+
+function safeCurationOverridePath(override: string | undefined, canonical: string): string {
+  if (!override) return canonical;
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return canonical;
+  }
+}
 
 export interface CurationLowYieldHint {
   document_path: string;
@@ -127,35 +151,62 @@ type ArchiveHistoryEntry = {
 
 function sloConfigPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_SLO_CONFIG_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/knowledge-curation-slo.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/knowledge-curation-slo.json')
+  );
+}
+
+function curationSloCatalog(
+  filePath: string
+): GovernedCatalog<CurationSloConfig & { version: string }> {
+  const cached = curationSloCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<CurationSloConfig & { version: string }>({
+    id: 'knowledge-curation-slo',
+    path: filePath,
+    schema: CURATION_SLO_SCHEMA_PATH,
+    fallback: { version: '1.0.0', ...DEFAULT_SLO_CONFIG },
+    fallbackOnInvalid: true,
+  });
+  curationSloCatalogs.set(filePath, catalog);
+  return catalog;
 }
 
 function taxonomyPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_TAXONOMY_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/knowledge-taxonomy.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/knowledge-taxonomy.json')
+  );
 }
 
 function reportPath(): string {
   const override = getRegisteredEnvText('KYBERION_CURATION_REPORT_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.knowledge('product/governance/CURATION_REPORT.md');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.knowledge('product/governance/CURATION_REPORT.md')
+  );
 }
 
 function archiveHistoryPath(tenantSlug?: string): string {
   if (tenantSlug) {
-    return pathResolver.rootResolve(
-      physicalScopedPath(
-        'active/shared/runtime/feedback-loop',
-        { tier: 'confidential', tenant_slug: tenantSlug, scope_kind: 'tenant' },
-        'curation-archive-history.json'
-      )
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        physicalScopedPath(
+          'active/shared/runtime/feedback-loop',
+          { tier: 'confidential', tenant_slug: tenantSlug, scope_kind: 'tenant' },
+          'curation-archive-history.json'
+        )
+      ),
+      { allowMissingLeaf: true }
     );
   }
   const override = getRegisteredEnvText('KYBERION_CURATION_ARCHIVE_HISTORY_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/feedback-loop/curation-archive-history.json');
+  return safeCurationOverridePath(
+    override,
+    pathResolver.shared('runtime/feedback-loop/curation-archive-history.json')
+  );
 }
 
 /** Physical archive-history location used by the weekly steward report. */
@@ -294,10 +345,6 @@ export function knowledgeCurationReportPath(): string {
   return reportPath();
 }
 
-function isPositiveNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0;
-}
-
 function registeredKnowledgeTenants(): string[] {
   try {
     return listTenantProfileSlugs();
@@ -318,26 +365,12 @@ function usageScopeForTenant(tenantSlug: string): ScopeContext {
  */
 export function loadCurationSloConfig(): CurationSloConfig {
   const filePath = sloConfigPath();
-  if (!safeExistsSync(filePath)) return { ...DEFAULT_SLO_CONFIG };
   try {
-    const parsed = readJson<Partial<CurationSloConfig>>(filePath);
-    const freshnessByKind: Record<string, number> = {};
-    if (parsed.freshness_days_by_kind && typeof parsed.freshness_days_by_kind === 'object') {
-      for (const [kind, days] of Object.entries(parsed.freshness_days_by_kind)) {
-        if (isPositiveNumber(days)) freshnessByKind[kind] = days;
-      }
-    }
+    const parsed = curationSloCatalog(filePath).load();
     return {
-      low_yield_delivery_threshold: isPositiveNumber(parsed.low_yield_delivery_threshold)
-        ? parsed.low_yield_delivery_threshold
-        : DEFAULT_SLO_CONFIG.low_yield_delivery_threshold,
-      freshness_days_by_kind:
-        Object.keys(freshnessByKind).length > 0
-          ? freshnessByKind
-          : { ...DEFAULT_SLO_CONFIG.freshness_days_by_kind },
-      default_freshness_days: isPositiveNumber(parsed.default_freshness_days)
-        ? parsed.default_freshness_days
-        : DEFAULT_SLO_CONFIG.default_freshness_days,
+      low_yield_delivery_threshold: parsed.low_yield_delivery_threshold,
+      freshness_days_by_kind: { ...parsed.freshness_days_by_kind },
+      default_freshness_days: parsed.default_freshness_days,
     };
   } catch {
     return { ...DEFAULT_SLO_CONFIG };
@@ -349,11 +382,29 @@ interface TaxonomyDirectoryDefault {
   kind: string;
 }
 
+interface TaxonomyCatalogPayload {
+  version: string;
+  directory_defaults?: TaxonomyDirectoryDefault[];
+}
+
+const taxonomyCatalogs = new Map<string, GovernedCatalog<TaxonomyCatalogPayload>>();
+
+function taxonomyCatalog(filePath: string): GovernedCatalog<TaxonomyCatalogPayload> {
+  const cached = taxonomyCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<TaxonomyCatalogPayload>({
+    id: 'knowledge-taxonomy',
+    path: filePath,
+    schema: TAXONOMY_SCHEMA_PATH,
+  });
+  taxonomyCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
 function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
   const filePath = taxonomyPath();
-  if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = readJson<{ directory_defaults?: TaxonomyDirectoryDefault[] }>(filePath);
+    const parsed = taxonomyCatalog(filePath).load();
     return Array.isArray(parsed.directory_defaults) ? parsed.directory_defaults : [];
   } catch {
     return [];
@@ -368,13 +419,23 @@ function loadTaxonomyDirectoryDefaults(): TaxonomyDirectoryDefault[] {
  */
 function scanRoots(): string[] {
   const override = getRegisteredEnvText('KYBERION_CURATION_SCAN_ROOTS')?.trim();
-  if (override) {
-    return override
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean);
-  }
-  return loadTaxonomyDirectoryDefaults().map((entry) => entry.path_prefix);
+  const roots = override
+    ? override
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    : loadTaxonomyDirectoryDefaults().map((entry) => entry.path_prefix);
+  return roots.flatMap((root) => {
+    try {
+      return [
+        assertSafeRepositoryPath(pathResolver.rootResolve(root), {
+          allowMissingLeaf: true,
+        }),
+      ];
+    } catch {
+      return [];
+    }
+  });
 }
 
 function extractFrontmatterValue(content: string, key: string): string | undefined {
@@ -422,7 +483,12 @@ function scanMarkdownDocs(
   }
   for (const entry of entries) {
     if (entry.startsWith('.')) continue;
-    const fullPath = path.join(root, entry);
+    let fullPath: string;
+    try {
+      fullPath = assertSafeRepositoryPath(path.join(root, entry));
+    } catch {
+      continue;
+    }
     let stat;
     try {
       stat = safeStat(fullPath);
@@ -499,7 +565,7 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   const directoryDefaults = loadTaxonomyDirectoryDefaults();
   const docs: ScannedDoc[] = [];
   for (const root of scanRoots()) {
-    scanMarkdownDocs(pathResolver.rootResolve(root), directoryDefaults, docs);
+    scanMarkdownDocs(root, directoryDefaults, docs);
   }
 
   const freshnessBreaches: CurationFreshnessBreach[] = [];

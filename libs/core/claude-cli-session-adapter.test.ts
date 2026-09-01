@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { ClaudeCliSessionAdapter } from './claude-cli-session-adapter.js';
+import {
+  ClaudeCliSessionAdapter,
+  normalizeClaudeStreamMessage,
+} from './claude-cli-session-adapter.js';
 
 interface FakeChild extends EventEmitter {
   stdout: PassThrough;
@@ -106,6 +109,32 @@ function result(text: string): Record<string, unknown> {
 }
 
 describe('ClaudeCliSessionAdapter (CN-01)', () => {
+  it('normalizes stream envelopes and rejects malformed protocol shapes', () => {
+    expect(normalizeClaudeStreamMessage([])).toBeUndefined();
+    expect(normalizeClaudeStreamMessage({ type: 'result', result: 42 })).toBeUndefined();
+    expect(
+      normalizeClaudeStreamMessage({
+        type: 'assistant',
+        message: {
+          content: [{ type: 'tool_use', id: 'toolu_1', input: { run_in_background: 1 } }],
+        },
+      })
+    ).toMatchObject({ type: 'assistant', message: { content: [] } });
+    expect(
+      normalizeClaudeStreamMessage({
+        type: 'system',
+        subtype: 'init',
+        session_id: 'sess-1',
+        agents: ['kyberion-explorer'],
+        message: { content: [{ type: 'text', text: 'ok' }, []] },
+      })
+    ).toMatchObject({
+      type: 'system',
+      agents: ['kyberion-explorer'],
+      message: { content: [{ type: 'text', text: 'ok' }] },
+    });
+  });
+
   describe('session argv', () => {
     it('builds a deterministic stream-json session for the explorer tier', () => {
       const args = new ClaudeCliSessionAdapter({

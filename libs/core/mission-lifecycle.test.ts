@@ -27,6 +27,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
@@ -34,6 +35,7 @@ import {
   collectMissionEvidence,
   evaluateMissionFinishExitGate,
   finishMission,
+  readMissionNextTasks,
   repairLegacyMissionState,
   reconcileLifecycleClosureCriteria,
   tryAutoCompleteTaskFromEvidence,
@@ -179,6 +181,26 @@ describe('mission lifecycle finish gate', () => {
     expect(collectMissionEvidence(missionPath).map(({ ref }) => path.basename(ref))).toEqual([
       'report.md',
     ]);
+  });
+
+  it('rejects external and symlinked mission paths before reading lifecycle artifacts', () => {
+    expect(() => collectMissionEvidence('/tmp/kyberion-external-mission')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(() => readMissionNextTasks('/tmp/kyberion-external-mission')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+
+    const target = pathResolver.sharedTmp('mission-lifecycle-symlink-target');
+    const linked = pathResolver.sharedTmp('mission-lifecycle-symlink');
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, linked);
+    try {
+      expect(() => collectMissionEvidence(linked)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(linked, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
   });
 
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {

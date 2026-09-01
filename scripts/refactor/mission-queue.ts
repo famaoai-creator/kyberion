@@ -3,22 +3,77 @@
  * Queue persistence and dispatch selection for mission orchestration.
  */
 
-import { logger, safeExistsSync, safeReadFile, safeWriteFile, withLock } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { withLock } from '@agent/core/src/lock-utils';
+import { appendJsonLine, readJsonLines } from '@agent/core/foundation';
 
 export interface MissionQueueEntry {
   mission_id: string;
-  tier: string;
+  tier: 'personal' | 'confidential' | 'public';
   priority: number;
   status: 'pending' | 'dispatched';
   enqueued_at: string;
   dependencies: string[];
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
+  if (!isJsonRecord(value)) return null;
+  const missionId = value.mission_id;
+  const tier = value.tier;
+  const priority = value.priority;
+  const status = value.status;
+  const enqueuedAt = value.enqueued_at;
+  const dependencies = value.dependencies;
+  let normalizedPriority = 5;
+  if (
+    priority !== undefined &&
+    (typeof priority !== 'number' || !Number.isInteger(priority) || !Number.isFinite(priority))
+  ) {
+    return null;
+  }
+  if (typeof priority === 'number') normalizedPriority = priority;
+
+  let normalizedDependencies: string[] = [];
+  if (
+    dependencies !== undefined &&
+    (!Array.isArray(dependencies) ||
+      dependencies.some((dependency) => typeof dependency !== 'string'))
+  ) {
+    return null;
+  }
+  if (Array.isArray(dependencies)) normalizedDependencies = dependencies;
+
+  if (
+    typeof missionId !== 'string' ||
+    !missionId.trim() ||
+    (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') ||
+    (status !== 'pending' && status !== 'dispatched') ||
+    typeof enqueuedAt !== 'string' ||
+    !enqueuedAt.trim() ||
+    !Number.isFinite(Date.parse(enqueuedAt))
+  ) {
+    return null;
+  }
+
+  return {
+    mission_id: missionId.trim(),
+    tier,
+    priority: normalizedPriority,
+    status,
+    enqueued_at: enqueuedAt,
+    dependencies: normalizedDependencies,
+  };
+}
+
 export async function enqueueMission(
   queuePath: string,
   missionId: string,
-  tier: string,
+  tier: MissionQueueEntry['tier'],
   priority = 5,
   deps: string[] = []
 ): Promise<void> {
@@ -40,7 +95,7 @@ export async function enqueueMission(
 export async function dispatchNextQueuedMission(
   queuePath: string,
   checkDependencies: (missionId: string) => { ok: boolean; missing: string[] },
-  onDispatch: (missionId: string, tier: string) => Promise<void>
+  onDispatch: (missionId: string, tier: MissionQueueEntry['tier']) => Promise<void>
 ): Promise<void> {
   await withLock('mission-queue', async () => {
     if (!safeExistsSync(queuePath)) {
@@ -48,10 +103,10 @@ export async function dispatchNextQueuedMission(
       return;
     }
 
-    const lines = (safeReadFile(queuePath, { encoding: 'utf8' }) as string)
-      .split('\n')
-      .filter(Boolean);
-    const queue = lines.map((line) => JSON.parse(line) as MissionQueueEntry);
+    const queue = readJsonLines<unknown>(queuePath, { onMalformed: 'skip' }).flatMap((value) => {
+      const entry = parseMissionQueueEntry(value);
+      return entry ? [entry] : [];
+    });
     const pending = queue.filter((mission) => mission.status === 'pending');
 
     if (pending.length === 0) {

@@ -4,8 +4,10 @@ import * as path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/json.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -515,7 +517,7 @@ export class AgyCliBackend implements ReasoningBackend {
     const stdout = await this.spawnCli(args);
     let cliResult: any;
     try {
-      cliResult = JSON.parse(extractJsonPayload(stdout));
+      cliResult = parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output');
     } catch (err: any) {
       throw new Error(
         `[agy-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`
@@ -535,7 +537,10 @@ export class AgyCliBackend implements ReasoningBackend {
     let structuredValue: unknown = structured;
     if (typeof structured === 'string') {
       try {
-        structuredValue = JSON.parse(extractJsonPayload(structured));
+        structuredValue = parseSafeJsonInput(
+          extractJsonPayload(structured),
+          'agy-cli structured output'
+        );
       } catch (err: any) {
         throw new Error(
           `[agy-cli] structured output was not valid JSON: ${err?.message ?? String(err)}. Structured: ${structured.slice(0, 500)}`
@@ -569,8 +574,11 @@ export class AgyCliBackend implements ReasoningBackend {
 
     const stdout = await this.spawnCli(args, signal);
     try {
-      const cliResult = JSON.parse(extractJsonPayload(stdout));
-      const responseStr: string | undefined = cliResult.response;
+      const cliResult = parseSafeJsonObjectValue(
+        parseSafeJsonInput(extractJsonPayload(stdout), 'agy-cli JSON output'),
+        'agy-cli JSON output'
+      );
+      const responseStr = typeof cliResult.response === 'string' ? cliResult.response : undefined;
       if (responseStr === undefined || responseStr === null) {
         return stdout.trim();
       }
@@ -601,12 +609,15 @@ export class AgyCliBackend implements ReasoningBackend {
    * planner — agy has no verified no-exec mode) throws before any spawn.
    */
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
-    if (!profile) {
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('agy', profile);
+    if (!effectiveProfile) {
       return [...(this.sandbox ? ['--sandbox'] : []), '--dangerously-skip-permissions'];
     }
-    const resolution = resolveProviderPermissionArgs(profile, 'agy');
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'agy');
     if (resolution.kind === 'refused') {
-      throw new Error(`[agy-cli] permission profile "${profile}" refused: ${resolution.reason}`);
+      throw new Error(
+        `[agy-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
+      );
     }
     return [...resolution.args];
   }
@@ -708,10 +719,20 @@ export async function runAgyCliQuery<T>(params: RunAgyCliQueryParams<T>): Promis
 function resolveAgySubagentProfile(options?: ReasoningCallOptions): SubagentCapabilityProfile {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested);
+    const profile = getSubagentCapabilityProfile(requested);
+    const effective = resolveEffectiveProviderPermissionProfile(
+      'agy',
+      profile.name as ProviderPermissionProfileName
+    );
+    return getSubagentCapabilityProfile(effective ?? profile.name);
   } catch {
     const mapped = resolveCapabilityProfileForTeamRole(requested);
-    return getSubagentCapabilityProfile(mapped);
+    const profile = getSubagentCapabilityProfile(mapped);
+    const effective = resolveEffectiveProviderPermissionProfile(
+      'agy',
+      profile.name as ProviderPermissionProfileName
+    );
+    return getSubagentCapabilityProfile(effective ?? profile.name);
   }
 }
 
@@ -719,12 +740,14 @@ function resolvePermissionProfileName(
   options?: ReasoningCallOptions
 ): ProviderPermissionProfileName | undefined {
   const requested = options?.profile || options?.role;
-  if (!requested) return undefined;
+  if (!requested) return resolveEffectiveProviderPermissionProfile('agy');
   try {
-    return getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    const profile = getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    return resolveEffectiveProviderPermissionProfile('agy', profile) ?? profile;
   } catch {
     const mapped = resolveCapabilityProfileForTeamRole(requested);
-    return getSubagentCapabilityProfile(mapped).name as ProviderPermissionProfileName;
+    const profile = getSubagentCapabilityProfile(mapped).name as ProviderPermissionProfileName;
+    return resolveEffectiveProviderPermissionProfile('agy', profile) ?? profile;
   }
 }
 

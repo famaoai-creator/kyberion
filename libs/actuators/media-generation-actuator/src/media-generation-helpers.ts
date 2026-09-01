@@ -1,25 +1,25 @@
+import { safeWriteFile, safeCopyFileSync, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
+import { executeServicePreset } from '@agent/core/service-engine';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  safeWriteFile,
-  safeCopyFileSync,
-  safeExistsSync,
-  safeMkdir,
-  executeServicePreset,
-  pathResolver,
-  buildGovernedRetryOptions,
+  createGovernedRetryOptionsBuilder,
   loadRecoveryPolicy as loadCoreRecoveryPolicy,
-  retry,
-  compileMusicGenerationADF,
+} from '@agent/core/recovery-policy';
+import { retry, sleep } from '@agent/core/async-utils';
+import { compileMusicGenerationADF } from '@agent/core/music-workflow-compiler';
+import {
   compileImageGenerationADF,
   compileVideoGenerationADF,
-  resolveMediaBackendForPlatform,
-  sleep,
+} from '@agent/core/visual-workflow-compiler';
+import { resolveMediaBackendForPlatform } from '@agent/core/media-backend-registry';
+import {
   resolveCreativeDesign,
   renderPromptStyleBlock,
-} from '@agent/core';
+} from '@agent/core/creative-design-resolver';
 import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import type { GenerationJob } from '@agent/core';
+import type { GenerationJob } from '@agent/core/src/types/generation-job';
 import {
   getGenerationHistoryAdapter,
   getGenerationHistoryAdapterForAction,
@@ -118,14 +118,11 @@ function loadRecoveryPolicy(): Record<string, any> {
   return loadCoreRecoveryPolicy(MEDIA_GENERATION_MANIFEST_PATH);
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
-    defaults: DEFAULT_MEDIA_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEDIA_GENERATION_MANIFEST_PATH,
+  defaults: DEFAULT_MEDIA_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function ensureGenerationJobDir(): void {
   if (!safeExistsSync(GENERATION_JOB_DIR)) {

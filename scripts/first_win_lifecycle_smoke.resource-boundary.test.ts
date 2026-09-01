@@ -1,0 +1,48 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  resolveFirstWinResourcePath,
+  validateFirstWinLifecycleLiveOptions,
+} from './first_win_lifecycle_smoke.js';
+
+const root = pathResolver.sharedTmp(`first-win-lifecycle-boundary-${process.pid}`);
+
+afterEach(() => {
+  safeRmSync(root, { recursive: true, force: true });
+});
+
+describe('first-win lifecycle resource boundary', () => {
+  it('rejects repository-external identity resources', () => {
+    expect(() => resolveFirstWinResourcePath('/tmp/first-win-identity.json')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    expect(
+      validateFirstWinLifecycleLiveOptions({
+        identityFile: '/tmp/first-win-identity.json',
+        runId: '20260901-a',
+        confirm: 'FIRST-WIN-LIFECYCLE-LIVE',
+        allowWrites: '1',
+      })
+    ).toEqual([expect.stringContaining('[RESOURCE_PATH_SCOPE]')]);
+  });
+
+  it('rejects symlinked identity resources', () => {
+    const target = path.join(root, 'target');
+    const link = path.join(root, 'identity.json');
+    safeMkdir(target, { recursive: true });
+    safeWriteFile(path.join(target, 'identity.json'), '{}\n');
+    safeSymlinkSync(path.join(target, 'identity.json'), link);
+
+    expect(() => resolveFirstWinResourcePath(link)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(
+      validateFirstWinLifecycleLiveOptions({
+        identityFile: link,
+        runId: '20260901-b',
+        confirm: 'FIRST-WIN-LIFECYCLE-LIVE',
+        allowWrites: '1',
+      })
+    ).toEqual([expect.stringContaining('[RESOURCE_PATH_SYMLINK]')]);
+  });
+});

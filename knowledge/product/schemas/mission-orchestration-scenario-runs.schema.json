@@ -1,0 +1,36 @@
+{
+  "$id": "https://kyberion.internal/schemas/mission-orchestration-scenario-runs.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Mission orchestration scenario runs",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "required": [
+      "scenario_id",
+      "mode",
+      "completion_status",
+      "clarification_count",
+      "policy_violations",
+      "contract_valid",
+      "operator_corrections"
+    ],
+    "properties": {
+      "scenario_id": { "type": "string", "minLength": 1 },
+      "mode": { "type": "string", "enum": ["baseline", "orchestrated"] },
+      "completion_status": {
+        "type": "string",
+        "enum": ["completed", "blocked", "failed"]
+      },
+      "clarification_count": { "type": "integer", "minimum": 0 },
+      "policy_violations": { "type": "integer", "minimum": 0 },
+      "contract_valid": { "type": "boolean" },
+      "operator_corrections": { "type": "integer", "minimum": 0 },
+      "context_chars": { "type": "integer", "minimum": 0 },
+      "rollup_used": { "type": "boolean" },
+      "result_schema_ok": { "type": "boolean" },
+      "needs_count": { "type": "integer", "minimum": 0 }
+    },
+    "additionalProperties": false
+  }
+}

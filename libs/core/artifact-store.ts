@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -7,9 +7,9 @@ import {
   type RetentionArtifactClass,
 } from './storage-retention-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
   loadJson,
@@ -44,7 +44,9 @@ export function resolveGovernedArtifactPath(logicalPath: string): string {
       `Artifact path is outside governed coordination/observability scopes: ${logicalPath}`
     );
   }
-  return pathResolver.resolve(logicalPath);
+  return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function ensureGovernedArtifactDir(role: GovernedArtifactRole, logicalDir: string): string {
@@ -223,6 +225,50 @@ export function isScopedArtifactPath(logicalPath: string): boolean {
   return false;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function persistedString(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`scoped artifact index ${key} must be a non-empty string`);
+  }
+  return value;
+}
+
+/** Validate an artifacts-index row before lifecycle code treats it as typed state. */
+export function parseScopedArtifactIndexEntry(value: unknown): ScopedArtifactIndexEntry {
+  if (!isRecord(value)) throw new Error('scoped artifact index entry must be an object');
+  persistedString(value, 'name');
+  const artifactClass = persistedString(value, 'artifact_class');
+  if (!RETENTION_ARTIFACT_CLASSES.includes(artifactClass as RetentionArtifactClass)) {
+    throw new Error('scoped artifact index artifact_class is invalid');
+  }
+  const artifactPath = persistedString(value, 'path');
+  if (!isScopedArtifactPath(artifactPath) || artifactPath.startsWith('/')) {
+    throw new Error('scoped artifact index path is invalid');
+  }
+  const scope = value.scope;
+  if (!isRecord(scope)) throw new Error('scoped artifact index scope is invalid');
+  const scopeKeys = ['tenant', 'project', 'mission', 'task', 'session'] as const;
+  if (!scopeKeys.some((key) => scope[key] !== undefined)) {
+    throw new Error('scoped artifact index scope is empty');
+  }
+  for (const key of scopeKeys) {
+    if (scope[key] !== undefined) persistedString(scope, key);
+  }
+  const scopeKind = persistedString(value, 'scope_kind');
+  if (!['task', 'mission', 'project', 'session', 'tenant'].includes(scopeKind)) {
+    throw new Error('scoped artifact index scope_kind is invalid');
+  }
+  const writtenAt = persistedString(value, 'written_at');
+  if (!Number.isFinite(Date.parse(writtenAt))) {
+    throw new Error('scoped artifact index written_at is invalid');
+  }
+  return value as unknown as ScopedArtifactIndexEntry;
+}
+
 function resolveScopeBase(
   scope: ScopedArtifactScope,
   tier: 'personal' | 'confidential' | 'public'
@@ -317,6 +363,11 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
   const absolutePath = path.join(targetDir, ...name.split('/'));
   const indexPath = path.join(artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
 
+  assertSafeRepositoryPath(base, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(targetDir, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(absolutePath, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true });
+
   // Fail closed: both the artifact and its index must be inside a recognized
   // scoped-artifact root, expressed repo-relative (never machine-absolute).
   const repoRelative = pathResolver.toRepoRelative(absolutePath).split(path.sep).join('/');
@@ -360,9 +411,8 @@ export function readScopedArtifactIndex(
 ): ScopedArtifactIndexEntry[] {
   const { base } = resolveScopeBase(scope, tier ?? 'confidential');
   const indexPath = path.join(base, 'artifacts', SCOPED_ARTIFACT_INDEX_FILENAME);
-  if (!safeExistsSync(indexPath)) return [];
-  return String(safeReadFile(indexPath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as ScopedArtifactIndexEntry);
+  return readJsonLines<ScopedArtifactIndexEntry>(
+    assertSafeRepositoryPath(indexPath, { allowMissingLeaf: true }),
+    { map: (value) => parseScopedArtifactIndexEntry(value) }
+  );
 }

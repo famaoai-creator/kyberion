@@ -10,8 +10,8 @@ import {
   reconcileProjectOperationalState,
   updateManagedProjectTrack,
   updateManagedProject,
-} from '@agent/core';
-import type { ProjectTrackRecord } from '@agent/core';
+} from '@agent/core/project-management';
+import type { ProjectTrackRecord } from '@agent/core/project-track-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';

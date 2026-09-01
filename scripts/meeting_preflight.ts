@@ -1,18 +1,15 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { installCoreEnvironmentProbes } from '@agent/core/environment-capability-probes';
+import { listToolRuntimeInventory } from '@agent/core/tool-runtime-registry';
+import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
-  installCoreEnvironmentProbes,
-  listToolRuntimeInventory,
-  loadEnvironmentManifest,
-  pathResolver,
-  probeManifest,
-  safeExecResult,
-  safeExistsSync,
-  safeReaddir,
   createCoreAudioDeviceInventoryBridge,
   resolveAudioDevice,
   type CoreAudioDeviceInventoryBridge,
-} from '@agent/core';
+} from '@agent/core/coreaudio-device-inventory';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { collectDoctorReport } from './run_doctor.js';
 import { checkSpeakConsent } from '../libs/actuators/meeting-actuator/src/meeting-actuator-helpers.js';
@@ -152,7 +149,7 @@ async function probeBlackHoleDevice(
       'blackhole.device',
       'pass',
       `BlackHole 2ch ready; input/output UID ${inputDescriptor.uid}, ${inputDescriptor.channel_count ?? '?'} channel(s), rates ${formatRates(inputDescriptor.supported_sample_rates)}`,
-      'pnpm voice:route:probe -- --json',
+      'pnpm voice:route probe -- --json',
       {
         data: {
           input_device: inputDescriptor,
@@ -261,7 +258,7 @@ function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
   const mlxAudio = inventory.items.find((entry) => entry.tool.tool_id === 'mlx_audio');
   const fix =
     formatCommand(mlxAudio?.install_backend?.command, mlxAudio?.install_backend?.args) ||
-    'pnpm voice:setup --apply';
+    'pnpm kyberion voice setup --apply';
   return item(
     'mlx.audio.runtime',
     'fail',

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
   buildLocalesBlock,
   buildVocabularyKeys,
@@ -6,6 +8,16 @@ import {
 } from './generate_vocabulary_types.js';
 
 describe('generate_vocabulary_types (I18N-02)', () => {
+  it('uses the governed vocabulary catalog loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_vocabulary_types.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadVocabularyCatalog()');
+    expect(source).not.toContain('readJson<');
+  });
+
   describe('buildLocalesBlock / spliceLocalesBlock', () => {
     it('renders a sorted, deduplicated locales array literal between markers', () => {
       const block = buildLocalesBlock(['ja', 'en']);

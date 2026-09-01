@@ -39,6 +39,24 @@ describe('surface runtime intent gateway boundary', () => {
     ).toBe(false);
   });
 
+  it('reuses a pre-resolved packet for the compile decision', () => {
+    expect(
+      shouldCompileSurfaceIntent(
+        input('unrelated text'),
+        'Current incoming message:\nunrelated text',
+        undefined,
+        {
+          kind: 'intent_resolution_packet',
+          utterance: 'unrelated text',
+          selected_intent_id: 'live-query',
+          selected_confidence: 0.9,
+          selected_resolution: { shape: 'direct_reply' },
+          candidates: [],
+        }
+      )
+    ).toBe(false);
+  });
+
   it('does not let an explicit receiver bypass governed compilation', () => {
     expect(
       shouldCompileSurfaceIntent(

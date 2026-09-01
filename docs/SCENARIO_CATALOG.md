@@ -49,8 +49,8 @@ All external publication is a Distribution responsibility and requires an authen
 
 | Scenario                                 | Effect             | Entry point                                         | Completion boundary                                                           |
 | ---------------------------------------- | ------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Calendar availability check              | `read`             | `pnpm cli -- task plan`                             | Read plan and expected evidence are visible                                   |
-| Meeting prep with deck and email draft   | `draft`            | `pnpm cli -- task start`                            | Task Session and plan artifact exist; nothing is sent                         |
+| Calendar availability check              | `read`             | `pnpm kyberion task plan`                           | Read plan and expected evidence are visible                                   |
+| Meeting prep with deck and email draft   | `draft`            | `pnpm kyberion task start`                          | Task Session and plan artifact exist; nothing is sent                         |
 | Calendar update or meeting participation | `external_write`   | Productivity plan plus approval workflow            | Authenticated human approval and effect receipt are required                  |
 | Browser checkout or payment              | `financial_commit` | Productivity plan plus browser procedure dispatcher | Merchant, amount, limit, bound approval, and post-action receipt are required |
 | Connected-system information collection  | `read`             | `service:preset` selected by the plan               | Source bindings and collection evidence are recorded                          |

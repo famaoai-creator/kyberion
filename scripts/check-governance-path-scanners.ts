@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pathResolver, safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir, safeReadFile, safeStat } from '@agent/core/secure-io';
 
 const MACHINE_ABS_PATH_RE =
   /(?:\/Users\/|\/home\/[A-Za-z0-9._-]+\/|\/private\/(?:var\/folders|tmp)\/|[A-Za-z]:\\Users\\)/; // governance-allow-abs-path

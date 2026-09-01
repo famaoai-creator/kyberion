@@ -7,16 +7,15 @@
  * drivers concurrently would turn at-least-once into at-N-times.
  */
 import {
-  acquireLock,
-  releaseLock,
-  logger,
   runMeshDeliveryPass,
   formatMeshDeliveryPassReport,
   type MeshDeliveryPassReport,
-} from '@agent/core';
+} from '@agent/core/mesh-delivery-driver';
+import { acquireLock, releaseLock } from '@agent/core/src/lock-utils';
+import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const DRIVER_LOCK_ID = 'mesh-delivery-driver';
 
@@ -42,8 +41,8 @@ export async function runMeshDeliveryDriverOnce(options: {
   return report;
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = createStandardYargs(['node', 'mesh_delivery_driver', ...args])
     .option('limit', { type: 'number', default: 10, describe: 'Max deliveries per pass' })
     .option('loop', {
       type: 'boolean',
@@ -100,12 +99,21 @@ async function main(): Promise<void> {
   }
 }
 
+export const runMeshDeliveryDriver = defineScript({
+  name: 'mesh:delivery-driver',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'mesh_delivery_driver.ts') ||
   isDirectScript(import.meta.url, 'mesh_delivery_driver.js')
-) {
-  main().catch((err) => {
-    logger.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
-}
+)
+  void runMeshDeliveryDriver();

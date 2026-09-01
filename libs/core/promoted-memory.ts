@@ -4,7 +4,13 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import type { DistillCandidateRecord } from './distill-candidate-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 import type { MemoryScopeEnvelope } from './memory-scope.js';
@@ -76,30 +82,56 @@ const validatorCache = new Map<string, ValidateFunction>();
 // Overriding the paths lets tests run against a scratch copy.
 function tenantEvolutionRoot(scope?: MemoryScopeEnvelope): string | undefined {
   const tenant = scope?.tier === 'confidential' ? scope.tenant_slug?.trim() : undefined;
-  if (!tenant || tenant.includes('/') || tenant.includes('\\')) return undefined;
+  if (
+    !tenant ||
+    tenant.includes('/') ||
+    tenant.includes('\\') ||
+    tenant === '.' ||
+    tenant === '..'
+  ) {
+    return undefined;
+  }
   // KYBERION_HINTS_PATH is a legacy/global file override used by tests and
   // the shared governance lane. It must never become the parent of a tenant
   // namespace (a file path would otherwise turn into
   // `<HINTS_PATH>/<tenant>/evolution`). Tenant promotion always resolves from
   // the authoritative confidential knowledge root.
-  return `${pathResolver.knowledge('confidential')}/${tenant}/evolution`;
+  return assertSafeRepositoryPath(
+    path.join(pathResolver.knowledge('confidential'), tenant, 'evolution'),
+    { allowMissingLeaf: true }
+  );
+}
+
+function safeOverridePath(override: string | undefined, fallback: string): string {
+  if (override) {
+    try {
+      return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      // An optional test/runtime override must never widen the write surface.
+    }
+  }
+  return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
 }
 
 function resolveHintsPath(scope?: MemoryScopeEnvelope): string {
   const tenantRoot = tenantEvolutionRoot(scope);
-  if (tenantRoot) return `${tenantRoot}/HINTS.md`;
+  if (tenantRoot)
+    return assertSafeRepositoryPath(path.join(tenantRoot, 'HINTS.md'), {
+      allowMissingLeaf: true,
+    });
   const override = getRegisteredEnvText('KYBERION_HINTS_PATH');
-  return override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.knowledge('product/governance/HINTS.md');
+  return safeOverridePath(override, pathResolver.knowledge('product/governance/HINTS.md'));
 }
 function resolveHintsArchiveDir(scope?: MemoryScopeEnvelope): string {
   const tenantRoot = tenantEvolutionRoot(scope);
-  if (tenantRoot) return `${tenantRoot}/hints-archive`;
+  if (tenantRoot)
+    return assertSafeRepositoryPath(path.join(tenantRoot, 'hints-archive'), {
+      allowMissingLeaf: true,
+    });
   const override = getRegisteredEnvText('KYBERION_HINTS_ARCHIVE_DIR');
-  return override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.knowledge('product/hints/archive');
+  return safeOverridePath(override, pathResolver.knowledge('product/hints/archive'));
 }
 const HINTS_MARKER =
   '<!-- Distillation pipeline will append structured hint blocks below this line -->';
@@ -410,7 +442,14 @@ function resolvePromotedRecordPath(ref: string): string | null {
   const normalized = String(ref || '').trim();
   if (!normalized) return null;
   if (normalized.endsWith('.md') || normalized.includes('/')) {
-    const abs = pathResolver.resolve(normalized);
+    let abs: string;
+    try {
+      abs = assertSafeRepositoryPath(pathResolver.resolve(normalized), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      return null;
+    }
     return safeExistsSync(abs) ? abs : null;
   }
   const kinds = ['pattern', 'sop_candidate', 'knowledge_hint', 'report_template'] as const;
@@ -716,11 +755,17 @@ export function savePromotedMemoryRecord(
       tier: record.tier,
       scope: candidate.scope,
     });
-    const absDir = pathResolver.resolve(logicalDir);
+    const absDir = assertSafeRepositoryPath(pathResolver.resolve(logicalDir), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(absDir)) safeMkdir(absDir, { recursive: true });
     const baseName = record.record_id;
-    const jsonPath = pathResolver.resolve(`${logicalDir}/${baseName}.json`);
-    const mdPath = pathResolver.resolve(`${logicalDir}/${baseName}.md`);
+    const jsonPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.json`), {
+      allowMissingLeaf: true,
+    });
+    const mdPath = assertSafeRepositoryPath(path.join(absDir, `${baseName}.md`), {
+      allowMissingLeaf: true,
+    });
     safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
     const markdown = buildMarkdown(record);
     safeWriteFile(mdPath, markdown);

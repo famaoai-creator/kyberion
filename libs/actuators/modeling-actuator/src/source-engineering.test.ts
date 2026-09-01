@@ -2,7 +2,8 @@ import * as path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { handleAction } from './index.js';
 
 const ROOT = pathResolver.rootDir();

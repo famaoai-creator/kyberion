@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode,
+  resolveReasoningBackendSelectionFromContext,
   resolveReasoningBackendModeFromContext,
   resolveScopedBackendPolicy,
 } from './reasoning-backend-policy.js';
@@ -233,6 +234,37 @@ describe('reasoning-backend-policy', () => {
         providers: [{ provider: 'copilot', installed: true, healthy: true }],
       })
     ).toBe('copilot');
+  });
+
+  it('returns safe provenance for each selection source without exposing env values', () => {
+    const policy = loadReasoningBackendPolicy();
+    const selection = resolveReasoningBackendSelectionFromContext({
+      policy,
+      env: { ANTHROPIC_API_KEY: 'secret-value' },
+      providers: [],
+    });
+    expect(selection.mode).toBe('anthropic');
+    expect(selection.reason).toContain('env=ANTHROPIC_API_KEY');
+    expect(selection.reason).not.toContain('secret-value');
+
+    const scoped = resolveReasoningBackendSelectionFromContext({
+      policy: {
+        ...policy,
+        default_mode: 'stub',
+        project_overrides: { project_a: { default_mode: 'stub' } },
+      },
+      env: {},
+      providers: [],
+      scope: {
+        tier: 'confidential',
+        tenant_slug: 'tenant_a',
+        project_id: 'project_a',
+      },
+    });
+    expect(scoped).toEqual({
+      mode: 'stub',
+      reason: 'policy default_mode=stub; scope overlays=project',
+    });
   });
 
   it('prefers the in-session claude-agent when inside a Claude Code harness (CLAUDECODE)', () => {

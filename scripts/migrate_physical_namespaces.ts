@@ -14,23 +14,23 @@
 
 import * as path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
+import { physicalScopedPath } from '@agent/core/physical-namespace';
+import { resolveScopeForRecord } from '@agent/core/scope-migration';
+import { normalizeEventScope, type EventScope } from '@agent/core/event-scope';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  physicalScopedPath,
-  resolveScopeForRecord,
-  normalizeEventScope,
-  pathResolver,
-  type EventScope,
   safeExistsSync,
+  assertSafeRepositoryPath,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
   safeReaddir,
-  safeStat,
+  safeLstat,
   safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
 const MIGRATION_ROOT = 'active/shared/runtime/migrations/physical-namespace';
@@ -85,25 +85,38 @@ interface MigrationPlan {
 }
 
 function listJsonFiles(root: string): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root)
+  const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) return [];
+  return safeReaddir(safeRoot)
     .sort()
     .flatMap((name) => {
       if (name === '.quarantine' || name === 'tenants') return [];
-      const logicalPath = path.join(root, name);
-      const stat = safeStat(logicalPath);
-      if (stat.isDirectory()) return listJsonFiles(logicalPath);
-      return stat.isFile() && name.endsWith('.json') ? [logicalPath] : [];
+      const logicalPath = path.join(safeRoot, name);
+      try {
+        const safePath = assertSafeRepositoryPath(logicalPath);
+        const stat = safeLstat(safePath);
+        if (stat.isDirectory()) return listJsonFiles(safePath);
+        return stat.isFile() && name.endsWith('.json') ? [safePath] : [];
+      } catch {
+        return [];
+      }
     });
 }
 
 function listSurfaceFiles(): string[] {
   const files: string[] = [];
-  if (safeExistsSync(SURFACE_ROOT)) {
-    for (const surface of safeReaddir(SURFACE_ROOT)) {
+  const surfaceRoot = assertSafeRepositoryPath(SURFACE_ROOT, { allowMissingLeaf: true });
+  if (safeExistsSync(surfaceRoot) && safeLstat(surfaceRoot).isDirectory()) {
+    for (const surface of safeReaddir(surfaceRoot)) {
       if (surface === 'tenants' || surface === '.quarantine') continue;
-      const surfaceRoot = path.join(SURFACE_ROOT, surface);
-      if (!safeExistsSync(surfaceRoot) || !safeStat(surfaceRoot).isDirectory()) continue;
+      const surfacePath = path.join(surfaceRoot, surface);
+      let safeSurfacePath: string;
+      try {
+        safeSurfacePath = assertSafeRepositoryPath(surfacePath);
+      } catch {
+        continue;
+      }
+      if (!safeExistsSync(safeSurfacePath) || !safeLstat(safeSurfacePath).isDirectory()) continue;
       for (const recordKind of [
         'requests',
         'notifications',
@@ -111,7 +124,7 @@ function listSurfaceFiles(): string[] {
         'dead-letter',
         'dead-targets',
       ]) {
-        const recordRoot = path.join(surfaceRoot, recordKind);
+        const recordRoot = path.join(safeSurfacePath, recordKind);
         files.push(...listJsonFiles(recordRoot));
       }
     }
@@ -123,31 +136,60 @@ function listSurfaceFiles(): string[] {
 }
 
 function listFeedbackFiles(root: string): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root)
+  const safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) return [];
+  return safeReaddir(safeRoot)
     .sort()
     .flatMap((name) => {
       if (name === 'tenants' || name === '.quarantine') return [];
-      const logicalPath = path.join(root, name);
-      const stat = safeStat(logicalPath);
-      if (stat.isDirectory()) return listFeedbackFiles(logicalPath);
-      return stat.isFile() && name.endsWith('.jsonl') ? [logicalPath] : [];
+      const logicalPath = path.join(safeRoot, name);
+      try {
+        const safePath = assertSafeRepositoryPath(logicalPath);
+        const stat = safeLstat(safePath);
+        if (stat.isDirectory()) return listFeedbackFiles(safePath);
+        return stat.isFile() && name.endsWith('.jsonl') ? [safePath] : [];
+      } catch {
+        return [];
+      }
     });
 }
 
 function listIntentFiles(): string[] {
   const source = path.join(INTENT_ROOT, INTENT_FILE);
-  return safeExistsSync(source) ? [source] : [];
+  try {
+    const safeSource = assertSafeRepositoryPath(source);
+    return safeLstat(safeSource).isFile() ? [safeSource] : [];
+  } catch {
+    return [];
+  }
 }
 
 function listLedgerFiles(): string[] {
   const source = path.join(LEDGER_ROOT, LEDGER_FILE);
-  return safeExistsSync(source) ? [source] : [];
+  try {
+    const safeSource = assertSafeRepositoryPath(source);
+    return safeLstat(safeSource).isFile() ? [safeSource] : [];
+  } catch {
+    return [];
+  }
 }
 
 function listPromotionFiles(): string[] {
   const source = pathResolver.rootResolve(`active/shared/runtime/memory/${PROMOTION_FILE}`);
-  return safeExistsSync(source) ? [source] : [];
+  try {
+    const safeSource = assertSafeRepositoryPath(source);
+    return safeLstat(safeSource).isFile() ? [safeSource] : [];
+  } catch {
+    return [];
+  }
+}
+
+function requireRegularMigrationFile(source: string): string {
+  const safeSource = assertSafeRepositoryPath(source);
+  if (!safeLstat(safeSource).isFile()) {
+    throw new Error(`[physical-namespace-migration] source must be a regular file: ${source}`);
+  }
+  return safeSource;
 }
 
 function candidates(kind: MigrationKind): Candidate[] {
@@ -193,8 +235,16 @@ function safeRecordName(source: string): string {
 
 function hashFile(source: string): string {
   return createHash('sha256')
-    .update(String(safeReadFile(source, { encoding: 'utf8' })))
+    .update(String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' })))
     .digest('hex');
+}
+
+function parseMigrationJsonObject(raw: string, label: string): Record<string, unknown> {
+  return parseSafeJsonObjectValue(parseSafeJsonInput(raw, label), label);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function scopeFromRecord(record: unknown): ReturnType<typeof resolveScopeForRecord> {
@@ -232,7 +282,7 @@ function feedbackScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -241,7 +291,7 @@ function feedbackScopes(source: string): {
   let unscoped = 0;
   for (const line of lines) {
     try {
-      const record = JSON.parse(line) as Record<string, unknown>;
+      const record = parseMigrationJsonObject(line, 'feedback record');
       const result = scopeFromRecord(record);
       if (result.disposition === 'canonical' || result.disposition === 'mission-derived') {
         if (!result.scope?.tenant_slug) {
@@ -290,19 +340,22 @@ function intentScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  let parsed: unknown;
+  let parsed: Record<string, unknown>;
   try {
-    parsed = readJson<unknown>(source);
+    parsed = parseMigrationJsonObject(
+      String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' })),
+      'intent memory'
+    );
   } catch (error) {
     return {
       disposition: 'invalid',
       reason: `intent memory unreadable: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
-  if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as any).entries)) {
+  if (!Array.isArray(parsed.entries)) {
     return { disposition: 'invalid', reason: 'intent memory entries array is missing' };
   }
-  const entries = (parsed as { entries: unknown[] }).entries;
+  const entries = parsed.entries;
   if (entries.length === 0) {
     return {
       disposition: 'unscoped-legacy',
@@ -345,7 +398,7 @@ function ledgerScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -355,7 +408,7 @@ function ledgerScopes(source: string): {
   for (const line of lines) {
     let record: Record<string, unknown>;
     try {
-      record = JSON.parse(line) as Record<string, unknown>;
+      record = parseMigrationJsonObject(line, 'ledger record');
     } catch (error) {
       return {
         disposition: 'invalid',
@@ -364,8 +417,15 @@ function ledgerScopes(source: string): {
     }
     const target = typeof record.target_path === 'string' ? record.target_path : '';
     const match = target.replace(/\\/g, '/').match(/^knowledge\/confidential\/([^/]+)\//u);
+    if (
+      record.visible_to !== undefined &&
+      (!Array.isArray(record.visible_to) ||
+        !record.visible_to.every((value) => typeof value === 'string'))
+    ) {
+      return { disposition: 'invalid', reason: 'ledger visible_to must be a string array' };
+    }
     const visibleTo = Array.isArray(record.visible_to)
-      ? record.visible_to.map((value) => String(value || '').trim()).filter(Boolean)
+      ? record.visible_to.map((value) => value.trim()).filter(Boolean)
       : [];
     const tenant = match?.[1] || (visibleTo.length === 1 ? visibleTo[0] : undefined);
     if (tenant) {
@@ -394,7 +454,7 @@ function promotionScopes(source: string): {
   scope?: EventScope;
   reason?: string;
 } {
-  const lines = String(safeReadFile(source, { encoding: 'utf8' }))
+  const lines = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
@@ -403,8 +463,11 @@ function promotionScopes(source: string): {
   let scoped = 0;
   for (const line of lines) {
     try {
-      const candidate = JSON.parse(line) as Record<string, unknown>;
-      if (candidate.scope && typeof candidate.scope === 'object') scoped += 1;
+      const candidate = parseMigrationJsonObject(line, 'promotion record');
+      if (candidate.scope !== undefined && !isRecord(candidate.scope)) {
+        return { disposition: 'invalid', reason: 'promotion scope must be a JSON object' };
+      }
+      if (candidate.scope !== undefined) scoped += 1;
       else unscoped += 1;
     } catch (error) {
       return {
@@ -504,9 +567,12 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
       });
       continue;
     }
-    let record: unknown;
+    let record: Record<string, unknown>;
     try {
-      record = readJson<unknown>(candidate.source);
+      record = parseMigrationJsonObject(
+        String(safeReadFile(requireRegularMigrationFile(candidate.source), { encoding: 'utf8' })),
+        `${candidate.kind} record`
+      );
     } catch (error) {
       items.push({
         kind,

@@ -6,7 +6,8 @@
 // is strictly additive — determineActuatorStepType previously threw
 // unknown-op for all of them.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const PRESENCE_SCHEMA = {
   type: 'object',
@@ -51,11 +52,11 @@ export const PRESENCE_ACTUATOR_APPLY_OPS = [
   'record_interaction',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   return { op, kind, input_schema: PRESENCE_SCHEMA, examples: PRESENCE_EXAMPLE };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...PRESENCE_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...PRESENCE_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

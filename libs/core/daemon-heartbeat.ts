@@ -1,8 +1,9 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -33,12 +34,16 @@ export interface HeartbeatOptions {
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
 
 function heartbeatRoot(rootDir?: string): string {
-  return rootDir ?? pathResolver.shared('runtime/heartbeats');
+  return assertSafeRepositoryPath(rootDir ?? pathResolver.shared('runtime/heartbeats'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function heartbeatPath(daemonId: string, rootDir?: string): string {
   const safeId = daemonId.replace(/[^a-zA-Z0-9_.-]/g, '_');
-  return path.join(heartbeatRoot(rootDir), `${safeId}.json`);
+  return assertSafeRepositoryPath(path.join(heartbeatRoot(rootDir), `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function recordDaemonHeartbeat(
@@ -70,8 +75,7 @@ export function readDaemonHeartbeat(
     return { daemon_id: daemonId, status: 'missing', reason: 'heartbeat file is missing' };
   }
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const heartbeat = JSON.parse(raw) as DaemonHeartbeat;
+    const heartbeat = readJson<DaemonHeartbeat>(filePath);
     if (
       heartbeat.daemon_id !== daemonId ||
       typeof heartbeat.timestamp !== 'string' ||

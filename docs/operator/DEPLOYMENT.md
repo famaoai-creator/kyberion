@@ -58,7 +58,7 @@ pnpm build
 ### 1.3 Configure (single-user)
 
 ```bash
-pnpm surfaces:reconcile     # bring up background surfaces
+pnpm surfaces reconcile     # bring up background surfaces
 pnpm onboard                # interactive identity setup → active stance overlay / personal fallback
 ```
 
@@ -240,7 +240,7 @@ git clone https://github.com/famaoai-creator/kyberion.git
 Set-Location kyberion
 pnpm install --frozen-lockfile
 pnpm build
-pnpm surfaces:reconcile
+pnpm surfaces reconcile
 pnpm onboard
 ```
 
@@ -249,7 +249,7 @@ For tenant-bound work, do not start a mission immediately after `pnpm onboard`; 
 The same setup is available through the governed environment manifests. Use a dry run first, then apply operator-confirmed installs when a tool is missing:
 
 ```powershell
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 ```
@@ -258,11 +258,11 @@ pnpm env:bootstrap --manifest kyberion-toolchain --apply --force
 
 ```powershell
 pnpm doctor
-pnpm cli list --check
+pnpm kyberion list --check
 pnpm pipeline --input pipelines/baseline-check.json
 ```
 
-Windows-native services should be managed through the existing surface commands (`pnpm surfaces:status`, `pnpm surfaces:repair`). Linux `systemd` and macOS `launchd` unit files do not apply on Windows.
+Windows-native services should be managed through the existing surface commands (`pnpm surfaces status`, `pnpm surfaces repair`). Linux `systemd` and macOS `launchd` unit files do not apply on Windows.
 
 ---
 
@@ -340,7 +340,7 @@ After any of the three deploys above:
 
 ```bash
 pnpm doctor                 # preflight: must / should / nice
-pnpm cli list --check       # actuator capability check
+pnpm kyberion list --check       # actuator capability check
 pnpm pipeline --input pipelines/baseline-check.json   # full health
 ```
 
@@ -461,7 +461,7 @@ pnpm peer:runtime-recovery request \
   --tenant-id acme \
   --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/acme/<restore-id> \
   --requested-by <operator>
-pnpm cli approve <approval-id> peer-recovery
+pnpm kyberion approve <approval-id> peer-recovery
 pnpm peer:runtime-recovery resume \
   --tenant-id acme \
   --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/acme/<restore-id> \

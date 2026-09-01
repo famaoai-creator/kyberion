@@ -13,7 +13,8 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync } from './secure-io.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,9 @@ function checkConnectorConfig(): CoworkHealthCheck {
 }
 
 function checkSyncPolicy(): CoworkHealthCheck {
-  const policyPath = pathResolver.rootResolve('knowledge/product/governance/cowork-sync-policy.json');
+  const policyPath = pathResolver.rootResolve(
+    'knowledge/product/governance/cowork-sync-policy.json'
+  );
   const exists = safeExistsSync(policyPath);
   return {
     name: 'sync_policy_present',
@@ -78,7 +81,9 @@ function checkCoworkOutbox(): CoworkHealthCheck {
   return {
     name: 'cowork_outbox_accessible',
     passed: exists,
-    detail: exists ? outboxPath : 'Cowork outbox dir not yet created (no deliveries yet — acceptable)',
+    detail: exists
+      ? outboxPath
+      : 'Cowork outbox dir not yet created (no deliveries yet — acceptable)',
   };
 }
 
@@ -95,8 +100,7 @@ function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; 
   }
 
   try {
-    const raw = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-    const state = JSON.parse(raw) as { last_sync_at?: string };
+    const state = readJson<{ last_sync_at?: string }>(statePath);
     const lastSync = state.last_sync_at ? new Date(state.last_sync_at).getTime() : 0;
     const ageHours = (Date.now() - lastSync) / (1000 * 60 * 60);
     const stale = lastSync > 0 && ageHours > maxAgeHours;
@@ -123,7 +127,7 @@ function checkSyncStateFreshness(maxAgeHours = 24): { check: CoworkHealthCheck; 
 
 function checkSurfaceManifest(): CoworkHealthCheck {
   const manifestPath = pathResolver.rootResolve(
-    'knowledge/product/governance/surfaces/mcp-server-cowork.json',
+    'knowledge/product/governance/surfaces/mcp-server-cowork.json'
   );
   const exists = safeExistsSync(manifestPath);
   return {
@@ -140,7 +144,9 @@ function checkSurfaceManifest(): CoworkHealthCheck {
  *
  * @param options.syncStateMaxAgeHours  Warn if sync state is older than this (default: 24h).
  */
-export function runCoworkHealthCheck(options: { syncStateMaxAgeHours?: number } = {}): CoworkHealthReport {
+export function runCoworkHealthCheck(
+  options: { syncStateMaxAgeHours?: number } = {}
+): CoworkHealthReport {
   const freshnessResult = checkSyncStateFreshness(options.syncStateMaxAgeHours ?? 24);
 
   const checks: CoworkHealthCheck[] = [

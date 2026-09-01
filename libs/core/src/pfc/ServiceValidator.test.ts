@@ -115,4 +115,11 @@ describe('ServiceValidator (3-Tier Service Validation)', () => {
     expect(inspection.cliFallbacks).toContain(fakeCli);
     expect(inspection.setupHint).toContain('Run gws auth setup');
   });
+
+  it('rejects a service preset path outside the repository', () => {
+    const inspection = inspectServiceAuth('google-workspace', '/tmp/external-service-preset.json');
+
+    expect(inspection.valid).toBe(false);
+    expect(inspection.reason).toContain('inside the repository');
+  });
 });

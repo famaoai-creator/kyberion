@@ -167,4 +167,12 @@ describe('deployment-adapter', () => {
       })
     ).toThrow(/Invalid deployment adapter config/);
   });
+
+  it('rejects an external explicit deployment config path before reading it', () => {
+    expect(() =>
+      installShellDeploymentAdapterFromConfigIfAvailable({
+        KYBERION_DEPLOY_CONFIG_PATH: '/tmp/outside-deployment-config.json',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });

@@ -1,23 +1,24 @@
 import * as path from 'node:path';
-import AjvFormats from 'ajv-formats';
 import yargs from 'yargs';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import {
-  compileSchemaFromPath,
-  pathResolver,
-  resolveActiveProfileRoot,
   resolveOnboardingFlowPolicy,
-  resolveOnboardingSummaryPolicy,
+  resolveOnboardingText,
+} from '@agent/core/onboarding-flow-policy';
+import { resolveOnboardingSummaryPolicy } from '@agent/core/onboarding-summary-policy';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeWriteFile,
-  withExecutionContext,
-  withLock,
-  resolveOnboardingText,
-  resolveOperatorLocale,
-  isValidTenantSlug,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { createAjv, setRegisteredEnv } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { withLock } from '@agent/core/src/lock-utils';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { compileSchema, readJson, setRegisteredEnv } from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -32,7 +33,6 @@ import {
 } from './reasoning_backend_selection.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const addFormats: any = (AjvFormats as any).default || AjvFormats;
 const ONBOARDING_IDENTITY_EXAMPLE = 'knowledge/public/templates/onboarding/identity.example.json';
 
 interface ApplyInput {
@@ -63,6 +63,14 @@ interface ApplyInput {
    * wizard's reasoning-phase selection (LC-05).
    */
   reasoning_backend?: string;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function profileRoot(): string {
@@ -111,14 +119,19 @@ export function ensureDir(p: string) {
   if (!safeExistsSync(p)) safeMkdir(p, { recursive: true });
 }
 
+export function resolveOnboardingInputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
 export async function readInput(file?: string): Promise<ApplyInput> {
   if (file) {
-    if (!safeExistsSync(file)) {
+    const safeFile = resolveOnboardingInputPath(file);
+    if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) {
       throw new Error(
         `identity file not found: ${file}. Copy ${ONBOARDING_IDENTITY_EXAMPLE} and retry, or use --dry-run first.`
       );
     }
-    return readJson<ApplyInput>(file);
+    return parseApplyInput(readJson<unknown>(safeFile));
   }
   // stdin fallback
   if (process.stdin.isTTY) {
@@ -128,15 +141,34 @@ export async function readInput(file?: string): Promise<ApplyInput> {
   }
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as ApplyInput;
+  return parseApplyInput(JSON.parse(Buffer.concat(chunks).toString('utf8')));
 }
 
-export function validateInput(input: ApplyInput) {
-  if (!input?.identity) {
+export function parseApplyInput(value: unknown): ApplyInput {
+  validateInput(value);
+  return value;
+}
+
+export function validateInput(input: unknown): asserts input is ApplyInput {
+  if (!isRecord(input) || !isRecord(input.identity)) {
     throw new Error(`identity block is required. See ${ONBOARDING_IDENTITY_EXAMPLE}.`);
   }
-  const { name, language, interaction_style, primary_domain, vision, agent_id } = input.identity;
-  if (!name || !language || !interaction_style || !primary_domain || !vision || !agent_id) {
+  const candidate = input as {
+    identity: Record<string, unknown>;
+    tenants?: unknown;
+    tutorial?: unknown;
+    reasoning_backend?: unknown;
+  };
+  const { name, language, interaction_style, primary_domain, vision, agent_id, persona } =
+    candidate.identity;
+  if (
+    !isNonEmptyString(name) ||
+    !isNonEmptyString(language) ||
+    !isNonEmptyString(interaction_style) ||
+    !isNonEmptyString(primary_domain) ||
+    !isNonEmptyString(vision) ||
+    !isNonEmptyString(agent_id)
+  ) {
     throw new Error(
       `identity requires {name, language, interaction_style, primary_domain, vision, agent_id}. See ${ONBOARDING_IDENTITY_EXAMPLE}.`
     );
@@ -146,28 +178,53 @@ export function validateInput(input: ApplyInput) {
       `interaction_style must be one of Senior Partner | Concierge | Minimalist, got: ${interaction_style}`
     );
   }
-  if (
-    input.identity.persona !== undefined &&
-    !ONBOARDING_PERSONAS.includes(
-      input.identity.persona
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '_') as (typeof ONBOARDING_PERSONAS)[number]
-    )
-  ) {
-    throw new Error(
-      `persona must be one of ${ONBOARDING_PERSONAS.join(' | ')}, got: ${input.identity.persona}`
-    );
+  if (persona !== undefined) {
+    const normalizedPersona = isNonEmptyString(persona)
+      ? persona.trim().toLowerCase().replace(/\s+/g, '_')
+      : '';
+    if (!ONBOARDING_PERSONAS.includes(normalizedPersona as (typeof ONBOARDING_PERSONAS)[number])) {
+      throw new Error(
+        `persona must be one of ${ONBOARDING_PERSONAS.join(' | ')}, got: ${String(persona)}`
+      );
+    }
   }
-  for (const tenant of input.tenants || []) {
+  if (candidate.tenants !== undefined && !Array.isArray(candidate.tenants)) {
+    throw new Error('tenants must be an array when provided.');
+  }
+  for (const tenant of Array.isArray(candidate.tenants) ? candidate.tenants : []) {
+    if (
+      !isRecord(tenant) ||
+      !isNonEmptyString(tenant.tenant_slug) ||
+      !isNonEmptyString(tenant.display_name) ||
+      !isNonEmptyString(tenant.assigned_role) ||
+      (tenant.purpose !== undefined && !isNonEmptyString(tenant.purpose))
+    ) {
+      throw new Error(
+        'tenant entries require tenant_slug, display_name, and assigned_role strings.'
+      );
+    }
     if (!isValidTenantSlug(tenant.tenant_slug)) {
       throw new Error(`Invalid tenant_slug: ${tenant.tenant_slug}`);
     }
   }
-  if (input.reasoning_backend !== undefined) {
-    if (normalizeReasoningBackendChoice(input.reasoning_backend) === null) {
+  if (candidate.tutorial !== undefined) {
+    if (
+      !isRecord(candidate.tutorial) ||
+      !['simulate', 'apply', 'skipped'].includes(String(candidate.tutorial.mode))
+    ) {
+      throw new Error('tutorial.mode must be one of simulate | apply | skipped.');
+    }
+    if (candidate.tutorial.summary !== undefined && !isNonEmptyString(candidate.tutorial.summary)) {
+      throw new Error('tutorial.summary must be a non-empty string when provided.');
+    }
+  }
+  if (candidate.reasoning_backend !== undefined) {
+    if (!isNonEmptyString(candidate.reasoning_backend)) {
+      throw new Error('reasoning_backend must be a non-empty string when provided.');
+    }
+    if (normalizeReasoningBackendChoice(candidate.reasoning_backend) === null) {
       throw new Error(
-        `Invalid reasoning_backend: ${input.reasoning_backend}. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes).`
+        `Invalid reasoning_backend: ${candidate.reasoning_backend}. See knowledge/product/governance/reasoning-backend-policy.json (allowed_modes).`
       );
     }
   }
@@ -256,7 +313,7 @@ export async function applyTenants(
       // Cross-tenant/public learning is an explicit brokered promotion, never
       // an onboarding default. Strict isolation must remain meaningful.
       isolation_policy: { strict_isolation: true, allow_cross_distillation: false },
-      metadata: { onboarding_source: 'pnpm onboard:apply' },
+      metadata: { onboarding_source: 'pnpm onboard apply' },
     };
     await writeJson(
       path.join(tenantDir, `${t.tenant_slug}.json`),
@@ -363,7 +420,7 @@ export function buildSummary(
     `- Summary: ${tutorial.summary}`,
     '',
     `## ${summaryPolicy.sections.next_steps}`,
-    '- Run `pnpm vital --format=json` to verify the live ecosystem health.',
+    '- Run `pnpm pipeline vital-check --format=json` to verify the live ecosystem health.',
     '- Open Chronos at http://127.0.0.1:3000 — your Identity Badge should appear in the header.',
     '',
     '## Runbook Skill',
@@ -391,9 +448,9 @@ export function buildApplySummary(
     `Summary: ${paths.summaryPath}`,
     '',
     'Next steps:',
-    '1. Run `pnpm vital` to verify the live ecosystem health.',
+    '1. Run `pnpm pipeline vital-check` to verify the live ecosystem health.',
     '2. Open Chronos to confirm the identity badge and tenant context.',
-    '3. Re-run `pnpm onboard:apply --json` if you need machine-readable output.',
+    '3. Re-run `pnpm onboard apply --json` if you need machine-readable output.',
   ];
   return lines.join('\n');
 }
@@ -401,10 +458,7 @@ export function buildApplySummary(
 /** Library entry used by governed pipelines; the CLI below remains a facade. */
 export async function applyOnboardingInput(input: ApplyInput) {
   validateInput(input);
-  const ajv = createAjv();
-  addFormats(ajv);
-  const validateState = compileSchemaFromPath(
-    ajv,
+  const validateState = compileSchema(
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
   );
 

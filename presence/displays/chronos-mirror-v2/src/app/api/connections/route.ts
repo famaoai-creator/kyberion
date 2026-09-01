@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { listConnectionReviewItems, recordConnectionReview } from '../../../lib/connection-review';
+import { readChronosJsonObject } from '../../../lib/request-input';
+import { parseConnectionReviewInput } from './connection-review-input';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
@@ -46,20 +48,15 @@ export async function POST(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
 
-    const body = await req.json();
-    const bindingId = typeof body?.bindingId === 'string' ? body.bindingId : '';
-    const action =
-      body?.action === 'approve' ||
-      body?.action === 'hold' ||
-      body?.action === 'delete' ||
-      body?.action === 'modify'
-        ? body.action
-        : null;
-    const note = typeof body?.note === 'string' ? body.note : '';
-    if (!bindingId || !action) {
-      return NextResponse.json({ error: 'Missing connection review payload' }, { status: 400 });
+    const parsedBody = await readChronosJsonObject(req, 'Chronos connections');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    let input;
+    try {
+      input = parseConnectionReviewInput(parsedBody.body);
+    } catch (error) {
+      return viewerErrorResponse(error, 400);
     }
-    const tenant = typeof body?.tenant === 'string' ? body.tenant : undefined;
+    const { bindingId, action, note, tenant } = input;
     const tenantSlugs = strictViewerScopeTenantSlugs(resolvedViewer.context, tenant);
     const binding = listConnectionReviewItems().find((item) => item.binding_id === bindingId);
     if (

@@ -11,7 +11,7 @@ import {
   applyBackgroundReviewSkillPatch,
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
-} from '@agent/core';
+} from '@agent/core/background-review';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(argv: string[], name: string): string {
@@ -47,7 +47,7 @@ export const main = defineScript({
         approval_request_id: request.id,
         storage_channel: request.storageChannel,
         candidate_id: flag(argv, '--candidate'),
-        next: `pnpm cli -- approve ${request.id} ${request.storageChannel}`,
+        next: `pnpm kyberion approve ${request.id} ${request.storageChannel}`,
       });
       return;
     }

@@ -11,9 +11,10 @@
  * It reads sources as text rather than importing them: the checker must be able
  * to report on a tree that does not compile.
  */
-import { pathResolver, safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface EventWiringSources {
   /** Repo-relative path → file contents, for every scanned .ts/.md/.json file. */
@@ -358,14 +359,18 @@ export const runCheckEventWiring = defineScript({
     const sources = collectEventWiringSources();
     const violations = collectEventWiringViolations(sources);
     if (violations.length > 0) {
-      for (const violation of violations) console.error(`[check:event-wiring] ${violation}`);
-      console.error(`[check:event-wiring] ${violations.length} violation(s)`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        [
+          `${violations.length} violation(s)`,
+          ...violations.map((violation) => `- ${violation}`),
+        ].join('\n')
+      );
     }
     context.print(
       `[check:event-wiring] OK — ${Object.keys(sources.files).length} files scanned, 6 rules satisfied`
     );
+    return { violations };
   },
 });
 

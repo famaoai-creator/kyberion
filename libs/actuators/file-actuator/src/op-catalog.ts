@@ -1,10 +1,11 @@
-import { getOpInputContract } from '@agent/core';
+import { getOpInputContract } from '@agent/core/op-input-contracts';
 
 // AR-02: self-described op catalog — the single source the registry and
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const FILE_EXTRA_CONTRACTS: Record<
   string,
@@ -96,7 +97,7 @@ export const FILE_ACTUATOR_APPLY_OPS = [
 
 export const FILE_ACTUATOR_CONTROL_OPS = ['if', 'while'] as const;
 
-function withInputSchema(op: string, kind: OpSpecKind) {
+function withInputSchema(op: string, kind: PipelineStepType) {
   const contract = getOpInputContract('file', op);
   return contract
     ? { op, kind, input_schema: contract.schema, examples: contract.examples }
@@ -112,7 +113,7 @@ function withInputSchema(op: string, kind: OpSpecKind) {
 
 const toSpec = withInputSchema;
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...FILE_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...FILE_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

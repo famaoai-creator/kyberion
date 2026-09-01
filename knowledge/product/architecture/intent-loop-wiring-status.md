@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, intent-loop, wiring, feedback-loop, audit]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-06-25
+last_updated: 2026-08-31
 ---
 
 # Intent-Loop Wiring Status
@@ -25,7 +25,7 @@ Connection audit of Kyberion's core loop (capture intent → goal → execute �
 | Intent resolution (single entry)                           | ✗ **fragmented**                              | ≥4 resolvers: `intent-resolution.ts:470` (spine), `procedure-registry.ts:179` (browser/CLI), `intent-track-resolver.ts:301` (CLI-flag-only), `src/intent-compiler.ts:34`. `run_intent.ts` runs two that can disagree               |
 | "Deterministic-first" ladder (pipelines→actuators→ADF)     | ✗ not enforced                                | No runtime code checks for an existing pipeline before LLM compilation                                                                                                                                                             |
 | Capability broker (provider selection)                     | ✗ orphaned                                    | `capability-broker.ts:153 resolveProviderDecision` has no execution call site                                                                                                                                                      |
-| Surface UX contract                                        | ⚠ tested, not invoked                         | `surface-ux-contract.ts validateSurfaceUxContract` + test exist, but **no call site** outside the barrel — outbound surface messages are not validated                                                                             |
+| Surface UX contract                                        | ✓ enforced                                    | `runSurfaceMessageConversation` validates/repairs the in-process path; Concierge `/api/message` applies the same deterministic check to the voice-hub fast path before delivery                                                    |
 | Surfaces → mission (non-Slack)                             | ✗ silo                                        | Browser extension / iMessage / Telegram don't create missions; receipts use synthetic IDs                                                                                                                                          |
 
 ## What the 2026-06-25 fix closed (the "learning loop")

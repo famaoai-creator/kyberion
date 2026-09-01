@@ -15,6 +15,11 @@ import {
   normalizeRejectionReasonCategory,
   type RejectionReasonCategory,
 } from './rejection-reason.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 
 /** MO-11 S-2: `brief` = the mission-brief HTML review surface (report-review). */
 export type SurfaceApproval = 'slack' | 'telegram' | 'discord' | 'imessage' | 'presence' | 'brief';
@@ -73,7 +78,8 @@ export function createSurfaceApprovalRequest(params: {
 
 export function buildSurfaceApprovalText(
   surface: SurfaceApproval,
-  record: ApprovalRequestRecord
+  record: ApprovalRequestRecord,
+  intentResolution?: IntentResolutionContract
 ): string {
   return [
     `承認が必要です [${surface}]`,
@@ -85,6 +91,15 @@ export function buildSurfaceApprovalText(
     '1: 承認する',
     '2: 却下する',
     `返信: appr:${record.id}:approve または appr:${record.id}:reject`,
+    ...(intentResolution
+      ? [
+          '',
+          `Authority: ${renderIntentAuthorityLabel(intentResolution.authority_level, 'ja')}`,
+          `Next action: ${intentResolution.next_action.label}`,
+          `Consequence: ${intentResolution.next_action.consequence}`,
+          `Outcome: ${renderIntentOutcomeLabel(intentResolution.outcome_kind, 'ja')}`,
+        ]
+      : []),
   ].join('\n');
 }
 

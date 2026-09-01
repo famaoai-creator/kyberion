@@ -18,16 +18,15 @@
  */
 import {
   acknowledgeOpsAlerts,
-  createStandardYargs,
-  logger,
   readOpsAlertLogRecords,
   redeliverUndeliveredOpsAlerts,
   summarizeOpsAlertLog,
-  enqueueOperationalLearningSignal,
   OPS_ALERT_WEBHOOK_ENV,
   type OpsAlertLogSummary,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/ops-alert';
+import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 export function formatOpsAlertSummary(summary: OpsAlertLogSummary): string[] {
   const lines: string[] = [];
@@ -66,9 +65,12 @@ export function formatOpsAlertSummary(summary: OpsAlertLogSummary): string[] {
   return lines;
 }
 
-async function main(args: string[] = []): Promise<void> {
-  const argv = await createStandardYargs(['node', 'ops_alerts', ...args])
-    .option('json', { type: 'boolean', default: false })
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined,
+  json = args.includes('--json')
+): Promise<void> {
+  const argv = await createStandardYargs(['node', 'ops_alerts', ...stripSharedScriptFlags(args)])
     .option('redeliver', {
       type: 'boolean',
       default: false,
@@ -97,16 +99,18 @@ async function main(args: string[] = []): Promise<void> {
     const report = redeliverUndeliveredOpsAlerts({
       ...(typeof argv.limit === 'number' ? { limit: argv.limit } : {}),
     });
-    if (argv.json) {
-      console.log(JSON.stringify(report, null, 2));
+    if (json) {
+      print(report);
     } else {
-      logger.info(
-        `Redelivery: attempted=${report.attempted} delivered=${report.delivered} failed=${report.failed}`
+      print(
+        [
+          `Redelivery: attempted=${report.attempted} delivered=${report.delivered} failed=${report.failed}`,
+          ...report.outcomes
+            .filter((entry) => !entry.delivered)
+            .map((outcome) => `  failed: ${outcome.ref} (${outcome.title}): ${outcome.error}`),
+          `Receipts appended to ${report.recorded_path}`,
+        ].join('\n')
       );
-      for (const outcome of report.outcomes.filter((entry) => !entry.delivered)) {
-        logger.warn(`  failed: ${outcome.ref} (${outcome.title}): ${outcome.error}`);
-      }
-      logger.info(`Receipts appended to ${report.recorded_path}`);
     }
     return;
   }
@@ -115,13 +119,15 @@ async function main(args: string[] = []): Promise<void> {
     const receipt = acknowledgeOpsAlerts({
       ...(argv.before ? { before: argv.before } : {}),
     });
-    if (argv.json) {
-      console.log(JSON.stringify(receipt, null, 2));
+    if (json) {
+      print(receipt);
     } else {
-      logger.info(
-        `Acknowledged ${receipt.acked_count} undelivered record(s) with timestamp <= ${receipt.before}`
+      print(
+        [
+          `Acknowledged ${receipt.acked_count} undelivered record(s) with timestamp <= ${receipt.before}`,
+          `Ack record appended to ${receipt.recorded_path}`,
+        ].join('\n')
       );
-      logger.info(`Ack record appended to ${receipt.recorded_path}`);
     }
     return;
   }
@@ -143,22 +149,22 @@ async function main(args: string[] = []): Promise<void> {
       },
     });
   }
-  if (argv.json) {
-    console.log(JSON.stringify(summary, null, 2));
+  if (json) {
+    print(summary);
     return;
   }
-  for (const line of formatOpsAlertSummary(summary)) {
-    console.log(line);
-  }
+  print(formatOpsAlertSummary(summary).join('\n'));
 }
+
+export const runOpsAlerts = defineScript({
+  name: 'ops:alerts',
+  flags: ['json', 'quiet'],
+  run: ({ argv, print, json }) => main(argv, print, json),
+});
 
 if (
   isDirectScript(import.meta.url, 'ops_alerts.ts') ||
   isDirectScript(import.meta.url, 'ops_alerts.js')
 ) {
-  void defineScript({
-    name: 'ops:alerts',
-    flags: [],
-    run: (context) => main(context.argv),
-  })();
+  void runOpsAlerts();
 }

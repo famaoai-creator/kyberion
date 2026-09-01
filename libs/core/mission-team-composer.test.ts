@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
 import { safeMkdir, safeRmSync } from './secure-io.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
+import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
   composeMissionTeamPlan,
   resolveMissionTeamReceiver,
@@ -353,6 +356,11 @@ describe('mission-team-composer classification integration', () => {
       expect(reviewer?.agent_id).toBeTruthy();
       const implementationAgentId = reviewer!.agent_id!;
       writeMissionTeamPlan(missionPath, plan);
+      expect(
+        loadProvisionedEntryRecords(missionId)
+          .filter((record) => record.phase === 'verified')
+          .map((record) => record.target_path)
+      ).toContain('team-composition.json');
 
       const selected = resolveMissionTeamReceiver({
         missionId,
@@ -380,6 +388,38 @@ describe('mission-team-composer classification integration', () => {
       else process.env.MISSION_ROLE = previousRole;
       if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
       else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('records a composed team brief through the provisioned receipt contract', () => {
+    const missionId = 'MSN-TEAM-BRIEF-RECEIPT-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionPath, { recursive: true });
+    });
+    try {
+      const brief = composeMissionTeamBrief({
+        missionId,
+        missionType: 'product_development',
+        request: 'Prepare a product development plan.',
+        tier: 'public',
+      });
+      const receiptTargets = withExecutionContext('mission_controller', () => {
+        const targetPath = writeMissionTeamBrief(missionPath, brief);
+        return {
+          targetPath,
+          targets: loadProvisionedEntryRecords(missionId)
+            .filter((record) => record.phase === 'verified')
+            .map((record) => record.target_path),
+        };
+      });
+
+      expect(receiptTargets.targetPath).toBe(`${missionPath}/evidence/team-composition-brief.json`);
+      expect(receiptTargets.targets).toContain('evidence/team-composition-brief.json');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
     }
   });
 });

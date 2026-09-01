@@ -1,20 +1,21 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeExec,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  derivePipelineStatus,
-  pathResolver,
-  resolveVars,
-  assertValidMobileAppProfile,
-  retry,
-  buildGovernedRetryOptions,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import type { MobileAppProfile } from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic-utils';
+import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
+import type { MobileAppProfile } from '@agent/core/app-profiles';
+import { retry } from '@agent/core/async-utils';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import * as path from 'node:path';
 
 const IOS_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/ios-actuator/manifest.json');
@@ -26,11 +27,15 @@ export const DEFAULT_IOS_RETRY = {
   jitter: true,
 };
 
-export function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: IOS_MANIFEST_PATH,
-    defaults: DEFAULT_IOS_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: IOS_MANIFEST_PATH,
+  defaults: DEFAULT_IOS_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
+
+function resolveIosRepositoryPath(rootDir: string, value: unknown): string {
+  return assertSafeRepositoryPath(path.resolve(rootDir, String(value || '').trim()), {
+    allowMissingLeaf: true,
   });
 }
 
@@ -59,13 +64,18 @@ interface SimctlDevice {
   runtime: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 export async function executePipeline(
   steps: PipelineStep[],
   options: IOSAction['options'] = {},
   initialCtx: Record<string, any> = {}
 ) {
+  ensureDefaultOpPreflight();
   const rootDir = pathResolver.rootDir();
-  const artifactsDir = path.resolve(
+  const artifactsDir = resolveIosRepositoryPath(
     rootDir,
     options?.artifacts_dir || pathResolver.sharedTmp(`actuators/ios-actuator/session_${Date.now()}`)
   );
@@ -78,57 +88,47 @@ export async function executePipeline(
     ios_device_udid: options?.device_udid || initialCtx.ios_device_udid || '',
   };
 
-  const resolve = (val: any): any => resolveVars(val, ctx);
-
-  const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
-
-  for (const step of steps) {
-    try {
-      logger.info(`  [IOS_PIPELINE] ${step.type}:${step.op}...`);
-      ensureDefaultOpPreflight();
-      const preflight = await runOpPreflight({
-        op: `ios:${step.op}`,
-        params: step.params || {},
-        context: ctx,
-        source: 'actuator',
-      });
-      if (preflight.decision !== 'allow') {
-        throw new Error(
-          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ios:${step.op} was not admitted.`}`
-        );
-      }
-      const params = preflight.input;
+  const sequence = await runActuatorStepSequence({
+    actuatorId: 'ios',
+    steps,
+    context: ctx,
+    resolveParams: (params, context) =>
+      resolvePipelineContextValues(params, context) as Record<string, any>,
+    onStepStart: (step) => logger.info(`  [IOS_PIPELINE] ${step.type}:${step.op}...`),
+    onStepError: (step, error) =>
+      logger.error(
+        `  [IOS_PIPELINE] Step failed (${step.op}): ${error instanceof Error ? error.message : String(error)}`
+      ),
+    execute: async (_op, params, context, step) => {
+      const resolve = (val: any): any => resolveVars(val, context);
       switch (step.type) {
         case 'capture':
-          ctx = await opCapture(step.op, params, ctx, resolve, options);
-          break;
+          return opCapture(step.op, params, context, resolve, options);
         case 'transform':
-          ctx = await opTransform(step.op, params, ctx, resolve);
-          break;
+          return opTransform(step.op, params, context, resolve);
         case 'apply':
-          ctx = await opApply(step.op, params, ctx, resolve, options);
-          break;
+          return opApply(step.op, params, context, resolve, options);
         default:
           logger.warn(`[IOS_PIPELINE] Unsupported step type: ${step.type}`);
+          return context;
       }
-      results.push({ op: step.op, status: 'success' });
-    } catch (error: any) {
-      logger.error(`  [IOS_PIPELINE] Step failed (${step.op}): ${error.message}`);
-      results.push({ op: step.op, status: 'failed', error: error.message });
-      break;
-    }
-  }
+    },
+  });
+  ctx = sequence.context;
 
   if (initialCtx.context_path) {
     await retry(async () => {
-      safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+      safeWriteFile(
+        resolveIosRepositoryPath(rootDir, initialCtx.context_path),
+        JSON.stringify(ctx, null, 2)
+      );
       return undefined;
     }, buildRetryOptions());
   }
 
   return {
-    status: derivePipelineStatus(results),
-    results,
+    status: sequence.status,
+    results: sequence.results,
     context: ctx,
   };
 }
@@ -143,10 +143,10 @@ async function opCapture(
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_json': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveIosRepositoryPath(rootDir, resolve(params.path));
       const parsed = await retry(async () => {
         const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
-        return JSON.parse(content);
+        return parseSafeJsonInput(content, 'iOS JSON input');
       }, buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
@@ -154,7 +154,7 @@ async function opCapture(
       return { ...ctx, [params.export_as || 'last_json']: parsed };
     }
     case 'read_text_file': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveIosRepositoryPath(rootDir, resolve(params.path));
       const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
         buildRetryOptions()
@@ -200,7 +200,7 @@ async function opCapture(
         buildRetryOptions()
       );
       const sourcePath = path.join(containerRoot, relativePath);
-      const outPath = path.resolve(
+      const outPath = resolveIosRepositoryPath(
         rootDir,
         resolve(
           params.path ||
@@ -219,7 +219,7 @@ async function opCapture(
       return {
         ...ctx,
         [params.export_as || 'runtime_session_handoff']: await retry(
-          async () => JSON.parse(content),
+          async () => parseSafeJsonInput(content, 'iOS session handoff'),
           buildRetryOptions()
         ),
         runtime_session_handoff_path: outPath,
@@ -355,7 +355,7 @@ async function opApply(
     case 'capture_screen': {
       ensureSimctlAvailable(ctx, options);
       const device = resolveDeviceUdid(ctx, options, params);
-      const outPath = path.resolve(
+      const outPath = resolveIosRepositoryPath(
         rootDir,
         resolve(params.path || path.join(ctx.artifacts_dir, `ios-screen-${Date.now()}.png`))
       );
@@ -368,7 +368,7 @@ async function opApply(
     }
     case 'emit_session_handoff': {
       const handoff = buildSessionHandoffArtifact(params, ctx, resolve);
-      const outPath = path.resolve(
+      const outPath = resolveIosRepositoryPath(
         rootDir,
         resolve(
           params.path || path.join(ctx.artifacts_dir, `ios-session-handoff-${Date.now()}.json`)
@@ -423,18 +423,36 @@ function collectSimctlHealth(ctx: Record<string, any>, options?: IOSAction['opti
   }
 }
 
-function parseSimctlDevices(output: string): SimctlDevice[] {
-  const parsed = JSON.parse(output) as { devices?: Record<string, Array<Record<string, any>>> };
-  const entries = parsed.devices || {};
-  return Object.entries(entries).flatMap(([runtime, devices]) =>
-    devices.map((device) => ({
-      udid: String(device.udid || ''),
-      name: String(device.name || ''),
-      state: String(device.state || 'unknown'),
-      isAvailable: typeof device.isAvailable === 'boolean' ? device.isAvailable : true,
-      runtime,
-    }))
-  );
+export function parseSimctlDevices(output: string): SimctlDevice[] {
+  const parsed: unknown = parseSafeJsonInput(output, 'simctl devices response');
+  if (!isRecord(parsed) || !isRecord(parsed.devices)) return [];
+
+  return Object.entries(parsed.devices).flatMap(([runtime, devices]) => {
+    if (!Array.isArray(devices)) return [];
+    return devices.flatMap((candidate): SimctlDevice[] => {
+      if (!isRecord(candidate)) return [];
+      if (
+        typeof candidate.udid !== 'string' ||
+        !candidate.udid.trim() ||
+        typeof candidate.name !== 'string' ||
+        !candidate.name.trim() ||
+        typeof candidate.state !== 'string' ||
+        !candidate.state.trim() ||
+        (candidate.isAvailable !== undefined && typeof candidate.isAvailable !== 'boolean')
+      ) {
+        return [];
+      }
+      return [
+        {
+          udid: candidate.udid,
+          name: candidate.name,
+          state: candidate.state,
+          isAvailable: typeof candidate.isAvailable === 'boolean' ? candidate.isAvailable : true,
+          runtime,
+        },
+      ];
+    });
+  });
 }
 
 function ensureSimctlAvailable(ctx: Record<string, any>, options?: IOSAction['options']) {
@@ -502,10 +520,10 @@ function resolveAppPath(
   rootDir: string
 ): string {
   const explicit = String(resolve(params.app_path || '')).trim();
-  if (explicit) return path.resolve(rootDir, explicit);
+  if (explicit) return resolveIosRepositoryPath(rootDir, explicit);
   const profile = resolveAppProfile(params, ctx);
   const profilePath = String(profile?.launch?.app_path || '').trim();
-  return profilePath ? path.resolve(rootDir, profilePath) : '';
+  return profilePath ? resolveIosRepositoryPath(rootDir, profilePath) : '';
 }
 
 function buildSessionHandoffArtifact(

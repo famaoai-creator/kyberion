@@ -1,5 +1,6 @@
 {
   "$schema": "../schemas/package-policy.schema.json",
+  "documentation_only": true,
   "ignore_deps": ["@agent/core", "typescript", "ts-node"],
   "normalization": {
     "private": true,

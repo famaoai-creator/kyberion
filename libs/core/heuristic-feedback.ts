@@ -11,8 +11,14 @@
  */
 
 import * as path from 'node:path';
-import { rootResolve } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir, safeWriteFile } from './secure-io.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -20,6 +26,9 @@ import {
 } from './memory-promotion-queue.js';
 
 const HEURISTICS_ROOT = 'knowledge/confidential/heuristics';
+const HEURISTIC_SCHEMA_PATH = assertSafeRepositoryPath(
+  pathResolver.knowledge('product/schemas/heuristic-entry.schema.json')
+);
 
 export interface HeuristicEntry {
   id: string;
@@ -60,7 +69,21 @@ export interface ValidateParams {
 }
 
 function heuristicFilePath(entryId: string): string {
-  return rootResolve(path.join(HEURISTICS_ROOT, `${entryId}.json`));
+  const normalized = String(entryId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`[heuristic-feedback] illegal entry id: ${entryId}`);
+  }
+  return assertSafeRepositoryPath(rootResolve(path.join(HEURISTICS_ROOT, `${normalized}.json`)), {
+    allowMissingLeaf: true,
+  });
+}
+
+function heuristicCatalog(filePath: string) {
+  return defineCatalog<HeuristicEntry>({
+    id: 'heuristic-entry',
+    path: filePath,
+    schema: HEURISTIC_SCHEMA_PATH,
+  });
 }
 
 /**
@@ -86,18 +109,23 @@ function round(value: number): number {
 export function readHeuristic(entryId: string): HeuristicEntry | null {
   const file = heuristicFilePath(entryId);
   if (!safeExistsSync(file)) return null;
-  return loadJson<HeuristicEntry>(file);
+  return heuristicCatalog(file).load();
 }
 
 export function listHeuristics(): HeuristicEntry[] {
-  const dir = rootResolve(HEURISTICS_ROOT);
+  const dir = assertSafeRepositoryPath(rootResolve(HEURISTICS_ROOT), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) return [];
   const entries = safeReaddir(dir)
     .filter((name) => name.endsWith('.json'))
     .map((name) => name.replace(/\.json$/u, ''));
-  return entries
-    .map((id) => readHeuristic(id))
-    .filter((entry): entry is HeuristicEntry => entry != null);
+  return entries.flatMap((id) => {
+    try {
+      const entry = readHeuristic(id);
+      return entry ? [entry] : [];
+    } catch {
+      return [];
+    }
+  });
 }
 
 /**
@@ -122,7 +150,9 @@ export function validateHeuristic(params: ValidateParams): HeuristicEntry {
     outcome_ref: existing.outcome_ref ?? params.evidenceRef,
     validation,
   };
-  safeWriteFile(heuristicFilePath(params.entryId), `${JSON.stringify(updated, null, 2)}\n`, {
+  const filePath = heuristicFilePath(params.entryId);
+  heuristicCatalog(filePath).validate(updated, filePath);
+  safeWriteFile(filePath, `${JSON.stringify(updated, null, 2)}\n`, {
     encoding: 'utf8',
     mkdir: true,
   });

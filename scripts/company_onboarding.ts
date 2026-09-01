@@ -4,19 +4,24 @@
  * create the initial AI workforce, and leave one reviewed first-work plan.
  */
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   readTenantProfile,
+  tenantProfilePath,
+  writeTenantProfile,
+} from '@agent/core/tenant-registry';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeMkdir,
   safeUnlinkSync,
   safeWriteFile,
-  tenantProfilePath,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import { applyOnboardingContextBinding, writeTenantProfile } from '@agent/core';
+import { applyOnboardingContextBinding } from '@agent/core/onboarding-context';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -59,28 +64,40 @@ function validateInput(input: AiCompanyOnboardingInput): void {
   if (!input.firstWork.trim()) throw new Error('[company-onboard] firstWork is required');
 }
 
-function writeJson(filePath: string, value: unknown): void {
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(value, null, 2));
+function writeJson(filePath: string, value: unknown, rootDir: string): void {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir });
+  safeMkdir(path.dirname(safePath), { recursive: true });
+  safeWriteFile(safePath, JSON.stringify(value, null, 2));
 }
 
-function snapshotFiles(filePaths: string[]): Map<string, string | undefined> {
+function requireRegularFile(filePath: string, rootDir: string, label: string): string {
+  const safePath = assertSafeRepositoryPath(filePath, { rootDir });
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[company-onboard] ${label} must be a regular file`);
+  }
+  return safePath;
+}
+
+function snapshotFiles(filePaths: string[], rootDir: string): Map<string, string | undefined> {
   return new Map(
     filePaths.map((filePath) => [
-      filePath,
-      safeExistsSync(filePath)
-        ? (safeReadFile(filePath, { encoding: 'utf8' }) as string)
+      assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir }),
+      safeExistsSync(assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir }))
+        ? (safeReadFile(assertSafeRepositoryPath(filePath, { rootDir }), {
+            encoding: 'utf8',
+          }) as string)
         : undefined,
     ])
   );
 }
 
-function restoreFiles(snapshots: Map<string, string | undefined>): void {
+function restoreFiles(snapshots: Map<string, string | undefined>, rootDir: string): void {
   for (const [filePath, previous] of snapshots) {
-    if (previous === undefined) safeUnlinkSync(filePath);
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true, rootDir });
+    if (previous === undefined) safeUnlinkSync(safePath);
     else {
-      safeMkdir(path.dirname(filePath), { recursive: true });
-      safeWriteFile(filePath, previous, { encoding: 'utf8' });
+      safeMkdir(path.dirname(safePath), { recursive: true });
+      safeWriteFile(safePath, previous, { encoding: 'utf8' });
     }
   }
 }
@@ -98,9 +115,18 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
   };
   validateInput(normalized);
   const rootDir = normalized.rootDir || pathResolver.rootDir();
-  const customerDir = path.join(rootDir, 'customer', normalized.slug);
-  const readinessPath = path.join(customerDir, 'onboarding', 'ai-company-readiness.json');
-  const firstWorkPath = path.join(customerDir, 'onboarding', 'first-work-plan.md');
+  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', normalized.slug), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  const readinessPath = assertSafeRepositoryPath(
+    path.join(customerDir, 'onboarding', 'ai-company-readiness.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
+  const firstWorkPath = assertSafeRepositoryPath(
+    path.join(customerDir, 'onboarding', 'first-work-plan.md'),
+    { allowMissingLeaf: true, rootDir }
+  );
   const tenantSlug = normalized.tenantSlug || '<registered-tenant>';
   const organizationId = normalized.tenantSlug ? normalized.slug : '<organization>';
   const nextCommands = [
@@ -129,17 +155,26 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     };
   }
 
-  const profilePath = path.join(customerDir, 'organization-profile.json');
-  const templateDir = path.join(
-    pathResolver.rootDir(),
-    'templates',
-    'companies',
-    normalized.vertical
+  const profilePath = assertSafeRepositoryPath(
+    path.join(customerDir, 'organization-profile.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
+  const templateDir = assertSafeRepositoryPath(
+    path.join(pathResolver.rootDir(), 'templates', 'companies', normalized.vertical),
+    { rootDir: pathResolver.rootDir() }
   );
   const templatePaths = safeExistsSync(templateDir)
-    ? safeReaddir(templateDir).map((entry) => path.join(customerDir, entry))
+    ? safeReaddir(templateDir).map((entry) =>
+        assertSafeRepositoryPath(path.join(customerDir, entry), {
+          allowMissingLeaf: true,
+          rootDir,
+        })
+      )
     : [];
-  const snapshots = snapshotFiles([...templatePaths, profilePath, readinessPath, firstWorkPath]);
+  const snapshots = snapshotFiles(
+    [...templatePaths, profilePath, readinessPath, firstWorkPath],
+    rootDir
+  );
   try {
     const bootstrapped = bootstrapCompany({
       vertical: normalized.vertical,
@@ -148,7 +183,9 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       rootDir,
       force: normalized.force,
     });
-    const profile = readJson<Record<string, unknown>>(profilePath);
+    const profile = readJson<Record<string, unknown>>(
+      requireRegularFile(profilePath, rootDir, 'organization profile')
+    );
     profile.accountable_human_resource_id = normalized.accountableHumanId;
     profile.workforce = {
       mode: 'solo_founder_ai_workforce',
@@ -156,7 +193,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       default_approval_holder: normalized.accountableHumanId,
       default_budget_posture: 'block',
     };
-    writeJson(profilePath, profile);
+    writeJson(profilePath, profile, rootDir);
 
     const now = new Date().toISOString();
     const readiness = {
@@ -199,7 +236,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         review_before_execution: true,
       },
     };
-    writeJson(readinessPath, readiness);
+    writeJson(readinessPath, readiness, rootDir);
     safeMkdir(path.dirname(firstWorkPath), { recursive: true });
     safeWriteFile(
       firstWorkPath,
@@ -224,8 +261,14 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
         rootDir,
         env: { ...process.env, KYBERION_CUSTOMER: normalized.slug },
       });
-      const previousTenantProfile = safeExistsSync(tenantPath)
-        ? (safeReadFile(tenantPath, { encoding: 'utf8' }) as string)
+      const safeTenantPath = assertSafeRepositoryPath(tenantPath, {
+        allowMissingLeaf: true,
+        rootDir,
+      });
+      const previousTenantProfile = safeExistsSync(safeTenantPath)
+        ? (safeReadFile(assertSafeRepositoryPath(safeTenantPath, { rootDir }), {
+            encoding: 'utf8',
+          }) as string)
         : undefined;
       try {
         const existingTenant = readTenantProfile(normalized.tenantSlug, {
@@ -246,7 +289,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
               display_name: normalized.companyName,
               status: 'active',
               assigned_role: 'owner',
-              metadata: { onboarding_source: 'company:onboard', purpose: normalized.firstWork },
+              metadata: { onboarding_source: 'onboard company', purpose: normalized.firstWork },
             },
             { rootDir, env: { ...process.env, KYBERION_CUSTOMER: normalized.slug } }
           );
@@ -264,8 +307,8 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
           entry.endsWith('organization-context.json')
         );
       } catch (error) {
-        if (previousTenantProfile === undefined) safeUnlinkSync(tenantPath);
-        else safeWriteFile(tenantPath, previousTenantProfile, { encoding: 'utf8' });
+        if (previousTenantProfile === undefined) safeUnlinkSync(safeTenantPath);
+        else safeWriteFile(safeTenantPath, previousTenantProfile, { encoding: 'utf8' });
         throw error;
       } finally {
         setRegisteredEnv('KYBERION_CUSTOMER', previousCustomer);
@@ -287,7 +330,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       nextCommands,
     };
   } catch (error) {
-    restoreFiles(snapshots);
+    restoreFiles(snapshots, rootDir);
     throw error;
   }
 }
@@ -298,10 +341,10 @@ function flag(argv: string[], name: string): string | undefined {
   return value && !value.startsWith('--') ? value : undefined;
 }
 
-function main(argv: string[]): number {
+export function main(argv: string[], print: (value: unknown) => void = () => undefined): number {
   if (argv.includes('--help') || argv.length === 0) {
-    console.log(
-      'Usage: pnpm company:onboard --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
+    print(
+      'Usage: pnpm onboard company --vertical <id> --slug <slug> --name "<company>" --goal "<first work>" [--owner-id human:operator] [--tenant-slug <tenant>] [--root-dir <path>] [--dry-run]'
     );
     return argv.length === 0 ? 1 : 0;
   }
@@ -317,7 +360,7 @@ function main(argv: string[]): number {
     force: argv.includes('--force'),
     dryRun: argv.includes('--dry-run'),
   });
-  console.log(JSON.stringify(result, null, 2));
+  print(result);
   return 0;
 }
 
@@ -326,10 +369,10 @@ if (
   isDirectScript(import.meta.url, 'company_onboarding.js')
 )
   void defineScript({
-    name: 'company:onboard',
-    flags: [],
+    name: 'onboard:company',
+    flags: ['json', 'dry-run', 'quiet'],
     run(context) {
-      const status = main(context.argv);
+      const status = main(context.argv, context.print);
       if (status !== 0) throw new Error(`company onboarding failed with exit code ${status}`);
     },
   })();

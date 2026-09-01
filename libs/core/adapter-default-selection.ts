@@ -12,8 +12,9 @@ import {
   type AdapterDefaultKey,
   type AdapterDefaultPreferences,
 } from './adapter-default-preferences.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import { getServiceRuntimeRegistry } from './service-runtime-registry.js';
 import { listToolRuntimes, getToolRuntimeRegistry } from './tool-runtime-registry.js';
 import { listVadBackends, resolveVadBackend } from './vad-registry.js';
@@ -56,7 +57,10 @@ const CATEGORY_LABELS: Record<AdapterDefaultKey, string> = {
 };
 
 function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'adapter-defaults.json');
+  return assertSafeRepositoryPath(
+    path.join(resolveActiveProfileRoot(), 'onboarding', 'adapter-defaults.json'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function isAdapterDefaultKey(value: string): value is AdapterDefaultKey {
@@ -65,13 +69,13 @@ function isAdapterDefaultKey(value: string): value is AdapterDefaultKey {
 
 function loadPersistedPreferences(): AdapterDefaultPreferences {
   const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) {
+  const parsed = readJsonIfPresent<
+    Partial<AdapterDefaultPreferences> & { defaults?: Record<string, unknown> }
+  >(filePath);
+  if (!parsed) {
     return setAdapterDefaultPreferences({ version: '1.0.0', defaults: {} });
   }
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<AdapterDefaultPreferences> & { defaults?: Record<string, unknown> };
     const defaults: Partial<Record<AdapterDefaultKey, string>> = {};
     for (const [key, value] of Object.entries(parsed.defaults || {})) {
       if (isAdapterDefaultKey(key) && typeof value === 'string' && value.trim()) {

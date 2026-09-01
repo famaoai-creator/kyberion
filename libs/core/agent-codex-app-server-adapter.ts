@@ -9,14 +9,16 @@
 
 import * as path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
+import { parseSafeJsonInput } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExecResult } from './secure-io.js';
 import { spawnManagedProcess, stopManagedProcess, touchManagedProcess } from './managed-process.js';
 import { resolveCodexBinary } from './codex-cli-query.js';
 import { loadAgentInstructionResource } from './agent-instruction-loader.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import { safeChildEnv } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
 import type {
   AgentAdapter,
   AgentAskOptions,
@@ -26,6 +28,77 @@ import type {
 
 const logger = createLogger('codex-app-server-adapter');
 const PROJECT_ROOT = pathResolver.rootDir();
+
+interface CodexAppServerMessage {
+  jsonrpc?: '2.0';
+  id?: number | string;
+  method?: string;
+  params?: Record<string, unknown>;
+  result?: unknown;
+  error?: { code?: number; message?: string; data?: unknown };
+}
+
+/** Normalize one JSON-RPC envelope emitted by the Codex app server. */
+export function normalizeCodexAppServerMessage(value: unknown): CodexAppServerMessage | null {
+  if (!isRecord(value)) return null;
+  if (value.jsonrpc !== undefined && value.jsonrpc !== '2.0') return null;
+
+  let id: number | string | undefined;
+  if (value.id !== undefined) {
+    if (typeof value.id === 'number') {
+      if (!Number.isFinite(value.id)) return null;
+      id = value.id;
+    } else if (typeof value.id === 'string' && value.id.length > 0) {
+      id = value.id;
+    } else {
+      return null;
+    }
+  }
+
+  let method: string | undefined;
+  if (value.method !== undefined) {
+    if (typeof value.method !== 'string' || value.method.length === 0) return null;
+    method = value.method;
+  }
+
+  let params: Record<string, unknown> | undefined;
+  if (value.params !== undefined) {
+    if (!isRecord(value.params)) return null;
+    params = value.params;
+  }
+
+  let error: CodexAppServerMessage['error'];
+  if (value.error !== undefined) {
+    if (!isRecord(value.error)) return null;
+    const code = value.error.code;
+    if (code !== undefined) {
+      if (typeof code !== 'number' || !Number.isFinite(code)) return null;
+    }
+    const message = value.error.message;
+    if (message !== undefined && typeof message !== 'string') return null;
+    const normalizedCode: number | undefined = typeof code === 'number' ? code : undefined;
+    const normalizedMessage: string | undefined = typeof message === 'string' ? message : undefined;
+    error = {
+      ...(normalizedCode !== undefined ? { code: normalizedCode } : {}),
+      ...(normalizedMessage !== undefined ? { message: normalizedMessage } : {}),
+      ...(value.error.data !== undefined ? { data: value.error.data } : {}),
+    };
+  }
+
+  const hasResult = Object.prototype.hasOwnProperty.call(value, 'result');
+  if (hasResult && error !== undefined) return null;
+  if (id === undefined && method === undefined) return null;
+  if (id !== undefined && method === undefined && !hasResult && error === undefined) return null;
+
+  return {
+    ...(value.jsonrpc !== undefined ? { jsonrpc: '2.0' } : {}),
+    ...(id !== undefined ? { id } : {}),
+    ...(method !== undefined ? { method } : {}),
+    ...(params !== undefined ? { params } : {}),
+    ...(hasResult ? { result: value.result } : {}),
+    ...(error !== undefined ? { error } : {}),
+  };
+}
 
 function registerEnhancer(enhancers: AgentEnhancer[], enhancer: AgentEnhancer): void {
   enhancers.push(enhancer);
@@ -102,7 +175,7 @@ export class CodexExecutionEnhancer implements AgentEnhancer {
   private loadExecutionContext(): string {
     if (this.cachedContext !== null) return this.cachedContext;
     const maxChars = this.options.maxContractChars || 4000;
-    const agents = loadAgentInstructionResource(PROJECT_ROOT);
+    const agents = loadAgentInstructionResource(PROJECT_ROOT, { trustResolved: false });
     if (!agents) {
       this.cachedContext = '';
       return this.cachedContext;
@@ -230,7 +303,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async boot(): Promise<void> {
-    const cwd = this.options.cwd || PROJECT_ROOT;
+    const cwd = this.resolveCwd();
     logger.info('[UAA] Codex App Server booting (cwd: ' + cwd + ')');
     this.runtimeResourceId = 'codex-app-server:' + cwd;
     this.codexBinary = resolveCodexBinary(process.env);
@@ -482,7 +555,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
 
   public async refreshContext(): Promise<{ mode: 'soft'; threadId?: string | null }> {
     if (!this.child) throw new Error('Codex app-server not booted.');
-    const cwd = this.options.cwd || PROJECT_ROOT;
+    const cwd = this.resolveCwd();
     const approvalMode = this.options.approvalMode || 'strict';
     const sandboxMode = this.getSandboxMode();
     const threadRes: any = await this.sendRequest(
@@ -514,8 +587,10 @@ export class CodexAppServerAdapter implements AgentAdapter {
       this.buffer = this.buffer.slice(newlineIdx + 1);
       if (line.length > 0) {
         try {
-          const msg = JSON.parse(line);
-          this.handleMessage(msg);
+          const msg = normalizeCodexAppServerMessage(
+            parseSafeJsonInput(line, 'Codex app-server message')
+          );
+          if (msg) this.handleMessage(msg);
         } catch (e: any) {
           logger.warn('[UAA_CODEX_PARSE] Failed to parse JSON: ' + e.message);
         }
@@ -752,6 +827,15 @@ export class CodexAppServerAdapter implements AgentAdapter {
     return this.isWithinRoot(cwd);
   }
 
+  private resolveCwd(): string {
+    const configured = this.options.cwd || PROJECT_ROOT;
+    const resolved = path.isAbsolute(configured)
+      ? path.resolve(configured)
+      : path.resolve(PROJECT_ROOT, configured);
+    if (resolved === path.resolve(PROJECT_ROOT)) return resolved;
+    return assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  }
+
   private isPathAllowed(targetPath?: string | null, cwd?: string | null): boolean {
     if (!targetPath) return true;
     const base = cwd || this.options.cwd || this.projectRoot;
@@ -763,7 +847,13 @@ export class CodexAppServerAdapter implements AgentAdapter {
     const root = path.resolve(this.projectRoot);
     const resolved = path.resolve(targetPath);
     if (resolved === root) return true;
-    return resolved.startsWith(root + path.sep);
+    if (!resolved.startsWith(root + path.sep)) return false;
+    try {
+      assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

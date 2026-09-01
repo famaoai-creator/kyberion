@@ -32,7 +32,3 @@ export function loadMediaDrawioSecurityGroupOrderCatalog(): MediaDrawioSecurityG
 export function resolveMediaDrawioSecurityGroupRelationPrefix(): string {
   return loadMediaDrawioSecurityGroupOrderCatalog().relation_prefix;
 }
-
-export function resetMediaDrawioSecurityGroupOrderCatalogCache(): void {
-  catalog.reset();
-}

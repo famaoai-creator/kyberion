@@ -16,7 +16,7 @@ status: active
 - QM-03: `memory_consolidation` を background-review の候補保存、承認要求、現行ハッシュ照合、バックアップ付き適用へ接続。
 - QM-05: shell 承認キャッシュの action descriptor を `rule:<matchedRuleId>` 単位へ正規化。実payloadのhash bindingは維持。
 - QM-06: `backend-conformance.ts` と `check:backend-conformance` を追加。CLI version/helpの実probe結果を `evidence/QM-06-CLI-MATRIX-20260808.json` に保存。
-- QM-08: onboarding wizard と `onboard:apply` が runbook `SKILL.md` と provenance sidecarをprofile配下へ生成。
+- QM-08: onboarding wizard と `onboard apply` が runbook `SKILL.md` と provenance sidecarをprofile配下へ生成。
 
 ## 検証
 

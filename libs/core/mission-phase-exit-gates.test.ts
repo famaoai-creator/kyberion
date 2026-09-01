@@ -64,6 +64,86 @@ describe('mission phase exit gates (MO-02)', () => {
     expect(definitions[0].position).toBe('exit');
   });
 
+  it('loads gate definitions from an existing confidential mission root', () => {
+    const confidentialMissionId = `MSN-GATE-CONF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const confidentialMissionPath = missionDir(confidentialMissionId, 'confidential');
+    const definitionsDir = path.join(confidentialMissionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(definitionsDir, 'CONFIDENTIAL_GATE.json'),
+      JSON.stringify({
+        mission_id: confidentialMissionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'CONFIDENTIAL_GATE', checks: [] },
+      })
+    );
+
+    try {
+      expect(loadMissionPhaseGateDefinitions(confidentialMissionId)).toEqual([
+        expect.objectContaining({
+          phase: 'execution',
+          position: 'exit',
+          gate: expect.objectContaining({ id: 'CONFIDENTIAL_GATE' }),
+        }),
+      ]);
+    } finally {
+      fs.rmSync(confidentialMissionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not load gate definitions through a symlinked mission directory', () => {
+    const externalMissionPath = path.join(
+      path.dirname(missionPath),
+      `external-${missionId.toLowerCase()}`
+    );
+    const externalDefinitions = path.join(externalMissionPath, 'gates', 'definitions');
+    fs.mkdirSync(externalDefinitions, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalDefinitions, 'ESCAPED.json'),
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'ESCAPED', checks: [] },
+      })
+    );
+    fs.rmSync(missionPath, { recursive: true, force: true });
+    fs.symlinkSync(externalMissionPath, missionPath, 'dir');
+    try {
+      expect(() => loadMissionPhaseGateDefinitions(missionId)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(missionPath);
+      fs.rmSync(externalMissionPath, { recursive: true, force: true });
+      fs.mkdirSync(missionPath, { recursive: true });
+    }
+  });
+
+  it('skips a gate definition that is a symlink to an external file', () => {
+    const externalDefinition = path.join(
+      path.dirname(missionPath),
+      `external-${missionId.toLowerCase()}.json`
+    );
+    fs.writeFileSync(
+      externalDefinition,
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'ESCAPED', checks: [] },
+      })
+    );
+    const definitionsDir = path.join(missionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.symlinkSync(externalDefinition, path.join(definitionsDir, 'ESCAPED.json'));
+    try {
+      expect(loadMissionPhaseGateDefinitions(missionId)).toEqual([]);
+    } finally {
+      fs.unlinkSync(path.join(definitionsDir, 'ESCAPED.json'));
+      fs.rmSync(externalDefinition, { force: true });
+    }
+  });
+
   it('passes when required evidence exists and records the evaluation', async () => {
     const evidencePath = path.join(missionPath, 'evidence', 'report.md');
     fs.mkdirSync(path.dirname(evidencePath), { recursive: true });

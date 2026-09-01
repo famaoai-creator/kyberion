@@ -1,18 +1,18 @@
 /** EG-09/12: cross-entity drift and boundary conformance checker. */
 import * as path from 'node:path';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { listProjectRecords } from '@agent/core/project-registry';
 import {
-  pathResolver,
   safeExistsSync,
   safeReadFile,
   safeReaddir,
   safeExecResult,
   safeStat,
-  listProjectRecords,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { getRegisteredEnvBool, readJson } from '@agent/core/foundation';
 import { runCheck as runTenantRegistryCheck } from './check_tenant_registry_consistency.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface EntityGovernanceReport {
   status: 'ok' | 'drift';
@@ -294,7 +294,8 @@ export const runCheckEntityGovernance = defineScript({
     const strictWarnings =
       context.argv.includes('--strict-warnings') ||
       getRegisteredEnvBool('KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS') === true;
-    if (shouldFailEntityGovernance(report, strictWarnings)) process.exitCode = 1;
+    if (shouldFailEntityGovernance(report, strictWarnings)) throw new ScriptExitError(1);
+    return report;
   },
 });
 

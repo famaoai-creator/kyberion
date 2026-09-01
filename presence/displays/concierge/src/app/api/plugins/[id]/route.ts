@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
 import {
-  decideApprovalRequest,
   listManagedPlugins,
-  loadApprovalRequest,
   refreshManagedPluginActivation,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/plugin-managed-install';
+import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
 import {
   conciergeText,
   resolveConciergeLocale,
@@ -44,7 +44,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const parsedBody = await readRequestObject(req);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const decision = ALLOWED_DECISIONS.includes(body?.decision as PluginDecision)
       ? (body.decision as PluginDecision)
       : null;

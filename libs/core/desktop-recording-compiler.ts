@@ -1,9 +1,14 @@
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { readJson } from './foundation/json.js';
-import { invalidateProcedureCache, resolveAllowlistedRecordingRef } from './procedure-registry.js';
+import {
+  invalidateProcedureCache,
+  readProcedureCatalog,
+  resolveAllowlistedRecordingRef,
+  validateProcedureCatalog,
+} from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   loadJson,
   safeExistsSync,
   safeMkdir,
@@ -230,7 +235,9 @@ export function promoteDesktopProcedure(options: {
     recordingRef,
     status: options.status ?? 'active',
   });
-  const catalogPath = options.catalogPath ?? PERSONAL_CATALOG_PATH;
+  const catalogPath = assertSafeRepositoryPath(options.catalogPath ?? PERSONAL_CATALOG_PATH, {
+    allowMissingLeaf: true,
+  });
   if (path.resolve(catalogPath) !== path.resolve(PERSONAL_CATALOG_PATH)) {
     throw new Error('desktop promotion catalog must be the governed personal procedures catalog');
   }
@@ -239,7 +246,7 @@ export function promoteDesktopProcedure(options: {
     assertNoPendingDesktopPromotion(options.procedureId, { lockHeld: true });
     let catalog: ProcedureCatalog = { schema_version: 'procedures.v1', procedures: [] };
     try {
-      catalog = readJson<ProcedureCatalog>(catalogPath);
+      catalog = readProcedureCatalog(catalogPath);
     } catch (error) {
       if (safeExistsSync(catalogPath)) {
         throw new Error(
@@ -253,7 +260,10 @@ export function promoteDesktopProcedure(options: {
         `procedure_id "${options.procedureId}" already exists in the selected catalog`
       );
     }
-    const pipelinePath = pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref);
+    const pipelinePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(compiled.procedureEntry.pipeline_ref),
+      { allowMissingLeaf: true }
+    );
     const previousPipeline = safeExistsSync(pipelinePath)
       ? (safeReadFile(pipelinePath, { encoding: 'utf8' }) as string)
       : null;
@@ -261,6 +271,7 @@ export function promoteDesktopProcedure(options: {
       ? (safeReadFile(catalogPath, { encoding: 'utf8' }) as string)
       : null;
     catalog.procedures.push(compiled.procedureEntry);
+    validateProcedureCatalog(catalog, catalogPath);
     const nextPipelineText = `${JSON.stringify(compiled.pipeline, null, 2)}\n`;
     const nextCatalogText = `${JSON.stringify(catalog, null, 2)}\n`;
     const safeProcedureId = options.procedureId.replace(/[^a-zA-Z0-9._-]/g, '_');

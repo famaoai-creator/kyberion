@@ -166,7 +166,7 @@ status: archived
    - プレースホルダの**ロケール間一致**検査(en に `{name}` があり ja に無い、を落とす)
 6. スキーマ `user-facing-vocabulary.schema.json` に `required_locales` を追加(`additionalProperties: false` のため必須)。
 
-**受入**: 305 キーが namespace 化されても `pnpm check:catalogs` / 既存語彙契約テスト(`tests/chronos-ux-vocabulary-contract.test.ts` ほか3本)が緑。存在しないキーを参照するコードが typecheck で落ちる。
+**受入**: 305 キーが namespace 化されても `pnpm run check -- --scope full --only catalogs` / 既存語彙契約テスト(`tests/chronos-ux-vocabulary-contract.test.ts` ほか3本)が緑。存在しないキーを参照するコードが typecheck で落ちる。
 
 ---
 

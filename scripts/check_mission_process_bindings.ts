@@ -1,15 +1,21 @@
 import * as yaml from 'js-yaml';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { loadStandardIntentCatalog } from '@agent/core/intent-resolution';
+import { loadMissionClassificationPolicy } from '@agent/core/mission-classification';
+import { loadMissionReviewGateRegistry } from '@agent/core/mission-review-gates';
+import { loadMissionWorkflowCatalog } from '@agent/core/mission-workflow-catalog';
+import {
+  loadGateProfileRegistry,
+  loadMissionOrchestrationScenarioPack,
+  loadMissionProcessRegistry,
+  loadMissionTaskClassificationScenarioPack,
+} from '@agent/core/mission-process-governance';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type JsonRecord = Record<string, any>;
 
 const rel = (value: string) => pathResolver.rootResolve(value);
-
-function readJson(path: string): JsonRecord {
-  return readFoundationJson<JsonRecord>(rel(path));
-}
 
 function addValuesAtKey(value: unknown, key: string, out: Set<string>): void {
   if (!value || typeof value !== 'object') return;
@@ -59,7 +65,7 @@ function allGateIds(
 
 export function findMissionProcessBindingViolations(): string[] {
   const violations: string[] = [];
-  const processRegistry = readJson('knowledge/product/governance/mission-process-registry.json');
+  const processRegistry = loadMissionProcessRegistry();
   const declaredLayers = new Set(
     (processRegistry.layers || []).map((layer: JsonRecord) => String(layer.id))
   );
@@ -77,21 +83,13 @@ export function findMissionProcessBindingViolations(): string[] {
       }
     }
   }
-  const catalog = readJson('knowledge/product/governance/mission-workflow-catalog.json');
-  const classificationPolicy = readJson(
-    'knowledge/product/governance/mission-classification-policy.json'
-  );
-  const reviewRegistry = readJson('knowledge/product/governance/mission-review-gate-registry.json');
-  const gateProfiles = readJson(
-    'knowledge/product/governance/gate-profiles/gate-profile-registry.json'
-  );
-  const standardIntents = readJson('knowledge/product/governance/standard-intents.json');
-  const orchestration = readJson(
-    'knowledge/product/governance/mission-orchestration-scenario-pack.json'
-  );
-  const classification = readJson(
-    'knowledge/product/governance/mission-task-classification-scenarios.json'
-  );
+  const catalog = loadMissionWorkflowCatalog();
+  const classificationPolicy = loadMissionClassificationPolicy();
+  const reviewRegistry = loadMissionReviewGateRegistry();
+  const gateProfiles = loadGateProfileRegistry();
+  const standardIntents = loadStandardIntentCatalog();
+  const orchestration = loadMissionOrchestrationScenarioPack();
+  const classification = loadMissionTaskClassificationScenarioPack();
 
   const workflowIds = new Set(
     (catalog.templates || []).map((entry: JsonRecord) => String(entry.id))
@@ -107,9 +105,7 @@ export function findMissionProcessBindingViolations(): string[] {
   addValuesAtKey(catalog, 'delivery_shapes', deliveryShapes);
   addValuesAtKey(classificationPolicy, 'risk_profile', riskProfiles);
   addValuesAtKey(catalog, 'risk_profiles', riskProfiles);
-  const intentIds = new Set(
-    (standardIntents.intents || []).map((entry: JsonRecord) => String(entry.id))
-  );
+  const intentIds = new Set(standardIntents.map((entry) => String(entry.id)));
   const gateIds = allGateIds(catalog, reviewRegistry, gateProfiles);
 
   if (orchestration.purpose !== 'regression-fixture')
@@ -215,11 +211,15 @@ export const runCheckMissionProcessBindings = defineScript({
   run(context) {
     const violations = checkMissionProcessBindings();
     if (violations.length) {
-      console.error('[check:mission-process-bindings] violations detected:');
-      for (const violation of violations.sort()) console.error(`- ${violation}`);
-      throw new Error(`${violations.length} mission process binding violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...violations.sort().map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
     context.print('[check:mission-process-bindings] OK');
+    return { violations };
   },
 });
 

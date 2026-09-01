@@ -16,34 +16,32 @@
  */
 
 import * as path from 'node:path';
+import { auditChain } from '@agent/core/audit-chain';
+import { discoverProviders } from '@agent/core/provider-discovery';
+import { discoverReasoningEndpoints } from '@agent/core/reasoning-endpoint-discovery';
 import {
-  auditChain,
-  discoverProviders,
-  discoverReasoningEndpoints,
   getInstalledReasoningMode,
-  getRegisteredEnv,
-  getReasoningBackend,
   installReasoningBackends,
-  logger,
-  pathResolver,
-  resolveMissionClassification,
-  resolveMissionWorkflowDesign,
-  safeExec,
-  safeExistsSync,
-  TraceContext,
-  persistTrace,
-  safeReaddir,
-  missionEvidenceDir,
-  killSwitch,
-  renderStatus,
-  buildHandoffPacket,
-  recordMissionGateOverride,
-  missionLifecycleService,
-  releaseOrchestratorSessionForMissionBestEffort,
-  resumeAiDlcPhaseState,
-  reassignMissionToProject,
-  recordMissionHandoff,
-} from '@agent/core';
+} from '@agent/core/reasoning-bootstrap';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { logger } from '@agent/core/core';
+import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
+import { resolveMissionClassification } from '@agent/core/mission-classification';
+import { resolveMissionWorkflowDesign } from '@agent/core/mission-workflow-catalog';
+import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { TraceContext, persistTrace } from '@agent/core/src/trace';
+import { killSwitch } from '@agent/core/kill-switch';
+import { renderStatus } from '@agent/core/ux-vocabulary';
+import { buildHandoffPacket } from '@agent/core/handoff-packet';
+import { recordMissionGateOverride } from '@agent/core/mission-gate-engine';
+import { missionLifecycleService } from '@agent/core/mission-lifecycle-service';
+import { releaseOrchestratorSessionForMissionBestEffort } from '@agent/core/orchestrator-session';
+import { resumeAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
+import { reassignMissionToProject } from '@agent/core/project-management';
+import { recordMissionHandoff } from '@agent/core/work-coordination';
+import type { ArtifactReviewFinding } from '@agent/core/artifact-review';
+import { createMissionWorkReconciliationApprovalRequest } from '@agent/core/mission-work-reconciliation';
 
 function registeredEnv(name: string): string | undefined {
   return getRegisteredEnv<string>(name) as string | undefined;
@@ -211,13 +209,18 @@ async function dispatchMissionWorkItems(id: string): Promise<void> {
  * Mission Commands
  */
 
-async function enqueueMission(id: string, tier: string, priority: number = 5, deps: string[] = []) {
+async function enqueueMission(
+  id: string,
+  tier: 'personal' | 'confidential' | 'public',
+  priority: number = 5,
+  deps: string[] = []
+) {
   await _enqueueMission(QUEUE_PATH, id, tier, priority, deps);
 }
 
 async function dispatchNextMission() {
   await dispatchNextQueuedMission(QUEUE_PATH, checkDependencies, async (missionId, tier) =>
-    startMission(missionId, tier as any)
+    startMission(missionId, tier)
   );
 }
 
@@ -228,7 +231,7 @@ async function createMission(
   missionType: string = 'development',
   visionRef?: string,
   persona: string = 'worker',
-  relationships: any = {},
+  relationships: Partial<import('./refactor/mission-types.js').MissionRelationships> = {},
   tenantSlug?: string,
   organizationId?: string,
   options?: { ephemeral?: boolean; intentGoal?: string }
@@ -301,7 +304,7 @@ async function startMission(
   tenantId: string = 'default',
   missionType: string = 'development',
   visionRef?: string,
-  relationships: any = {},
+  relationships: Partial<import('./refactor/mission-types.js').MissionRelationships> = {},
   tenantSlug?: string,
   organizationId?: string,
   options?: { ephemeral?: boolean; intentGoal?: string; force?: boolean }
@@ -456,7 +459,11 @@ async function repairLegacyMissionState(id: string, note?: string) {
   return missionSystem.repairLegacyMissionState(id, note);
 }
 
-async function recordTask(missionId: string, description: string, details: any = {}) {
+async function recordTask(
+  missionId: string,
+  description: string,
+  details: Record<string, unknown> = {}
+) {
   return missionSystem.recordTask(missionId, description, details);
 }
 
@@ -509,7 +516,7 @@ async function recordArtifactReview(
     missionId,
     reviewTaskId,
     reviewerAgentId,
-    (findings || []) as import('@agent/core').ArtifactReviewFinding[],
+    (findings || []) as ArtifactReviewFinding[],
     reviewerTeamRole,
     specialistRoles
   );
@@ -521,8 +528,32 @@ async function recordArtifactReview(
   return result;
 }
 
-async function reconcileExistingWork(missionId: string, manifestPath: string, dryRun = false) {
-  const result = await missionSystem.reconcileExistingWork(missionId, manifestPath, dryRun);
+async function requestMissionWorkReconciliationApproval(
+  missionId: string,
+  manifestPath: string,
+  requestedBy?: string
+) {
+  const result = createMissionWorkReconciliationApprovalRequest({
+    missionId,
+    manifestPath,
+    requestedBy,
+  });
+  console.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+async function reconcileExistingWork(
+  missionId: string,
+  manifestPath: string,
+  dryRun = false,
+  approvalRequestId?: string
+) {
+  const result = await missionSystem.reconcileExistingWork(
+    missionId,
+    manifestPath,
+    dryRun,
+    approvalRequestId
+  );
   console.log(JSON.stringify(result, null, 2));
   return result;
 }
@@ -820,7 +851,8 @@ Maintenance Commands:
                                  Record a real ArtifactReviewReceipt for a review-kind task (required before it
                                  can complete — bare record-evidence is not enough for review tasks). Independence
                                  from the implementer is computed from the execution ledger, not self-declared.
-  reconcile-work <ID> --manifest <PATH> [--dry-run]
+  reconcile-work <ID> --manifest <PATH> [--dry-run] [--approval-request-id <UUID>]
+                                 --request-approval [--requested-by <ACTOR>] creates a hash-bound human approval request
                                  --generate [--output <PATH>] scaffolds a manifest from current git state
                                  Validate and adopt verified work completed outside dispatch-workitems
   review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
@@ -1367,6 +1399,7 @@ export async function main(args: string[] = currentProcessArgv()): Promise<void>
     recordTask,
     recordEvidence,
     recordArtifactReview,
+    requestMissionWorkReconciliationApproval,
     reconcileExistingWork,
     reenterMissionFromReview,
     purgeMissions,

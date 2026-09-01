@@ -1,7 +1,5 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadStandardIntentCatalog } from './intent-resolution.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
@@ -17,12 +15,26 @@ import { getPresentationBriefQuestions } from './presentation-preference-profile
 import { slugify } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
+import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
+import type { NarratedVideoPreferenceProfile } from './src/types/narrated-video-preference-profile.js';
 import { logger } from './core.js';
 
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/question-resolution-policy.schema.json'
 );
 const POLICY_PATH = pathResolver.knowledge('product/governance/question-resolution-policy.json');
+const MEETING_PROFILE_PATH = pathResolver.knowledge(
+  'product/schemas/meeting-operations-profile.example.json'
+);
+const MEETING_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/meeting-operations-profile.schema.json'
+);
+const NARRATED_VIDEO_PROFILE_PATH = pathResolver.knowledge(
+  'product/schemas/narrated-video-preference-profile.example.json'
+);
+const NARRATED_VIDEO_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/narrated-video-preference-profile.schema.json'
+);
 
 export interface QuestionResolutionQuestion {
   id: string;
@@ -180,24 +192,26 @@ export interface QuestionResolutionResult {
   };
 }
 
-let policyValidateFn: ValidateFunction | null = null;
+const policyCatalog = defineCatalog<QuestionResolutionPolicyFile>({
+  id: 'question-resolution-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
 
-function ensurePolicyValidator(): ValidateFunction {
-  if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchema(POLICY_SCHEMA_PATH);
-  return policyValidateFn;
-}
+const meetingProfileCatalog = defineCatalog<MeetingOperationsProfile>({
+  id: 'meeting-operations-profile-example',
+  path: MEETING_PROFILE_PATH,
+  schema: MEETING_PROFILE_SCHEMA_PATH,
+});
+
+const narratedVideoProfileCatalog = defineCatalog<NarratedVideoPreferenceProfile>({
+  id: 'narrated-video-preference-profile-example',
+  path: NARRATED_VIDEO_PROFILE_PATH,
+  schema: NARRATED_VIDEO_PROFILE_SCHEMA_PATH,
+});
 
 function loadPolicyFile(): QuestionResolutionPolicyFile {
-  const parsed = readJson<QuestionResolutionPolicyFile>(POLICY_PATH);
-  const validate = ensurePolicyValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid question-resolution-policy: ${errors}`);
-  }
-  return parsed;
+  return policyCatalog.load();
 }
 
 function clampConfidence(value: unknown, fallback = 0.5): number {
@@ -348,16 +362,12 @@ function buildProfileQuestions(intentId: string | undefined): QuestionResolution
   }
 }
 
-function getMeetingProfileFallback(): any {
-  return readJson<any>(
-    pathResolver.knowledge('product/schemas/meeting-operations-profile.example.json')
-  );
+function getMeetingProfileFallback(): MeetingOperationsProfile {
+  return meetingProfileCatalog.load();
 }
 
-function getNarratedVideoProfileFallback(): any {
-  return readJson<any>(
-    pathResolver.knowledge('product/schemas/narrated-video-preference-profile.example.json')
-  );
+function getNarratedVideoProfileFallback(): NarratedVideoPreferenceProfile {
+  return narratedVideoProfileCatalog.load();
 }
 
 export function resolveQuestionResolution(input: ResolveQuestionInput): QuestionResolutionResult {

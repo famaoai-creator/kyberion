@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { getVoiceEngineRecord, listVoiceEngines } from './voice-engine-registry.js';
 import { getVoiceProfileRegistry } from './voice-profile-registry.js';
 
@@ -59,6 +59,9 @@ export interface VoiceProfileRegistrationValidationResult {
 const DEFAULT_POLICY_PATH = pathResolver.knowledge(
   'product/governance/voice-sample-ingestion-policy.json'
 );
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/voice-sample-ingestion-policy.schema.json'
+);
 
 const FALLBACK_POLICY: VoiceSampleIngestionPolicy = {
   version: 'fallback',
@@ -81,39 +84,39 @@ let cachedPolicyPath: string | null = null;
 let cachedPolicy: VoiceSampleIngestionPolicy | null = null;
 
 function getPolicyPath(): string {
-  return (
+  const configured =
     getRegisteredEnvText('KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH')?.trim() ||
-    DEFAULT_POLICY_PATH
-  );
+    DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
-export function resetVoiceSampleIngestionPolicyCache(): void {
+const policyCatalog = defineCatalog<VoiceSampleIngestionPolicy>({
+  id: 'voice-sample-ingestion-policy',
+  path: getPolicyPath,
+  schema: POLICY_SCHEMA_PATH,
+  fallback: FALLBACK_POLICY,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    if (!/missing:/u.test(String(error))) {
+      logger.warn(
+        `[VOICE_SAMPLE_INGESTION_POLICY] Failed to load policy at ${getPolicyPath()}: ${String(error)}`
+      );
+    }
+  },
+});
+
+export function _resetVoiceSampleIngestionPolicyCacheForTests(): void {
   cachedPolicyPath = null;
   cachedPolicy = null;
+  policyCatalog.reset();
 }
 
 export function getVoiceSampleIngestionPolicy(): VoiceSampleIngestionPolicy {
   const policyPath = getPolicyPath();
   if (cachedPolicyPath === policyPath && cachedPolicy) return cachedPolicy;
-  if (!safeExistsSync(policyPath)) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
-  try {
-    const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<VoiceSampleIngestionPolicy>(raw, 'voice sample ingestion policy');
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(
-      `[VOICE_SAMPLE_INGESTION_POLICY] Failed to load policy at ${policyPath}: ${error.message}`
-    );
-    cachedPolicyPath = policyPath;
-    cachedPolicy = FALLBACK_POLICY;
-    return cachedPolicy;
-  }
+  cachedPolicyPath = policyPath;
+  cachedPolicy = policyCatalog.load();
+  return cachedPolicy;
 }
 
 export function validateVoiceProfileRegistration(
@@ -187,7 +190,13 @@ export function validateVoiceProfileRegistration(
       continue;
     }
 
-    const resolvedPath = pathResolver.rootResolve(samplePath);
+    let resolvedPath: string;
+    try {
+      resolvedPath = assertSafeRepositoryPath(samplePath, { allowMissingLeaf: true });
+    } catch (error) {
+      violations.push(`sample path rejected (${samplePath}): ${String(error)}`);
+      continue;
+    }
     if (policy.profile_rules.require_unique_sample_paths) {
       if (seenPaths.has(resolvedPath)) {
         violations.push(`duplicate sample path detected (${samplePath})`);

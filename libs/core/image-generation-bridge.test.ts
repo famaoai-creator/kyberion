@@ -341,6 +341,21 @@ describe('LlmApiImageGenerationProvider', () => {
       })
     );
   });
+
+  it('fails closed when an image response has a malformed nested payload', async () => {
+    process.env.GEMINI_API_KEY = 'mock-imagen-key';
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ generatedImages: [{ image: { imageBytes: { leaked: true } } }] }),
+    } as Response);
+
+    await expect(
+      new LlmApiImageGenerationProvider().generate({
+        prompt: 'malformed image response',
+        providerPreference: ['gemini'],
+      })
+    ).rejects.toThrow('Gemini Imagen API returned no image bytes');
+  });
 });
 
 describe('LocalFluxImageGenerationProvider', () => {
@@ -559,6 +574,18 @@ describe('HostAgentImageGenerationProvider', () => {
         targetPath: 'needs-gen.png',
       })
     ).rejects.toThrow('HOST_AGENT_IMAGE_GENERATION_REQUIRED');
+  });
+
+  it('rejects an external target path before creating a host bridge request', async () => {
+    process.env.KYBERION_HOST_AGENT_ACTIVE = 'true';
+    const provider = new HostAgentImageGenerationProvider();
+
+    await expect(
+      provider.generate({
+        prompt: 'test prompt',
+        targetPath: '/tmp/outside-image.png',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });
 

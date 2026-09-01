@@ -1,40 +1,48 @@
 import {
-  buildOrganizationDomainRecord,
-  buildOrganizationLearningCandidate,
   buildOrganizationManagementView,
-  buildOrganizationObjectiveAddition,
   buildOrganizationOperationRecord,
   buildOrganizationProjectLink,
-  buildOrganizationPurposeRecord,
-  buildOrganizationScaffold,
   buildOrganizationCadence,
   buildOrganizationDecision,
+  reconcileOrganizationState,
+} from '@agent/core/organization-operating-model-management';
+import {
+  buildOrganizationDomainRecord,
+  buildOrganizationLearningCandidate,
+  buildOrganizationObjectiveAddition,
+  buildOrganizationPurposeRecord,
+  buildOrganizationScaffold,
   buildOrganizationServiceAddition,
   buildOrganizationServiceState,
   enqueueOrganizationLearningCandidate,
-  loadOrganizationOperatingModelCatalog,
-  loadOrganizationProfile,
-  removeOrganizationEntity,
-  reconcileOrganizationState,
-  retireOrganizationEntity,
-  transitionOrganizationLifecycle,
-  resolveOrganizationWork,
-  saveOrganizationDomain,
   saveOrganizationOperation,
-  saveOrganizationOperationalState,
-  saveOrganizationPurpose,
   saveOrganizationCadence,
   saveOrganizationDecision,
+} from '@agent/core/organization-operating-model-operations';
+import {
+  loadOrganizationOperatingModelCatalog,
+  resolveOrganizationWork,
+  saveOrganizationDomain,
+  saveOrganizationOperationalState,
+  saveOrganizationPurpose,
   saveOrganizationService,
   saveOrganizationServiceState,
-  type OrganizationCadenceRecord,
-  type OrganizationDecisionRecord,
-  type OrganizationOperationRecord,
-  type OrganizationOperationType,
-  type OrganizationPurposeRecord,
-  type OrganizationServiceRecord,
-  type OrganizationServiceState,
-} from '@agent/core';
+  transitionOrganizationLifecycle,
+} from '@agent/core/organization-operating-model-persistence';
+import {
+  removeOrganizationEntity,
+  retireOrganizationEntity,
+} from '@agent/core/organization-operating-model';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
+import type {
+  OrganizationCadenceRecord,
+  OrganizationDecisionRecord,
+  OrganizationOperationRecord,
+  OrganizationOperationType,
+  OrganizationPurposeRecord,
+  OrganizationServiceRecord,
+  OrganizationServiceState,
+} from '@agent/core/organization-operating-model';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ParsedArgs = {

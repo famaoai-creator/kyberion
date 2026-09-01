@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
+import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  buildExecutionEnv,
-  listTenantProfileSlugs,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeRmSync,
   safeWriteFile,
-  secureIo,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import { parseIngestCliVerdict } from '../ingest-output-parser';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,19 +66,6 @@ function sanitizeFileName(name: string): string {
   const base = path.basename(String(name || '')).replace(/[^A-Za-z0-9._ぁ-ヿ一-鿿-]/gu, '_');
   const trimmed = base.replace(/^[._]+/, '').slice(0, 120);
   return trimmed || `upload-${Date.now().toString(36)}`;
-}
-
-/** Extract the first pretty-printed JSON object the ingest CLI prints after `marker`. */
-function parseJsonAfter(stdout: string, marker: string): Record<string, unknown> | null {
-  const at = stdout.indexOf(marker);
-  if (at < 0) return null;
-  const brace = stdout.indexOf('{', at);
-  if (brace < 0) return null;
-  try {
-    return JSON.parse(stdout.slice(brace)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }
 
 function toDisplayPath(value: unknown): string | undefined {
@@ -141,7 +130,14 @@ export async function POST(req: NextRequest) {
     }
 
     const ingestScript = pathResolver.rootResolve(INGEST_RELATIVE);
-    if (!safeExistsSync(ingestScript)) {
+    let ingestReady = false;
+    try {
+      const safeIngestScript = assertSafeRepositoryPath(ingestScript, { allowMissingLeaf: true });
+      ingestReady = safeExistsSync(safeIngestScript) && safeLstat(safeIngestScript).isFile();
+    } catch {
+      ingestReady = false;
+    }
+    if (!ingestReady) {
       console.error(`[concierge/ingest] ingest build missing: ${ingestScript}`);
       return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 503 });
     }
@@ -207,7 +203,7 @@ export async function POST(req: NextRequest) {
 
     // Exit code 0 alone is not success: read the ceremony's own verdict lines.
     if (dryRun) {
-      const plan = parseJsonAfter(result.stdout, '[ingest] DRY RUN');
+      const plan = parseIngestCliVerdict(result.stdout, '[ingest] DRY RUN');
       if (!plan || plan.dry_run !== true) {
         return NextResponse.json({ ok: false, error: t('api.ingest.failed') }, { status: 502 });
       }
@@ -230,7 +226,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (result.stdout.includes('[ingest] committed ')) {
-      const asset = parseJsonAfter(result.stdout, '[ingest] committed ');
+      const asset = parseIngestCliVerdict(result.stdout, '[ingest] committed ');
       const summary: IngestSummary = {
         dry_run: false,
         outcome: 'committed',

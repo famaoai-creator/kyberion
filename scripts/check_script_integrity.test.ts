@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { checkScriptIntegrity, findDirectScriptGuardViolations } from './check_script_integrity.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('check-script-integrity');

@@ -1,5 +1,5 @@
 import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 
 /**

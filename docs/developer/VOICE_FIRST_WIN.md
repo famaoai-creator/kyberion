@@ -14,11 +14,11 @@ The promise: **clone → 5 minutes → speak to Kyberion, hear it speak back, wi
 
 ## Three tiers
 
-| Tier | STT (input) | TTS (output) | External deps |
-|---|---|---|---|
-| **0** (default first win) | Browser Web Speech API | OS native (`say` / `espeak` / SAPI) | None |
-| 1 (opt-in upgrade) | Anthropic Voice / OpenAI Realtime | same | API key |
-| 2 (further opt-in) | Whisper (local) | Style-Bert-VITS2 (local) | python + GPU |
+| Tier                      | STT (input)                       | TTS (output)                        | External deps |
+| ------------------------- | --------------------------------- | ----------------------------------- | ------------- |
+| **0** (default first win) | Browser Web Speech API            | OS native (`say` / `espeak` / SAPI) | None          |
+| 1 (opt-in upgrade)        | Anthropic Voice / OpenAI Realtime | same                                | API key       |
+| 2 (further opt-in)        | Whisper (local)                   | Style-Bert-VITS2 (local)            | python + GPU  |
 
 Tier 0 is the first-win path. This document is about wiring tier 0.
 
@@ -72,13 +72,13 @@ These are the concrete next tasks for Phase A-5 to land end-to-end. Each is smal
 
 ```bash
 # Tier 0 → Tier 1 (cloud voice)
-pnpm voice:upgrade-cloud
-# Sets KYBERION_VOICE_TIER=1, copies a customer-specific voice profile,
+pnpm voice:upgrade cloud
+# Writes voice_tier=1 to the customer-specific voice profile,
 # verifies API key. The pipeline switches to anthropic-voice-bridge for input.
 
 # Tier 1 → Tier 2 (local Style-Bert-VITS2)
-pnpm voice:upgrade-local
-# Pulls model files (1.2 GB), starts local server, verifies.
+pnpm voice:upgrade local
+# Writes voice_tier=2 to the profile, then follow the local runtime setup and verification steps.
 ```
 
 The upgrade commands are implemented as configurators and validate prerequisites.

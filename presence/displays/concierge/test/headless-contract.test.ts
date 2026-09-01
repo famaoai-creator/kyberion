@@ -43,8 +43,11 @@ describe('Concierge headless boundary', () => {
   });
 
   it('derives local viewer authority from loopback and does not accept arbitrary remote access', () => {
+    vi.stubEnv('KYBERION_TRUST_PROXY', 'true');
     const local = resolveConciergeViewerContext(
-      new NextRequest('http://localhost:3033/api/headless/manifest')
+      new NextRequest('http://localhost:3033/api/headless/manifest', {
+        headers: { 'x-forwarded-for': '127.0.0.1' },
+      })
     );
     expect(local).toMatchObject({ role: 'localadmin', source: 'loopback', tenantSlugs: 'all' });
 

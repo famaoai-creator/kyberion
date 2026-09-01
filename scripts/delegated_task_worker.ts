@@ -5,7 +5,7 @@ import {
   registerDelegatedTaskWorker,
   resumeDelegatedTask,
   wakeDelegatedTaskWorker,
-} from '@agent/core';
+} from '@agent/core/delegated-task-observability';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function readArg(name: string, argv: string[]): string {

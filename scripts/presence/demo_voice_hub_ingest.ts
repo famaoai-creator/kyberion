@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { defineScript, isDirectScript } from '../lib/harness.js';
 
 async function main() {
   const response = await fetch('http://127.0.0.1:3032/api/ingest-text', {
@@ -21,7 +22,14 @@ async function main() {
   console.log(JSON.stringify(body, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+const runVoiceHubIngestDemo = defineScript({
+  name: 'presence-demo-voice-hub-ingest',
+  flags: [],
+  run: main,
 });
+
+if (
+  isDirectScript(import.meta.url, 'presence/demo_voice_hub_ingest.ts') ||
+  isDirectScript(import.meta.url, 'presence/demo_voice_hub_ingest.js')
+)
+  void runVoiceHubIngestDemo();

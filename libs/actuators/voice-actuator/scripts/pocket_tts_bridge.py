@@ -25,7 +25,7 @@ def _health() -> dict:
         return {
             "status": "unavailable",
             "error": str(exc),
-            "install_hint": "pnpm voice:setup --apply",
+            "install_hint": "pnpm kyberion voice setup --apply",
         }
     return {"status": "ok", "model": "kyutai/pocket-tts"}
 

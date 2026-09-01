@@ -1,26 +1,35 @@
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveGoldenRulePriorityOrder, resolveVision } from '@agent/core/vision-resolver';
 import {
-  pathResolver,
-  resolveGoldenRulePriorityOrder,
-  resolveVision,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
-  type GoldenRulePriority,
-} from '@agent/core';
-import { nowIso, readJson as readFoundationJson } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import type { GoldenRulePriority } from '@agent/core/vision-resolver';
+import { nowIso } from '@agent/core/foundation';
+import {
+  readWisdomJsonObject,
+  readWisdomRecordArray,
+  readWisdomString,
+  readWisdomStringArray,
+  type WisdomJsonObject,
+} from './wisdom-persisted-json.js';
 
 function readResolvedPath(rel: string): string {
-  return safeReadFile(pathResolver.rootResolve(rel), { encoding: 'utf8' }) as string;
+  return safeReadFile(assertSafeRepositoryPath(pathResolver.rootResolve(rel)), {
+    encoding: 'utf8',
+  }) as string;
 }
 
-function readJSON<T = any>(rel: string): T {
-  return readFoundationJson<T>(pathResolver.rootResolve(rel));
+function readJSON(rel: string): WisdomJsonObject {
+  return readWisdomJsonObject(rel);
 }
 
 function writeJSON(rel: string, data: any): string {
-  const abs = pathResolver.rootResolve(rel);
+  const abs = assertSafeRepositoryPath(pathResolver.rootResolve(rel), { allowMissingLeaf: true });
   safeMkdir(path.dirname(abs), { recursive: true });
   safeWriteFile(abs, JSON.stringify(data, null, 2));
   return rel;
@@ -91,34 +100,51 @@ export function emitDissentLog(input: {
   mission_id?: string;
   topic?: string;
 }): { written_to: string; count: number } {
-  const src = readJSON<any>(input.source_path);
-  const pool: any[] = src.hypotheses || src.items || [];
+  const src = readJSON(input.source_path);
+  const pool = readWisdomRecordArray(src, ['hypotheses', 'items'], 'source');
 
   const rejected = pool.filter((h) => {
-    if (h.status) return h.status === 'rejected';
+    if (typeof h.status === 'string') return h.status === 'rejected';
     if (typeof h.survived === 'boolean') return !h.survived;
     return false;
   });
 
   const dissents = rejected.map((h) => ({
-    hypothesis: h.content || h.hypothesis || h.summary || JSON.stringify(h),
-    proposed_by: h.proposed_by || h.persona || 'unknown',
-    rejection_reason: h.rejection_reason || h.critique || 'not-provided',
-    rejection_confidence: h.rejection_confidence || 'medium',
-    revisit_triggers: h.revisit_triggers || [],
-    evidence_refs: h.evidence_refs || [],
+    hypothesis:
+      readWisdomString(h, 'content', '', 'hypothesis') ||
+      readWisdomString(h, 'hypothesis', '', 'hypothesis') ||
+      readWisdomString(h, 'summary', JSON.stringify(h), 'hypothesis'),
+    proposed_by:
+      readWisdomString(h, 'proposed_by', '', 'hypothesis') ||
+      readWisdomString(h, 'persona', 'unknown', 'hypothesis'),
+    rejection_reason:
+      readWisdomString(h, 'rejection_reason', '', 'hypothesis') ||
+      readWisdomString(h, 'critique', 'not-provided', 'hypothesis'),
+    rejection_confidence: readWisdomString(h, 'rejection_confidence', 'medium', 'hypothesis'),
+    revisit_triggers: readWisdomStringArray(h, 'revisit_triggers', 'hypothesis'),
+    evidence_refs: readWisdomStringArray(h, 'evidence_refs', 'hypothesis'),
   }));
 
-  let existing: any = null;
-  if (input.append && safeExistsSync(pathResolver.rootResolve(input.output_path))) {
+  let existing: WisdomJsonObject | null = null;
+  const outputPath = assertSafeRepositoryPath(pathResolver.rootResolve(input.output_path), {
+    allowMissingLeaf: true,
+  });
+  if (input.append && safeExistsSync(outputPath)) {
     existing = readJSON(input.output_path);
+    readWisdomRecordArray(existing, ['dissents'], 'existing dissent log');
   }
 
   const payload = existing
-    ? { ...existing, dissents: [...(existing.dissents || []), ...dissents] }
+    ? {
+        ...existing,
+        dissents: [
+          ...readWisdomRecordArray(existing, ['dissents'], 'existing dissent log'),
+          ...dissents,
+        ],
+      }
     : {
-        mission_id: input.mission_id || src.mission_id || 'unknown',
-        topic: input.topic || src.topic || 'unspecified',
+        mission_id: input.mission_id || readWisdomString(src, 'mission_id', 'unknown', 'source'),
+        topic: input.topic || readWisdomString(src, 'topic', 'unspecified', 'source'),
         dissents,
         created_at: nowIso(),
       };
@@ -137,15 +163,15 @@ export function renderHypothesisReport(input: {
   output_path: string;
   title?: string;
 }): { written_to: string; sections: number } {
-  const src = readJSON<any>(input.source_path);
-  const topic: string = src.topic || '';
-  const hypotheses: any[] = src.hypotheses || [];
-  const generatedBy: string = src.generated_by || 'unknown';
-  const generatedAt: string = src.generated_at || '';
+  const src = readJSON(input.source_path);
+  const topic = readWisdomString(src, 'topic', '', 'source');
+  const hypotheses = readWisdomRecordArray(src, ['hypotheses'], 'source');
+  const generatedBy = readWisdomString(src, 'generated_by', 'unknown', 'source');
+  const generatedAt = readWisdomString(src, 'generated_at', '', 'source');
 
   const byPersona = new Map<string, any[]>();
   for (const h of hypotheses) {
-    const key = h.proposed_by || 'unknown';
+    const key = readWisdomString(h, 'proposed_by', 'unknown', 'hypothesis');
     if (!byPersona.has(key)) byPersona.set(key, []);
     byPersona.get(key)!.push(h);
   }
@@ -178,19 +204,26 @@ export function renderHypothesisReport(input: {
     lines.push('');
     for (const h of items) {
       const statusEmoji = h.survived === true ? '✅' : h.survived === false ? '❌' : '⏳';
-      lines.push(`#### ${statusEmoji} ${h.id || '(no-id)'}`);
+      lines.push(`#### ${statusEmoji} ${readWisdomString(h, 'id', '(no-id)', 'hypothesis')}`);
       lines.push('');
-      lines.push(h.content || '(no content)');
+      lines.push(readWisdomString(h, 'content', '(no content)', 'hypothesis'));
       lines.push('');
-      if (h.survived === false && h.rejection_reason) {
+      if (h.survived === false && typeof h.rejection_reason === 'string') {
         lines.push(`> **Rejected because**: ${h.rejection_reason}`);
         lines.push('');
       }
-      if (Array.isArray(h.critiques) && h.critiques.length > 0) {
+      const critiques = readWisdomRecordArray(
+        h,
+        ['critiques'],
+        `hypothesis ${readWisdomString(h, 'id', '(no-id)', 'hypothesis')}`
+      );
+      if (critiques.length > 0) {
         lines.push('**Critiques:**');
         lines.push('');
-        for (const c of h.critiques) {
-          lines.push(`- *by ${c.by || 'unknown'}*: ${c.content || ''}`);
+        for (const c of critiques) {
+          lines.push(
+            `- *by ${readWisdomString(c, 'by', 'unknown', 'critique')}*: ${readWisdomString(c, 'content', '', 'critique')}`
+          );
         }
         lines.push('');
       }
@@ -216,8 +249,11 @@ export function renderHypothesisReport(input: {
   }
   lines.push('');
 
-  safeMkdir(path.dirname(pathResolver.rootResolve(input.output_path)), { recursive: true });
-  safeWriteFile(pathResolver.rootResolve(input.output_path), lines.join('\n'));
+  const outputPath = assertSafeRepositoryPath(pathResolver.rootResolve(input.output_path), {
+    allowMissingLeaf: true,
+  });
+  safeMkdir(path.dirname(outputPath), { recursive: true });
+  safeWriteFile(outputPath, lines.join('\n'));
   return { written_to: input.output_path, sections: personaEntries.length };
 }
 
@@ -241,8 +277,8 @@ export function resolveHypothesisConflict(input: {
   golden_rule_priority: GoldenRulePriority[];
   written_to: string;
 } {
-  const src = readJSON<any>(input.source_path);
-  const hypotheses: any[] = Array.isArray(src.hypotheses) ? src.hypotheses : [];
+  const src = readJSON(input.source_path);
+  const hypotheses = readWisdomRecordArray(src, ['hypotheses'], 'source');
   const survivors = hypotheses.filter((h) => h.survived === true);
 
   const priority = resolveGoldenRulePriorityOrder(resolveVision(input.tenant_slug ?? null));
@@ -258,7 +294,7 @@ export function resolveHypothesisConflict(input: {
     : (survivors[0] ?? null);
 
   const result = {
-    winner_id: winner?.id ?? null,
+    winner_id: typeof winner?.id === 'string' ? winner.id : null,
     conflict,
     survivor_count: survivors.length,
     golden_rule_priority: priority,
@@ -281,7 +317,7 @@ export function adjustProposalAppend(input: {
   const original = readResolvedPath(input.proposal_path);
   const block = `\n\n---\n### Updates (${nowIso()})\n\n\`\`\`json\n${JSON.stringify(input.signals, null, 2)}\n\`\`\`\n`;
   const out = input.output_path || input.proposal_path;
-  const abs = pathResolver.rootResolve(out);
+  const abs = assertSafeRepositoryPath(pathResolver.rootResolve(out), { allowMissingLeaf: true });
   const dir = path.dirname(abs);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, original + block);

@@ -11,7 +11,7 @@ import {
   resetReasoningBackend,
   stubReasoningBackend,
 } from './reasoning-backend.js';
-import { resetVoiceEngineRegistryCache } from './voice-engine-registry.js';
+import { _resetVoiceEngineRegistryCacheForTests } from './voice-engine-registry.js';
 import { resetVoiceProfileRegistryCache } from './voice-profile-registry.js';
 import {
   ensureRealtimeVoiceConversationSession,
@@ -35,7 +35,7 @@ describe('realtime voice conversation', () => {
     delete process.env.KYBERION_VOICE_PROFILE_REGISTRY_PATH;
     delete process.env.KYBERION_VOICE_ENGINE_REGISTRY_PATH;
     resetVoiceProfileRegistryCache();
-    resetVoiceEngineRegistryCache();
+    _resetVoiceEngineRegistryCacheForTests();
     resetSpeechToTextBridge();
     resetReasoningBackend();
   });
@@ -95,6 +95,31 @@ describe('realtime voice conversation', () => {
 
     expect(generated.payload.delivery).toMatchObject({ format: 'wav' });
     expect(generated.artifactPath).toMatch(/\.wav$/u);
+  });
+
+  it('rejects traversal-shaped session ids and request tags before artifact generation', () => {
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: '../outside',
+        profileId: 'unused',
+        language: 'ja',
+        text: 'こんにちは。',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'allow_fallback',
+      })
+    ).toThrow(/single path segment/u);
+
+    expect(() =>
+      buildRealtimeVoiceGenerationPayload({
+        sessionId: 'rtc-safe',
+        requestTag: '../outside',
+        profileId: 'unused',
+        language: 'ja',
+        text: 'こんにちは。',
+        deliveryMode: 'artifact',
+        personalVoiceMode: 'allow_fallback',
+      })
+    ).toThrow(/requestTag must be a single path segment/u);
   });
 
   it('creates a session and runs a turn using active personal voice profile', async () => {

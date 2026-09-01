@@ -39,8 +39,17 @@ function color(code: keyof typeof ANSI, text: string): string {
   return `${ANSI[code]}${text}${ANSI.reset}`;
 }
 
+function isQuietProcess(): boolean {
+  return (
+    process.env.LOG_LEVEL === 'silent' ||
+    process.argv.includes('--quiet') ||
+    process.argv.includes('--json')
+  );
+}
+
 export const logger = {
   _log: (level: string, msg: string) => {
+    if (isQuietProcess() && level !== 'error') return;
     if (process.env.NODE_ENV === 'test' && level !== 'error') return;
     const ts = color('dim', new Date().toISOString());
     const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
@@ -62,6 +71,7 @@ export const logger = {
   warn: (msg: string) => logger._log('warn', msg),
   error: (msg: string) => logger._log('error', msg),
   success: (msg: string) => {
+    if (isQuietProcess()) return;
     const ts = color('dim', new Date().toISOString());
     const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
     console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);

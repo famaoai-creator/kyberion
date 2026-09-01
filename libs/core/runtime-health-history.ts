@@ -1,8 +1,14 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 
 /**
  * OP-04: durable RSS / restart history. The degradation watch could only
@@ -32,7 +38,9 @@ const MAX_LINES = 5000;
 const KEEP_LINES = 2500;
 
 function historyPath(): string {
-  return pathResolver.rootResolve(HISTORY_RELATIVE);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(HISTORY_RELATIVE), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function recordRuntimeHealthSample(input: {
@@ -78,20 +86,17 @@ export function loadRuntimeHealthSamples(
 ): RuntimeHealthSample[] {
   const filePath = historyPath();
   if (!safeExistsSync(filePath)) return [];
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   const since = now - windowMs;
-  const samples: RuntimeHealthSample[] = [];
-  for (const line of raw.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as RuntimeHealthSample;
-      const at = Date.parse(parsed.timestamp || '');
-      if (Number.isFinite(at) && at >= since) samples.push(parsed);
-    } catch {
-      /* skip malformed lines */
-    }
-  }
-  return samples;
+  return readJsonLines<RuntimeHealthSample | null>(filePath, {
+    onMalformed: 'skip',
+    map: (value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as RuntimeHealthSample)
+        : null,
+  }).filter((sample): sample is RuntimeHealthSample => {
+    const at = Date.parse(sample?.timestamp || '');
+    return Number.isFinite(at) && at >= since;
+  });
 }
 
 export interface RuntimeTrendThresholds {

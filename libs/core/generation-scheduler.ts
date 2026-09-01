@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
@@ -93,7 +94,9 @@ export function findGenerationSchedulePath(scheduleId: string, scope?: EventScop
 
 function resolveRootRelativePath(logicalPath?: string | null): string | null {
   if (!logicalPath) return null;
-  return pathResolver.rootResolve(logicalPath);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
 }
 
 function scheduleScope(schedule: GenerationSchedule): EventScope {
@@ -107,8 +110,11 @@ function scheduleScope(schedule: GenerationSchedule): EventScope {
 
 function tenantArtifactRoot(scope: EventScope, scheduleId: string): string | null {
   if (!scope.tenant_slug) return null;
-  return pathResolver.rootResolve(
-    `${GENERATION_ARTIFACT_ROOT}/tenants/${scope.tenant_slug}/${scheduleId}`
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      `${GENERATION_ARTIFACT_ROOT}/tenants/${scope.tenant_slug}/${scheduleId}`
+    ),
+    { allowMissingLeaf: true }
   );
 }
 

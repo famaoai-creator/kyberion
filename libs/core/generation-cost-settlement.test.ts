@@ -94,6 +94,21 @@ describe('generation cost settlement', () => {
     expect(settled.actual_cost_usd).toBe(0.2);
     expect(collectorEntries()).toHaveLength(1);
   });
+
+  it('rejects an external settlement root before writing provider cost', () => {
+    expect(() =>
+      settleGenerationProviderCost(
+        {
+          job_id: 'generation-job-external',
+          action: 'generate_video',
+          status: 'succeeded',
+          scope: tenantScope,
+          result: { actual_cost_usd: 1 },
+        },
+        { rootDir: '/tmp' }
+      )
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });
 
 function collectorEntries() {

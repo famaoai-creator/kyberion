@@ -1,6 +1,7 @@
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -137,17 +138,31 @@ const BUILT_IN_CATALOG: VideoMotionCatalog = {
 };
 
 let cachedCatalog: VideoMotionCatalog | null = null;
+const MOTION_CATALOG_PATH = pathResolver.knowledge(
+  'public/design-patterns/media-templates/video-motion-patterns.json'
+);
+const MOTION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/video-motion-patterns.schema.json'
+);
+const motionCatalog: GovernedCatalog<VideoMotionCatalog> = defineCatalog<VideoMotionCatalog>({
+  id: 'video-motion-patterns',
+  path: MOTION_CATALOG_PATH,
+  schema: MOTION_SCHEMA_PATH,
+  fallback: BUILT_IN_CATALOG,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    logger.warn(
+      `motion catalog unreadable, using built-in default: ${error instanceof Error ? error.message : String(error)}`
+    );
+  },
+});
 
 /** Load the curated motion catalog; a missing/broken file degrades to built-ins. */
 export function loadVideoMotionCatalog(): VideoMotionCatalog {
   if (cachedCatalog) return cachedCatalog;
   try {
-    const catalogPath = pathResolver.knowledge(
-      'public/design-patterns/media-templates/video-motion-patterns.json'
-    );
-    if (safeExistsSync(catalogPath)) {
-      const parsed = loadJson<{ patterns?: unknown }>(catalogPath);
-      const catalog = coerceCatalog(parsed);
+    if (safeExistsSync(MOTION_CATALOG_PATH)) {
+      const catalog = coerceCatalog(motionCatalog.load());
       if (catalog) {
         cachedCatalog = catalog;
         return cachedCatalog;
@@ -158,10 +173,6 @@ export function loadVideoMotionCatalog(): VideoMotionCatalog {
   }
   cachedCatalog = BUILT_IN_CATALOG;
   return cachedCatalog;
-}
-
-export function resetVideoMotionCatalogCache(): void {
-  cachedCatalog = null;
 }
 
 /** Drop `_meta` documentation keys and reject a catalog missing either layer. */

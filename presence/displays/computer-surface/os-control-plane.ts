@@ -1,12 +1,12 @@
+import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
 import {
-  CloudflareOsControlPlane,
   CloudflareOsReadOnlySurface,
   CloudflareOsSurface,
-  auditChain,
   type CloudflareOsSurfaceAccess,
   type CloudflareOsSurfaceSnapshot,
-  isValidTenantSlug,
-} from '@agent/core';
+} from '@agent/core/cloudflare-os-surface';
+import { auditChain } from '@agent/core/audit-chain';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
 
 export function getComputerSurfaceAccess(
   env: NodeJS.ProcessEnv = process.env

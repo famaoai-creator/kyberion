@@ -1,6 +1,10 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { composeAgentActivityBoard } from './agent-activity-board.js';
+import { composeAgentActivityBoard, readMissionTenantSlug } from './agent-activity-board.js';
 import type { WorkItem } from './work-coordination.js';
+import { pathResolver } from './path-resolver.js';
+import { safeWriteFile } from './secure-io.js';
 
 function item(partial: Partial<WorkItem>): WorkItem {
   return {
@@ -109,5 +113,27 @@ describe('agent-activity-board', () => {
       mission_id: 'MSN-EXPLICIT',
       tenant_slug: 'aurora',
     });
+  });
+
+  it('does not read tenant identity through a symlinked mission directory', () => {
+    const missionId = `ACTIVITY-SYMLINK-${process.pid}`;
+    const linkedMissionPath = pathResolver.missionDir(missionId, 'public');
+    const boundaryRoot = pathResolver.sharedTmp('agent-activity-board-boundary');
+    const targetMissionPath = path.join(boundaryRoot, 'target-mission');
+    fs.mkdirSync(targetMissionPath, { recursive: true });
+    safeWriteFile(
+      path.join(targetMissionPath, 'mission-state.json'),
+      JSON.stringify({ tenant_slug: 'outside-tenant' })
+    );
+    fs.mkdirSync(path.dirname(linkedMissionPath), { recursive: true });
+    fs.symlinkSync(targetMissionPath, linkedMissionPath, 'dir');
+
+    try {
+      expect(readMissionTenantSlug(missionId)).toBeUndefined();
+      expect(fs.existsSync(path.join(targetMissionPath, 'mission-state.json'))).toBe(true);
+    } finally {
+      fs.rmSync(linkedMissionPath, { recursive: true, force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
   });
 });

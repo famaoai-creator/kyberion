@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   pathResolver,
@@ -7,7 +7,7 @@ import {
   safeReadFile,
   safeRmSync,
 } from '@agent/core';
-import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
+import { bootstrapCompany, listCompanyVerticals, main } from './company_bootstrap.js';
 
 const tmpRoot = pathResolver.rootResolve('active/shared/tmp/company-bootstrap-test');
 
@@ -16,6 +16,13 @@ afterEach(() => {
 });
 
 describe('company bootstrap', () => {
+  it('emits the vertical list through the supplied harness printer', () => {
+    const print = vi.fn();
+
+    expect(main(['--list'], print)).toBe(0);
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('Available company verticals:'));
+  });
+
   it('lists the shipped verticals', () => {
     const verticals = listCompanyVerticals();
     expect(verticals).toContain('saas-product-company');

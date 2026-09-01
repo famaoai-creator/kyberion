@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
 
 export interface ServicePresetRecord {
@@ -25,6 +25,9 @@ export interface ServicePresetsCatalog {
 }
 
 const DEFAULT_SERVICE_PRESETS_DIR = pathResolver.knowledge('product/orchestration/service-presets');
+const SERVICE_PRESETS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-presets.schema.json'
+);
 
 let cachedServicePresetsDir: string | null = null;
 let cachedServicePresets: ServicePresetsCatalog | null = null;
@@ -37,14 +40,22 @@ function getServicePresetsDir(): string {
 
 function loadPresetFromPath(presetPath: string): ServicePresetRecord {
   try {
-    return readJson<ServicePresetRecord>(pathResolver.rootResolve(presetPath));
+    return defineCatalog<ServicePresetRecord>({
+      id: 'service-preset',
+      path: assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
+        allowMissingLeaf: true,
+      }),
+      schema: SERVICE_PRESETS_SCHEMA_PATH,
+    }).load();
   } catch (error: any) {
     throw new Error(`Failed to load service preset at ${presetPath}: ${error?.message || error}`);
   }
 }
 
 function loadServicePresetsDirectory(catalogDir: string): ServicePresetsCatalog {
-  const dir = pathResolver.rootResolve(catalogDir);
+  const dir = assertSafeRepositoryPath(pathResolver.rootResolve(catalogDir), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) {
     throw new Error(`Service presets directory not found: ${dir}`);
   }
@@ -58,7 +69,7 @@ function loadServicePresetsDirectory(catalogDir: string): ServicePresetsCatalog 
 
   const services: Record<string, ServicePresetRecord> = {};
   for (const file of files) {
-    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
     if (!safeStat(filePath).isFile()) continue;
 
     const parsed = loadPresetFromPath(filePath);
@@ -107,8 +118,11 @@ export function loadServicePresetsCatalog(): ServicePresetsCatalog {
     return cachedServicePresets;
   }
 
-  if (safeExistsSync(pathResolver.rootResolve(catalogDir))) {
-    const dirEntries = safeReaddir(pathResolver.rootResolve(catalogDir));
+  const resolvedCatalogDir = assertSafeRepositoryPath(pathResolver.rootResolve(catalogDir), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(resolvedCatalogDir)) {
+    const dirEntries = safeReaddir(resolvedCatalogDir);
     const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
     if (hasJsonFiles) {
       try {
@@ -170,28 +184,30 @@ export function resolveServicePresetPath(
   presetPathHint?: string
 ): string | null {
   if (presetPathHint) {
-    const hintedPath = pathResolver.rootResolve(presetPathHint);
+    const hintedPath = assertSafeRepositoryPath(pathResolver.rootResolve(presetPathHint), {
+      allowMissingLeaf: true,
+    });
     if (safeExistsSync(hintedPath)) return presetPathHint;
   }
 
   const catalogDir = getServicePresetsDir();
   const dirPath = pathResolver.rootResolve(path.join(catalogDir, `${serviceId}.json`));
-  if (safeExistsSync(dirPath)) {
+  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeDirPath)) {
     return path.join(catalogDir, `${serviceId}.json`);
   }
 
   const endpointPresetPath = loadServiceEndpointsCatalog().services?.[serviceId]?.preset_path;
   if (
     typeof endpointPresetPath === 'string' &&
-    safeExistsSync(pathResolver.rootResolve(endpointPresetPath))
+    safeExistsSync(
+      assertSafeRepositoryPath(pathResolver.rootResolve(endpointPresetPath), {
+        allowMissingLeaf: true,
+      })
+    )
   ) {
     return endpointPresetPath;
   }
 
   return null;
-}
-
-export function resetServicePresetsCache(): void {
-  cachedServicePresetsDir = null;
-  cachedServicePresets = null;
 }

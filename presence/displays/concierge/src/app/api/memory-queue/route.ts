@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
   listMemoryPromotionCandidates,
-  withExecutionContext,
   type MemoryCandidate,
-} from '@agent/core';
+} from '@agent/core/memory-promotion-queue';
+import { withExecutionContext } from '@agent/core/authority';
+import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,9 @@ function toItem(candidate: MemoryCandidate): MemoryQueueItem {
   };
 }
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const candidates = withExecutionContext('sovereign_concierge', () =>
       listMemoryPromotionCandidates()
@@ -52,12 +55,19 @@ export function GET() {
       // Only undecided candidates are the operator's business here; approved/
       // rejected/promoted rows stay in the ledger for the CLI and audits.
       .filter((candidate) => candidate.status === 'queued')
+      .filter(
+        (candidate) =>
+          resolved.context.tierAccess.includes(candidate.sensitivity_tier) &&
+          (resolved.context.tenantSlugs === 'all'
+            ? true
+            : Boolean(
+                candidate.scope?.tenant_slug &&
+                resolved.context.tenantSlugs.includes(candidate.scope.tenant_slug)
+              ))
+      )
       .sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)));
     return NextResponse.json({ ok: true, candidates: candidates.map(toItem) });
   } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return conciergeErrorResponse(error);
   }
 }

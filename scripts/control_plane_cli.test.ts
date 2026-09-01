@@ -1,5 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildChronosNextActions, summarizeMissionSeedAssessment } from './control_plane_cli.js';
+import {
+  buildChronosNextActions,
+  parseSurfaceRuntimeCommandOutput,
+  summarizeMissionSeedAssessment,
+} from './control_plane_cli.js';
+
+describe('surface runtime command response parser', () => {
+  it('accepts the fields used by the operator summary', () => {
+    expect(
+      parseSurfaceRuntimeCommandOutput({ status: 'started', id: 'presence', port: 3317 })
+    ).toEqual({ status: 'started', id: 'presence', port: 3317 });
+  });
+
+  it.each([null, [], 'started', { status: 42 }, { port: Number.NaN }])(
+    'rejects malformed command output: %j',
+    (value) => {
+      expect(() => parseSurfaceRuntimeCommandOutput(value)).toThrow(
+        /invalid_surface_runtime_output/
+      );
+    }
+  );
+});
 
 describe('control_plane_cli next actions', () => {
   it('prioritizes flagged mission seeds before promotable seeds', () => {

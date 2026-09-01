@@ -16,15 +16,17 @@
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeStat,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -49,21 +51,29 @@ interface RunnerOptions {
 }
 
 function resolveMigrationDir(input: string | undefined): string {
-  if (!input || input.trim().length === 0) return pathResolver.rootResolve('migration');
-  return path.isAbsolute(input) ? input : pathResolver.rootResolve(input);
+  if (!input || input.trim().length === 0) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve('migration'), {
+      allowMissingLeaf: true,
+    });
+  }
+  return assertSafeRepositoryPath(pathResolver.resolve(input), { allowMissingLeaf: true });
 }
 
 function resolveStatePath(input: string | undefined): string {
-  if (!input || input.trim().length === 0)
-    return pathResolver.shared('runtime/migrations.applied.json');
-  return path.isAbsolute(input) ? input : pathResolver.rootResolve(input);
+  if (!input || input.trim().length === 0) {
+    return assertSafeRepositoryPath(pathResolver.shared('runtime/migrations.applied.json'), {
+      allowMissingLeaf: true,
+    });
+  }
+  return assertSafeRepositoryPath(pathResolver.resolve(input), { allowMissingLeaf: true });
 }
 
 function listMigrationFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir)) return [];
   const entries: string[] = [];
-  for (const name of safeReaddir(dir)) {
-    const filePath = path.join(dir, name);
+  for (const name of safeReaddir(safeDir)) {
+    const filePath = assertSafeRepositoryPath(path.join(safeDir, name));
     const stat = safeStat(filePath);
     if (!stat.isFile()) continue;
     if (!/\.(ts|js|mjs|cjs)$/.test(name)) continue;
@@ -75,6 +85,12 @@ function listMigrationFiles(dir: string): string[] {
 
 function readState(statePath: string): MigrationState {
   if (!safeExistsSync(statePath)) return { applied: [] };
+  if (!safeLstat(statePath).isFile()) {
+    throw new Error(`Migration state must be a regular file: ${statePath}`);
+  }
+  if (!safeLstat(statePath).isFile()) {
+    throw new Error(`Migration state must be a regular file: ${statePath}`);
+  }
   try {
     const parsed = readJson<{ applied?: unknown }>(statePath);
     if (Array.isArray(parsed.applied)) {
@@ -133,8 +149,10 @@ async function rollbackMigration(filePath: string, dryRun: boolean): Promise<Mig
 export async function runMigrations(
   opts: RunnerOptions
 ): Promise<{ applied: string[]; pending: string[] }> {
-  const files = listMigrationFiles(opts.dir);
-  const state = readState(opts.statePath);
+  const migrationDir = assertSafeRepositoryPath(opts.dir, { allowMissingLeaf: true });
+  const statePath = assertSafeRepositoryPath(opts.statePath, { allowMissingLeaf: true });
+  const files = listMigrationFiles(migrationDir);
+  const state = readState(statePath);
   const applied = new Set(state.applied);
   const pendingFiles = files.filter((file) => !applied.has(migrationIdFromFile(file)));
   const pending = pendingFiles.map(migrationIdFromFile);
@@ -157,13 +175,13 @@ export async function runMigrations(
     const targetFile = files.find((file) => migrationIdFromFile(file) === latestAppliedId);
     if (!targetFile) {
       throw new Error(
-        `Cannot rollback ${latestAppliedId}: migration script not found in ${opts.dir}`
+        `Cannot rollback ${latestAppliedId}: migration script not found in ${migrationDir}`
       );
     }
     await rollbackMigration(targetFile, opts.dryRun);
     if (!opts.dryRun) {
       state.applied = state.applied.filter((id) => id !== latestAppliedId);
-      writeState(opts.statePath, state);
+      writeState(statePath, state);
     }
     return { applied: state.applied, pending };
   }
@@ -177,7 +195,7 @@ export async function runMigrations(
     const migration = await runMigration(file, opts.dryRun);
     if (!opts.dryRun) {
       state.applied.push(migration.id);
-      writeState(opts.statePath, state);
+      writeState(statePath, state);
     }
   }
 
@@ -185,8 +203,11 @@ export async function runMigrations(
   return { applied: state.applied, pending };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
+  const argv = await createStandardYargs(['node', 'run_migrations', ...args])
     .option('dir', { type: 'string' })
     .option('state', { type: 'string' })
     .option('dry-run', { type: 'boolean', default: false })
@@ -205,6 +226,7 @@ async function main(): Promise<void> {
   if (result.pending.length > 0 && !argv['dry-run'] && !argv.rollback && !argv.list) {
     logger.info(`Applied ${result.pending.length} migration(s).`);
   }
+  print(result);
 }
 
 if (
@@ -212,10 +234,10 @@ if (
   isDirectScript(import.meta.url, 'run_migrations.js')
 ) {
   void defineScript({
-    name: 'migrations:run',
-    flags: [],
-    run() {
-      return main();
+    name: 'migration',
+    flags: ['json', 'dry-run', 'quiet'],
+    run({ argv, print }) {
+      return main(argv, print);
     },
   })();
 }

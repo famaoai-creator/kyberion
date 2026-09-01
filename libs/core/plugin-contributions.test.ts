@@ -180,7 +180,18 @@ describe('governed plugin contributions', () => {
           evidence: 'live structured contract',
         },
         { name: 'abort' as const, status: 'verified' as const, evidence: 'live abort' },
+        { name: 'failover' as const, status: 'verified' as const, evidence: 'live failover' },
+        {
+          name: 'egress_scope' as const,
+          status: 'verified' as const,
+          evidence: 'live egress scope',
+        },
         { name: 'usage' as const, status: 'declared' as const, evidence: 'adapter boundary' },
+        {
+          name: 'sandbox_enforcement' as const,
+          status: 'declared' as const,
+          evidence: 'API provider has no local process sandbox.',
+        },
       ],
     };
     const activation = await activatePluginContributions(
@@ -211,6 +222,47 @@ describe('governed plugin contributions', () => {
         {
           registerKyberionContributions: (api) =>
             api.registerReasoningProvider('anthropic', factory, failed),
+        }
+      )
+    ).rejects.toThrow('[REASONING_PROVIDER_CONFORMANCE_FAILED] anthropic');
+  });
+
+  it('rejects a receipt that hides a failed non-required check behind passed=true', async () => {
+    const factory = () => null;
+    const failedUsage = {
+      version: '1.0.0' as const,
+      backend: 'anthropic',
+      live: true,
+      passed: true,
+      checks: [
+        { name: 'prompt' as const, status: 'verified' as const, evidence: 'live prompt' },
+        {
+          name: 'structured_output' as const,
+          status: 'verified' as const,
+          evidence: 'live structured contract',
+        },
+        { name: 'abort' as const, status: 'verified' as const, evidence: 'live abort' },
+        { name: 'failover' as const, status: 'verified' as const, evidence: 'live failover' },
+        {
+          name: 'egress_scope' as const,
+          status: 'verified' as const,
+          evidence: 'live egress scope',
+        },
+        { name: 'usage' as const, status: 'failed' as const, evidence: 'usage unavailable' },
+        {
+          name: 'sandbox_enforcement' as const,
+          status: 'declared' as const,
+          evidence: 'API provider has no local process sandbox.',
+        },
+      ],
+    };
+    await expect(
+      activatePluginContributions(
+        { providers: ['anthropic'] },
+        { pluginId: 'failed-usage-provider', sourcePath: '/managed/provider', trust: 'official' },
+        {
+          registerKyberionContributions: (api) =>
+            api.registerReasoningProvider('anthropic', factory, failedUsage),
         }
       )
     ).rejects.toThrow('[REASONING_PROVIDER_CONFORMANCE_FAILED] anthropic');

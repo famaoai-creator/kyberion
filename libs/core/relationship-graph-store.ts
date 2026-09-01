@@ -13,12 +13,13 @@
 
 import * as path from 'node:path';
 import { rootResolve } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 const RELATIONSHIPS_ROOT = 'knowledge/confidential/relationships';
 const HISTORY_MAX = 20;
 const ALLOWED_SOURCES = ['presence-actuator', 'voice-actuator', 'manual'] as const;
-export type RelationshipSource = typeof ALLOWED_SOURCES[number];
+export type RelationshipSource = (typeof ALLOWED_SOURCES)[number];
 
 export interface RelationshipIdentity {
   name: string;
@@ -77,7 +78,10 @@ export interface SuggestFieldUpdateParams {
 function nodePath(org: string, personSlug: string): string {
   const safeOrg = sanitizeSegment(org);
   const safeSlug = sanitizeSegment(personSlug);
-  return rootResolve(path.join(RELATIONSHIPS_ROOT, safeOrg, `${safeSlug}.json`));
+  return assertSafeRepositoryPath(
+    rootResolve(path.join(RELATIONSHIPS_ROOT, safeOrg, `${safeSlug}.json`)),
+    { allowMissingLeaf: true }
+  );
 }
 
 function sanitizeSegment(value: string): string {
@@ -92,7 +96,7 @@ function sanitizeSegment(value: string): string {
 function assertSource(source: string): asserts source is RelationshipSource {
   if (!ALLOWED_SOURCES.includes(source as RelationshipSource)) {
     throw new Error(
-      `[relationship-graph] unsupported source "${source}"; allowed: ${ALLOWED_SOURCES.join(', ')}`,
+      `[relationship-graph] unsupported source "${source}"; allowed: ${ALLOWED_SOURCES.join(', ')}`
     );
   }
 }
@@ -100,8 +104,7 @@ function assertSource(source: string): asserts source is RelationshipSource {
 export function readNode(org: string, personSlug: string): RelationshipNode | null {
   const file = nodePath(org, personSlug);
   if (!safeExistsSync(file)) return null;
-  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
-  return JSON.parse(raw) as RelationshipNode;
+  return readJson<RelationshipNode>(file);
 }
 
 function writeNode(org: string, personSlug: string, node: RelationshipNode): void {
@@ -153,7 +156,7 @@ export function suggestFieldUpdate(params: SuggestFieldUpdateParams): Relationsh
   const existing = readNode(params.org, params.personSlug);
   if (!existing) {
     throw new Error(
-      `[relationship-graph] cannot suggest update — node missing for ${params.org}/${params.personSlug}`,
+      `[relationship-graph] cannot suggest update — node missing for ${params.org}/${params.personSlug}`
     );
   }
   const suggestion: PendingSuggestion = {

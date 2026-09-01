@@ -1,7 +1,8 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, safeReadFile } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { safeReadFile } from '@agent/core/secure-io';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -12,6 +13,7 @@ import {
   DEFAULT_CHRONOS_WEB_DESIGN_SYSTEM_PACK,
   DEFAULT_CHRONOS_WEB_THEME_PACK,
   isDarkWebTheme,
+  isWebThemePack,
   webThemePackToCssVars,
 } from './web-design-system.js';
 
@@ -60,6 +62,23 @@ describe('web design system pack', () => {
 
     expect(cssVars['--kb-accent']).toBe('#00F2FF');
     expect(cssVars['--kb-font-sans']).toBe("Inter, 'Noto Sans JP', sans-serif");
+  });
+
+  it('rejects malformed theme packs before css projection', () => {
+    expect(
+      isWebThemePack({
+        kind: 'web-theme-pack',
+        version: '1.0.0',
+        theme_id: 'test',
+        brand_name: 'Test',
+        tenant_slug: 'test',
+        design_system_id: 'test',
+        theme: { name: 'Test', colors: {}, fonts: {} },
+      })
+    ).toBe(false);
+    expect(isWebThemePack({ theme: null })).toBe(false);
+    expect(isWebThemePack(['theme'])).toBe(false);
+    expect(isWebThemePack(DEFAULT_CHRONOS_WEB_THEME_PACK)).toBe(true);
   });
 
   it('classifies dark and light theme packs by ink-vs-page luminance', () => {

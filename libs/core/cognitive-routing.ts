@@ -333,9 +333,3 @@ export function loadCognitiveRoutingSchema(): unknown {
   cachedSchemaRaw = raw;
   return JSON.parse(raw);
 }
-
-export function resetCognitiveRoutingCache(): void {
-  validateFn = null;
-  cachedSchemaPath = null;
-  cachedSchemaRaw = null;
-}

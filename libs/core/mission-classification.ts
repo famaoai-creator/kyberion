@@ -1,7 +1,6 @@
 import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 
 export const MISSION_CLASS_VALUES = [
@@ -101,7 +100,6 @@ type ClassificationPolicy = {
   }>;
 };
 
-const ajv = createAjv();
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-classification-policy.schema.json'
 );
@@ -110,18 +108,17 @@ const RESULT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-classification.schema.json'
 );
 
-let policyValidateFn: ValidateFunction | null = null;
-let resultValidateFn: ValidateFunction | null = null;
+const classificationPolicyCatalog = defineCatalog<ClassificationPolicy>({
+  id: 'mission-classification-policy',
+  path: POLICY_PATH,
+  schema: POLICY_SCHEMA_PATH,
+});
 
-function ensurePolicyValidator(): ValidateFunction {
-  if (policyValidateFn) return policyValidateFn;
-  policyValidateFn = compileSchemaFromPath(ajv, POLICY_SCHEMA_PATH);
-  return policyValidateFn;
-}
+let resultValidateFn: ValidateFunction | null = null;
 
 function ensureResultValidator(): ValidateFunction {
   if (resultValidateFn) return resultValidateFn;
-  resultValidateFn = compileSchemaFromPath(ajv, RESULT_SCHEMA_PATH);
+  resultValidateFn = compileSchema(RESULT_SCHEMA_PATH);
   return resultValidateFn;
 }
 
@@ -215,15 +212,11 @@ function stageRuleMatches(
 }
 
 function loadPolicy(): ClassificationPolicy {
-  const parsed = readJson<ClassificationPolicy>(POLICY_PATH);
-  const validate = ensurePolicyValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid mission-classification-policy: ${errors}`);
-  }
-  return parsed;
+  return classificationPolicyCatalog.load();
+}
+
+export function loadMissionClassificationPolicy(): ClassificationPolicy {
+  return loadPolicy();
 }
 
 function coerceInput(input: MissionClassificationInput) {

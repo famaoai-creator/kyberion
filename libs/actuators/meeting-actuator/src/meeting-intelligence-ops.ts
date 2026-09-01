@@ -1,16 +1,8 @@
 import {
   appendReminder,
-  delegateBestOf,
-  enqueueSlackOutboxMessage,
-  getReasoningBackend,
-  getVoiceBridge,
   listActionItems,
   listOperatorSelfPending,
   listOthersPending,
-  listSlackOutboxMessages,
-  loadMeetingFacilitatorPolicy,
-  logger,
-  matchRestrictedAction,
   nextActionItemId,
   recordActionItem,
   updateActionItemStatus,
@@ -20,17 +12,33 @@ import {
   type ActionItemModality,
   type ActionItemProvenance,
   type ActionItemReviewState,
-  type MeetingFacilitatorPolicy,
-} from '@agent/core';
+} from '@agent/core/action-item-store';
+import {
+  enqueueSlackOutboxMessage,
+  listSlackOutboxMessages,
+} from '@agent/core/surface-coordination-store';
+import { delegateBestOf, getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getVoiceBridge } from '@agent/core/voice-bridge';
+import { loadMeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
+import { logger } from '@agent/core/core';
+import { matchRestrictedAction } from '@agent/core/restricted-action-policy';
 import { listMissionSummaries } from '@agent/core/mission-read-model';
-import { safeExistsSync, safeMkdir, safeWriteFile, pathResolver } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 import { z } from 'zod';
-import { delegateWorkItemWithReasoningBackend, getWorkItem } from '@agent/core';
+import { getWorkItem } from '@agent/core/work-coordination';
+import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning-backend-execution-adapter';
 import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
 
 function writeJSON(rel: string, data: unknown): string {
-  const abs = pathResolver.rootResolve(rel);
+  const abs = assertSafeRepositoryPath(pathResolver.rootResolve(rel), { allowMissingLeaf: true });
   const dir = path.dirname(abs);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, JSON.stringify(data, null, 2));
@@ -151,6 +159,39 @@ function extractFirstJsonBlock(text: string): unknown {
   throw new Error('unbalanced JSON block in delegateTask response');
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseEnum<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === 'string' && allowed.includes(value as T) ? (value as T) : undefined;
+}
+
+export function parseMeetingModelObject(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('meeting model response must be a JSON object');
+  return value;
+}
+
+export function parseMeetingModelObjectArray(value: unknown): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) throw new Error('meeting model response must be a JSON array');
+  return value.map((entry, index) => {
+    try {
+      return parseMeetingModelObject(entry);
+    } catch {
+      throw new Error(`meeting model response item ${index} must be a JSON object`);
+    }
+  });
+}
+
+const ACTION_ITEM_ASSIGNEE_KINDS: readonly ActionItemAssigneeKind[] = [
+  'operator_self',
+  'team_member',
+  'external',
+  'unassigned',
+];
+const ACTION_ITEM_PRIORITIES = ['must', 'should', 'could', 'wont'] as const;
+const FACILITATION_ACTIONS = ['continue_listen', 'transition_topic', 'wrap_up', 'pause'] as const;
+
 export async function extractActionItemsOp(input: {
   mission_id: string;
   work_item_id?: string;
@@ -244,12 +285,9 @@ export async function extractActionItemsOp(input: {
     work_item_id: input.work_item_id,
     task_id: 'extract-action-items',
   });
-  let parsed: any[];
+  let parsed: Array<Record<string, unknown>>;
   try {
-    parsed = extractFirstJsonBlock(raw) as any[];
-    if (!Array.isArray(parsed)) {
-      throw new Error('expected array');
-    }
+    parsed = parseMeetingModelObjectArray(extractFirstJsonBlock(raw));
   } catch (err: any) {
     logger.warn(
       `[extract_action_items] parse failed: ${err?.message ?? err}; raw="${raw.slice(0, 200)}"`
@@ -283,10 +321,7 @@ export async function extractActionItemsOp(input: {
       String(entry.assignee_label ?? input.default_assignee_label ?? 'unassigned').trim() ||
       'unassigned';
     let kind: ActionItemAssigneeKind =
-      entry.assignee_kind &&
-      ['operator_self', 'team_member', 'external', 'unassigned'].includes(entry.assignee_kind)
-        ? (entry.assignee_kind as ActionItemAssigneeKind)
-        : 'unassigned';
+      parseEnum(entry.assignee_kind, ACTION_ITEM_ASSIGNEE_KINDS) || 'unassigned';
     if (kind === 'unassigned' && operatorTokens.has(assigneeLabel.toLowerCase())) {
       kind = 'operator_self';
     }
@@ -355,16 +390,16 @@ export async function extractActionItemsOp(input: {
       policy.restriction_rule_id = restrictedHit.id;
     }
     if (managerHandle) policy.manager_handle = managerHandle;
+    const priority = parseEnum(entry.priority, ACTION_ITEM_PRIORITIES);
+    const dueAt = typeof entry.due_at_iso === 'string' ? entry.due_at_iso : undefined;
     const recorded = recordActionItem({
       item_id: itemId,
       mission_id: input.mission_id,
       title: title.slice(0, 120),
       ...(summaryParts.length ? { summary: summaryParts.join('\n') } : {}),
       assignee,
-      ...(entry.priority && ['must', 'should', 'could', 'wont'].includes(entry.priority)
-        ? { priority: entry.priority }
-        : {}),
-      ...(entry.due_at_iso ? { due_at: entry.due_at_iso } : {}),
+      ...(priority ? { priority } : {}),
+      ...(dueAt ? { due_at: dueAt } : {}),
       modality,
       review_state: reviewState,
       provenance,
@@ -435,14 +470,10 @@ export async function generateFacilitationScriptOp(input: {
       task_id: 'facilitation-script',
     });
     try {
-      const parsed = extractFirstJsonBlock(raw) as any;
+      const parsed = parseMeetingModelObject(extractFirstJsonBlock(raw));
       return {
         speech_text: typeof parsed.speech_text === 'string' ? parsed.speech_text : '',
-        next_action:
-          parsed.next_action &&
-          ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
-            ? parsed.next_action
-            : 'continue_listen',
+        next_action: parseEnum(parsed.next_action, FACILITATION_ACTIONS) || 'continue_listen',
       };
     } catch (parseErr: any) {
       logger.warn(`[generate_facilitation_script] parse failed: ${parseErr?.message ?? parseErr}`);
@@ -468,13 +499,9 @@ export async function generateFacilitationScriptOp(input: {
       task_id: 'facilitation-script',
     });
     try {
-      const parsed = extractFirstJsonBlock(raw) as any;
+      const parsed = parseMeetingModelObject(extractFirstJsonBlock(raw));
       const speech = typeof parsed.speech_text === 'string' ? parsed.speech_text : '';
-      const next =
-        parsed.next_action &&
-        ['continue_listen', 'transition_topic', 'wrap_up', 'pause'].includes(parsed.next_action)
-          ? parsed.next_action
-          : 'continue_listen';
+      const next = parseEnum(parsed.next_action, FACILITATION_ACTIONS) || 'continue_listen';
       return { speech_text: speech, next_action: next };
     } catch (parseErr: any) {
       logger.warn(`[generate_facilitation_script] parse failed: ${parseErr?.message ?? parseErr}`);
@@ -591,7 +618,7 @@ export async function executeSelfActionItemsOp(input: {
       });
       let summary = '';
       try {
-        const parsed = extractFirstJsonBlock(plan) as any;
+        const parsed = parseMeetingModelObject(extractFirstJsonBlock(plan));
         if (typeof parsed.completion_summary === 'string') summary = parsed.completion_summary;
         if (typeof parsed.plan === 'string') plan = parsed.plan;
       } catch {
@@ -833,7 +860,7 @@ export async function generateReminderMessageOp(input: {
   });
   let text = '';
   try {
-    const parsed = extractFirstJsonBlock(raw) as any;
+    const parsed = parseMeetingModelObject(extractFirstJsonBlock(raw));
     text = typeof parsed.text === 'string' ? parsed.text : '';
   } catch {
     // Fall back to a deterministic template if parse fails.
@@ -998,8 +1025,11 @@ export async function runActionItemReminderSweepOp(input?: {
   }
 
   safeWriteFile(
-    pathResolver.rootResolve(
-      input?.report_path ?? 'active/shared/tmp/action-item-reminders-report.json'
+    assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        input?.report_path ?? 'active/shared/tmp/action-item-reminders-report.json'
+      ),
+      { allowMissingLeaf: true }
     ),
     JSON.stringify(report, null, 2)
   );

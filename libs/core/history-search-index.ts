@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeExecResult,
   safeMkdir,
@@ -10,7 +11,9 @@ import {
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
+import { readJson, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
+import { validateTraceReplay } from './trace-schema.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -89,14 +92,28 @@ export interface MissionHistorySearchOptions extends Omit<HistorySearchOptions, 
 const DEFAULT_MAX_RESULTS = 20;
 const VALID_TIERS = new Set<HistorySearchTier>(['public', 'confidential', 'personal', 'product']);
 
+function safeHistoryDirectory(filePath: string): string | undefined {
+  try {
+    const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return safeExistsSync(resolved) ? resolved : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function safeHistoryFile(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath);
+  } catch {
+    return undefined;
+  }
+}
+
 /** Resolve an explicit tier marker from a runtime record; unknown is never public. */
 export function resolveHistoryTier(raw: unknown): HistorySearchTier | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const record = raw as Record<string, unknown>;
-  const metadata =
-    record.metadata && typeof record.metadata === 'object'
-      ? (record.metadata as Record<string, unknown>)
-      : undefined;
+  if (!isRecord(raw)) return undefined;
+  const record = raw;
+  const metadata = isRecord(record.metadata) ? record.metadata : undefined;
   const candidate =
     record.tier ??
     record.history_tier ??
@@ -120,7 +137,7 @@ function databasePath(): string {
   if (!absolute.startsWith(sharedRoot)) {
     throw new Error(`history search database must stay under active/shared (received ${absolute})`);
   }
-  return absolute;
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }
 
 function sqlLiteral(value: unknown): string {
@@ -295,9 +312,23 @@ function ensureFtsHealthy(): boolean {
             (SELECT count(*) FROM history_trigram) AS trigram_entries;`,
     true
   );
-  const row = JSON.parse(raw || '[]')[0] as
-    { entries: number; unicode_entries: number; trigram_entries: number } | undefined;
-  return Boolean(row && row.entries === row.unicode_entries && row.entries === row.trigram_entries);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || '[]') as unknown;
+  } catch {
+    return false;
+  }
+  if (!Array.isArray(parsed) || !isRecord(parsed[0])) return false;
+  const entries = finiteNumber(parsed[0].entries);
+  const unicodeEntries = finiteNumber(parsed[0].unicode_entries);
+  const trigramEntries = finiteNumber(parsed[0].trigram_entries);
+  return Boolean(
+    entries !== undefined &&
+    unicodeEntries !== undefined &&
+    trigramEntries !== undefined &&
+    entries === unicodeEntries &&
+    entries === trigramEntries
+  );
 }
 
 function repairFts(): void {
@@ -328,16 +359,114 @@ interface SqlSearchRow {
   entry_id: string;
   source_type: HistoryIndexEntry['sourceType'];
   source_id: string;
-  session_id: string;
-  lineage_id: string;
+  session_id?: string;
+  lineage_id?: string;
   timestamp: string;
-  role: string;
+  role?: string;
   content: string;
   tier: HistorySearchTier;
   scheduled: number;
   subagent: number;
   snippet: string;
   rank: number;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return value === undefined || value === null
+    ? undefined
+    : typeof value === 'string'
+      ? value
+      : undefined;
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function normalizeSqlSearchRow(value: unknown): SqlSearchRow | undefined {
+  if (!isRecord(value)) return undefined;
+  const rowid = finiteNumber(value.rowid);
+  const entryId = optionalString(value.entry_id);
+  const sourceType = optionalString(value.source_type);
+  const sourceId = optionalString(value.source_id);
+  const timestamp = optionalString(value.timestamp);
+  const content = optionalString(value.content);
+  const tier = optionalString(value.tier);
+  const scheduled = finiteNumber(value.scheduled);
+  const subagent = finiteNumber(value.subagent);
+  const rank = finiteNumber(value.rank);
+  if (
+    rowid === undefined ||
+    !Number.isInteger(rowid) ||
+    !entryId ||
+    !sourceType ||
+    !['conversation', 'mission', 'trace', 'channel'].includes(sourceType) ||
+    !sourceId ||
+    !timestamp ||
+    !content ||
+    !tier ||
+    !VALID_TIERS.has(tier as HistorySearchTier) ||
+    (scheduled !== 0 && scheduled !== 1) ||
+    (subagent !== 0 && subagent !== 1) ||
+    rank === undefined
+  ) {
+    return undefined;
+  }
+  const snippet = optionalString(value.snippet);
+  return {
+    rowid,
+    entry_id: entryId,
+    source_type: sourceType as HistoryIndexEntry['sourceType'],
+    source_id: sourceId,
+    ...(optionalString(value.session_id) ? { session_id: optionalString(value.session_id) } : {}),
+    ...(optionalString(value.lineage_id) ? { lineage_id: optionalString(value.lineage_id) } : {}),
+    timestamp,
+    ...(optionalString(value.role) ? { role: optionalString(value.role) } : {}),
+    content,
+    tier: tier as HistorySearchTier,
+    scheduled,
+    subagent,
+    snippet: snippet || content,
+    rank,
+  };
+}
+
+function parseSqlSearchRows(raw: string): SqlSearchRow[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || '[]') as unknown;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((value) => {
+    const row = normalizeSqlSearchRow(value);
+    return row ? [row] : [];
+  });
+}
+
+function parseSqlContent(raw: string): string | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || '[]') as unknown;
+  } catch {
+    return undefined;
+  }
+  if (!Array.isArray(parsed)) return undefined;
+  const first = parsed[0];
+  return isRecord(first) && typeof first.content === 'string' ? first.content : undefined;
+}
+
+function parseSqlCount(raw: string): number {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw || '[]') as unknown;
+  } catch {
+    return 0;
+  }
+  if (!Array.isArray(parsed) || !isRecord(parsed[0])) return 0;
+  const count = finiteNumber(parsed[0].count);
+  return count !== undefined && count >= 0 ? count : 0;
 }
 
 function queryFtsTable(
@@ -355,14 +484,14 @@ function queryFtsTable(
     FROM ${table} JOIN history_entries e ON e.rowid = ${table}.rowid
     WHERE ${table} MATCH ${sqlLiteral(query)} AND ${filters.join(' AND ')}
     ORDER BY rank LIMIT ${Math.max(100, (options.maxResults || DEFAULT_MAX_RESULTS) * 5)};`;
-  return JSON.parse(runSql(sql, true) || '[]') as SqlSearchRow[];
+  return parseSqlSearchRows(runSql(sql, true));
 }
 
 function queryBrowse(options: HistorySearchOptions, tiers: HistorySearchTier[]): SqlSearchRow[] {
   const filters = [tierClause(tiers), `e.subagent = ${options.includeSubagent ? 1 : 0}`];
   if (options.includeScheduled === false) filters.push('e.scheduled = 0');
   if (options.sessionId) filters.push(`e.session_id = ${sqlLiteral(options.sessionId)}`);
-  return JSON.parse(
+  return parseSqlSearchRows(
     runSql(
       `SELECT e.rowid, e.entry_id, e.source_type, e.source_id, e.session_id,
         e.lineage_id, e.timestamp, e.role, e.content, e.tier, e.scheduled, e.subagent,
@@ -370,8 +499,8 @@ function queryBrowse(options: HistorySearchOptions, tiers: HistorySearchTier[]):
        FROM history_entries e WHERE ${filters.join(' AND ')}
        ORDER BY e.timestamp DESC, e.rowid DESC LIMIT ${Math.max(100, (options.maxResults || DEFAULT_MAX_RESULTS) * 5)};`,
       true
-    ) || '[]'
-  ) as SqlSearchRow[];
+    )
+  );
 }
 
 function loadContext(
@@ -380,18 +509,18 @@ function loadContext(
 ): { before?: string; after?: string } {
   if (!row.session_id) return {};
   const where = `${tierClause(tiers)} AND e.subagent = 0 AND e.session_id = ${sqlLiteral(row.session_id)}`;
-  const before = JSON.parse(
+  const before = parseSqlContent(
     runSql(
       `SELECT e.content FROM history_entries e WHERE ${where} AND e.rowid < ${row.rowid} ORDER BY e.rowid DESC LIMIT 1;`,
       true
-    ) || '[]'
-  )[0]?.content as string | undefined;
-  const after = JSON.parse(
+    )
+  );
+  const after = parseSqlContent(
     runSql(
       `SELECT e.content FROM history_entries e WHERE ${where} AND e.rowid > ${row.rowid} ORDER BY e.rowid LIMIT 1;`,
       true
-    ) || '[]'
-  )[0]?.content as string | undefined;
+    )
+  );
   return { before, after };
 }
 
@@ -433,15 +562,15 @@ export function searchHistory(options: HistorySearchOptions = {}): HistorySearch
 
   let rows = collectRows();
   if (sanitized && rows.length === 0) {
-    const eligible = JSON.parse(
+    const eligible = parseSqlCount(
       runSql(
         `SELECT count(*) AS count FROM history_entries e WHERE ${tierClause(tiers)}
           AND e.subagent = ${options.includeSubagent ? 1 : 0}
           ${options.includeScheduled === false ? 'AND e.scheduled = 0' : ''};`,
         true
-      ) || '[]'
-    )[0]?.count;
-    if (Number(eligible) > 0) {
+      )
+    );
+    if (eligible > 0) {
       repairFts();
       rebuilt = true;
       rows = collectRows();
@@ -498,19 +627,27 @@ export function readHistorySearchDatabaseMetadata(): { exists: boolean; bytes?: 
   }
 }
 
-function readJsonLines(filePath: string): unknown[] {
-  if (!safeExistsSync(filePath)) return [];
-  return String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as unknown];
-      } catch {
-        return [];
-      }
-    });
+function readValidatedTraceLines(filePath: string): Record<string, unknown>[] {
+  const safePath = safeHistoryFile(filePath);
+  if (!safePath) return [];
+  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).flatMap((raw) => {
+    if (validateTraceReplay(raw, { strictUnknownSpans: true }).length > 0 || !isRecord(raw))
+      return [];
+    return [raw];
+  });
+}
+
+function readHistoryRecord(filePath: string): Record<string, unknown> | undefined {
+  try {
+    const value = readJson<unknown>(filePath);
+    return isRecord(value) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function recordItems(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
 }
 
 function normalizeMissionId(value: string): string {
@@ -528,21 +665,25 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
   if (!missionPath) {
     throw new Error(`[POLICY_VIOLATION] Mission not found: ${missionId}`);
   }
-  const pathMatch = missionPath.match(/[\\/](confidential|personal)[\\/]/iu);
+  let safeMissionPath: string;
+  try {
+    safeMissionPath = assertSafeRepositoryPath(missionPath);
+  } catch {
+    throw new Error(`[POLICY_VIOLATION] Mission path is unsafe: ${missionId}`);
+  }
+  const pathMatch = safeMissionPath.match(/[\\/](confidential|personal)[\\/]/iu);
   if (!pathMatch) {
     throw new Error(
       `[POLICY_VIOLATION] Governed private history search requires a confidential or personal mission: ${missionId}`
     );
   }
   const tier = pathMatch[1].toLowerCase() as GovernedHistoryTier;
-  const statePath = path.join(missionPath, 'mission-state.json');
+  const statePath = assertSafeRepositoryPath(path.join(safeMissionPath, 'mission-state.json'));
   if (!safeExistsSync(statePath)) {
     throw new Error(`[POLICY_VIOLATION] Mission state is missing: ${missionId}`);
   }
-  let state: Record<string, unknown>;
-  try {
-    state = readJson<Record<string, unknown>>(statePath);
-  } catch {
+  const state = readHistoryRecord(statePath);
+  if (!state) {
     throw new Error(`[POLICY_VIOLATION] Mission state is unreadable: ${missionId}`);
   }
   if (resolveHistoryTier(state) !== tier) {
@@ -550,7 +691,7 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
       `[POLICY_VIOLATION] Mission path/state tier mismatch for governed history search: ${missionId}`
     );
   }
-  return { missionId, tier, missionPath };
+  return { missionId, tier, missionPath: safeMissionPath };
 }
 
 function assertMissionHistoryAccess(scope: MissionHistorySearchScope): void {
@@ -563,12 +704,9 @@ function assertMissionHistoryAccess(scope: MissionHistorySearchScope): void {
 }
 
 function explicitMissionId(raw: unknown): string | undefined {
-  if (!raw || typeof raw !== 'object') return undefined;
-  const record = raw as Record<string, unknown>;
-  const metadata =
-    record.metadata && typeof record.metadata === 'object'
-      ? (record.metadata as Record<string, unknown>)
-      : undefined;
+  if (!isRecord(raw)) return undefined;
+  const record = raw;
+  const metadata = isRecord(record.metadata) ? record.metadata : undefined;
   const candidate =
     record.mission_id ??
     record.missionId ??
@@ -585,12 +723,13 @@ function matchesMission(raw: unknown, missionId: string): boolean {
 
 function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryIndexEntry[] {
   const entries: HistoryIndexEntry[] = [];
-  const statePath = path.join(scope.missionPath, 'mission-state.json');
-  const state = readJson<Record<string, unknown>>(statePath);
-  const history = Array.isArray(state.history) ? state.history : [];
-  history.forEach((raw, index) => {
-    const item = raw as Record<string, unknown>;
-    const content = [item.event, item.note].filter(Boolean).join(': ');
+  const statePath = assertSafeRepositoryPath(path.join(scope.missionPath, 'mission-state.json'));
+  const state = readHistoryRecord(statePath);
+  if (!state) return entries;
+  recordItems(state.history).forEach((item, index) => {
+    const content = [item.event, item.note]
+      .filter((value): value is string => typeof value === 'string')
+      .join(': ');
     if (!content.trim()) return;
     entries.push({
       entryId: `mission:${scope.missionId}:${index}`,
@@ -608,12 +747,15 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
     });
   });
 
-  const conversationsDir = pathResolver.shared('runtime/a2a-conversations');
-  if (safeExistsSync(conversationsDir)) {
+  const conversationsDir = safeHistoryDirectory(pathResolver.shared('runtime/a2a-conversations'));
+  if (conversationsDir) {
     for (const file of safeReaddir(conversationsDir).filter((name) => name.endsWith('.jsonl'))) {
+      const conversationPath = safeHistoryFile(path.join(conversationsDir, file));
+      if (!conversationPath) continue;
       const sessionId = file.replace(/\.jsonl$/u, '');
-      readJsonLines(path.join(conversationsDir, file)).forEach((raw, index) => {
-        const turn = raw as Record<string, unknown>;
+      readJsonLines<unknown>(conversationPath, { onMalformed: 'skip' }).forEach((raw, index) => {
+        if (!isRecord(raw)) return;
+        const turn = raw;
         if (resolveHistoryTier(turn) !== scope.tier || !matchesMission(turn, scope.missionId))
           return;
         const content = [turn.prompt, turn.result]
@@ -647,12 +789,15 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
     'imessage-bridge/thread-history',
   ];
   for (const root of channelRoots) {
-    const directory = pathResolver.shared(`runtime/${root}`);
-    if (!safeExistsSync(directory)) continue;
+    const directory = safeHistoryDirectory(pathResolver.shared(`runtime/${root}`));
+    if (!directory) continue;
     for (const file of safeReaddir(directory).filter((name) => name.endsWith('.jsonl'))) {
+      const channelPath = safeHistoryFile(path.join(directory, file));
+      if (!channelPath) continue;
       const sessionId = file.replace(/\.jsonl$/u, '');
-      readJsonLines(path.join(directory, file)).forEach((raw, index) => {
-        const item = raw as Record<string, unknown>;
+      readJsonLines<unknown>(channelPath, { onMalformed: 'skip' }).forEach((raw, index) => {
+        if (!isRecord(raw)) return;
+        const item = raw;
         if (resolveHistoryTier(item) !== scope.tier || !matchesMission(item, scope.missionId))
           return;
         const content = String(item.text || item.content || '').trim();
@@ -675,14 +820,13 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
     }
   }
 
-  const traceDirectory = pathResolver.shared('logs/traces');
-  if (safeExistsSync(traceDirectory)) {
+  const traceDirectory = safeHistoryDirectory(pathResolver.shared('logs/traces'));
+  if (traceDirectory) {
     for (const file of safeReaddir(traceDirectory).filter(
       (name) => name.startsWith('traces-') && name.endsWith('.jsonl')
     )) {
-      readJsonLines(path.join(traceDirectory, file)).forEach((raw) => {
-        const trace = raw as Record<string, unknown>;
-        const metadata = (trace.metadata || {}) as Record<string, unknown>;
+      readValidatedTraceLines(path.join(traceDirectory, file)).forEach((trace) => {
+        const metadata = isRecord(trace.metadata) ? trace.metadata : {};
         if (resolveHistoryTier(trace) !== scope.tier || !matchesMission(trace, scope.missionId))
           return;
         const visit = (span: Record<string, unknown>): void => {
@@ -691,7 +835,8 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
             span.name,
             span.error,
             ...events.map((event) => {
-              const item = event as Record<string, unknown>;
+              if (!isRecord(event)) return '';
+              const item = event;
               return [item.name, JSON.stringify(item.attributes || {})].filter(Boolean).join(': ');
             }),
           ]
@@ -716,11 +861,11 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
             });
           }
           for (const child of Array.isArray(span.children) ? span.children : []) {
-            visit(child as Record<string, unknown>);
+            if (isRecord(child)) visit(child);
           }
         };
-        if (trace.rootSpan && typeof trace.rootSpan === 'object') {
-          visit(trace.rootSpan as Record<string, unknown>);
+        if (isRecord(trace.rootSpan)) {
+          visit(trace.rootSpan);
         }
       });
     }
@@ -729,7 +874,10 @@ function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryI
 }
 
 function scopedDatabasePath(scope: MissionHistorySearchScope): string {
-  return pathResolver.shared(`runtime/history-search/${scope.tier}/${scope.missionId}.sqlite`);
+  return assertSafeRepositoryPath(
+    pathResolver.shared(`runtime/history-search/${scope.tier}/${scope.missionId}.sqlite`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function withDatabasePath<T>(database: string, callback: () => T): T {
@@ -770,13 +918,16 @@ export function searchMissionHistory(options: MissionHistorySearchOptions): Hist
 }
 
 function collectPublicA2AEntries(): HistoryIndexEntry[] {
-  const directory = pathResolver.shared('runtime/a2a-conversations');
-  if (!safeExistsSync(directory)) return [];
+  const directory = safeHistoryDirectory(pathResolver.shared('runtime/a2a-conversations'));
+  if (!directory) return [];
   const entries: HistoryIndexEntry[] = [];
   for (const file of safeReaddir(directory).filter((name) => name.endsWith('.jsonl'))) {
+    const conversationPath = safeHistoryFile(path.join(directory, file));
+    if (!conversationPath) continue;
     const sessionId = file.replace(/\.jsonl$/u, '');
-    readJsonLines(path.join(directory, file)).forEach((raw, index) => {
-      const turn = raw as Record<string, unknown>;
+    readJsonLines<unknown>(conversationPath, { onMalformed: 'skip' }).forEach((raw, index) => {
+      if (!isRecord(raw)) return;
+      const turn = raw;
       if (resolveHistoryTier(turn) !== 'public') return;
       const content = [turn.prompt, turn.result]
         .filter((value) => typeof value === 'string')
@@ -805,28 +956,24 @@ function collectPublicA2AEntries(): HistoryIndexEntry[] {
 }
 
 function collectPublicMissionEntries(): HistoryIndexEntry[] {
-  const directory = pathResolver.active('missions/public');
-  if (!safeExistsSync(directory)) return [];
+  const directory = safeHistoryDirectory(pathResolver.active('missions/public'));
+  if (!directory) return [];
   const entries: HistoryIndexEntry[] = [];
   for (const missionId of safeReaddir(directory)) {
-    const statePath = path.join(directory, missionId, 'mission-state.json');
-    if (!safeExistsSync(statePath)) continue;
-    let state: Record<string, unknown>;
-    try {
-      state = readJson<Record<string, unknown>>(statePath);
-    } catch {
-      continue;
-    }
+    const statePath = safeHistoryFile(path.join(directory, missionId, 'mission-state.json'));
+    if (!statePath) continue;
+    const state = readHistoryRecord(statePath);
+    if (!state) continue;
     if (
       String(state.tier || '')
         .trim()
         .toLowerCase() !== 'public'
     )
       continue;
-    const history = Array.isArray(state.history) ? state.history : [];
-    history.forEach((raw, index) => {
-      const item = raw as Record<string, unknown>;
-      const content = [item.event, item.note].filter(Boolean).join(': ');
+    recordItems(state.history).forEach((item, index) => {
+      const content = [item.event, item.note]
+        .filter((value): value is string => typeof value === 'string')
+        .join(': ');
       if (!content.trim()) return;
       entries.push({
         entryId: `mission:${missionId}:${index}`,
@@ -850,12 +997,15 @@ function collectPublicChannelEntries(): HistoryIndexEntry[] {
   const roots = ['telegram-bridge/thread-history', 'discord-bridge/thread-history'];
   const entries: HistoryIndexEntry[] = [];
   for (const root of roots) {
-    const directory = pathResolver.shared(`runtime/${root}`);
-    if (!safeExistsSync(directory)) continue;
+    const directory = safeHistoryDirectory(pathResolver.shared(`runtime/${root}`));
+    if (!directory) continue;
     for (const file of safeReaddir(directory).filter((name) => name.endsWith('.jsonl'))) {
+      const channelPath = safeHistoryFile(path.join(directory, file));
+      if (!channelPath) continue;
       const sessionId = file.replace(/\.jsonl$/u, '');
-      readJsonLines(path.join(directory, file)).forEach((raw, index) => {
-        const item = raw as Record<string, unknown>;
+      readJsonLines<unknown>(channelPath, { onMalformed: 'skip' }).forEach((raw, index) => {
+        if (!isRecord(raw)) return;
+        const item = raw;
         if (resolveHistoryTier(item) !== 'public') return;
         const content = String(item.text || item.content || '').trim();
         if (!content) return;
@@ -879,15 +1029,14 @@ function collectPublicChannelEntries(): HistoryIndexEntry[] {
 }
 
 function collectPublicTraceEntries(): HistoryIndexEntry[] {
-  const directory = pathResolver.shared('logs/traces');
-  if (!safeExistsSync(directory)) return [];
+  const directory = safeHistoryDirectory(pathResolver.shared('logs/traces'));
+  if (!directory) return [];
   const entries: HistoryIndexEntry[] = [];
   for (const file of safeReaddir(directory).filter(
     (name) => name.startsWith('traces-') && name.endsWith('.jsonl')
   )) {
-    readJsonLines(path.join(directory, file)).forEach((raw) => {
-      const trace = raw as Record<string, unknown>;
-      const metadata = (trace.metadata || {}) as Record<string, unknown>;
+    readValidatedTraceLines(path.join(directory, file)).forEach((trace) => {
+      const metadata = isRecord(trace.metadata) ? trace.metadata : {};
       if (resolveHistoryTier(trace) !== 'public') return;
       // Mission-bound traces may carry confidential or personal content. They
       // are indexed by a future tier-specific collector, never public here.
@@ -898,7 +1047,8 @@ function collectPublicTraceEntries(): HistoryIndexEntry[] {
           span.name,
           span.error,
           ...events.map((event) => {
-            const item = event as Record<string, unknown>;
+            if (!isRecord(event)) return '';
+            const item = event;
             return [item.name, JSON.stringify(item.attributes || {})].filter(Boolean).join(': ');
           }),
         ]
@@ -922,11 +1072,11 @@ function collectPublicTraceEntries(): HistoryIndexEntry[] {
           });
         }
         for (const child of Array.isArray(span.children) ? span.children : []) {
-          visit(child as Record<string, unknown>);
+          if (isRecord(child)) visit(child);
         }
       };
-      if (trace.rootSpan && typeof trace.rootSpan === 'object') {
-        visit(trace.rootSpan as Record<string, unknown>);
+      if (isRecord(trace.rootSpan)) {
+        visit(trace.rootSpan);
       }
     });
   }

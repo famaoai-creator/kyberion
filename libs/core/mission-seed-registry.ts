@@ -1,12 +1,11 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -34,45 +33,73 @@ export interface MissionSeedRecord {
 }
 
 const SEED_SCHEMA_PATH = pathResolver.knowledge('product/schemas/mission-seed-record.schema.json');
-let seedValidateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (seedValidateFn) return seedValidateFn;
-  seedValidateFn = compileSchema(SEED_SCHEMA_PATH);
-  return seedValidateFn;
-}
 
 function seedDir(rootDir = pathResolver.rootDir()): string {
-  return path.resolve(rootDir, 'active/shared/runtime/mission-seeds');
+  return assertSafeRepositoryPath(path.resolve(rootDir, 'active/shared/runtime/mission-seeds'), {
+    allowMissingLeaf: true,
+  });
+}
+
+function normalizeSeedId(seedId: string): string {
+  const normalized = String(seedId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`[mission-seed-registry] invalid seed id: ${seedId}`);
+  }
+  return normalized;
+}
+
+function seedRecordPathInDirectory(directory: string, seedId: string): string {
+  return assertSafeRepositoryPath(`${directory}/${normalizeSeedId(seedId)}.json`, {
+    allowMissingLeaf: true,
+  });
 }
 
 export function missionSeedRecordPath(seedId: string, rootDir = pathResolver.rootDir()): string {
-  return `${seedDir(rootDir)}/${seedId}.json`;
+  return seedRecordPathInDirectory(seedDir(rootDir), seedId);
 }
+
+const missionSeedRecordCatalog = defineCatalog<MissionSeedRecord>({
+  id: 'mission-seed-record',
+  path: seedDir,
+  schema: SEED_SCHEMA_PATH,
+});
 
 function seedDirs(rootDir = pathResolver.rootDir()): string[] {
   const dirs: string[] = [];
   const customerSeedDir = customerResolver.customerRoot('mission-seeds', process.env, rootDir);
-  if (customerSeedDir && safeExistsSync(customerSeedDir)) {
-    dirs.push(customerSeedDir);
+  if (customerSeedDir) {
+    try {
+      const safeCustomerSeedDir = assertSafeRepositoryPath(customerSeedDir, {
+        allowMissingLeaf: true,
+      });
+      if (safeExistsSync(safeCustomerSeedDir)) dirs.push(safeCustomerSeedDir);
+    } catch {
+      // An unsafe customer overlay is ignored rather than merged into the registry.
+    }
   }
   dirs.push(seedDir(rootDir));
   return dirs;
 }
 
 export function validateMissionSeedRecord(value: unknown): value is MissionSeedRecord {
-  return Boolean(ensureValidator()(value));
+  try {
+    missionSeedRecordCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function saveMissionSeedRecord(
   record: MissionSeedRecord,
   options: { rootDir?: string } = {}
 ): string {
-  if (!validateMissionSeedRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  try {
+    missionSeedRecordCatalog.validate(record);
+  } catch (error) {
+    throw new Error(
+      `Invalid mission seed record: ${error instanceof Error ? error.message : String(error)}`
     );
-    throw new Error(`Invalid mission seed record: ${errors.join('; ')}`);
   }
   const directory = seedDir(options.rootDir || pathResolver.rootDir());
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
@@ -86,11 +113,23 @@ export function loadMissionSeedRecord(
   options: { rootDir?: string } = {}
 ): MissionSeedRecord | null {
   for (const dir of seedDirs(options.rootDir || pathResolver.rootDir())) {
-    const filePath = `${dir}/${seedId}.json`;
+    let filePath: string;
+    try {
+      filePath = seedRecordPathInDirectory(dir, seedId);
+    } catch {
+      continue;
+    }
     if (!safeExistsSync(filePath)) continue;
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as MissionSeedRecord;
-    if (validateMissionSeedRecord(parsed)) return parsed;
+    try {
+      return defineCatalog<MissionSeedRecord>({
+        id: 'mission-seed-record',
+        path: filePath,
+        schema: SEED_SCHEMA_PATH,
+      }).load();
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Invalid catalog ')) continue;
+      throw error;
+    }
   }
   return null;
 }

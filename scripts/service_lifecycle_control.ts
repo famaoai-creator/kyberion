@@ -1,14 +1,15 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeWriteFile,
   safeExec,
-  loadSurfaceManifest,
-  loadSurfaceState,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
 
@@ -35,7 +36,9 @@ function isRunningPid(pid: unknown): pid is number {
 function loadPidMap(): Record<string, number> {
   if (!safeExistsSync(PID_FILE)) return {};
   try {
-    const parsed = readJson<Record<string, unknown>>(PID_FILE);
+    const safePidFile = assertSafeRepositoryPath(PID_FILE);
+    if (!safeLstat(safePidFile).isFile()) return {};
+    const parsed = readJson<Record<string, unknown>>(safePidFile);
     return Object.fromEntries(
       Object.entries(parsed)
         .filter(([, pid]) => isRunningPid(pid))
@@ -47,7 +50,10 @@ function loadPidMap(): Record<string, number> {
 }
 
 function savePidMap(pids: Record<string, number>): void {
-  safeWriteFile(PID_FILE, JSON.stringify(pids, null, 2));
+  safeWriteFile(
+    assertSafeRepositoryPath(PID_FILE, { allowMissingLeaf: true }),
+    JSON.stringify(pids, null, 2)
+  );
 }
 
 function loadStartableChoices(): SurfaceStartableChoice[] {
@@ -191,8 +197,8 @@ function startService(serviceName: string) {
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []) {
+  const argv = await createStandardYargs(['node', 'service_lifecycle_control', ...args])
     .option('operation', {
       type: 'string',
       choices: ['list', 'start', 'stop'] as const,
@@ -260,7 +266,14 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runServiceLifecycleControl = defineScript({
+  name: 'service:lifecycle',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'service_lifecycle_control.ts') ||
+  isDirectScript(import.meta.url, 'service_lifecycle_control.js')
+)
+  void runServiceLifecycleControl();

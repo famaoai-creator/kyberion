@@ -1,9 +1,51 @@
-import { safeReadFile } from '../secure-io.js';
+import * as path from 'node:path';
+import { readJson } from '../foundation/json.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import type { PipelineAdfStep } from '../pipeline-contract.js';
+import { validatePipelineAdf, type PipelineAdfStep } from '../pipeline-contract.js';
+import { assertProjectTrustApproval } from '../project-trust.js';
+import { safeLstat } from '../secure-io.js';
+import { isBuiltinPipelineResource, requiresProjectTrust } from '../trust-requiring-resources.js';
 
 const MAX_REF_DEPTH = 10;
+
+function resolveSafeRefPath(refPath: string, parentCtx: Record<string, unknown>): string {
+  const root = path.resolve(pathResolver.rootDir());
+  const resolved = path.resolve(pathResolver.rootResolve(refPath));
+  const relative = path.relative(root, resolved).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[PIPELINE_SCOPE] ref path is outside the repository root: ${refPath}`);
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) {
+        throw new Error(`[PIPELINE_SCOPE] ref path cannot traverse a symbolic link: ${relative}`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[PIPELINE_SCOPE]')) throw error;
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+      throw new Error(`[PIPELINE_SCOPE] ref path could not be inspected safely: ${relative}`);
+    }
+  }
+
+  if (requiresProjectTrust(relative) && !isBuiltinPipelineResource(relative)) {
+    const approvalId =
+      typeof parentCtx.project_trust_approval_id === 'string'
+        ? parentCtx.project_trust_approval_id.trim()
+        : '';
+    if (approvalId) {
+      assertProjectTrustApproval(approvalId, relative);
+    } else if (parentCtx.trust_resolved !== true) {
+      throw new Error(
+        `[TRUST_REQUIRED] project-local pipeline ref cannot be loaded before trust resolution: ${relative}`
+      );
+    }
+  }
+  return resolved;
+}
 
 export interface OnErrorConfig {
   strategy: 'skip' | 'abort' | 'fallback';
@@ -36,16 +78,15 @@ export async function resolveRef(
     );
   }
 
-  const resolvedPath = pathResolver.rootResolve(refPath);
+  const resolvedPath = resolveSafeRefPath(refPath, parentCtx);
   logger.info(
     `[PIPELINE] resolveRef: loading sub-pipeline from ${resolvedPath} (depth=${currentDepth})`
   );
 
-  const raw = safeReadFile(resolvedPath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw);
+  const parsed = validatePipelineAdf(readJson<unknown>(resolvedPath));
 
-  const subSteps: any[] = parsed.steps || [];
-  const subContext: Record<string, any> = parsed.context || {};
+  const subSteps: PipelineAdfStep[] = parsed.steps;
+  const subContext: Record<string, unknown> = parsed.context || {};
 
   // Merge bind values (resolved via parent context) into sub-context
   const resolvedBind: Record<string, any> = {};

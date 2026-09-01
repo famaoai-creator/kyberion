@@ -5,6 +5,42 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const realFsSecureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (
+    filePath: string,
+    options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
+  ) => {
+    const root = path.resolve(options.rootDir ?? process.env.KYBERION_ROOT ?? process.cwd());
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(
+            `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+          );
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error(`Resource path does not exist: ${resolved}`);
+    }
+    return resolved;
+  },
   safeAppendFileSync: (filePath: string, data: string) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
@@ -159,5 +195,31 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     });
     expect(fs.existsSync(filePath)).toBe(true);
     expect(mod.loadNotificationPreferences().default_channel?.target).toBe('C9');
+  });
+
+  it('does not read or overwrite preferences through a symlink', () => {
+    const preferencePath = path.join(
+      tmpRoot,
+      'knowledge',
+      'personal',
+      'notification-preferences.json'
+    );
+    const externalPath = path.join(tmpRoot, 'outside-notification-preferences.json');
+    fs.mkdirSync(path.dirname(preferencePath), { recursive: true });
+    fs.writeFileSync(
+      externalPath,
+      JSON.stringify({ default_channel: { surface: 'slack', target: 'EXTERNAL' } })
+    );
+    fs.symlinkSync(externalPath, preferencePath);
+
+    expect(mod.loadNotificationPreferences()).toEqual({});
+    expect(() =>
+      mod.saveNotificationPreferences({
+        default_channel: { surface: 'slack', target: 'SHOULD_NOT_WRITE' },
+      })
+    ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(JSON.parse(fs.readFileSync(externalPath, 'utf8')).default_channel.target).toBe(
+      'EXTERNAL'
+    );
   });
 });

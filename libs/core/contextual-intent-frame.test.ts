@@ -35,4 +35,11 @@ describe('contextual-intent-frame', () => {
     expect(frame.source_binding.selected).toBe('google_calendar');
     expect(frame.missing).not.toContain('calendar_source');
   });
+
+  it('rejects an external memory path override before writing', () => {
+    process.env.KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH = '/tmp/contextual-intent-memory.json';
+    expect(() =>
+      recordSchedulePreference({ source: 'google_calendar', calendarName: 'Personal' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });

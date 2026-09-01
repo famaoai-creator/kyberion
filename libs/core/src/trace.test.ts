@@ -16,6 +16,14 @@ afterEach(() => {
 });
 
 describe('trace OTLP bridge', () => {
+  it('type-checks exact attributes for governed span names', () => {
+    const context = new TraceContext('workflow.test');
+    context.startSpan('mission', { mission_id: 'M1' });
+    // @ts-expect-error governed span attributes reject undeclared keys
+    context.startSpan('mission', { undeclared: true });
+    context.endSpan('ok');
+  });
+
   it('is disabled unless an OTLP endpoint is configured', async () => {
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     const trace = new TraceContext('workflow.test').finalize();

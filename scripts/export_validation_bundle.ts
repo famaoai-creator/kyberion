@@ -42,19 +42,19 @@
 
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
+import { logger } from '@agent/core/core';
+import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  pathResolver,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
   safeLstat,
-  findMissionPath,
-  missionEvidenceDir,
-} from '@agent/core';
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/audit-chain';
 
 interface BundleManifest {
   mission_id: string;
@@ -123,9 +123,9 @@ function copyDirIntoBundle(
 function filterAuditChainByMission(
   auditDir: string,
   missionId: string
-): { allEvents: any[]; overrideEvents: any[] } {
-  const allEvents: any[] = [];
-  const overrideEvents: any[] = [];
+): { allEvents: Array<Record<string, unknown>>; overrideEvents: Array<Record<string, unknown>> } {
+  const allEvents: Array<Record<string, unknown>> = [];
+  const overrideEvents: Array<Record<string, unknown>> = [];
   if (!safeExistsSync(auditDir)) return { allEvents, overrideEvents };
   for (const entry of safeReaddir(auditDir)) {
     if (!entry.endsWith('.jsonl')) continue;
@@ -134,30 +134,33 @@ function filterAuditChainByMission(
     for (const line of txt.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      let event: any;
+      let event: AuditEntry;
+      let persisted: Record<string, unknown>;
       try {
-        event = JSON.parse(trimmed);
+        const raw = JSON.parse(trimmed) as unknown;
+        event = normalizePersistedAuditEntry(raw);
+        persisted = raw as Record<string, unknown>;
       } catch {
         continue;
       }
       const matches =
         (event.metadata && event.metadata.mission_id === missionId) ||
         (typeof event.operation === 'string' && event.operation.includes(missionId)) ||
-        event.mission_id === missionId;
+        persisted.mission_id === missionId;
       if (!matches) continue;
-      allEvents.push(event);
+      allEvents.push(persisted);
       if (
         event.action === 'rubric.override_accepted' ||
-        event.type === 'rubric.override_accepted'
+        persisted.type === 'rubric.override_accepted'
       ) {
-        overrideEvents.push(event);
+        overrideEvents.push(persisted);
       }
     }
   }
   return { allEvents, overrideEvents };
 }
 
-function writeJsonl(absPath: string, lines: any[]): { bytes: number; sha256: string } {
+function writeJsonl(absPath: string, lines: unknown[]): { bytes: number; sha256: string } {
   const text = lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : '');
   safeMkdir(path.dirname(absPath), { recursive: true });
   safeWriteFile(absPath, text);
@@ -167,7 +170,16 @@ function writeJsonl(absPath: string, lines: any[]): { bytes: number; sha256: str
   };
 }
 
+export function resolveValidationBundleOutputBase(outputBaseDir: string): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(outputBaseDir), {
+    allowMissingLeaf: true,
+  });
+}
+
+export { filterAuditChainByMission };
+
 function exportBundle(missionId: string, outputBaseDir: string): string {
+  const safeOutputBaseDir = resolveValidationBundleOutputBase(outputBaseDir);
   const upperId = missionId.toUpperCase();
   const missionPath = findMissionPath(upperId);
   if (!missionPath) {
@@ -178,7 +190,7 @@ function exportBundle(missionId: string, outputBaseDir: string): string {
     throw new Error(`Mission evidence dir not found: ${upperId}`);
   }
 
-  const bundleRoot = path.join(outputBaseDir, `${upperId}-validation-bundle`);
+  const bundleRoot = path.join(safeOutputBaseDir, `${upperId}-validation-bundle`);
   if (safeExistsSync(bundleRoot)) {
     throw new Error(
       `Bundle already exists at ${bundleRoot}; refusing to overwrite. Move or delete the existing one first.`
@@ -371,7 +383,7 @@ function main(args: string[]): number {
   const outputIdx = args.indexOf('--output');
   const outputBase =
     outputIdx >= 0 && args[outputIdx + 1]
-      ? path.resolve(args[outputIdx + 1])
+      ? pathResolver.resolve(args[outputIdx + 1])
       : pathResolver.rootResolve('active/shared/exports/validation-bundles');
   safeMkdir(outputBase, { recursive: true });
   try {

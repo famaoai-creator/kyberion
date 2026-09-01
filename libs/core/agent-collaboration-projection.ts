@@ -1,6 +1,7 @@
 import * as path from 'node:path';
+import { readJsonLines } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import {
   collaborationKindFromEventType,
   createAgentCollaborationEvent,
@@ -96,25 +97,26 @@ const JSONL_SOURCES: Array<{ file: string; source: CollaborationSource }> = [
   { file: 'agent-runtime-supervisor-events.jsonl', source: 'runtime' },
 ];
 
+function safeOptionalRepositoryPath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 function toRecordOrNull(value: unknown): JsonRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
 function readJsonl(filePath: string): JsonRecord[] {
-  if (!safeExistsSync(filePath)) return [];
+  const safePath = safeOptionalRepositoryPath(filePath);
+  if (!safePath || !safeExistsSync(safePath)) return [];
   try {
-    return String(safeReadFile(filePath, { encoding: 'utf8' }) || '')
-      .split(/\r?\n/u)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .flatMap((line) => {
-        try {
-          const value = toRecordOrNull(JSON.parse(line));
-          return value ? [value] : [];
-        } catch {
-          return [];
-        }
-      });
+    return readJsonLines<JsonRecord | null>(safePath, {
+      onMalformed: 'skip',
+      map: (value) => toRecordOrNull(value),
+    }).filter((value): value is JsonRecord => value !== null);
   } catch {
     return [];
   }
@@ -249,16 +251,21 @@ function eventFromRecord(
 }
 
 function readWorkerEvents(): AgentCollaborationEvent[] {
-  if (!safeExistsSync(WORKER_EVENTS_DIR)) return [];
+  const safeWorkerEventsDir = safeOptionalRepositoryPath(WORKER_EVENTS_DIR);
+  if (!safeWorkerEventsDir || !safeExistsSync(safeWorkerEventsDir)) return [];
   const files: string[] = [];
-  for (const entry of safeReaddir(WORKER_EVENTS_DIR)) {
-    const entryPath = path.join(WORKER_EVENTS_DIR, entry);
+  for (const entry of safeReaddir(safeWorkerEventsDir)) {
+    const entryPath = safeOptionalRepositoryPath(path.join(safeWorkerEventsDir, entry));
+    if (!entryPath) continue;
     if (entry.endsWith('.jsonl')) files.push(entryPath);
     if (entry === 'missions' && safeExistsSync(entryPath)) {
       for (const mission of safeReaddir(entryPath)) {
-        const missionPath = path.join(entryPath, mission);
+        const missionPath = safeOptionalRepositoryPath(path.join(entryPath, mission));
+        if (!missionPath || !safeExistsSync(missionPath)) continue;
         for (const file of safeReaddir(missionPath)) {
-          if (file.endsWith('.jsonl')) files.push(path.join(missionPath, file));
+          if (!file.endsWith('.jsonl')) continue;
+          const filePath = safeOptionalRepositoryPath(path.join(missionPath, file));
+          if (filePath) files.push(filePath);
         }
       }
     }

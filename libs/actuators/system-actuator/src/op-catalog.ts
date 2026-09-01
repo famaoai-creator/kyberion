@@ -1,4 +1,6 @@
-import { getOpInputContract, withCatalogInputContract } from '@agent/core';
+import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
   'screenshot',
@@ -524,7 +526,7 @@ function withInputSchema(op: string, kind: SystemOpSpec['kind']): SystemOpSpec {
   return withCatalogInputContract('system', op, kind, description);
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...SYSTEM_ACTUATOR_CAPTURE_OPS.map((op) => withInputSchema(op, 'capture')),
     ...SYSTEM_ACTUATOR_TRANSFORM_OPS.map((op) => withInputSchema(op, 'transform')),

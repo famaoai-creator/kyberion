@@ -1,22 +1,23 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { inspectServiceAuth } from '@agent/core/service-validator';
 import {
-  customerResolver,
-  buildNextAction,
-  formatNextAction,
-  inspectServiceAuth,
   loadNotificationPreferences,
-  loadServiceEndpointsCatalog,
-  logger,
   resolveOperatorNotificationRoute,
-  resolveOpsAlertChannelStatus,
+} from '@agent/core/operator-notifications';
+import { resolveOpsAlertChannelStatus } from '@agent/core/ops-alert';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { logger } from '@agent/core/core';
+import { readJsonIfPresent } from '@agent/core/foundation';
+import {
   isServiceConnectionReady,
   requiredServiceConnectionKeys,
-  safeExistsSync,
-  safeReadFile,
-} from '@agent/core';
+} from '@agent/core/service-connection-readiness';
+import { safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { formatSetupHintLine, formatSetupSummaryLine } from './setup-report-format.js';
 
@@ -68,9 +69,8 @@ function inspectConnection(serviceId: string): {
     if (!safeExistsSync(filePath)) return false;
     if (requiredKeys.length === 0) return true;
     try {
-      const record = JSON.parse(
-        String(safeReadFile(filePath, { encoding: 'utf8' }) ?? '')
-      ) as Record<string, unknown>;
+      const record = readJsonIfPresent<Record<string, unknown>>(filePath);
+      if (!record) return false;
       return isServiceConnectionReady(serviceId, record);
     } catch {
       return false;
@@ -255,8 +255,8 @@ export async function setupServices(options: { quiet?: boolean } = {}) {
   };
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'services_setup', ...args])
     .option('json', { type: 'boolean', default: false })
     .parseSync();
 
@@ -268,14 +268,17 @@ async function main(): Promise<void> {
   logger.success('Service setup check completed.');
 }
 
+const runServiceSetupScript = defineScript({
+  name: 'service:setup',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'services_setup.ts') ||
   isDirectScript(import.meta.url, 'services_setup.js')
 ) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runServiceSetupScript();
 }
 
 export { main as runServiceSetup };

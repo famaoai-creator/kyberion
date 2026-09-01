@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
 
@@ -127,6 +128,9 @@ export interface MarketingCompletionEvidence {
 }
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/marketing-risk-policy.json');
+const POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-risk-policy.schema.json'
+);
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
@@ -569,7 +573,11 @@ export function validateMarketingCompletionEvidence(input: {
 export function loadMarketingRiskPolicy(env: NodeJS.ProcessEnv = process.env): MarketingRiskPolicy {
   const overlay = customerResolver.customerRoot('policy/marketing-risk-policy.json', env);
   const source = overlay && safeExistsSync(overlay) ? overlay : DEFAULT_POLICY_PATH;
-  return loadJson<MarketingRiskPolicy>(source);
+  return defineCatalog<MarketingRiskPolicy>({
+    id: 'marketing-risk-policy',
+    path: source,
+    schema: POLICY_SCHEMA_PATH,
+  }).load();
 }
 
 export function requiredMarketingControls(

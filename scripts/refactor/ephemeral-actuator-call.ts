@@ -1,9 +1,10 @@
-import { capabilityEntry, pathResolver, safeExec, safeExistsSync, safeUnlinkSync, safeWriteFile } from '@agent/core';
+import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
+import { safeExec, safeExistsSync, safeUnlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 export function invokeActuatorWithTempInput(
   actuatorName: string,
   input: unknown,
-  tempPrefix: string,
+  tempPrefix: string
 ): string {
   const tempPath = pathResolver.sharedTmp(`scripts/${tempPrefix}-${Date.now()}.json`);
   safeWriteFile(tempPath, JSON.stringify(input, null, 2));

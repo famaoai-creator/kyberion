@@ -1,12 +1,12 @@
 import * as path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { safeReadFile } from '@agent/core/secure-io';
 import {
-  compileSchemaFromPath,
   getBookingPreflightQuestions,
-  safeReadFile,
   selectBookingPreflightQuestionSet,
-} from '@agent/core';
+} from './booking-preference-profile.js';
 import { describe, expect, it } from 'vitest';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;

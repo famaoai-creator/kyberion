@@ -15,6 +15,7 @@ vi.mock('./path-resolver.js', () => ({
   findMissionPath: mocks.findMissionPath,
 }));
 vi.mock('./secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: mocks.safeExistsSync,
   loadJson: mocks.loadJson,
 }));

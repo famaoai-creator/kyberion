@@ -28,6 +28,8 @@ export {
 
 export { AnthropicReasoningBackend } from './anthropic-reasoning-backend.js';
 
+export { probeAnthropicApiBackendAvailability } from './anthropic-api-probe.js';
+
 export type { AnthropicReasoningBackendOptions } from './anthropic-reasoning-backend.js';
 
 export {
@@ -211,7 +213,6 @@ export {
   loadReasoningBackendPolicy,
   normalizeReasoningBackendMode as normalizeReasoningBackendModePolicy,
   resolveReasoningBackendModeFromContext,
-  resetReasoningBackendPolicyCache,
 } from './reasoning-backend-policy.js';
 
 export {
@@ -308,31 +309,23 @@ export {
   loadVoiceTaskProfileCatalog,
   resolveVoiceTaskDistillTargetKind,
   resolveVoiceTaskProfile,
-  resetVoiceTaskProfileCatalogCache,
 } from './voice-task-profile-catalog.js';
 
-export {
-  loadMediaToneStyleMapCatalog,
-  resolveMediaToneStyle,
-  resetMediaToneStyleMapCatalogCache,
-} from './media-tone-style-map.js';
+export { loadMediaToneStyleMapCatalog, resolveMediaToneStyle } from './media-tone-style-map.js';
 
 export {
   loadMediaDrawioPolicyCatalog,
   resolveMediaDrawioBoundaryPalette,
   resolveMediaDrawioNodeSize,
-  resetMediaDrawioPolicyCatalogCache,
 } from './media-drawio-policy.js';
 
 export {
   loadMediaAwsIconRuleCatalog,
   resolveMediaAwsIconCandidates,
-  resetMediaAwsIconRuleCatalogCache,
 } from './media-aws-icon-rules.js';
 
 export {
   loadMediaSemanticMapCatalog,
   resolveMediaSemanticType,
   resolveProposalEvidenceIndex,
-  resetMediaSemanticMapCatalogCache,
 } from './media-semantic-map.js';

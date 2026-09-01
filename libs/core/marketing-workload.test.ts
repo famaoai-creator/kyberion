@@ -377,6 +377,7 @@ describe('marketing workload gates', () => {
   it('rejects unsafe customer selectors and preserves the no-customer fallback', () => {
     const defaultPolicy = loadMarketingRiskPolicy({});
     expect(defaultPolicy.allowed_channels).toContain('linkedin');
+    expect(defaultPolicy.levels['4'].dry_run_required).toBe(true);
     expect(() => loadMarketingRiskPolicy({ KYBERION_CUSTOMER: '../other-customer' })).toThrow(
       'Invalid KYBERION_CUSTOMER'
     );

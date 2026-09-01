@@ -1,11 +1,7 @@
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 import {
   readKyberionDesignTokens,
@@ -42,59 +38,70 @@ const THEMES_JSON_NESTED_PATH = path.join(
   'knowledge/public/design-patterns/media-templates/themes/themes.json'
 );
 
-function updateTokenSurface(filePath: string, tokenBlock: string) {
+function renderUpdatedFile(filePath: string, content: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
   const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-  const next = replaceTokenBlock(source, tokenBlock);
-  if (next !== source) {
-    safeWriteFile(filePath, next);
-    console.log(`Updated ${path.relative(ROOT, filePath)}`);
-  }
+  return content === source ? undefined : { path: filePath, content };
 }
 
-function updateTailwindConfig(filePath: string) {
+function renderTokenSurface(filePath: string, tokenBlock: string): GeneratedFile | undefined {
+  if (!safeExistsSync(filePath)) return;
+  const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  return renderUpdatedFile(filePath, replaceTokenBlock(source, tokenBlock));
+}
+
+function renderTailwindConfig(filePath: string): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
   const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   const next = source.replace(
     /        kyberion: \{[\s\S]*?\n        \}/m,
     renderKyberionTailwindColorsBlock()
   );
-  if (next !== source) {
-    safeWriteFile(filePath, next);
-    console.log('Updated tailwind.config.cjs');
-  }
+  return renderUpdatedFile(filePath, next);
 }
 
-function updateThemesCatalog(
+function renderThemesCatalog(
   filePath: string,
   tokens: ReturnType<typeof readKyberionDesignTokens>,
   includeDefaultTheme: boolean
-) {
+): GeneratedFile | undefined {
   if (!safeExistsSync(filePath)) return;
   const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   const next = updateThemesJson(source, tokens, { includeDefaultTheme });
-  if (next !== source) {
-    safeWriteFile(filePath, next);
-    console.log(`Updated ${path.relative(ROOT, filePath)}`);
-  }
+  return renderUpdatedFile(filePath, next);
 }
 
-function run() {
+function render(): GeneratedFile[] {
   const tokens = readKyberionDesignTokens();
   const tokenBlock = renderKyberionDesignTokenBlock(tokens);
 
-  updateTokenSurface(GLOBALS_CSS_PATH, tokenBlock);
-  updateTokenSurface(OPERATOR_GLOBALS_CSS_PATH, tokenBlock);
-  updateTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock);
-  updateTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock);
-  updateTailwindConfig(TAILWIND_CONFIG_PATH);
-  updateThemesCatalog(THEMES_JSON_PATH, tokens, true);
-  updateThemesCatalog(THEMES_JSON_NESTED_PATH, tokens, false);
+  return [
+    renderTokenSurface(GLOBALS_CSS_PATH, tokenBlock),
+    renderTokenSurface(OPERATOR_GLOBALS_CSS_PATH, tokenBlock),
+    renderTokenSurface(PRESENCE_TOKENS_CSS_PATH, tokenBlock),
+    renderTokenSurface(COMPUTER_TOKENS_CSS_PATH, tokenBlock),
+    renderTailwindConfig(TAILWIND_CONFIG_PATH),
+    renderThemesCatalog(THEMES_JSON_PATH, tokens, true),
+    renderThemesCatalog(THEMES_JSON_NESTED_PATH, tokens, false),
+  ].filter((file): file is GeneratedFile => file !== undefined);
 }
 
-try {
-  withExecutionContext('ecosystem_architect', run);
-} catch (error) {
-  console.error(error);
-  process.exitCode = 1;
-}
+export const runGenerateDesignTokens = defineGenerator({
+  id: 'design-tokens',
+  outputs: [
+    GLOBALS_CSS_PATH,
+    OPERATOR_GLOBALS_CSS_PATH,
+    PRESENCE_TOKENS_CSS_PATH,
+    COMPUTER_TOKENS_CSS_PATH,
+    TAILWIND_CONFIG_PATH,
+    THEMES_JSON_PATH,
+    THEMES_JSON_NESTED_PATH,
+  ],
+  render,
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_design_tokens.ts') ||
+  isDirectScript(import.meta.url, 'generate_design_tokens.js')
+)
+  void runGenerateDesignTokens();

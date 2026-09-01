@@ -45,7 +45,3 @@ export function resolveMediaDrawioTierRank(tier?: string): number {
   const index = catalog.tier_order.indexOf(normalized);
   return index >= 0 ? index : catalog.tier_order.length;
 }
-
-export function resetMediaDrawioTierOrderCatalogCache(): void {
-  catalog.reset();
-}

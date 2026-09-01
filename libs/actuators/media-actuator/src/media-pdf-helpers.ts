@@ -1,5 +1,5 @@
 import type { PdfDesignProtocol } from '@agent/core/media-contracts';
-import type { OcrResult } from '@agent/core';
+import type { OcrResult } from '@agent/core/ocr-types';
 
 export interface PdfToPptxHints {
   canvas?: { fallbackW?: number; fallbackH?: number };
@@ -462,7 +462,7 @@ export function mergeCleanerPdfText(
 
 export async function extractCleanerPdfText(pdfPath: string): Promise<string> {
   const { PDFParse } = await import('pdf-parse');
-  const { safeReadFile } = await import('@agent/core');
+  const { safeReadFile } = await import('@agent/core/secure-io');
   const data = safeReadFile(pdfPath, { encoding: null }) as Buffer;
   const parser = new PDFParse({ data });
   try {

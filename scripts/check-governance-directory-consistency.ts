@@ -1,11 +1,96 @@
 import * as path from 'node:path';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { loadAgentProfileSnapshot, loadTeamRoleSnapshot } from '@agent/core/mission-team-index';
 import {
-  pathResolver,
-  safeExistsSync,
-  safeReaddir,
-  loadActuatorManifestCatalog,
-} from '@agent/core';
-import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
+  compileSchema,
+  defineCatalog,
+  readJson as readFoundationJson,
+} from '@agent/core/foundation';
+
+type VoiceProfileSnapshot = {
+  default_profile_id?: string;
+  profiles?: Array<{ profile_id?: string }>;
+};
+
+type AuthorityRoleSnapshot = {
+  authority_roles?: Record<string, unknown>;
+};
+
+type SurfaceProviderSnapshot = {
+  entries?: Array<{ id?: string }>;
+};
+
+type SpecialistSnapshot = {
+  version?: string;
+  specialists?: Record<string, unknown>;
+};
+
+type VoiceEngineSnapshot = {
+  default_engine_id?: string;
+  engines?: Array<{ engine_id?: string }>;
+};
+
+type GlobalActuatorIndexSnapshot = {
+  v?: string;
+  t?: number;
+  u?: string;
+  actuators?: Array<{
+    n?: string;
+    path?: string;
+    d?: string;
+    s?: string;
+    version?: string;
+    capability_count?: number;
+    ops?: string[];
+    contract_schema?: string;
+    prerequisites_summary?: string;
+  }>;
+};
+
+const serviceEndpointsSnapshotCatalog = defineCatalog<ServiceEndpointsCatalog>({
+  id: 'service-endpoints-snapshot',
+  path: pathResolver.knowledge('product/orchestration/service-endpoints.json'),
+  schema: pathResolver.knowledge('product/schemas/service-endpoints.schema.json'),
+});
+
+const voiceProfileSnapshotCatalog = defineCatalog<VoiceProfileSnapshot>({
+  id: 'voice-profile-registry-snapshot',
+  path: pathResolver.knowledge('product/governance/voice-profile-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/voice-profile-registry.schema.json'),
+});
+
+const authorityRoleSnapshotCatalog = defineCatalog<AuthorityRoleSnapshot>({
+  id: 'authority-role-index-snapshot',
+  path: pathResolver.knowledge('product/governance/authority-role-index.json'),
+  schema: pathResolver.knowledge('product/schemas/authority-role-index.schema.json'),
+});
+
+const surfaceProviderSnapshotCatalog = defineCatalog<SurfaceProviderSnapshot>({
+  id: 'surface-provider-manifest-catalog-snapshot',
+  path: pathResolver.knowledge('product/governance/surface-provider-manifest-catalog.json'),
+  schema: pathResolver.knowledge('product/schemas/surface-provider-manifest-catalog.schema.json'),
+});
+
+const specialistSnapshotCatalog = defineCatalog<SpecialistSnapshot>({
+  id: 'specialist-catalog-snapshot',
+  path: pathResolver.knowledge('product/orchestration/specialist-catalog.json'),
+  schema: pathResolver.knowledge('product/schemas/specialist-catalog.schema.json'),
+});
+
+const voiceEngineSnapshotCatalog = defineCatalog<VoiceEngineSnapshot>({
+  id: 'voice-engine-registry-snapshot',
+  path: pathResolver.knowledge('product/governance/voice-engine-registry.json'),
+  schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
+});
+
+const globalActuatorIndexSnapshotCatalog = defineCatalog<GlobalActuatorIndexSnapshot>({
+  id: 'global-actuator-index-snapshot',
+  path: pathResolver.knowledge('product/orchestration/global_actuator_index.json'),
+  schema: pathResolver.knowledge('product/schemas/global-actuator-index.schema.json'),
+});
 
 function readJson<T>(relativePath: string): T {
   return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
@@ -32,10 +117,7 @@ export function validateAgentProfileDirectoryConsistency(violations: string[]) {
 
   const schemaPath = 'knowledge/product/schemas/agent-profile-index.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{ agents?: Record<string, unknown> }>(
-    'knowledge/product/orchestration/agent-profile-index.json'
-  );
-  const snapshotAgents = snapshot.agents || {};
+  const snapshotAgents = loadAgentProfileSnapshot();
   const seenAgentIds = new Set<string>();
 
   for (const file of files) {
@@ -101,10 +183,7 @@ export function validateVoiceProfileDirectoryConsistency(violations: string[]) {
 
   const schemaPath = 'knowledge/product/schemas/voice-profile-registry.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{
-    default_profile_id?: string;
-    profiles?: Array<{ profile_id?: string }>;
-  }>('knowledge/product/governance/voice-profile-registry.json');
+  const snapshot = voiceProfileSnapshotCatalog.load();
   const snapshotProfiles = snapshot.profiles || [];
   const snapshotIds = new Set(snapshotProfiles.map((profile) => String(profile.profile_id || '')));
   const directoryIds: string[] = [];
@@ -178,9 +257,7 @@ export function validateAuthorityRoleDirectoryConsistency(violations: string[]) 
 
   const schemaPath = 'knowledge/product/schemas/authority-role.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{ authority_roles?: Record<string, unknown> }>(
-    'knowledge/product/governance/authority-role-index.json'
-  );
+  const snapshot = authorityRoleSnapshotCatalog.load();
   const snapshotRoles = snapshot.authority_roles || {};
   const seenRoleIds = new Set<string>();
 
@@ -246,10 +323,7 @@ export function validateTeamRoleDirectoryConsistency(violations: string[]) {
 
   const schemaPath = 'knowledge/product/schemas/team-role.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{ team_roles?: Record<string, unknown> }>(
-    'knowledge/product/orchestration/team-role-index.json'
-  );
-  const snapshotRoles = snapshot.team_roles || {};
+  const snapshotRoles = loadTeamRoleSnapshot();
   const seenRoleIds = new Set<string>();
 
   for (const file of files) {
@@ -316,9 +390,7 @@ export function validateSurfaceProviderCatalogDirectoryConsistency(violations: s
 
   const schemaPath = 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{ entries?: Array<{ id?: string }> }>(
-    'knowledge/product/governance/surface-provider-manifest-catalog.json'
-  );
+  const snapshot = surfaceProviderSnapshotCatalog.load();
   const snapshotIds = new Set((snapshot.entries || []).map((entry) => String(entry.id || '')));
   const directoryIds: string[] = [];
 
@@ -380,10 +452,7 @@ export function validateServiceEndpointsDirectoryConsistency(violations: string[
 
   const schemaPath = 'knowledge/product/schemas/service-endpoints.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{
-    default_pattern?: string;
-    services?: Record<string, { intent_aliases?: string[] }>;
-  }>('knowledge/product/orchestration/service-endpoints.json');
+  const snapshot = serviceEndpointsSnapshotCatalog.load();
   const snapshotIds = new Set(
     Object.keys(snapshot.services || {}).map((entry) => String(entry || ''))
   );
@@ -455,9 +524,7 @@ export function validateSpecialistCatalogDirectoryConsistency(violations: string
 
   const schemaPath = 'knowledge/product/schemas/specialist-catalog.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{ version?: string; specialists?: Record<string, unknown> }>(
-    'knowledge/product/orchestration/specialist-catalog.json'
-  );
+  const snapshot = specialistSnapshotCatalog.load();
   const snapshotIds = new Set(
     Object.keys(snapshot.specialists || {}).map((entry) => String(entry || ''))
   );
@@ -521,10 +588,7 @@ export function validateVoiceEngineDirectoryConsistency(violations: string[]) {
 
   const schemaPath = 'knowledge/product/schemas/voice-engine-registry.schema.json';
   const validate = compileSchema(schemaPath);
-  const snapshot = readJson<{
-    default_engine_id?: string;
-    engines?: Array<{ engine_id?: string }>;
-  }>('knowledge/product/governance/voice-engine-registry.json');
+  const snapshot = voiceEngineSnapshotCatalog.load();
   const snapshotEngines = snapshot.engines || [];
   const snapshotIds = new Set(snapshotEngines.map((engine) => String(engine.engine_id || '')));
   const directoryIds: string[] = [];
@@ -582,17 +646,7 @@ export function validateActuatorCatalogDirectoryConsistency(violations: string[]
     return;
   }
 
-  const snapshot = readJson<{
-    actuators?: Array<{
-      n?: string;
-      path?: string;
-      d?: string;
-      version?: string;
-      capability_count?: number;
-      ops?: string[];
-      contract_schema?: string;
-    }>;
-  }>('knowledge/product/orchestration/global_actuator_index.json');
+  const snapshot = globalActuatorIndexSnapshotCatalog.load();
   const snapshotById = new Map(
     (snapshot.actuators || []).map((entry) => [String(entry.n || ''), entry])
   );

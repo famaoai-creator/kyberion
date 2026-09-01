@@ -25,4 +25,16 @@ describe('wire error boundary checker', () => {
       )
     ).toEqual([expect.stringContaining('raw exception message')]);
   });
+
+  it('rejects conditional raw exception messages and debug fields', () => {
+    expect(
+      findWireErrorBoundaryViolations(
+        'return NextResponse.json({ error: error instanceof Error ? error.message : "bad", debugStack: error.stack });',
+        'presence/displays/chronos-mirror-v2/src/app/api/example/route.ts'
+      )
+    ).toEqual([
+      expect.stringContaining('raw exception message'),
+      expect.stringContaining('raw debug error fields'),
+    ]);
+  });
 });

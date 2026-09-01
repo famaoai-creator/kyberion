@@ -21,7 +21,8 @@ import { resolveAgentProviderTarget } from './agent-provider-resolution.js';
 import { listDemotedProviders } from './provider-health-registry.js';
 import { auditChain } from './audit-chain.js';
 import { isA2ATaskContractLike, validateA2ATaskContract } from './a2a-task-contract.js';
-import { recordGovernanceAction } from './kill-switch.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
+import { registerA2ARoute } from './a2a-route-port.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -1096,3 +1097,5 @@ if (!(globalThis as any)[GLOBAL_KEY]) {
   (globalThis as any)[GLOBAL_KEY] = new A2ABridgeImpl();
 }
 export const a2aBridge: A2ABridgeImpl = (globalThis as any)[GLOBAL_KEY];
+
+registerA2ARoute((envelope) => a2aBridge.route(envelope));

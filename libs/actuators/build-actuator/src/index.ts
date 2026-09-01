@@ -1,6 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
-import { logger, runActuatorCli, defineCatalogBackedActuator } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleAction } from './build-actuator-helpers.js';
 import { describeOps } from './op-catalog.js';
 
@@ -13,6 +15,7 @@ export const actuator = defineCatalogBackedActuator({
 const main = async () => {
   await runActuatorCli({
     name: 'build-actuator',
+    args: process.argv,
     handleAction,
   });
 };

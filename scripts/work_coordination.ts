@@ -1,7 +1,7 @@
-import { auditChain, createStandardYargs, logger } from '@agent/core';
+import { auditChain } from '@agent/core/audit-chain';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   appendCoordinationEvent,
-  getWorkCoordinationImportCatalogEntryByCommand,
   claimWorkItem,
   createBoard,
   createWorkItem,
@@ -10,31 +10,41 @@ import {
   listBoardItems,
   listBoards,
   listCoordinationEvents,
-  listWorkCoordinationImportCatalogEntries,
   listWorkItems,
   migrateLegacyWorkItemContexts,
   releaseWorkItem,
   renewWorkItemLease,
   updateWorkItem,
-  importGitHubIssueWithEvent,
-  importJiraIssueWithEvent,
   type WorkBoardType,
   type WorkItemPriority,
   type WorkItemSource,
   type WorkItemStatus,
   type WorkItemContext,
-  type GitHubIssueLike,
-  type JiraIssueLike,
+} from '@agent/core/work-coordination';
+import {
+  getWorkCoordinationImportCatalogEntryByCommand,
+  listWorkCoordinationImportCatalogEntries,
+} from '@agent/core/work-coordination-import-catalog';
+import type { GitHubIssueLike } from '@agent/core/work-integrations/github-issues';
+import type { JiraIssueLike } from '@agent/core/work-integrations/jira-issues';
+import { importGitHubIssueWithEvent } from '@agent/core/work-integrations/github-issues';
+import { importJiraIssueWithEvent } from '@agent/core/work-integrations/jira-issues';
+import {
   buildIntegratedHandoffHistory,
   formatIntegratedHandoffHistory,
-  loadAiDlcPhaseState,
-  projectWorkGraphToNextTasks,
-  pathResolver,
+} from '@agent/core/handoff-history';
+import { loadAiDlcPhaseState } from '@agent/core/aidlc-phase-state';
+import { projectWorkGraphToNextTasks } from '@agent/core/work-graph-projection';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry)).filter(Boolean);
@@ -45,9 +55,29 @@ function csv(value: unknown): string[] {
     .filter(Boolean);
 }
 
-function json(value: unknown): Record<string, unknown> | undefined {
+const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeJsonValue(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeJsonValue);
+  if (value === null || typeof value !== 'object') return true;
+  return Object.keys(value).every(
+    (key) =>
+      !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonValue((value as Record<string, unknown>)[key])
+  );
+}
+
+export function parseWorkCoordinationJson(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
-  return JSON.parse(value) as Record<string, unknown>;
+  const parsed: unknown = JSON.parse(value);
+  if (
+    parsed === null ||
+    typeof parsed !== 'object' ||
+    Array.isArray(parsed) ||
+    !isSafeJsonValue(parsed)
+  ) {
+    throw new Error('Expected a safe JSON object.');
+  }
+  return parsed as Record<string, unknown>;
 }
 
 const WORK_SHAPES = new Set<NonNullable<WorkItemContext['work_shape']>>([
@@ -60,7 +90,7 @@ const WORK_SHAPES = new Set<NonNullable<WorkItemContext['work_shape']>>([
 ]);
 
 function context(argv: Record<string, unknown>): WorkItemContext | undefined {
-  const parsed = json(argv.context);
+  const parsed = parseWorkCoordinationJson(argv.context);
   const value = { ...(parsed || {}) } as Record<string, unknown>;
   const mappings: Array<[string, keyof WorkItemContext & string]> = [
     ['organization-id', 'organization_id'],
@@ -96,38 +126,62 @@ function print(value: unknown): void {
   console.log(JSON.stringify(value, null, 2));
 }
 
+export function resolveWorkCoordinationInputPath(inputPath: string): string {
+  return assertSafeRepositoryPath(inputPath);
+}
+
 function discoverReadableMissionStates(): Array<{ missionId: string; state: any }> {
   const roots = [pathResolver.active('missions'), pathResolver.active('archive/missions')];
   const states: Array<{ missionId: string; state: any }> = [];
   const seen = new Set<string>();
   const visit = (root: string, nested = false): void => {
-    if (!safeExistsSync(root)) return;
-    for (const entry of safeReaddir(root)) {
-      const candidate = nested
-        ? path.join(root, entry, 'mission-state.json')
-        : path.join(root, entry, 'mission-state.json');
-      if (safeExistsSync(candidate)) {
-        try {
-          const state = readJson<Record<string, unknown>>(candidate);
-          const missionId = String(state?.mission_id || path.basename(path.dirname(candidate)));
-          if (!seen.has(missionId)) {
-            seen.add(missionId);
-            states.push({ missionId, state });
+    let safeRoot: string;
+    try {
+      safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeRoot) || !safeLstat(safeRoot).isDirectory()) return;
+    } catch {
+      return;
+    }
+    let entries: string[];
+    try {
+      entries = safeReaddir(safeRoot);
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      try {
+        const missionDir = assertSafeRepositoryPath(path.join(safeRoot, entry), {
+          allowMissingLeaf: true,
+        });
+        if (!safeLstat(missionDir).isDirectory()) continue;
+        const candidate = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+        if (safeExistsSync(candidate)) {
+          try {
+            const state = readJson<Record<string, unknown>>(candidate);
+            const missionId = String(state?.mission_id || path.basename(missionDir));
+            if (!seen.has(missionId)) {
+              seen.add(missionId);
+              states.push({ missionId, state });
+            }
+          } catch {
+            // Ignore malformed mission state; the history view remains best-effort.
           }
-        } catch {
-          // Ignore malformed mission state; the history view remains best-effort.
+          continue;
         }
-        continue;
+        if (!nested) visit(missionDir, true);
+      } catch {
+        // Ignore unsafe or malformed mission entries; keep safe history visible.
       }
-      if (!nested) visit(path.join(root, entry), true);
     }
   };
   for (const root of roots) visit(root);
   return states;
 }
 
-async function main(): Promise<void> {
-  const yargs = createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const yargs = createStandardYargs(['node', 'work_coordination', ...args])
     .command('create-item', 'Create a new work item', () => undefined)
     .command('create-board', 'Create or update a board', () => undefined)
     .command('list-board', 'List board items or boards', () => undefined)
@@ -230,7 +284,7 @@ async function main(): Promise<void> {
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
         dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
-        metadata: json(argv.metadata),
+        metadata: parseWorkCoordinationJson(argv.metadata),
       });
       print(item);
       break;
@@ -240,7 +294,7 @@ async function main(): Promise<void> {
         boardId: argv['board-id'] ? String(argv['board-id']) : undefined,
         name: String(argv['board-name'] || argv.title || argv['board-id'] || ''),
         type: (argv['board-type'] ? String(argv['board-type']) : 'project') as WorkBoardType,
-        filters: json(argv.filters) as any,
+        filters: parseWorkCoordinationJson(argv.filters) as any,
         sortBy: argv['sort-by'] ? (String(argv['sort-by']) as any) : undefined,
         lanes: Array.isArray(argv.lane) ? argv.lane.map(String) : undefined,
         description: argv.description ? String(argv.description) : undefined,
@@ -340,7 +394,7 @@ async function main(): Promise<void> {
         assigneeUserId: argv['assignee-user-id'] ? String(argv['assignee-user-id']) : undefined,
         labels: argv.labels !== undefined ? csv(argv.labels) : undefined,
         dependencies: argv.dependencies !== undefined ? csv(argv.dependencies) : undefined,
-        metadata: json(argv.metadata),
+        metadata: parseWorkCoordinationJson(argv.metadata),
       });
       print(item);
       break;
@@ -357,7 +411,7 @@ async function main(): Promise<void> {
         idempotencyKey: argv['idempotency-key'] ? String(argv['idempotency-key']) : undefined,
         expectedVersion: argv['expected-version'] ? Number(argv['expected-version']) : undefined,
         note: argv.note ? String(argv.note) : undefined,
-        payload: json(argv.payload),
+        payload: parseWorkCoordinationJson(argv.payload),
       });
       print(event);
       break;
@@ -402,7 +456,9 @@ async function main(): Promise<void> {
         throw new Error(`unknown command '${command}'`);
       }
       if (!argv.input) throw new Error('Missing --input issue JSON file');
-      const issue = readJson<GitHubIssueLike | JiraIssueLike>(String(argv.input));
+      const issue = readJson<GitHubIssueLike | JiraIssueLike>(
+        resolveWorkCoordinationInputPath(String(argv.input))
+      );
       const projectId = argv.project
         ? String(argv.project)
         : importEntry.default_project_id || undefined;
@@ -416,7 +472,14 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runWorkCoordination = defineScript({
+  name: 'work:coordination',
+  flags: [],
+  run: ({ argv }) => main(argv),
 });
+
+if (
+  isDirectScript(import.meta.url, 'work_coordination.ts') ||
+  isDirectScript(import.meta.url, 'work_coordination.js')
+)
+  void runWorkCoordination();

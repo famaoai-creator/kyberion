@@ -13,7 +13,7 @@ tags:
     extension-model,
     adoption-plan,
   ]
-last_updated: 2026-08-17
+last_updated: 2026-08-30
 status: active
 ---
 
@@ -93,7 +93,7 @@ kyberion 側の実態(実コード突合、`libs/core` 1,813 非テスト .ts / 
 | 方針の介入位置             | `tools/pre-execute → 単調 guard → execute → post-execute` の waterfall、approval `never` は service 内で pre-dispatch | tier guard は `secure-io` 内の真の interception。**approval は約 42 モジュールが call-site で呼ぶ**、egress は provider 境界で明示呼び出し。`LifecycleHookEngine`(13 event)は **並列実行 → boolean block**、値を順に変換する waterfall は無い                                                                         | 劣後(承認・egress)                |
 | per-worker 能力合成        | scope key chain + preset(runtime)                                                                                     | `subagent-capability-profiles.ts` → `generate_subagent_definitions.ts` で **生成・コミット**(runtime 合成なし)。真の per-scope registry は `getMissionDynamicInjectionRegistry(missionId)` のみ。ADF `facets:` は宣言的(TK-04)で preset に相当                                                                        | 部分的                            |
 | 「今どう束縛されているか」 | `--dump-config`(boot と同一算法)                                                                                      | 無し。`config:report` は env metadata のみ。reasoning だけ `reasoning_runtime_selection` audit 記録                                                                                                                                                                                                                   | 劣後                              |
-| 宣言と実装の突合           | ~35 `verify-*` gate、独立 AST backstop、package-attributed invariants、生成 capability graph                          | **48 `check:*`**(43 が `validate`): generate-and-diff SSoT(`check:op-registry`, `check:subagent-definitions`, `check:env-registry`)、**dead-declaration 検出**(`check:event-wiring`「宣言だけの機能は不在より悪い」)、boundary allowlist ceremony(`kyberion-development-practices.md:16-28`)                          | **kyberion 同等〜優位**           |
+| 宣言と実装の突合           | ~35 `verify-*` gate、独立 AST backstop、package-attributed invariants、生成 capability graph                          | **48 `check:*`**(43 が `validate`): generate-and-diff SSoT(`generate:op-registry -- --check`, `agents:generate -- --check`, `check:env-registry`)、**dead-declaration 検出**(`check:event-wiring`「宣言だけの機能は不在より悪い」)、boundary allowlist ceremony(`kyberion-development-practices.md:16-28`)            | **kyberion 同等〜優位**           |
 | 実行前 provenance          | 無し(dynamic package は「bash access と同等」)                                                                        | plugin は承認済み path 以外 **import しない**(fail-closed execution)                                                                                                                                                                                                                                                  | **kyberion 優位**                 |
 | tenant/scope 次元          | 無し(scope は agent 単位、authority 境界ではない)                                                                     | 選択(`tenant_overrides`)と event 可視性(`EventScope`)が tenant/org/project で統治                                                                                                                                                                                                                                     | **kyberion 優位**                 |
 | 劣化の可視化               | invariants                                                                                                            | stub-taint(`recordStubServed`)、hollow-chain 検出、failover 時 `resetSession`                                                                                                                                                                                                                                         | 同等〜優位                        |
@@ -130,7 +130,7 @@ seam 選択・prompt section・guard・hook のいずれも「登録順で決ま
 | DH-02 | seam 契約 `defineSeam`(可逆登録・多重度宣言・曖昧は失敗)と 27 seam の移行                                              | **P0** | M    | `adapter-first-extension-policy.md` / 116 `reset*`                             |
 | DH-03 | `pnpm bindings --dump`(seam × 束縛 × 理由)と `check:seam-multiplicity`                                                 | P1     | S    | KO-06 `pnpm scope` / `reasoning_runtime_selection` audit                       |
 | DH-04 | reasoning provider を descriptor + provider module registry へ(20 分岐 switch の開放、plugin から追加可)               | P1     | L    | RG-01 / QM-06 / PI-10                                                          |
-| DH-05 | op resolver 化(registry が実装を解決、managed pack が `namespace:op` を provenance 付きで寄与)                         | P1     | L    | `check:op-registry` / KD-06 plugin gate                                        |
+| DH-05 | op resolver 化(registry が実装を解決、managed pack が `namespace:op` を provenance 付きで寄与)                         | P1     | L    | `generate:op-registry -- --check` / KD-06 plugin gate                          |
 | DH-06 | 「model-visible ⟺ logged」不変条件と module 帰属 invariants registry                                                   | P1     | M    | PI-05 record log / Trace v1 / `check:event-wiring`                             |
 | DH-07 | 生成 capability-seams グラフ(三役の完全性 guard)と独立 AST backstop                                                    | P1     | S    | `CAPABILITIES_GUIDE` / `EXTENSION_POINTS.md` / `check:reference-drift`         |
 | DH-08 | plugin manifest の貢献動詞拡張(`provides` seam provider / hooks / prompt section / facet)と skill-plugin-loader の統合 | P1     | M    | KD-06 / TK-04 facet / PI-09 provenance                                         |
@@ -169,7 +169,7 @@ seam 選択・prompt section・guard・hook のいずれも「登録順で決ま
 
 ### DH-05: op resolver 化(P1 / L)
 
-**dsh の設計**: `ctx.tools.register` で plugin が tool を足し、registry が実行する。**kyberion**: `namespace:op` → ファイル規約 import、op registry は validator。**実装**: `actuator-op-registry.json` を resolver の SSoT にし(`domain → module, ops[]`)、builtin actuator はそのまま、managed pack は `provides.ops` を provenance 付きで登録。`check:op-registry` は生成・差分検査を維持しつつ「解決可能性」も検査。ADF 側の変更なし。
+**dsh の設計**: `ctx.tools.register` で plugin が tool を足し、registry が実行する。**kyberion**: `namespace:op` → ファイル規約 import、op registry は validator。**実装**: `actuator-op-registry.json` を resolver の SSoT にし(`domain → module, ops[]`)、builtin actuator はそのまま、managed pack は `provides.ops` を provenance 付きで登録。`generate:op-registry -- --check` は生成・差分検査を維持しつつ「解決可能性」も検査。ADF 側の変更なし。
 
 ### DH-06: 「model-visible ⟺ logged」と invariants registry(P1 / M)
 
@@ -260,7 +260,8 @@ seam 選択・prompt section・guard・hook のいずれも「登録順で決ま
 - 2026-08-17: DH-01 の追加段として media-generation / video-composition の direct action を preflight 化した。video の cancellation は event-loop 前に開始される既存契約を保つため、同期 listener/guard のみを許可する `runOpPreflightSync` を追加し、async extension は fail-closed にした。`op-preflight.test.ts` と video cancellation fixture で検証し、modeling / ingest など残る direct/custom loop、approval metadata の全 actuator 展開、個別 gate の全面置換は未完了。
 - 2026-08-17: DH-01 の追加段として ingest の custom pipeline loop 各 op と modeling の `reconcile` entry にも preflight を接続した。ingest は context 変数解決後の repaired params を実処理へ渡し、`check:op-preflight-coverage` は26から28境界へ拡張した。orchestrator / media / その他の custom direct helper と approval metadata の全 actuator 展開、個別 gate の全面置換は未完了。
 - 2026-08-17: DH-01 の追加段として legacy orchestrator pipeline helper の各 step にも標準 preflight を接続した。super-nerve と legacy helper の二重実装で governance が分かれないよう、control/capture/transform/apply の全分岐へ repaired params を渡し、`check:op-preflight-coverage` は28から29境界へ拡張した。media の ADF 外 direct helper と approval metadata の全 actuator 展開、個別 gate の全面置換は未完了。
-- 2026-08-17: DH-07 の第一段として `generate:capability-seams` / `check:capability-seams` を追加し、移行済み 20 seam の declaration/provider/consumer 役割を `docs/developer/CAPABILITY_SEAMS.md` に決定的に生成する。宣言 module の `defineSeam`、consumer file の存在、runtime catalog との対応を fail-closed で検査する。独立 TypeScript AST backstop と未移行 seam の全27件化は未完了。
+- 2026-08-28: DH-01 のレビュー修正として media actuator の公開 `handleMediaAction` 入口にも `media:pipeline` の標準 preflight を接続し、修復済み steps/context/options を実行へ渡すようにした。direct dispatch が block された場合に media operation が開始されない回帰を追加し、coverage checker を34境界で検査できるようにした。approval metadata の全 actuator 展開と個別 gate の全面置換は継続課題である。
+- 2026-08-17: DH-07 の第一段として `generate:capability-seams`（`--check` で差分検査）を追加し、移行済み 20 seam の declaration/provider/consumer 役割を `docs/developer/CAPABILITY_SEAMS.md` に決定的に生成する。宣言 module の `defineSeam`、consumer file の存在、runtime catalog との対応を fail-closed で検査する。独立 TypeScript AST backstop と未移行 seam の全27件化は未完了。
 - 2026-08-17: DH-05 の第一段として `resolveActuatorOperation(domain, action)` を actuator op registry と manifest catalog に接続し、解決した actuator id・module path・step type・manifest path を返すようにした。module path は manifest の `entrypoint` を基準に `.js` へ決定的に変換する。`run_pipeline` は registry 解決を優先し、`actuator.resolved` trace に provenance を記録し、未登録の managed/legacy actuator だけ従来の filesystem convention にフォールバックする。managed pack の runtime op 登録と convention fallback の完全廃止は未完了。
 - 2026-08-17: DH-05 の第二段として manifest entrypoint の module path 変換を `resolveActuatorModulePath` に分離し、absolute path と `.`/`..` segment を import 前に拒否する fail-closed 境界と fixture を追加した。managed pack の runtime op 自動発見、operation-level module catalog、convention fallback の完全廃止は未完了。
 - 2026-08-17: DH-05 の第三段として plugin が寄与した `namespace:op` も `listRegisteredDomainOps` の domain catalog へ合成し、既存の registry consumer が builtin と managed op を同じ一覧で参照できるようにした。DH-14 の operation timeout も plugin API の宣言から resolver・`actuator.resolved` trace へ伝播する。managed pack の自動発見、operation-level catalog の永続化、convention fallback の完全廃止は未完了。
@@ -306,12 +307,447 @@ seam 選択・prompt section・guard・hook のいずれも「登録順で決ま
 - 2026-08-17: DH-12 の第七段として supervisor daemon が worker の exit を監視し、未 claim の durable `next_run` inbox が残る場合だけ最大 3 回の指数バックオフ restart を行うようにした。activation は `pending → claimed → completed|failed` として親 snapshot へ記録し、正常完了を再実行せず、claim 後の crash は one-shot 制約を維持したまま bounded failure として監査する。restart exhaustion、pending inbox の有無、activation completion の回帰テストを追加した。実 provider E2E と provider 自体の個別 restart policy は未完了。
 - 2026-08-17: DH-03 の第二段として seam provider metadata に deterministic な `reason` を追加し、`pnpm bindings --dump --json` が provenance/source だけでなく現在の binding 理由も出力できるようにした。未指定の builtin/plugin/provider は provenance または source から安定した fallback reason を導出し、登録順や実装値に依存しない。選択理由の policy/env/tenant/probe 実測と全 seam の provider override は未完了。
 - 2026-08-17: DH-03 の第三段として human-readable な `pnpm bindings --dump` にも JSON dump と同じ deterministic binding reason を表示するようにした。運用者が provenance/source と選択理由を同じ出力で確認できる。選択理由の policy/env/tenant/probe 実測と全 seam の provider override は未完了。
+- 2026-08-31: DH-03 の第四段として reasoning backend の実選択関数から safe な provenance reason を生成し、`requested`、環境変数名、CLI provider probe の healthy 判定、fallback 順、tenant/organization/project overlay の適用を seam binding metadata へ接続した。環境変数の値や secret は記録しない。policy/bootstrap/seam の 38 テスト、`build:packages`、canonical full gate（67/67）で確認した。全 seam の provider override、外部 provider の実 probe 証跡、未移行 seam の runtime catalog 化は継続課題である。
 - 2026-08-17: DH-12 の第八段として実際の `spawnDelegatedTaskWorkerProcess` を使う process-level E2E を追加した。stub backend の実 worker が durable inbox を `register→wake→resume(fromInbox)` で消費し、親 snapshot を `activation_status=completed` へ更新し、queue を空にすることを検証する。実 provider credentials を使う live E2E と provider 個別 restart policy は引き続き未完了。
 - 2026-08-17: DH-13 の第二段として service binding が credential fallback candidate を `SecretReference[]`（env/scope/operation のみ）として保持するようにした。実際の secret 値の解決は従来どおり最終的な secret-guard boundary に限定し、候補順を壊さず rotation/fallback を追跡できる。service binding と resolver の回帰テストで、reference に値を混入させず operation scope を保持することを固定した。secret actuator/全 secret consumer の late-bound reference 化、operation ごとの実 provider policy、credential rotation の外部 integration は未完了。
 - 2026-08-17: DH-01 の追加段として code / wisdom actuator の直接 `reconcile` 公開入口にも標準 preflight と repaired input の受け渡しを接続した。ADF 内部 step だけでなく strategy を直接読む経路も `scope → ADF → egress → spend` waterfall を通り、`check:op-preflight-coverage` は29から31境界へ拡張した。wisdom の既存 contract test は tenant 必須の security scope と terminal preflight denial を明示する形へ補正し、両 actuator の関連テスト・型チェックを通過した。残る approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは未完了。
 - 2026-08-17: DH-01 の追加段として ADF 外の artifact actuator 直接操作（artifact write/read/list/delivery pack）にも標準 preflight を接続し、拒否判定前に成果物書込みが発生しないことを回帰テストで固定した。`check:op-preflight-coverage` は31から32境界へ拡張した。残る approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは未完了。
 - 2026-08-17: DH-01 の追加段として system actuator の直接 `reconcile` も標準 preflight を通し、strategy JSON の読み込み前に block/ask を終端判定できるようにした。repaired な strategy path/options は実行へ引き継ぎ、拒否時に strategy を読まない回帰テストを追加した。`check:op-preflight-coverage` は32から33境界へ拡張した。残る approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは未完了。
 - 2026-08-17: DH-01 の追加段として system の `computer_interaction` direct action も `system:computer_interaction:<type>` preflight を通すようにした。repaired action params を OS automation へ渡し、拒否時は click/type/key 等を開始しないことを回帰テストで固定した。system actuator の同一公開境界内で reconcile と OS direct action の governance を統一した。残る approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは未完了。
+- 2026-08-29: DH-01/SX-10 のレビュー修正として Android/iOS の custom pipeline loop も `runActuatorPipeline` へ移行した。結果配列、最大 step 数、失敗時停止、mobile domain handler は維持し、step の placeholder 再帰解決・標準 preflight・repaired input の受け渡しだけを shared SDK に統一した。preflight listener が実値を観測する回帰を追加し、直接 loop の raw admission ずれを防いだ。approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは継続課題である。
+- 2026-08-29: DH-01 のレビュー修正として `check:op-preflight-coverage` の検出をコメント・文字列中の例ではなく実呼び出し構文に限定した。共有 SDK/ADF engine の preflight 実装と各 public boundary の接続を同じ checker が検査し、コメントだけの synthetic boundary が green にならない回帰テストを追加した。approval metadata の全 actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは継続課題である。
+- 2026-08-29: DH-01/SX-10 の追加レビュー修正として Vision actuator の action-form custom pipeline loop を `runActuatorPipeline` へ移行した。schema の `action` step を shared runner の `op` ABI へ明示変換し、単発 action と legacy media-generation fallback の domain 実行は維持した。Vision の pipeline 回帰を追加し、残る custom direct helper の棚卸しを継続する。
+- 2026-08-29: DH-01/SX-10 の追加レビュー修正として Media Generation actuator の `continue_on_error` custom pipeline loop を `runActuatorPipeline` へ移行した。action-form step を shared runner の `op` ABI へ明示変換し、step failure の集約、継続実行、trace span と result envelope は維持した。残る custom direct helper の棚卸しを継続する。
+- 2026-08-29: DH-01/SX-10 の追加レビュー修正として Voice actuator の pipeline loop も `runActuatorPipeline` へ移行した。action-form と top-level action contract の step 全体を preflight input として保持し、既存の単発入口、trace、失敗時 envelope を維持したまま shared admission に統一した。残る custom direct helper の棚卸しを継続する。
+- 2026-08-29: DH-01/SX-10 の追加レビュー修正として Orchestrator の control-flow pipeline loop も `runActuatorPipeline` へ移行した。step 上限、timeout、if/while/nested pipeline、context persistence は維持し、capture/transform/apply/control の domain dispatch だけを execute callback に残して、step admission を shared runner に統一した。残る custom direct helper の棚卸しを継続する。
+- 2026-08-29: DH-01 の追加レビュー修正として `runActuatorPipeline` と `executeAdfSteps` が step-level `approval_required` / `_approval_required` metadata を共通 preflight の `requiresApproval` へ伝播するようにした。承認済み判定は trusted caller callback、human presence は caller signal のみを受け付け、未指定または未承認は ask/block のまま handler を実行しない。approval metadata の全 direct actuator 展開と個別 gate の全面置換は継続課題である。
+- 2026-08-29: DH-01/PI-06 の追加レビュー修正として、共有 trace replay validator が event timestamp の欠損・不正値と未登録 span 名を strict mode で fail-closed に拒否するようにした。現行 extension namespace を明示 registry 化し、Chronos/Terminal/history/intent の persisted consumer が schema 不正 event/span を表示・集計しない境界を回帰テストで固定した。全 custom direct helper と Exact telemetry 型の全面適用は継続課題である。
+- 2026-08-29: DH-01 の追加レビュー修正として、service actuator と Super-Nerve の個別 preflight が `_approval_granted` を入力/contextから承認済み扱いしないようにした。service の公開入口は trusted caller option のみで既存承認を受け付け、未信頼 approval payload の回帰を追加した。個別 gate の全面統一は継続課題である。
+- 2026-08-29: DH-01/PI-08 の追加レビュー修正として、Chronos の deliverable inbox、trace feed、raw trace log、knowledge-ref の各 read boundary に viewer の tierAccess を適用した。mission state/record metadata/path から tier を解決し、personal や unknown tier の record を masked viewer へ返さない回帰を追加した。残る直接 read boundary の棚卸しは継続する。
+- 2026-08-29: DH-01/PI-08 の追加レビュー修正として、Chronos の `runtime-file` 直接 read にも project path/registry の tier・tenant scope を適用した。tier を解決できない legacy path は拒否し、confidential project skeleton を public-only viewer が読めない回帰を追加した。残る直接 read boundary の棚卸しは継続する。
+- 2026-08-29: DH-01/PI-08 の追加レビュー修正として、Chronos `intelligence` 集約の active mission/project/work coordination/recent artifact 投影にも viewer tierAccess を適用した。public-only viewer が confidential の運用データを集約レスポンスから受け取らないよう、project/mission/record の tier を入力段で fail-closed にした。残る集約補助データの tier metadata 監査は継続する。
+- 2026-08-29: DH-01/PI-08 の追加レビュー修正として、Chronos `intelligence` の履歴/control/owner/agent/A2A/runtime/approval 補助投影にも viewer tierAccess を適用した。GET と SSE の両経路を同じ mission scope 判定へ接続し、public-only viewer の confidential metadata 混入を防いだ。project track/mission seed、runtime 集計、mission/project control の POST 境界も許可 tier 基準へ揃えた。集約補助データの tier metadata 監査は継続する。
+
+- 2026-08-29: DH-01/PI-08 の追加レビュー修正として、legacy Chronos `/api/agent` の deterministic pipeline shortcut を localadmin 専用へ制限し、input path を repository 内 `pipelines/**/*.json` に限定した。readonly viewer の実行と `../` による path escape を防ぐ resolver を追加し、helper/route 回帰を通過した。残る直接実行入口の棚卸しは継続する。
+- 2026-08-30: DH-02 の追加 wave として、未移行だった `a2a-route`、`agent-runtime-ensurer`、`super-nerve-executor`、`provider-health-resolver` の4 sole portを `defineSeam`/`coreSeamCatalog` へ移行した。登録は disposer を返し、二重 provider は last-wins せず拒否する。未初期化時の conservative fallback と既存の route replacement エラーは維持し、bindings generator の declaration/consumer role と回帰テストを追加した。これにより runtime catalog 上の seam は 25 件となり、残る未移行登録口と `reset*` の全面廃止は継続課題である。
+- 2026-08-30: DH-02 の完了 wave として、残っていた `identity-context-resolver` と `mission-worker-core-dispatcher` も `coreSeamCatalog` の sole seam へ移行した。bootstrap 時の安全な identity fallback、未初期化 dispatcher の拒否、重複登録拒否、disposer による復元を維持し、bindings dump は計画上の 27 seam と一致した。DH-02 の27 seam catalog化と生成グラフは完了し、`reset*` の全面廃止と未分類の低層 registration bridge は継続課題である。
+- 2026-08-30: DH-02 の追加レビュー修正として、security-sensitive な `risky-approval-handler` も sole seam 化した。未登録時の pending fallback、既存の replacement 拒否コード、同一 handler の idempotent registration を維持し、approval registry の provider が bindings dump と生成グラフに現れるようにした。計画上の27 seamに加えた28件目の登録口であり、残る未分類の低層 registration bridge と `reset*` の全面廃止は継続課題である。
+- 2026-08-31: DH-01 のレビュー修正として、orchestrator 公開 wrapper の `reconcile` 入口にも標準 preflight を追加し、strategy path のリポジトリ外参照・symlink traversal・未承認 project-local strategy の読み込みを拒否するようにした。strategy の読み込み前に trust と admission を完了し、回帰テストと `check:op-preflight-coverage` の境界登録で固定した。approval metadata の全 direct actuator 展開、個別 gate の全面置換、全 custom direct helper の棚卸しは継続課題である。
+- 2026-08-31: DH-01/PI-03 の追加レビュー修正として、Chronos scheduler の登録・解決経路で相対 `..` による pipeline path escape を拒否し、実行対象を `pipelines/**/*.json` の repository-owned regular file に限定した。symlink 配下・symlink 自体の scheduled pipeline は登録/実行対象から除外し、scheduler の path portability を保ったまま scope 回帰を追加した。CLI/operator の全 direct loader と承認記録の接続、その他の直接 read boundary の棚卸しは継続課題である。
+- 2026-08-31: DH-16/PI-03 の追加レビュー修正として、project-local external hook config の登録を path ごとの hash-bound `project-trust` approval に接続した。trust 済み boolean だけでは設定変更後の command を許可しないよう、authenticated human approval の content hash を `external-hook-discovery` が read 前に再検証し、未承認・改変 config は partial registration せず `skipped` へ落とす。external hook 5 テスト、対象 lint、build/full gate で確認した。global interactive ask surface と default engine への暗黙登録は継続課題である。
+- 2026-08-31: DH-16/PI-03 の追加レビュー修正として、内部 `loadLifecycleHookEngine` を canonical governance config のみ読む loader へ限定した。任意の外部 JSON を command hook として登録できる path を閉じ、別 provider config は external discovery の trust/approval 境界へ分離する。19 テスト、対象 lint、build/full gate で確認した。global interactive ask surface と default engine への暗黙登録は継続課題である。
+- 2026-08-31: DH-01/PI-03 の追加レビュー修正として、`pipeline-preview` と CLI `preview` の input/ref reader に repository root／symlink 境界を接続した。読み取り専用 preview であっても外部 JSON の step 内容を可視化経路へ混入させないようにし、13 テスト、対象 lint、build/full gate で確認した。その他の直接 read boundary の棚卸しは継続課題である。
+- 2026-08-31: DH-11 の追加レビュー修正として、`sandbox-policy.ts` の resolved policy を async-safe な実行コンテキストへ接続した。ADF handler は partial enforcement を dispatch 前に拒否し、network-disabled は ADF HTTP hook・`validateUrl`・egress policy の全経路で deny、read-only／writable roots は secure-io の write permission へ伝播する。sandbox policy 5 テストを含む関連 83 テスト、対象 lint、typecheck で確認した。provider capability probe による外部 CLI の enforcement 実測と全 provider adapter の context wiring は継続課題である。
+- 2026-08-31: DH-11/PI-03 の追加レビュー修正として、provider capability registry／scan policy の明示 override path を repository root・path component symlink 検査へ接続した。既定の governed catalog と schema 検証は維持し、repository 外 override を `[RESOURCE_PATH_SCOPE]` で拒否する回帰を追加した。provider capability scanner 9 テスト、対象 lint、typecheck、`build:packages`、canonical full gate（67/67）で確認した。外部 CLI の sandbox enforcement 実測と全 provider adapter の context wiring は継続課題である。
+- 2026-08-31: DH-11/PI-03 の追加レビュー修正として、active sandbox policy を provider permission matrix へ伝播し、Claude／Codex／AGY／Grok の CLI delegation／native subagent／structured path と legacy agent adapter に適用した。read-only は explorer へ狭め、AGY の partial enforcement は spawn 前に拒否し、network-disabled は reasoning outbound choke point で拒否する。provider capability scanner の evidence probe 失敗も capability を available にせず、個別 probe の結果を返す fail-closed 契約へ変更した。関連 adapter／scanner／egress／registry **151 tests passed**、対象 lint、typecheck、`build:packages`、canonical full gate で確認した。実 CLI に対する OS-level sandbox enforcement の live probe は、provider 側の安定した非対話 probe 契約が必要なため継続課題である。
+
+- 2026-08-31: DH-11/PI-03 の追加レビュー修正として、Gemini CLI の delegation／structured／prompt 経路へ active sandbox policy を `--sandbox`／`--approval-mode` として射影し、`extraArgs` による `-y`／approval mode／sandbox の上書きを除去した。Copilot ACP は sandbox projection を表現できないため session boot 前に typed refusal とし、provider capability registry には実モデル実行を伴わない `--help` flag-support probe（supported／unsupported／unknown）と schema を追加した。関連 66 tests、lint、typecheck、`build:packages`、canonical full gate **67/67** で確認した。help flag は OS-level enforcement の証明ではなく、実 CLI の非対話 enforcement probe は継続課題である。
+- 2026-08-31: PI-03 の direct loader 再レビューとして、browser onboarding の active profile／voice sample path、mission process template の mission-local path、deal store／deal document の customer path を `assertSafeRepositoryPath` と canonical tenant slug／deal ID 検証へ接続した。repository 外、path component の symlink、invalid tenant slug／deal ID は読み書き前に fail-closed とし、契約テンプレートも knowledge 配下へ限定した。対象 **30 tests**、lint、typecheck、package build、canonical full gate **67/67**、`git diff --check` で確認した。未監査の direct loader 全件 inventory と実 CLI の enforcement probe は継続課題である。
+- 2026-08-31: PI-03 の mission lifecycle direct loader 再レビューとして、completion の mission／evidence／receipt／deliverable path を `assertSafeRepositoryPath` と mission-relative confinement へ統一した。外部 mission directory、絶対／traversal path、symlink component は lifecycle artifact の読書き前に fail-closed とし、meeting deliverable の customer root／mission id も再検査した。関連 **25 tests**、lint、typecheck、package build、canonical full gate **67/67**、baseline pipeline、`git diff --check` で確認した。未監査の direct loader 全件 inventory と tenant-aware discovery は継続課題である。
+- 2026-08-31: PI-03 の peer runtime recovery direct loader 再レビューとして、tenant-scoped quarantine path、manifest、peer directory、move source／destination、recovery event log の repository 所属と symbolic link を復元前に再検査した。tenant root の prefix boundary と peer ID の path segment も fail-closed にし、既存の authenticated human approval／fresh heartbeat gate は維持した。関連 **3 tests**、lint、typecheck、package build、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+- 2026-08-31: PI-03 のレビュー修正として、tenant design resolver の `customerId` 経路が fixture／設定済み `rootDir` ではなく実 repo の customer overlay を参照していた残存を修正した。明示 tenant context がある場合は対象 tenant の confidential design だけを走査し、registry の `override_path` も `knowledge/confidential/{tenant}/design` 配下へ限定した。別 tenant の branding と personal-tier override を返さない回帰を追加し、関連 **11 tests**、対象 lint、typecheck、package build、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+- 2026-08-31: PI-03 の追加レビュー修正として、mission phase gate／work graph projection／mission hygiene／planning progress の mission artifact 読み書きを `assertSafeRepositoryPath` へ接続した。mission directory、gate definition、NEXT_TASKS、TASK_BOARD、dispatch manifest の repository 所属と path component symlink を再検査し、外部内容を gate／operator 投影へ混入させない回帰を追加した。関連 **22 tests**、対象 lint、typecheck、package build、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+- 2026-08-31: PI-03 の mission context pack 追加レビューとして、mission root、mission-state、dispatch manifest／response、context rollup／context-pack の読み書きを `assertSafeRepositoryPath` へ接続した。manifest 由来の外部 response path は model-visible seed へ取り込まず、symlinked mission root は build／save 前に fail-closed とした。関連 **8 files / 68 tests passed**、対象 lint、typecheck、5 package build、`git diff --check`、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+- 2026-08-31: PI-03 の mission closure／governance／maintenance／orchestration event 追加レビューとして、mission artifact closure と purge/archive の全 destructive target、finish quality／review／marketing gate、runtime event／payload loader を `assertSafeRepositoryPath` へ接続した。symlinked mission/class path、外部 receipt／artifact／payload、unsafe archive target は読み書き・削除・移動前に fail-closed とし、purge sweep は全候補を先に preflight して部分適用を防止した。関連 **15 files / 125 tests passed**、対象 lint、typecheck、5 package build、`git diff --check`、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+- 2026-08-31: PI-03 の mission retrospective 追加レビューとして、mission telemetry／NEXT_TASKS／dispatch manifest／retrospective report の読み書きを `assertSafeRepositoryPath` へ接続した。symlinked telemetry は統計・改善提案の入力へ取り込まず、mission-local report と shared queue の repository 所属を再検査した。関連 **16 files / 131 tests passed**、対象 lint、typecheck、5 package build、`git diff --check`、canonical full gate **67/67** で確認した。未監査の direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: DH-11/PI-13 の追加レビュー修正として、provider conformance に runtime sandbox enforcement の明示 check を追加した。`--help` の flag evidence と OS-level write-sentinel evidence を分離し、live provider の probe 未実行を `unavailable`、sandbox write 成功を `failed` として受入れから除外する。矛盾した非該当証跡と空の evidence も拒否し、stub／API provider の非該当も暗黙に成功させず明示する。関連 18 tests、typecheck、`git diff --check` で確認した。実 CLI の非対話 probe と全 provider adapter の wiring は継続課題である。
+
+## 2026-08-31: DH-11 の tenant boundary 追加レビューとして、customer channel binding discovery を tenant registry の active profile と repository／symlink path assertion へ接続した。customer overlay のディレクトリ名だけで tenant identity を作らず、未登録・suspended／archived tenant、registry profile の symlink、symlink overlay、tenant registry が返す overlay root を inbound binding／tenant resolution から除外する。関連 **2 files / 22 tests**、typecheck、package build、lint、`git diff --check`、canonical full gate **67/67**、baseline pipeline で確認した。provider CLI の実 CLI enforcement probe と全 direct loader inventory は継続課題である。
+
+## 2026-08-31: DH-11 の audit mirror 追加レビューとして、任意の customer directory discovery を master audit chain の有効 tenant entry 起点へ変更し、secure-io の path assertion capability を mirror の read／write 全経路へ伝播した。symlink overlay と capability 欠落は fail-closed とする。関連 **4 files / 45 tests**、typecheck、package build、lint、`git diff --check`、canonical full gate **67/67**、baseline pipeline で確認した。provider CLI の実 CLI enforcement probe と全 direct loader inventory は継続課題である。
+
+## 2026-08-31: DH-11 の runtime／service direct loader 追加レビューとして、service connection fallback、Cloudflare control-plane state、daemon heartbeat、service recording、provider capability cache、A2A secret、stimuli journal の保存・読込 path を `assertSafeRepositoryPath` へ統一した。service ID と recording ID の path segment 境界、任意 heartbeat root の repository confinement、symlink component 拒否を回帰で確認した。関連 **8 test files / 73 tests**、typecheck、package build、lint、`git diff --check`、canonical full gate **67/67 passed**、baseline pipeline、`check:op-preflight-coverage` **37 public boundaries passed** で確認した。provider CLI の実 CLI enforcement probe と全 direct loader inventory は継続課題である。
+
+- 2026-08-31: DSH-12 の追加レビューとして、動的 session ID／request tag を使う browser conversation／realtime voice と plugin／desktop／screen の temporary artifact path を単一 path segment 検証＋`assertSafeRepositoryPath` に接続した。関連 **6 files / 75 tests passed**、typecheck、`git diff --check`、baseline pipeline passed で確認した。canonical full gate は約3分半後も子プロセス無応答のため停止し、provider CLI の OS-level 非対話 enforcement probe と未監査 direct loader 全件 inventory は継続課題として保持する。
+
+- 2026-08-31: DSH-12 の working-memory path 再レビューとして、外部入力の `mdPath` を `active/` 配下の volatile face に限定し、symlink component を拒否する `read`／`nominate-promotion` 境界を追加した。QM-03 の UPDATE provenance 保持と consolidation threshold の read-only status も回帰で確認した。関連 **5 files / 52 tests passed**、`bench:memory`、typecheck、package build、lint、`check:op-preflight-coverage` **37 public boundaries passed**、`git diff --check` で確認した。provider CLI の OS-level 非対話 enforcement probe と未監査 direct loader 全件 inventory は継続課題として保持する。
+
+- 2026-08-31: DSH-12 の capability registry 再レビューとして、working-memory actuator の self-described op catalog を registry generator に接続し、既存 weekly-review の3 working-memory opを capability resolution へ復旧した。全 op に bounded input schema／examples を付与し、weekly-review dry-run が `ready` になる回帰を追加した。関連 **3 files / 297 tests passed**、`generate:op-registry --check`、module invariants **6 registered invariants** で確認した。provider CLI の OS-level 非対話 enforcement probe と未監査 direct loader 全件 inventory は継続課題として保持する。
+
+## 2026-08-31: DSH-12/PI-03 の direct loader 再レビューとして、project／mission／surface／session の動的 ID と明示 root を使う保存・読込境界へ repository／symlink 検査を追加した。AI-DLC、in-room minutes、ingest cursor、surface runtime、computer surface、trust／generation の証跡を含め、関連 **14 files / 78 tests passed**、typecheck、lint、package build、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と canonical loader 全件 inventory は継続課題として保持する。
+
+## 2026-08-31: DH-16 の interactive ask／default engine 連携
+
+外部 hook discovery が明示 engine にしか登録できず、`ask` を実際の surface で承認要求へ変換する process-wide 接続がなかった残存を修正した。hash-bound project trust を維持した `registerDiscoveredExternalLifecycleHooksOnDefaultEngine` を追加し、default lifecycle engine へ接続できるようにした。さらに `registerDefaultLifecycleHookApprovalSurface` と `fireDefaultLifecycleHooks` を追加し、surface resolver が返す場合だけ shared approval store へ materialize する。resolver 未登録・未対応・例外時は既存の fail-closed blocked outcome を維持し、global surface の silent last-wins 置換も拒否する。
+
+検証: lifecycle hook／external discovery **3 files / 30 tests passed**、root／core typecheck、対象 lint、`git diff --check`。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、残りの script registry 集約は継続課題である。
+
+## 2026-08-31: PI-03 の environment capability direct loader 再レビュー
+
+`mission-evidence.filename` と setup receipt の manifest／mission id が、JSON read／write 前に repository／mission-relative boundary を再検査していなかった残存を修正した。evidence filename は単一の安全な file name に限定し、receipt path は manifest id を検証したうえで `assertSafeRepositoryPath` を通す。manifest 一覧でも symlink／regular file 以外を採用しない。traversal、symlink、receipt path escape の回帰を追加した。
+
+検証: environment capability **2 files / 54 tests passed**、core typecheck、対象 lint、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の meeting consent direct loader 再レビュー
+
+`checkMeetingParticipationConsent` の mission id と `voice-consent.json` を、path resolver の返却値だけで読み取っていた残存を修正した。mission id を検証し、consent path を JSON read 前に `assertSafeRepositoryPath` へ通すことで、traversal と symlinked evidence directory を fail-closed にした。関連 **1 file / 11 tests passed**、対象 lint、typecheck、`git diff --check`、canonical full gate で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: EV-03/PI-03 の reflex definition loader 再レビュー
+
+untrusted stimulus から自動 dispatch へつながる reflex definition loader に、repository／symlink／regular-file 境界を追加した。定義ディレクトリと各 `.adf.json` を `assertSafeRepositoryPath` と `safeLstat` で検査し、不正な1定義を skip して安全な定義の読み込みを継続する。関連 **1 file / 14 tests passed**、shared-nerve typecheck、対象 lint、`git diff --check`、canonical full gate で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の operator reasoning selection loader 再レビュー
+
+default reasoning route が operator の `llm-selection.json` を path resolver の返却値だけで信頼していた残存を修正した。selection path を JSON read 前に `assertSafeRepositoryPath` へ通し、symlink 経由の provider／model 選択を fallback へ戻す回帰を追加した。関連 **2 files / 20 tests passed**、core typecheck、対象 lint、`git diff --check`、canonical full gate で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: I18N-01/05 の profile identity loader 再レビュー
+
+timezone／locale／operator display name の identity file loader が profile root の返却値だけで `my-identity.json` を読んでいた残存を修正した。3経路を JSON read 前の `assertSafeRepositoryPath` へ接続し、symlink identity は timezone／locale の fallback または display name の fallback へ fail-closed する回帰を追加した。関連 **6 files / 49 tests passed**、core typecheck、対象 lint、`git diff --check`、canonical full gate で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: DA-01/PI-03 の tenant registry enumeration 再レビュー
+
+tenant profile の一覧が `.json` suffix と tenant slug だけで symlink profile を登録候補へ含めていた残存を修正した。列挙段階で `safeLstat(...).isFile()` を要求し、`resolveTenant` の customer overlay error 変換も同じ保護範囲へ収束させた。関連 **1 file / 17 tests passed**、core typecheck、対象 lint、`git diff --check`、canonical full gate で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の secret-guard direct loader 再レビュー
+
+personal connection の起動時 scan、connection document、secrets／grant file、backup path が secure I/O の権限検査だけで読込・書込へ進み、既存 path component／symlink を再検査していなかった残存を修正した。共通 `assertSafeRepositoryPath` と `safeLstat` を JSON／JSONL read 前へ適用し、symlink／非 regular file は秘密値 cache へ取り込まず、unsafe connection は fail-closed とした。関連 **1 file / 8 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の operator notification resource loader 再レビュー
+
+operator notification preferences と未配送通知の shared log が path resolver の返却値だけで JSON read／JSONL append へ進んでいた残存を修正した。preferences／運用ログを `assertSafeRepositoryPath` へ接続し、symlink 経由の通知先読込・ログ書込を fail-closed にした。関連 **2 files / 8 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の procedure catalog reader 再レビュー
+
+`readProcedureCatalog(filePath)` が公開 loader 自身では caller の path を再検査せず JSON read へ進み得た残存を修正した。catalog reader の入口で `assertSafeRepositoryPath` を必須化し、symlink／repository 外の procedure catalog を schema validation／procedure dispatch の入力へ混入させない回帰を追加した。関連 **2 files / 27 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の CLI input reader 再レビュー
+
+公開 `readJsonFile`／`readTextFile` が caller の path を直接 secure reader へ渡していた残存を修正した。両入口で `assertSafeRepositoryPath` を必須化し、repository 外・symlink 経由の CLI input が JSON／text reader へ到達しない回帰を追加した。関連 **2 files / 3 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の mission-state direct loader 再レビュー
+
+mission focus と project ledger が共有する JSON 補助 loader の入口で、caller の path を再検査せずに read／write へ進み得た残存を修正した。`readFocusedMissionId`／`writeFocusedMissionId`／`readJsonFileSafe` を `assertSafeRepositoryPath` へ接続し、symlink 経由の focus／ledger resource を fail-closed にした。関連 **2 files / 3 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の media catalog direct loader 再レビュー
+
+media actuator の再帰 catalog discovery が JSON symlink を `loadJson` へ渡し、公開 `loadJsonValue` も単独呼出しでは path boundary を持たなかった残存を修正した。directory／leaf を `assertSafeRepositoryPath` と regular-file 検査へ接続し、tenant index／confidential tenant directory の symlink を候補から除外した。関連 **2 files / 2 tests passed**、actuator typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の fs-utils／orchestrator status loader 再レビュー
+
+共通 `fs-utils` が symlink を regular file として返し、orchestrator の mission／project status snapshot がその結果を直接 JSON／README read へ渡していた残存を修正した。recursive／async enumeration で symlink と非 regular file を除外し、snapshot の JSON／README 入力を `assertSafeRepositoryPath` へ接続した。関連 **3 files / 25 tests passed**、core／actuator typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03/PI-19 の work coordination store loader 再レビュー
+
+work coordination の runtime root が安全でも、既存の `items.jsonl`／`leases.jsonl`／`boards.json`／events leaf が symlink の場合に JSONL／JSON read・append・write が進み得た残存を修正した。共通 store helper の全 read／append／write 入口を `assertSafeRepositoryPath` へ接続した。関連 **2 files / 21 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03/PI-19 の mission-task-events loader 再レビュー
+
+mission task event の mission-local／shared event path と authority state read が path resolver の返却値だけで JSONL／JSON 処理へ進み得た残存を修正した。event path、shared observability path、mission state path を `assertSafeRepositoryPath` へ接続し、symlinked mission resource を fail-closed にした。関連 **3 files / 5 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の source-analysis metadata loader 再レビュー
+
+source-analysis の source root と package manifest の path を、列挙結果や lexical containment だけでなく `assertSafeRepositoryPath` へ接続した。symlinked package manifest は依存関係 read に到達せず、source-derived analysis へ外部 metadata を混入させない。関連 **2 files / 6 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の system actuator status／directory loader 再レビュー
+
+system actuator の `list_missions`／`list_capabilities`／`sample_traces`／`artifact_collection` と `scan_directory` が、列挙した mission／package／trace／artifact path を直接 read していた残存を修正した。directory／leaf を `assertSafeRepositoryPath` と `safeLstat` で再検査し、symlink／非 regular file を status・capability・trace・artifact read-model へ混入させない。関連 **2 files / 1 test passed**、actuator typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: KD-03/PI-03 の worker-state journal loader 再レビュー
+
+worker state journal の constructor 後に journal／derived index leaf が差し替わると、restore／summary の JSONL／JSON read と index write が再検証なしに進み得た残存を修正した。append、restore、self-healing projection の各操作時に `assertSafeRepositoryPath` を再適用し、symlinked worker state を fail-closed にした。関連 **2 files / 20 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: KD-02/PI-03 の manual-drive bridge resource loader 再レビュー
+
+manual-drive bridge の descriptor／command／result／cancellation resource が初期 `bridgePaths` 解決後に差し替えられた場合、JSON／JSONL read・append・write が再検証なしに進み得た残存を修正した。durable descriptor、command queue、result journal、cancellation journal の各操作時に `assertSafeRepositoryPath` を再適用した。関連 **1 file / 17 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-16/PI-03 の writer-lease resource loader 再レビュー
+
+writer lease の本体と metrics が初期 lease path の解決後に JSON／metrics leaf を差し替えられた場合、read／write が再検証なしに進み得た残存を修正した。lease read／write、metrics read／write、metrics path derivation の各入口を `assertSafeRepositoryPath` へ接続し、symlinked lease を fencing／observability state に混入させない。関連 **2 files / 9 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の surface／task-session／metrics resource loader 再レビュー
+
+surface coordination の record discovery／JSON read／削除、task-session の runtime／manifest／state read、metrics の履歴／SLO read と JSONL append に残っていた operation-time path boundary を修正した。`safeStat` の symlink 追跡を `safeLstat`／`assertSafeRepositoryPath` へ置き換え、symlinked outbox／session／metrics history が外部 resource を read-model・task list・metrics ledger へ混入させないことを固定した。関連 **6 files / 48 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68** で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の governed catalog 共通 loader 再レビュー
+
+`defineCatalog` の `load`／`generation`／`publish` が Foundation I/O へ委譲する前に catalog path を再検証していなかった残存を修正した。共通入口を `assertSafeRepositoryPath` へ接続し、symlinked catalog が cache／generation 判定／publication の入力へ混入しないようにした。関連 **2 files / 4 tests passed**、core typecheck、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68** で確認した。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全件 inventory は継続課題である。
+
+## 2026-08-31: PI-03 の intent trace／Nexus／管理 CLI direct loader 再レビュー
+
+intent trace の trace／audit JSONL discovery、Nexus daemon の常駐 JSON／runtime session、control-plane／knowledge／workflow registration CLI の catalog・proposal path を操作時の `assertSafeRepositoryPath` へ接続した。symlink／repository 外 resource は証跡 read-model、常駐 dispatch、管理 catalog の read／write に到達せず、Nexus の runtime session 列挙も regular directory／file に限定した。関連 **5 test files / 7 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、全 script harness／generator 移行は継続課題である。
+
+## 2026-08-31: PI-03 の egress／TaskScenario smoke loader 再レビュー
+
+egress warn report の caller 指定 audit directory／JSONL leaf と TaskScenario smoke の scenario／generated profile path を操作時の `assertSafeRepositoryPath`／`safeLstat` へ接続した。repository 外・symlink・非 regular file は運用 report の read と smoke fixture の read／write に到達せず、egress report は不正な1 leaf を skip して安全な観測を継続する。関連 **4 test files / 5 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、全 script harness／generator 移行は継続課題である。
+
+## 2026-08-31: PI-03 の Chronos trace feed loader 再レビュー
+
+Chronos の trace feed／detail read-model が trace directory と日付形式 JSONL leaf を列挙時に再検証していなかった残存を修正した。`assertSafeRepositoryPath`／`safeLstat` によって symlink／非 regular file は tenant／tier projection 前の保存済み trace read に到達しない。関連 **1 file / 9 tests passed**、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、全 script harness／generator 移行は継続課題である。
+
+## 2026-08-31: PI-02/PI-03 の Chronos agent route mission projection 再レビュー
+
+Chronos agent route の repository-wide quick-action mission projection が動的 core facade に存在しない `loadJson` を参照していた runtime defect を修正し、`readJson`／`assertSafeRepositoryPath` へ統一した。mission／NEXT_TASKS／PLAN の path を列挙・read 前に再検証し、malformed／symlink entry は単一 mission 単位で除外して他の projection を継続する。関連 **3 test files / 36 tests passed**、typecheck、対象 lint、Prettier、`git diff --check` で確認した。provider CLI の実 OS-level enforcement probe、未監査 direct loader 全件 inventory、全 script harness／generator 移行は継続課題である。
+
+## 2026-09-01: PI-03 の Wisdom actuator direct loader 再レビュー
+
+Wisdom actuator の `knowledge_inject`／`knowledge_export`／`knowledge_import`／reconcile が path resolver の返却値だけで source、package、destination、strategy の read／write へ進み得た残存を修正した。各 operation-time path を `assertSafeRepositoryPath` へ接続し、入力 leaf は `allowMissingLeaf` で boundary／symlink component を先に検査したうえで、従来の missing-resource／schema error semantics を維持する。
+
+検証: Wisdom actuator **4 files / 44 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の system actuator focused-target／reconcile path 境界
+
+system actuator の focused-target store と reconcile strategy が module-level／resolver-derived path を operation-time に再検査せず read／write へ進み得た残存を修正した。focused target の保存・復元と strategy の missing semantics を維持し、`assertSafeRepositoryPath` によって symlink／repository 外 resource を fail-closed にした。
+
+検証: system actuator **5 files / 100 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の meeting browser cookie resource 境界
+
+meeting browser driver の cookie store が account slug を path segment として検証せず、resolver-derived credential path を read／write していた残存を修正した。slug を単一 safe path segment に限定し、cookie file と parent directory を operation-time の `assertSafeRepositoryPath` で再検査する。
+
+検証: meeting browser driver **1 file / 22 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の meeting actuator consent resource 境界
+
+meeting actuator の `checkSpeakConsent` が mission evidence path を resolver の返却値だけで `safeExistsSync`／`loadJson` へ渡していた残存を修正した。`voice-consent.json` を read 前に `assertSafeRepositoryPath` で再検査し、missing／malformed／expired consent の既存 semantics を維持しながら symlink／repository 外 evidence を fail-closed にした。
+
+検証: meeting actuator **4 files / 21 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の browser runtime resource 境界
+
+browser actuator の session metadata、CDP marker、action trail、approval、snapshot、operator continue が helper 内で直接 resource path を組み立てていた残存を修正した。operation-time の `assertSafeRepositoryPath` と session-derived filename の単一セグメント正規化を追加し、repository 外・symlink 経由の runtime resource を read／write／poll へ到達させない。
+
+検証: browser actuator **4 files / 43 tests passed**、対象 lint、Prettier、`git diff --check`、canonical full gate **68/68 passed**。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の browser passkey catalog 境界
+
+browser actuator の passkey provider catalog が resolver の返却値を直接 `loadJson` へ渡していた残存を修正した。catalog read 前に `assertSafeRepositoryPath` を再適用し、symlink／repository 外 catalog は既存の provider fallback へ到達せず fail-closed にした。
+
+検証: browser actuator **2 files / 44 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の working-memory period path 境界
+
+working-memory の daily／weekly period key が personal journal／weekly path のファイル名へ直接連結されていた残存を修正した。日付の実在性と ISO week key を検証し、sidecar／index／personal resource も operation-time の `assertSafeRepositoryPath` で再検査する。
+
+検証: working-memory **2 files / 9 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の deployment adapter config 境界
+
+deployment adapter の既定 personal config path が resolver の返却値だけで JSON read へ進み得た残存を修正した。環境由来の explicit path と同じ `assertSafeRepositoryPath` を default path にも適用し、symlink／repository 外 config を adapter 設定へ混入させない。
+
+検証: deployment adapter **3 files / 14 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の direct loader 残存再レビュー
+
+orchestrator の bundle template、code の skill index、Android UI defaults、media document layout catalog に残っていた resolver 結果の直接 read を修正し、読み込み直前に `assertSafeRepositoryPath` を適用した。ジョブ由来の repository 外 template と既定 catalog の symlink／非境界 path を fail-closed にする。
+
+検証: 対象 actuator **7 files / 126 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の OAuth／plugin pack loader 境界
+
+OAuth の state 未指定セッション読み込みと plugin pack の manifest discovery に残っていた symlink／非 regular file の直接 read を修正した。`assertSafeRepositoryPath` と `safeLstat` を read 前に適用し、credential と untrusted pack metadata の境界を fail-closed にする。
+
+検証: OAuth／plugin pack **2 files / 19 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の mission process planning artifact 境界
+
+mission process planning の `NEXT_TASKS.json`、gate definitions／records、`TASK_BOARD.md` が mission root 検証後に child path を直接組み立てていた残存を修正した。operation-time の `assertSafeRepositoryPath` を各 artifact へ適用し、symlink／repository 外 process artifact の read／write／gate evaluation を fail-closed にする。
+
+検証: mission process planning **2 files / 16 tests passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の kyberion_home procedure inspect trust 境界
+
+`kyberion_home procedure inspect` が desktop pipeline のロード時に `trustResolved: true` を無条件指定していた残存を修正した。未承認の project-local pipeline は inspection でも trust boundary を越えず、既存の blocked／repair guidance を維持する。
+
+検証: kyberion home trust boundary **1 file / 1 test passed**、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の skill plugin trust-input 境界
+
+`.kyberion-plugins.json` と plugin manifest を parse する前に `safeLstat` で trust input 自体を検査し、symlink 経由で別 resource を読む経路を fail-closed にした。プロジェクト外の正当な設定は引き続き許容する。
+
+検証: skill plugin loader **1 file / 14 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の capability broker pin path 境界
+
+`MISSION_ID` から組み立てる mission／shared provider pin path を read／write 前の `assertSafeRepositoryPath` へ接続し、traversal-shaped mission ID が repository 外の pin resource に到達しないようにした。
+
+検証: capability broker **1 file / 5 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の intent snapshot evidence path 境界
+
+mission evidence 配下の intent snapshot／delta／scope-change JSONL path を read／append 前の `assertSafeRepositoryPath` へ接続し、symlink evidence directory を経由する履歴 resource を fail-closed にした。
+
+検証: intent snapshot store **1 file / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-05 の provisioned receipt replay recovery
+
+provisioned receipt の `provisioned`／`verified` 対を pure reducer で検査し、未検証 receipt が残る replay plan は `recovery_required` を返して orchestration の自動再実行を停止するようにした。orphaned verification も corruption として拒否する。
+
+検証: mission orchestration journal **1 file / 10 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。全 worker 成果物の record→write→verify 接続と手動 `reconcile-work` への自動分岐は継続課題である。
+
+## 2026-09-01: PI-05 の resume recovery scaffold
+
+未検証 provision receipt を検出した `mission_controller resume` が、既存 scaffold を再利用しながら `reconcile-work` の operator-editable scaffold を自動生成するようにした。manifest の apply は引き続き human-gated とする。
+
+検証: mission maintenance **1 file / 11 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。全 worker 成果物の record→write→verify 接続と manifest apply の自動分岐は継続課題である。
+
+## 2026-09-01: PI-05 の残存 writer 接続
+
+process-template planner、reconcile-work 適用、requested task recovery の `NEXT_TASKS.json`／gate／task board writer を共通の provisioned receipt + fenced write + reread verify へ移行した。native artifact shape と既存の再計画・再発行 semantics は維持する。
+
+検証: process planning／task recovery **2 files / 18 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。任意 worker deliverable の全 writer 棚卸し、resume 全体の欠落検出、manifest apply の自動分岐は継続課題である。
+
+## 2026-09-01: PI-15 task recovery の scope 解決
+
+task recovery の `NEXT_TASKS.json` は public 固定ではなく、既存 mission の tier／current tenant path を優先して解決し、その mission root を provisioned receipt writer の lease 境界へ渡すようにした。tenant／tier mismatch と path component 差し替えを fail-closed にする。
+
+検証: mission task recovery **1 file / 1 test passed**、typecheck、対象 lint、Prettier、`git diff --check`。
+
+## 2026-09-01: PI-05 の verified artifact 欠落検出
+
+replay 前に target ごとの最新 verified receipt の mission-local artifact を再読し、消失は recovery-required として scaffold 導線へ、改変・読取不能・scope 外は `MISSION_LOG_CORRUPT` として自動 replay を停止するようにした。更新型 artifact の古い receipt は履歴として保持し、最新 receipt のみを現行状態と比較する。recovery observation には missing receipt 件数も反映する。
+
+検証: journal **11 tests**、maintenance／worker **40 tests**、typecheck、対象 lint、Prettier、`git diff --check`。receipt 対象外の shared artifact と manifest apply の自動分岐は継続課題である。
+
+## 2026-09-01: PI-14 の承認後 manual action resume
+
+承認待ちで停止した durable manual command を、元 command と関連付けた新しい command として一度だけ再開できるようにした。再開時も worker の approval gate を再評価し、承認の付与や action binding の省略は行わない。Chronos の `manual_resume` と AgentPanel の Resume 操作まで同じ wire 契約へ接続した。
+
+検証: bridge／Chronos API／入力契約 **4 files / 56 tests passed**、`build:packages`、typecheck、対象 lint、canonical full gate **68/68**。supervisor の正式な restart/recovery ceremony は継続課題である。
+
+## 2026-09-01: PI-05 の dispatch artifact writer 接続
+
+ticket／work-item dispatch の manifest、`NEXT_TASKS.json`、reflection、外部 ticket payload、artifact-review projection を共通 provisioned receipt writer へ接続した。native JSON shape は保持し、replay 時に dispatch artifact の欠落・改変を検出できる前提を揃えた。
+
+検証: 関連 **5 files / 58 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、`build:packages`。任意 worker deliverable の全 writer 棚卸しと manifest apply の自動分岐は継続課題である。
+
+## 2026-09-01: PI-08 の承認後 pipeline resume 接続
+
+`core:await_decision` の approval record に durable pipeline run ID を追加し、承認決定後に suspended journal と approval の scope／step／correlation を再照合してから canonical runner を managed process として起動する adapter を追加した。照合できない承認や終了済み run は fail-closed で自動起動しない。
+
+検証: pipeline approval／run journal／approval store **4 files / 82 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。全 surface の実運用 adapter と supervisor の正式な restart/recovery ceremony は継続課題である。
+
+## 2026-09-01: mission worker restart/recovery ceremony 接続
+
+`mission_controller resume` が専用の durable `mission_worker_recovery_requested` event を発行し、detached mission-orchestration worker が `paused` goal journal と task scope を再検証してから goal driver の明示 resume を実行するようにした。provider runtime supervisor が担当する runtime prewarm／管理とは分離し、provision recovery blocked 時と rapid resume の重複は no-op にする。
+
+検証: 関連 **5 test files / 44 tests passed**、typecheck、対象 Prettier、`git diff --check`。
+
+## 2026-09-01: PI-15 の recovery scope 再レビュー修正
+
+上記 recovery event が `NEXT_TASKS.json` と graph journal を `public` 固定で探していたため、confidential／tenant mission の paused goal が存在しても no-op になる残存を修正した。既存 mission の解決済み tier／tenant root を progress controller、dispatch preflight、graph journal の read／write／lease 境界で共有し、confidential mission の回帰を追加した。
+
+検証: 関連 **2 files / 8 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、package build、canonical full gate **68/68**。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03/PI-15 の mission orchestration scope 再監査
+
+同じ public 固定参照が phase-exit gate、worker の review diff／task result／clarification、coordination bus、process-template reader に残っていたため、既存 mission の解決済み tier／tenant root を各 read／write／lease 境界で利用するよう修正した。confidential mission の gate／bus／planner／worker evidence 回帰を追加し、public mission の既存 path boundary も維持した。
+
+検証: 関連 **6 files / 45 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`、package build。canonical full gate はこの後の docs 更新を含めて再実行する。provider CLI の実 OS-level enforcement probe と未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-05 の team composition writer 再監査
+
+planner の team-composition plan／brief が native JSON を直接書いていた残存を、共通の provisioned receipt + fenced write + reread verify へ移行した。保存時の native JSON shape と既存の plan／brief 読み込み semantics は維持し、receipt の verified target を回帰で確認した。
+
+検証: team composition **2 files / 13 tests passed**、対象 lint、Prettier、`git diff --check`、typecheck、package build。任意 worker deliverable の全 writer 棚卸し、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03/PI-05/PI-15 の worker scope／成果物 writer 再監査
+
+worker の prompt／context provisioning、goal journal、acceptance gate、draft refine、clarification／best-of／PR evidence が public 固定 root または暗黙の journal root を使う残存を修正した。既存 mission の tier／tenant root を優先し、明示 tenant はその scope に固定する。mission 外 deliverable は読む前に拒否し、clarification／alternative／PR artifact も解決済み root の receipt writer へ接続した。
+
+検証: 関連 **8 files / 77 tests passed**、対象 lint、typecheck、Prettier、`git diff --check`、`build:packages`、canonical full gate **68/68**。manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe、未監査 direct loader 全体 inventory は継続課題である。
+
+## 2026-09-01: PI-03 の direct loader inventory 再監査
+
+intent trace の mission／trace JSONL、Google Workspace payload-file、CLI の mission／app profile resource、actuator の capability／example／playground manifest discovery に read 前の repository／symlink 境界検査を追加した。安全でない候補は取り込まず、既存の discovery／fallback semantics を維持した。
+
+検証: 関連 **11 files / 12 tests passed**、対象 lint、typecheck、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の mission alignment approval loader 再監査
+
+alignment approval の要求・判定・brief surface が解決済み mission path を操作時に再検査せず、brief の存在確認／JSON read へ進める残存を修正した。`assertSafeRepositoryPath` を3入口へ接続し、brief leaf／親 component の symlink と repository 外 path を fail-closed にした。既存の no-request／missing／drifted semantics は維持した。
+
+検証: 関連 **3 test files / 18 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の virtual office mission discovery 再監査
+
+virtual office の mission discovery が列挙した directory／`mission-state.json` を操作時に再検査せず、symlink mission が dashboard read-model へ混入し得る残存を修正した。root、mission directory、state leaf を `assertSafeRepositoryPath`／`safeLstat` で確認し、不正候補は skip して既存の表示 semantics を維持した。テストfixtureの不足していた process-definition registry も最小限補った。
+
+検証: virtual office **1 file / 5 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の facet evaluation fixture discovery 再監査
+
+`eval/facets` の fixture discovery が列挙結果を直接 JSON read していた残存を修正した。fixture root、各 JSON leaf、regular-file 種別を操作時に `assertSafeRepositoryPath`／`safeLstat` で確認し、symlink fixture は評価入力へ混入させず安全な fixture の処理を継続する。
+
+検証: facet loader **1 file / 1 test passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の mission journal discovery 再監査
+
+mission journal の directory 列挙が symlink mission と state leaf を直接 JSON read していた残存を修正した。search root、mission directory、`mission-state.json` を操作時に `assertSafeRepositoryPath`／`safeLstat` で確認し、不正候補は履歴表示へ混入させず継続する。
+
+検証: mission journal **1 test passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の config mission path boundary 再監査
+
+config mission の tenant／instance identifier と preset manifest discovery が lexical path のまま resource read／write へ進み得た残存を修正した。config mission root、brief path、preset leaf を `assertSafeRepositoryPath`／`safeLstat` へ接続し、traversal・symlink・非 regular file を fail-closed にした。
+
+検証: config mission **1 test passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の soak restart root 境界
+
+`soak_restart_e2e --root` が caller の root を cleanup／state write／worker引数へ直接渡していた残存を修正した。root と daemon heartbeat／journal／provider state leaf を operation-time の `assertSafeRepositoryPath` で再検査し、repository 外・symlink 経由の削除／書込みを開始前に拒否する。
+
+検証: soak restart **1 file / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の sovereign dashboard discovery 再監査
+
+sovereign dashboard の runtime doctor／active mission／connection discovery が列挙結果を直接 state／JSON read へ渡していた残存を修正した。root、directory、state／JSON leafを `assertSafeRepositoryPath`／`safeLstat` で操作時に検査し、symlink mission／connectionを dashboard read-model へ混入させない。
+
+検証: sovereign dashboard **1 file / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の mission alignment reviewed-resource reader 再監査
+
+`read-decision` が caller の reviewed HTML／brief JSON path を直接存在確認・readしていた残存を修正した。両入力を `assertSafeRepositoryPath` で解析前に再検査し、repository 外・symlink resource を承認判断の入力へ混入させない。
+
+検証: read-decision **1 test passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の software quality artifact reader 再監査
+
+software quality report の contract／inventory／execution reader と report／defect output が caller pathを直接扱っていた残存を修正した。入力・出力を `assertSafeRepositoryPath` で統一し、repository 外・symlink経由の品質証跡 read／writeを fail-closed にした。
+
+検証: software quality **1 file / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の work coordination／Slack kickoff input reader 再監査
+
+work coordination の再帰mission scanとSlack kickoff互換CLIが、列挙・caller指定のJSON pathを直接 readしていた残存を修正した。mission root／child／state leafとissue／job inputを `assertSafeRepositoryPath`／`safeLstat` へ接続し、repository 外・symlink resourceを履歴・dispatch入力へ混入させない。
+
+検証: work coordination／Slack kickoff **2 test files / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の soak endurance resource boundary 再監査
+
+`soak_endurance` の caller 指定 `samplePaths`／`reportPath`／`metricsDir`／`evidenceDir` と metrics filename が、repository 外または symlink 経由の resource を read／write／cleanup へ渡し得る残存を修正した。各 path を harness 開始時と実 I/O 直前に再検査し、sample は regular file のみを採用、metrics filename は単一安全セグメントに限定した。repository 外・symlink・traversal の回帰を追加した。
+
+検証: soak endurance **1 test file / 8 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の mission brief renderer resource boundary 再監査
+
+`mission-alignment-gate/render-brief` の caller 指定 brief JSON／HTML output が、repository 外または symlink 経由の resource を read／write へ渡し得る残存を修正した。入力は regular file を確認してから JSON read し、既定・明示 output も `assertSafeRepositoryPath` で write 前に再検査する resolver と境界回帰を追加した。
+
+検証: render brief **2 test files / 3 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の onboarding identity input reader 再監査
+
+`onboarding_apply --identity` の caller 指定 JSON path が、repository 外・symlink・非 regular file を `safeExistsSync`／`readJson` へ渡し得る残存を修正した。入力 resolver と regular-file 検査を read 前へ追加し、既存の missing-file guidance を維持した。
+
+検証: onboarding input **1 test file / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の voice profile reader 再監査
+
+`voice_upgrade` の active voice profile が、resolver で解決済みでも symlink／非 regular file のまま既存 profile の JSON read／tier write へ到達し得る残存を修正した。profile resource を read／write 前に repository／symlink 境界へ接続し、境界 resolver の回帰を追加した。
+
+検証: voice profile **1 test file / 2 tests passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の contract schema shared catalog loader 再監査
+
+contract-schema checker の governance／surface／service／agent／voice catalog discovery が、列挙した JSON leaf を直接 `readJson` へ渡していた残存を修正した。共通 helper で directory／leaf を `assertSafeRepositoryPath`／`safeLstat` に通し、symlink・非 regular file・repository 外 resource を schema check 入力から除外する。
+
+検証: contract schema loader **1 test passed**、対象 lint、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-01: PI-03 の First-Win lifecycle smoke reader 再監査
+
+First-Win lifecycle smoke の live identity、schedule pipeline、dry-run fixture read を `assertSafeRepositoryPath`／`safeLstat` へ接続した。repository 外・symlink・非 regular file の identity／pipeline は live acceptance／schedule validation の read へ到達しない。
+
+検証: First-Win lifecycle **3 files / 16 tests passed**、対象 lint、typecheck、Prettier、`git diff --check`。未監査 direct loader 全体 inventory、manifest apply の自動分岐、provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 10. 検証コマンド(実装時)
 

@@ -1,13 +1,11 @@
 #!/usr/bin/env node
-import {
-  pathResolver,
-  resolveProductionEvidenceSummaryPolicy,
-  safeExistsSync,
-  safeReadFile,
-  resolveOnboardingText,
-  resolveOperatorLocale,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readJson } from '@agent/core/foundation';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { resolveOnboardingText } from '@agent/core/onboarding-flow-policy';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveProductionEvidenceSummaryPolicy } from '@agent/core/production-evidence-summary-policy';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type ProductionEvidenceStatus = 'pending_external_evidence' | 'verified';
 
@@ -100,21 +98,20 @@ const REQUIRED_REF_REQUIREMENT_PATTERNS: Record<string, readonly string[]> = {
   no_fork_statement: ['docs/operator/', 'migration/', 'https://'],
 };
 
-function parseRegister(raw: string, source: string): ProductionEvidenceRegister {
-  try {
-    return JSON.parse(raw) as ProductionEvidenceRegister;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid production evidence register JSON at ${source}: ${message}`);
-  }
-}
-
 export function loadProductionEvidenceRegister(
   registerPath = DEFAULT_REGISTER_PATH
 ): ProductionEvidenceRegister {
   const resolved = pathResolver.rootResolve(registerPath);
-  const raw = safeReadFile(resolved, { encoding: 'utf8' }) as string;
-  return parseRegister(raw, registerPath);
+  try {
+    return readJson<ProductionEvidenceRegister>(resolved);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(
+        `Invalid production evidence register JSON at ${registerPath}: ${error.message}`
+      );
+    }
+    throw error;
+  }
 }
 
 function isSupportedUrlRef(ref: string): boolean {
@@ -465,10 +462,8 @@ export const runCheckProductionEvidence = defineScript({
     const output = json ? `${JSON.stringify(summary, null, 2)}\n` : formatSummary(summary);
 
     if (summary.ok) context.print(output);
-    else {
-      console.error(output.trimEnd());
-      process.exitCode = 1;
-    }
+    else throw new ScriptExitError(1, output.trimEnd());
+    return summary;
   },
 });
 

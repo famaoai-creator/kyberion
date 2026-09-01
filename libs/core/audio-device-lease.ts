@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
+  assertSafeRepositoryPath,
   safeCreateExclusiveFileSync,
   safeExistsSync,
   safeUnlink,
@@ -40,7 +41,10 @@ export class AudioDeviceLeaseManager {
   private readonly pid: number;
 
   constructor(options: AudioDeviceLeaseManagerOptions = {}) {
-    this.leaseDir = options.lease_dir ?? pathResolver.shared('runtime/audio-leases');
+    this.leaseDir = assertSafeRepositoryPath(
+      options.lease_dir ?? pathResolver.shared('runtime/audio-leases'),
+      { allowMissingLeaf: true }
+    );
     this.now = options.now ?? Date.now;
     this.pid = options.pid ?? process.pid;
   }

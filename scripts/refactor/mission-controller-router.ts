@@ -3,19 +3,93 @@
  * Command routing for the Mission Controller CLI.
  */
 
+import { logger } from '@agent/core/core';
+import { auditChain } from '@agent/core/audit-chain';
 import {
-  logger,
-  auditChain,
   clearSurfaceOutboxMessage,
   listSurfaceOutboxMessages,
-  resolveIntentTrackGate,
-  saveProjectTrackRecord,
-  writeIntentGoalHandoff,
-} from '@agent/core';
+} from '@agent/core/surface-coordination-store';
+import { resolveIntentTrackGate } from '@agent/core/intent-track-resolver';
+import { saveProjectTrackRecord } from '@agent/core/project-track-registry';
+import { writeIntentGoalHandoff } from '@agent/core/intent-handoff';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  collectMissionHygieneReport,
+  formatMissionHygieneLine,
+  notifyMissionHygiene,
+} from '@agent/core/mission-hygiene';
+import {
+  applyProcessImprovementProposal,
+  decideProcessImprovementProposal,
+  listProcessImprovementProposals,
+  runMissionRetrospective,
+} from '@agent/core/mission-retrospective';
+import { generateMissionWorkReconciliationScaffold } from '@agent/core/mission-work-reconciliation';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from './mission-creation.js';
 import type { MissionRelationships } from './mission-types.js';
+
+const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
+const MEMORY_QUEUE_STATUSES = ['queued', 'approved', 'rejected', 'promoted'] as const;
+const MEMORY_EXECUTION_ROLES = ['mission_controller', 'chronos_gateway'] as const;
+const ACTOR_TYPES = ['agent', 'human', 'service'] as const;
+const REVIEWER_TEAM_ROLES = ['reviewer', 'qa'] as const;
+
+function parseAllowedValue<T extends string>(
+  value: string | undefined,
+  flag: string,
+  allowed: readonly T[]
+): T | undefined {
+  if (value === undefined) return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  throw new Error(`${flag} must be one of: ${allowed.join(', ')}`);
+}
+
+function requireAllowedValue<T extends string>(
+  value: string | undefined,
+  flag: string,
+  allowed: readonly T[]
+): T {
+  const parsed = parseAllowedValue(value, flag, allowed);
+  if (parsed === undefined) throw new Error(`${flag} is required`);
+  return parsed;
+}
+
+function parseIntegerArgument(raw: string | undefined, fallback: number, flag: string): number {
+  if (raw === undefined) return fallback;
+  if (!/^-?\d+$/u.test(raw)) throw new Error(`${flag} must be an integer`);
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`${flag} must be a safe integer`);
+  return parsed;
+}
+
+function parseJsonRecord(raw: string | undefined, flag: string): Record<string, unknown> {
+  if (raw === undefined || raw.trim() === '') return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${flag} must contain valid JSON`);
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${flag} must contain a JSON object`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function parseJsonArray(raw: string | undefined, flag: string): unknown[] {
+  if (raw === undefined || raw.trim() === '') return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(`${flag} must contain valid JSON`);
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${flag} must contain a JSON array`);
+  }
+  return parsed;
+}
 
 type Awaitable<T> = T | Promise<T>;
 
@@ -126,7 +200,12 @@ export interface MissionControllerRoutingContext {
     }
   ) => Awaitable<void>;
   sealMission: (id: string) => Awaitable<unknown>;
-  enqueueMission: (id: string, tier: string, priority: number, deps: string[]) => Awaitable<void>;
+  enqueueMission: (
+    id: string,
+    tier: 'personal' | 'confidential' | 'public',
+    priority: number,
+    deps: string[]
+  ) => Awaitable<void>;
   dispatchNextMission: () => Awaitable<void>;
   acceptRubricOverride: (id: string, reason?: string, severity?: string) => void;
   listMemoryQueue: (filterStatus?: 'queued' | 'approved' | 'rejected' | 'promoted') => void;
@@ -174,7 +253,13 @@ export interface MissionControllerRoutingContext {
   reconcileExistingWork: (
     missionId: string,
     manifestPath: string,
-    dryRun?: boolean
+    dryRun?: boolean,
+    approvalRequestId?: string
+  ) => Awaitable<unknown>;
+  requestMissionWorkReconciliationApproval: (
+    missionId: string,
+    manifestPath: string,
+    requestedBy?: string
   ) => Awaitable<unknown>;
   reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
@@ -290,7 +375,9 @@ function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return { raw };
   }
@@ -516,7 +603,7 @@ export async function runMissionControllerAction(
 
   switch (action) {
     case 'create': {
-      const positionalTier = context.arg2 as 'personal' | 'confidential' | 'public' | undefined;
+      const positionalTier = parseAllowedValue(context.arg2, 'mission tier', MISSION_TIERS);
       let createInput = context.validateMissionStartCreateInput('create', arg1, context.argv);
       const intentTrack = await applyIntentTrackGate(context, createInput, arg1);
       createInput = intentTrack.input;
@@ -686,8 +773,6 @@ export async function runMissionControllerAction(
       await context.dispatchMissionWorkItems(arg1!);
       break;
     case 'hygiene': {
-      const { collectMissionHygieneReport, notifyMissionHygiene, formatMissionHygieneLine } =
-        await import('@agent/core');
       const staleDaysRaw = getValue('--stale-days', context.argv);
       const abandonedDaysRaw = getValue('--abandoned-days', context.argv);
       const report = collectMissionHygieneReport({
@@ -713,11 +798,6 @@ export async function runMissionControllerAction(
       break;
     }
     case 'improvements': {
-      const {
-        listProcessImprovementProposals,
-        decideProcessImprovementProposal,
-        applyProcessImprovementProposal,
-      } = await import('@agent/core');
       const approveId = getValue('--approve', context.argv);
       const rejectId = getValue('--reject', context.argv);
       const applyId = getValue('--apply', context.argv);
@@ -745,7 +825,6 @@ export async function runMissionControllerAction(
       break;
     }
     case 'retrospective': {
-      const { runMissionRetrospective } = await import('@agent/core');
       const result = await runMissionRetrospective(arg1!);
       console.log(
         JSON.stringify(
@@ -766,8 +845,8 @@ export async function runMissionControllerAction(
     case 'enqueue':
       await context.enqueueMission(
         arg1!,
-        arg2!,
-        parseInt(arg3 || '5'),
+        requireAllowedValue(arg2, 'mission tier', MISSION_TIERS),
+        parseIntegerArgument(arg3, 5, 'enqueue priority'),
         arg4 ? arg4.split(',') : []
       );
       break;
@@ -782,7 +861,9 @@ export async function runMissionControllerAction(
       );
       break;
     case 'memory-queue':
-      context.listMemoryQueue(arg1 as any);
+      context.listMemoryQueue(
+        parseAllowedValue(arg1, 'memory-queue status', MEMORY_QUEUE_STATUSES)
+      );
       break;
     case 'memory-review':
       context.showMemoryReview(
@@ -809,8 +890,11 @@ export async function runMissionControllerAction(
     case 'memory-promote':
       await context.promoteMemoryCandidate(
         arg1!,
-        (getValue('--execution-role', context.argv) as 'mission_controller' | 'chronos_gateway') ||
-          'mission_controller',
+        parseAllowedValue(
+          getValue('--execution-role', context.argv),
+          '--execution-role',
+          MEMORY_EXECUTION_ROLES
+        ) || 'mission_controller',
         getValue('--note', context.argv),
         getValue('--supersedes', context.argv),
         getValue('--tenant-slug', context.argv)
@@ -819,8 +903,11 @@ export async function runMissionControllerAction(
     case 'memory-promote-pending':
       await context.promotePendingMemoryCandidates({
         executionRole:
-          (getValue('--execution-role', context.argv) as
-            'mission_controller' | 'chronos_gateway') || 'mission_controller',
+          parseAllowedValue(
+            getValue('--execution-role', context.argv),
+            '--execution-role',
+            MEMORY_EXECUTION_ROLES
+          ) || 'mission_controller',
         note: getValue('--note', context.argv),
         supersedes: getValue('--supersedes', context.argv),
         dryRun: context.argv.includes('--dry-run'),
@@ -842,7 +929,7 @@ export async function runMissionControllerAction(
       await context.repairLegacyMissionState(arg1!, getValue('--note', context.argv));
       break;
     case 'record-task':
-      await context.recordTask(arg1!, arg2!, JSON.parse(context.arg3 || '{}'));
+      await context.recordTask(arg1!, arg2!, parseJsonRecord(context.arg3, 'record-task details'));
       break;
     case 'record-evidence':
       await context.recordEvidence(
@@ -852,14 +939,17 @@ export async function runMissionControllerAction(
         parseCsvOption('--evidence', context.argv),
         getValue('--team-role', context.argv),
         getValue('--actor-id', context.argv),
-        getValue('--actor-type', context.argv) as any
+        parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES)
       );
       break;
     case 'review-task': {
       const findingsRaw = getValue('--findings', context.argv);
-      const findings = findingsRaw ? JSON.parse(findingsRaw) : [];
-      const reviewerTeamRole = getValue('--reviewer-team-role', context.argv) as
-        'reviewer' | 'qa' | undefined;
+      const findings = parseJsonArray(findingsRaw, '--findings');
+      const reviewerTeamRole = parseAllowedValue(
+        getValue('--reviewer-team-role', context.argv),
+        '--reviewer-team-role',
+        REVIEWER_TEAM_ROLES
+      );
       const specialistRoles = parseCsvOption('--specialist-roles', context.argv);
       await context.recordArtifactReview(
         arg1!,
@@ -873,7 +963,6 @@ export async function runMissionControllerAction(
     }
     case 'reconcile-work': {
       if (context.argv.includes('--generate')) {
-        const { generateMissionWorkReconciliationScaffold } = await import('@agent/core');
         const scaffold = generateMissionWorkReconciliationScaffold({
           missionId: arg1!,
           outputPath: getValue('--output', context.argv),
@@ -884,7 +973,20 @@ export async function runMissionControllerAction(
       }
       const manifestPath = getValue('--manifest', context.argv);
       if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
-      await context.reconcileExistingWork(arg1!, manifestPath, context.hasDryRun);
+      if (context.argv.includes('--request-approval')) {
+        await context.requestMissionWorkReconciliationApproval(
+          arg1!,
+          manifestPath,
+          getValue('--requested-by', context.argv)
+        );
+        break;
+      }
+      await context.reconcileExistingWork(
+        arg1!,
+        manifestPath,
+        context.hasDryRun,
+        getValue('--approval-request-id', context.argv)
+      );
       break;
     }
     case 'review-reenter':

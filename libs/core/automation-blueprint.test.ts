@@ -232,6 +232,24 @@ describe('automation-blueprint', () => {
     ]);
   });
 
+  it('rejects an external scheduled pipeline path', () => {
+    const entry = {
+      blueprint: createAutomationBlueprintFromPipeline('pipelines/daily-report.json', source),
+      pipeline: { steps: [], ...source },
+    };
+
+    expect(() =>
+      registerAutomationBlueprint(
+        entry,
+        {},
+        {
+          pipelinePath: '/tmp/automation-pipeline-external.json',
+          rootDir: pathResolver.sharedTmp(`automation-external-${Date.now()}`),
+        }
+      )
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('refuses to register a blueprint before required bindings are wired', () => {
     const blueprint = createAutomationBlueprintFromPipeline('pipelines/gadget.json', {
       ...source,

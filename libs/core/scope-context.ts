@@ -22,6 +22,7 @@ import {
   safeExec,
   safeUnlinkSync,
   safeWriteFile,
+  assertSafeRepositoryPath,
 } from './secure-io.js';
 
 /**
@@ -64,7 +65,10 @@ const SCOPE_ENV_KEYS = [
 ] as const;
 
 function scopeEnvPath(env: NodeJS.ProcessEnv = process.env): string {
-  return env.KYBERION_SCOPE_ENV_PATH?.trim() || pathResolver.shared('runtime/scope.env');
+  const configured = env.KYBERION_SCOPE_ENV_PATH?.trim();
+  return assertSafeRepositoryPath(configured || pathResolver.shared('runtime/scope.env'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function readScopeEnv(env: NodeJS.ProcessEnv = process.env): ScopeContextInput {
@@ -95,13 +99,16 @@ function readMissionScope(missionId: string): ScopeContextInput {
   try {
     const missionPath = pathResolver.findMissionPath(missionId);
     if (!missionPath) return {};
+    const statePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`)
+    );
     const state = loadJson<{
       tier?: unknown;
       tenant_slug?: unknown;
       tenant_id?: unknown;
       organization_id?: unknown;
       relationships?: { project?: { project_id?: unknown } };
-    }>(pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`));
+    }>(statePath);
     return {
       tier: state.tier as TierLevel | undefined,
       tenant_slug:

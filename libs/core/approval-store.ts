@@ -71,6 +71,8 @@ export interface ApprovalRequesterContext {
   stepId?: string;
   /** Effect step this approval is explicitly bound to. */
   targetStepId?: string;
+  /** Durable pipeline run that must be resumed after this approval. */
+  pipelineRunId?: string;
 }
 
 export interface ApprovalTargetDescriptor {
@@ -177,6 +179,9 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   requestedAt: string;
   decidedAt?: string;
   decidedBy?: string;
+  /** Durable copy of the decision identity used by fail-closed consumers. */
+  decidedByType?: ApprovalRecord['decidedByType'];
+  authenticated?: boolean;
   /**
    * MO-11 S-3: how the decider was authenticated. Previously this survived only
    * inside `workflow.approvals[]` and the event log, so a record without a
@@ -910,6 +915,8 @@ export function decideApprovalRequest(
     status: params.decision,
     decidedAt,
     decidedBy: params.decidedBy,
+    ...(params.decidedByType ? { decidedByType: params.decidedByType } : {}),
+    ...(params.authenticated !== undefined ? { authenticated: params.authenticated } : {}),
     ...(params.authMethod ? { decidedAuthMethod: params.authMethod } : {}),
     workflow,
   };
@@ -988,8 +995,68 @@ export function decideApprovalRequest(
   if (updated.status === 'approved' && updated.steering) {
     scheduleSteeringApprovalExecution(role, storageChannel, updated);
   }
+  if (
+    updated.status === 'approved' &&
+    updated.kind === 'mission_gate' &&
+    updated.requestedByContext?.pipelineRunId
+  ) {
+    schedulePipelineApprovalResume(role, storageChannel, updated);
+  }
 
   return updated;
+}
+
+/**
+ * PI-08: approval decisions are the single resume trigger for a suspended
+ * pipeline. The adapter is deliberately asynchronous so every existing
+ * approval surface keeps its synchronous decision contract; the resume
+ * module re-reads the journal and binds the launch to the exact approval,
+ * step, and mission before spawning anything.
+ */
+const pendingPipelineApprovalResumes = new Set<Promise<void>>();
+
+function schedulePipelineApprovalResume(
+  role: GovernedArtifactRole,
+  storageChannel: string,
+  record: ApprovalRequestRecord
+): void {
+  const task = (async () => {
+    let applyResult: ApprovalApplyResult;
+    try {
+      const { resumePipelineRunAfterApproval } = await import('./pipeline-approval-resume.js');
+      const outcome = await resumePipelineRunAfterApproval(record);
+      applyResult = {
+        appliedAt: new Date().toISOString(),
+        appliedBy: 'pipeline_approval_resume',
+        result:
+          outcome.status === 'started' || outcome.status === 'already_running'
+            ? 'success'
+            : 'failed',
+        auditRef: outcome.reason,
+      };
+    } catch (error) {
+      applyResult = {
+        appliedAt: new Date().toISOString(),
+        appliedBy: 'pipeline_approval_resume',
+        result: 'failed',
+        auditRef: error instanceof Error ? error.message : String(error),
+      };
+    }
+    try {
+      recordApprovalApplyResult(role, {
+        channel: record.channel,
+        storageChannel,
+        requestId: record.id,
+        applyResult,
+      });
+    } catch {
+      // The resume outcome is already represented by the journal/process; a
+      // best-effort apply receipt must not turn a successful decision into an
+      // unhandled rejection.
+    }
+  })();
+  pendingPipelineApprovalResumes.add(task);
+  void task.finally(() => pendingPipelineApprovalResumes.delete(task));
 }
 
 /**

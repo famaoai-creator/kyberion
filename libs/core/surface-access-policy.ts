@@ -12,10 +12,21 @@ interface ParsedAllowlist {
 }
 
 const DEFAULT_DENY_UNCONFIGURED = new Set(['telegram']);
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isSafeRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((key) => !DANGEROUS_KEYS.has(key))
+  );
+}
 
 function normalizeIds(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
-  return Array.from(new Set(value.map((entry) => String(entry ?? '').trim()).filter(Boolean)));
+  if (value.some((entry) => typeof entry !== 'string')) return null;
+  return Array.from(new Set(value.map((entry) => entry.trim()).filter(Boolean)));
 }
 
 function parseCommonAllowlist(raw: string, surface: string): ParsedAllowlist | null {
@@ -24,18 +35,16 @@ function parseCommonAllowlist(raw: string, surface: string): ParsedAllowlist | n
     if (Array.isArray(parsed)) {
       return { ids: normalizeIds(parsed) || [], source: 'common' };
     }
-    if (!parsed || typeof parsed !== 'object') return { ids: [], source: 'invalid' };
-    const record = parsed as Record<string, unknown>;
+    if (!isSafeRecord(parsed)) return { ids: [], source: 'invalid' };
+    const record = parsed;
     const entry = Object.prototype.hasOwnProperty.call(record, surface)
       ? record[surface]
       : record['*'];
     if (entry === undefined) return null;
     const ids = Array.isArray(entry)
       ? normalizeIds(entry)
-      : entry && typeof entry === 'object'
-        ? normalizeIds(
-            (entry as Record<string, unknown>).actors ?? (entry as Record<string, unknown>).ids
-          )
+      : isSafeRecord(entry)
+        ? normalizeIds(entry.actors ?? entry.ids)
         : null;
     return ids ? { ids, source: 'common' } : { ids: [], source: 'invalid' };
   } catch {

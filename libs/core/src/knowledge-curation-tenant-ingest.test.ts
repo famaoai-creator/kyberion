@@ -164,6 +164,20 @@ describe('computeTenantIngestCuration', () => {
     });
     expect(sections).toEqual([]);
   });
+
+  it('rejects an external tenant-ingest fixture root before ledger access', () => {
+    const key = 'KYBERION_CURATION_TENANT_ROOTDIR';
+    const previous = process.env[key];
+    process.env[key] = '/tmp/external-curation-root';
+    try {
+      expect(() =>
+        computeTenantIngestCuration({ config: CONFIG, now: NOW, tenants: ['acme-corp'] })
+      ).toThrow('RESOURCE_PATH_SCOPE');
+    } finally {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+    }
+  });
 });
 
 describe('renderCurationReportMarkdown — tenant ingest section', () => {

@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/restricted-skills.schema.json",
   "version": "1.0",
   "last_updated": "2026-03-06",
   "restrictions": [

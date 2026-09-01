@@ -4,8 +4,7 @@
  * Uses knowledge hints + standard intents as context for LLM generation.
  */
 import { logger } from '../core.js';
-import { safeReadFile, safeExistsSync } from '../secure-io.js';
-import { pathResolver } from '../path-resolver.js';
+import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from '../intent-resolution.js';
 
 export interface CompiledIntent {
   intentId: string;
@@ -35,23 +34,22 @@ export function compileIntent(
   intent: string,
   options?: { knowledgeHints?: any[]; standardIntents?: any[] }
 ): CompiledIntent | null {
-  const intentsPath = pathResolver.knowledge('product/governance/standard-intents.json');
-  let standardIntents: any[] = options?.standardIntents || [];
-
-  if (standardIntents.length === 0 && safeExistsSync(intentsPath)) {
-    try {
-      const raw = safeReadFile(intentsPath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw);
-      standardIntents = Array.isArray(parsed) ? parsed : parsed.intents || [];
-    } catch {
-      /* ignore */
-    }
-  }
+  const usesCanonicalResolver = options?.standardIntents === undefined;
+  const standardIntents = usesCanonicalResolver
+    ? loadStandardIntentCatalog()
+    : options.standardIntents;
+  const resolutionPacket = usesCanonicalResolver
+    ? resolveIntentResolutionPacket(intent)
+    : undefined;
 
   const intentLower = intent.toLowerCase();
 
   // 1. Exact ID match
-  const exactMatch = standardIntents.find((si) => si.id === intent || si.id === intentLower);
+  const exactMatch = standardIntents.find(
+    (si) =>
+      si.id === resolutionPacket?.selected_intent_id ||
+      (resolutionPacket === undefined && (si.id === intent || si.id === intentLower))
+  );
   if (exactMatch) {
     const steps = exactMatch.pipeline
       ? exactMatch.pipeline.steps || exactMatch.pipeline
@@ -60,14 +58,41 @@ export function compileIntent(
     logger.info(`[INTENT_COMPILER] Exact match: ${exactMatch.id}`);
     return {
       intentId: exactMatch.id,
-      confidence: 1.0,
+      confidence: resolutionPacket?.selected_confidence ?? 1.0,
       source: 'template',
       steps,
       explanation: `Exact match: ${exactMatch.id}`,
     };
   }
 
-  // 2. Keyword match
+  // 2. Keyword match is retained only for callers supplying an explicit
+  // catalog (tests and compatibility tooling). Production resolution must
+  // come from the canonical IntentResolutionPacket above.
+  if (resolutionPacket !== undefined) {
+    const hints = options?.knowledgeHints || [];
+    const matchedHints = hints.filter((h) => {
+      const words = intentLower.split(/\s+/);
+      return words.some(
+        (w) =>
+          (h.topic || '').toLowerCase().includes(w) ||
+          (h.tags || []).some((t: string) => t.toLowerCase().includes(w))
+      );
+    });
+    if (matchedHints.length > 0) {
+      logger.info(`[INTENT_COMPILER] Found ${matchedHints.length} knowledge hints`);
+      return {
+        intentId: `hint-${Date.now()}`,
+        confidence: 0.6,
+        source: 'hint',
+        steps: [],
+        explanation: `Found ${matchedHints.length} knowledge hints. Use LLM to generate pipeline steps.`,
+        warnings: ['No pre-defined pipeline. Hints available for LLM-based generation.'],
+      };
+    }
+    return null;
+  }
+
+  // 2. Keyword match for explicit compatibility catalogs.
   for (const si of standardIntents) {
     const triggers: string[] = si.triggers || si.trigger_keywords || si.keywords || [];
     const matched = triggers.some((t: string) => intentLower.includes(t.toLowerCase()));
@@ -87,7 +112,7 @@ export function compileIntent(
     }
   }
 
-  // 3. Knowledge hint match
+  // 3. Knowledge hint match for explicit compatibility catalogs.
   const hints = options?.knowledgeHints || [];
   const matchedHints = hints.filter((h: any) => {
     const words = intentLower.split(/\s+/);

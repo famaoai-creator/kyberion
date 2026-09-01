@@ -1,11 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as pathResolver from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
+  ensureRecoveryScaffold,
   recordTask,
   shouldSkipResumeEntry,
   RESUME_IDEMPOTENCY_WINDOW_MS,
 } from './mission-maintenance.js';
+
+const mocks = vi.hoisted(() => ({ spawnManagedProcess: vi.fn() }));
+
+vi.mock('./managed-process.js', () => ({
+  spawnManagedProcess: mocks.spawnManagedProcess,
+}));
 
 describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
   const now = new Date('2026-05-07T12:00:00.000Z');
@@ -157,5 +164,96 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       'attempts=1; repeat=0; stop=no; attention=no'
     );
     expect(state.history.at(-1)?.event).toBe('RECORD_TASK');
+  });
+
+  it('creates a reconcile-work scaffold for interrupted artifact recovery', () => {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    const missionId = 'MSN-MAINTENANCE-SCAFFOLD';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const scaffoldPath = pathResolver.rootResolve(
+      `active/shared/tmp/reconciliation-${missionId}.scaffold.json`
+    );
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission_controller';
+    safeRmSync(missionPath, { recursive: true, force: true });
+    safeRmSync(scaffoldPath, { force: true });
+    safeMkdir(missionPath, { recursive: true });
+    try {
+      const first = ensureRecoveryScaffold(missionId);
+      const second = ensureRecoveryScaffold(missionId);
+      expect(first).toBe(second);
+      expect(first).toContain(`reconciliation-${missionId}.scaffold.json`);
+      expect(safeExistsSync(scaffoldPath)).toBe(true);
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeRmSync(scaffoldPath, { force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+});
+
+describe('mission resume worker recovery ceremony', () => {
+  it('publishes a dedicated recovery event after recording an explicit resume', async () => {
+    const missionId = `MSN-MAINTENANCE-RECOVERY-${process.pid}-${Date.now()}`;
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const state = {
+      mission_id: missionId,
+      tier: 'public',
+      status: 'active',
+      execution_mode: 'delegated',
+      priority: 1,
+      assigned_persona: 'mission_controller',
+      confidence_score: 1,
+      git: { branch: 'main', start_commit: 'start', latest_commit: 'latest', checkpoints: [] },
+      history: [],
+    };
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    safeRmSync(missionPath, { recursive: true, force: true });
+    mocks.spawnManagedProcess.mockReset();
+    let eventPathForCleanup: string | undefined;
+    let payloadPathForCleanup: string | undefined;
+    safeMkdir(missionPath, { recursive: true });
+    safeWriteFile(`${missionPath}/mission-state.json`, JSON.stringify(state, null, 2));
+
+    try {
+      const { resumeMission } = await import('./mission-maintenance.js');
+      const { loadMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
+      await resumeMission(missionId, {
+        readFocusedMissionId: () => null,
+        writeFocusedMissionId: () => undefined,
+        getCurrentBranch: () => 'main',
+        syncProjectLedgerIfLinked: async () => undefined,
+      });
+
+      const recoveryStart = mocks.spawnManagedProcess.mock.calls.find(
+        ([spec]) => spec?.metadata?.eventType === 'mission_worker_recovery_requested'
+      );
+      expect(recoveryStart).toBeDefined();
+      const eventPath = recoveryStart?.[0]?.args?.[2];
+      expect(typeof eventPath).toBe('string');
+      eventPathForCleanup = String(eventPath);
+      const event = loadMissionOrchestrationEvent(String(eventPath));
+      payloadPathForCleanup = event.payload_ref
+        ? pathResolver.rootResolve(event.payload_ref)
+        : undefined;
+      expect(event.event_type).toBe('mission_worker_recovery_requested');
+      expect(event.payload).toEqual({ operation: 'resume_goal_driven' });
+      expect(
+        JSON.parse(
+          safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) as string
+        ).history.at(-1)?.event
+      ).toBe('RESUME');
+    } finally {
+      if (eventPathForCleanup) safeRmSync(eventPathForCleanup, { force: true });
+      if (payloadPathForCleanup) safeRmSync(payloadPathForCleanup, { force: true });
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
   });
 });

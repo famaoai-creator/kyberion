@@ -18,6 +18,8 @@ export interface GovernedRetryOptionsInput {
   additionalShouldRetry?: (error: Error, category: string) => boolean;
 }
 
+export type GovernedRetryOptionsBuilderInput = Omit<GovernedRetryOptionsInput, 'override'>;
+
 const DEFAULT_RETRY_KEYS = ['retry', 'default_retry'] as const;
 const DEFAULT_FALLBACK_CATEGORIES = [
   'network',
@@ -96,4 +98,11 @@ export function buildGovernedRetryOptions({
       return categoryAllowed || Boolean(additionalShouldRetry?.(error, category));
     },
   };
+}
+
+/** Create the small actuator-local adapter without duplicating policy wiring. */
+export function createGovernedRetryOptionsBuilder(
+  input: GovernedRetryOptionsBuilderInput
+): (override?: Record<string, unknown>) => RetryOptions {
+  return (override) => buildGovernedRetryOptions({ ...input, override });
 }

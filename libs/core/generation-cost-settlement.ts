@@ -12,7 +12,14 @@ import { pathResolver } from './path-resolver.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { withLockSync } from './src/lock-utils.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReaddir, safeStat, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReaddir,
+  safeStat,
+  safeWriteFile,
+} from './secure-io.js';
 
 export const GENERATION_COST_SETTLEMENT_ROOT =
   'active/shared/runtime/media-generation/cost-settlements';
@@ -58,9 +65,12 @@ function settlementFile(
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(jobId)) {
     throw new Error(`[GENERATION_COST_JOB_ID_INVALID] invalid job_id '${jobId}'`);
   }
-  return path.join(
-    rootDir,
-    physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`)
+  return assertSafeRepositoryPath(
+    path.join(
+      assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true }),
+      physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`)
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -222,9 +232,14 @@ export function listGenerationCostSettlements(
     rootDir?: string;
   } = {}
 ): GenerationCostSettlement[] {
-  const root = path.join(
-    options.rootDir || pathResolver.rootDir(),
-    GENERATION_COST_SETTLEMENT_ROOT
+  const root = assertSafeRepositoryPath(
+    path.join(
+      assertSafeRepositoryPath(options.rootDir || pathResolver.rootDir(), {
+        allowMissingLeaf: true,
+      }),
+      GENERATION_COST_SETTLEMENT_ROOT
+    ),
+    { allowMissingLeaf: true }
   );
   const seen = new Map<string, GenerationCostSettlement>();
   for (const filePath of settlementFiles(root)) {

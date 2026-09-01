@@ -1,12 +1,13 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './android-runtime-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 
 const main = async () => {
   await runActuatorCli({
     name: 'android-actuator',
+    args: process.argv,
     handleAction,
   });
 };

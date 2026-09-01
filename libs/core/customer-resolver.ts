@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { rawExistsSync } from './fs-primitives.js';
 import * as pathResolver from './path-resolver.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 /**
  * Customer Aggregation Resolver
@@ -41,7 +42,17 @@ export function customerRoot(
   const slug = activeCustomer(env);
   if (!slug) return null;
   const base = path.join(rootDir, 'customer', slug);
-  return subPath ? path.join(base, subPath) : base;
+  const candidate = subPath ? path.resolve(base, subPath) : base;
+  const relative = path.relative(base, candidate);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(
+      `[CUSTOMER_SCOPE] customer overlay path escapes customer '${slug}': ${subPath}`
+    );
+  }
+  return assertSafeRepositoryPath(candidate, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 }
 
 /**
@@ -51,7 +62,10 @@ export function customerRoot(
  */
 export function customerDirForSlug(slug: string, rootDir: string = pathResolver.rootDir()): string {
   if (!SLUG_PATTERN.test(slug)) throw new InvalidCustomerSlugError(slug);
-  return path.join(rootDir, 'customer', slug);
+  return assertSafeRepositoryPath(path.join(rootDir, 'customer', slug), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 }
 
 /**

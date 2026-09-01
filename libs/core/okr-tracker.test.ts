@@ -6,7 +6,13 @@ import {
   summarizeOkrTracker,
 } from './okr-tracker.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('okr-tracker', () => {
   const tmpRoot = pathResolver.sharedTmp('okr-tracker-test');
@@ -56,6 +62,52 @@ describe('okr-tracker', () => {
     expect(summary?.objective_count).toBe(1);
     expect(summary?.key_result_count).toBe(2);
     expect(summary?.progress_percent).toBe(0);
+  });
+
+  it('skips an invalid higher-priority overlay and resolves the next candidate', () => {
+    safeMkdir(`${tmpRoot}/customer/acme`, { recursive: true });
+    safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/customer/acme/okr.json`,
+      JSON.stringify({ company_id: 'acme', tenant_slug: 'acme', objectives: 'invalid' })
+    );
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/governance/okr.json`,
+      JSON.stringify({
+        company_id: 'acme',
+        tenant_slug: 'acme',
+        source_kind: 'public',
+        source_path: 'placeholder',
+        period: { period_id: 'current', label: 'Current' },
+        objectives: [],
+      })
+    );
+
+    const tracker = resolveOkrTracker('acme', tmpRoot);
+
+    expect(tracker.source_kind).toBe('public');
+    expect(tracker.source_path).toContain('/knowledge/product/governance/okr.json');
+  });
+
+  it('fails closed for an invalid tenant slug without resolving a traversed path', () => {
+    const tracker = resolveOkrTracker('../outside-tenant', tmpRoot);
+
+    expect(tracker.source_kind).toBe('derived');
+    expect(tracker.tenant_slug).toBeNull();
+    expect(tracker.objectives).toEqual([]);
+    expect(tracker.source_path).toBe(`${tmpRoot}/knowledge/product/governance/okr.json`);
+  });
+
+  it('rejects a symlinked customer overlay before reading it', () => {
+    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/outside`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/outside/okr.json`,
+      JSON.stringify({ company_id: 'outside', tenant_slug: 'outside', objectives: [] })
+    );
+    safeSymlinkSync(`${tmpRoot}/outside/okr.json`, `${tmpRoot}/customer/acme/okr.json`);
+
+    expect(() => resolveOkrTracker('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   it('hydrates key results from financial and operational sources', () => {

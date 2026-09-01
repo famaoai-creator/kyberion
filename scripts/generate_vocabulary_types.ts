@@ -27,8 +27,9 @@
  */
 
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeReadFile } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import { loadVocabularyCatalog } from '@agent/core/vocabulary-catalog';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 interface VocabularyCatalogFile {
@@ -46,7 +47,11 @@ const LOCALES_BEGIN_MARKER = '// GENERATED-LOCALES:BEGIN';
 const LOCALES_END_MARKER = '// GENERATED-LOCALES:END';
 
 function loadCatalog(): VocabularyCatalogFile {
-  return readJson<VocabularyCatalogFile>(CATALOG_PATH);
+  const catalog = loadVocabularyCatalog();
+  if (!catalog) {
+    throw new Error(`Vocabulary catalog is unavailable: ${CATALOG_PATH}`);
+  }
+  return catalog;
 }
 
 /** Builds the replacement block for locale-normalize.ts's generated locales array. */

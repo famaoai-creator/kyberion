@@ -26,6 +26,8 @@ export * from './wire-error.js';
 
 export * from './trust-requiring-resources.js';
 
+export * from './project-trust.js';
+
 export * from './resource-provenance.js';
 
 export * from './skill-resource-loader.js';

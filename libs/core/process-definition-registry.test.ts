@@ -45,4 +45,14 @@ describe('process definition registry', () => {
     expect(audit.errors[0]).toContain('missing');
     expect(() => assertProcessDefinitionRegistry()).not.toThrow();
   });
+
+  it('rejects registered source paths outside the repository root', () => {
+    const registry = loadProcessDefinitionRegistry();
+    expect(() =>
+      auditProcessDefinitionRegistry({
+        ...registry,
+        sources: [{ ...registry.sources[0]!, path: '../outside.json' }],
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });

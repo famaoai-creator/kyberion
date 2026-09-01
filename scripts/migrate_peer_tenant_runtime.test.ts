@@ -4,6 +4,7 @@ import { pathResolver, safeExistsSync, safeRmSync, safeWriteFile } from '@agent/
 import {
   applyPeerTenantMigrationPlan,
   buildPeerTenantMigrationPlan,
+  parsePeerTenantMigrationPlan,
   type PeerTenantMigrationRoot,
 } from './migrate_peer_tenant_runtime.js';
 
@@ -24,6 +25,53 @@ afterEach(() => {
 });
 
 describe('peer tenant runtime migration', () => {
+  it('rejects malformed or unsafe persisted plans before apply', () => {
+    const unsafePlan = {
+      format: 'kyberion-peer-tenant-migration-v1',
+      migration_id: 'migration-test',
+      generated_at: '2026-09-01T00:00:00.000Z',
+      apply_requested: true,
+      migration_root: MIGRATION_ROOT,
+      sources: [
+        {
+          kind: 'peer-messaging',
+          source: `${LEGACY_ROOT}/peer-a/inbox.jsonl`,
+          source_quarantine: `${MIGRATION_ROOT}/quarantine/inbox.legacy`,
+          source_sha256: 'hash',
+          action: 'migrate',
+          unknown_record_count: 0,
+          records: 1,
+          destinations: [
+            {
+              tenant_id: 'tenant-acme',
+              destination: `${LEGACY_ROOT}/tenants/tenant-acme/inbox.jsonl`,
+              record_count: 1,
+              disposition: 'move',
+            },
+          ],
+          state: 'planned',
+        },
+      ],
+      status: 'planned',
+    } as Record<string, unknown>;
+    expect(parsePeerTenantMigrationPlan(unsafePlan)).not.toBeNull();
+
+    const malformedPlan = {
+      format: 'kyberion-peer-tenant-migration-v1',
+      migration_id: 'migration-test',
+      generated_at: '2026-09-01T00:00:00.000Z',
+      apply_requested: true,
+      migration_root: MIGRATION_ROOT,
+      sources: [],
+      status: 'planned',
+    } as Record<string, unknown>;
+    Object.defineProperty(malformedPlan, '__proto__', {
+      value: { source: '/tmp/unsafe' },
+      enumerable: true,
+    });
+    expect(parsePeerTenantMigrationPlan(malformedPlan)).toBeNull();
+  });
+
   it('splits explicit tenant records and quarantines legacy sources', () => {
     safeWriteFile(
       `${LEGACY_ROOT}/peer-a/inbox.jsonl`,

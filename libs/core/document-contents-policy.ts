@@ -46,7 +46,3 @@ export function resolveDocumentContentsLabel(locale?: string): string {
 export function resolveDocumentContentsSubtitle(): string {
   return loadDocumentContentsPolicyCatalog().subtitle || 'Document navigation';
 }
-
-export function resetDocumentContentsPolicyCatalogCache(): void {
-  catalog.reset();
-}

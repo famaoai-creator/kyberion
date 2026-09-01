@@ -3,10 +3,36 @@
  * CLI argument parsing utilities for the Mission Controller.
  */
 
-import { safeExistsSync } from '@agent/core';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
+import { normalizeRelationships } from './mission-state.js';
 import { currentProcessArgv } from '../lib/harness.js';
+import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from '../lib/json-input.js';
+
+const RELATIONSHIP_TYPES = ['belongs_to', 'supports', 'governs', 'independent'] as const;
+const PROJECT_GATE_IMPACTS = ['none', 'informational', 'review_required', 'blocking'] as const;
+const TRACK_TYPES = [
+  'delivery',
+  'release',
+  'change',
+  'incident',
+  'operations',
+  'governance',
+  'compliance',
+  'research',
+] as const;
+
+function getAllowedOption<T extends string>(
+  flag: string,
+  argv: string[],
+  allowed: readonly T[]
+): T | undefined {
+  const value = getOptionValue(flag, argv);
+  if (value === undefined) return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  throw new Error(`${flag} must be one of: ${allowed.join(', ')}`);
+}
 
 export interface MissionStartCreateOptions {
   tier?: 'personal' | 'confidential' | 'public';
@@ -79,24 +105,10 @@ export function extractProjectRelationshipOptionsFromArgv(
 ): Partial<MissionRelationships> {
   const projectId = getOptionValue('--project-id', argv);
   const projectPath = getOptionValue('--project-path', argv);
-  const relationshipType = getOptionValue(
-    '--project-relationship',
-    argv
-  ) as MissionRelationships['project'] extends infer T
-    ? T extends { relationship_type: infer R }
-      ? R
-      : never
-    : never;
+  const relationshipType = getAllowedOption('--project-relationship', argv, RELATIONSHIP_TYPES);
   const affectedArtifacts = parseCsvOption('--affected-artifacts', argv);
   const traceabilityRefs = parseCsvOption('--traceability-refs', argv);
-  const gateImpact = getOptionValue(
-    '--gate-impact',
-    argv
-  ) as MissionRelationships['project'] extends infer T
-    ? T extends { gate_impact: infer G }
-      ? G
-      : never
-    : never;
+  const gateImpact = getAllowedOption('--gate-impact', argv, PROJECT_GATE_IMPACTS);
   const note = getOptionValue('--project-note', argv);
 
   const hasProjectOptions = Boolean(
@@ -131,23 +143,9 @@ export function extractTrackRelationshipOptionsFromArgv(
 ): Partial<MissionRelationships> {
   const trackId = getOptionValue('--track-id', argv);
   const trackName = getOptionValue('--track-name', argv);
-  const trackType = getOptionValue(
-    '--track-type',
-    argv
-  ) as MissionRelationships['track'] extends infer T
-    ? T extends { track_type: infer R }
-      ? R
-      : never
-    : never;
+  const trackType = getAllowedOption('--track-type', argv, TRACK_TYPES);
   const lifecycleModel = getOptionValue('--lifecycle-model', argv);
-  const relationshipType = getOptionValue(
-    '--track-relationship',
-    argv
-  ) as MissionRelationships['track'] extends infer T
-    ? T extends { relationship_type: infer R }
-      ? R
-      : never
-    : never;
+  const relationshipType = getAllowedOption('--track-relationship', argv, RELATIONSHIP_TYPES);
   const traceabilityRefs = parseCsvOption('--track-traceability-refs', argv);
   const note = getOptionValue('--track-note', argv);
 
@@ -188,7 +186,7 @@ export function extractJsonRelationshipsOption(
   const raw =
     getOptionValue('--relationships-json', argv) || getOptionValue('--relationships', argv);
   if (!raw) return {};
-  return JSON.parse(raw) as Partial<MissionRelationships>;
+  return normalizeRelationships(parseSafeJsonObjectInput(raw, '--relationships-json') || {});
 }
 
 export function extractFileRelationshipsOption(
@@ -199,7 +197,8 @@ export function extractFileRelationshipsOption(
   if (!safeExistsSync(filePath)) {
     throw new Error(`Relationships file not found: ${filePath}`);
   }
-  return readJson<Partial<MissionRelationships>>(filePath);
+  const parsed = parseSafeJsonObjectValue(readJson<unknown>(filePath), 'Relationships file');
+  return normalizeRelationships(parsed);
 }
 
 export function extractMissionStartCreateOptionsFromArgv(
@@ -207,7 +206,7 @@ export function extractMissionStartCreateOptionsFromArgv(
 ): MissionStartCreateOptions {
   const tenantSlug = getOptionValue('--tenant-slug', argv);
   return {
-    tier: getOptionValue('--tier', argv) as MissionStartCreateOptions['tier'] | undefined,
+    tier: getAllowedOption('--tier', argv, ['personal', 'confidential', 'public']),
     tenantId: getOptionValue('--tenant-id', argv) || getOptionValue('--tenant', argv),
     organizationId: getOptionValue('--organization-id', argv) || getOptionValue('--org', argv),
     ...(tenantSlug ? { tenantSlug } : {}),

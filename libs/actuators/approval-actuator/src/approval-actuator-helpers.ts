@@ -1,12 +1,14 @@
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
+import { retry } from '@agent/core/async-utils';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import {
-  buildGovernedRetryOptions,
-  normalizeRejectionReasonCategory,
-  retry,
-  executeAdfSteps,
-  resolveVars,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { resolveVars } from '@agent/core/src/logic-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import {
   createApprovalRequest,
   decideApprovalRequest,
@@ -20,7 +22,7 @@ import {
   type ApprovalWorkflowState,
 } from '@agent/core/governance';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
-import { pathResolver } from '@agent/core';
+import * as pathResolver from '@agent/core/path-resolver';
 import { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 
 const APPROVAL_MANIFEST_PATH = pathResolver.rootResolve(
@@ -34,13 +36,11 @@ const DEFAULT_APPROVAL_RETRY = {
   jitter: true,
 };
 
-function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: APPROVAL_MANIFEST_PATH,
-    defaults: DEFAULT_APPROVAL_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: APPROVAL_MANIFEST_PATH,
+  defaults: DEFAULT_APPROVAL_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
 
 export interface ApprovalAction {
   action: 'create' | 'load' | 'decide' | 'list_pending' | 'pipeline';
@@ -98,11 +98,15 @@ async function executeApprovalPipeline(
   initialContext: Record<string, unknown> = {},
   options: ApprovalAction['options'] = {}
 ) {
-  return executeAdfSteps(
+  return runAdfActuatorPipeline({
+    actuatorId: 'approval',
     steps,
-    { ...initialContext, timestamp: new Date().toISOString() },
-    { maxSteps: options.max_steps || 1000, timeoutMs: options.timeout_ms || 60000 },
-    {
+    context: { ...initialContext, timestamp: new Date().toISOString() },
+    options: {
+      maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,
+    },
+    handlers: {
       capture: async () => {
         throw new Error('[UNKNOWN_OP] Approval actuator does not own capture operations');
       },
@@ -127,8 +131,8 @@ async function executeApprovalPipeline(
                 });
         return { ...context, [String(params.export_as || op)]: result };
       },
-    }
-  );
+    },
+  });
 }
 
 export async function handleApprovalAction(input: ApprovalAction) {

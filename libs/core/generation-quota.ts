@@ -2,8 +2,9 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 
 export const GENERATION_QUOTA_POLICY_REPO_PATH =
@@ -34,6 +35,27 @@ export const DEFAULT_GENERATION_QUOTA_POLICY: GenerationQuotaPolicy = Object.fre
   },
   tenant_overrides: {},
 });
+
+const GENERATION_QUOTA_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/media-generation-quota-policy.schema.json'
+);
+
+function createGenerationQuotaPolicyCatalog(root: string) {
+  return defineCatalog<GenerationQuotaPolicy>({
+    id: 'media-generation-quota-policy',
+    path: assertSafeRepositoryPath(
+      path.join(root, ...GENERATION_QUOTA_POLICY_REPO_PATH.split('/')),
+      { allowMissingLeaf: true, rootDir: root }
+    ),
+    schema: GENERATION_QUOTA_POLICY_SCHEMA_PATH,
+    fallback: DEFAULT_GENERATION_QUOTA_POLICY,
+    fallbackOnInvalid: true,
+  });
+}
+
+const defaultGenerationQuotaPolicyCatalog = createGenerationQuotaPolicyCatalog(
+  pathResolver.rootDir()
+);
 
 export type GenerationQuotaLevel = 'ok' | 'warn' | 'block';
 
@@ -73,7 +95,19 @@ function positive(value: unknown): value is number {
 }
 
 function rootDir(options: GenerationQuotaOptions): string {
-  return options.rootDir ?? pathResolver.rootDir();
+  const candidate = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  const relative = path.relative(pathResolver.rootDir(), candidate).replaceAll('\\', '/');
+  if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[RESOURCE_PATH_SCOPE] generation quota root is outside the repository: ${candidate}`
+    );
+  }
+  // Check the configured root itself even when the fixture directory is not
+  // present yet; the synthetic leaf also re-checks existing symlink parents.
+  assertSafeRepositoryPath(path.join(candidate, '.generation-quota-root'), {
+    allowMissingLeaf: true,
+  });
+  return candidate;
 }
 
 export function generationQuotaDateKey(now?: string | Date): string {
@@ -91,68 +125,55 @@ export function generationQuotaCounterPath(
   if (!isValidTenantSlug(tenantSlug)) {
     throw new Error(`[generation-quota] invalid tenant slug '${tenantSlug}'`);
   }
-  return path.join(
-    rootDir(options),
-    ...GENERATION_QUOTA_COUNTER_REPO_SUBPATH.split('/'),
-    tenantSlug,
-    `${generationQuotaDateKey(options.now)}.json`
+  return assertSafeRepositoryPath(
+    path.join(
+      rootDir(options),
+      ...GENERATION_QUOTA_COUNTER_REPO_SUBPATH.split('/'),
+      tenantSlug,
+      `${generationQuotaDateKey(options.now)}.json`
+    ),
+    { allowMissingLeaf: true, rootDir: rootDir(options) }
   );
 }
 
 function readPolicy(options: GenerationQuotaOptions): GenerationQuotaPolicy {
-  const policyPath = path.join(rootDir(options), ...GENERATION_QUOTA_POLICY_REPO_PATH.split('/'));
-  if (!safeExistsSync(policyPath)) return { ...DEFAULT_GENERATION_QUOTA_POLICY };
-  try {
-    const parsed = readJson<{
-      max_units_per_day?: unknown;
-      warn_ratio?: unknown;
-      operation_units?: unknown;
-      tenant_overrides?: unknown;
-    }>(policyPath);
-    const operationUnits = Object.fromEntries(
-      Object.entries(parsed.operation_units ?? {}).filter(([, value]) => positive(value))
+  const catalog =
+    options.rootDir === undefined
+      ? defaultGenerationQuotaPolicyCatalog
+      : createGenerationQuotaPolicyCatalog(rootDir(options));
+  const parsed = catalog.load();
+  const operationUnits = Object.fromEntries(
+    Object.entries(parsed.operation_units ?? {}).filter(([, value]) => positive(value))
+  ) as Record<string, number>;
+  const tenantOverrides: Record<string, GenerationQuotaOverride> = {};
+  for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
+    if (!raw || typeof raw !== 'object') continue;
+    const operationOverride = Object.fromEntries(
+      Object.entries(raw.operation_units ?? {}).filter(([, unit]) => positive(unit))
     ) as Record<string, number>;
-    const tenantOverrides: Record<string, GenerationQuotaOverride> = {};
-    if (parsed.tenant_overrides && typeof parsed.tenant_overrides === 'object') {
-      for (const [tenant, raw] of Object.entries(parsed.tenant_overrides)) {
-        if (!raw || typeof raw !== 'object') continue;
-        const value = raw as Record<string, unknown>;
-        const operationOverride = Object.fromEntries(
-          Object.entries(value.operation_units ?? {}).filter(([, unit]) => positive(unit))
-        ) as Record<string, number>;
-        const override: GenerationQuotaOverride = {
-          ...(positive(value.max_units_per_day)
-            ? { max_units_per_day: value.max_units_per_day }
-            : {}),
-          ...(positive(value.warn_ratio) && value.warn_ratio <= 1
-            ? { warn_ratio: value.warn_ratio }
-            : {}),
-          ...(Object.keys(operationOverride).length > 0
-            ? { operation_units: operationOverride }
-            : {}),
-        };
-        if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
-      }
-    }
-    return {
-      max_units_per_day: positive(parsed.max_units_per_day)
-        ? parsed.max_units_per_day
-        : DEFAULT_GENERATION_QUOTA_POLICY.max_units_per_day,
-      warn_ratio:
-        positive(parsed.warn_ratio) && parsed.warn_ratio <= 1
-          ? parsed.warn_ratio
-          : DEFAULT_GENERATION_QUOTA_POLICY.warn_ratio,
-      operation_units:
-        Object.keys(operationUnits).length > 0
-          ? operationUnits
-          : { ...DEFAULT_GENERATION_QUOTA_POLICY.operation_units },
-      ...(Object.keys(tenantOverrides).length > 0
-        ? { tenant_overrides: tenantOverrides }
-        : { tenant_overrides: {} }),
+    const override: GenerationQuotaOverride = {
+      ...(positive(raw.max_units_per_day) ? { max_units_per_day: raw.max_units_per_day } : {}),
+      ...(positive(raw.warn_ratio) && raw.warn_ratio <= 1 ? { warn_ratio: raw.warn_ratio } : {}),
+      ...(Object.keys(operationOverride).length > 0 ? { operation_units: operationOverride } : {}),
     };
-  } catch {
-    return { ...DEFAULT_GENERATION_QUOTA_POLICY };
+    if (Object.keys(override).length > 0) tenantOverrides[tenant] = override;
   }
+  return {
+    max_units_per_day: positive(parsed.max_units_per_day)
+      ? parsed.max_units_per_day
+      : DEFAULT_GENERATION_QUOTA_POLICY.max_units_per_day,
+    warn_ratio:
+      positive(parsed.warn_ratio) && parsed.warn_ratio <= 1
+        ? parsed.warn_ratio
+        : DEFAULT_GENERATION_QUOTA_POLICY.warn_ratio,
+    operation_units:
+      Object.keys(operationUnits).length > 0
+        ? operationUnits
+        : { ...DEFAULT_GENERATION_QUOTA_POLICY.operation_units },
+    ...(Object.keys(tenantOverrides).length > 0
+      ? { tenant_overrides: tenantOverrides }
+      : { tenant_overrides: {} }),
+  };
 }
 
 export function loadGenerationQuotaPolicy(
@@ -196,6 +217,10 @@ function writeUsage(
   usage: GenerationQuotaUsage,
   options: GenerationQuotaOptions
 ): void {
+  counterPath = assertSafeRepositoryPath(counterPath, {
+    allowMissingLeaf: true,
+    rootDir: rootDir(options),
+  });
   safeMkdir(path.dirname(counterPath), { recursive: true });
   safeWriteFile(
     counterPath,

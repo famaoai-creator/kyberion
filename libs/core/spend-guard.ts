@@ -12,11 +12,11 @@
  */
 
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { metrics } from './metrics.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
 
 export interface SpendPolicyOverride {
   posture?: 'warn' | 'block';
@@ -61,12 +61,16 @@ const DEFAULT_POLICY: SpendPolicy = {
   mission_cap_usd: 20,
 };
 
+const spendPolicyCatalog = defineCatalog<SpendPolicy>({
+  id: 'spend-policy',
+  path: POLICY_PATH,
+  schema: pathResolver.knowledge('product/schemas/spend-policy.schema.json'),
+  fallback: DEFAULT_POLICY,
+});
+
 export function loadSpendPolicy(): SpendPolicy {
-  if (!safeExistsSync(POLICY_PATH)) return DEFAULT_POLICY;
+  const parsed = spendPolicyCatalog.load();
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(POLICY_PATH, { encoding: 'utf8' }) || '{}')
-    ) as Partial<SpendPolicy>;
     const tenantOverrides: Record<string, SpendPolicyOverride> = {};
     for (const [tenant, raw] of Object.entries(parsed.tenant_overrides ?? {})) {
       if (!raw || typeof raw !== 'object') continue;
@@ -144,12 +148,6 @@ function loadUsageEntries(now: number): UsageEntry[] {
   cachedEntries = metrics.loadHistory() as UsageEntry[];
   cachedAt = now;
   return cachedEntries;
-}
-
-/** Test hook: drop the usage cache. */
-export function resetSpendGuardCache(): void {
-  cachedEntries = null;
-  cachedAt = 0;
 }
 
 const alertedBreaches = new Set<string>();

@@ -20,7 +20,7 @@ import {
 } from './provider-health-registry.js';
 import type { ProviderInfo } from './provider-discovery.js';
 import * as pathResolver from './path-resolver.js';
-import { safeWriteFile } from './secure-io.js';
+import { safeRmSync, safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 
 function provider(
   providerId: string,
@@ -153,6 +153,36 @@ describe('provider-health-registry', () => {
       );
       reloadProviderHealthFromDisk(T0 + 1000);
       expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(false);
+    });
+
+    it('rejects a state path outside the repository before persistence', () => {
+      const configuredPath = process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH;
+      process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = '/tmp/provider-health-external.json';
+      try {
+        expect(() => reportProviderRateLimited('codex', { retryAfterMs: 5000, now: T0 })).toThrow(
+          '[RESOURCE_PATH_SCOPE]'
+        );
+      } finally {
+        process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = configuredPath;
+        clearProviderHealth();
+      }
+    });
+
+    it('rejects a state path traversing a symbolic link', () => {
+      const targetPath = pathResolver.sharedTmp(`provider-health-target-${process.pid}.json`);
+      const linkPath = pathResolver.sharedTmp(`provider-health-link-${process.pid}.json`);
+      safeWriteFile(targetPath, JSON.stringify({ version: '1.0', demotions: [] }));
+      safeSymlinkSync(targetPath, linkPath);
+      const configuredPath = process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH;
+      process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = linkPath;
+      try {
+        expect(() => reloadProviderHealthFromDisk(T0)).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = configuredPath;
+        clearProviderHealth();
+        safeUnlinkSync(linkPath);
+        safeRmSync(targetPath, { force: true });
+      }
     });
   });
 });

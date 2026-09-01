@@ -1,15 +1,24 @@
 import * as path from 'node:path';
 import chalk from 'chalk';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveLocale as resolveUnifiedLocale, type SupportedLocale } from '@agent/core/locale';
 import {
-  pathResolver,
-  resolveLocale as resolveUnifiedLocale,
+  assertSafeRepositoryPath,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
-  type SupportedLocale,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { t as coreT } from '@agent/core/t';
-import type { VocabularyKey } from '@agent/core';
+import type { VocabularyKey } from '@agent/core/t';
+import { offboardScope } from '@agent/core/scope-offboarding';
+import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
+import {
+  classifyTaskSessionIntent,
+  createTaskSession,
+  saveTaskSession,
+  validateTaskSession,
+} from '@agent/core/task-session';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import {
   executeEmailDelivery,
   generateEmailReplyDraft,
@@ -26,8 +35,18 @@ import {
   queryCalendarFreeBusy,
   readM365AuthStatus,
 } from '@agent/core/calendar-workflow';
+import { main as taskInitMain } from './task_init.js';
+import { main as taskListMain } from './task_list.js';
+import { main as taskRunMain } from './task_run.js';
+import { main as taskSmokeMain } from './task_smoke.js';
 
 const rootDir = pathResolver.rootDir();
+
+function resolveWorkflowPath(value: unknown, label: string, allowMissingLeaf = false): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
 
 function resolveLocale(): SupportedLocale {
   return resolveUnifiedLocale();
@@ -47,7 +66,18 @@ function getCalendarProvider(
 ): 'google-workspace' | 'm365' {
   const provider =
     typeof options['--provider'] === 'string' ? options['--provider'] : 'google-workspace';
-  return provider === 'm365' ? 'm365' : 'google-workspace';
+  if (provider === 'google-workspace' || provider === 'm365') return provider;
+  throw new Error(`Unsupported calendar provider: ${provider}`);
+}
+
+function printCalendarResult(result: unknown, options: Record<string, string | boolean>): void {
+  if (options['--quiet'] === true) return;
+  if (options['--json'] === true) {
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  printHeader();
+  console.log(JSON.stringify(result, null, 2));
 }
 
 function printEmailHelp(locale = resolveLocale()): void {
@@ -62,16 +92,16 @@ function printEmailHelp(locale = resolveLocale()): void {
   console.log(t('cli_help_email_archive_short', locale));
   console.log('');
   console.log(t('cli_help_examples', locale));
-  console.log('  npm run cli -- email status');
-  console.log('  npm run cli -- email draft --triage-file active/shared/tmp/email-inbox-triage.md');
-  console.log('  npm run cli -- email latest-draft');
+  console.log('  pnpm kyberion email status');
+  console.log('  pnpm kyberion email draft --triage-file active/shared/tmp/email-inbox-triage.md');
+  console.log('  pnpm kyberion email latest-draft');
   console.log(
-    '  npm run cli -- email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
+    '  pnpm kyberion email deliver --draft-mode --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
   );
   console.log(
-    '  npm run cli -- email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
+    '  pnpm kyberion email deliver --approved --body-file active/shared/runtime/presence-studio/email-drafts/latest.md'
   );
-  console.log('  npm run cli -- email archive-inbox --apply');
+  console.log('  pnpm kyberion email archive-inbox --apply');
 }
 
 function printCalendarHelp(locale = resolveLocale()): void {
@@ -86,17 +116,17 @@ function printCalendarHelp(locale = resolveLocale()): void {
   console.log(t('cli_help_calendar_create_short', locale));
   console.log('');
   console.log(t('cli_help_examples', locale));
-  console.log('  npm run cli -- calendar status');
-  console.log('  npm run cli -- calendar status --provider m365');
-  console.log('  npm run cli -- calendar list-calendars');
-  console.log('  npm run cli -- calendar list-calendars --provider m365');
-  console.log('  npm run cli -- calendar agenda --calendar-id primary --days 7');
-  console.log('  npm run cli -- calendar agenda --provider m365 --calendar-id primary --days 7');
+  console.log('  pnpm kyberion calendar status');
+  console.log('  pnpm kyberion calendar status --provider m365');
+  console.log('  pnpm kyberion calendar list-calendars');
+  console.log('  pnpm kyberion calendar list-calendars --provider m365');
+  console.log('  pnpm kyberion calendar agenda --calendar-id primary --days 7');
+  console.log('  pnpm kyberion calendar agenda --provider m365 --calendar-id primary --days 7');
   console.log(
-    '  npm run cli -- calendar freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00'
+    '  pnpm kyberion calendar freebusy --calendar-ids primary,team@example.com --time-min 2026-06-21T09:00:00+09:00 --time-max 2026-06-21T18:00:00+09:00'
   );
   console.log(
-    '  npm run cli -- calendar create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet'
+    '  pnpm kyberion calendar create-event --summary "Planning" --start 2026-06-22T13:00:00+09:00 --end 2026-06-22T14:00:00+09:00 --with-meet'
   );
 }
 
@@ -107,13 +137,53 @@ function printTaskHelp(locale = resolveLocale()): void {
   console.log(t('cli_help_commands', locale));
   console.log(t('cli_help_task_plan_short', locale));
   console.log(t('cli_help_task_start_short', locale));
+  console.log('  scenario <list|init|run|smoke>  repeatable TaskScenario workflows');
   console.log('');
   console.log(t('cli_help_examples', locale));
-  console.log('  npm run cli -- task plan "明日の会議資料とメール下書きを作って"');
+  console.log('  pnpm kyberion task plan "明日の会議資料とメール下書きを作って"');
   console.log(
-    '  npm run cli -- task plan "ブラウザで購入して決済して" --output active/shared/tmp/purchase-plan.json'
+    '  pnpm kyberion task plan "ブラウザで購入して決済して" --output active/shared/tmp/purchase-plan.json'
   );
-  console.log('  npm run cli -- task start "連携システムから情報収集して資料を作って"');
+  console.log('  pnpm kyberion task start "連携システムから情報収集して資料を作って"');
+  console.log('  pnpm kyberion task scenario list');
+  console.log('  pnpm kyberion task scenario run daily-email-triage --dry-run');
+}
+
+function printTaskScenarioHelp(): void {
+  console.log('Usage: pnpm kyberion task scenario <list|init|run|smoke> [options]');
+  console.log('  list [--json]');
+  console.log('  init <scenario-id> [--answers-json <json>] [--answers-file <path>]');
+  console.log('  run <scenario-id> [--profile <path>] [--dry-run] [--json]');
+  console.log('  smoke <scenario-id>');
+}
+
+function printTaskScenarioValue(value: unknown): void {
+  console.log(typeof value === 'string' ? value : JSON.stringify(value, null, 2));
+}
+
+async function handleTaskScenarioCommand(args: string[]): Promise<void> {
+  const [subcommand, ...subcommandArgs] = args;
+  if (!subcommand || subcommand === 'help' || subcommand === '--help' || subcommand === '-h') {
+    printTaskScenarioHelp();
+    return;
+  }
+
+  switch (subcommand) {
+    case 'list':
+      await taskListMain(subcommandArgs, printTaskScenarioValue, subcommandArgs.includes('--json'));
+      return;
+    case 'init':
+      await taskInitMain(subcommandArgs);
+      return;
+    case 'run':
+      await taskRunMain(subcommandArgs, printTaskScenarioValue, subcommandArgs.includes('--json'));
+      return;
+    case 'smoke':
+      await taskSmokeMain(subcommandArgs, console.log);
+      return;
+    default:
+      throw new Error(`Unknown TaskScenario subcommand: ${subcommand}`);
+  }
 }
 
 function parseEmailWorkflowOptions(args: string[]): Record<string, string | boolean> {
@@ -161,12 +231,12 @@ function printOffboardHelp(locale = resolveLocale()): void {
   console.log(t('cli_help_offboard_restore_note', locale));
   console.log('');
   console.log(t('cli_help_examples', locale));
-  console.log('  npm run cli -- offboard tenant acme');
+  console.log('  pnpm kyberion offboard tenant acme');
   console.log(
-    '  npm run cli -- offboard tenant acme --execute --approved-by founder --purpose "contract ended"'
+    '  pnpm kyberion offboard tenant acme --execute --approved-by founder --purpose "contract ended"'
   );
   console.log(
-    '  npm run cli -- offboard project PRJ-ALPHA --tenant-slug acme --organization-id ORG-ALPHA --json'
+    '  pnpm kyberion offboard project PRJ-ALPHA --tenant-slug acme --organization-id ORG-ALPHA --json'
   );
 }
 
@@ -245,7 +315,6 @@ export async function handleOffboardCommand(
   }
 
   const parsed = parseOffboardArgs([firstArg, ...restArgs]);
-  const { offboardScope } = await import('@agent/core');
   const result = offboardScope({
     scopeType: parsed.scopeType,
     scopeId: parsed.scopeId,
@@ -300,6 +369,10 @@ export async function handleTaskCommand(
     printTaskHelp(locale);
     return;
   }
+  if (subcommand === 'scenario') {
+    await handleTaskScenarioCommand(args);
+    return;
+  }
   if (subcommand !== 'plan' && subcommand !== 'start') {
     throw new Error(`Unknown task subcommand: ${subcommand}`);
   }
@@ -309,18 +382,11 @@ export async function handleTaskCommand(
     throw new Error('task request is required; pass it as text or with --request');
   }
 
-  const {
-    buildProductivityTaskPlan,
-    classifyTaskSessionIntent,
-    createTaskSession,
-    saveTaskSession,
-    validateTaskSession,
-  } = await import('@agent/core');
   const plan = buildProductivityTaskPlan(request);
 
   if (subcommand === 'plan') {
     if (outputPath) {
-      const absoluteOutputPath = pathResolver.rootResolve(outputPath);
+      const absoluteOutputPath = resolveWorkflowPath(outputPath, 'output path', true);
       safeMkdir(path.dirname(absoluteOutputPath), { recursive: true });
       safeWriteFile(absoluteOutputPath, `${JSON.stringify(plan, null, 2)}\n`);
     }
@@ -366,7 +432,7 @@ export async function handleTaskCommand(
 
   const planPath =
     outputPath || `active/shared/tmp/productivity-task-plans/${session.session_id}.json`;
-  const absolutePlanPath = pathResolver.rootResolve(planPath);
+  const absolutePlanPath = resolveWorkflowPath(planPath, 'plan path', true);
   safeMkdir(path.dirname(absolutePlanPath), { recursive: true });
   safeWriteFile(absolutePlanPath, `${JSON.stringify(plan, null, 2)}\n`);
   const sessionPath = saveTaskSession(session);
@@ -414,12 +480,12 @@ export async function handleEmailWorkflowCommand(
         ? options['--triage-file']
         : resolveEmailTriagePath();
     const triageText = String(
-      safeReadFile(pathResolver.rootResolve(triageFile), { encoding: 'utf8' }) || ''
+      safeReadFile(resolveWorkflowPath(triageFile, 'triage file'), { encoding: 'utf8' }) || ''
     ).trim();
     if (!triageText) {
       throw new Error(`triage text not found at ${triageFile}`);
     }
-    const backend = (await import('@agent/core')).getReasoningBackend();
+    const backend = getReasoningBackend();
     const result = await generateEmailReplyDraft({
       requestId: typeof options['--request-id'] === 'string' ? options['--request-id'] : undefined,
       recipient: typeof options['--to'] === 'string' ? options['--to'] : undefined,
@@ -440,7 +506,9 @@ export async function handleEmailWorkflowCommand(
       typeof options['--body-markdown'] === 'string'
         ? options['--body-markdown']
         : bodyFile
-          ? String(safeReadFile(pathResolver.rootResolve(bodyFile), { encoding: 'utf8' }) || '')
+          ? String(
+              safeReadFile(resolveWorkflowPath(bodyFile, 'body file'), { encoding: 'utf8' }) || ''
+            )
           : '';
     if (!bodyMarkdown.trim()) {
       throw new Error('body_markdown is required; provide --body-markdown or --body-file');
@@ -520,15 +588,13 @@ export async function handleCalendarWorkflowCommand(
   if (subcommand === 'status') {
     const provider = getCalendarProvider(options);
     const status = provider === 'm365' ? await readM365AuthStatus() : readGwsAuthStatus();
-    printHeader();
-    console.log(JSON.stringify(status, null, 2));
+    printCalendarResult(status, options);
     return;
   }
 
   if (subcommand === 'list-calendars') {
     const result = await listCalendars(getCalendarProvider(options));
-    printHeader();
-    console.log(JSON.stringify(result, null, 2));
+    printCalendarResult(result, options);
     return;
   }
 
@@ -547,8 +613,7 @@ export async function handleCalendarWorkflowCommand(
       time_max: typeof options['--time-max'] === 'string' ? options['--time-max'] : undefined,
       time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
     });
-    printHeader();
-    console.log(JSON.stringify(result, null, 2));
+    printCalendarResult(result, options);
     return;
   }
 
@@ -575,8 +640,7 @@ export async function handleCalendarWorkflowCommand(
       time_max: timeMax,
       time_zone: typeof options['--time-zone'] === 'string' ? options['--time-zone'] : undefined,
     });
-    printHeader();
-    console.log(JSON.stringify(result, null, 2));
+    printCalendarResult(result, options);
     return;
   }
 
@@ -621,8 +685,7 @@ export async function handleCalendarWorkflowCommand(
           ? options['--conference-request-id']
           : undefined,
     });
-    printHeader();
-    console.log(JSON.stringify(result, null, 2));
+    printCalendarResult(result, options);
     return;
   }
 

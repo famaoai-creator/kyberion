@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync } from './secure-io.js';
 import { validateReasoningEgress, type ContextSecurityScope } from './context-security-scope.js';
 import { evaluateEgressPolicy } from './egress-policy.js';
 import {
@@ -77,6 +78,29 @@ const BUILT_IN_RUBRIC: VisualReviewRubric = {
 };
 
 const cachedRubrics = new Map<string, VisualReviewRubric>();
+const rubricCatalogs = new Map<string, GovernedCatalog<VisualReviewRubric>>();
+const RUBRIC_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/visual-review-rubric.schema.json'
+);
+
+function rubricCatalog(filePath: string): GovernedCatalog<VisualReviewRubric> {
+  const cached = rubricCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<VisualReviewRubric>({
+    id: `visual-review-rubric:${filePath}`,
+    path: filePath,
+    schema: RUBRIC_SCHEMA_PATH,
+    fallback: BUILT_IN_RUBRIC,
+    fallbackOnInvalid: true,
+    onFallback: (error) => {
+      logger.warn(
+        `rubric unreadable, using built-in: ${error instanceof Error ? error.message : String(error)}`
+      );
+    },
+  });
+  rubricCatalogs.set(filePath, catalog);
+  return catalog;
+}
 
 export function loadVisualReviewRubric(options: { tenantSlug?: string } = {}): VisualReviewRubric {
   if (options.tenantSlug && !isValidTenantSlug(options.tenantSlug)) {
@@ -103,33 +127,15 @@ export function loadVisualReviewRubric(options: { tenantSlug?: string } = {}): V
         ];
     const rubricPath = candidatePaths.find((candidate) => safeExistsSync(candidate));
     if (rubricPath) {
-      const parsed = loadJson<Partial<VisualReviewRubric>>(rubricPath);
-      const criteria = Array.isArray(parsed?.criteria)
-        ? parsed.criteria.filter((entry: any) => entry?.id && entry?.prompt)
-        : [];
-      if (criteria.length > 0) {
-        const rubric = {
-          version: String(parsed?.version || '1'),
-          criteria,
-          banned_patterns: Array.isArray(parsed.banned_patterns) ? parsed.banned_patterns : [],
-          iteration: {
-            max_rounds: Number(parsed?.iteration?.max_rounds) || 3,
-            stop_when_no_errors: parsed?.iteration?.stop_when_no_errors !== false,
-          },
-        };
-        cachedRubrics.set(cacheKey, rubric);
-        return rubric;
-      }
+      const rubric = rubricCatalog(rubricPath).load();
+      cachedRubrics.set(cacheKey, rubric);
+      return rubric;
     }
   } catch (error: any) {
-    logger.warn(`rubric unreadable, using built-in: ${error?.message || error}`);
+    logger.warn(`rubric unavailable, using built-in: ${error?.message || error}`);
   }
   cachedRubrics.set(cacheKey, BUILT_IN_RUBRIC);
   return BUILT_IN_RUBRIC;
-}
-
-export function resetVisualReviewRubricCache(): void {
-  cachedRubrics.clear();
 }
 
 /** One actionable defect seen in the render. */

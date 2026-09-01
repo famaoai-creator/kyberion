@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
@@ -11,7 +12,7 @@ import {
 } from './mission-team-orchestrator.js';
 import { agentLifecycle, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
@@ -59,6 +60,20 @@ interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeam
 const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
 const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
 
+function safeQueuePath(filePath: string, queueDir: string): string {
+  const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const relative = path.relative(path.resolve(queueDir), resolved);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(`[AGENT_RUNTIME_QUEUE_SCOPE] path is outside the queue directory: ${filePath}`);
+  }
+  return resolved;
+}
+
 function estimateRuntimeTokens(chars: unknown): number {
   const count = Number(chars || 0);
   return Number.isFinite(count) && count > 0 ? Math.ceil(count / 4) : 0;
@@ -98,18 +113,20 @@ export function resolveRuntimeTokenUsage(input: {
 }
 
 function ensureQueueDirs(): void {
+  assertSafeRepositoryPath(REQUESTS_DIR, { allowMissingLeaf: true });
+  assertSafeRepositoryPath(RESULTS_DIR, { allowMissingLeaf: true });
   safeMkdir(REQUESTS_DIR);
   safeMkdir(RESULTS_DIR);
 }
 
 export function getAgentRuntimeEnsureRequestPath(requestId: string): string {
   ensureQueueDirs();
-  return `${REQUESTS_DIR}/${requestId}.json`;
+  return safeQueuePath(path.join(REQUESTS_DIR, `${requestId}.json`), REQUESTS_DIR);
 }
 
 export function getAgentRuntimeEnsureResultPath(requestId: string): string {
   ensureQueueDirs();
-  return `${RESULTS_DIR}/${requestId}.json`;
+  return safeQueuePath(path.join(RESULTS_DIR, `${requestId}.json`), RESULTS_DIR);
 }
 
 export function enqueueMissionTeamPrewarmRequest(input: {
@@ -145,7 +162,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  const request = readJson<AgentRuntimeEnsureRequest>(requestPath);
+  const request = readJson<AgentRuntimeEnsureRequest>(safeQueuePath(requestPath, REQUESTS_DIR));
   return {
     ...request,
     mission_id: request.mission_id.toUpperCase(),

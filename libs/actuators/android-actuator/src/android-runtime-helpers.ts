@@ -1,23 +1,23 @@
+import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import {
-  executeLlmDecideOp,
+  assertSafeRepositoryPath,
   loadJson,
-  logger,
   safeExec,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  derivePipelineStatus,
-  pathResolver,
-  resolveVars,
-  assertValidMobileAppProfile,
-  retry,
-  buildGovernedRetryOptions,
-  sleep,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import type { MobileAppProfile } from '@agent/core';
+} from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic-utils';
+import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
+import type { MobileAppProfile } from '@agent/core/app-profiles';
+import { retry, sleep } from '@agent/core/async-utils';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import * as path from 'node:path';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
@@ -68,11 +68,15 @@ interface AndroidTapTarget extends AndroidUiNode {
   center: { x: number; y: number };
 }
 
-export function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: ANDROID_MANIFEST_PATH,
-    defaults: DEFAULT_ANDROID_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
+export const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: ANDROID_MANIFEST_PATH,
+  defaults: DEFAULT_ANDROID_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
+
+function resolveAndroidRepositoryPath(rootDir: string, value: unknown): string {
+  return assertSafeRepositoryPath(path.resolve(rootDir, String(value || '').trim()), {
+    allowMissingLeaf: true,
   });
 }
 
@@ -88,8 +92,9 @@ export async function executePipeline(
   options: AndroidAction['options'] = {},
   initialCtx: Record<string, any> = {}
 ) {
+  ensureDefaultOpPreflight();
   const rootDir = pathResolver.rootDir();
-  const artifactsDir = path.resolve(
+  const artifactsDir = resolveAndroidRepositoryPath(
     rootDir,
     options?.artifacts_dir ||
       pathResolver.sharedTmp(`actuators/android-actuator/session_${Date.now()}`)
@@ -103,59 +108,46 @@ export async function executePipeline(
     android_serial: options?.serial || initialCtx.android_serial || '',
   };
 
-  const resolve = (val: any): any => resolveVars(val, ctx);
-
-  const results: Array<{ op: string; status: 'success' | 'failed'; error?: string }> = [];
-
   const maxSteps = options?.max_steps ?? 50;
-  if (steps.length > maxSteps) {
-    throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
-  }
-
-  for (const step of steps) {
-    try {
-      logger.info(`  [ANDROID_PIPELINE] ${step.type}:${step.op}...`);
-      ensureDefaultOpPreflight();
-      const preflight = await runOpPreflight({
-        op: `android:${step.op}`,
-        params: step.params || {},
-        context: ctx,
-        source: 'actuator',
-      });
-      if (preflight.decision !== 'allow') {
-        throw new Error(
-          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation android:${step.op} was not admitted.`}`
-        );
-      }
-      const params = preflight.input;
+  const sequence = await runActuatorStepSequence({
+    actuatorId: 'android',
+    steps,
+    context: ctx,
+    maxSteps,
+    resolveParams: (params, context) =>
+      resolvePipelineContextValues(params, context) as Record<string, any>,
+    onStepStart: (step) => logger.info(`  [ANDROID_PIPELINE] ${step.type}:${step.op}...`),
+    onStepError: (step, error) =>
+      logger.error(
+        `  [ANDROID_PIPELINE] Step failed (${step.op}): ${error instanceof Error ? error.message : String(error)}`
+      ),
+    execute: async (_op, params, context, step) => {
+      const resolve = (val: any): any => resolveVars(val, context);
       switch (step.type) {
         case 'capture':
-          ctx = await opCapture(step.op, params, ctx, resolve, options);
-          break;
+          return opCapture(step.op, params, context, resolve, options);
         case 'transform':
-          ctx = await opTransform(step.op, params, ctx, resolve);
-          break;
+          return opTransform(step.op, params, context, resolve);
         case 'apply':
-          ctx = await opApply(step.op, params, ctx, resolve, options);
-          break;
+          return opApply(step.op, params, context, resolve, options);
         default:
           logger.warn(`[ANDROID_PIPELINE] Unsupported step type: ${step.type}`);
+          return context;
       }
-      results.push({ op: step.op, status: 'success' });
-    } catch (error: any) {
-      logger.error(`  [ANDROID_PIPELINE] Step failed (${step.op}): ${error.message}`);
-      results.push({ op: step.op, status: 'failed', error: error.message });
-      break;
-    }
-  }
+    },
+  });
+  ctx = sequence.context;
 
   if (initialCtx.context_path) {
-    safeWriteFile(path.resolve(rootDir, initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    safeWriteFile(
+      resolveAndroidRepositoryPath(rootDir, initialCtx.context_path),
+      JSON.stringify(ctx, null, 2)
+    );
   }
 
   return {
-    status: derivePipelineStatus(results),
-    results,
+    status: sequence.status,
+    results: sequence.results,
     context: ctx,
   };
 }
@@ -170,7 +162,7 @@ async function opCapture(
   const rootDir = pathResolver.rootDir();
   switch (op) {
     case 'read_text_file': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveAndroidRepositoryPath(rootDir, resolve(params.path));
       const content = await retry(
         async () => safeReadFile(sourcePath, { encoding: 'utf8' }) as string,
         buildRetryOptions()
@@ -178,10 +170,10 @@ async function opCapture(
       return { ...ctx, [params.export_as || 'last_text']: content };
     }
     case 'read_json': {
-      const sourcePath = path.resolve(rootDir, resolve(params.path));
+      const sourcePath = resolveAndroidRepositoryPath(rootDir, resolve(params.path));
       const parsed = await retry(async () => {
         const content = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
-        return JSON.parse(content);
+        return parseSafeJsonInput(content, 'Android JSON input');
       }, buildRetryOptions());
       if (params.validate_as === 'mobile-app-profile') {
         assertValidMobileAppProfile(parsed, sourcePath);
@@ -227,7 +219,7 @@ async function opCapture(
           'capture_runtime_session_handoff requires params.device_path or app_profile.webview.runtime_export.android_device_path'
         );
       }
-      const outPath = path.resolve(
+      const outPath = resolveAndroidRepositoryPath(
         rootDir,
         resolve(
           params.path ||
@@ -241,7 +233,7 @@ async function opCapture(
       );
       const parsed = await retry(async () => {
         const content = safeReadFile(outPath, { encoding: 'utf8' }) as string;
-        return JSON.parse(content);
+        return parseSafeJsonInput(content, 'Android session handoff');
       }, buildRetryOptions());
       return {
         ...ctx,
@@ -251,7 +243,7 @@ async function opCapture(
     }
     case 'extract_ui_tree': {
       ensureAdbAvailable(ctx, options);
-      const outPath = path.resolve(
+      const outPath = resolveAndroidRepositoryPath(
         rootDir,
         resolve(params.path || path.join(ctx.artifacts_dir, `ui-tree-${Date.now()}.xml`))
       );
@@ -297,13 +289,16 @@ async function opCapture(
       const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let layout: unknown;
       try {
-        layout = JSON.parse(raw);
+        layout = parseSafeJsonInput(raw, 'Android CLI layout');
       } catch {
         layout = raw;
       }
-      const outPath = params.path
-        ? path.resolve(rootDir, resolve(params.path))
-        : path.join(ctx.artifacts_dir, `cli-layout-${Date.now()}.json`);
+      const outPath = resolveAndroidRepositoryPath(
+        rootDir,
+        params.path
+          ? resolve(params.path)
+          : path.join(ctx.artifacts_dir, `cli-layout-${Date.now()}.json`)
+      );
       ensureParentDir(outPath);
       safeWriteFile(outPath, typeof layout === 'string' ? layout : JSON.stringify(layout, null, 2));
       return {
@@ -327,7 +322,7 @@ async function opCapture(
       const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let resolved: unknown;
       try {
-        resolved = JSON.parse(raw);
+        resolved = parseSafeJsonInput(raw, 'Android CLI screen resolve');
       } catch {
         resolved = { raw };
       }
@@ -346,7 +341,7 @@ async function opCapture(
       const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let description: unknown;
       try {
-        description = JSON.parse(raw);
+        description = parseSafeJsonInput(raw, 'Android CLI description');
       } catch {
         description = raw;
       }
@@ -364,7 +359,7 @@ async function opCapture(
       const raw = await retry(async () => runAndroidCli(cliArgs, options), buildRetryOptions());
       let results: unknown;
       try {
-        results = JSON.parse(raw);
+        results = parseSafeJsonInput(raw, 'Android CLI docs search');
       } catch {
         results = raw;
       }
@@ -594,7 +589,7 @@ async function opApply(
     case 'capture_screen': {
       ensureAdbAvailable(ctx, options);
       const serial = resolveSerial(ctx, options, params);
-      const outPath = path.resolve(
+      const outPath = resolveAndroidRepositoryPath(
         rootDir,
         resolve(params.path || path.join(ctx.artifacts_dir, `screen-${Date.now()}.png`))
       );
@@ -1077,9 +1072,12 @@ function serializeTapTarget(target: AndroidTapTarget) {
 }
 
 function loadAndroidUiDefaults(): any {
-  if (safeExistsSync(ANDROID_UI_DEFAULTS_PATH)) {
+  const safeDefaultsPath = assertSafeRepositoryPath(ANDROID_UI_DEFAULTS_PATH, {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(safeDefaultsPath)) {
     try {
-      return loadJson<unknown>(ANDROID_UI_DEFAULTS_PATH);
+      return loadJson<unknown>(safeDefaultsPath);
     } catch (err) {
       logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
     }

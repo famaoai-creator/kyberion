@@ -17,17 +17,20 @@
  * ⇒ block — same convention as claude-code-hook).
  */
 
+import * as path from 'node:path';
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync } from './secure-io.js';
+import { safeExecResult, safeExistsSync, safeLstat } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import {
   createApprovalRequest,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from './approval-store.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 
 export const LIFECYCLE_HOOK_EVENTS = [
   'pre_tool_use',
@@ -112,6 +115,17 @@ export interface LifecycleHookApprovalSurface {
   severity?: 'low' | 'medium' | 'high';
 }
 
+/**
+ * Process-wide adapter used by a real interactive surface (for example a
+ * channel bridge) to turn a lifecycle `ask` into a human approval request.
+ * Returning undefined keeps the event non-interactive and therefore blocked.
+ */
+export type LifecycleHookApprovalSurfaceResolver = (input: {
+  event: LifecycleHookEvent;
+  payload: LifecycleHookPayload;
+  outcome: LifecycleHookOutcome;
+}) => LifecycleHookApprovalSurface | undefined | Promise<LifecycleHookApprovalSurface | undefined>;
+
 export interface LifecycleHookEngineOptions {
   /** Keep a security block active until an explicit operator reset. */
   stickyHalt?: boolean;
@@ -129,6 +143,66 @@ const ALLOW_OUTCOME: LifecycleHookOutcome = {
 
 const DEFAULT_COMMAND_TIMEOUT_MS = 10_000;
 const CONFIG_LOGICAL_PATH = 'knowledge/product/governance/lifecycle-hooks.json';
+const CONFIG_SCHEMA_PATH = 'knowledge/product/schemas/lifecycle-hooks.schema.json';
+const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+interface CommandHookOutput {
+  decision?: string;
+  reason?: string;
+  additional_context?: string;
+  result_patch?: Record<string, unknown>;
+  hookSpecificOutput?: {
+    permissionDecision?: string;
+    permissionDecisionReason?: string;
+  };
+}
+
+function isSafeJsonTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeJsonTree);
+  if (value === null || typeof value !== 'object') return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonTree(nested)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function parseCommandHookOutput(raw: string): CommandHookOutput | null {
+  let value: unknown;
+  try {
+    value = parseSafeJsonInput(raw.trim() || '{}', 'lifecycle hook output');
+  } catch {
+    return null;
+  }
+  if (!isRecord(value) || !isSafeJsonTree(value)) return null;
+  if (
+    value.decision !== undefined &&
+    (typeof value.decision !== 'string' ||
+      !['allow', 'ask', 'block', 'deny'].includes(value.decision))
+  ) {
+    return null;
+  }
+  if (value.reason !== undefined && typeof value.reason !== 'string') return null;
+  if (value.additional_context !== undefined && typeof value.additional_context !== 'string') {
+    return null;
+  }
+  if (value.result_patch !== undefined && !isRecord(value.result_patch)) return null;
+  if (value.hookSpecificOutput !== undefined) {
+    const permission = value.hookSpecificOutput;
+    if (
+      !isRecord(permission) ||
+      (permission.permissionDecision !== undefined &&
+        typeof permission.permissionDecision !== 'string') ||
+      (permission.permissionDecisionReason !== undefined &&
+        typeof permission.permissionDecisionReason !== 'string')
+    ) {
+      return null;
+    }
+  }
+  return value as CommandHookOutput;
+}
 
 export class LifecycleHookEngine {
   private readonly hooks: LifecycleHookRegistration[] = [];
@@ -317,21 +391,9 @@ function runCommandHook(
     input: JSON.stringify({ event, ...payload }),
   });
   // Exit 2 = block (claude-code-hook convention); stdout may refine it.
-  let parsed: {
-    decision?: string;
-    reason?: string;
-    additional_context?: string;
-    result_patch?: Record<string, unknown>;
-    hookSpecificOutput?: {
-      permissionDecision?: string;
-      permissionDecisionReason?: string;
-    };
-  } = {};
-  try {
-    parsed = JSON.parse(result.stdout.trim() || '{}');
-  } catch {
-    /* non-JSON stdout is fine for allow/exit-code-only hooks */
-  }
+  // Non-JSON or malformed stdout is fine for allow/exit-code-only hooks, but
+  // never let an unchecked object become a decision or result patch.
+  const parsed = parseCommandHookOutput(result.stdout) || {};
   const externalDecision = parsed.hookSpecificOutput?.permissionDecision?.toLowerCase();
   const decision =
     result.status === 2 ||
@@ -382,7 +444,6 @@ export async function fireLifecycleHooks(
   if (outcome.blocked) {
     // Deliberately unguarded emits: a failure here should surface loudly
     // rather than let a security block vanish from the record.
-    const { recordGovernanceAction } = await import('./kill-switch.js');
     recordGovernanceAction(
       'lifecycle-hooks',
       'hook_block',
@@ -417,6 +478,17 @@ export async function fireLifecycleHooksWithApproval(
   surface: LifecycleHookApprovalSurface
 ): Promise<LifecycleHookOutcome> {
   const outcome = await fireLifecycleHooks(engine, event, payload);
+  if (outcome.decision !== 'ask') return outcome;
+
+  return materializeLifecycleHookApproval(outcome, event, payload, surface);
+}
+
+function materializeLifecycleHookApproval(
+  outcome: LifecycleHookOutcome,
+  event: LifecycleHookEvent,
+  payload: LifecycleHookPayload,
+  surface: LifecycleHookApprovalSurface
+): LifecycleHookOutcome {
   if (outcome.decision !== 'ask') return outcome;
 
   const pending = listApprovalRequests({ status: 'pending', kind: 'channel-approval' }).find(
@@ -455,6 +527,44 @@ interface LifecycleHookConfigFile {
   }>;
 }
 
+function lifecycleHookConfigCatalog(configPath: string) {
+  return defineCatalog<LifecycleHookConfigFile>({
+    id: 'lifecycle-hooks',
+    path: configPath,
+    schema: pathResolver.rootResolve(CONFIG_SCHEMA_PATH),
+    fallback: { hooks: [] },
+    fallbackOnInvalid: true,
+    onFallback: (error) => {
+      logger.warn(
+        `[lifecycle-hooks] invalid config ${configPath}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    },
+  });
+}
+
+function isCanonicalLifecycleConfigPath(configPath: string): boolean {
+  const root = path.resolve(pathResolver.rootDir());
+  const canonical = path.resolve(pathResolver.rootResolve(CONFIG_LOGICAL_PATH));
+  const absolute = path.resolve(configPath);
+  if (absolute !== canonical) return false;
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return false;
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) return false;
+    } catch {
+      // A missing config is handled by the normal empty-engine path below.
+      if (!safeExistsSync(current)) return true;
+      return false;
+    }
+  }
+  return true;
+}
+
 /**
  * Load command hooks from the governed config file. Malformed entries are
  * skipped with a warning (fail-open) — a broken config must not brick every
@@ -464,10 +574,14 @@ export function loadLifecycleHookEngine(
   configPath: string = pathResolver.rootResolve(CONFIG_LOGICAL_PATH)
 ): LifecycleHookEngine {
   const engine = new LifecycleHookEngine();
+  if (!isCanonicalLifecycleConfigPath(configPath)) {
+    logger.warn(`[lifecycle-hooks] refusing non-canonical config path: ${configPath}`);
+    return engine;
+  }
   if (!safeExistsSync(configPath)) return engine;
   let config: LifecycleHookConfigFile;
   try {
-    config = readJson<LifecycleHookConfigFile>(configPath);
+    config = lifecycleHookConfigCatalog(configPath).load();
   } catch (err) {
     logger.warn(
       `[lifecycle-hooks] unreadable config ${configPath}: ${err instanceof Error ? err.message : String(err)}`
@@ -493,6 +607,7 @@ export function loadLifecycleHookEngine(
 }
 
 const GLOBAL_KEY = Symbol.for('kyberion.lifecycleHookEngine');
+const APPROVAL_SURFACE_KEY = Symbol.for('kyberion.lifecycleHookApprovalSurface');
 
 /** Process-wide engine (config hooks + programmatic registrations). */
 export function getDefaultLifecycleHookEngine(): LifecycleHookEngine {
@@ -501,7 +616,53 @@ export function getDefaultLifecycleHookEngine(): LifecycleHookEngine {
   return holder[GLOBAL_KEY] as LifecycleHookEngine;
 }
 
+/**
+ * Install the one process-wide interactive approval adapter. Registration is
+ * deliberately exclusive: channel bridges must compose their routing behind
+ * this resolver instead of silently replacing another bridge.
+ */
+export function registerDefaultLifecycleHookApprovalSurface(
+  resolver: LifecycleHookApprovalSurfaceResolver
+): () => void {
+  const holder = globalThis as Record<symbol, unknown>;
+  const existing = holder[APPROVAL_SURFACE_KEY] as LifecycleHookApprovalSurfaceResolver | undefined;
+  if (existing && existing !== resolver) {
+    throw new Error('[HOOK_APPROVAL_SURFACE_ALREADY_REGISTERED]');
+  }
+  holder[APPROVAL_SURFACE_KEY] = resolver;
+  return () => {
+    if (holder[APPROVAL_SURFACE_KEY] === resolver) delete holder[APPROVAL_SURFACE_KEY];
+  };
+}
+
+/**
+ * Fire the process-wide engine and materialize `ask` when the installed
+ * surface can own this event. A resolver failure or no matching surface does
+ * not reopen the operation: the already fail-closed outcome is returned.
+ */
+export async function fireDefaultLifecycleHooks(
+  event: LifecycleHookEvent,
+  payload: LifecycleHookPayload = {}
+): Promise<LifecycleHookOutcome> {
+  const outcome = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), event, payload);
+  if (outcome.decision !== 'ask') return outcome;
+  const resolver = (globalThis as Record<symbol, unknown>)[APPROVAL_SURFACE_KEY] as
+    LifecycleHookApprovalSurfaceResolver | undefined;
+  if (!resolver) return outcome;
+  try {
+    const surface = await resolver({ event, payload, outcome });
+    return surface ? materializeLifecycleHookApproval(outcome, event, payload, surface) : outcome;
+  } catch {
+    return outcome;
+  }
+}
+
 /** Test seam. */
 export function resetDefaultLifecycleHookEngine(): void {
   delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
+}
+
+/** Test seam for the process-wide interactive adapter. */
+export function resetDefaultLifecycleHookApprovalSurface(): void {
+  delete (globalThis as Record<symbol, unknown>)[APPROVAL_SURFACE_KEY];
 }

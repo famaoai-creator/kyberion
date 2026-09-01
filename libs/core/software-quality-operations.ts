@@ -1,9 +1,9 @@
 import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
 
 import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import type {
   DefectCandidate,
@@ -28,6 +28,19 @@ export interface TestViewpointCatalog {
   viewpoints: TestViewpointDefinition[];
 }
 
+const VIEWPOINT_CATALOG_PATH = pathResolver.knowledge(
+  'product/governance/software-test-viewpoints.json'
+);
+const VIEWPOINT_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/software-test-viewpoints.schema.json'
+);
+
+const viewpointCatalog = defineCatalog<TestViewpointCatalog>({
+  id: 'software-test-viewpoints',
+  path: VIEWPOINT_CATALOG_PATH,
+  schema: VIEWPOINT_CATALOG_SCHEMA_PATH,
+});
+
 export interface DeriveTestInventoryInput {
   contract: SoftwareQualityContract;
   systemTags: string[];
@@ -37,9 +50,7 @@ export interface DeriveTestInventoryInput {
 }
 
 function loadViewpointCatalog(): TestViewpointCatalog {
-  return readJson<TestViewpointCatalog>(
-    pathResolver.knowledge('product/governance/software-test-viewpoints.json')
-  );
+  return viewpointCatalog.load();
 }
 
 function deterministicInventory(input: DeriveTestInventoryInput): TestInventoryItem[] {
@@ -267,6 +278,69 @@ export interface DefectTransitionEvent {
   occurred_at: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isDefectStatus(value: unknown): value is DefectStatus {
+  return (
+    value === 'candidate' ||
+    value === 'open' ||
+    value === 'in_progress' ||
+    value === 'fixed' ||
+    value === 'retest' ||
+    value === 'closed' ||
+    value === 'reopened' ||
+    value === 'duplicate' ||
+    value === 'cannot_reproduce' ||
+    value === 'accepted_risk'
+  );
+}
+
+export function parseDefectTransitionEvent(value: unknown): DefectTransitionEvent | undefined {
+  if (!isRecord(value)) return undefined;
+  const from = value.from === null ? null : isDefectStatus(value.from) ? value.from : undefined;
+  const to = isDefectStatus(value.to) ? value.to : undefined;
+  const actorType =
+    value.actor_type === 'human' ||
+    value.actor_type === 'ai_agent' ||
+    value.actor_type === 'automation'
+      ? value.actor_type
+      : undefined;
+  const evidenceRefs = value.evidence_refs;
+  const normalizedEvidenceRefs =
+    Array.isArray(evidenceRefs) &&
+    evidenceRefs.every((ref) => typeof ref === 'string' && ref.trim())
+      ? evidenceRefs
+      : undefined;
+  if (
+    typeof value.defect_id !== 'string' ||
+    !value.defect_id.trim() ||
+    from === undefined ||
+    to === undefined ||
+    typeof value.actor_id !== 'string' ||
+    !value.actor_id.trim() ||
+    actorType === undefined ||
+    typeof value.reason !== 'string' ||
+    !value.reason.trim() ||
+    normalizedEvidenceRefs === undefined ||
+    typeof value.occurred_at !== 'string' ||
+    !Number.isFinite(Date.parse(value.occurred_at))
+  ) {
+    return undefined;
+  }
+  return {
+    defect_id: value.defect_id,
+    from,
+    to,
+    actor_id: value.actor_id,
+    actor_type: actorType,
+    reason: value.reason,
+    evidence_refs: normalizedEvidenceRefs,
+    occurred_at: value.occurred_at,
+  };
+}
+
 const DEFECT_TRANSITIONS: Record<DefectStatus, DefectStatus[]> = {
   candidate: ['open', 'duplicate', 'cannot_reproduce'],
   open: ['in_progress', 'duplicate', 'cannot_reproduce', 'accepted_risk'],
@@ -284,8 +358,16 @@ function readDefectEvents(filePath: string): DefectTransitionEvent[] {
   if (!safeExistsSync(filePath)) return [];
   return (safeReadFile(filePath, { encoding: 'utf8' }) as string)
     .split('\n')
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as DefectTransitionEvent);
+    .filter((line) => line.trim() !== '')
+    .flatMap((line) => {
+      try {
+        return [parseDefectTransitionEvent(JSON.parse(line) as unknown)].filter(
+          (event): event is DefectTransitionEvent => event !== undefined
+        );
+      } catch {
+        return [];
+      }
+    });
 }
 
 export function defectCurrentStatus(

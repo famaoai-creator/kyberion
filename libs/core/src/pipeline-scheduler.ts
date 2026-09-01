@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { safeReadFile, safeWriteFile, safeExistsSync } from '../secure-io.js';
+import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { safeWriteFile, safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './cron-utils.js';
@@ -23,6 +24,9 @@ export interface ScheduledPipeline {
   enabled: boolean;
   lastRun?: string;
   lastStatus?: 'succeeded' | 'failed';
+  consecutiveFailures?: number;
+  disabledReason?: string;
+  disabledAt?: string;
   context?: Record<string, any>; // additional context to inject
   deliver_to?: {
     surface: string;
@@ -55,12 +59,34 @@ export interface PipelineSchedulerOptions {
 // ---------------------------------------------------------------------------
 
 const REGISTRY_PATH = 'active/shared/runtime/pipeline-schedules.json';
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/pipeline-schedule-registry.schema.json'
+);
 const DEFAULT_RUN_LOCK_TTL_MS = 15 * 60 * 1000;
 
 function registryPath(options: PipelineSchedulerOptions = {}): string {
   return options.rootDir
     ? path.join(options.rootDir, 'active/shared/runtime/pipeline-schedules.json')
-    : REGISTRY_PATH;
+    : pathResolver.rootResolve(REGISTRY_PATH);
+}
+
+const registryCatalogs = new Map<string, GovernedCatalog<PipelineScheduleRegistry>>();
+
+function registryCatalog(
+  options: PipelineSchedulerOptions = {}
+): GovernedCatalog<PipelineScheduleRegistry> {
+  const filePath = registryPath(options);
+  const cached = registryCatalogs.get(filePath);
+  if (cached) return cached;
+  const catalog = defineCatalog<PipelineScheduleRegistry>({
+    id: 'pipeline-schedule-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+    fallback: { version: '1.0', schedules: [] },
+    fallbackOnInvalid: true,
+  });
+  registryCatalogs.set(filePath, catalog);
+  return catalog;
 }
 
 function nowValue(options: PipelineSchedulerOptions = {}): Date {
@@ -103,8 +129,7 @@ export function loadScheduleRegistry(
     return { version: '1.0', schedules: [] };
   }
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as PipelineScheduleRegistry;
+    const parsed = registryCatalog(options).load();
     const schedules = (parsed.schedules || []).map((schedule) => ({
       ...schedule,
       pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
@@ -124,8 +149,18 @@ export function saveScheduleRegistry(
   options: PipelineSchedulerOptions = {}
 ): void {
   ensureRegistryDir(options);
-  safeWriteFile(registryPath(options), JSON.stringify(registry, null, 2));
-  logger.info(`[PIPELINE-SCHEDULER] Registry saved with ${registry.schedules.length} schedule(s)`);
+  const normalizedRegistry: PipelineScheduleRegistry = {
+    ...registry,
+    schedules: registry.schedules.map((schedule) => ({
+      ...schedule,
+      pipelinePath: normalizeScheduledPipelinePath(schedule.pipelinePath, options.rootDir),
+    })),
+  };
+  registryCatalog(options).validate(normalizedRegistry, registryPath(options));
+  safeWriteFile(registryPath(options), JSON.stringify(normalizedRegistry, null, 2));
+  logger.info(
+    `[PIPELINE-SCHEDULER] Registry saved with ${normalizedRegistry.schedules.length} schedule(s)`
+  );
 }
 
 /**
@@ -139,15 +174,33 @@ export function normalizeScheduledPipelinePath(pipelinePath: string, rootDir?: s
   const root = rootDir ?? pathResolver.rootDir();
   const trimmed = String(pipelinePath || '').trim();
   if (!trimmed) throw new Error('pipelinePath must be a non-empty path');
-  if (!path.isAbsolute(trimmed)) return trimmed.replace(/\\/g, '/');
+  const normalized = trimmed.replace(/\\/g, '/');
+  const assertRepoRelative = (candidate: string): string => {
+    const resolvedRoot = path.resolve(root);
+    const resolved = path.resolve(resolvedRoot, candidate);
+    const relative = path.relative(resolvedRoot, resolved);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `pipelinePath must be repo-relative or inside the repo root (got path outside the repo: ${trimmed})`
+      );
+    }
+    return candidate;
+  };
+  if (!path.isAbsolute(trimmed)) return assertRepoRelative(normalized);
   const relative = path.relative(root, trimmed);
   if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
-    return relative.replace(/\\/g, '/');
+    return assertRepoRelative(relative.replace(/\\/g, '/'));
   }
   const marker = `${path.sep}pipelines${path.sep}`;
   const markerIndex = trimmed.indexOf(marker);
   if (markerIndex >= 0) {
     const migrated = trimmed.slice(markerIndex + 1).replace(/\\/g, '/');
+    assertRepoRelative(migrated);
     logger.warn(
       `[PIPELINE-SCHEDULER] migrated legacy absolute pipelinePath to repo-relative: ${trimmed} -> ${migrated}`
     );
@@ -163,8 +216,7 @@ export function resolveScheduledPipelinePath(
   options: PipelineSchedulerOptions = {}
 ): string {
   const root = options.rootDir ?? pathResolver.rootDir();
-  const stored = String(schedule.pipelinePath || '').trim();
-  if (path.isAbsolute(stored)) return stored;
+  const stored = normalizeScheduledPipelinePath(schedule.pipelinePath, root);
   return path.join(root, stored);
 }
 

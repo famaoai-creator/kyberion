@@ -23,19 +23,21 @@
  *     required for Meet, which has no public bot SDK)
  */
 
+import { logger } from '@agent/core/core';
+import { retry } from '@agent/core/async-utils';
 import {
   registerMeetingJoinDriver,
-  abortableAudioChunks,
-  logger,
-  retry,
-  type AudioBus,
-  type AudioChunk,
   validateMeetingTarget,
   type MeetingJoinDriver,
+} from '@agent/core/meeting-join-driver';
+import {
+  abortableAudioChunks,
+  type AudioChunk,
   type MeetingSession,
   type MeetingSessionState,
   type MeetingTarget,
-} from '@agent/core';
+} from '@agent/core/meeting-session-types';
+import type { AudioBus } from '@agent/core/audio-bus';
 import {
   MEET_SELECTORS,
   TEAMS_SELECTORS,
@@ -50,7 +52,7 @@ import {
   trySelectors,
   waitForAnyVisibleSelector,
 } from './meeting-browser-driver-helpers.js';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
 
 /* Playwright type stand-ins so this file compiles without playwright

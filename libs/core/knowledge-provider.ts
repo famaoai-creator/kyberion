@@ -1,5 +1,7 @@
+import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from './knowledge-scope.js';
 
@@ -49,14 +51,14 @@ export class KnowledgeProvider {
     }
 
     const fullPath = pathResolver.knowledge(relativePath);
+    this.assertSafeResourcePath(fullPath);
     if (!safeExistsSync(fullPath)) {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Knowledge file not found: ${fullPath}`);
     }
 
     try {
-      const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
-      return JSON.parse(content) as T;
+      return readJson<T>(fullPath);
     } catch (err: any) {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Failed to parse Knowledge file ${relativePath}: ${err.message}`);
@@ -81,6 +83,7 @@ export class KnowledgeProvider {
     }
 
     const fullPath = pathResolver.knowledge(relativePath);
+    this.assertSafeResourcePath(fullPath);
     if (!safeExistsSync(fullPath)) {
       if (defaultValue !== undefined) return defaultValue;
       throw new Error(`Knowledge file not found: ${fullPath}`);
@@ -100,6 +103,42 @@ export class KnowledgeProvider {
       throw new Error(
         `[KNOWLEDGE_SCOPE_DENIED] path '${relativePath}' is outside the authorized knowledge scope`
       );
+    }
+  }
+
+  private static assertSafeResourcePath(fullPath: string): void {
+    const root = path.resolve(pathResolver.knowledge());
+    const absolute = path.resolve(fullPath);
+    const relative = path.relative(root, absolute).replaceAll('\\', '/');
+    if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+      throw new Error(`[KNOWLEDGE_SCOPE_DENIED] path '${fullPath}' is outside knowledge root`);
+    }
+    try {
+      if (safeLstat(root).isSymbolicLink()) {
+        throw new Error('[KNOWLEDGE_SCOPE_DENIED] knowledge root cannot be a symbolic link');
+      }
+      let current = root;
+      for (const segment of relative.split('/')) {
+        current = path.join(current, segment);
+        try {
+          if (safeLstat(current).isSymbolicLink()) {
+            throw new Error(
+              `[KNOWLEDGE_SCOPE_DENIED] knowledge path cannot traverse a symbolic link: ${relative}`
+            );
+          }
+        } catch (error) {
+          if (error instanceof Error && error.message.startsWith('[KNOWLEDGE_SCOPE_DENIED]')) {
+            throw error;
+          }
+          if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+          throw error;
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[KNOWLEDGE_SCOPE_DENIED]')) {
+        throw error;
+      }
+      throw new Error(`[KNOWLEDGE_SCOPE_DENIED] knowledge path could not be inspected safely`);
     }
   }
 }

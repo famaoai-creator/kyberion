@@ -54,7 +54,3 @@ export function resolveMediaToneStyle(tone?: string): MediaToneStyleMapEntry['st
   const resolved = catalog.tones.find((entry) => entry.tone === normalized)?.style;
   return resolved || FALLBACK_MAP[normalized] || 'info';
 }
-
-export function resetMediaToneStyleMapCatalogCache(): void {
-  catalog.reset();
-}

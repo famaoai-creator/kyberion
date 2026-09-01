@@ -7,31 +7,47 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { logger } from './core.js';
 import { resolveMissionLedgerPolicy } from './mission-ledger-policy.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { loadState, readJsonFileSafe } from './mission-state.js';
-import { readTextFile } from './cli-input.js';
+import { readTextFile } from './foundation/text.js';
 import { normalizeEventScope } from './event-scope.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
-  if (resolved.endsWith('.md')) return resolved;
-  return path.join(resolved, '04_control', 'mission-ledger.md');
+  const ledgerPath = resolved.endsWith('.md')
+    ? resolved
+    : path.join(resolved, '04_control', 'mission-ledger.md');
+  return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
 }
 
 export function resolveProjectLedgerJsonPath(projectPath: string): string {
   const resolved = pathResolver.rootResolve(projectPath);
-  if (resolved.endsWith('.json')) return resolved;
-  if (resolved.endsWith('.md')) return resolved.replace(/\.md$/i, '.json');
-  return path.join(resolved, '04_control', 'mission-ledger.json');
+  const ledgerPath = resolved.endsWith('.json')
+    ? resolved
+    : resolved.endsWith('.md')
+      ? resolved.replace(/\.md$/i, '.json')
+      : path.join(resolved, '04_control', 'mission-ledger.json');
+  return assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
 }
 
 export function ensureProjectMissionLedgerExists(ledgerPath: string): void {
-  if (safeExistsSync(ledgerPath)) return;
-  const blueprintPath = pathResolver.knowledge('public/templates/blueprints/mission-ledger.md');
-  const ledgerDir = path.dirname(ledgerPath);
+  const safeLedgerPath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeLedgerPath)) return;
+  const blueprintPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('public/templates/blueprints/mission-ledger.md')
+  );
+  const ledgerDir = assertSafeRepositoryPath(path.dirname(safeLedgerPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
   const blueprint = safeReadFile(blueprintPath, { encoding: 'utf8' }) as string;
-  safeWriteFile(ledgerPath, blueprint);
+  safeWriteFile(safeLedgerPath, blueprint);
 }
 
 export function escapeTableCell(value: string): string {
@@ -105,7 +121,9 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
   const ledgerPath = resolveProjectLedgerPath(project.project_path);
   const ledgerJsonPath = resolveProjectLedgerJsonPath(project.project_path);
   ensureProjectMissionLedgerExists(ledgerPath);
-  const ledgerDir = path.dirname(ledgerJsonPath);
+  const ledgerDir = assertSafeRepositoryPath(path.dirname(ledgerJsonPath), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(ledgerDir)) safeMkdir(ledgerDir, { recursive: true });
 
   const summary = escapeTableCell(

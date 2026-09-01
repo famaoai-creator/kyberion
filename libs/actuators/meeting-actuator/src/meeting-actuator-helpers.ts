@@ -20,25 +20,30 @@
  * in a vendor SDK behind the same JSON contract).
  */
 
+import { auditChain } from '@agent/core/audit-chain';
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeExec,
   safeReadFile,
-  loadJson,
   safeWriteFile,
   safeExistsSync,
-  pathResolver,
-  auditChain,
-  buildGovernedRetryOptions,
-  retry,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  resolveIdentityContext,
-  executeAdfSteps,
-  resolveVars,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { resolveIdentityContext } from '@agent/core/authority';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import { resolveVars } from '@agent/core/src/logic-utils';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { loadJson } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
@@ -53,6 +58,18 @@ import {
   runActionItemReminderSweepOp,
   trackPendingActionItemsOp,
 } from './meeting-intelligence-ops.js';
+
+function resolveMeetingPath(ref: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
+}
+
+function resolveExistingMeetingFile(ref: string, label: string): string {
+  const resolved = resolveMeetingPath(ref, false);
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`[MEETING_RESOURCE_FILE] ${label} must be a regular file: ${ref}`);
+  }
+  return resolved;
+}
 import { resolveMeetingProvider } from './meeting-provider-adapters.js';
 
 export interface MeetingAction {
@@ -88,9 +105,23 @@ export interface MeetingPipelineAction {
 
 export interface MeetingActionResult {
   status: 'success' | 'error' | 'denied';
+  action?: string;
   platform?: string;
   method?: string;
   join_backend?: string;
+  provider?: string;
+  provider_profile_id?: string;
+  execution_profile_id?: string;
+  mode?: string;
+  node?: string;
+  audio_bridge?: string;
+  url_policy?: string;
+  chars?: number;
+  duration?: number;
+  elapsed?: number;
+  playwright_driver?: string;
+  voice_bridge?: string;
+  blackhole_router?: string;
   message?: string;
   audit_event_id?: string;
   trace?: unknown;
@@ -128,6 +159,59 @@ function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed || undefined;
+}
+
+const MEETING_RESULT_STRING_FIELDS = [
+  'action',
+  'platform',
+  'method',
+  'join_backend',
+  'provider',
+  'provider_profile_id',
+  'execution_profile_id',
+  'mode',
+  'node',
+  'audio_bridge',
+  'url_policy',
+  'message',
+  'partial_reason',
+  'transcript_path',
+  'playwright_driver',
+  'voice_bridge',
+  'blackhole_router',
+] as const;
+
+const MEETING_RESULT_NUMBER_FIELDS = ['chars', 'duration', 'elapsed'] as const;
+
+/** Validate the JSON envelope emitted by the Python meeting bridge. */
+export function parseMeetingActionResult(value: unknown): MeetingActionResult | undefined {
+  if (!isPlainObject(value)) return undefined;
+  if (value.status !== 'success' && value.status !== 'error' && value.status !== 'denied') {
+    return undefined;
+  }
+
+  const result: MeetingActionResult = { status: value.status };
+  for (const field of MEETING_RESULT_STRING_FIELDS) {
+    const candidate = value[field];
+    if (candidate !== undefined && typeof candidate !== 'string') return undefined;
+    if (typeof candidate === 'string') result[field] = candidate;
+  }
+  for (const field of MEETING_RESULT_NUMBER_FIELDS) {
+    const candidate = value[field];
+    if (candidate !== undefined && (typeof candidate !== 'number' || !Number.isFinite(candidate))) {
+      return undefined;
+    }
+    if (typeof candidate === 'number') result[field] = candidate;
+  }
+  if (value.partial_state !== undefined && typeof value.partial_state !== 'boolean') {
+    return undefined;
+  }
+  if (typeof value.partial_state === 'boolean') result.partial_state = value.partial_state;
+  if (value.audit_event_id !== undefined && typeof value.audit_event_id !== 'string') {
+    return undefined;
+  }
+  if (typeof value.audit_event_id === 'string') result.audit_event_id = value.audit_event_id;
+  return result;
 }
 
 function validateGrantedConsent(
@@ -194,7 +278,9 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (!evidenceDir) {
     return { allowed: false, reason: `mission '${missionId}' not found` };
   }
-  const consentPath = path.join(evidenceDir, 'voice-consent.json');
+  const consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(consentPath)) {
     return {
       allowed: false,
@@ -226,14 +312,11 @@ function redactedTarget(input: MeetingAction): string {
   }
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEETING_MANIFEST_PATH,
-    defaults: DEFAULT_MEETING_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEETING_MANIFEST_PATH,
+  defaults: DEFAULT_MEETING_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function recordMeetingEvent(input: MeetingAction, result: MeetingActionResult): string {
   const isDenied = result.status === 'denied';
@@ -314,14 +397,15 @@ async function executeMeetingPipeline(
   initialContext: Record<string, unknown> = {},
   options: MeetingPipelineAction['options'] = {}
 ) {
-  const result = await executeAdfSteps(
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'meeting',
     steps,
-    { ...initialContext, timestamp: new Date().toISOString() } as Record<string, unknown>,
-    {
-      maxSteps: options.max_steps || 1000,
-      timeoutMs: options.timeout_ms || 60000,
+    context: { ...initialContext, timestamp: new Date().toISOString() } as Record<string, unknown>,
+    options: {
+      maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,
     },
-    {
+    handlers: {
       capture: async (op, rawParams, context) => {
         if (op !== 'listen' && op !== 'status') {
           throw new Error(`[UNKNOWN_OP] Unknown meeting capture op: ${op}`);
@@ -371,7 +455,11 @@ async function executeMeetingPipeline(
           case 'extract_action_items': {
             const transcriptPath = params.transcript_path ? String(params.transcript_path) : '';
             const transcript = transcriptPath
-              ? String(safeReadFile(pathResolver.rootResolve(transcriptPath), { encoding: 'utf8' }))
+              ? String(
+                  safeReadFile(resolveExistingMeetingFile(transcriptPath, 'transcript_path'), {
+                    encoding: 'utf8',
+                  })
+                )
               : String(params.transcript || '');
             const attendees = (
               Array.isArray(params.attendees)
@@ -485,7 +573,7 @@ async function executeMeetingPipeline(
             });
             if (params.output_path) {
               safeWriteFile(
-                pathResolver.rootResolve(String(params.output_path)),
+                resolveMeetingPath(String(params.output_path)),
                 JSON.stringify(result, null, 2)
               );
             }
@@ -507,7 +595,7 @@ async function executeMeetingPipeline(
             const report = auditSpeakerFairnessOp({ mission_id: missionId });
             if (params.output_path) {
               safeWriteFile(
-                pathResolver.rootResolve(String(params.output_path)),
+                resolveMeetingPath(String(params.output_path)),
                 JSON.stringify(report, null, 2)
               );
             }
@@ -517,8 +605,8 @@ async function executeMeetingPipeline(
             throw new Error(`[UNKNOWN_OP] Unknown meeting op: ${op}`);
         }
       },
-    }
-  );
+    },
+  });
   return result as unknown as Record<string, unknown>;
 }
 
@@ -604,7 +692,10 @@ export async function handleAction(
     if (!normalized) {
       parsed = { status: 'error', message: 'meeting-bridge produced no output' };
     } else {
-      parsed = JSON.parse(normalized) as MeetingActionResult;
+      parsed = parseMeetingActionResult(JSON.parse(normalized) as unknown) || {
+        status: 'error',
+        message: 'meeting-bridge produced an invalid result envelope',
+      };
     }
   } catch (err: any) {
     parsed = {
@@ -620,11 +711,11 @@ export async function handleAction(
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(process.argv)
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = pathResolver.rootResolve(argv.input as string);
+  const inputPath = resolveExistingMeetingFile(String(argv.input), 'input');
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   const result = await handleAction(JSON.parse(inputContent));
   console.log(JSON.stringify(result, null, 2));

@@ -225,6 +225,12 @@ describe('mission-team-binding', () => {
     expect(safeExistsSync(paths.teamBlueprintPath)).toBe(true);
     expect(safeExistsSync(paths.staffingAssignmentsPath)).toBe(true);
     expect(safeExistsSync(paths.executionLedgerPath)).toBe(true);
+    const receiptPath = `${TEST_MISSION_DIR}/coordination/provisioned-entries.jsonl`;
+    const receipts = String(safeReadFile(receiptPath, { encoding: 'utf8' }) || '');
+    expect(receipts).toContain('"phase":"verified"');
+    expect(receipts).toContain('"target_path":"team-blueprint.json"');
+    expect(receipts).toContain('"target_path":"staffing-assignments.json"');
+    expect(receipts).toContain('"target_path":"execution-ledger.jsonl"');
 
     appendMissionExecutionLedgerEntry({
       mission_id: MISSION_ID,
