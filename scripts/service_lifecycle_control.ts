@@ -8,7 +8,7 @@ import {
   safeWriteFile,
   safeExec,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
@@ -174,7 +174,7 @@ function startService(serviceName: string) {
 
     let parsed: unknown = resultText;
     try {
-      parsed = JSON.parse(resultText);
+      parsed = parseSafeJsonInput(resultText, 'surface runtime response');
     } catch {
       // keep plain text
     }

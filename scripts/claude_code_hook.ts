@@ -26,6 +26,7 @@ import {
   summarizeTranscriptUsage,
 } from '@agent/core/claude-code-hook';
 import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
@@ -39,7 +40,7 @@ async function readStdin(): Promise<string> {
 export function parseHookPayload(raw: string): Record<string, unknown> {
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = parseSafeJsonInput(raw, 'Claude Code hook payload');
     return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
