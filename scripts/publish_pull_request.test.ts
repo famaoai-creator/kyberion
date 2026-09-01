@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildGhArgs, parsePublishArgs, resolvePublishTitle } from './publish_pull_request.js';
+import {
+  buildGhArgs,
+  parseDefaultBranchResponse,
+  parsePublishArgs,
+  resolvePublishTitle,
+} from './publish_pull_request.js';
 
 describe('publish_pull_request', () => {
   it('parses explicit publish flags', () => {
@@ -16,7 +21,7 @@ describe('publish_pull_request', () => {
   it('builds a guarded gh pr create command', () => {
     const args = buildGhArgs(
       { title: 'fix(pr): validate before publish', draft: true, fill: true },
-      { head: 'codex/pr-guard', defaultBranch: 'main' },
+      { head: 'codex/pr-guard', defaultBranch: 'main' }
     );
 
     expect(args).toEqual([
@@ -31,5 +36,12 @@ describe('publish_pull_request', () => {
       '--head',
       'codex/pr-guard',
     ]);
+  });
+
+  it('rejects unsafe default-branch responses before publish', () => {
+    expect(parseDefaultBranchResponse('{"defaultBranchRef":{"name":"main"}}')).toBe('main');
+    expect(() =>
+      parseDefaultBranchResponse('{"defaultBranchRef":{"__proto__":{"name":"evil"}}}')
+    ).toThrow('dangerous JSON key');
   });
 });
