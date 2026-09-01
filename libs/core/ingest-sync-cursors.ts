@@ -24,6 +24,7 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -105,10 +106,6 @@ function isCursorValue(value: unknown): value is string | Record<string, string>
   return Object.values(value as Record<string, unknown>).every(
     (entry) => typeof entry === 'string'
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function assertCursorState(
