@@ -33,7 +33,7 @@ import {
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import type { ProcedureCatalog, ProcedureEntry } from '@agent/core/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -110,7 +110,7 @@ export function main(argv: string[] = []): void {
 
   let intentPhrases: string[];
   try {
-    const parsed = intentPhrasesRaw ? JSON.parse(intentPhrasesRaw) : [];
+    const parsed = parseSafeJsonInput(intentPhrasesRaw || '[]', '--intent-phrases');
     if (
       !Array.isArray(parsed) ||
       parsed.some((p) => typeof p !== 'string') ||
