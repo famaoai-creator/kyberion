@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -136,10 +137,6 @@ function randomId(prefix: string): string {
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {
   return appendGovernedArtifactJsonl(role, logicalPath, record);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function persistedString(record: Record<string, unknown>, key: string): string {

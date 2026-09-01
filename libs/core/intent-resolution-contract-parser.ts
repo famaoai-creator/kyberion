@@ -1,3 +1,5 @@
+import { isRecord } from './foundation/text.js';
+
 export type IntentResolutionShape =
   'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
 export type IntentOutcomeKind =
@@ -25,10 +27,6 @@ export interface IntentResolutionContract {
     confidence: number;
   };
   rationale: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {

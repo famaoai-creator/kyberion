@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { isRecord } from './foundation/text.js';
 import { assertModuleInvariant } from './invariants.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeLstat } from './secure-io.js';
@@ -163,10 +164,6 @@ function isSafeJsonTree(value: unknown): boolean {
   return Object.entries(value).every(
     ([key, nested]) => !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonTree(nested)
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseCommandHookOutput(raw: string): CommandHookOutput | null {

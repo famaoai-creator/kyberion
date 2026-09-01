@@ -24,6 +24,7 @@ import { currentScope } from './scope-context.js';
 import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -424,10 +425,6 @@ export interface SurfaceWeatherCurrent {
   weather_code?: number;
   wind_speed_10m?: number;
   relative_humidity_2m?: number;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function finiteNumber(value: unknown): number | undefined {
