@@ -654,10 +654,16 @@ export async function runMissionRetrospective(
   if (backend.name !== 'stub') {
     try {
       const raw = await backend.prompt(buildRetrospectivePrompt(stats));
+      const trimmed = raw.trim();
+      const firstJsonToken = trimmed.search(/[\[{]/u);
       const start = raw.indexOf('{');
       const end = raw.lastIndexOf('}');
       const parsed: unknown =
-        start >= 0 && end > start ? JSON.parse(raw.slice(start, end + 1)) : { proposals: [] };
+        firstJsonToken >= 0 && trimmed[firstJsonToken] === '['
+          ? { proposals: [] }
+          : start >= 0 && end > start
+            ? parseSafeJsonInput(raw.slice(start, end + 1), 'retrospective proposal response')
+            : { proposals: [] };
       const proposalDrafts =
         isRecord(parsed) && Array.isArray(parsed.proposals)
           ? parsed.proposals.flatMap((entry) => {
