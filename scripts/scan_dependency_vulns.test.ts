@@ -158,6 +158,7 @@ describe('defer re-evaluation loop (Task 4)', () => {
       JSON.stringify({ kind: 'patch_apply', package_name: 'x', status: 'patched' }),
       JSON.stringify({ kind: 'patch_apply', package_name: 'y', status: 'patched' }),
       JSON.stringify({ kind: 'patch_apply', package_name: 'y', status: 'rolled_back' }),
+      '{"findings":[{"package_name":"unsafe","__proto__":{"polluted":true}}]}',
       'not json',
     ];
     safeWriteFile(ledgerPath, `${lines.join('\n')}\n`);
@@ -165,6 +166,7 @@ describe('defer re-evaluation loop (Task 4)', () => {
     const state = readPreviousLedgerState(ledgerPath);
     expect(state.findings.get('a')?.latest_version).toBe('1.2.0');
     expect([...state.patched]).toEqual(['x']);
+    expect(state.findings.has('unsafe')).toBe(false);
   });
 
   it('reports reevaluations and unresolved counts across two scans', () => {

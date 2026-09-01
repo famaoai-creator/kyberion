@@ -8,9 +8,8 @@ import {
   safeReaddir,
   safeLstat,
 } from '@agent/core/secure-io';
-import { safeJsonParse } from '@agent/core/validators';
 import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -80,12 +79,12 @@ function readJson<T>(text: string, label: string): T {
   const trimmed = String(text || '').trim();
   if (!trimmed) return {} as T;
   try {
-    return safeJsonParse<T>(trimmed, label);
+    return parseSafeJsonInput(trimmed, label) as T;
   } catch {
     const start = trimmed.indexOf('{');
     const end = trimmed.lastIndexOf('}');
     if (start >= 0 && end > start) {
-      return safeJsonParse<T>(trimmed.slice(start, end + 1), label);
+      return parseSafeJsonInput(trimmed.slice(start, end + 1), label) as T;
     }
     return {} as T;
   }
@@ -288,7 +287,7 @@ export function readPreviousLedgerState(ledgerPath: string): PreviousLedgerState
   for (const line of lines) {
     let record: unknown;
     try {
-      record = JSON.parse(line) as unknown;
+      record = parseSafeJsonInput(line, 'dependency vulnerability ledger entry');
     } catch {
       continue;
     }
