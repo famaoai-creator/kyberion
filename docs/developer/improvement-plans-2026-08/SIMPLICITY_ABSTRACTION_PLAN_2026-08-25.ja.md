@@ -10873,6 +10873,12 @@ LLM injection scannerとsecurity screenのverdict抽出を再監査し、root配
 
 検証: untrusted content／security screen **2 files / 47 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 190
+
+Software quality operationsのreasoning test inventoryとdefect transition JSONLを再監査し、直接 `JSON.parse` の結果を品質計画・defect statusへ渡していた境界をshared safe parserへ移行した。root配列／malformed／nested dangerous keyはinventory・transitionとして採用せず、正常なviewpoint追加、型検証、壊れたJSONL行のskip semanticsは維持した。
+
+検証: software quality operations **1 file / 9 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
