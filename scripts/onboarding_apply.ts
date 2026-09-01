@@ -18,7 +18,12 @@ import { withExecutionContext } from '@agent/core/authority';
 import { withLock } from '@agent/core/src/lock-utils';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
-import { compileSchema, readJson, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  compileSchema,
+  parseSafeJsonInput,
+  readJson,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import {
   evaluateReasoningBackend,
   formatReasoningSummary,
@@ -141,7 +146,9 @@ export async function readInput(file?: string): Promise<ApplyInput> {
   }
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
-  return parseApplyInput(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+  return parseApplyInput(
+    parseSafeJsonInput(Buffer.concat(chunks).toString('utf8'), 'onboarding identity input')
+  );
 }
 
 export function parseApplyInput(value: unknown): ApplyInput {
