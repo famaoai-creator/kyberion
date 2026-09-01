@@ -97,7 +97,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeStat,
   saveDistillCandidateRecord,

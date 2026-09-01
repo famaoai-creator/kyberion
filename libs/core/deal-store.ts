@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
@@ -8,7 +8,6 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  loadJson,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -121,7 +120,7 @@ export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
   const filePath = dealPath(tenantSlug, dealId);
   try {
     if (!safeExistsSync(filePath)) return null;
-    return loadJson<DealRecord>(filePath);
+    return readJson<DealRecord>(filePath);
   } catch {
     return null;
   }
