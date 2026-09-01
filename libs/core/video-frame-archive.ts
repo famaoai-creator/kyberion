@@ -11,6 +11,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
 import type { VideoFrame, VideoFormat } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 
@@ -31,7 +32,7 @@ const DEFAULT_FFMPEG_BIN = 'ffmpeg';
 
 function normalizeFps(frames: VideoFrame[], requested?: number): number {
   if (requested && Number.isFinite(requested) && requested > 0) {
-    return Math.max(1, Math.min(120, Math.round(requested)));
+    return clamp(Math.round(requested), 1, 120);
   }
   if (frames.length < 2) return 30;
   const deltas: number[] = [];
@@ -42,7 +43,7 @@ function normalizeFps(frames: VideoFrame[], requested?: number): number {
   if (deltas.length === 0) return 30;
   const avgDelta = deltas.reduce((total, value) => total + value, 0) / deltas.length;
   if (!Number.isFinite(avgDelta) || avgDelta <= 0) return 30;
-  return Math.max(1, Math.min(120, Math.round(1000 / avgDelta)));
+  return clamp(Math.round(1000 / avgDelta), 1, 120);
 }
 
 function frameFileExtension(format: VideoFormat): 'jpg' | 'png' {
@@ -151,7 +152,7 @@ export async function* readVideoFramesFromMp4(
   const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('decode'), {
     allowMissingLeaf: true,
   });
-  const fps = Math.max(1, Math.min(120, Math.round(options.fps || 30)));
+  const fps = clamp(Math.round(options.fps || 30), 1, 120);
   safeMkdir(tempDir, { recursive: true });
 
   try {

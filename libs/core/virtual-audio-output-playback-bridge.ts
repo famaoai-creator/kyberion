@@ -9,6 +9,7 @@ import {
 } from './secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from './audio-device-lease.js';
 import { pathResolver } from './path-resolver.js';
+import { clamp } from './foundation/text.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
   createVirtualDeviceInventoryBridge,
@@ -175,7 +176,7 @@ function writeSineToneWav(
   writeString(36, 'data');
   writeUInt32LE(40, dataSize);
 
-  const amplitude = Math.max(0, Math.min(1, opts.volume)) * 0x7fff;
+  const amplitude = clamp(opts.volume, 0, 1) * 0x7fff;
   let offset = 44;
   for (let i = 0; i < frameCount; i += 1) {
     const sample = Math.round(
