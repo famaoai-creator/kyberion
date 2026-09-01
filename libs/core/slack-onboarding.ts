@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
@@ -137,7 +138,36 @@ function serializeOnboardingAction(payload: SlackOnboardingActionPayload): strin
 }
 
 export function parseSlackOnboardingAction(value: string): SlackOnboardingActionPayload {
-  return JSON.parse(value) as SlackOnboardingActionPayload;
+  const parsed = parseSafeJsonObjectInput(value, 'Slack onboarding action');
+  const fields: OnboardingField[] = [
+    'name',
+    'language',
+    'interaction_style',
+    'primary_domain',
+    'vision',
+    'agent_id',
+  ];
+  if (
+    !parsed ||
+    typeof parsed.channel !== 'string' ||
+    !parsed.channel.trim() ||
+    typeof parsed.threadTs !== 'string' ||
+    !parsed.threadTs.trim() ||
+    typeof parsed.field !== 'string' ||
+    !fields.includes(parsed.field as OnboardingField)
+  ) {
+    throw new Error('Slack onboarding action has an invalid channel, threadTs, or field');
+  }
+  if (parsed.answer !== undefined && typeof parsed.answer !== 'string') {
+    throw new Error('Slack onboarding action answer must be a string');
+  }
+  const answer = parsed.answer as string | undefined;
+  return {
+    channel: parsed.channel,
+    threadTs: parsed.threadTs,
+    field: parsed.field as OnboardingField,
+    ...(answer !== undefined ? { answer } : {}),
+  };
 }
 
 export function buildSlackOnboardingPrompt(

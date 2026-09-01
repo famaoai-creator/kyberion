@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildSlackApprovalBlocks } from './slack-approval-ui.js';
+import {
+  buildSlackApprovalBlocks,
+  parseSlackApprovalAction,
+  parseSlackAskWhyAction,
+} from './slack-approval-ui.js';
 
 describe('Slack approval UI intent contract projection', () => {
   it('renders authority and next action alongside approval controls', () => {
@@ -39,5 +43,17 @@ describe('Slack approval UI intent contract projection', () => {
     );
     expect(contractBlock?.text?.text).toContain('*Outcome:* service change');
     expect(contractBlock?.text?.text).not.toContain('approval_required');
+  });
+
+  it('rejects malformed or prototype-bearing action payloads before dispatch', () => {
+    expect(() => parseSlackApprovalAction('{"requestId":"approval-1","decision":"other"}')).toThrow(
+      /valid decision/u
+    );
+    expect(() =>
+      parseSlackApprovalAction('{"requestId":"approval-1","decision":"approved","__proto__":{}}')
+    ).toThrow(/dangerous JSON key/u);
+    expect(() => parseSlackAskWhyAction('{"requestId":"approval-1","category":"unknown"}')).toThrow(
+      /valid category/u
+    );
   });
 });
