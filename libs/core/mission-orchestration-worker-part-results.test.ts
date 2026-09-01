@@ -27,4 +27,8 @@ describe('parseBestOfJudgeVerdict', () => {
       merge_hints: ['valid'],
     });
   });
+
+  it('rejects nested dangerous JSON keys', () => {
+    expect(parseBestOfJudgeVerdict('{"winner":"A","meta":{"__proto__":{}}}')).toBeNull();
+  });
 });

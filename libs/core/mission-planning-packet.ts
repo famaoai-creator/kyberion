@@ -6,6 +6,7 @@ import {
   renderStructuredOutputSchemaPrompt,
 } from './structured-output-contracts.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
@@ -165,7 +166,8 @@ export function parsePlanningReviewVerdict(text: string): PlanningReviewVerdict 
 
   if (json) {
     try {
-      const candidate = JSON.parse(json) as unknown;
+      const candidate = parseSafeJsonObjectInput(json, 'planning review verdict');
+      if (!candidate) throw new Error('planning review verdict must be an object');
       const result = PlanningReviewVerdictSchema.safeParse(candidate);
       if (result.success) {
         parsed = candidate as Record<string, unknown>;
