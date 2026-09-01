@@ -129,6 +129,25 @@ describe('generation scheduler', () => {
     expect(() => generationSchedulePath('../escape')).toThrow(/GENERATION_SCHEDULE_ID_INVALID/);
   });
 
+  it('rejects external delivery paths for system schedules', () => {
+    const schedule = {
+      kind: 'generation-schedule',
+      schedule_id: 'system-image',
+      enabled: true,
+      scope: { scope_kind: 'system', tier: 'public' },
+      trigger: { type: 'interval', interval_ms: 60_000 },
+      job_template: {
+        action: 'generate_image',
+        params: { image_adf: { output: { format: 'png' } } },
+      },
+      execution_policy: { concurrency: 'skip_if_running' },
+      created_at: '2026-03-01T00:00:00.000Z',
+      delivery_policy: { artifact_dir: '/tmp/external-generation-artifacts' },
+    } as any;
+
+    expect(() => resolveGenerationScheduleDeliveryPaths(schedule)).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('requires an active tenant registry entry for tenant schedules', () => {
     const schedule = {
       scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'client-a' },

@@ -127,6 +127,15 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     expect(loadAiDlcPhaseState('MSN-NONE', baseDir)).toBeNull();
   });
 
+  it('rejects traversal mission ids and external persistence roots', () => {
+    expect(() => saveAiDlcPhaseState(createAiDlcPhaseState('../outside'), '/tmp')).toThrow(
+      /invalid mission id/i
+    );
+    expect(() => saveAiDlcPhaseState(createAiDlcPhaseState('MSN-AIDLC-EXTERNAL'), '/tmp')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it('cleanly resumes a stopped state while retaining failure context', () => {
     const baseDir = path.join(
       pathResolver.active('shared/tmp/tests'),

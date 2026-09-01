@@ -12,7 +12,11 @@ import * as os from 'node:os';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { subscribeJsonl } from './jsonl-tail.js';
-import { isStimulusExpired, rotateStimuliJournalIfNeeded } from './stimuli-journal.js';
+import {
+  isStimulusExpired,
+  normalizeNerveMessage,
+  rotateStimuliJournalIfNeeded,
+} from './stimuli-journal.js';
 
 const logger = createLogger('nerve-bridge');
 
@@ -115,6 +119,7 @@ export function listenToNerve(
     {
       intervalMs: options.intervalMs ?? 1000,
       fromBeginning: options.fromBeginning ?? false,
+      parse: normalizeNerveMessage,
       ...(options.signal ? { signal: options.signal } : {}),
       onMalformed: (line, err) =>
         logger.warn(

@@ -2,7 +2,7 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile } from './secure-io.js';
 import {
   appendPromptVisibilityRecord,
   type PromptVisibilityRecord,
@@ -44,6 +44,8 @@ export interface ReadSkillResourceForModelInput {
   taskId?: string;
   contextPackId?: string;
   scope: ScopeContext;
+  /** Project-local skill bodies require an explicit trust decision at read time too. */
+  trustResolved?: boolean;
 }
 
 export interface ReadSkillResourceForModelResult {
@@ -142,6 +144,43 @@ function resolveSkillPath(inputPath: string): string {
   return path.join(resolved, 'SKILL.md');
 }
 
+function assertSkillResourcePath(filePath: string): string {
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (
+    !relative ||
+    relative === '.' ||
+    relative === '..' ||
+    relative.startsWith('../') ||
+    path.isAbsolute(relative)
+  ) {
+    throw new Error(
+      `[SKILL_RESOURCE_SCOPE] skill resource must be inside the repository root: ${filePath}`
+    );
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) break;
+    if (safeLstat(current).isSymbolicLink()) {
+      throw new Error(
+        `[SKILL_RESOURCE_SCOPE] skill resource cannot traverse a symbolic link: ${relative}`
+      );
+    }
+  }
+  return relative;
+}
+
+function assertSkillResourceTrust(relative: string, trustResolved?: boolean): void {
+  if (trustResolved !== true && requiresProjectTrust(relative)) {
+    throw new Error(
+      `[TRUST_REQUIRED] project-local skill cannot be loaded before trust resolution: ${relative}`
+    );
+  }
+}
+
 /** Load only skill metadata; the body is intentionally not returned. */
 export function loadSkillResourceDescriptor(
   inputPath: string,
@@ -149,13 +188,12 @@ export function loadSkillResourceDescriptor(
   options: { trustResolved?: boolean } = {}
 ): SkillResourceDescriptor {
   const filePath = resolveSkillPath(inputPath);
-  const relative = path.relative(pathResolver.rootDir(), filePath).replaceAll('\\', '/');
-  if (options.trustResolved === false && requiresProjectTrust(relative)) {
-    throw new Error(
-      `[TRUST_REQUIRED] project-local skill cannot be loaded before trust resolution: ${relative}`
-    );
-  }
+  const relative = assertSkillResourcePath(filePath);
+  assertSkillResourceTrust(relative, options.trustResolved);
   if (!safeExistsSync(filePath)) throw new Error(`[SKILL_RESOURCE_NOT_FOUND] ${filePath}`);
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[SKILL_RESOURCE_INVALID] skill resource must be a regular file: ${filePath}`);
+  }
   const frontmatter = parseSkillDocument(
     String(safeReadFile(filePath, { encoding: 'utf8' }) || ''),
     filePath
@@ -248,10 +286,21 @@ export function resolveSkillToolSurface(
 /** Read the full body only from an explicit caller, never from model index rendering. */
 export function readSkillResourceBody(
   descriptor: SkillResourceDescriptor,
-  origin: SkillReadOrigin = 'explicit'
+  origin: SkillReadOrigin = 'explicit',
+  options: { trustResolved?: boolean } = {}
 ): string {
+  const relative = assertSkillResourcePath(descriptor.path);
+  assertSkillResourceTrust(relative, options.trustResolved);
   if (origin === 'model' && descriptor.frontmatter.disable_model_invocation) {
     throw new Error(`[SKILL_MODEL_INVOCATION_DISABLED] ${descriptor.name}`);
+  }
+  if (!safeExistsSync(descriptor.path)) {
+    throw new Error(`[SKILL_RESOURCE_NOT_FOUND] ${descriptor.path}`);
+  }
+  if (!safeLstat(descriptor.path).isFile()) {
+    throw new Error(
+      `[SKILL_RESOURCE_INVALID] skill resource must be a regular file: ${descriptor.path}`
+    );
   }
   return String(safeReadFile(descriptor.path, { encoding: 'utf8' }) || '')
     .replace(/^---\n[\s\S]*?\n---\n/u, '')
@@ -279,7 +328,9 @@ export function readSkillResourceForModel(
       `[SKILL_RESOURCE_RESTRICTED] ${descriptor.name}: ${decision.reason || 'policy'}`
     );
   }
-  const body = readSkillResourceBody(descriptor, 'model');
+  const body = readSkillResourceBody(descriptor, 'model', {
+    trustResolved: input.trustResolved,
+  });
   const promptVisibilityRecord = appendPromptVisibilityRecord({
     missionPath: input.missionPath,
     missionId: input.missionId,

@@ -1,15 +1,20 @@
+import { logger } from '@agent/core/core';
 import {
-  logger,
+  assertSafeRepositoryPath,
   safeMkdir,
   safeExistsSync,
   safeReaddir,
-  loadProjectRecord,
-  loadServiceBindingRecord,
+} from '@agent/core/secure-io';
+import { loadProjectRecord } from '@agent/core/project-registry';
+import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
+import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
+} from '@agent/core/media-theme-role-policy';
+import {
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-} from '@agent/core';
+} from '@agent/core/document-inference-policy';
 import { createProposalPptxFlow } from './proposal-pptx-helpers.js';
 import { createMediaDocumentPipelineHelpers } from './media-document-pipeline-helpers.js';
 import {
@@ -184,7 +189,9 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
       continue;
     }
     try {
-      const packPath = path.resolve(rootDir, entry.pack_path);
+      const packPath = assertSafeRepositoryPath(path.resolve(rootDir, entry.pack_path), {
+        allowMissingLeaf: true,
+      });
       return loadJsonValue(packPath);
     } catch {
       continue;

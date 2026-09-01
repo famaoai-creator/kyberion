@@ -4,7 +4,7 @@ import {
   resolveGateOverrideSignatureMode,
   signHumanOverride,
 } from './mission-gate-engine.js';
-import { resetA2ASecretCache } from './a2a-envelope-signature.js';
+import { _resetA2ASecretCacheForTests } from './a2a-envelope-signature.js';
 
 // MO-02: human_override checks must carry an attributable HMAC signature.
 // warn (default) preserves the legacy pass-through; enforce rejects
@@ -13,13 +13,13 @@ import { resetA2ASecretCache } from './a2a-envelope-signature.js';
 describe('human_override signature (MO-02)', () => {
   beforeEach(() => {
     process.env.KYBERION_A2A_SECRET = 'test-secret';
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
   });
 
   afterEach(() => {
     delete process.env.KYBERION_A2A_SECRET;
     delete process.env.KYBERION_GATE_OVERRIDE_SIGNATURE;
-    resetA2ASecretCache();
+    _resetA2ASecretCacheForTests();
   });
 
   async function evaluate(params: Record<string, unknown>) {

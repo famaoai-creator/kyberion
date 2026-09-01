@@ -1,22 +1,24 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import type { ActionItem } from '@agent/core/action-item-store';
 import {
-  pathResolver,
-  safeMkdir,
-  safeRmSync,
-  safeWriteFile,
-  type ActionItem,
-  type MeetingFacilitatorPolicy,
   listActionItems,
   recordActionItem,
+  summarizeActionItemLifecycle,
+} from '@agent/core/action-item-store';
+import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
+import {
   registerReasoningBackend,
   resetReasoningBackend,
   stubReasoningBackend,
-  summarizeActionItemLifecycle,
+} from '@agent/core/reasoning-backend';
+import {
   createWorkItem,
   clearWorkCoordinationStore,
   setWorkCoordinationNamespace,
-} from '@agent/core';
+} from '@agent/core/work-coordination';
 import {
   applyRestrictedActionGate,
   auditSpeakerFairnessOp,
@@ -242,7 +244,7 @@ describe('action-item follow-up ops', () => {
       assignee: { kind: 'operator_self', label: 'Operator' },
     });
 
-    const { updateActionItemStatus } = await import('@agent/core');
+    const { updateActionItemStatus } = await import('@agent/core/action-item-store');
     updateActionItemStatus({
       mission_id: FIX_MISSION,
       item_id: 'AI-TEAM-BLOCK',

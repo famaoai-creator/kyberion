@@ -9,9 +9,16 @@ import {
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
 import { recordProtocolServiceLifecycleBestEffort } from './protocol-service-lifecycle.js';
-import { safeExistsSync, safeMkdir, safeMoveSync, safeReadFile, safeReaddir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeMoveSync,
+  safeReaddir,
+} from './secure-io.js';
 
 const RECOVERY_ROLE: GovernedArtifactRole = 'mission_controller';
 const RECOVERY_APPROVAL_CHANNEL = 'peer-recovery';
@@ -78,25 +85,26 @@ function normalizeQuarantinePath(quarantinePath: string, tenantId: string): stri
     throw new Error('peer_recovery_quarantine_path_outside_tenant_root');
   }
   const resolved = pathResolver.resolve(normalized);
-  const expectedRoot = pathResolver.resolve(prefix);
-  if (!resolved.startsWith(expectedRoot)) {
+  const expectedRoot = path.resolve(pathResolver.resolve(prefix));
+  if (resolved !== expectedRoot && !resolved.startsWith(`${expectedRoot}${path.sep}`)) {
     throw new Error('peer_recovery_quarantine_path_outside_tenant_root');
   }
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
   return path
-    .relative(pathResolver.rootDir(), resolved)
+    .relative(pathResolver.rootDir(), safeResolved)
     .split(path.sep)
     .join('/')
     .replace(/\/+$/u, '');
 }
 
 function readManifest(quarantinePath: string, tenantId: string): QuarantineManifest {
-  const manifestPath = path.join(quarantinePath, 'quarantine-manifest.json');
+  const manifestPath = assertSafeRepositoryPath(
+    path.join(quarantinePath, 'quarantine-manifest.json')
+  );
   if (!safeExistsSync(manifestPath)) throw new Error('peer_recovery_quarantine_manifest_missing');
   let manifest: QuarantineManifest;
   try {
-    manifest = JSON.parse(
-      String(safeReadFile(manifestPath, { encoding: 'utf8' }) || '')
-    ) as QuarantineManifest;
+    manifest = readJson<QuarantineManifest>(manifestPath);
   } catch {
     throw new Error('peer_recovery_quarantine_manifest_invalid');
   }
@@ -113,9 +121,17 @@ function readManifest(quarantinePath: string, tenantId: string): QuarantineManif
 function peerIdsInQuarantine(quarantinePath: string): string[] {
   const peerIds = new Set<string>();
   for (const label of ['runtime-peer-messaging', 'runtime-peer-conversations']) {
-    const peersPath = path.join(quarantinePath, label, 'peers');
+    const peersPath = assertSafeRepositoryPath(path.join(quarantinePath, label, 'peers'), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(peersPath)) continue;
-    for (const peerId of safeReaddir(peersPath)) peerIds.add(peerId);
+    for (const peerId of safeReaddir(peersPath)) {
+      if (!/^[^./\\][^/\\]*$/u.test(peerId)) {
+        throw new Error(`peer_recovery_invalid_peer_id:${peerId}`);
+      }
+      assertSafeRepositoryPath(path.join(peersPath, peerId));
+      peerIds.add(peerId);
+    }
   }
   return [...peerIds].sort();
 }
@@ -248,13 +264,23 @@ export function resumePeerRuntimeFromQuarantine(
     if (safeExistsSync(destination)) {
       throw new Error(`peer_recovery_destination_exists:${destination}`);
     }
-    return { label, source: path.join(quarantinePath, label), destination };
+    return {
+      label,
+      source: assertSafeRepositoryPath(path.join(quarantinePath, label)),
+      destination: assertSafeRepositoryPath(pathResolver.resolve(destination), {
+        allowMissingLeaf: true,
+      }),
+    };
   });
   for (const move of moves) {
     safeMkdir(path.dirname(move.destination), { recursive: true });
     safeMoveSync(move.source, move.destination);
   }
-  appendGovernedArtifactJsonl(RECOVERY_ROLE, path.join(quarantinePath, 'recovery-events.jsonl'), {
+  const recoveryEventsPath = assertSafeRepositoryPath(
+    path.join(quarantinePath, 'recovery-events.jsonl'),
+    { allowMissingLeaf: true }
+  );
+  appendGovernedArtifactJsonl(RECOVERY_ROLE, pathResolver.toRepoRelative(recoveryEventsPath), {
     ts: now,
     type: 'peer_runtime_recovery_resumed',
     tenant_id: tenantId,

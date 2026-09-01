@@ -15,11 +15,28 @@ export const TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES = [
   'skills/',
 ] as const;
 
+/**
+ * Repository-owned pipeline entrypoints are part of the executable product,
+ * not project-local configuration. They are needed by the session gate and
+ * other built-in commands before an operator has made a project-trust
+ * decision. A nested run still inherits its parent's trust signal, so callers
+ * cannot use this classification to widen an unresolved execution.
+ */
+export const BUILTIN_PIPELINE_RESOURCE_PREFIXES = [
+  'pipelines/',
+  'knowledge/product/pipeline-templates/',
+] as const;
+
 export type TrustRequiringProjectConfigResource =
   (typeof TRUST_REQUIRING_PROJECT_CONFIG_RESOURCES)[number];
 
 function normalizeResourcePath(resourcePath: string): string {
   return resourcePath.replaceAll('\\', '/').replace(/^\.\//u, '').replace(/\/+/gu, '/');
+}
+
+export function isBuiltinPipelineResource(resourcePath: string): boolean {
+  const normalized = normalizeResourcePath(resourcePath);
+  return BUILTIN_PIPELINE_RESOURCE_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
 /** Return the matching trust-sensitive resource declaration, if any. */

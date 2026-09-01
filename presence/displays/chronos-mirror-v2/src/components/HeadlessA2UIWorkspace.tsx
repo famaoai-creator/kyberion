@@ -2,23 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { A2UIRenderer } from './A2UIComponentLibrary';
-
-type A2UIComponent = {
-  id: string;
-  type: string;
-  props: Record<string, unknown>;
-};
-
-type HeadlessA2UIResponse = {
-  ok?: boolean;
-  data?: {
-    a2ui?: {
-      updateComponents?: {
-        components?: A2UIComponent[];
-      };
-    };
-  };
-};
+import {
+  parseHeadlessA2UIResponse,
+  type HeadlessA2UIComponent,
+} from '../lib/headless-a2ui-response';
 
 export function HeadlessA2UIWorkspace({
   tenant,
@@ -29,7 +16,7 @@ export function HeadlessA2UIWorkspace({
   organizationId?: string;
   projectId?: string;
 }) {
-  const [components, setComponents] = useState<A2UIComponent[]>([]);
+  const [components, setComponents] = useState<HeadlessA2UIComponent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -48,11 +35,13 @@ export function HeadlessA2UIWorkspace({
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(`headless A2UI ${response.status}`);
-        return (await response.json()) as HeadlessA2UIResponse;
+        const payload = parseHeadlessA2UIResponse(await response.json().catch(() => null));
+        if (!payload) throw new Error('Invalid headless A2UI response');
+        return payload;
       })
       .then((payload) => {
         if (cancelled) return;
-        setComponents(payload.data?.a2ui?.updateComponents?.components || []);
+        setComponents(payload.data.a2ui.updateComponents.components);
         setError(null);
       })
       .catch((reason) => {

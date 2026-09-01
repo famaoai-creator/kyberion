@@ -96,8 +96,3 @@ export function getDefaultServiceIdForSurface(surface: string): string | null {
   );
   return matched?.service_id || null;
 }
-
-export function resetServiceBootstrapCatalogCache(): void {
-  publicCatalog.reset();
-  personalCatalog.reset();
-}

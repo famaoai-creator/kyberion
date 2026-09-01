@@ -1,4 +1,5 @@
-import { safeExistsSync, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import { readJson } from '../../foundation/json.js';
+import { safeExistsSync, safeWriteFile } from '../../secure-io.js';
 
 export type Layer =
   'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5' | 'L6' | 'L7' | 'L8' | 'L9' | 'L10' | 'L11';
@@ -49,8 +50,7 @@ export class PfcController {
   private loadState(): PfcState {
     if (safeExistsSync(this.stateFilePath)) {
       try {
-        const raw = safeReadFile(this.stateFilePath, { encoding: 'utf8' }) as string;
-        const parsed = JSON.parse(raw) as PfcState;
+        const parsed = readJson<PfcState>(this.stateFilePath);
         // Forward-compat: a state file persisted before a new layer was
         // added won't have that layer's key. Backfill defaults rather than
         // crash the first time the new layer runs.

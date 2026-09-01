@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
 import { createLogger } from './logger.js';
 const logger = createLogger('unclassified-error-registry');
@@ -27,6 +28,14 @@ const REGISTRY_RELATIVE = nodePath.join(
 );
 const EXCERPT_LEN = 200;
 
+const registryCatalog = defineCatalog<UnclassifiedErrorRegistry>({
+  id: 'unclassified-error-registry',
+  path: registryPath,
+  schema: pathResolver.knowledge('product/schemas/unclassified-error-registry.schema.json'),
+  fallback: { version: '1.0.0', entries: [] },
+  fallbackOnInvalid: true,
+});
+
 // In-process cooldown: skip disk write if the same excerpt was recorded within 60 s.
 const _recentWrites = new Map<string, number>();
 const COOLDOWN_MS = 60_000;
@@ -37,9 +46,7 @@ function registryPath(): string {
 
 function readRegistry(): UnclassifiedErrorRegistry {
   try {
-    const p = registryPath();
-    if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<UnclassifiedErrorRegistry>(p);
+    return registryCatalog.load();
   } catch {
     return { version: '1.0.0', entries: [] };
   }
@@ -47,6 +54,7 @@ function readRegistry(): UnclassifiedErrorRegistry {
 
 function writeRegistry(registry: UnclassifiedErrorRegistry): void {
   try {
+    registryCatalog.validate(registry, registryPath());
     safeWriteFile(registryPath(), JSON.stringify(registry, null, 2));
   } catch {
     /* observability must never break the caller */

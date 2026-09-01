@@ -1,6 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 import {
@@ -31,17 +29,21 @@ vi.mock('./policy-engine.js', () => ({
 }));
 
 import { missionEvidenceDir } from './path-resolver.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync } from './secure-io.js';
 
 describe('intent-snapshot-store', () => {
   let tmpDir = '';
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'intent-snap-'));
+    tmpDir = pathResolver.sharedTmp(`intent-snapshot-test/${process.pid}`);
+    safeRmSync(tmpDir);
+    safeMkdir(tmpDir, { recursive: true });
     (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(tmpDir);
   });
 
   afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    safeRmSync(tmpDir);
     vi.clearAllMocks();
   });
 
@@ -114,6 +116,18 @@ describe('intent-snapshot-store', () => {
       intent: { goal: 'beta' },
     });
     expect(latestSnapshot('MSN-3')?.intent.goal).toBe('beta');
+  });
+
+  it('rejects an evidence directory reached through a symlink', () => {
+    const targetMission = path.join(tmpDir, 'target-mission');
+    const linkedMission = path.join(tmpDir, 'linked-mission');
+    safeMkdir(path.join(targetMission, 'evidence'), { recursive: true });
+    safeSymlinkSync(targetMission, linkedMission);
+    (missionEvidenceDir as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+      path.join(linkedMission, 'evidence')
+    );
+
+    expect(() => listSnapshots('MSN-LINK')).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   describe('evaluateIntentDriftGate', () => {

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createStandardYargs, runActuatorCli } from './cli-utils.js';
+import * as path from 'node:path';
+import {
+  createStandardYargs,
+  normalizeActuatorServeRequest,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from './cli-utils.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
@@ -20,6 +26,19 @@ afterEach(() => {
 });
 
 describe('cli-utils', () => {
+  it('rejects malformed warm actuator requests before dispatch', () => {
+    expect(() => normalizeActuatorServeRequest([])).toThrow(
+      'actuator serve request must be a JSON object'
+    );
+    expect(() => normalizeActuatorServeRequest({ id: 42 })).toThrow(
+      'actuator serve request.id must be a non-empty string'
+    );
+    expect(normalizeActuatorServeRequest({ id: 'r1', input: { action: 'check' } })).toEqual({
+      id: 'r1',
+      input: { action: 'check' },
+    });
+  });
+
   it('parses standard options and defaults the tier', async () => {
     const argv = await createStandardYargs([
       'node',
@@ -126,5 +145,31 @@ describe('cli-utils', () => {
     ).rejects.toThrow('handleAction failed');
 
     expect(errorSpy).toHaveBeenCalledWith('[test-actuator] handleAction failed: boom');
+  });
+
+  it('rejects input paths outside the repository root', async () => {
+    const outsidePath = path.join(pathResolver.rootDir(), '..', 'cli-utils-outside.json');
+    await expect(
+      runActuatorCli({
+        name: 'test-actuator',
+        args: ['node', 'script', '--input', outsidePath],
+        handleAction: async () => ({}),
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('reports package-local entrypoint failures through the shared boundary', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const previousExitCode = process.exitCode;
+    process.exitCode = undefined;
+    try {
+      await runActuatorCliEntryPoint(async () => {
+        throw new Error('entrypoint boom');
+      }, 'test-actuator');
+      expect(errorSpy).toHaveBeenCalledWith('[test-actuator] entrypoint boom');
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = previousExitCode;
+    }
   });
 });

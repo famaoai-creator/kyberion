@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getTraceSpanDefinition,
+  isGovernedTraceSpanName,
   redactTraceAttributes,
   resolveTraceSpanKind,
   sanitizeTraceForPersistence,
@@ -108,6 +109,60 @@ describe('PI-06 trace schema', () => {
     ).toContainEqual({
       path: 'trace.rootSpan.children[0].name',
       message: 'span name must be a non-empty string',
+    });
+  });
+
+  it('rejects replay events without a valid timestamp', () => {
+    const issues = validateTraceReplay({
+      traceId: 'trace-events',
+      rootSpan: {
+        spanId: 'root-span',
+        name: 'workflow.custom',
+        status: 'ok',
+        startTime: '2026-01-01T00:00:00.000Z',
+        events: [{ name: 'step' }, { name: 'step', timestamp: 'not-a-time' }],
+        artifacts: [],
+        knowledgeRefs: [],
+        children: [],
+      },
+    });
+
+    expect(issues).toContainEqual({
+      path: 'trace.rootSpan.events[0].timestamp',
+      message: 'event timestamp must be an ISO timestamp',
+    });
+    expect(issues).toContainEqual({
+      path: 'trace.rootSpan.events[1].timestamp',
+      message: 'event timestamp must be an ISO timestamp',
+    });
+  });
+
+  it('provides a closed replay vocabulary for known extensions', () => {
+    expect(isGovernedTraceSpanName('pipeline:baseline-check')).toBe(true);
+    expect(isGovernedTraceSpanName('action.completed')).toBe(true);
+    expect(isGovernedTraceSpanName('meeting_participation:run')).toBe(true);
+    expect(isGovernedTraceSpanName('phase.report.step-1')).toBe(true);
+    expect(isGovernedTraceSpanName('attacker:exfiltrate')).toBe(false);
+    expect(
+      validateTraceReplay(
+        {
+          traceId: 'trace-unknown-span',
+          rootSpan: {
+            spanId: 'root-span',
+            name: 'attacker:exfiltrate',
+            status: 'ok',
+            startTime: '2026-01-01T00:00:00.000Z',
+            events: [],
+            artifacts: [],
+            knowledgeRefs: [],
+            children: [],
+          },
+        },
+        { strictUnknownSpans: true }
+      )
+    ).toContainEqual({
+      path: 'trace.rootSpan.name',
+      message: 'span name is not governed: attacker:exfiltrate',
     });
   });
 });

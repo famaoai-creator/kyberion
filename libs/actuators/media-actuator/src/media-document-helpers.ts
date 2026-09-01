@@ -1,20 +1,26 @@
+import { assertSafeRepositoryPath, loadJson } from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
 import {
-  loadJson,
-  logger,
   resolveDocumentContentsLabel,
   resolveDocumentContentsSubtitle,
+} from '@agent/core/document-contents-policy';
+import {
   resolveReportSectionTitle,
   resolveReportSummaryTitle,
+} from '@agent/core/document-outline-label-policy';
+import {
   resolveProposalSectionKeywords,
   resolveProposalEvidenceIndex,
-  resolveSignalToneRank,
+} from '@agent/core/media-semantic-map';
+import { resolveSignalToneRank } from '@agent/core/media-style-policy';
+import {
   resolveDocumentTypeFromClues as resolveDocumentTypeFromCluesPolicy,
   resolveDocumentProfileCandidates as resolveDocumentProfileCandidatesPolicy,
   resolveDocumentProfileKeywords as resolveDocumentProfileKeywordsPolicy,
-  loadMediaSignalEntryPolicyCatalog,
-  loadTrackerSheetPolicyCatalog,
-  isLegacyMediaOp,
-} from '@agent/core';
+} from '@agent/core/document-inference-policy';
+import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entry-policy';
+import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
+import { isLegacyMediaOp } from '@agent/core/legacy-media-ops';
 import * as path from 'node:path';
 
 export type MediaBriefCategory = 'presentation' | 'document' | 'spreadsheet' | 'diagram';
@@ -565,7 +571,10 @@ export function normalizeSpreadsheetDocumentBrief(rootDir: string, input: any): 
 
   let protocol = input.payload.protocol;
   if (!protocol && input.payload.protocol_path) {
-    const protocolPath = path.resolve(rootDir, input.payload.protocol_path);
+    const protocolPath = assertSafeRepositoryPath(
+      path.resolve(rootDir, input.payload.protocol_path),
+      { allowMissingLeaf: true }
+    );
     protocol = loadJson<unknown>(protocolPath);
   }
   if (!protocol && (!Array.isArray(input.payload.columns) || !Array.isArray(input.payload.rows))) {

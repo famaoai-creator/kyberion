@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { classifyError, formatClassification } from '@agent/core/error-classifier';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  classifyError,
-  formatClassification,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
@@ -34,11 +34,19 @@ function rootDir(): string {
 }
 
 function customerRoot(slug: string): string {
-  return path.join(rootDir(), 'customer', slug);
+  const resolvedRoot = rootDir();
+  return assertSafeRepositoryPath(path.join(resolvedRoot, 'customer', slug), {
+    allowMissingLeaf: true,
+    rootDir: resolvedRoot,
+  });
 }
 
 function templateRoot(): string {
-  return path.join(rootDir(), 'customer', '_template');
+  const resolvedRoot = rootDir();
+  return assertSafeRepositoryPath(path.join(resolvedRoot, 'customer', '_template'), {
+    allowMissingLeaf: true,
+    rootDir: resolvedRoot,
+  });
 }
 
 function isDirectoryEmpty(dir: string): boolean {
@@ -46,10 +54,21 @@ function isDirectoryEmpty(dir: string): boolean {
 }
 
 function copyTree(srcDir: string, dstDir: string): void {
-  safeMkdir(dstDir, { recursive: true });
-  for (const entry of safeReaddir(srcDir)) {
-    const src = path.join(srcDir, entry);
-    const dst = path.join(dstDir, entry);
+  const resolvedRoot = rootDir();
+  const safeSourceDir = assertSafeRepositoryPath(srcDir, { rootDir: resolvedRoot });
+  const safeDestinationDir = assertSafeRepositoryPath(dstDir, {
+    allowMissingLeaf: true,
+    rootDir: resolvedRoot,
+  });
+  safeMkdir(safeDestinationDir, { recursive: true });
+  for (const entry of safeReaddir(safeSourceDir)) {
+    const src = assertSafeRepositoryPath(path.join(safeSourceDir, entry), {
+      rootDir: resolvedRoot,
+    });
+    const dst = assertSafeRepositoryPath(path.join(safeDestinationDir, entry), {
+      allowMissingLeaf: true,
+      rootDir: resolvedRoot,
+    });
     const stat = safeLstat(src);
     if (stat.isDirectory()) {
       copyTree(src, dst);
@@ -84,7 +103,11 @@ export function createCustomer(slugInput: string): {
   return { slug, root: dest, template };
 }
 
-function main(argv: string[]): void {
+export function formatCreatedCustomer(root: string): string[] {
+  return [`Created customer template at ${path.relative(rootDir(), root)}`];
+}
+
+function main(argv: string[]): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
     const usage = 'Usage: customer_create <slug>';
@@ -97,7 +120,7 @@ function main(argv: string[]): void {
 
   try {
     const created = createCustomer(slug);
-    console.log(`Created customer template at ${path.relative(rootDir(), created.root)}`);
+    return formatCreatedCustomer(created.root);
   } catch (err) {
     throw new Error(formatClassification(classifyError(err)));
   }
@@ -111,6 +134,6 @@ if (
     name: 'customer:create',
     flags: [],
     run(context) {
-      return main(context.argv);
+      context.print(main(context.argv).join('\n'));
     },
   })();

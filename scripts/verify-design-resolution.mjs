@@ -5,74 +5,20 @@
  */
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { resolveTenantDesign, safeExistsSync, safeReadFile } from '@agent/core';
+import { resolveTenantDesign } from '@agent/core/tenant-design-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
+import {
+  resolveBodyZoneKey as resolveRuntimeBodyZoneKey,
+  resolveLayoutTemplate as resolveRuntimeLayoutTemplate,
+} from '../dist/libs/actuators/media-actuator/src/media-layout-catalog.js';
+import { loadMediaDesignSystemsCatalog } from '../dist/libs/actuators/media-actuator/src/media-catalog-loaders.js';
 
 const moduleDir = fileURLToPath(new URL('.', import.meta.url));
 const rootDir = resolve(moduleDir, '..');
 
 function safeRead(p) {
   return readJson(resolve(rootDir, p));
-}
-
-function resolveLayoutTemplate(brief, tenantResolution) {
-  const systems = safeRead(
-    'knowledge/public/design-patterns/media-templates/media-design-systems/systems.json'
-  );
-  const system = systems.systems?.[brief.design_system_id];
-
-  // Priority 1: tenant confidential catalog
-  if (tenantResolution?.layoutCatalog) {
-    try {
-      const catalog = safeRead(tenantResolution.layoutCatalog);
-      const id = tenantResolution.tenantOverride?.layout_template_id || catalog.default;
-      if (catalog.templates?.[id]) {
-        return { templateId: id, source: tenantResolution.layoutCatalog };
-      }
-    } catch {
-      /* fall through */
-    }
-  }
-
-  // Priority 2: system-level public catalog
-  const templateId =
-    tenantResolution?.tenantOverride?.layout_template_id || system?.layout_template_id || null;
-  if (templateId) {
-    const publicCatalog = safeRead(
-      'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
-    );
-    if (publicCatalog.templates?.[templateId]) {
-      return { templateId, source: 'public/layout-templates.json' };
-    }
-  }
-
-  return { templateId: 'body-zone-layouts.json (fallback)', source: 'fallback' };
-}
-
-const FALLBACK_ZONE_MAP = {
-  hero: 'hero',
-  problem: 'two_column_callout',
-  evidence: 'two_column_callout',
-  roi: 'two_column_callout',
-  control: 'two_column_risk',
-  plan: 'timeline',
-  roadmap: 'timeline',
-  solution: 'architecture_panel',
-  architecture: 'architecture_panel',
-  decision: 'decision_cta',
-  cta: 'decision_cta',
-  summary: 'single_column',
-};
-
-function resolveBodyZoneKey(semanticType, designSystemId) {
-  const systems = safeRead(
-    'knowledge/public/design-patterns/media-templates/media-design-systems/systems.json'
-  );
-  const system = systems.systems?.[designSystemId];
-  if (system?.body_zone_map?.[semanticType]) {
-    return { key: system.body_zone_map[semanticType], source: 'body_zone_map' };
-  }
-  return { key: FALLBACK_ZONE_MAP[semanticType] || 'single_column', source: 'fallback' };
 }
 
 // --- scenario runner ---
@@ -109,6 +55,8 @@ for (const scenario of SCENARIOS) {
   const brief = safeRead(scenario.brief);
   const brandName = brief.branding?.brand_name || brief.client || '';
   const dsId = brief.design_system_id;
+  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
+  const system = designSystems.systems?.[dsId];
 
   console.log(`  design_system_id : ${dsId}`);
   console.log(`  brand_name       : ${brandName}`);
@@ -125,9 +73,15 @@ for (const scenario of SCENARIOS) {
   }
 
   // Layout template
-  const layout = resolveLayoutTemplate(brief, tenant);
-  console.log(`  レイアウトテンプレート : ${layout.templateId}`);
-  console.log(`                     from: ${layout.source}`);
+  const layout = resolveRuntimeLayoutTemplate(rootDir, dsId, brief, tenant.themePack);
+  const templateId =
+    brief.layout_template_id ||
+    tenant.tenantOverride?.layout_template_id ||
+    system?.layout_template_id;
+  console.log(`  レイアウトテンプレート : ${templateId || 'runtime fallback'}`);
+  console.log(
+    `                     from: shared runtime (${layout ? Object.keys(layout).length : 0} keys)`
+  );
 
   // Body zone per semantic type
   console.log('\n  スライドごとの body_zone 解決:');
@@ -138,8 +92,9 @@ for (const scenario of SCENARIOS) {
   for (const slide of brief.slides || []) {
     const st = slide.semantic_type;
     if (!st || st === 'hero') continue; // hero uses its own zone
-    const bz = resolveBodyZoneKey(st, dsId);
-    console.log(`  ${st.padEnd(PAD)} → ${bz.key.padEnd(22)} (${bz.source})`);
+    const key = resolveRuntimeBodyZoneKey(st, dsId, rootDir);
+    const source = system?.body_zone_map?.[st] ? 'body_zone_map' : 'runtime fallback';
+    console.log(`  ${st.padEnd(PAD)} → ${key.padEnd(22)} (${source})`);
   }
 }
 

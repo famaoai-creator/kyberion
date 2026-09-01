@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core';
+import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/approval-store';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,10 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const body = await req.json().catch(() => ({}));
+    const parsedBody = await readRequestObject(req);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const decision =
       body?.decision === 'approved' || body?.decision === 'rejected' ? body.decision : null;
     const channel = typeof body?.channel === 'string' && body.channel ? body.channel : 'chronos';

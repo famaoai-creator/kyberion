@@ -41,7 +41,11 @@ import {
   getSubagentCapabilityProfile,
   type SubagentCapabilityProfile,
 } from './subagent-capability-profiles.js';
-import { resolveProviderPermissionArgs } from './provider-permission-profiles.js';
+import {
+  resolveEffectiveProviderPermissionProfile,
+  resolveProviderPermissionArgs,
+  type ProviderPermissionProfileName,
+} from './provider-permission-profiles.js';
 import { resolveSandboxPolicy, toCodexSandboxPolicy } from './sandbox-policy.js';
 import type { NativeSubagentAdopter } from './native-subagent-adopter.js';
 
@@ -308,9 +312,14 @@ function normalizeCodexModelId(model?: string): string | undefined {
 function resolveProfile(options?: { role?: string; profile?: string }): SubagentCapabilityProfile {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested);
+    const profile = getSubagentCapabilityProfile(requested).name as ProviderPermissionProfileName;
+    return getSubagentCapabilityProfile(
+      resolveEffectiveProviderPermissionProfile('codex', profile) ?? profile
+    );
   } catch {
-    return getSubagentCapabilityProfile('implementer');
+    return getSubagentCapabilityProfile(
+      resolveEffectiveProviderPermissionProfile('codex', 'implementer') ?? 'implementer'
+    );
   }
 }
 

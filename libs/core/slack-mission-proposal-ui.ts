@@ -2,6 +2,11 @@ import type {
   MissionProposal,
   SlackMissionProposalActionPayload,
 } from './channel-surface-types.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 
 function valueOrFallback(value: string | undefined, fallback: string): string {
   return value?.trim() || fallback;
@@ -13,7 +18,10 @@ function valueOrFallback(value: string | undefined, fallback: string): string {
  * The plain-text fallback intentionally keeps the numbered grammar so that
  * clients without interactive blocks can use the same confirmation contract.
  */
-export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[] {
+export function buildSlackMissionProposalBlocks(
+  proposal: MissionProposal,
+  intentResolution?: IntentResolutionContract
+): any[] {
   const summary = valueOrFallback(proposal.summary, 'Mission proposal');
   const missionType = valueOrFallback(proposal.mission_type, 'development');
   const tier = valueOrFallback(proposal.tier, 'public');
@@ -39,7 +47,17 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
       elements: [
         {
           type: 'mrkdwn',
-          text: '承認するとミッションを作成して実行を開始します。待つと保留、拒否すると提案を破棄します。',
+          text: [
+            '承認するとミッションを作成して実行を開始します。待つと保留、拒否すると提案を破棄します。',
+            ...(intentResolution
+              ? [
+                  `Authority: ${renderIntentAuthorityLabel(intentResolution.authority_level)}`,
+                  `Next action: ${intentResolution.next_action.label}`,
+                  `Consequence: ${intentResolution.next_action.consequence}`,
+                  `Outcome: ${renderIntentOutcomeLabel(intentResolution.outcome_kind)}`,
+                ]
+              : []),
+          ].join('\n'),
         },
       ],
     },
@@ -69,9 +87,22 @@ export function buildSlackMissionProposalBlocks(proposal: MissionProposal): any[
   ];
 }
 
-export function slackMissionProposalFallbackText(proposal: MissionProposal): string {
+export function slackMissionProposalFallbackText(
+  proposal: MissionProposal,
+  intentResolution?: IntentResolutionContract
+): string {
   const summary = valueOrFallback(proposal.summary, 'Mission proposal');
-  return `${summary}\n1) 作成する 2) やめる`;
+  return [
+    `${summary}\n1) 作成する 2) やめる`,
+    ...(intentResolution
+      ? [
+          `Authority: ${renderIntentAuthorityLabel(intentResolution.authority_level)}`,
+          `Next action: ${intentResolution.next_action.label}`,
+          `Consequence: ${intentResolution.next_action.consequence}`,
+          `Outcome: ${renderIntentOutcomeLabel(intentResolution.outcome_kind)}`,
+        ]
+      : []),
+  ].join('\n');
 }
 
 export function parseSlackMissionProposalAction(value: string): SlackMissionProposalActionPayload {

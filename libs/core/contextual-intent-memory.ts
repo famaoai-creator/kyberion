@@ -1,6 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -26,15 +26,19 @@ export interface ContextualIntentMemory {
 
 function memoryPath(scope?: ScopeContext): string {
   const configuredPath = getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH')?.trim();
-  const base = configuredPath
-    ? pathResolver.rootResolve(configuredPath)
-    : pathResolver.knowledge('personal/contextual-intent-memory.json');
+  const base = assertSafeRepositoryPath(
+    configuredPath
+      ? pathResolver.rootResolve(configuredPath)
+      : pathResolver.knowledge('personal/contextual-intent-memory.json'),
+    { allowMissingLeaf: true }
+  );
   if (!scope?.tenant_slug) return base;
-  return (
+  return assertSafeRepositoryPath(
     physicalScopedPath(path.dirname(base), {
       ...scope,
       scope_kind: scope.mission_id ? 'mission' : 'tenant',
-    }) + `/${path.basename(base)}`
+    }) + `/${path.basename(base)}`,
+    { allowMissingLeaf: true }
   );
 }
 

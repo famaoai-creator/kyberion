@@ -1,6 +1,12 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
@@ -138,7 +144,10 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
   }
 
   async captureScreenshot(input: ScreenCaptureRequest = {}): Promise<ScreenCaptureResult> {
-    const savePath = path.resolve(input.save_path ?? defaultOutputPath());
+    const savePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(input.save_path ?? defaultOutputPath()),
+      { allowMissingLeaf: true }
+    );
     const captureMode = normalizeCaptureMode(input.capture_mode);
     const displayIndex = normalizeDisplayIndex(input.display_index);
     const probe = await this.probe();
@@ -191,8 +200,11 @@ export class ScreenCaptureBridgeImpl implements ScreenCaptureBridge {
     const frameCount = Math.max(1, Number(input.max_frames || 1));
     const intervalMs = Math.max(0, Number(input.frame_interval_ms || 250));
     for (let index = 0; index < frameCount; index += 1) {
-      const tempPath = pathResolver.sharedTmp(
-        path.join('screen-stream', `frame-${Date.now()}-${randomUUID()}-${index}.png`)
+      const tempPath = assertSafeRepositoryPath(
+        pathResolver.sharedTmp(
+          path.join('screen-stream', `frame-${Date.now()}-${randomUUID()}-${index}.png`)
+        ),
+        { allowMissingLeaf: true }
       );
       try {
         const result = await this.captureScreenshot({

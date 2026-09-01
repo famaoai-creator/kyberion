@@ -138,6 +138,10 @@ describe('project and artifact registries', () => {
     expect(items.some((item) => item.title.toLowerCase().includes('architecture'))).toBe(true);
   });
 
+  it('rejects a project id that escapes the project record directory', () => {
+    expect(() => loadProjectRecord('../outside')).toThrow(/escapes its directory/);
+  });
+
   it('emits artifact records that satisfy the schema', () => {
     const ajv = new Ajv({ allErrors: true });
     const schemaPath = path.join(

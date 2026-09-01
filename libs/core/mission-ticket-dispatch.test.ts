@@ -9,6 +9,7 @@ import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
+import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js';
 
 const missionId = 'MSN-TICKET-DISPATCH-001';
 const projectId = 'PRJ-TICKET-DISPATCH-001';
@@ -207,6 +208,30 @@ describe('mission ticket dispatch', () => {
     expect(missionState.history.at(-1)?.event).toBe('RECORD_TASK');
     expect(safeExistsSync(`${missionPath}/coordination/events/ticket-events.jsonl`)).toBe(true);
     expect(safeExistsSync(`${missionPath}/coordination/tickets/dispatch-manifest.json`)).toBe(true);
+    const provisionedTargets = loadProvisionedEntryRecords(missionId).map(
+      (record) => record.target_path
+    );
+    expect(provisionedTargets).toEqual(
+      expect.arrayContaining([
+        'NEXT_TASKS.json',
+        'coordination/tickets/dispatch-manifest.json',
+        'coordination/tickets/github/task-1.json',
+        'coordination/tickets/jira/task-1.json',
+      ])
+    );
+    for (const targetPath of [
+      'NEXT_TASKS.json',
+      'coordination/tickets/dispatch-manifest.json',
+      'coordination/tickets/github/task-1.json',
+      'coordination/tickets/jira/task-1.json',
+    ]) {
+      expect(
+        loadProvisionedEntryRecords(missionId).filter((record) => record.target_path === targetPath)
+      ).toEqual([
+        expect.objectContaining({ phase: 'provisioned' }),
+        expect.objectContaining({ phase: 'verified' }),
+      ]);
+    }
   });
 
   it('rejects tasks without an assigned owner or enough detail', async () => {

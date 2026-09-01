@@ -1,14 +1,5 @@
 import * as path from 'node:path';
-import addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
-
-type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 
 import {
   validatorFor,

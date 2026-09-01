@@ -1,8 +1,8 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { assertModuleInvariant } from './invariants.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
 
 export const PROMPT_VISIBILITY_LEDGER_VERSION = 1 as const;
 
@@ -44,9 +44,9 @@ function contentHash(content: string): string {
 }
 
 function ledgerFile(input: AppendPromptVisibilityRecordInput): string {
-  return (
-    input.ledgerPath || path.join(input.missionPath, 'coordination', 'prompt-visibility.jsonl')
-  );
+  const candidate =
+    input.ledgerPath || path.join(input.missionPath, 'coordination', 'prompt-visibility.jsonl');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function assertRecordShape(record: PromptVisibilityRecord): void {
@@ -82,20 +82,17 @@ export function appendPromptVisibilityRecord(
 }
 
 export function loadPromptVisibilityLedger(ledgerPath: string): PromptVisibilityRecord[] {
-  if (!safeExistsSync(ledgerPath)) return [];
-  const raw = String(safeReadFile(ledgerPath, { encoding: 'utf8' }) || '');
-  const records: PromptVisibilityRecord[] = [];
-  for (const [index, line] of raw.split(/\r?\n/u).entries()) {
-    if (!line.trim()) continue;
-    try {
-      const parsed = JSON.parse(line) as PromptVisibilityRecord;
-      assertRecordShape(parsed);
-      records.push(parsed);
-    } catch (error) {
+  const safeLedgerPath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+  return readJsonLines<PromptVisibilityRecord>(safeLedgerPath, {
+    onMalformed: (error, lineNumber) => {
       throw new Error(
-        `MISSION_LOG_CORRUPT:prompt_visibility_record:${index + 1}${error instanceof Error ? `:${error.message}` : ''}`
+        `MISSION_LOG_CORRUPT:prompt_visibility_record:${lineNumber}${error instanceof Error ? `:${error.message}` : ''}`
       );
-    }
-  }
-  return records;
+    },
+    map: (value) => {
+      const parsed = value as PromptVisibilityRecord;
+      assertRecordShape(parsed);
+      return parsed;
+    },
+  });
 }

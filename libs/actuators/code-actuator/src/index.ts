@@ -1,8 +1,9 @@
-import { logger, defineCatalogBackedActuator } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './code-pipeline-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 export const actuator = defineCatalogBackedActuator({
@@ -14,6 +15,7 @@ export const actuator = defineCatalogBackedActuator({
 const main = async () => {
   await runActuatorCli({
     name: 'code-actuator',
+    args: process.argv,
     handleAction,
   });
 };

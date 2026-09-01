@@ -69,8 +69,10 @@ export {
 } from '@agent/core/surface-runtime';
 export { pathResolver } from '@agent/core/path-resolver';
 export {
+  assertSafeRepositoryPath,
   safeExistsSync,
   loadJson,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeStat,

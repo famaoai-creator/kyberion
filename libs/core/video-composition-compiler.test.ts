@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import {
   compileVideoCompositionADF,
   writeVideoCompositionBundle,
@@ -7,6 +8,55 @@ import {
 import type { VideoCompositionADF } from './video-composition-contract.js';
 
 describe('video composition compiler', () => {
+  it('rejects an external bundle directory at compile time', () => {
+    expect(() =>
+      compileVideoCompositionADF({
+        kind: 'video-composition-adf',
+        version: '1.0.0',
+        composition: { duration_sec: 1, fps: 24, width: 640, height: 360 },
+        scenes: [],
+        output: { format: 'mp4', bundle_dir: '/tmp/external-video-bundle' },
+      })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
+  it('rejects external audio and scene asset references at compile time', () => {
+    const base = {
+      kind: 'video-composition-adf' as const,
+      version: '1.0.0',
+      composition: { duration_sec: 2, fps: 24, width: 640, height: 360 },
+      scenes: [
+        {
+          scene_id: 'hook',
+          role: 'hook' as const,
+          start_sec: 0,
+          duration_sec: 2,
+          template_ref: { template_id: 'basic-title-card' },
+          content: { headline: 'Safe path boundary' },
+        },
+      ],
+      output: {
+        format: 'mp4' as const,
+        bundle_dir: pathResolver.sharedTmp('video-composition-bundle-tests/path-boundary'),
+      },
+    };
+
+    expect(() =>
+      compileVideoCompositionADF({ ...base, audio: { narration_ref: '/tmp/external-audio.wav' } })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+    expect(() =>
+      compileVideoCompositionADF({
+        ...base,
+        scenes: [
+          {
+            ...base.scenes[0],
+            asset_refs: [{ asset_id: 'external', path: '/tmp/external-image.png' }],
+          },
+        ],
+      })
+    ).toThrow('RESOURCE_PATH_SCOPE');
+  });
+
   it('compiles render plans and writes bundle artifacts', () => {
     const bundleDir = pathResolver.sharedTmp('video-composition-bundle-tests/product-explainer');
     const adf: VideoCompositionADF = {

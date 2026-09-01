@@ -29,7 +29,7 @@ Example surface record:
 Run:
 
 ```bash
-pnpm surfaces:reconcile
+pnpm surfaces reconcile
 ```
 
 ## 5. What It Does

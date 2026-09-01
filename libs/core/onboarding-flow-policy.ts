@@ -83,7 +83,3 @@ export function loadOnboardingFlowPolicyCatalog(): OnboardingFlowPolicyCatalog {
 export function resolveOnboardingFlowPolicy(): OnboardingFlowPolicyCatalog {
   return loadOnboardingFlowPolicyCatalog();
 }
-
-export function resetOnboardingFlowPolicyCatalogCache(): void {
-  catalog.reset();
-}

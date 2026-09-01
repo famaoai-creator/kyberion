@@ -45,6 +45,40 @@ vi.mock('@agent/core/governance', async () => {
   };
 });
 
+vi.mock('@agent/core/generation-scheduler', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/generation-scheduler')>(
+    '@agent/core/generation-scheduler'
+  );
+  return {
+    ...actual,
+    registerGenerationSchedule: mocks.registerGenerationSchedule,
+    runGenerationScheduleAction: mocks.runGovernedGenerationScheduleAction,
+  };
+});
+
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return { ...actual, safeExistsSync: mocks.safeExistsSync };
+});
+
+vi.mock('@agent/core/protocol-service-registry', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/protocol-service-registry')>(
+    '@agent/core/protocol-service-registry'
+  );
+  return { ...actual, assertProtocolServiceRegistered: vi.fn() };
+});
+
+vi.mock('@agent/core/protocol-service-lifecycle', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/protocol-service-lifecycle')>(
+    '@agent/core/protocol-service-lifecycle'
+  );
+  return {
+    ...actual,
+    recordProtocolServiceLifecycleBestEffort: mocks.recordProtocolServiceLifecycle,
+  };
+});
+
 describe('run_generation_schedule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,6 +109,16 @@ describe('run_generation_schedule', () => {
     await expect(runGenerationScheduleAction({ action: 'register' })).rejects.toThrow(
       /requires --input/
     );
+  });
+
+  it('rejects a schedule input outside the repository', async () => {
+    const { runGenerationScheduleAction } = await import('./run_generation_schedule.js');
+    await expect(
+      runGenerationScheduleAction({
+        action: 'register',
+        input: '../external-generation-schedule.json',
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('delegates tick to the governed library implementation', async () => {
@@ -113,6 +157,21 @@ describe('run_generation_schedule', () => {
     await runGenerationScheduleAction({ action: 'list' });
 
     expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({ action: 'list' });
+  });
+
+  it('parses explicit argv and emits through the harness printer', async () => {
+    const result = [{ schedule_id: 'demo' }];
+    mocks.runGovernedGenerationScheduleAction.mockResolvedValue(result);
+
+    const { main } = await import('./run_generation_schedule.js');
+    const print = vi.fn();
+    await main(['--action', 'list'], print);
+
+    expect(mocks.runGovernedGenerationScheduleAction).toHaveBeenCalledWith({
+      action: 'list',
+      scope: { scope_kind: 'system', tier: 'public' },
+    });
+    expect(print).toHaveBeenCalledWith(result);
   });
 
   it('forwards an explicit tenant scope for duplicate schedule IDs', async () => {

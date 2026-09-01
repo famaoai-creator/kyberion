@@ -11,31 +11,39 @@
  */
 
 import * as path from 'node:path';
+import { loadJson } from '@agent/core/foundation';
 import {
+  assertSafeRepositoryPath,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeExistsSync,
   safeLstat,
-  pathResolver,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   loadCapabilityBundleRegistry,
-  scanProviderCapabilities,
-  CloudflareOsControlPlane,
-  CloudflareOsReadOnlySurface,
   type CapabilityBundleEntry,
+} from '@agent/core/capability-bundle-registry';
+import { scanProviderCapabilities } from '@agent/core/provider-capability-scanner';
+import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
+import {
+  CloudflareOsSurface,
+  CloudflareOsReadOnlySurface,
   type CloudflareOsSurfaceAccess,
   type CloudflareOsSurfaceSnapshot,
+} from '@agent/core/cloudflare-os-surface';
+import { isValidTenantSlug } from '@agent/core/entity-scope';
+import {
+  buildSurfaceLauncherRecommendations,
   getSurfaceDirectory,
   getSurfaceDirectorySummary,
   getSurfaceScenarioGuide,
-  buildSurfaceLauncherRecommendations,
-  isValidTenantSlug,
   type SurfaceDirectoryRow,
   type SurfaceDirectorySummary,
   type SurfaceScenarioGuide,
   type SurfaceLauncherRecommendation,
-} from '@agent/core';
-import { logger } from '@agent/core';
+} from '@agent/core/surface-ux';
+import { logger } from '@agent/core/core';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export {
@@ -52,6 +60,8 @@ export type {
   CloudflareOsSurfaceAccess,
   CloudflareOsSurfaceSnapshot,
 };
+export { listIntentSnapshotRows } from './intent-snapshots';
+export type { IntentSnapshotRow } from './intent-snapshots';
 
 export function getTenantScope(): string | undefined {
   const slug = (getRegisteredEnvText('KYBERION_TENANT') || '').trim();
@@ -84,7 +94,7 @@ export function getOsSurfaceAccess(): CloudflareOsSurfaceAccess {
 
 export function getCloudflareOsSnapshot(missionId?: string): CloudflareOsSurfaceSnapshot {
   return new CloudflareOsReadOnlySurface(
-    new CloudflareOsControlPlane({ auditRestoreFailures: false })
+    new CloudflareOsSurface(new CloudflareOsControlPlane({ auditRestoreFailures: false }))
   ).snapshot(missionId, getOsSurfaceAccess());
 }
 
@@ -119,8 +129,17 @@ export interface MissionDetail extends MissionRow {
 
 function readJsonSafe<T>(absPath: string): T | null {
   try {
-    if (!safeExistsSync(absPath)) return null;
-    return loadJson<T>(absPath);
+    const safePath = assertSafeRepositoryPath(absPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
+    return loadJson<T>(safePath);
+  } catch {
+    return null;
+  }
+}
+
+function safeResourcePath(absPath: string): string | null {
+  try {
+    return assertSafeRepositoryPath(absPath, { allowMissingLeaf: true });
   } catch {
     return null;
   }
@@ -145,18 +164,21 @@ function detectMissionTenantSlug(state: any, dirPath: string): string | undefine
 }
 
 function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): MissionRow[] {
-  const tierRoot = pathResolver.rootResolve(`active/missions/${tier}`);
-  if (!safeExistsSync(tierRoot)) return [];
+  const tierRoot = safeResourcePath(pathResolver.rootResolve(`active/missions/${tier}`));
+  if (!tierRoot || !safeExistsSync(tierRoot) || !safeLstat(tierRoot).isDirectory()) return [];
   const rows: MissionRow[] = [];
   const visit = (dir: string) => {
+    const safeDir = safeResourcePath(dir);
+    if (!safeDir || !safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return;
     let entries: string[] = [];
     try {
-      entries = safeReaddir(dir);
+      entries = safeReaddir(safeDir);
     } catch {
       return;
     }
     for (const entry of entries) {
-      const abs = path.join(dir, entry);
+      const abs = safeResourcePath(path.join(safeDir, entry));
+      if (!abs) continue;
       let stat;
       try {
         stat = safeLstat(abs);
@@ -164,8 +186,8 @@ function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): Miss
         continue;
       }
       if (!stat.isDirectory()) continue;
-      const statePath = path.join(abs, 'mission-state.json');
-      if (safeExistsSync(statePath)) {
+      const statePath = safeResourcePath(path.join(abs, 'mission-state.json'));
+      if (statePath && safeExistsSync(statePath) && safeLstat(statePath).isFile()) {
         const state = readJsonSafe<any>(statePath);
         if (!state) continue;
         rows.push({
@@ -208,20 +230,25 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
   const scope = getTenantScope();
   const tiers: Array<'personal' | 'confidential' | 'public'> = ['public', 'confidential'];
   for (const tier of tiers) {
-    const tierRoot = pathResolver.rootResolve(`active/missions/${tier}`);
-    if (!safeExistsSync(tierRoot)) continue;
+    const tierRoot = safeResourcePath(pathResolver.rootResolve(`active/missions/${tier}`));
+    if (!tierRoot || !safeExistsSync(tierRoot) || !safeLstat(tierRoot).isDirectory()) continue;
     const stack: string[] = [tierRoot];
     while (stack.length) {
       const dir = stack.pop()!;
       let entries: string[] = [];
+      let safeDir: string | null = null;
       try {
-        entries = safeReaddir(dir);
+        safeDir = safeResourcePath(dir);
+        if (!safeDir || !safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) continue;
+        entries = safeReaddir(safeDir);
       } catch {
         continue;
       }
+      if (!safeDir) continue;
       for (const entry of entries) {
         if (entry !== upperId && entry !== 'mission-state.json') {
-          const sub = path.join(dir, entry);
+          const sub = safeResourcePath(path.join(safeDir, entry));
+          if (!sub) continue;
           let stat;
           try {
             stat = safeLstat(sub);
@@ -231,9 +258,17 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
           if (stat.isDirectory()) stack.push(sub);
           continue;
         }
-        const candidate = path.join(dir, upperId);
-        const statePath = path.join(candidate, 'mission-state.json');
-        if (!safeExistsSync(statePath)) continue;
+        const candidate = safeResourcePath(path.join(safeDir, upperId));
+        const statePath = candidate
+          ? safeResourcePath(path.join(candidate, 'mission-state.json'))
+          : null;
+        if (
+          !candidate ||
+          !statePath ||
+          !safeExistsSync(statePath) ||
+          !safeLstat(statePath).isFile()
+        )
+          continue;
         const state = readJsonSafe<any>(statePath);
         if (!state) continue;
         const tenantSlug = detectMissionTenantSlug(state, candidate);
@@ -262,8 +297,15 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
 function listEvidenceFiles(
   missionDir: string
 ): Array<{ name: string; bytes: number; modified_at: string }> {
-  const evidenceDir = path.join(missionDir, 'evidence');
-  if (!safeExistsSync(evidenceDir)) return [];
+  let evidenceDir: string;
+  try {
+    evidenceDir = assertSafeRepositoryPath(path.join(missionDir, 'evidence'), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(evidenceDir) || !safeLstat(evidenceDir).isDirectory()) return [];
+  } catch {
+    return [];
+  }
   const out: Array<{ name: string; bytes: number; modified_at: string }> = [];
   try {
     for (const entry of safeReaddir(evidenceDir)) {
@@ -301,8 +343,8 @@ export interface AuditEventRow {
 
 export function listRecentAuditEvents(limit = 100): AuditEventRow[] {
   const scope = getTenantScope();
-  const auditDir = pathResolver.rootResolve('active/audit');
-  if (!safeExistsSync(auditDir)) return [];
+  const auditDir = safeResourcePath(pathResolver.rootResolve('active/audit'));
+  if (!auditDir || !safeExistsSync(auditDir) || !safeLstat(auditDir).isDirectory()) return [];
   const rows: AuditEventRow[] = [];
   let entries: string[] = [];
   try {
@@ -312,7 +354,9 @@ export function listRecentAuditEvents(limit = 100): AuditEventRow[] {
   }
   const ledgers = entries.filter((f) => f.endsWith('.jsonl')).sort();
   for (const ledger of ledgers) {
-    const txt = safeReadFile(path.join(auditDir, ledger), { encoding: 'utf8' }) as string;
+    const ledgerPath = safeResourcePath(path.join(auditDir, ledger));
+    if (!ledgerPath || !safeExistsSync(ledgerPath) || !safeLstat(ledgerPath).isFile()) continue;
+    const txt = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     for (const line of txt.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
@@ -431,9 +475,16 @@ export function getProviderPins(): Record<string, any> {
 
   // 1. Read default pins
   const defaultPath = pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
-  if (safeExistsSync(defaultPath)) {
+  let safeDefaultPath: string | null = null;
+  try {
+    const candidate = assertSafeRepositoryPath(defaultPath, { allowMissingLeaf: true });
+    if (safeExistsSync(candidate) && safeLstat(candidate).isFile()) safeDefaultPath = candidate;
+  } catch {
+    safeDefaultPath = null;
+  }
+  if (safeDefaultPath) {
     try {
-      const data = loadJson<{ pins?: Record<string, unknown> }>(defaultPath);
+      const data = loadJson<{ pins?: Record<string, unknown> }>(safeDefaultPath);
       Object.assign(pins, data.pins || {});
     } catch (err) {
       logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
@@ -442,12 +493,22 @@ export function getProviderPins(): Record<string, any> {
 
   // 2. Scan all session pin files in active/shared/runtime/provider-pins/
   const dirPath = pathResolver.rootResolve('active/shared/runtime/provider-pins');
-  if (safeExistsSync(dirPath)) {
+  let safeDirPath: string | null = null;
+  try {
+    const candidate = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+    if (safeExistsSync(candidate) && safeLstat(candidate).isDirectory()) safeDirPath = candidate;
+  } catch {
+    safeDirPath = null;
+  }
+  if (safeDirPath) {
     try {
-      const files = safeReaddir(dirPath);
+      const files = safeReaddir(safeDirPath);
       for (const file of files) {
         if (file === 'default.json' || !file.endsWith('.json')) continue;
-        const fullPath = path.join(dirPath, file);
+        const fullPath = assertSafeRepositoryPath(path.join(safeDirPath, file), {
+          allowMissingLeaf: true,
+        });
+        if (!safeExistsSync(fullPath) || !safeLstat(fullPath).isFile()) continue;
         const data = loadJson<{ pins?: Record<string, unknown> }>(fullPath);
         Object.assign(pins, data.pins || {});
       }

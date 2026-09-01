@@ -15,6 +15,7 @@ import {
   type ViewerContext,
 } from '../../../lib/viewer-context';
 import { resolveApprovalTenant } from '../../../lib/su-surface-data';
+import { readChronosJsonObject } from '../../../lib/request-input';
 import { memoryCandidateVisibleToViewer } from '../../../lib/knowledge-scope';
 import { buildCompanyVisionRef, resolveCompany, type CompanyAggregate } from '@agent/core/company';
 import {
@@ -109,10 +110,19 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
-import { getProjectManagementView } from '@agent/core';
+import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
+import { inferDeliverableTier } from '../../../lib/deliverable-inbox';
 import * as intelligenceData from './intelligence-observation-data';
 import * as intelligenceControlData from './intelligence-control-data';
+import { parseChronosIntelligenceInput } from './intelligence-input';
+
+let intelligenceSnapshotRevision = 0;
+
+function nextIntelligenceSnapshotRevision(): number {
+  intelligenceSnapshotRevision = Math.max(intelligenceSnapshotRevision + 1, Date.now());
+  return intelligenceSnapshotRevision;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -126,6 +136,8 @@ export async function GET(req: NextRequest) {
       resolvedViewer.context,
       req.nextUrl.searchParams.get('tenant') || undefined
     );
+    const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
+    const allowedTiers = new Set<string>(tierAccess);
     const accessRole = getChronosAccessRoleOrThrow(req);
     const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
     const runtime = listAgentRuntimeSnapshots();
@@ -133,25 +145,25 @@ export async function GET(req: NextRequest) {
       .collectActiveMissions()
       .filter(
         (mission) =>
-          tenantSlugs === 'all' ||
-          Boolean(mission.tenantSlug && tenantSlugs.includes(mission.tenantSlug))
+          allowedTiers.has(mission.tier) &&
+          (tenantSlugs === 'all' ||
+            Boolean(mission.tenantSlug && tenantSlugs.includes(mission.tenantSlug)))
       );
     const runtimeLeases = listAgentRuntimeLeaseSummaries()
       .filter((lease) =>
-        tenantSlugs === 'all'
-          ? true
-          : intelligenceData.missionVisibleToTenant(
-              lease.owner_type === 'mission'
-                ? lease.owner_id
-                : typeof lease.metadata?.mission_id === 'string'
-                  ? lease.metadata.mission_id
-                  : undefined,
-              tenantSlugs
-            )
+        intelligenceData.missionVisibleToScope(
+          lease.owner_type === 'mission'
+            ? lease.owner_id
+            : typeof lease.metadata?.mission_id === 'string'
+              ? lease.metadata.mission_id
+              : undefined,
+          tenantSlugs,
+          tierAccess
+        )
       )
       .slice(0, 12);
     const rawSurfaces = await intelligenceControlData.collectSurfaceSummaries();
-    const controlActions = intelligenceControlData.collectControlActions(tenantSlugs);
+    const controlActions = intelligenceControlData.collectControlActions(tenantSlugs, tierAccess);
     const { activeMissions, surfaces } = intelligenceControlData.applyPendingActionSummaries(
       rawActiveMissions,
       rawSurfaces,
@@ -159,10 +171,10 @@ export async function GET(req: NextRequest) {
     );
     const missionProgress = intelligenceData.collectMissionProgress(activeMissions);
     const agentMessages = collectAgentMessages().filter((message) =>
-      intelligenceData.missionVisibleToTenant(message.missionId, tenantSlugs)
+      intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
     );
     const a2aHandoffs = collectA2AHandoffs().filter((handoff) =>
-      intelligenceData.missionVisibleToTenant(handoff.missionId, tenantSlugs)
+      intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
     );
     let managedRuntimes: Array<{
       agentId: string;
@@ -218,26 +230,25 @@ export async function GET(req: NextRequest) {
         };
       });
     }
-    const scopedRuntime =
-      tenantSlugs === 'all'
-        ? runtime
-        : runtime.filter((entry) =>
-            runtimeLeases.some((lease) => lease.agent_id === entry.agent.agentId)
-          );
-    if (tenantSlugs !== 'all') {
-      const scopedAgentIds = new Set(runtimeLeases.map((lease) => lease.agent_id));
-      managedRuntimes = managedRuntimes.filter((runtimeEntry) =>
-        scopedAgentIds.has(runtimeEntry.agentId)
-      );
-    }
+    const scopedAgentIds = new Set(runtimeLeases.map((lease) => lease.agent_id));
+    const scopedRuntime = runtime.filter((entry) => scopedAgentIds.has(entry.agent.agentId));
+    managedRuntimes = managedRuntimes.filter((runtimeEntry) =>
+      scopedAgentIds.has(runtimeEntry.agentId)
+    );
     const controlActionCatalog = intelligenceControlData.collectControlActionCatalog(accessRole);
     const controlActionAvailability = intelligenceControlData.collectControlActionAvailability(
       accessRole,
       activeMissions,
       surfaces
     );
-    const secretApprovals = intelligenceControlData.collectPendingSecretApprovals(tenantSlugs);
-    const pendingApprovals = intelligenceControlData.collectPendingApprovals(tenantSlugs);
+    const secretApprovals = intelligenceControlData.collectPendingSecretApprovals(
+      tenantSlugs,
+      tierAccess
+    );
+    const pendingApprovals = intelligenceControlData.collectPendingApprovals(
+      tenantSlugs,
+      tierAccess
+    );
     const workCoordination = intelligenceData.safeCollect(
       'intelligenceData.collectWorkCoordinationSummary',
       {
@@ -252,11 +263,11 @@ export async function GET(req: NextRequest) {
         runningAttempts: 0,
         recentItems: [],
       },
-      () => intelligenceData.collectWorkCoordinationSummary(tenantSlugs)
+      () => intelligenceData.collectWorkCoordinationSummary(tenantSlugs, tierAccess)
     );
     const projects = listProjectRecords().filter(
       (project) =>
-        project.tier !== 'personal' &&
+        allowedTiers.has(project.tier) &&
         Boolean(project.tenant_slug) &&
         (tenantSlugs === 'all' || tenantSlugs.includes(project.tenant_slug as string))
     );
@@ -269,19 +280,14 @@ export async function GET(req: NextRequest) {
     const projectIds = new Set(projects.map((project) => project.project_id));
     const projectTracks = listProjectTrackRecords().filter(
       (track) =>
-        tenantSlugs === 'all' ||
-        Boolean(
-          (track.tenant_slug && tenantSlugs.includes(track.tenant_slug)) ||
-          projectIds.has(track.project_id)
-        )
+        projectIds.has(track.project_id) &&
+        (tenantSlugs === 'all' ||
+          Boolean(track.tenant_slug && tenantSlugs.includes(track.tenant_slug)))
     );
-    const missionSeeds = listMissionSeedRecords().filter(
-      (seed) => tenantSlugs === 'all' || projectIds.has(seed.project_id)
-    );
+    const missionSeeds = listMissionSeedRecords().filter((seed) => projectIds.has(seed.project_id));
     const missionSeedAssessment = summarizeMissionSeedAssessment(missionSeeds);
-    const distillCandidates = listDistillCandidateRecords().filter(
-      (candidate) =>
-        tenantSlugs === 'all' || (candidate.project_id && projectIds.has(candidate.project_id))
+    const distillCandidates = listDistillCandidateRecords().filter((candidate) =>
+      Boolean(candidate.project_id && projectIds.has(candidate.project_id))
     );
     const memoryCandidates = listMemoryPromotionCandidates().filter((candidate) =>
       memoryCandidateVisibleToViewer(
@@ -302,21 +308,38 @@ export async function GET(req: NextRequest) {
     );
     const scopedSurfaceOutbox = {
       slack: listSurfaceOutboxMessages('slack', { includeTenantNamespaces: true }).filter(
-        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
+        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs, tierAccess)
       ),
       chronos: listSurfaceOutboxMessages('chronos', { includeTenantNamespaces: true }).filter(
-        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
+        (message) => intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs, tierAccess)
       ),
     };
-    const scopedBrowserSessions = tenantSlugs === 'all' ? collectBrowserSessions() : [];
-    const scopedBrowserConversationSessions =
-      tenantSlugs === 'all' ? collectBrowserConversationSessions() : [];
-    const scopedComputerSessions = tenantSlugs === 'all' ? collectComputerSessions() : [];
-    const allArtifacts = listArtifactRecords().filter(
-      (artifact) =>
-        tenantSlugs === 'all' ||
-        Boolean(artifact.tenant_slug && tenantSlugs.includes(artifact.tenant_slug))
-    );
+    const broadOperationalAccess = tenantSlugs === 'all' && tierAccess.includes('confidential');
+    const scopedBrowserSessions = broadOperationalAccess ? collectBrowserSessions() : [];
+    const scopedBrowserConversationSessions = broadOperationalAccess
+      ? collectBrowserConversationSessions()
+      : [];
+    const scopedComputerSessions = broadOperationalAccess ? collectComputerSessions() : [];
+    const allArtifacts = listArtifactRecords().filter((artifact) => {
+      if (
+        tenantSlugs !== 'all' &&
+        (!artifact.tenant_slug || !tenantSlugs.includes(artifact.tenant_slug))
+      ) {
+        return false;
+      }
+      const projectTier = artifact.project_id
+        ? projects.find((project) => project.project_id === artifact.project_id)?.tier
+        : undefined;
+      const missionTier = artifact.mission_id
+        ? rawActiveMissions.find((mission) => mission.missionId === artifact.mission_id)?.tier
+        : undefined;
+      const tier = inferDeliverableTier(
+        artifact,
+        artifact.path?.replace(/\\/g, '/'),
+        projectTier || missionTier
+      );
+      return Boolean(tier && allowedTiers.has(tier));
+    });
     const recentArtifacts = allArtifacts.slice(-8).reverse();
     const gateReadiness = buildTrackGateReadinessSummaries({
       tracks: projectTracks,
@@ -330,6 +353,7 @@ export async function GET(req: NextRequest) {
       )
     );
     return NextResponse.json({
+      revision: nextIntelligenceSnapshotRevision(),
       company,
       tenantSlugs,
       activeMissions,
@@ -353,7 +377,7 @@ export async function GET(req: NextRequest) {
       recentEvents: intelligenceData.safeCollect(
         'intelligenceControlData.collectRecentEvents',
         [],
-        () => intelligenceControlData.collectRecentEvents(tenantSlugs)
+        () => intelligenceControlData.collectRecentEvents(tenantSlugs, tierAccess)
       ),
       agentMessages,
       a2aHandoffs,
@@ -363,12 +387,12 @@ export async function GET(req: NextRequest) {
       controlActionDetails: intelligenceData.safeCollect(
         'intelligenceControlData.collectControlActionDetails',
         {},
-        () => intelligenceControlData.collectControlActionDetails(tenantSlugs)
+        () => intelligenceControlData.collectControlActionDetails(tenantSlugs, tierAccess)
       ),
       ownerSummaries: intelligenceData.safeCollect(
         'intelligenceControlData.collectOwnerSummaries',
         [],
-        () => intelligenceControlData.collectOwnerSummaries(tenantSlugs)
+        () => intelligenceControlData.collectOwnerSummaries(tenantSlugs, tierAccess)
       ),
       browserSessions: scopedBrowserSessions,
       browserConversationSessions: scopedBrowserConversationSessions,
@@ -384,7 +408,7 @@ export async function GET(req: NextRequest) {
           intelligenceControlData
             .collectRecentSurfaceOutbox()
             .filter((message) =>
-              intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs)
+              intelligenceData.surfaceOutboxVisibleToTenant(message, tenantSlugs, tierAccess)
             )
       ),
       runtime: {
@@ -420,30 +444,10 @@ export async function POST(req: NextRequest) {
     if (requiresAdmin) return requiresAdmin;
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
-    const body = await req.json();
-    const action = body?.action;
-
-    if (
-      action !== 'cleanup_runtime_lease' &&
-      action !== 'restart_runtime_lease' &&
-      action !== 'clear_surface_outbox' &&
-      action !== 'memory_promote_pending' &&
-      action !== 'memory_promote_candidate' &&
-      action !== 'memory_approve_candidate' &&
-      action !== 'memory_reject_candidate' &&
-      action !== 'next_action_execute' &&
-      action !== 'mission_control' &&
-      action !== 'intervention_respond' &&
-      action !== 'surface_control' &&
-      action !== 'promote_mission_seed' &&
-      action !== 'create_track_seed' &&
-      action !== 'distill_candidate_decision' &&
-      action !== 'approval_decision' &&
-      action !== 'close_browser_session' &&
-      action !== 'restart_browser_session'
-    ) {
-      return NextResponse.json({ error: 'Unsupported action' }, { status: 400 });
-    }
+    const parsedBody = await readChronosJsonObject(req, 'Chronos intelligence');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    const body = parseChronosIntelligenceInput(parsedBody.body);
+    const action = body.action;
 
     if (action === 'approval_decision') {
       const requestId = typeof body?.requestId === 'string' ? body.requestId : '';
@@ -1170,7 +1174,11 @@ export async function POST(req: NextRequest) {
         resolvedViewer.context,
         typeof body?.tenant === 'string' ? body.tenant : undefined
       );
-      if (!message || !intelligenceData.surfaceOutboxVisibleToTenant(message, allowedTenants)) {
+      const allowedTiers = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
+      if (
+        !message ||
+        !intelligenceData.surfaceOutboxVisibleToTenant(message, allowedTenants, allowedTiers)
+      ) {
         return NextResponse.json(
           { error: 'Surface outbox message is outside the viewer tenant scope' },
           { status: 403 }

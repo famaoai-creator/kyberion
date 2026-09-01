@@ -24,7 +24,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';
@@ -129,11 +129,30 @@ export function checkMeetingParticipationConsent(input: {
       reason: `${input.purpose} requires mission_id + voice-consent.json in the mission evidence dir`,
     };
   }
-  const evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  let evidenceDir: string | null;
+  try {
+    pathResolver.assertMissionIdArgument(missionId);
+    evidenceDir = pathResolver.missionEvidenceDir(missionId);
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      reason: `mission evidence path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   if (!evidenceDir) {
     return { allowed: false, reason: `mission evidence dir not found for ${missionId}` };
   }
-  const consentPath = path.join(evidenceDir, 'voice-consent.json');
+  let consentPath: string;
+  try {
+    consentPath = assertSafeRepositoryPath(path.join(evidenceDir, 'voice-consent.json'), {
+      allowMissingLeaf: true,
+    });
+  } catch (err: unknown) {
+    return {
+      allowed: false,
+      reason: `voice-consent path rejected for ${missionId}: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
   if (!safeExistsSync(consentPath)) {
     return {
       allowed: false,

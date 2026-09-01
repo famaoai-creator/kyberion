@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { classifyError, formatClassification } from '@agent/core/error-classifier';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  classifyError,
-  formatClassification,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]*$/;
@@ -31,16 +32,23 @@ function validateSlug(slug: string): string {
 
 export function switchCustomer(slugInput: string): { slug: string; envPath: string } {
   const slug = validateSlug(slugInput);
-  const customerDir = path.join(pathResolver.rootDir(), 'customer', slug);
-  if (!safeExistsSync(customerDir)) {
+  const rootDir = pathResolver.rootDir();
+  const customerDir = assertSafeRepositoryPath(path.join(rootDir, 'customer', slug), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if (!safeExistsSync(customerDir) || !safeLstat(customerDir).isDirectory()) {
     throw new Error(
       `Customer overlay not found: ${path.relative(pathResolver.rootDir(), customerDir)}. Run pnpm customer:create first.`
     );
   }
 
   const missing = REQUIRED_FILES.filter((required) => {
-    const requiredPath = path.join(customerDir, required);
-    return !safeExistsSync(requiredPath);
+    const requiredPath = assertSafeRepositoryPath(path.join(customerDir, required), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
+    return !safeExistsSync(requiredPath) || !safeLstat(requiredPath).isFile();
   });
   if (missing.length > 0) {
     throw new Error(
@@ -53,7 +61,15 @@ export function switchCustomer(slugInput: string): { slug: string; envPath: stri
   return { slug, envPath: CUSTOMER_ENV_PATH };
 }
 
-function main(argv: string[]): void {
+export function formatSwitchedCustomer(result: { slug: string; envPath: string }): string[] {
+  return [
+    `Switched customer to ${result.slug}`,
+    `Activation profile: ${path.relative(pathResolver.rootDir(), result.envPath)}`,
+    `Source it with: source ${path.relative(pathResolver.rootDir(), result.envPath)}`,
+  ];
+}
+
+function main(argv: string[]): string[] {
   const slug = argv[0];
   if (!slug || slug === '--help' || slug === '-h') {
     const usage = 'Usage: customer_switch <slug>';
@@ -66,9 +82,7 @@ function main(argv: string[]): void {
 
   try {
     const result = switchCustomer(slug);
-    console.log(`Switched customer to ${result.slug}`);
-    console.log(`Activation profile: ${path.relative(pathResolver.rootDir(), result.envPath)}`);
-    console.log(`Source it with: source ${path.relative(pathResolver.rootDir(), result.envPath)}`);
+    return formatSwitchedCustomer(result);
   } catch (err) {
     throw new Error(formatClassification(classifyError(err)));
   }
@@ -82,6 +96,6 @@ if (
     name: 'customer:switch',
     flags: [],
     run(context) {
-      return main(context.argv);
+      context.print(main(context.argv).join('\n'));
     },
   })();

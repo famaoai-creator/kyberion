@@ -1,22 +1,24 @@
 import {
-  logger,
   safeReadFile,
   safeWriteFile,
   safeExec,
-  ledger,
-  buildGovernedRetryOptions,
-  retry,
   safeExistsSync,
   safeMkdir,
+} from '@agent/core/secure-io';
+import * as secureIo from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { ledger } from '@agent/core/ledger';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import {
   fetchSecret,
   storeSecret,
   removeSecret,
   listSecrets as coreListSecrets,
-  pathResolver,
-  secureIo,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+} from '@agent/core/secret-bridge';
+import * as pathResolver from '@agent/core/path-resolver';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 
 /**
@@ -107,14 +109,11 @@ function registryRemove(service: string, account: string): void {
   saveRegistry(registry);
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: SECRET_MANIFEST_PATH,
-    defaults: DEFAULT_SECRET_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: SECRET_MANIFEST_PATH,
+  defaults: DEFAULT_SECRET_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function withGovernedMutation(
   actionType: 'set' | 'delete',

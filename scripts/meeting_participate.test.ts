@@ -6,10 +6,24 @@ import {
   prepareMeetingTarget,
   resolveMeetingParticipationVoiceProfile,
   shouldResolveMeetingParticipationVoiceProfile,
+  extractFirstJson,
 } from './meeting_participate.js';
 import { resolveMeetingParticipationRuntimePlan } from '@agent/core';
 
 describe('meeting_participate bootstrap gate', () => {
+  it('parses only safe JSON object responses from the reasoning backend', () => {
+    expect(extractFirstJson('```json\n{"speech":"Ready","leave":false}\n```')).toEqual({
+      speech: 'Ready',
+      leave: false,
+    });
+    expect(extractFirstJson('{"speech":"Ready","leave":"true"}')).toEqual({
+      speech: 'Ready',
+      leave: 'true',
+    });
+    expect(extractFirstJson('{"speech":"Ready","__proto__":{"polluted":true}}')).toBeNull();
+    expect(extractFirstJson('[]')).toBeNull();
+  });
+
   it('records a failed gate in trace and returns not ready', async () => {
     const trace = new TraceContext('meeting_participate:MSN-TEST-001', {
       missionId: 'MSN-TEST-001',
@@ -47,8 +61,12 @@ describe('meeting_participate bootstrap gate', () => {
     const gateSpan = traceDoc.rootSpan.children[0];
     expect(gateSpan.name).toBe('meeting_participate.bootstrap_gate');
     expect(gateSpan.status).toBe('error');
-    expect(gateSpan.events.map((event) => event.name)).toContain('meeting_participate.bootstrap_gate_failed');
-    expect(gateSpan.events.map((event) => event.name)).toContain('meeting_participate.bootstrap_gate_missing');
+    expect(gateSpan.events.map((event) => event.name)).toContain(
+      'meeting_participate.bootstrap_gate_failed'
+    );
+    expect(gateSpan.events.map((event) => event.name)).toContain(
+      'meeting_participate.bootstrap_gate_missing'
+    );
     expect(traceDoc.rootSpan.status).toBe('error');
   });
 
@@ -70,7 +88,9 @@ describe('meeting_participate bootstrap gate', () => {
     const traceDoc = trace.finalize();
     const gateSpan = traceDoc.rootSpan.children[0];
     expect(gateSpan.status).toBe('error');
-    expect(gateSpan.events.map((event) => event.name)).toContain('meeting_participate.bootstrap_gate_error');
+    expect(gateSpan.events.map((event) => event.name)).toContain(
+      'meeting_participate.bootstrap_gate_error'
+    );
     expect(traceDoc.rootSpan.status).toBe('error');
   });
 
@@ -79,7 +99,7 @@ describe('meeting_participate bootstrap gate', () => {
       prepareMeetingTarget({
         url: 'https://example.com/meeting',
         platform: 'auto',
-      } as any),
+      } as any)
     ).toThrow(/unsupported meeting URL/i);
   });
 
@@ -93,7 +113,7 @@ describe('meeting_participate bootstrap gate', () => {
         busProbe: { available: true },
         stt: { bridge_id: 'stub' },
         tts: { bridge_id: 'stub' },
-      }),
+      })
     ).toThrow(/requires a real audio bus/);
   });
 
@@ -110,7 +130,7 @@ describe('meeting_participate bootstrap gate', () => {
         busProbe: { available: false, reason: 'not installed' },
         stt: { bridge_id: 'stub' },
         tts: { bridge_id: 'stub' },
-      }),
+      })
     ).not.toThrow();
   });
 
@@ -136,15 +156,25 @@ describe('meeting_participate bootstrap gate', () => {
   });
 
   it('does not require voice profile registry resolution for transcribe-only runs', () => {
-    const transcribeFirst = resolveMeetingParticipationRuntimePlan({ transport_mode: 'transcribe_first' });
-    const realtimeVoice = resolveMeetingParticipationRuntimePlan({ transport_mode: 'realtime_voice' });
+    const transcribeFirst = resolveMeetingParticipationRuntimePlan({
+      transport_mode: 'transcribe_first',
+    });
+    const realtimeVoice = resolveMeetingParticipationRuntimePlan({
+      transport_mode: 'realtime_voice',
+    });
 
-    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: transcribeFirst })).toBe(false);
-    expect(shouldResolveMeetingParticipationVoiceProfile({
-      runtimePlan: transcribeFirst,
-      voiceProfileId: 'operator-ja-default',
-    })).toBe(true);
-    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: realtimeVoice })).toBe(true);
+    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: transcribeFirst })).toBe(
+      false
+    );
+    expect(
+      shouldResolveMeetingParticipationVoiceProfile({
+        runtimePlan: transcribeFirst,
+        voiceProfileId: 'operator-ja-default',
+      })
+    ).toBe(true);
+    expect(shouldResolveMeetingParticipationVoiceProfile({ runtimePlan: realtimeVoice })).toBe(
+      true
+    );
   });
 
   it('rejects an explicit voice profile that is missing from the registry', () => {
@@ -165,7 +195,7 @@ describe('meeting_participate bootstrap gate', () => {
             },
           ],
         },
-      }),
+      })
     ).toThrow(/not present in the active registry\.$/);
   });
 });

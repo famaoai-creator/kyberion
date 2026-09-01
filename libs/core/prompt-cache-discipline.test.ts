@@ -144,6 +144,33 @@ describe('renderDeferredToolAnnouncement / promoteDeferredToolDeclarations', () 
     ).toThrow(/DEFERRED_TOOL_ROLE_DENIED/);
   });
 
+  it('validates explicit deferred definitions with the same role boundary', () => {
+    const plan = planDeferredToolLoading([{ name: 'read_file', description: 'Read a file.' }], {
+      role: 'agent',
+      deferredTools: [
+        {
+          name: 'search',
+          description: 'Search knowledge.',
+          allowed_roles: ['agent'],
+        },
+      ],
+    });
+    expect(plan.active.map((tool) => tool.name)).toEqual(['read_file']);
+    expect(plan.deferred.map((tool) => tool.name)).toEqual(['search']);
+    expect(() =>
+      planDeferredToolLoading([{ name: 'read_file', description: 'Read a file.' }], {
+        role: 'agent',
+        deferredTools: [
+          {
+            name: 'deploy',
+            description: 'Deploy a release.',
+            allowed_roles: ['operator'],
+          },
+        ],
+      })
+    ).toThrow(/DEFERRED_TOOL_ROLE_DENIED/);
+  });
+
   it('rejects duplicate catalog names before producing a model-visible plan', () => {
     expect(() =>
       planDeferredToolLoading([
@@ -151,6 +178,14 @@ describe('renderDeferredToolAnnouncement / promoteDeferredToolDeclarations', () 
         { name: 'read_file', description: 'second' },
       ])
     ).toThrow(/DEFERRED_TOOL_DUPLICATE/);
+  });
+
+  it('uses canonical names when selecting deferred catalog entries', () => {
+    const plan = planDeferredToolLoading([{ name: ' search ', description: 'Search knowledge.' }], {
+      deferredToolNames: ['search'],
+    });
+    expect(plan.active).toEqual([]);
+    expect(plan.deferred.map((tool) => tool.name)).toEqual([' search ']);
   });
 });
 

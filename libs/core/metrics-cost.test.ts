@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { loadModelCostRegistry, resetModelCostRegistryCache, resolveCostRates } from './metrics.js';
+import {
+  loadModelCostRegistry,
+  _resetModelCostRegistryCacheForTests,
+  resolveCostRates,
+} from './metrics.js';
 
 describe('model-cost registry — data-driven (not source-hardcoded)', () => {
-  beforeEach(() => resetModelCostRegistryCache());
+  beforeEach(() => _resetModelCostRegistryCacheForTests());
 
   it('loads rates from the knowledge-tier JSON registry', () => {
     const reg = loadModelCostRegistry();
@@ -18,7 +22,7 @@ describe('model-cost registry — data-driven (not source-hardcoded)', () => {
 });
 
 describe('resolveCostRates — per-model cost resolution', () => {
-  beforeEach(() => resetModelCostRegistryCache());
+  beforeEach(() => _resetModelCostRegistryCacheForTests());
 
   it('exact-matches a known model id', () => {
     const r = resolveCostRates('gpt-4o');

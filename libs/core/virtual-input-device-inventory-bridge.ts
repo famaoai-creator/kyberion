@@ -78,6 +78,15 @@ function uniqueByName(records: VirtualInputDeviceRecord[]): VirtualInputDeviceRe
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function parseWindowsInputDeviceRows(payload: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(payload)) return payload.filter(isRecord);
+  return isRecord(payload) ? [payload] : [];
+}
+
 function runCommand(
   opts: VirtualInputDeviceInventoryOptions,
   command: string,
@@ -365,9 +374,9 @@ function collectWindowsInputDevices(
   } catch {
     return [];
   }
-  const rows = Array.isArray(payload) ? payload : payload ? [payload] : [];
+  const rows = parseWindowsInputDeviceRows(payload);
   const records: VirtualInputDeviceRecord[] = [];
-  for (const row of rows as Array<Record<string, unknown>>) {
+  for (const row of rows) {
     const name = String(row.FriendlyName || '').trim();
     if (!name) continue;
     const lower = name.toLowerCase();

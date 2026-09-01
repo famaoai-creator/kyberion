@@ -47,7 +47,3 @@ export function resolvePromotedReportAudience(): string {
 export function resolvePromotedReportOutputFormat(): string {
   return loadPromotedReportTemplatePolicyCatalog().output_format || FALLBACK_CATALOG.output_format;
 }
-
-export function resetPromotedReportTemplatePolicyCatalogCache(): void {
-  catalog.reset();
-}

@@ -264,6 +264,20 @@ export { loadRestrictedActionRules, matchRestrictedAction } from './restricted-a
 
 export type { RestrictedActionMatch, RestrictedActionRule } from './restricted-action-policy.js';
 
+export {
+  assertCapabilityAllowed,
+  checkCapabilityRestriction,
+  evaluateCapabilityRestriction,
+  loadCapabilityRestrictionPolicy,
+} from './capability-restriction-policy.js';
+
+export type {
+  CapabilityRestrictionDecision,
+  CapabilityRestrictionPolicy,
+  CapabilityRestrictionRecord,
+  CapabilityRestrictionStatus,
+} from './capability-restriction-policy.js';
+
 export { loadMeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
 
 export type { MeetingFacilitatorPolicy } from './meeting-facilitator-policy.js';
@@ -300,6 +314,7 @@ export { installCoreEnvironmentProbes } from './environment-capability-probes.js
 export {
   formatEnvValidationReport,
   getRegisteredEnv,
+  loadEnvRegistryFile,
   loadEnvRegistryEntries,
   validateEnv,
   validateEnvAgainstRegistry,
@@ -307,6 +322,8 @@ export {
 
 export type {
   EnvRegistryValidationEntry,
+  EnvRegistryEntry,
+  EnvRegistryFile,
   EnvValidationOptions,
   EnvValidationIssue,
   EnvValidationReport,

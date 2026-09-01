@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 
 vi.mock('./path-resolver.js', async () => {
@@ -21,7 +20,8 @@ vi.mock('./policy-engine.js', () => ({
   policyEngine: { evaluate: () => ({ allowed: true, action: 'allow' }) },
 }));
 
-import { rootResolve } from './path-resolver.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
 import {
   getTrustLevel,
   listNgTopics,
@@ -35,7 +35,9 @@ describe('relationship-graph-store', () => {
   const mockResolve = rootResolve as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rel-graph-'));
+    tmpDir = pathResolver.sharedTmp(`rel-graph-${process.pid}`);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(tmpDir, { recursive: true });
     mockResolve.mockImplementation((rel: string) => path.join(tmpDir, rel));
   });
 
@@ -101,7 +103,7 @@ describe('relationship-graph-store', () => {
           org: 'nbs',
           source: 'some-random-actuator' as unknown as 'voice-actuator',
           interaction: { at: '2026-04-20T10:00:00Z', summary: 'attempted write' },
-        }),
+        })
       ).toThrow(/unsupported source/);
     });
 
@@ -112,8 +114,21 @@ describe('relationship-graph-store', () => {
           org: 'nbs',
           source: 'voice-actuator',
           interaction: { at: '2026-04-20T10:00:00Z', summary: 'x' },
-        }),
+        })
       ).toThrow(/illegal path segment/);
+    });
+
+    it('rejects a relationship organization directory that traverses a symbolic link', () => {
+      const realDir = path.join(tmpDir, 'real-relationships');
+      const linkedDir = path.join(tmpDir, 'knowledge/confidential/relationships/linked-org');
+      fs.mkdirSync(realDir, { recursive: true });
+      fs.mkdirSync(path.dirname(linkedDir), { recursive: true });
+      safeSymlinkSync(realDir, linkedDir, 'dir');
+      try {
+        expect(() => readNode('linked-org', 'person')).toThrow('[RESOURCE_PATH_SYMLINK]');
+      } finally {
+        safeUnlinkSync(linkedDir);
+      }
     });
   });
 
@@ -145,7 +160,7 @@ describe('relationship-graph-store', () => {
           source: 'voice-actuator',
           fieldPath: 'trust_level.current',
           proposedValue: 5,
-        }),
+        })
       ).toThrow(/node missing/);
     });
   });

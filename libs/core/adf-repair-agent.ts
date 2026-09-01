@@ -7,7 +7,8 @@
  */
 
 import { getReasoningBackend, type ReasoningCallOptions } from './reasoning-backend.js';
-import { safeReadFile, safeWriteFile } from './secure-io.js';
+import * as path from 'node:path';
+import { assertSafeRepositoryPath, safeReadFile, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 import { validate, loadSchema } from './validate.js';
 import { pathResolver } from './path-resolver.js';
@@ -31,6 +32,8 @@ import { delegateWorkItemWithReasoningBackend } from './reasoning-backend-execut
 import { getWorkItem } from './work-coordination.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { truncateNormalizedText } from './foundation/text.js';
+import { assertProjectTrustApproval } from './project-trust.js';
+import { isBuiltinPipelineResource } from './trust-requiring-resources.js';
 import type { ValidationResult } from './types.js';
 
 export interface AdfRepairResult {
@@ -52,10 +55,36 @@ export interface AdfRepairFailure {
 }
 export interface AdfRepairOptions {
   workItemId?: string;
+  /** Explicit project-trust decision for pipeline ADF mutation. */
+  trustResolved?: boolean;
+  /** Durable human approval for the exact project-local pipeline ADF. */
+  projectTrustApprovalId?: string;
   /** Explicit step failure context for the canonical execution repair path. */
   step?: AdfRepairStep;
   failure?: AdfRepairFailure;
   delegationOptions?: ReasoningCallOptions;
+}
+
+function resolveAdfRepairPath(adfPath: string): string {
+  return assertSafeRepositoryPath(path.resolve(pathResolver.rootResolve(adfPath)));
+}
+
+function assertPipelineRepairTrust(adfPath: string, options: AdfRepairOptions): void {
+  const absolute = resolveAdfRepairPath(adfPath);
+  const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
+  if (!relative || relative === '.' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[TRUST_REQUIRED] ADF repair target must stay inside the repository: ${adfPath}`
+    );
+  }
+  if (options.projectTrustApprovalId) {
+    assertProjectTrustApproval(options.projectTrustApprovalId, absolute);
+    return;
+  }
+  if (isBuiltinPipelineResource(relative) || options.trustResolved === true) return;
+  throw new Error(
+    `[TRUST_REQUIRED] project-local pipeline ADF repair requires an explicit project-trust decision: ${relative}`
+  );
 }
 
 /**
@@ -68,7 +97,9 @@ export async function validateAndRepairAdf(
   schemaName: string,
   options: AdfRepairOptions = {}
 ): Promise<AdfRepairResult> {
-  const content = safeReadFile(adfPath, { encoding: 'utf8' }) as string;
+  const repairPath = resolveAdfRepairPath(adfPath);
+  if (schemaName === 'pipeline-adf') assertPipelineRepairTrust(repairPath, options);
+  const content = safeReadFile(repairPath, { encoding: 'utf8' }) as string;
   let parsed: any;
   try {
     parsed = JSON.parse(content);
@@ -78,14 +109,14 @@ export async function validateAndRepairAdf(
     if (lightweight !== null) {
       const repairedStr = repairJsonString(content)!;
       logger.info(
-        `[adf-repair] Lightweight JSON repair succeeded for ${adfPath} — skipping subagent delegation`
+        `[adf-repair] Lightweight JSON repair succeeded for ${repairPath} — skipping subagent delegation`
       );
-      safeWriteFile(adfPath, repairedStr, { encoding: 'utf8' });
+      safeWriteFile(repairPath, repairedStr, { encoding: 'utf8' });
       parsed = lightweight;
     } else {
-      logger.error(`[adf-repair] Failed to parse JSON at ${adfPath}: ${err.message}`);
+      logger.error(`[adf-repair] Failed to parse JSON at ${repairPath}: ${err.message}`);
       return attemptSubagentRepair(
-        adfPath,
+        repairPath,
         schemaName,
         `JSON parse error: ${err.message}`,
         [],
@@ -99,7 +130,7 @@ export async function validateAndRepairAdf(
       const stepLabel = options.step?.op ? ` for step ${options.step.op}` : '';
       const details = [options.failure.detail, options.failure.repairAction].filter(Boolean);
       return attemptSubagentRepair(
-        adfPath,
+        repairPath,
         schemaName,
         `Execution failure${stepLabel}: ${options.failure.category}`,
         details,
@@ -108,13 +139,13 @@ export async function validateAndRepairAdf(
     }
     try {
       const pipeline = validatePipelineAdf(parsed);
-      const guardrails = validatePipelineGuardrails(pipeline, adfPath);
+      const guardrails = validatePipelineGuardrails(pipeline, repairPath);
       if (!guardrails.ok) {
         const errors = guardrails.findings
           .filter((finding) => finding.severity === 'error')
           .map((finding) => `${finding.path}: ${finding.message}`);
         logger.warn(
-          `[adf-repair] Guardrail validation failed for ${adfPath}. Errors: ${errors.length}.`
+          `[adf-repair] Guardrail validation failed for ${repairPath}. Errors: ${errors.length}.`
         );
         return {
           repaired: false,
@@ -124,7 +155,7 @@ export async function validateAndRepairAdf(
       }
       return { repaired: false };
     } catch (err: any) {
-      return attemptSubagentRepair(adfPath, schemaName, '', [err.message], options);
+      return attemptSubagentRepair(repairPath, schemaName, '', [err.message], options);
     }
   }
 
@@ -135,10 +166,10 @@ export async function validateAndRepairAdf(
   }
 
   logger.warn(
-    `[adf-repair] Schema validation failed for ${adfPath}. Errors: ${validation.errors.length}. Delegating to sub-agent...`
+    `[adf-repair] Schema validation failed for ${repairPath}. Errors: ${validation.errors.length}. Delegating to sub-agent...`
   );
   return attemptSubagentRepair(
-    adfPath,
+    repairPath,
     schemaName,
     '',
     validation.errors.map((e) => `${e.field}: ${e.message}`),

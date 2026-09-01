@@ -35,12 +35,12 @@ import {
   type PluginTrustLabel,
 } from './plugin-source-trust.js';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeMoveSync,
-  safeReadFile,
   safeReaddir,
   safeRmSync,
   safeStat,
@@ -136,25 +136,17 @@ function readPluginManifestSafely(pluginRoot: string): {
     return { manifest: null, diagnostics };
   }
 
-  let raw: string;
-  try {
-    raw = safeReadFile(candidatePath, { encoding: 'utf8' }) as string;
-  } catch (err: unknown) {
-    diagnostics.push({
-      code: 'manifest_unreadable',
-      message: `Manifest could not be read: ${err instanceof Error ? err.message : String(err)}`,
-      severity: 'error',
-    });
-    return { manifest: null, diagnostics };
-  }
-
   let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(raw);
+    parsed = readJson<unknown>(candidatePath) as Record<string, unknown>;
   } catch (err: unknown) {
+    const code = err instanceof SyntaxError ? 'manifest_invalid_json' : 'manifest_unreadable';
     diagnostics.push({
-      code: 'manifest_invalid_json',
-      message: `Manifest is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      code,
+      message:
+        code === 'manifest_invalid_json'
+          ? `Manifest is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
+          : `Manifest could not be read: ${err instanceof Error ? err.message : String(err)}`,
       severity: 'error',
     });
     return { manifest: null, diagnostics };
@@ -350,7 +342,10 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       curatedOriginPrefixes: params.curatedOriginPrefixes,
     });
 
-    const stagingDir = pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`);
+    const stagingDir = assertSafeRepositoryPath(
+      pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`),
+      { allowMissingLeaf: true }
+    );
     safeRmSync(stagingDir);
     stagePluginDirectory(path.resolve(params.sourcePath), stagingDir);
 

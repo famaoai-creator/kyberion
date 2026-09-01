@@ -1,4 +1,11 @@
-import { pathResolver, safeExistsSync, loadJson, safeWriteFile } from './intelligence-primitives';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  pathResolver,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from './intelligence-primitives';
 
 type BrowserSessionControlAction = 'close_browser_session' | 'restart_browser_session';
 
@@ -30,10 +37,22 @@ export function applyBrowserSessionControl(
   sessionId: string,
   action: BrowserSessionControlAction
 ): boolean {
-  const filePath = browserSessionPath(sessionId);
-  if (!safeExistsSync(filePath)) return false;
+  let filePath: string;
+  try {
+    filePath = assertSafeRepositoryPath(browserSessionPath(sessionId), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) return false;
+  } catch {
+    return false;
+  }
 
-  const record = loadJson<BrowserSessionRecord>(filePath);
+  let record: BrowserSessionRecord;
+  try {
+    record = loadJson<BrowserSessionRecord>(filePath);
+  } catch {
+    return false;
+  }
   const nextStatus = action === 'restart_browser_session' ? 'expired' : 'released';
   const nextRecord: BrowserSessionRecord = {
     ...record,

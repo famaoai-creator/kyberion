@@ -67,6 +67,16 @@ describe('su surface data', () => {
     expect(summary.missionBreakdown).toHaveLength(1);
   });
 
+  it('ignores malformed metric values without leaking NaN into the summary', () => {
+    const summary = buildCostSummary({
+      history: [{ mission_id: 'MSN-MALFORMED', usage: [], cost_usd: {} }],
+    });
+
+    expect(summary.totalTokens).toBe(0);
+    expect(summary.totalUsd).toBe(0);
+    expect(summary.missionBreakdown[0]?.usd).toBe(0);
+  });
+
   it('excludes unscoped and cross-tenant usage from a tenant cost view', () => {
     const summary = buildCostSummary({
       history: [

@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { evaluateMissionGate, recordMissionGateOverride } from './mission-gate-engine.js';
 
 const missionId = 'MSN-GATE-ENGINE-001';
@@ -212,6 +219,42 @@ describe('mission-gate-engine', () => {
       confirmed_by: 'operator',
       source_gate_id: 'manual-review',
     });
+  });
+
+  it('writes an explicit recordPath as a file and rejects symlinked deliverables', async () => {
+    const recordPath = `${missionPath}/gates/explicit-record.json`;
+    const recorded = await evaluateMissionGate({
+      missionId: missionId,
+      gate: { id: 'explicit-record', checks: [] },
+      recordPath,
+    });
+
+    expect(recorded.verdict).toBe('pass');
+    expect(recorded.evidence_path).toBe(recordPath);
+    expect(JSON.parse(String(safeReadFile(recordPath, { encoding: 'utf8' })))).toMatchObject({
+      mission_id: missionId,
+      gate_id: 'explicit-record',
+      verdict: 'pass',
+    });
+
+    const targetPath = `${missionPath}/evidence/real-report.md`;
+    const linkedPath = `${missionPath}/evidence/linked-report.md`;
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(targetPath, '# report');
+    safeSymlinkSync(targetPath, linkedPath);
+    try {
+      const rejected = await evaluateMissionGate({
+        missionId,
+        gate: {
+          id: 'symlink-deliverable',
+          checks: [{ kind: 'deliverable_quality', params: { path: linkedPath, kind: 'text' } }],
+        },
+      });
+      expect(rejected.verdict).toBe('fail');
+      expect(rejected.reasons.join(' ')).toContain('Deliverable not found');
+    } finally {
+      safeRmSync(linkedPath, { force: true });
+    }
   });
 
   it('evaluates software quality lifecycle and traceability checks', async () => {

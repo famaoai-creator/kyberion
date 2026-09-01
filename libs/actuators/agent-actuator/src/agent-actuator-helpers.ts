@@ -1,9 +1,11 @@
+import { logger } from '@agent/core/core';
+import { agentRegistry } from '@agent/core/agent-registry';
+import { a2aBridge, type A2AMessage } from '@agent/core/a2a-bridge';
 import {
-  logger,
-  agentRegistry,
-  a2aBridge,
   resolveMissionTeamPlan,
   getMissionTeamAssignment,
+} from '@agent/core/mission-team-plan-composer';
+import {
   ensureMissionTeamRuntimeViaSupervisor,
   enqueueMissionTeamPrewarmRequest,
   startAgentRuntimeSupervisorForRequest,
@@ -15,6 +17,8 @@ import {
   refreshAgentRuntime,
   restartAgentRuntime,
   askAgentRuntime,
+} from '@agent/core/agent-runtime-supervisor';
+import {
   ensureAgentRuntimeViaDaemon,
   askAgentRuntimeViaDaemon,
   getAgentRuntimeStatusViaDaemon,
@@ -22,17 +26,18 @@ import {
   shutdownAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
   restartAgentRuntimeViaDaemon,
-  getAgentExecutionPort,
+} from '@agent/core/agent-runtime-supervisor-client';
+import { getAgentExecutionPort, type AgentTaskEnvelope } from '@agent/core/agent-execution-port';
+import {
   delegateCoordinatedAgentTask,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+  type CoordinatedAgentTaskEnvelope,
+} from '@agent/core/coordinated-agent-execution-port';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import type { AgentProvider } from '@agent/core/agent-registry';
-import type { AgentTaskEnvelope, CoordinatedAgentTaskEnvelope } from '@agent/core';
-import type { A2AMessage } from '@agent/core/a2a-bridge';
 
 const AGENT_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/agent-actuator/manifest.json');
 const DEFAULT_AGENT_RETRY = {
@@ -87,14 +92,11 @@ export interface AgentPipelineDispatch {
   context?: Record<string, unknown>;
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: AGENT_MANIFEST_PATH,
-    defaults: DEFAULT_AGENT_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: AGENT_MANIFEST_PATH,
+  defaults: DEFAULT_AGENT_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
   const { action } = input;

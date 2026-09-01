@@ -1,41 +1,91 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { loadJson, logger, safeExistsSync, pathResolver } from '@agent/core';
+import { loadJson } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-pipeline-helpers.js';
 
-function getPasskeyPreset(provider?: string) {
-  const catalog = loadPasskeyProviderCatalog();
-  const presetKey = provider || catalog.default_provider || 'webauthn.io';
-  const preset = catalog.providers?.[presetKey];
-  if (!preset) {
-    throw new Error(`Unsupported passkey provider: ${presetKey}`);
-  }
-  return preset;
+export interface PasskeyProviderPreset {
+  baseUrl: string;
+  usernameSelector: string;
+  registerSelector: string;
+  authenticateSelector: string;
+  postAuthUrlIncludes?: string;
 }
 
-function loadPasskeyProviderCatalog(): {
+export interface PasskeyProviderCatalog {
   default_provider?: string;
-  providers: Record<string, any>;
-} {
-  const passkeyProviderCatalogPath = pathResolver.knowledge(
-    'product/orchestration/browser-passkey-providers.json'
-  );
-  if (safeExistsSync(passkeyProviderCatalogPath)) {
-    try {
-      const parsed = loadJson<{
-        default_provider?: string;
-        providers: Record<string, any>;
-      }>(passkeyProviderCatalogPath);
-      if (parsed && typeof parsed === 'object' && parsed.providers) return parsed;
-    } catch (err) {
-      logger.warn(
-        `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
-      );
-    }
+  providers: Record<string, PasskeyProviderPreset>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isSafeProviderKey(key: string): boolean {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Validate provider catalog data before selectors or URLs reach Playwright. */
+export function parsePasskeyProviderCatalog(value: unknown): PasskeyProviderCatalog | undefined {
+  if (!isRecord(value) || !isRecord(value.providers)) return undefined;
+  const defaultProvider = isNonEmptyString(value.default_provider)
+    ? value.default_provider
+    : undefined;
+  if (value.default_provider !== undefined && !defaultProvider) {
+    return undefined;
   }
 
+  const providers: Record<string, PasskeyProviderPreset> = {};
+  for (const [key, candidate] of Object.entries(value.providers)) {
+    if (!isSafeProviderKey(key) || !isRecord(candidate)) continue;
+    const baseUrl = isNonEmptyString(candidate.baseUrl) ? candidate.baseUrl : undefined;
+    const usernameSelector = isNonEmptyString(candidate.usernameSelector)
+      ? candidate.usernameSelector
+      : undefined;
+    const registerSelector = isNonEmptyString(candidate.registerSelector)
+      ? candidate.registerSelector
+      : undefined;
+    const authenticateSelector = isNonEmptyString(candidate.authenticateSelector)
+      ? candidate.authenticateSelector
+      : undefined;
+    const postAuthUrlIncludes =
+      candidate.postAuthUrlIncludes === undefined
+        ? undefined
+        : isNonEmptyString(candidate.postAuthUrlIncludes)
+          ? candidate.postAuthUrlIncludes
+          : null;
+    if (
+      !baseUrl ||
+      !usernameSelector ||
+      !registerSelector ||
+      !authenticateSelector ||
+      postAuthUrlIncludes === null
+    )
+      continue;
+    providers[key] = {
+      baseUrl,
+      usernameSelector,
+      registerSelector,
+      authenticateSelector,
+      ...(postAuthUrlIncludes ? { postAuthUrlIncludes } : {}),
+    };
+  }
+  if (Object.keys(providers).length === 0) return undefined;
+  return {
+    ...(defaultProvider ? { default_provider: defaultProvider } : {}),
+    providers,
+  };
+}
+
+function defaultPasskeyProviderCatalog(): PasskeyProviderCatalog {
   return {
     default_provider: 'webauthn.io',
     providers: {
@@ -48,6 +98,38 @@ function loadPasskeyProviderCatalog(): {
       },
     },
   };
+}
+
+function getPasskeyPreset(provider?: string) {
+  const catalog = loadPasskeyProviderCatalog();
+  const presetKey = provider || catalog.default_provider || 'webauthn.io';
+  const preset = catalog.providers?.[presetKey];
+  if (!preset) {
+    throw new Error(`Unsupported passkey provider: ${presetKey}`);
+  }
+  return preset;
+}
+
+function loadPasskeyProviderCatalog(): PasskeyProviderCatalog {
+  const passkeyProviderCatalogPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('product/orchestration/browser-passkey-providers.json'),
+    { allowMissingLeaf: true }
+  );
+  if (
+    safeExistsSync(passkeyProviderCatalogPath) &&
+    safeLstat(passkeyProviderCatalogPath).isFile()
+  ) {
+    try {
+      const parsed = parsePasskeyProviderCatalog(loadJson<unknown>(passkeyProviderCatalogPath));
+      if (parsed) return parsed;
+    } catch (err) {
+      logger.warn(
+        `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
+      );
+    }
+  }
+
+  return defaultPasskeyProviderCatalog();
 }
 
 export async function getOrCreatePageCdpSession(

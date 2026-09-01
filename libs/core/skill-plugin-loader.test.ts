@@ -5,14 +5,24 @@ import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { decideApprovalRequest, loadApprovalRequest } from './approval-store.js';
 import { installPluginManaged, refreshManagedPluginActivation } from './plugin-managed-install.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   evaluateSkillRestrictionRecords,
+  isSkillAllowed,
   authorizeConfiguredSkillPlugins,
   disposeSkillPluginContributions,
   fireSkillPluginHook,
   loadAuthorizedSkillPlugins,
+  normalizePluginContributionDeclaration,
   readSkillPluginsConfig,
+  SKILL_PLUGINS_CONFIG_FILENAME,
 } from './skill-plugin-loader.js';
 import { resolveActuatorOperation } from './actuator-op-registry.js';
 
@@ -66,6 +76,27 @@ afterEach(() => {
   });
 });
 
+describe('plugin contribution manifest boundary', () => {
+  it('normalizes declared contribution names and trims whitespace', () => {
+    expect(
+      normalizePluginContributionDeclaration({
+        ops: [' code:run ', 'code:run'],
+        facets: ['summary'],
+      })
+    ).toEqual({ ops: ['code:run', 'code:run'], facets: ['summary'] });
+  });
+
+  it('rejects non-object and malformed contribution declarations', () => {
+    expect(normalizePluginContributionDeclaration([])).toBeUndefined();
+    expect(() => normalizePluginContributionDeclaration({ ops: [''] })).toThrow(
+      'provides.ops must be a non-empty string array'
+    );
+    expect(() => normalizePluginContributionDeclaration({ hooks: [{ id: 'hook' }] })).toThrow(
+      'provides.hooks must be a non-empty string array'
+    );
+  });
+});
+
 /** Writes an ESM plugin whose hooks append to `markerPath` when actually called. */
 function writeHookPlugin(filePath: string, markerPath: string): void {
   safeMkdir(path.dirname(filePath), { recursive: true });
@@ -100,7 +131,9 @@ describe('loadAuthorizedSkillPlugins', () => {
     const cwd = cwdDir('contributions');
     writeConfig(cwd, [CONTRIBUTION_FIXTURE_PATH]);
 
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, undefined, undefined, {
+      trustResolved: true,
+    });
     expect(diagnostics).toHaveLength(0);
     expect(loaded).toHaveLength(1);
     expect(loaded[0]?.contributions?.registered.ops).toEqual(['fixture:run']);
@@ -121,7 +154,9 @@ describe('loadAuthorizedSkillPlugins', () => {
     const cwd = cwdDir('official');
     writeConfig(cwd, [OFFICIAL_FIXTURE_PATH]);
 
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, undefined, undefined, {
+      trustResolved: true,
+    });
     expect(diagnostics).toHaveLength(0);
     expect(loaded).toHaveLength(1);
 
@@ -142,7 +177,9 @@ describe('loadAuthorizedSkillPlugins', () => {
     const cwd = cwdDir('unmanaged');
     writeConfig(cwd, [pluginFile]);
 
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, undefined, undefined, {
+      trustResolved: true,
+    });
     expect(loaded).toHaveLength(0);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.allowed).toBe(false);
@@ -207,7 +244,9 @@ describe('loadAuthorizedSkillPlugins', () => {
     const cwd = cwdDir('approved');
     writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
 
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot, undefined, {
+      trustResolved: true,
+    });
     expect(diagnostics).toHaveLength(0);
     expect(loaded).toHaveLength(1);
 
@@ -233,7 +272,9 @@ describe('loadAuthorizedSkillPlugins', () => {
     const cwd = cwdDir('pending');
     writeConfig(cwd, [path.join(record.managedPath, 'index.mjs')]);
 
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, managedRoot, undefined, {
+      trustResolved: true,
+    });
     expect(loaded).toHaveLength(0);
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.reason).toMatch(/not activatable/);
@@ -244,7 +285,9 @@ describe('loadAuthorizedSkillPlugins', () => {
   it('an absent .kyberion-plugins.json degrades to no plugins, not an error', async () => {
     const cwd = cwdDir('no-config');
     safeMkdir(cwd, { recursive: true });
-    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd, undefined, undefined, {
+      trustResolved: true,
+    });
     expect(loaded).toHaveLength(0);
     expect(diagnostics).toHaveLength(0);
   });
@@ -267,6 +310,27 @@ describe('loadAuthorizedSkillPlugins', () => {
     ]);
     expect(diagnostics[0]?.reason).toMatch(/trust is unresolved/);
     expect(safeExistsSync(markerPath)).toBe(false);
+  });
+
+  it('fails closed when the project plugin configuration traverses a symlink', () => {
+    const cwd = cwdDir('symlinked-config');
+    const targetDir = sourceDir('symlinked-config-target');
+    const targetConfig = path.join(targetDir, SKILL_PLUGINS_CONFIG_FILENAME);
+    safeMkdir(targetDir, { recursive: true });
+    safeWriteFile(targetConfig, JSON.stringify({ plugins: [OFFICIAL_FIXTURE_PATH] }));
+    safeMkdir(cwd, { recursive: true });
+    safeSymlinkSync(targetConfig, path.join(cwd, SKILL_PLUGINS_CONFIG_FILENAME));
+
+    expect(readSkillPluginsConfig(cwd)).toEqual([]);
+  });
+
+  it('fails closed when the trust decision is omitted', async () => {
+    const cwd = cwdDir('implicit-pre-trust');
+    writeConfig(cwd, [CONTRIBUTION_FIXTURE_PATH]);
+
+    const { loaded, diagnostics } = await loadAuthorizedSkillPlugins(cwd);
+    expect(loaded).toHaveLength(0);
+    expect(diagnostics[0]?.reason).toMatch(/trust is unresolved/);
   });
 });
 describe('restricted skill policy', () => {
@@ -297,6 +361,25 @@ describe('restricted skill policy', () => {
       'plugin-a',
       'plugin-b',
     ]);
+  });
+
+  it('fails closed when the governed restricted-skills catalog is invalid', () => {
+    const rootDir = tracked(
+      pathResolver.sharedTmp(
+        `skill-plugin-loader-test/${process.pid}-invalid-policy-${randomUUID()}`
+      )
+    );
+    const policyDir = path.join(rootDir, 'knowledge/product/governance');
+    safeMkdir(policyDir, { recursive: true });
+    safeWriteFile(
+      path.join(policyDir, 'restricted-skills.json'),
+      JSON.stringify({ version: '1.0', restrictions: [{ name: 'deploy' }] })
+    );
+
+    expect(isSkillAllowed('deploy', undefined, rootDir)).toMatchObject({
+      allowed: false,
+      reason: 'restricted-skills policy is unreadable',
+    });
   });
 
   it('rejects a plugin overlay that would introduce an undeclared resource', () => {

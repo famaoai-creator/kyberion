@@ -1,11 +1,7 @@
-import {
-  createStandardYargs,
-  logger,
-  formatMeshHubInspectionReport,
-  inspectMeshHub,
-} from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { formatMeshHubInspectionReport, inspectMeshHub } from '@agent/core/mesh-hub-inspection';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type MeshHubInspectionSection =
   'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters' | 'topics';
@@ -58,8 +54,8 @@ function renderSection(
   }
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = createStandardYargs(['node', 'mesh_hub_inspect', ...args])
     .scriptName('mesh_hub_inspect')
     .usage('$0 [section]')
     .positional('section', {
@@ -101,13 +97,16 @@ async function main(): Promise<void> {
   }
 }
 
+export { main as runMeshHubInspect };
+
+export const runMeshHubInspectScript = defineScript({
+  name: 'mesh-hub:inspect',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'mesh_hub_inspect.ts') ||
   isDirectScript(import.meta.url, 'mesh_hub_inspect.js')
 )
-  void main().catch((error) => {
-    logger.error(error?.message ?? String(error));
-    process.exitCode = 1;
-  });
-
-export { main as runMeshHubInspect };
+  void runMeshHubInspectScript();

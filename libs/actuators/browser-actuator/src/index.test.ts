@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
 const REPO_ROOT = process.cwd();
 
@@ -156,8 +162,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {
     ...actual,
     safeExistsSync: mocks.safeExistsSync,
@@ -169,6 +175,16 @@ vi.mock('@agent/core', async (importOriginal) => {
     secureFetch: mocks.secureFetch,
     retry: mocks.retry,
   };
+});
+
+vi.mock('@agent/core/network', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/network')>();
+  return { ...actual, secureFetch: mocks.secureFetch };
+});
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
+  return { ...actual, retry: mocks.retry };
 });
 
 vi.mock('@playwright/test', async () => {
@@ -187,6 +203,19 @@ describe('browser-actuator v3 contract', () => {
     const { resetBrowserRuntimeLeasesForTest } = await import('./index');
     await resetBrowserRuntimeLeasesForTest();
     vi.clearAllMocks();
+  });
+
+  it('rejects a browser profile path outside the repository before launching', async () => {
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({
+        action: 'pipeline',
+        session_id: 'browser-path-boundary',
+        steps: [],
+        options: { headless: true, user_data_dir: '/tmp/external-browser-profile' },
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.launchPersistentContext).not.toHaveBeenCalled();
   });
 
   it('uses the manifest recovery policy for ref interactions', async () => {

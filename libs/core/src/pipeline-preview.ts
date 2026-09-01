@@ -1,4 +1,8 @@
-import { safeReadFile, safeExistsSync } from '../secure-io.js';
+import * as path from 'node:path';
+import { safeExistsSync } from '../secure-io.js';
+import { safeLstat } from '../secure-io.js';
+import { readJson } from '../foundation/json.js';
+import { validatePipelineAdf } from '../pipeline-contract.js';
 import { pathResolver } from '../path-resolver.js';
 import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
 
@@ -28,6 +32,39 @@ export interface PipelinePreview {
     edges: GraphEdge[];
     mermaid: string;
   };
+}
+
+/** Validate a preview resource before it is exposed to the operator/model. */
+export function assertPipelinePreviewResourcePath(filePath: string): void {
+  const root = path.resolve(pathResolver.rootDir());
+  const absolute = path.resolve(filePath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(
+      `[PIPELINE_PREVIEW_SCOPE] resource is outside the repository root: ${filePath}`
+    );
+  }
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) {
+        throw new Error(
+          `[PIPELINE_PREVIEW_SCOPE] resource cannot traverse a symbolic link: ${relative}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[PIPELINE_PREVIEW_SCOPE]')) {
+        throw error;
+      }
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new Error(`[PIPELINE_PREVIEW_SCOPE] resource does not exist: ${filePath}`);
+      }
+      throw new Error(
+        `[PIPELINE_PREVIEW_SCOPE] resource could not be inspected safely: ${relative}`
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -180,11 +217,11 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   // Check ref paths
   if (step.op === 'ref' && step.params?.path) {
     const refPathRaw = String(step.params.path).replace(/\{\{[^}]+\}\}/g, '_');
-    const refPath = pathResolver.rootResolve(refPathRaw);
     try {
-      const content = safeReadFile(refPath, { encoding: 'utf8' }) as string;
-      const subPipeline = JSON.parse(content);
-      if (subPipeline.steps) {
+      const refPath = pathResolver.rootResolve(refPathRaw);
+      assertPipelinePreviewResourcePath(refPath);
+      const subPipeline = validatePipelineAdf(readJson<unknown>(refPath));
+      if (subPipeline.steps.length > 0) {
         const children = subPipeline.steps.map((s: any, j: number) =>
           previewStep(s, j, { ...ctx, ...step.params?.bind })
         );
@@ -199,8 +236,15 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
   // Check on_error
   if (step.on_error) {
     if (step.on_error.ref) {
-      const errRefPath = pathResolver.rootResolve(step.on_error.ref);
-      if (!safeExistsSync(errRefPath)) {
+      let safe = true;
+      try {
+        const errRefPath = pathResolver.rootResolve(step.on_error.ref);
+        assertPipelinePreviewResourcePath(errRefPath);
+        if (!safeExistsSync(errRefPath)) safe = false;
+      } catch {
+        safe = false;
+      }
+      if (!safe) {
         ps.warnings.push(`on_error ref path not found: ${step.on_error.ref}`);
       }
     }

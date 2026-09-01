@@ -32,7 +32,7 @@ The canonical first-win command sequence is deliberately short:
 ```bash
 pnpm install
 pnpm build
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
@@ -42,7 +42,7 @@ git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
 pnpm build
-pnpm prereq:check     # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm env:bootstrap --manifest kyberion-toolchain     # verifies Node 24+ floor; warns if Playwright browsers are missing
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
@@ -52,10 +52,10 @@ pnpm pipeline --input pipelines/verify-session.json
 For a solo founder whose main workforce is AI, run the company onboarding flow after the build:
 
 ```bash
-pnpm company:onboard --vertical saas-product-company --slug acme-ai \
+pnpm onboard company --vertical saas-product-company --slug acme-ai \
   --name "ACME AI" --owner-id human:founder \
   --goal "Define the first customer outcome and launch plan" --dry-run
-pnpm company:onboard --vertical saas-product-company --slug acme-ai \
+pnpm onboard company --vertical saas-product-company --slug acme-ai \
   --name "ACME AI" --owner-id human:founder \
   --goal "Define the first customer outcome and launch plan"
 ```
@@ -88,7 +88,7 @@ pnpm onboarding:context first-work --customer-slug acme-ai \
 If you already have an onboarding payload, use Path B instead of the wizard:
 
 ```bash
-pnpm onboard:apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
 ```
 
 Copy the template, edit it, and rerun without `--dry-run` when you are ready to apply it.
@@ -121,7 +121,7 @@ pnpm pipeline --input pipelines/voice-hello.json
 The browser session smoke writes `active/shared/tmp/first-win-session.png`.
 If browser launch is blocked, the pipeline now automatically falls back to `active/shared/tmp/first-win-fallback.txt`.
 
-If the smoke fails because a surface looks stale or a permission is missing, open [docs/user/TROUBLESHOOTING.md](./user/TROUBLESHOOTING.md) and run `pnpm surfaces:repair` or `pnpm setup:report --persona first-time-user` before retrying.
+If the smoke fails because a surface looks stale or a permission is missing, open [docs/user/TROUBLESHOOTING.md](./user/TROUBLESHOOTING.md) and run `pnpm surfaces repair` or `pnpm setup:report --persona first-time-user` before retrying.
 
 After the screenshot exists, spend the remaining 10 minutes on structure:
 
@@ -305,8 +305,8 @@ When you need to operate internals directly:
 ```bash
 pnpm doctor
 pnpm capabilities
-pnpm run cli -- list
-pnpm run cli -- search browser
+pnpm run kyberion -- list
+pnpm run kyberion -- search browser
 ```
 
 ### Mission lifecycle

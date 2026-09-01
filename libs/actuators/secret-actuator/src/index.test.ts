@@ -2,7 +2,8 @@ import path from 'node:path';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import * as pathResolver from '@agent/core/path-resolver';
 
 const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
@@ -17,14 +18,42 @@ const mocks = vi.hoisted(() => ({
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
   return {
-    ...(actual as any),
+    ...actual,
     safeExec: mocks.safeExec,
+  };
+});
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/async-utils')>();
+  return {
+    ...actual,
     retry: mocks.retry,
+  };
+});
+
+vi.mock('@agent/core/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/core')>();
+  return {
+    ...actual,
     logger: mocks.logger,
-    ledger: { record: mocks.ledgerRecord },
+  };
+});
+
+vi.mock('@agent/core/ledger', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/ledger')>();
+  return {
+    ...actual,
+    ledger: { ...actual.ledger, record: mocks.ledgerRecord },
+  };
+});
+
+vi.mock('@agent/core/secret-bridge', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secret-bridge')>();
+  return {
+    ...actual,
     fetchSecret: mocks.fetchSecret,
     storeSecret: mocks.storeSecret,
     removeSecret: mocks.removeSecret,

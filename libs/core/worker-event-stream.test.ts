@@ -8,6 +8,7 @@ const secureIo = vi.hoisted(() => {
   const abs = (filePath: string) =>
     path.isAbsolute(filePath) ? filePath : path.join(process.env.KYBERION_ROOT || '', filePath);
   return {
+    assertSafeRepositoryPath: (filePath: string) => filePath,
     safeAppendFileSync: (filePath: string, data: string) => {
       fs.mkdirSync(path.dirname(abs(filePath)), { recursive: true });
       fs.appendFileSync(abs(filePath), data, 'utf8');

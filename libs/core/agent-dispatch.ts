@@ -1,4 +1,4 @@
-import { a2aBridge } from './a2a-bridge.js';
+import { getA2ARoute } from './a2a-route-port.js';
 import { logger } from './core.js';
 import { deriveAgentNhiId } from './agent-identity.js';
 import {
@@ -39,6 +39,7 @@ import type {
 import { createDelegationHandle, type DelegationHandle } from './delegated-task-observability.js';
 import { runOpPreflight } from './op-preflight.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -215,7 +216,7 @@ export class InSessionDispatcher implements AgentDispatcher {
     this.pendingRepeatReminder = undefined;
 
     try {
-      const result = await backend.generateWithTools(fullPrompt, [invokeAgentTool]);
+      const result = await backend.generateWithTools(fullPrompt, [invokeAgentTool], options);
       const toolCall = result.toolCalls?.find((tc) => tc.name === 'invoke_agent');
       if (toolCall) {
         const decision = advanceToolCallRepeatGovernor(
@@ -230,7 +231,6 @@ export class InSessionDispatcher implements AgentDispatcher {
           logger.error(
             `[agent-dispatch:in-session] invoke_agent repeated ${decision.streak}x with identical arguments — breaking the loop via process-spawn fallback.`
           );
-          const { recordGovernanceAction } = await import('./kill-switch.js');
           recordGovernanceAction(
             'agent-dispatch:in-session',
             'tool_call_repeat_force_stop',
@@ -288,7 +288,11 @@ export class InSessionDispatcher implements AgentDispatcher {
   /** Route the task to a sub-agent within the same process via the A2A bridge. */
   private async routeToSubAgent(agentName: string, prompt: string): Promise<string> {
     logger.info(`[agent-dispatch:in-session] Waking up sub-agent: ${agentName} via A2A Bridge...`);
-    const response = await a2aBridge.route({
+    const route = getA2ARoute();
+    if (!route) {
+      throw new Error('[A2A_ROUTE_UNAVAILABLE] A2A route is not registered');
+    }
+    const response = await route({
       a2a_version: '1.1',
       header: {
         msg_id: `insession-${Date.now()}`,
@@ -786,9 +790,13 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
       if (text) yield text;
     })();
   }
-  generateWithTools(prompt: string, tools: ToolDefinition[]): Promise<GenerateWithToolsResult> {
-    if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools);
-    return this.base.prompt(prompt).then((text) => ({ text }));
+  generateWithTools(
+    prompt: string,
+    tools: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): Promise<GenerateWithToolsResult> {
+    if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools, options);
+    return this.base.prompt(prompt, options).then((text) => ({ text }));
   }
 }
 

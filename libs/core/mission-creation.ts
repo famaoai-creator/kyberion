@@ -23,10 +23,15 @@ import { loadOrganizationProfile } from './organization-profile.js';
 import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
 import { consumeIntentGoalHandoff } from './intent-handoff.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
 import { withExecutionContext } from './authority.js';
-import { readJsonFile } from './cli-input.js';
 import { getCurrentBranch, getGitHash, initMissionRepo } from './mission-git.js';
 import { applyProcessTemplatePlan } from './mission-process-planning.js';
 import {
@@ -41,6 +46,53 @@ import { syncRoleProcedure } from './mission-governance.js';
 import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+
+const MISSION_TEMPLATES_PATH = pathResolver.knowledge('product/governance/mission-templates.json');
+const MISSION_TEMPLATES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-template.schema.json'
+);
+
+interface MissionTemplateFile {
+  path: string;
+  content_template: string;
+}
+
+interface MissionTemplate {
+  name: string;
+  knowledge_injections?: KnowledgeInjectionDeclaration[];
+  files: MissionTemplateFile[];
+}
+
+export interface MissionTemplateCatalog {
+  templates: MissionTemplate[];
+}
+
+const missionTemplateCatalog = defineCatalog<MissionTemplateCatalog>({
+  id: 'mission-templates',
+  path: MISSION_TEMPLATES_PATH,
+  schema: MISSION_TEMPLATES_SCHEMA_PATH,
+});
+
+export function validateMissionTemplateCatalog(
+  value: unknown,
+  label = MISSION_TEMPLATES_PATH
+): MissionTemplateCatalog {
+  return missionTemplateCatalog.validate(value, label);
+}
+
+export function loadMissionTemplateCatalog(): MissionTemplateCatalog {
+  return missionTemplateCatalog.load();
+}
+
+function resolveMissionTemplateFilePath(missionDir: string, templatePath: string): string {
+  const basePath = assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+  const targetPath = path.resolve(basePath, templatePath);
+  if (targetPath !== basePath && !targetPath.startsWith(`${basePath}${path.sep}`)) {
+    throw new Error(`Mission template file path escapes mission directory: ${templatePath}`);
+  }
+  return assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
+}
 
 function normalizeTenantSlug(value: string | undefined | null): string | undefined {
   if (!value) return undefined;
@@ -203,15 +255,8 @@ export async function createMission(args: {
   const intentHandoff = intentGoalPath ? consumeIntentGoalHandoff(intentGoalPath) : null;
   const normalizedRelationships = normalizeRelationships(relationships);
   const organizationProfile = loadOrganizationProfile(rootDir);
-  const templatePath = pathResolver.knowledge('product/governance/mission-templates.json');
-  const templates = readJsonFile<{
-    templates: Array<{
-      name?: string;
-      knowledge_injections?: KnowledgeInjectionDeclaration[];
-      files: Array<{ content_template: string; path: string }>;
-    }>;
-  }>(templatePath).templates;
-  const template = templates.find((entry: any) => entry.name === missionType) || templates[0];
+  const templates = loadMissionTemplateCatalog().templates;
+  const template = templates.find((entry) => entry.name === missionType) || templates[0];
 
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
   const missionBaseDir = isEphemeral
@@ -219,10 +264,16 @@ export async function createMission(args: {
     : tenantSlug
       ? tenantMissionDir(upperId, tenantSlug, finalTier)
       : resolveMissionDir(upperId, finalTier);
-  const missionDir = isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir;
+  const missionDir = assertSafeRepositoryPath(
+    isEphemeral ? path.join(missionBaseDir, upperId) : missionBaseDir,
+    { allowMissingLeaf: true }
+  );
 
   if (!safeExistsSync(missionDir)) safeMkdir(missionDir, { recursive: true });
-  if (safeExistsSync(path.join(missionDir, 'mission-state.json'))) {
+  const missionStatePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(missionStatePath)) {
     logger.info(`Mission ${upperId} already exists at ${missionDir}.`);
     return;
   }
@@ -244,7 +295,7 @@ export async function createMission(args: {
       .replace(/{BRANCH}/g, gitBranch)
       .replace(/{HASH}/g, gitHash)
       .replace(/{NOW}/g, now);
-    safeWriteFile(path.join(missionDir, file.path), content);
+    safeWriteFile(resolveMissionTemplateFilePath(missionDir, file.path), content);
   }
 
   const teamPlan = composeMissionTeamPlan({
@@ -274,14 +325,15 @@ export async function createMission(args: {
     : undefined;
   if (classification && workflowDesign) {
     const taskBoardPath = path.join(missionDir, 'TASK_BOARD.md');
-    if (safeExistsSync(taskBoardPath)) {
-      const board = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
+    const safeTaskBoardPath = assertSafeRepositoryPath(taskBoardPath, { allowMissingLeaf: true });
+    if (safeExistsSync(safeTaskBoardPath)) {
+      const board = safeReadFile(safeTaskBoardPath, { encoding: 'utf8' }) as string;
       const headerLine =
         `> Class: \`${classification.mission_class}\` (risk: ${classification.risk_profile}) · ` +
         `Process: \`${workflowDesign.workflow_id}\` — ${workflowDesign.phases.join(' → ')}`;
       const lines = board.split('\n');
       lines.splice(1, 0, '', headerLine);
-      safeWriteFile(taskBoardPath, lines.join('\n'));
+      safeWriteFile(safeTaskBoardPath, lines.join('\n'));
     }
 
     // The task-board header is a one-line summary; this is the queryable
@@ -296,7 +348,9 @@ export async function createMission(args: {
       stage: classification.stage,
     });
     safeWriteFile(
-      path.join(missionDir, 'mission-workflow.json'),
+      assertSafeRepositoryPath(path.join(missionDir, 'mission-workflow.json'), {
+        allowMissingLeaf: true,
+      }),
       JSON.stringify(
         { classification, workflow_design: workflowDesign, review_design: reviewDesign },
         null,
@@ -321,10 +375,15 @@ export async function createMission(args: {
     }
   }
 
-  const evidenceDir = path.join(missionDir, 'evidence');
+  const evidenceDir = assertSafeRepositoryPath(path.join(missionDir, 'evidence'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(evidenceDir)) {
     safeMkdir(evidenceDir, { recursive: true });
-    safeWriteFile(path.join(evidenceDir, '.gitkeep'), '');
+    safeWriteFile(
+      assertSafeRepositoryPath(path.join(evidenceDir, '.gitkeep'), { allowMissingLeaf: true }),
+      ''
+    );
     logger.info(`📁 [Architecture] Created evidence directory for mission ${upperId}.`);
   }
 
@@ -336,7 +395,9 @@ export async function createMission(args: {
   try {
     const { initMissionMemory } = await import(
       /* webpackIgnore: true */
-      pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
+      assertSafeRepositoryPath(
+        pathResolver.rootResolve('dist/libs/actuators/working-memory-actuator/src/index.js')
+      )
     );
     initMissionMemory({ missionId: upperId, tier: finalTier });
     logger.info(`📝 [WorkingMemory] Volatile memory faces initialized for ${upperId}.`);

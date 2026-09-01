@@ -23,7 +23,7 @@ import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -132,7 +132,9 @@ function normalizeDeploymentProjectName(value: string): string {
 function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {
   const explicitPath = env.KYBERION_DEPLOY_CONFIG_PATH?.trim();
   if (explicitPath) {
-    return pathResolver.resolve(explicitPath);
+    return assertSafeRepositoryPath(pathResolver.resolve(explicitPath), {
+      allowMissingLeaf: true,
+    });
   }
   const projectName = normalizeDeploymentProjectName(
     env.KYBERION_DEPLOY_PROJECT ||
@@ -141,7 +143,10 @@ function resolveDeploymentConfigPath(env: NodeJS.ProcessEnv): string | null {
       'default'
   );
   if (!projectName) return null;
-  return pathResolver.knowledge(path.join('personal/deployments', `${projectName}.json`));
+  return assertSafeRepositoryPath(
+    pathResolver.knowledge(path.join('personal/deployments', `${projectName}.json`)),
+    { allowMissingLeaf: true }
+  );
 }
 
 function loadShellDeploymentAdapterConfig(

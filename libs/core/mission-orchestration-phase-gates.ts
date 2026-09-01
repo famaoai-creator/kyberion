@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import {
   evaluateMissionGate,
   writeMissionGateRecord,
@@ -5,10 +6,20 @@ import {
 } from './mission-gate-engine.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
-import { missionDir } from './path-resolver.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+
+function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
+  const missionPath = assertSafeRepositoryPath(
+    findMissionPath(missionId) || missionDir(missionId, 'public'),
+    { allowMissingLeaf }
+  );
+  return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
+    allowMissingLeaf,
+  });
+}
 
 export type MissionGateRecord = {
   gate_id?: string;
@@ -33,10 +44,10 @@ export interface PhaseExitGateOutcome {
 }
 
 export function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
-  const statePath = `${missionDir(missionId, 'public')}/mission-state.json`;
+  const statePath = safeMissionPath(missionId, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
   try {
-    const parsed = loadJson<unknown>(statePath);
+    const parsed = readJson<unknown>(statePath);
     return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
   } catch {
     return null;
@@ -60,13 +71,13 @@ export function missionRiskProfileOf(missionId: string): string | undefined {
 }
 
 function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
-  const gateDir = `${missionDir(missionId, 'public')}/gates`;
+  const gateDir = safeMissionPath(missionId, 'gates');
   if (!safeExistsSync(gateDir)) return [];
   return safeReaddir(gateDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = loadJson<unknown>(`${gateDir}/${entry}`);
+        const parsed = readJson<unknown>(assertSafeRepositoryPath(path.join(gateDir, entry)));
         return parsed && typeof parsed === 'object' ? (parsed as MissionGateRecord) : null;
       } catch {
         return null;
@@ -112,13 +123,13 @@ export function resolvePhaseGateMode(): 'off' | 'warn' | 'enforce' {
 }
 
 export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPhaseGateDefinition[] {
-  const defsDir = `${missionDir(missionId, 'public')}/gates/definitions`;
+  const defsDir = safeMissionPath(missionId, path.join('gates', 'definitions'));
   if (!safeExistsSync(defsDir)) return [];
   return safeReaddir(defsDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = readJson<unknown>(`${defsDir}/${entry}`);
+        const parsed = readJson<unknown>(assertSafeRepositoryPath(path.join(defsDir, entry)));
         if (!parsed || typeof parsed !== 'object') return null;
         const gate = (parsed as Record<string, unknown>).gate;
         if (!gate || typeof gate !== 'object') return null;
@@ -138,10 +149,10 @@ function enrichGateWithTaskOutcomes(
   missionId: string,
   gate: MissionGateDefinition
 ): MissionGateDefinition {
-  const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+  const nextTasksPath = safeMissionPath(missionId, 'NEXT_TASKS.json');
   let tasks: Array<Record<string, unknown>> = [];
   try {
-    const parsed = loadJson<unknown>(nextTasksPath);
+    const parsed = readJson<unknown>(nextTasksPath);
     if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
   } catch {
     /* no task board — checks keep their declared params */
@@ -194,13 +205,13 @@ export async function evaluateMissionPhaseExitGates(
         : await evaluateMissionGate({
             missionId,
             gate: enrichGateWithTaskOutcomes(missionId, definition.gate),
-            evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+            evidenceDir: safeMissionPath(missionId, 'gates'),
           });
     if (definition.gate.id === 'INTENT_DRIFT' && driftSummary) {
       writeMissionGateRecord({
         missionId,
         gateId: 'INTENT_DRIFT',
-        evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+        evidenceDir: safeMissionPath(missionId, 'gates'),
         payload: {
           phase: definition.phase,
           position: 'exit',
@@ -231,7 +242,7 @@ export async function evaluateMissionPhaseExitGates(
     writeMissionGateRecord({
       missionId,
       gateId: 'INTENT_DRIFT',
-      evidenceDir: `${missionDir(missionId, 'public')}/gates`,
+      evidenceDir: safeMissionPath(missionId, 'gates'),
       payload: {
         phase: latestSnapshot(missionId)?.stage || 'execution',
         position: 'exit',

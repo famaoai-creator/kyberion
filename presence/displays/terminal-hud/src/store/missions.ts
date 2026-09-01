@@ -3,7 +3,8 @@ import {
   buildMissionStatusView,
   type MissionSummary,
 } from '@agent/core/mission-read-model';
-import { currentScope, pathResolver, type ScopeContext } from '@agent/core';
+import { currentScope, type ScopeContext } from '@agent/core/scope-context';
+import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { DetailLine, PanelViewModel } from './types.js';

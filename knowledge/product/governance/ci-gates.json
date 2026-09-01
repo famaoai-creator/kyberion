@@ -35,6 +35,14 @@
       "rationale": "Keeps deterministic pipeline output snapshots stable in every validation scope."
     },
     {
+      "id": "memory-benchmark",
+      "scope": "pr",
+      "executable": "node",
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/benchmark_memory.ts"],
+      "owner": "quality",
+      "rationale": "Runs the deterministic QM-03 V-layer notebook fold and consolidation benchmark in the governed check lane."
+    },
+    {
       "id": "foundation-adoption",
       "scope": "pr",
       "executable": "node",
@@ -617,26 +625,6 @@
       "workflow": ".github/workflows/pr-validation.yml",
       "script": "check:pr-title",
       "reason": "Pull-request metadata is evaluated before repository gates."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:contract-schemas",
-      "reason": "Cross-platform contract smoke runs on every supported runner."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:contract-semver",
-      "reason": "Cross-platform contract compatibility smoke runs on every supported runner."
-    },
-    {
-      "workflow": ".github/workflows/cross-os.yml",
-      "script": "check:pipeline-shell-independence",
-      "reason": "Cross-platform shell-independence smoke runs on Unix runners."
-    },
-    {
-      "workflow": ".github/workflows/ci.yml",
-      "script": "check:first-win-smoke",
-      "reason": "Clean-clone first-win job validates the documented entry path."
     }
   ]
 }

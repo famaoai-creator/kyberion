@@ -1,13 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
-import { createAjv } from './foundation/ajv.js';
-
-const ajv = createAjv();
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-addFormats(ajv);
+import { compileSchema } from './foundation/ajv.js';
 
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-recording.schema.json');
 
@@ -65,7 +59,7 @@ export interface ServiceRecording {
 let validator: ValidateFunction | null = null;
 function getValidator(): ValidateFunction {
   if (!validator) {
-    validator = ajv.compile(loadJson<Record<string, unknown>>(SCHEMA_PATH));
+    validator = compileSchema(SCHEMA_PATH);
   }
   return validator;
 }

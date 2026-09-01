@@ -1,6 +1,7 @@
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import { collectIntentTraceReport, renderIntentTraceReport } from './intent.js';
 import type { MissionState } from './refactor/mission-types.js';
 
@@ -86,32 +87,36 @@ describe('intent trace', () => {
 
     safeWriteFile(
       traceFile,
-      JSON.stringify({
-        traceId: 'trace-1',
-        rootSpan: {
-          spanId: 'span-root',
-          name: 'intent-trace',
-          startTime: '2026-07-06T09:03:00.000Z',
-          endTime: '2026-07-06T09:04:00.000Z',
-          status: 'ok',
-          events: [
-            {
-              name: 'execute',
-              timestamp: '2026-07-06T09:03:30.000Z',
-              attributes: { correlationId },
-            },
-          ],
-          artifacts: [],
-          knowledgeRefs: [],
-          children: [],
-        },
-        metadata: {
-          missionId: 'MSN-001',
-          correlationId,
-          startedAt: '2026-07-06T09:03:00.000Z',
-          completedAt: '2026-07-06T09:04:00.000Z',
-        },
-      }) + '\n'
+      [
+        JSON.stringify({
+          traceId: 'trace-1',
+          rootSpan: {
+            spanId: 'span-root',
+            name: 'pipeline:intent-trace',
+            startTime: '2026-07-06T09:03:00.000Z',
+            endTime: '2026-07-06T09:04:00.000Z',
+            status: 'ok',
+            events: [
+              {
+                name: 'execute',
+                timestamp: '2026-07-06T09:03:30.000Z',
+                attributes: { correlationId },
+              },
+            ],
+            artifacts: [],
+            knowledgeRefs: [],
+            children: [],
+          },
+          metadata: {
+            missionId: 'MSN-001',
+            correlationId,
+            startedAt: '2026-07-06T09:03:00.000Z',
+            completedAt: '2026-07-06T09:04:00.000Z',
+          },
+        }),
+        JSON.stringify({ traceId: 'malformed-trace', rootSpan: { status: 'ok' } }),
+        JSON.stringify(['invalid-trace-root']),
+      ].join('\n') + '\n'
     );
 
     const report = collectIntentTraceReport(correlationId, {
@@ -162,5 +167,32 @@ describe('intent trace', () => {
     expect(rendered).toContain('mission=MSN-001');
     expect(rendered).toContain('trace=trace-1');
     expect(rendered).not.toContain('/Users/');
+  });
+
+  it('keeps intent CLI output behind the shared script harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/intent.ts'), { encoding: 'utf8' })
+    );
+
+    expect(source).toContain('runIntent = defineScript');
+    expect(source).toContain('print(serializeJsonReport(report))');
+    expect(source).not.toContain('console.log(');
+    expect(source).not.toContain('console.error(');
+  });
+
+  it('ignores trace directories that traverse a symbolic link', () => {
+    const target = path.join(FIXTURE_ROOT, 'trace-target');
+    const linked = path.join(FIXTURE_ROOT, 'trace-linked');
+    safeMkdir(target, { recursive: true });
+    fs.symlinkSync(target, linked, 'dir');
+
+    try {
+      const report = collectIntentTraceReport('corr-intent-trace-symlink', {
+        traceDir: linked,
+      });
+      expect(report.traces).toEqual([]);
+    } finally {
+      fs.unlinkSync(linked);
+    }
   });
 });

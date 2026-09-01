@@ -1,7 +1,8 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, safeReadFile } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { safeReadFile } from '@agent/core/secure-io';
 import { describe, expect, it } from 'vitest';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
@@ -12,14 +13,26 @@ describe('web theme pack schema', () => {
     const root = process.cwd();
     const ajv = new Ajv({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/web-theme-pack.schema.json'));
-    const example = JSON.parse(safeReadFile(path.resolve(root, 'knowledge/product/schemas/web-theme-pack.example.json'), { encoding: 'utf8' }) as string);
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/web-theme-pack.schema.json')
+    );
+    const example = JSON.parse(
+      safeReadFile(path.resolve(root, 'knowledge/product/schemas/web-theme-pack.example.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
 
     expect(validate(example)).toBe(true);
   });
 
   it('threads the web design theme into the web concept pipeline', () => {
-    const pipeline = JSON.parse(safeReadFile(path.resolve(process.cwd(), 'knowledge/product/pipeline-templates/build-web-concept.json'), { encoding: 'utf8' }) as string);
+    const pipeline = JSON.parse(
+      safeReadFile(
+        path.resolve(process.cwd(), 'knowledge/product/pipeline-templates/build-web-concept.json'),
+        { encoding: 'utf8' }
+      ) as string
+    );
     const renderPreview = pipeline.steps?.find((step: any) => step.id === 'render_preview');
     const includeParams = renderPreview?.params || {};
 
@@ -32,8 +45,24 @@ describe('web theme pack schema', () => {
   });
 
   it('routes web imports through the web theme pack branch', () => {
-    const extractTheme = JSON.parse(safeReadFile(path.resolve(process.cwd(), 'knowledge/product/pipeline-templates/extract-brand-theme.json'), { encoding: 'utf8' }) as string);
-    const importHtml = JSON.parse(safeReadFile(path.resolve(process.cwd(), 'knowledge/product/pipeline-templates/import-brand-from-html.json'), { encoding: 'utf8' }) as string);
+    const extractTheme = JSON.parse(
+      safeReadFile(
+        path.resolve(
+          process.cwd(),
+          'knowledge/product/pipeline-templates/extract-brand-theme.json'
+        ),
+        { encoding: 'utf8' }
+      ) as string
+    );
+    const importHtml = JSON.parse(
+      safeReadFile(
+        path.resolve(
+          process.cwd(),
+          'knowledge/product/pipeline-templates/import-brand-from-html.json'
+        ),
+        { encoding: 'utf8' }
+      ) as string
+    );
 
     const webExtractSteps = extractTheme.steps?.[0]?.params?.then || [];
     const webExtractStep = webExtractSteps.find((step: any) => step.id === 'synthesize_theme_web');

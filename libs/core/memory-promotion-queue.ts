@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { randomUUID } from 'node:crypto';
@@ -7,10 +7,10 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeReadFile,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -83,30 +83,47 @@ function tenantQueueScope(scope: MemoryScopeEnvelope): {
 // queue until the migration steward adopts them.
 function resolveQueuePath(scope?: MemoryScopeEnvelope): string {
   const override = getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  if (scope?.tenant_slug) {
-    return pathResolver.rootResolve(
-      physicalScopedPath(
-        'active/shared/runtime',
-        tenantQueueScope(scope),
-        'memory',
-        'promotion-queue.jsonl'
-      )
-    );
-  }
-  return pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : scope?.tenant_slug
+      ? pathResolver.rootResolve(
+          physicalScopedPath(
+            'active/shared/runtime',
+            tenantQueueScope(scope),
+            'memory',
+            'promotion-queue.jsonl'
+          )
+        )
+      : pathResolver.rootResolve(GLOBAL_QUEUE_PATH);
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function queuePathsForAllScopes(): string[] {
   if (getRegisteredEnvText('KYBERION_MEMORY_QUEUE_PATH')?.trim()) return [resolveQueuePath()];
   const paths = [resolveQueuePath()];
-  const tenantRoot = pathResolver.rootResolve(TENANT_RUNTIME_ROOT);
+  let tenantRoot: string;
+  try {
+    tenantRoot = assertSafeRepositoryPath(pathResolver.rootResolve(TENANT_RUNTIME_ROOT), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return paths;
+  }
   if (!safeExistsSync(tenantRoot) || !safeStat(tenantRoot).isDirectory()) return paths;
   for (const tenantSlug of safeReaddir(tenantRoot)) {
-    const tenantDir = path.join(tenantRoot, tenantSlug);
-    if (!safeStat(tenantDir).isDirectory()) continue;
-    const candidatePath = path.join(tenantDir, 'memory', 'promotion-queue.jsonl');
-    if (safeExistsSync(candidatePath)) paths.push(candidatePath);
+    try {
+      const tenantDir = assertSafeRepositoryPath(path.join(tenantRoot, tenantSlug), {
+        allowMissingLeaf: true,
+      });
+      if (!safeStat(tenantDir).isDirectory()) continue;
+      const candidatePath = assertSafeRepositoryPath(
+        path.join(tenantDir, 'memory', 'promotion-queue.jsonl'),
+        { allowMissingLeaf: true }
+      );
+      if (safeExistsSync(candidatePath)) paths.push(candidatePath);
+    } catch {
+      // An unsafe tenant shard must not poison the global queue scan.
+    }
   }
   return paths;
 }
@@ -161,14 +178,6 @@ function normalizeOccurrenceCount(value: unknown): number {
   return Math.max(1, count);
 }
 
-function parseJsonl(raw: string): MemoryCandidate[] {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as MemoryCandidate);
-}
-
 function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   // `sensitivity_tier` is the candidate's destination tier.  The envelope is
   // the source scope and must be validated against its own tier so a
@@ -201,7 +210,7 @@ function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
 }
 
 function ensureQueueDir(queuePath: string): void {
-  const dir = path.dirname(queuePath);
+  const dir = assertSafeRepositoryPath(path.dirname(queuePath), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 }
 
@@ -360,10 +369,7 @@ export function listMemoryPromotionCandidates(scope?: MemoryScopeEnvelope): Memo
   return (scope ? [resolveQueuePath(scope)] : queuePathsForAllScopes())
     .filter((queuePath, index, all) => all.indexOf(queuePath) === index)
     .filter((queuePath) => safeExistsSync(queuePath))
-    .flatMap((queuePath) => {
-      const raw = safeReadFile(queuePath, { encoding: 'utf8' }) as string;
-      return parseJsonl(raw);
-    });
+    .flatMap((queuePath) => readJsonLines<MemoryCandidate>(queuePath));
 }
 
 export function loadMemoryPromotionCandidate(
@@ -395,7 +401,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
       : queuePathsForAllScopes();
   const matchingQueuePaths = candidatePaths.filter((candidatePath) => {
     if (!safeExistsSync(candidatePath)) return false;
-    const rows = parseJsonl(safeReadFile(candidatePath, { encoding: 'utf8' }) as string);
+    const rows = readJsonLines<MemoryCandidate>(candidatePath);
     return rows.some(
       (row) =>
         row.candidate_id === input.candidateId &&
@@ -409,7 +415,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   }
   if (input.allMatching && !requestedScopeKey) {
     const matched = matchingQueuePaths.flatMap((queuePath) =>
-      parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string).filter(
+      readJsonLines<MemoryCandidate>(queuePath).filter(
         (row) => row.candidate_id === input.candidateId
       )
     );
@@ -425,7 +431,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   let firstUpdated: MemoryCandidate | null = null;
   const ratifiedAt = new Date().toISOString();
   for (const queuePath of matchingQueuePaths) {
-    const rows = parseJsonl(safeReadFile(queuePath, { encoding: 'utf8' }) as string);
+    const rows = readJsonLines<MemoryCandidate>(queuePath);
     let changed = false;
     for (let index = 0; index < rows.length; index += 1) {
       const current = rows[index] as MemoryCandidate;

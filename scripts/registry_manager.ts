@@ -1,5 +1,12 @@
 import * as path from 'node:path';
-import { safeWriteFile, safeExistsSync, safeMkdir, pathResolver } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  safeWriteFile,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
 import yargs from 'yargs';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -25,9 +32,14 @@ export async function main(args: string[] = []) {
     })
     .parse();
 
-  const adapterPath = path.resolve(process.cwd(), argv.adapter);
+  const adapterPath = assertSafeRepositoryPath(pathResolver.resolve(argv.adapter), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(adapterPath)) {
     throw new Error(`Input file not found: ${adapterPath}`);
+  }
+  if (!safeLstat(adapterPath).isFile()) {
+    throw new Error(`Input adapter must be a regular file: ${adapterPath}`);
   }
 
   const payload = readJson<Record<string, unknown>>(adapterPath);
@@ -40,8 +52,12 @@ export async function main(args: string[] = []) {
   const tierDir =
     argv.tier === 'public' ? 'knowledge/product/governance' : `knowledge/${argv.tier}/governance`;
   const registryPath = `${tierDir}/${argv.type}-capability-registry.json`;
-  const absRegistryPath = pathResolver.rootResolve(registryPath);
-  const absTierDir = pathResolver.rootResolve(tierDir);
+  const absRegistryPath = assertSafeRepositoryPath(pathResolver.rootResolve(registryPath), {
+    allowMissingLeaf: true,
+  });
+  const absTierDir = assertSafeRepositoryPath(pathResolver.rootResolve(tierDir), {
+    allowMissingLeaf: true,
+  });
 
   if (!safeExistsSync(absTierDir)) {
     safeMkdir(absTierDir, { recursive: true });
@@ -49,6 +65,9 @@ export async function main(args: string[] = []) {
 
   let registry: any = { version: '1.0.0', capabilities: [] };
   if (safeExistsSync(absRegistryPath)) {
+    if (!safeLstat(absRegistryPath).isFile()) {
+      throw new Error(`Capability registry must be a regular file: ${absRegistryPath}`);
+    }
     registry = readJson<Record<string, unknown>>(absRegistryPath);
   }
 
@@ -66,11 +85,16 @@ export async function main(args: string[] = []) {
   } else if (argv.type === 'gateway') {
     // Gateway capabilities store the profile as a separate artifact and point to it
     const adaptersDir = `${tierDir}/adapters`;
-    const absAdaptersDir = pathResolver.rootResolve(adaptersDir);
+    const absAdaptersDir = assertSafeRepositoryPath(pathResolver.rootResolve(adaptersDir), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(absAdaptersDir)) {
       safeMkdir(absAdaptersDir, { recursive: true });
     }
-    const absTargetAdapterPath = path.join(absAdaptersDir, path.basename(adapterPath));
+    const absTargetAdapterPath = assertSafeRepositoryPath(
+      path.join(absAdaptersDir, path.basename(adapterPath)),
+      { allowMissingLeaf: true }
+    );
     safeWriteFile(absTargetAdapterPath, JSON.stringify(payload, null, 2));
 
     const newEntry = {

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { validateWritePermission, scanForConfidentialMarkers, safeReadFile } from '@agent/core';
+import { validateWritePermission, scanForConfidentialMarkers } from '@agent/core/tier-guard';
+import { safeReadFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import yargs from 'yargs';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

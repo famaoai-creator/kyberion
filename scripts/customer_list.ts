@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { classifyError, formatClassification } from '@agent/core/error-classifier';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  classifyError,
-  formatClassification,
-  customerResolver,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeReaddir,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface CustomerEntry {
@@ -22,7 +22,11 @@ interface CustomerEntry {
 const REQUIRED_FILES = ['customer.json', 'identity.json', 'vision.md'];
 
 export function listCustomers(): CustomerEntry[] {
-  const customerRoot = path.join(pathResolver.rootDir(), 'customer');
+  const rootDir = pathResolver.rootDir();
+  const customerRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+    allowMissingLeaf: true,
+    rootDir,
+  });
   if (!safeExistsSync(customerRoot) || !safeLstat(customerRoot).isDirectory()) {
     return [];
   }
@@ -32,7 +36,10 @@ export function listCustomers(): CustomerEntry[] {
 
   for (const entry of safeReaddir(customerRoot).sort()) {
     if (entry === 'README.md' || entry === '_template') continue;
-    const full = path.join(customerRoot, entry);
+    const full = assertSafeRepositoryPath(path.join(customerRoot, entry), {
+      allowMissingLeaf: true,
+      rootDir,
+    });
     if (!safeLstat(full).isDirectory()) continue;
     const missing = REQUIRED_FILES.filter((required) => {
       const requiredPath = path.join(full, required);
@@ -50,16 +57,15 @@ export function listCustomers(): CustomerEntry[] {
   return entries;
 }
 
-export function printText(entries: CustomerEntry[]): void {
+export function printText(entries: CustomerEntry[]): string[] {
   if (entries.length === 0) {
-    console.log('No customer overlays found.');
-    return;
+    return ['No customer overlays found.'];
   }
 
-  for (const entry of entries) {
+  return entries.map((entry) => {
     const status = entry.ready ? 'ready' : `missing ${entry.missing.join(', ')}`;
-    console.log(`${entry.active ? '* ' : '  '}${entry.slug}\t${status}\t${entry.path}`);
-  }
+    return `${entry.active ? '* ' : '  '}${entry.slug}\t${status}\t${entry.path}`;
+  });
 }
 
 export const main = defineScript({
@@ -69,7 +75,7 @@ export const main = defineScript({
     try {
       const entries = listCustomers();
       if (context.json) context.print(entries);
-      else printText(entries);
+      else context.print(printText(entries).join('\n'));
     } catch (err) {
       throw new Error(formatClassification(classifyError(err)));
     }

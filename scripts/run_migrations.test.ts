@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
-import { runMigrations } from './run_migrations.js';
+import { main, runMigrations } from './run_migrations.js';
 
 const TMP_ROOT = pathResolver.sharedTmp('run-migrations-tests');
 const MIGRATIONS_DIR = path.join(TMP_ROOT, 'migration');
@@ -31,7 +31,7 @@ export const id = '0001-alpha';
 export const description = 'alpha';
 export const introduced_in = 'v0.2.0';
 export async function migrate(opts) { calls().push(['migrate', id, opts.dryRun]); }
-`,
+`
     );
     writeMigration(
       '0002-beta.ts',
@@ -42,7 +42,7 @@ export const description = 'beta';
 export const introduced_in = 'v0.2.0';
 export async function migrate(opts) { calls().push(['migrate', id, opts.dryRun]); }
 export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun]); }
-`,
+`
     );
 
     const result = await runMigrations({
@@ -61,6 +61,25 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     ]);
   });
 
+  it('emits the CLI result through the supplied harness printer', async () => {
+    writeMigration(
+      '0001-list.ts',
+      `
+export const id = '0001-list';
+export const description = 'list';
+export const introduced_in = 'v0.2.0';
+export async function migrate() {}
+`
+    );
+    const print = vi.fn();
+
+    await main(['--dir', MIGRATIONS_DIR, '--state', STATE_PATH, '--list'], print);
+
+    expect(print).toHaveBeenCalledWith(
+      expect.objectContaining({ pending: expect.arrayContaining(['0001-list']) })
+    );
+  });
+
   it('skips already-applied migrations and rolls back the latest one only', async () => {
     writeMigration(
       '0001-alpha.ts',
@@ -71,7 +90,7 @@ export const description = 'alpha';
 export const introduced_in = 'v0.2.0';
 export async function migrate(opts) { calls().push(['migrate', id, opts.dryRun]); }
 export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun]); }
-`,
+`
     );
     writeMigration(
       '0002-beta.ts',
@@ -82,7 +101,7 @@ export const description = 'beta';
 export const introduced_in = 'v0.2.0';
 export async function migrate(opts) { calls().push(['migrate', id, opts.dryRun]); }
 export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun]); }
-`,
+`
     );
     safeMkdir(path.dirname(STATE_PATH), { recursive: true });
     safeWriteFile(STATE_PATH, JSON.stringify({ applied: ['0001-alpha', '0002-beta'] }), {
@@ -100,5 +119,27 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     expect(dryRun.applied).toEqual(['0001-alpha', '0002-beta']);
     expect(readState().applied).toEqual(['0001-alpha', '0002-beta']);
     expect((globalThis as any).__migrationCalls).toEqual([['rollback', '0002-beta', true]]);
+  });
+
+  it('rejects migration directories and state paths outside the repository', async () => {
+    await expect(
+      runMigrations({
+        dir: path.join(pathResolver.rootDir(), '..', 'external-migrations'),
+        statePath: STATE_PATH,
+        dryRun: true,
+        rollback: false,
+        list: true,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runMigrations({
+        dir: MIGRATIONS_DIR,
+        statePath: path.join(pathResolver.rootDir(), '..', 'external-migration-state.json'),
+        dryRun: true,
+        rollback: false,
+        list: true,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

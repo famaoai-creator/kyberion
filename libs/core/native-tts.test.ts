@@ -27,11 +27,20 @@ describe('native-tts', () => {
       const result = __test__.buildCommand('hi', { voice: 'Alex' });
       expect(result).not.toBeNull();
       // The voice flag is stringified somewhere in the args.
-      expect(result!.args.some(a => a === 'Alex' || a.includes('Alex'))).toBe(true);
+      expect(result!.args.some((a) => a === 'Alex' || a.includes('Alex'))).toBe(true);
     });
   });
 
   describe('platform helpers', () => {
+    it.each([
+      ['darwin', 'say'],
+      ['linux', 'espeak'],
+      ['win32', 'powershell'],
+    ] as const)('builds the native command for %s', (platform, command) => {
+      const result = __test__.buildCommandForPlatform(platform, 'hello', {});
+      expect(result?.cmd).toBe(command);
+    });
+
     it('reports a known platform', () => {
       expect(['darwin', 'linux', 'win32']).toContain(currentPlatform());
     });

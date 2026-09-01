@@ -19,6 +19,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -193,12 +194,12 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   ): Promise<string> {
     assertReasoningEgressAllowed(this.name);
     const model = resolveGrokModelForTier(options?.model_tier, this.model);
-    const permissionArgs = this.resolvePermissionArgs(
-      options?.advisory ? 'planner' : options?.profile
-    );
+    const requestedProfile = options?.advisory ? 'planner' : options?.profile;
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', requestedProfile);
+    const permissionArgs = this.resolvePermissionArgs(effectiveProfile);
     // Historical default for unprofiled headless calls: auto-approve tools.
     // When a KD-05 profile is set, its permission projection owns the mode.
-    const defaultPermissionArgs = options?.advisory || options?.profile ? [] : ['--always-approve'];
+    const defaultPermissionArgs = effectiveProfile ? [] : ['--always-approve'];
     const prompt = [instruction.trim(), context ? `Context: ${context}` : '']
       .filter(Boolean)
       .join('\n\n');
@@ -316,11 +317,12 @@ export class ShellGrokCliBackend implements ReasoningBackend {
   }
 
   private resolvePermissionArgs(profile?: ProviderPermissionProfileName): string[] {
-    if (!profile) return [];
-    const resolution = resolveProviderPermissionArgs(profile, 'grok');
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('grok', profile);
+    if (!effectiveProfile) return [];
+    const resolution = resolveProviderPermissionArgs(effectiveProfile, 'grok');
     if (resolution.kind === 'refused') {
       throw new Error(
-        `[shell-grok-cli] permission profile "${profile}" refused: ${resolution.reason}`
+        `[shell-grok-cli] permission profile "${effectiveProfile}" refused: ${resolution.reason}`
       );
     }
     return [...resolution.args];
@@ -334,6 +336,8 @@ export class ShellGrokCliBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
     if ('$schema' in jsonSchema) delete jsonSchema['$schema'];
+    const activeProfile = resolveEffectiveProviderPermissionProfile('grok');
+    const defaultPermissionArgs = activeProfile ? [] : ['--always-approve'];
 
     const args = [
       '-p',
@@ -346,9 +350,10 @@ export class ShellGrokCliBackend implements ReasoningBackend {
       JSON.stringify(jsonSchema),
       '--model',
       this.model,
-      '--always-approve',
+      ...defaultPermissionArgs,
       '--disable-web-search',
       '--no-subagents',
+      ...this.resolvePermissionArgs(),
       ...this.extraArgs,
     ];
 
@@ -432,9 +437,16 @@ export class ShellGrokCliBackend implements ReasoningBackend {
 function resolveGrokSubagentProfile(options?: ReasoningCallOptions) {
   const requested = options?.profile || options?.role || 'implementer';
   try {
-    return getSubagentCapabilityProfile(requested);
+    const profile = getSubagentCapabilityProfile(requested);
+    const effective = resolveEffectiveProviderPermissionProfile(
+      'grok',
+      profile.name as ProviderPermissionProfileName
+    );
+    return getSubagentCapabilityProfile(effective ?? profile.name);
   } catch {
-    return getSubagentCapabilityProfile('implementer');
+    return getSubagentCapabilityProfile(
+      resolveEffectiveProviderPermissionProfile('grok', 'implementer') ?? 'implementer'
+    );
   }
 }
 

@@ -8,28 +8,28 @@
  */
 
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
-  logger,
-  pathResolver,
-  recordDaemonHeartbeat,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-  sendOpsAlert,
   registerScheduledPipeline,
   resolveScheduledPipelinePath,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
   completeScheduledPipelineRun,
+} from '@agent/core/pipeline-scheduler';
+import {
   enqueueChronosDelivery,
-  createTriggerRunner,
-  withExecutionContextAsync,
-  withTriggerLeaderLease,
   validateChronosDeliveryTarget,
-  type ChronosDeliveryTarget,
-} from '@agent/core';
+} from '@agent/core/chronos-delivery';
+import { createTriggerRunner, withTriggerLeaderLease } from '@agent/core/trigger-runner';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const TICK_INTERVAL_MS = 60_000;
 const triggerRunner = createTriggerRunner();
@@ -44,13 +44,53 @@ function collectPipelineFiles(dir: string): string[] {
   const entries = safeReaddir(dir);
   for (const name of entries) {
     const full = path.join(dir, name);
-    if (safeLstat(full).isDirectory()) {
+    const stat = safeLstat(full);
+    if (stat.isSymbolicLink()) continue;
+    if (stat.isDirectory()) {
       found.push(...collectPipelineFiles(full));
     } else if (name.endsWith('.json')) {
       found.push(full);
     }
   }
   return found;
+}
+
+/** Chronos executes only repository-owned pipeline files without project trust. */
+export function assertChronosPipelinePath(
+  inputPath: string,
+  rootDir = pathResolver.rootDir()
+): void {
+  const root = path.resolve(rootDir);
+  const absolute = path.resolve(inputPath);
+  const relative = path.relative(root, absolute).replaceAll('\\', '/');
+  if (
+    !relative ||
+    relative.startsWith('../') ||
+    path.isAbsolute(relative) ||
+    !relative.startsWith('pipelines/') ||
+    !relative.endsWith('.json')
+  ) {
+    throw new Error(
+      `[CHRONOS_SCOPE] scheduled pipeline must be a repository pipeline JSON: ${relative || inputPath}`
+    );
+  }
+
+  let current = root;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) {
+        throw new Error(
+          `[CHRONOS_SCOPE] scheduled pipeline cannot traverse a symbolic link: ${relative}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('[CHRONOS_SCOPE]')) throw error;
+      throw new Error(
+        `[CHRONOS_SCOPE] scheduled pipeline could not be inspected safely: ${relative}`
+      );
+    }
+  }
 }
 
 function syncSchedulesFromAdf(): void {
@@ -61,7 +101,12 @@ function syncSchedulesFromAdf(): void {
   let registered = 0;
   for (const fullPath of files) {
     try {
-      const adf = readValidatedPipelineAdf(fullPath);
+      assertChronosPipelinePath(fullPath);
+      const adf = readValidatedPipelineAdf(fullPath, {
+        // Chronos only registers pipeline files through its governed
+        // scheduler path; make that trust decision explicit for the loader.
+        trustResolved: true,
+      });
       if (!adf.schedule?.cron) continue;
 
       const sched = adf.schedule;
@@ -142,7 +187,10 @@ async function tickAsLeader(): Promise<void> {
 
         try {
           const resolvedPipelinePath = resolveScheduledPipelinePath(scheduled);
-          const adf = readValidatedPipelineAdf(resolvedPipelinePath);
+          assertChronosPipelinePath(resolvedPipelinePath);
+          const adf = readValidatedPipelineAdf(resolvedPipelinePath, {
+            trustResolved: true,
+          });
           const result = await runSteps(
             adf.steps,
             {
@@ -245,7 +293,7 @@ async function tick(): Promise<void> {
 // Entry point
 // ---------------------------------------------------------------------------
 
-async function main(): Promise<void> {
+async function main(_args: string[] = []): Promise<void> {
   logger.info('[CHRONOS] Kyberion Pipeline Scheduler starting...');
   recordDaemonHeartbeat('chronos-daemon', {
     status: 'starting',
@@ -273,18 +321,34 @@ async function main(): Promise<void> {
   logger.info(`[CHRONOS] Running. Tick interval: ${TICK_INTERVAL_MS / 1000}s`);
 }
 
-main().catch((err) => {
-  logger.error(`[CHRONOS] Fatal: ${err.message}`);
-  recordDaemonHeartbeat('chronos-daemon', {
-    status: 'error',
-    details: { error: err?.message ?? String(err) },
-  });
-  sendOpsAlert({
-    severity: 'critical',
-    title: 'Chronos daemon fatal error',
-    context: { daemon_id: 'chronos-daemon', error: err?.message ?? String(err) },
-    recommendation: 'Restart chronos and inspect active/shared/logs/traces for the last failure.',
-    dedupe_key: 'chronos-daemon:fatal',
-  });
-  process.exitCode = 1;
+const runChronosDaemon = defineScript({
+  name: 'chronos:daemon',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (err: any) {
+      logger.error(`[CHRONOS] Fatal: ${err.message}`);
+      recordDaemonHeartbeat('chronos-daemon', {
+        status: 'error',
+        details: { error: err?.message ?? String(err) },
+      });
+      sendOpsAlert({
+        severity: 'critical',
+        title: 'Chronos daemon fatal error',
+        context: { daemon_id: 'chronos-daemon', error: err?.message ?? String(err) },
+        recommendation:
+          'Restart chronos and inspect active/shared/logs/traces for the last failure.',
+        dedupe_key: 'chronos-daemon:fatal',
+      });
+      process.exitCode = 1;
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'chronos_daemon.ts') ||
+  isDirectScript(import.meta.url, 'chronos_daemon.js')
+) {
+  void runChronosDaemon();
+}

@@ -12,18 +12,19 @@
 
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
-  isValidTenantSlug,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeMoveSync,
   safeReadFile,
   safeReaddir,
-  safeStat,
+  safeLstat,
   safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
-import { nowIso } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -90,8 +91,116 @@ const DEFAULT_ROOTS: PeerTenantMigrationRoot[] = [
   { kind: 'mesh-hub-observability', root: 'active/shared/observability/mesh-hub' },
 ];
 
+const MIGRATION_KINDS = new Set<PeerTenantMigrationKind>([
+  'peer-messaging',
+  'peer-conversations',
+  'mesh-hub-runtime',
+  'mesh-hub-observability',
+]);
+const MIGRATION_STATUSES = new Set<PeerTenantMigrationPlan['status']>([
+  'planned',
+  'applying',
+  'completed',
+  'failed',
+]);
+const MIGRATION_ACTIONS = new Set<SourceItem['action']>(['migrate', 'quarantine']);
+const MIGRATION_DISPOSITIONS = new Set<SourceItem['destinations'][number]['disposition']>([
+  'move',
+  'conflict',
+]);
+const MIGRATION_STATES = new Set<SourceItem['state']>(['planned', 'applied']);
+const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSafeJsonTree(value: unknown): boolean {
+  if (Array.isArray(value)) return value.every(isSafeJsonTree);
+  if (value === null || typeof value !== 'object') return true;
+  return Object.entries(value).every(
+    ([key, nested]) => !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonTree(nested)
+  );
+}
+
+function isSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isSafeRepositoryPath(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try {
+    assertSafeRepositoryPath(value, { allowMissingLeaf: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function parsePeerTenantMigrationPlan(value: unknown): PeerTenantMigrationPlan | null {
+  if (!isRecord(value) || !isSafeJsonTree(value)) return null;
+  if (
+    value.format !== 'kyberion-peer-tenant-migration-v1' ||
+    typeof value.migration_id !== 'string' ||
+    !value.migration_id.trim() ||
+    typeof value.generated_at !== 'string' ||
+    typeof value.apply_requested !== 'boolean' ||
+    !isSafeRepositoryPath(value.migration_root) ||
+    !Array.isArray(value.sources) ||
+    typeof value.status !== 'string' ||
+    !MIGRATION_STATUSES.has(value.status as PeerTenantMigrationPlan['status'])
+  ) {
+    return null;
+  }
+  if (
+    value.tenant_id_override !== undefined &&
+    (typeof value.tenant_id_override !== 'string' || !isValidTenantSlug(value.tenant_id_override))
+  ) {
+    return null;
+  }
+  if (value.completed_at !== undefined && typeof value.completed_at !== 'string') {
+    return null;
+  }
+  if (value.failure !== undefined && typeof value.failure !== 'string') return null;
+
+  for (const source of value.sources) {
+    if (
+      !isRecord(source) ||
+      !MIGRATION_KINDS.has(source.kind as PeerTenantMigrationKind) ||
+      !isSafeRepositoryPath(source.source) ||
+      !isSafeRepositoryPath(source.source_quarantine) ||
+      typeof source.source_sha256 !== 'string' ||
+      !MIGRATION_ACTIONS.has(source.action as SourceItem['action']) ||
+      !isSafeInteger(source.unknown_record_count) ||
+      !isSafeInteger(source.records) ||
+      !Array.isArray(source.destinations) ||
+      !MIGRATION_STATES.has(source.state as SourceItem['state'])
+    ) {
+      return null;
+    }
+    if (source.reason !== undefined && typeof source.reason !== 'string') return null;
+    for (const destination of source.destinations) {
+      if (
+        !isRecord(destination) ||
+        typeof destination.tenant_id !== 'string' ||
+        !isValidTenantSlug(destination.tenant_id) ||
+        !isSafeRepositoryPath(destination.destination) ||
+        !isSafeInteger(destination.record_count) ||
+        !MIGRATION_DISPOSITIONS.has(
+          destination.disposition as SourceItem['destinations'][number]['disposition']
+        ) ||
+        (destination.destination_sha256 !== undefined &&
+          typeof destination.destination_sha256 !== 'string')
+      ) {
+        return null;
+      }
+    }
+  }
+  return value as unknown as PeerTenantMigrationPlan;
 }
 
 function safeName(value: string): string {
@@ -109,21 +218,40 @@ function normalizeTenant(value: string | undefined): string | undefined {
 
 function listLegacyFiles(root: string, relative = ''): string[] {
   const current = relative ? path.join(root, relative) : root;
-  if (!safeExistsSync(current) || !safeStat(current).isDirectory()) return [];
-  return safeReaddir(current)
+  let safeCurrent: string;
+  try {
+    safeCurrent = assertSafeRepositoryPath(current, { allowMissingLeaf: true });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(safeCurrent) || !safeLstat(safeCurrent).isDirectory()) return [];
+  return safeReaddir(safeCurrent)
     .filter((entry) => entry !== 'tenants' && entry !== '.quarantine')
     .sort()
     .flatMap((entry) => {
       const childRelative = relative ? path.join(relative, entry) : entry;
       const child = path.join(root, childRelative);
-      const stat = safeStat(child);
-      if (stat.isDirectory()) return listLegacyFiles(root, childRelative);
-      return stat.isFile() && /\.(json|jsonl)$/u.test(entry) ? [child] : [];
+      try {
+        const safeChild = assertSafeRepositoryPath(child);
+        const stat = safeLstat(safeChild);
+        if (stat.isDirectory()) return listLegacyFiles(root, childRelative);
+        return stat.isFile() && /\.(json|jsonl)$/u.test(entry) ? [safeChild] : [];
+      } catch {
+        return [];
+      }
     });
 }
 
+function requireRegularMigrationFile(source: string): string {
+  const safeSource = assertSafeRepositoryPath(source);
+  if (!safeLstat(safeSource).isFile()) {
+    throw new Error(`[peer-tenant-migration] source must be a regular file: ${source}`);
+  }
+  return safeSource;
+}
+
 function parseRows(source: string): ParsedRow[] {
-  const raw = String(safeReadFile(source, { encoding: 'utf8' }) || '');
+  const raw = String(safeReadFile(requireRegularMigrationFile(source), { encoding: 'utf8' }) || '');
   if (source.endsWith('.jsonl')) {
     return raw
       .split(/\r?\n/u)
@@ -347,13 +475,13 @@ export function runPeerTenantMigration(
   let plan: PeerTenantMigrationPlan;
   if (options.planPath) {
     try {
-      plan = JSON.parse(
-        String(safeReadFile(options.planPath, { encoding: 'utf8' }) || '')
-      ) as PeerTenantMigrationPlan;
+      plan = parsePeerTenantMigrationPlan(
+        readJson<unknown>(options.planPath)
+      ) as PeerTenantMigrationPlan | null;
     } catch {
       throw new Error(`peer_migration_plan_invalid:${options.planPath}`);
     }
-    if (plan.format !== 'kyberion-peer-tenant-migration-v1') {
+    if (!plan) {
       throw new Error(`peer_migration_plan_format_invalid:${options.planPath}`);
     }
   } else {

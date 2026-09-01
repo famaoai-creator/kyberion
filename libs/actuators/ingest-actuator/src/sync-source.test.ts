@@ -9,7 +9,9 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { pathResolver, readSyncCursor, safeMkdir, safeRmSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readSyncCursor } from '@agent/core/ingest-sync-cursors';
+import { safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { extractConfluenceCursor, syncSource, type SyncSourceTransport } from './sync-source.js';
 
 const NOW_1 = '2026-07-28T00:00:00.000Z';

@@ -1,7 +1,9 @@
 import * as path from 'node:path';
-import { pathResolver, safeReadFile, safeWriteFile, withExecutionContext } from '@agent/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const IMPROVEMENT_PLAN_ROOT = 'docs/developer/improvement-plans-2026-08';
 export const IMPROVEMENT_PLAN_ROOTS = [
@@ -203,11 +205,13 @@ export const runCheckImprovementPlanMetadata = defineScript({
     }
     const failures = checkImprovementPlanMetadata();
     if (failures.length) {
-      console.error('[check:improvement-plan-metadata] FAILED');
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} improvement-plan metadata violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
     context.print(`[check:improvement-plan-metadata] OK (${files.length} documents)`);
+    return { failures };
   },
 });
 

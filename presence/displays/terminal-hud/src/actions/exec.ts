@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult } from '@agent/core/secure-io';
 
 export interface HudExecResult {

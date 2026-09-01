@@ -5,6 +5,7 @@ import {
   hashPipelineOutput,
   loadPipelineRunJournal,
   newPipelineRunId,
+  readPipelineRunJournal,
 } from './pipeline-run-journal.js';
 
 describe('pipeline run journal', () => {
@@ -45,6 +46,25 @@ describe('pipeline run journal', () => {
     safeWriteFile(journal.path, '{not-json}\n');
     expect(() => loadPipelineRunJournal(runId)).toThrow(/corrupt JSONL journal/);
     safeRmSync(journal.path);
+  });
+
+  it('fails closed on dangerous JSONL records', () => {
+    const runId = `test-dangerous-${newPipelineRunId()}`;
+    const journal = createPipelineRunJournal(runId, {
+      pipeline_id: 'journal-dangerous-test',
+      input_path: 'pipelines/example.json',
+      step_ids: ['source'],
+    });
+    safeWriteFile(journal.path, '{"nested":{"constructor":{}}}\n');
+
+    expect(() => loadPipelineRunJournal(runId)).toThrow(/corrupt JSONL journal/);
+    safeRmSync(journal.path);
+  });
+
+  it('rejects journal reads outside the repository boundary', () => {
+    expect(() => readPipelineRunJournal('/tmp/kyberion-external-pipeline-run.jsonl')).toThrow(
+      /RESOURCE_PATH_SCOPE/
+    );
   });
 
   it('validates lifecycle payloads before appending them', () => {

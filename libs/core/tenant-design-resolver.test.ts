@@ -1,4 +1,5 @@
 import path from 'node:path';
+import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -118,6 +119,80 @@ describe('tenant-design-resolver', () => {
     expect(result.layoutCatalog).toBeNull();
     expect(result.logoPath).toBeNull();
   });
+
+  it('does not read a theme pack from another tenant directory', () => {
+    const tenantDir = path.join(rootDir, 'knowledge/confidential/tenant-a/design');
+    const otherDir = path.join(rootDir, 'knowledge/confidential/tenant-b/design');
+    safeMkdir(tenantDir, { recursive: true });
+    safeMkdir(otherDir, { recursive: true });
+    safeWriteFile(
+      path.join(otherDir, 'theme.json'),
+      JSON.stringify({ brand_name: 'Other Corp', theme: { colors: { primary: '#bad' } } })
+    );
+    safeWriteFile(
+      path.join(tenantDir, 'tenant-override.json'),
+      JSON.stringify({
+        brand_name: 'Tenant A',
+        matchers: ['tenant a'],
+        theme_pack_path: 'knowledge/confidential/tenant-b/design/theme.json',
+      })
+    );
+
+    const result = resolveTenantDesign({ rootDir, brandName: 'Tenant A' });
+    expect(result.source).toBe('tenant');
+    expect(result.themePack).toBeNull();
+    expect(JSON.stringify(result)).not.toContain('Other Corp');
+  });
+
+  it('keeps an explicit tenant context from resolving another tenant design', () => {
+    for (const [tenantId, brandName] of [
+      ['tenant-a', 'Tenant A'],
+      ['tenant-b', 'Tenant B'],
+    ]) {
+      const designDir = path.join(rootDir, 'knowledge/confidential', tenantId, 'design');
+      safeMkdir(designDir, { recursive: true });
+      safeWriteFile(
+        path.join(designDir, 'tenant-override.json'),
+        JSON.stringify({ brand_name: brandName, matchers: [brandName.toLowerCase()] })
+      );
+    }
+
+    const result = resolveTenantDesign({
+      rootDir,
+      customerId: 'tenant-a',
+      brandName: 'Tenant B',
+    });
+
+    expect(result.source).toBe('default');
+    expect(result.tenantOverride).toBeNull();
+  });
+
+  it('does not follow a registry override into a lower tier', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    const personalDesignDir = path.join(rootDir, 'knowledge/personal/secret/design');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeMkdir(personalDesignDir, { recursive: true });
+    safeWriteFile(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'secret',
+            override_path: 'knowledge/personal/secret/design/tenant-override.json',
+          },
+        ],
+      })
+    );
+    safeWriteFile(
+      path.join(personalDesignDir, 'tenant-override.json'),
+      JSON.stringify({ brand_name: 'Personal Leak', matchers: ['personal leak'] })
+    );
+
+    const result = resolveTenantDesign({ rootDir, brandName: 'Personal Leak' });
+
+    expect(result.source).toBe('default');
+    expect(result.tenantOverride).toBeNull();
+  });
 });
 
 // DS-02 acceptance 4: tier isolation — confidential branding must never
@@ -167,6 +242,25 @@ describe('tenant-design-resolver tier isolation (DS-02)', () => {
     const resolution = resolveTenantDesign({ rootDir, brandName: 'Some Other Brand' });
     expect(resolution.source).toBe('default');
     expect(JSON.stringify(resolution)).not.toContain('Secret Corp');
+  });
+
+  it('does not resolve a tenant override through a symlinked tenant directory', () => {
+    const targetDir = path.join(rootDir, 'active/shared/escaped-design');
+    const linkedDir = path.join(rootDir, 'knowledge/confidential/linked-corp');
+    safeMkdir(targetDir, { recursive: true });
+    safeMkdir(path.dirname(linkedDir), { recursive: true });
+    safeWriteFile(
+      path.join(targetDir, 'design/tenant-override.json'),
+      JSON.stringify({ brand_name: 'Escaped Corp', matchers: ['escaped corp'] })
+    );
+    fs.symlinkSync(targetDir, linkedDir, 'dir');
+    try {
+      const resolution = resolveTenantDesign({ rootDir, brandName: 'Escaped Corp' });
+      expect(resolution.source).toBe('default');
+      expect(resolution.tenantOverride).toBeNull();
+    } finally {
+      fs.unlinkSync(linkedDir);
+    }
   });
 
   it('serves confidential branding only inside the matching tenant context', () => {

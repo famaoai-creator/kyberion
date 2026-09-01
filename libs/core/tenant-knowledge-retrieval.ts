@@ -176,18 +176,48 @@ export function buildTenantKnowledgeScopeSet(
 }
 
 /** Rewrite an index-internal source (relative to knowledge/) to a repo-relative path. */
-function toRepoRelativePath(source: string): string {
+export function normalizeTenantKnowledgeSourcePath(source: string): string | null {
   const normalized = source.replace(/\\/g, '/');
-  // Customer-overlay sources are relative to knowledge/ and therefore start
-  // with '../' (the overlay lives beside knowledge/, under customer/).
-  if (normalized.startsWith('../')) return normalized.slice(3);
-  return `knowledge/${normalized}`;
+  const sourcePath = normalized.split('#chunk', 1)[0];
+  const canonical = path.posix.normalize(sourcePath);
+  if (!canonical || canonical === '.' || canonical === '..' || path.posix.isAbsolute(canonical)) {
+    return null;
+  }
+  // Customer-overlay and repository-sibling sources are relative to the
+  // knowledge root and are represented by exactly one leading `../`.
+  if (canonical.startsWith('../')) {
+    const repoRelative = canonical.slice(3);
+    return repoRelative && repoRelative !== '..' && !repoRelative.startsWith('../')
+      ? repoRelative
+      : null;
+  }
+  return `knowledge/${canonical}`;
 }
 
-function toHit(hint: KnowledgeHint, tenantSlug: string): TenantKnowledgeHit {
+function isTenantKnowledgeHitPathAllowed(
+  hint: KnowledgeHint,
+  hitPath: string,
+  tenantSlug: string
+): boolean {
+  if (hitPath.startsWith(`customer/${tenantSlug}/`)) {
+    return hint.tier === 'customer' && hint.customerId === tenantSlug;
+  }
+  if (hitPath.startsWith('knowledge/confidential/common/')) {
+    return hint.tier === 'confidential' && !hint.customerId;
+  }
+  return (
+    hitPath.startsWith(`knowledge/confidential/${tenantSlug}/`) &&
+    hint.tier === 'confidential' &&
+    hint.customerId === tenantSlug
+  );
+}
+
+function toHit(hint: KnowledgeHint, tenantSlug: string): TenantKnowledgeHit | null {
+  const hitPath = normalizeTenantKnowledgeSourcePath(hint.source);
+  if (!hitPath || !isTenantKnowledgeHitPathAllowed(hint, hitPath, tenantSlug)) return null;
   const excerpt = hint.hint.trim().replace(/\s+/g, ' ').slice(0, EXCERPT_MAX_CHARS);
   return {
-    path: toRepoRelativePath(hint.source),
+    path: hitPath,
     title: hint.topic,
     excerpt: excerpt || hint.topic,
     tags: hint.tags ?? [],
@@ -230,6 +260,7 @@ export async function queryTenantKnowledge(
       });
       for (const hint of results) {
         const hit = toHit(hint, scopeSet.tenantSlug);
+        if (!hit) continue;
         const existing = byPath.get(hit.path);
         if (!existing || hit.score > existing.score) byPath.set(hit.path, hit);
       }

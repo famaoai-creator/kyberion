@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { loadVocabularyCatalog } from './vocabulary-catalog.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
@@ -38,24 +39,12 @@ export interface LocaleContext {
   scope?: Pick<ScopeContext, 'tenant_slug' | 'organization_id' | 'project_id'>;
 }
 
-const VOCABULARY_PATH = pathResolver.knowledge('product/orchestration/user-facing-vocabulary.json');
-
-// Deliberately NOT reusing ux-vocabulary.ts's catalog loader here: this
-// module is imported by operator-identity.ts, and ux-vocabulary.ts is
-// rewired (I18N-01) to delegate its own locale resolution to this module.
-// Importing ux-vocabulary.ts from here would create an import cycle.
-// locale.ts stays dependency-light and reads the one field it needs
-// (`default_locale`) through its own tiny, independently-cached loader.
 let cachedDefaultLocale: SupportedLocale | undefined;
 
 function loadCatalogDefaultLocale(): SupportedLocale {
   if (cachedDefaultLocale !== undefined) return cachedDefaultLocale;
-  try {
-    const parsed = readJson<{ default_locale?: string }>(VOCABULARY_PATH);
-    cachedDefaultLocale = normalizeLocale(parsed?.default_locale) ?? 'en';
-  } catch {
-    cachedDefaultLocale = 'en';
-  }
+  const parsed = loadVocabularyCatalog();
+  cachedDefaultLocale = normalizeLocale(parsed?.default_locale) ?? 'en';
   return cachedDefaultLocale;
 }
 
@@ -71,8 +60,10 @@ export function resolveDefaultLocale(): SupportedLocale {
 
 function resolveIdentityLocale(identityPathOverride?: string): SupportedLocale | null {
   try {
-    const identityPath =
-      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json');
+    const identityPath = assertSafeRepositoryPath(
+      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json'),
+      { allowMissingLeaf: true }
+    );
     if (!safeExistsSync(identityPath)) return null;
     const parsed = readJson<Record<string, unknown>>(identityPath);
     const language = String(parsed?.language || '')

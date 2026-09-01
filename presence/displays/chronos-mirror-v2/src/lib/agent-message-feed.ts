@@ -5,7 +5,9 @@ import {
   safeExistsSync,
   safeReadFile,
 } from './intelligence-primitives';
-import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
+import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
+import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
+import { optionalStringField, parseJsonRecord, stringField } from './json-record';
 
 export interface AgentMessageSummary {
   ts: string;
@@ -77,43 +79,60 @@ function appendRuntimeMessages(
   }
 }
 
-function readObservedA2AHandoffs(): A2AHandoffSummary[] {
-  const observationPath = pathResolver.shared(
-    'observability/mission-control/orchestration-events.jsonl'
-  );
-  if (!safeExistsSync(observationPath)) return [];
+export interface AgentMessageFeedOptions {
+  observationPath?: string;
+}
 
-  const handoffs: A2AHandoffSummary[] = [];
-  const raw = safeReadFile(observationPath, { encoding: 'utf8' }) as string;
-  for (const line of raw.trim().split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const event = JSON.parse(line) as any;
-      if ((event.decision || event.event_type) !== 'a2a_message_routed') continue;
-      if (typeof event.mission_id !== 'string' || !event.mission_id) continue;
+function readObservedA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHandoffSummary[] {
+  const observationPath =
+    options.observationPath ||
+    pathResolver.shared('observability/mission-control/orchestration-events.jsonl');
+  try {
+    const safeObservationPath = assertSafeRepositoryPath(observationPath, {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(safeObservationPath) || !safeLstat(safeObservationPath).isFile()) return [];
 
-      handoffs.push({
-        ts: event.ts || new Date().toISOString(),
-        missionId: event.mission_id,
-        sender: typeof event.sender === 'string' ? event.sender : 'unknown',
-        receiver: typeof event.receiver === 'string' ? event.receiver : 'unknown',
-        teamRole: typeof event.team_role === 'string' ? event.team_role : undefined,
-        channel: typeof event.channel === 'string' ? event.channel : undefined,
-        thread: typeof event.thread === 'string' ? event.thread : undefined,
-        performative: typeof event.performative === 'string' ? event.performative : undefined,
-        intent: typeof event.intent === 'string' ? event.intent : undefined,
-        promptExcerpt: typeof event.prompt_excerpt === 'string' ? event.prompt_excerpt : undefined,
-      });
-    } catch {
-      // Ignore malformed lines.
+    const handoffs: A2AHandoffSummary[] = [];
+    const raw = safeReadFile(safeObservationPath, { encoding: 'utf8' }) as string;
+    for (const line of raw.trim().split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const event = parseJsonRecord(line);
+        if (!event) continue;
+        if (
+          (stringField(event, 'decision') || stringField(event, 'event_type')) !==
+          'a2a_message_routed'
+        )
+          continue;
+        const missionId = stringField(event, 'mission_id');
+        if (!missionId) continue;
+
+        handoffs.push({
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          missionId,
+          sender: stringField(event, 'sender', 'unknown'),
+          receiver: stringField(event, 'receiver', 'unknown'),
+          teamRole: optionalStringField(event, 'team_role'),
+          channel: optionalStringField(event, 'channel'),
+          thread: optionalStringField(event, 'thread'),
+          performative: optionalStringField(event, 'performative'),
+          intent: optionalStringField(event, 'intent'),
+          promptExcerpt: optionalStringField(event, 'prompt_excerpt'),
+        });
+      } catch {
+        // Ignore malformed lines.
+      }
     }
-  }
 
-  const bounded = new BoundedRingBuffer<A2AHandoffSummary>(CE_STREAM_LIMITS.maxLiveMessages);
-  // The ring buffer is FIFO: feed oldest-first so overflow sheds old history,
-  // then restore the operator-facing newest-first order.
-  for (const handoff of handoffs.sort((a, b) => a.ts.localeCompare(b.ts))) bounded.push(handoff);
-  return bounded.toArray().reverse().slice(0, 24);
+    const bounded = new BoundedRingBuffer<A2AHandoffSummary>(CE_STREAM_LIMITS.maxLiveMessages);
+    // The ring buffer is FIFO: feed oldest-first so overflow sheds old history,
+    // then restore the operator-facing newest-first order.
+    for (const handoff of handoffs.sort((a, b) => a.ts.localeCompare(b.ts))) bounded.push(handoff);
+    return bounded.toArray().reverse().slice(0, 24);
+  } catch {
+    return [];
+  }
 }
 
 function appendObservedA2AHandoffs(
@@ -139,12 +158,12 @@ function appendObservedA2AHandoffs(
   }
 }
 
-export function collectAgentMessages(): AgentMessageSummary[] {
+export function collectAgentMessages(options: AgentMessageFeedOptions = {}): AgentMessageSummary[] {
   const runtimeLeases = listAgentRuntimeLeaseSummaries();
   const runtimeSnapshots = listAgentRuntimeSnapshots();
   const leaseByAgent = new Map(runtimeLeases.map((lease) => [lease.agent_id, lease]));
   const messages: AgentMessageSummary[] = [];
-  const handoffs = readObservedA2AHandoffs();
+  const handoffs = readObservedA2AHandoffs(options);
 
   appendRuntimeMessages(messages, leaseByAgent, runtimeSnapshots);
   appendObservedA2AHandoffs(messages, handoffs);
@@ -156,6 +175,6 @@ export function collectAgentMessages(): AgentMessageSummary[] {
   return bounded.toArray().reverse().slice(0, 40);
 }
 
-export function collectA2AHandoffs(): A2AHandoffSummary[] {
-  return readObservedA2AHandoffs();
+export function collectA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHandoffSummary[] {
+  return readObservedA2AHandoffs(options);
 }

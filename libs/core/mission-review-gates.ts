@@ -157,6 +157,10 @@ function loadRegistry(): ReviewGateRegistry {
   return registryCatalog.load();
 }
 
+export function loadMissionReviewGateRegistry(): ReviewGateRegistry {
+  return loadRegistry();
+}
+
 export function resolveMissionReviewDesign(
   input: MissionReviewSelectionInput
 ): MissionReviewDesign {

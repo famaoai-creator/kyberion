@@ -26,7 +26,7 @@ This is the procedure behind the `live-voice` intent and its default execution p
 - strict mode rejects `shadow` profiles and clone-engine fallback
 - `KYBERION_STT_COMMAND` may be configured for a deployment-specific streaming
   backend; when it is unset, the managed `mlx_whisper` runtime installed by
-  `pnpm voice:setup --apply` is selected automatically when available
+  `pnpm kyberion voice setup --apply` is selected automatically when available
 - On Apple Silicon macOS, the CLI first tries the native Apple SpeechAnalyzer
   bridge and maps short language codes such as `ja` to `ja-JP`.
 - a reasoning backend should be available through `installReasoningBackends()`

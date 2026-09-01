@@ -187,4 +187,4 @@ Fragment 名は `*-fragment` の形に揃えると用途が検索しやすくな
 
 メインのパイプライン JSON 内で、`wisdom:apply_fragment` 等の操作（またはオーケストレータによる展開）を通じて利用されます。
 
-各 Fragment は `action: "pipeline"` と `steps[]` を持つ通常の Pipeline ADF 形状に寄せています。ただし一部の `op` は actuator 実装や fragment 展開層を前提にしたテンプレートです。実行前に `pnpm cli preview pipelines/fragments/<name>.json` 等で unresolved variable と実行可能性を確認してください。
+各 Fragment は `action: "pipeline"` と `steps[]` を持つ通常の Pipeline ADF 形状に寄せています。ただし一部の `op` は actuator 実装や fragment 展開層を前提にしたテンプレートです。実行前に `pnpm kyberion preview pipelines/fragments/<name>.json` 等で unresolved variable と実行可能性を確認してください。

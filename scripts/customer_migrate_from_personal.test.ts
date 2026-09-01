@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     template: '/tmp/template',
   })),
   safeCopyFileSync: vi.fn(),
+  assertSafeRepositoryPath: vi.fn((target: string) => target),
   safeExistsSync: vi.fn(),
   safeLstat: vi.fn(),
   safeMkdir: vi.fn(),
@@ -28,10 +29,17 @@ const mocks = vi.hoisted(() => ({
   formatClassification: vi.fn((c: any) => JSON.stringify(c)),
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/error-classifier', () => ({
   classifyError: mocks.classifyError,
   formatClassification: mocks.formatClassification,
+}));
+
+vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: mocks.pathResolver,
+}));
+
+vi.mock('@agent/core/secure-io', () => ({
+  assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
   safeCopyFileSync: mocks.safeCopyFileSync,
   safeExistsSync: mocks.safeExistsSync,
   safeLstat: mocks.safeLstat,
@@ -39,6 +47,10 @@ vi.mock('@agent/core', () => ({
   safeReadFile: mocks.safeReadFile,
   safeReaddir: mocks.safeReaddir,
   safeWriteFile: mocks.safeWriteFile,
+}));
+
+vi.mock('@agent/core/governance', () => ({
+  withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));
 
 // customer.json is read through the foundation JSON facade, which dispatches
@@ -123,5 +135,15 @@ describe('customer_migrate_from_personal', () => {
     expect(JSON.parse(fs.readFileSync(path.join(customerRoot, 'customer.json'), 'utf8')).slug).toBe(
       'acme'
     );
+  });
+
+  it('formats migration output without writing to stdout', async () => {
+    const rootDir = '/tmp/kyberion';
+    mocks.pathResolver.rootDir.mockReturnValue(rootDir);
+    const mod = await import('./customer_migrate_from_personal.js');
+
+    expect(mod.formatMigratedCustomer(`${rootDir}/customer/acme`)).toEqual([
+      'Migrated personal setup to customer/acme',
+    ]);
   });
 });

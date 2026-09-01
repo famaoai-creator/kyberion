@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
+import { safeExistsSync } from './secure-io.js';
 
 type BrandTokens = {
   tokens?: {
@@ -17,6 +19,9 @@ type FontFamilyPair = {
 };
 
 const BRAND_TOKENS_RELATIVE_PATH = 'knowledge/public/design-patterns/brand-tokens/kyberion.json';
+const BRAND_TOKENS_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/brand-tokens.schema.json'
+);
 const FALLBACK_SANS_STACK = "Inter, 'Noto Sans JP', sans-serif";
 const FALLBACK_MONO_STACK = "'JetBrains Mono', monospace";
 
@@ -41,13 +46,27 @@ function findExistingPath(relativePath: string): string {
   throw new Error(`Unable to locate ${relativePath} from cwd or module path`);
 }
 
+function resolveBrandTokensPath(): string {
+  try {
+    return findExistingPath(BRAND_TOKENS_RELATIVE_PATH);
+  } catch {
+    // Let the governed catalog surface its configured fallback when a fresh
+    // checkout has not generated the optional design-token artifact yet.
+    return pathResolver.rootResolve(BRAND_TOKENS_RELATIVE_PATH);
+  }
+}
+
+const brandTokensCatalog = defineCatalog<BrandTokens>({
+  id: 'brand-tokens',
+  path: resolveBrandTokensPath,
+  schema: BRAND_TOKENS_SCHEMA_PATH,
+  fallback: {},
+  fallbackOnInvalid: true,
+});
+
 function loadBrandTokens(): BrandTokens {
   if (!cachedBrandTokens) {
-    const raw = safeReadFile(findExistingPath(BRAND_TOKENS_RELATIVE_PATH), {
-      encoding: 'utf8',
-      label: 'brand tokens',
-    }) as string;
-    cachedBrandTokens = JSON.parse(raw) as BrandTokens;
+    cachedBrandTokens = brandTokensCatalog.load();
   }
   return cachedBrandTokens;
 }

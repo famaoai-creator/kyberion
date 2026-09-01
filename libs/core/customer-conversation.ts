@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   loadJsonIfPresent as loadOptionalJson,
   safeExistsSync,
   safeReadFile,
@@ -36,6 +37,7 @@ import {
   summarizeOpenQuestionsForPrompt,
   type CustomerConversationMode,
 } from './customer-conversation-modes.js';
+import { isValidTenantSlug } from './entity-scope.js';
 
 /**
  * E2E-06 Task 2: customer-mode conversation.
@@ -109,22 +111,38 @@ function loadGroundingSources(tenantSlug: string): {
   tenantNotes: string;
   sources: string[];
 } {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[CUSTOMER_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
   const sources: string[] = [];
-  const catalogPath = pathResolver.knowledge('public/sales/solution-catalog.json');
+  const catalogPath = assertSafeRepositoryPath(
+    pathResolver.knowledge('public/sales/solution-catalog.json'),
+    { allowMissingLeaf: true }
+  );
   const catalog = readJsonIfPresent(catalogPath);
   if (catalog) sources.push('solution-catalog');
 
   const priceBookPath =
     [
-      pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales', 'price-book.json')),
-      pathResolver.knowledge('product/sales/price-book.json'),
+      assertSafeRepositoryPath(
+        pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales', 'price-book.json')),
+        { allowMissingLeaf: true }
+      ),
+      assertSafeRepositoryPath(pathResolver.knowledge('product/sales/price-book.json'), {
+        allowMissingLeaf: true,
+      }),
     ].find((candidate) => safeExistsSync(candidate)) || '';
   const priceBook = priceBookPath ? readJsonIfPresent(priceBookPath) : null;
   if (priceBook) sources.push('price-book');
 
-  const tenantSalesDir = pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales'));
+  const tenantSalesDir = assertSafeRepositoryPath(
+    pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales')),
+    { allowMissingLeaf: true }
+  );
   let tenantNotes = '';
-  const notesPath = path.join(tenantSalesDir, 'notes.md');
+  const notesPath = assertSafeRepositoryPath(path.join(tenantSalesDir, 'notes.md'), {
+    allowMissingLeaf: true,
+  });
   if (safeExistsSync(notesPath)) {
     tenantNotes = String(safeReadFile(notesPath, { encoding: 'utf8' })).slice(0, 4000);
     sources.push('tenant-sales-notes');
@@ -315,6 +333,10 @@ export interface SendToCustomerInput {
   title: string;
   body: string;
   correlationId?: string;
+  /** Trusted execution-boundary presence for the outbound approval gate. */
+  hasHuman?: boolean;
+  hasUI?: boolean;
+  nonInteractive?: boolean;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -435,6 +457,9 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       input.correlationId ||
       `customer-outbound:${input.binding.tenantSlug}:${Date.now().toString(36)}`,
     channel: input.binding.binding.surface,
+    ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
+    ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
+    ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
       summary: `${violationNote}${input.body.slice(0, 400)}`,

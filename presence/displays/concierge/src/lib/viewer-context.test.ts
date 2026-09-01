@@ -9,8 +9,10 @@ function tokenHash(token: string): string {
 }
 
 function mockRegistrations(entries: unknown[]): void {
-  vi.doMock('@agent/core', async () => ({
-    ...(await vi.importActual<typeof import('@agent/core')>('@agent/core')),
+  vi.doMock('@agent/core/chronos-access-registry', async () => ({
+    ...(await vi.importActual<typeof import('@agent/core/chronos-access-registry')>(
+      '@agent/core/chronos-access-registry'
+    )),
     readChronosTokenRegistrations: () => entries,
   }));
 }
@@ -23,7 +25,7 @@ describe('concierge viewer-context tier masking', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    vi.doUnmock('@agent/core');
+    vi.doUnmock('@agent/core/chronos-access-registry');
   });
 
   it('never grants the personal tier to a loopback localadmin viewer', async () => {
@@ -129,5 +131,47 @@ describe('concierge viewer-context tier masking', () => {
     };
     expect(conciergeHeadlessScope(viewer).tier_access).toEqual(['confidential', 'public']);
     expect(toSurfaceAuthorizationContext(viewer).tierAccess).toEqual(['confidential', 'public']);
+  });
+
+  it('projects a single-tenant confidential viewer into a non-personal conversation scope', async () => {
+    const { conciergeConversationScope } = await import('./viewer-context.js');
+    expect(
+      conciergeConversationScope({
+        role: 'localadmin',
+        tenantSlugs: ['tenant-a'],
+        organizationIds: 'all',
+        projectIds: 'all',
+        tierAccess: ['confidential', 'public'],
+        source: 'token',
+      })
+    ).toEqual({ scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' });
+  });
+
+  it('uses a public system scope when the viewer spans multiple tenants', async () => {
+    const { conciergeConversationScope } = await import('./viewer-context.js');
+    expect(
+      conciergeConversationScope({
+        role: 'localadmin',
+        tenantSlugs: 'all',
+        organizationIds: 'all',
+        projectIds: 'all',
+        tierAccess: ['confidential', 'public'],
+        source: 'loopback',
+      })
+    ).toEqual({ scope_kind: 'system', tier: 'public' });
+  });
+
+  it('retains a single tenant boundary for a public-only viewer', async () => {
+    const { conciergeConversationScope } = await import('./viewer-context.js');
+    expect(
+      conciergeConversationScope({
+        role: 'readonly',
+        tenantSlugs: ['tenant-a'],
+        organizationIds: 'all',
+        projectIds: 'all',
+        tierAccess: ['public'],
+        source: 'token',
+      })
+    ).toEqual({ scope_kind: 'tenant', tier: 'public', tenant_slug: 'tenant-a' });
   });
 });

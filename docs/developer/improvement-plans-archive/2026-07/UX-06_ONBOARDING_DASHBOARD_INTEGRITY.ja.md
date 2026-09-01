@@ -33,7 +33,7 @@ status: archived
 
 - `pnpm onboard` はビルド前だと raw の "cannot find module dist/..." で落ちる(`docs/INITIALIZATION.md:13-40` は build 前提を強調していない)。
 - `cli.ts intent` の不一致時(`:1444-1452`)は候補列挙だけで終了し、言い換え・明確化フローへの誘導が無い。intent はあるが pipeline が無い場合(`:1498`)も「Use a task session instead.」のみで具体コマンドが無い。
-- `onboard:apply` は JSON のみ出力(`onboarding_apply.ts:257,279`)で人間向け確認が無い。
+- `onboard apply` は JSON のみ出力(`onboarding_apply.ts:257,279`)で人間向け確認が無い。
 - オンボーディングに所要時間・中断可否(resume 対応済み)の案内が無い(`:598-599`)。
 
 ## ゴール(受入条件)
@@ -82,5 +82,5 @@ status: archived
 - `runIdentityPhase` は identity 成果物の書き込み後に state を `complete` 側へ進めるよう変更した。
 - `runOnboarding()` は完了済み identity フェーズで成果物欠損を見つけた場合、再実行するようにした。
 - dashboard は customer overlay の `connections` / `tenants` / `onboarding` を読むように寄せた。ヘッダの user も identity から取るようにした。
-- `pnpm onboard` / `pnpm onboard:apply` は dist 欠落時に build を促す薄いガードを挟み、`onboarding_apply` は既定で human-readable summary を出し `--json` で機械出力に戻せるようにした。
+- `pnpm onboard` / `pnpm onboard apply` は dist 欠落時に build を促す薄いガードを挟み、`onboarding_apply` は既定で human-readable summary を出し `--json` で機械出力に戻せるようにした。
 - `onboarding_wizard` は開始時に所要時間と Ctrl-C 再開可否を案内するようにした。

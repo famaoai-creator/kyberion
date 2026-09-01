@@ -7,31 +7,33 @@
  */
 
 import * as path from 'node:path';
+import { pathResolver, type VolatileScope, type VolatileCadence } from '@agent/core/path-resolver';
 import {
-  pathResolver,
+  assertSafeRepositoryPath,
   loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeLstat,
   safeWriteFile,
   safeReaddir,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
   type MemoryCandidateKind,
   type MemoryCandidateTier,
-} from '@agent/core';
-import type { VolatileScope, VolatileCadence } from '@agent/core';
+} from '@agent/core/memory-promotion-queue';
 import {
+  boundNotebook,
   bullets as notebookBullets,
-  dateStr,
-  neutralizeUntrustedProvenance,
+  bulletsBelowMarker,
+  DEFAULT_CONSOLIDATE_AFTER,
+  foldCapture,
   normalize as normalizeBullet,
-} from '@agent/core';
-
+} from '@agent/core/memory-notebook';
 const pr = pathResolver;
 
 // ---------------------------------------------------------------------------
@@ -109,18 +111,49 @@ function weeklyExpiry(): string {
 }
 
 function ensureDir(dir: string): void {
-  if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir)) safeMkdir(safeDir, { recursive: true });
 }
 
 function sidecarPath(mdPath: string): string {
-  return mdPath.endsWith('.md')
+  const candidate = mdPath.endsWith('.md')
     ? mdPath.slice(0, -3) + '.volatile.json'
     : mdPath + '.volatile.json';
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function normalizeDailyPeriod(value: unknown): string {
+  const date = String(value ?? isoDate()).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`[working-memory] invalid daily period '${date}'`);
+  }
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new Error(`[working-memory] invalid daily period '${date}'`);
+  }
+  return date;
+}
+
+function normalizeWeeklyPeriod(value: unknown): string {
+  const week = String(value ?? isoWeek()).trim();
+  if (!/^\d{4}-W(?:0[1-9]|[1-4]\d|5[0-3])$/.test(week)) {
+    throw new Error(`[working-memory] invalid weekly period '${week}'`);
+  }
+  return week;
 }
 
 function loadSidecar(mdPath: string): VolatileSidecar | null {
   const sp = sidecarPath(mdPath);
-  if (!safeExistsSync(sp)) return null;
+  if (!isExistingRegularFile(sp)) return null;
   try {
     return loadJson<VolatileSidecar>(sp);
   } catch {
@@ -164,6 +197,43 @@ function personalDir(): string {
   return d;
 }
 
+/**
+ * Resolve an externally supplied volatile-face path without allowing a
+ * caller to turn this actuator into a general repository reader/writer.
+ * `allowMissingLeaf` is intentional for read and nomination paths: the
+ * operation owns the user-facing not-found result, while every existing
+ * component is still checked for symlink traversal.
+ */
+function resolveVolatilePath(value: unknown, label: string): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  const resolved = assertSafeRepositoryPath(requested, { allowMissingLeaf: true });
+  const activeRoot = assertSafeRepositoryPath(pr.active(), { allowMissingLeaf: true });
+  if (resolved !== activeRoot && !resolved.startsWith(`${activeRoot}${path.sep}`)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] ${label} must stay under active/`);
+  }
+  return resolved;
+}
+
+function consolidationStatus(
+  mdPath: string,
+  body?: string
+): {
+  due: boolean;
+  bullet_count: number;
+  threshold: number;
+} {
+  const content =
+    body ??
+    (isExistingRegularFile(mdPath) ? String(safeReadFile(mdPath, { encoding: 'utf8' })) : '');
+  const bulletCount = bulletsBelowMarker(content);
+  return {
+    due: bulletCount >= DEFAULT_CONSOLIDATE_AFTER,
+    bullet_count: bulletCount,
+    threshold: DEFAULT_CONSOLIDATE_AFTER,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Templates
 // ---------------------------------------------------------------------------
@@ -202,16 +272,18 @@ function opNote(params: Record<string, unknown>): unknown {
   // bullet carries a capture date. `trusted: true` marks operator-authored
   // notes whose provenance suffixes are kept verbatim.
   const trusted = params.trusted === true;
-  let content = String(params.content ?? '')
+  const rawContent = String(params.content ?? '')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/^[-*]\s+/, '');
-  if (!trusted) content = neutralizeUntrustedProvenance(content);
+
+  const foldedContent = foldCapture('', [rawContent], Date.now(), trusted);
+  const content = notebookBullets(foldedContent.body)[0] || '';
 
   const dir = pr.volatile(scope, scopeRef, { tier });
   ensureDir(dir);
   const mdPath = path.join(dir, 'MEMORY.md');
-  if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, memoryTemplate('Working Memory'));
+  if (!isExistingRegularFile(mdPath)) safeWriteFile(mdPath, memoryTemplate('Working Memory'));
 
   const existing = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
   const fullSidecarPatch: Partial<VolatileSidecar> = {
@@ -240,23 +312,34 @@ function opNote(params: Record<string, unknown>): unknown {
     const sidecarUnchanged = loadSidecar(mdPath)
       ? touchSidecar(mdPath, { updated_at: isoNow() })
       : touchSidecar(mdPath, fullSidecarPatch);
-    return { path: mdPath, sidecar: sidecarUnchanged, deduped: true };
+    return {
+      path: mdPath,
+      sidecar: sidecarUnchanged,
+      deduped: true,
+      consolidation: consolidationStatus(mdPath, existing),
+    };
   }
 
-  const bullet = `- (${dateStr(Date.now())}) ${content}`;
+  const bullet = `- ${content}`;
   const target = `## ${section}`;
   const idx = existing.indexOf(target);
   let updated: string;
   if (idx >= 0) {
-    const insertAt = existing.indexOf('\n', idx) + 1;
-    updated = existing.slice(0, insertAt) + `\n${bullet}\n` + existing.slice(insertAt);
+    const sectionStart = existing.indexOf('\n', idx) + 1;
+    const nextSection = existing.indexOf('\n## ', sectionStart);
+    const sectionEnd = nextSection >= 0 ? nextSection : existing.length;
+    const sectionBody = existing.slice(sectionStart, sectionEnd).trimEnd();
+    const prefix = existing.slice(0, sectionStart);
+    const suffix = existing.slice(sectionEnd);
+    updated = `${prefix}${sectionBody ? `${sectionBody}\n` : ''}${bullet}\n${suffix}`;
   } else {
     updated = existing.trimEnd() + `\n\n## ${section}\n\n${bullet}\n`;
   }
 
-  safeWriteFile(mdPath, updated);
+  const bounded = boundNotebook(updated);
+  safeWriteFile(mdPath, bounded);
   const sidecar = touchSidecar(mdPath, fullSidecarPatch);
-  return { path: mdPath, sidecar };
+  return { path: mdPath, sidecar, consolidation: consolidationStatus(mdPath, bounded) };
 }
 
 function opSetNow(params: Record<string, unknown>): unknown {
@@ -314,7 +397,7 @@ function opAddActionItem(params: Record<string, unknown>): unknown {
   const dir = pr.volatile(scope, scopeRef, { tier });
   ensureDir(dir);
   const mdPath = path.join(dir, 'MEMORY.md');
-  if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, memoryTemplate('Working Memory'));
+  if (!isExistingRegularFile(mdPath)) safeWriteFile(mdPath, memoryTemplate('Working Memory'));
 
   const existing = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
   const target = '## Action Items';
@@ -339,7 +422,7 @@ function opCompleteActionItem(params: Record<string, unknown>): unknown {
 
   const dir = pr.volatile(scope, scopeRef, { tier });
   const mdPath = path.join(dir, 'MEMORY.md');
-  if (!safeExistsSync(mdPath)) return { path: mdPath, found: false };
+  if (!isExistingRegularFile(mdPath)) return { path: mdPath, found: false };
 
   const existing = safeReadFile(mdPath, { encoding: 'utf8' }) as string;
   // Anchored end-of-line (^…$, multiline) prevents "Buy milk" matching "Buy milk chocolate"
@@ -353,7 +436,7 @@ function opCompleteActionItem(params: Record<string, unknown>): unknown {
 }
 
 function opDailyOpen(params: Record<string, unknown>): unknown {
-  const dateStr = (params.date as string) ?? isoDate();
+  const dateStr = normalizeDailyPeriod(params.date);
   const pDir = personalDir();
   const journalDir = path.join(pDir, 'journal');
   const todayDir = path.join(pDir, 'today');
@@ -362,7 +445,9 @@ function opDailyOpen(params: Record<string, unknown>): unknown {
   ensureDir(todayDir);
   ensureDir(weeklyDir);
 
-  const journalPath = path.join(journalDir, `${dateStr}.md`);
+  const journalPath = assertSafeRepositoryPath(path.join(journalDir, `${dateStr}.md`), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(journalPath)) safeWriteFile(journalPath, dailyJournalTemplate(dateStr));
 
   const weekKey = isoWeek(new Date(`${dateStr}T12:00:00Z`));
@@ -383,7 +468,9 @@ function opDailyOpen(params: Record<string, unknown>): unknown {
     pinned: false,
   });
 
-  const todoPath = path.join(todayDir, 'TODO.md');
+  const todoPath = assertSafeRepositoryPath(path.join(todayDir, 'TODO.md'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(todoPath)) safeWriteFile(todoPath, todoTemplate(dateStr));
   const todoSidecar = touchSidecar(todoPath, {
     $schema: SCHEMA_REF,
@@ -409,18 +496,22 @@ function opTodoAdd(params: Record<string, unknown>): unknown {
   const dateStr = (params.date as string) ?? isoDate();
   const item = String(params.item ?? '');
   const result = opDailyOpen({ date: dateStr }) as { todoPath: string };
-  const existing = safeReadFile(result.todoPath, { encoding: 'utf8' }) as string;
+  const existing = isExistingRegularFile(result.todoPath)
+    ? (safeReadFile(result.todoPath, { encoding: 'utf8' }) as string)
+    : '';
   safeWriteFile(result.todoPath, existing.trimEnd() + `\n- [ ] ${item}\n`);
   touchSidecar(result.todoPath, { updated_at: isoNow() });
   return { path: result.todoPath };
 }
 
 function opTodoDone(params: Record<string, unknown>): unknown {
-  const dateStr = (params.date as string) ?? isoDate();
+  const dateStr = normalizeDailyPeriod(params.date);
   const item = String(params.item ?? '');
   const pDir = pr.active('personal');
-  const todoPath = path.join(pDir, 'today', 'TODO.md');
-  if (!safeExistsSync(todoPath)) return { path: todoPath, found: false };
+  const todoPath = assertSafeRepositoryPath(path.join(pDir, 'today', 'TODO.md'), {
+    allowMissingLeaf: true,
+  });
+  if (!isExistingRegularFile(todoPath)) return { path: todoPath, found: false };
 
   const existing = safeReadFile(todoPath, { encoding: 'utf8' }) as string;
   const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -431,8 +522,10 @@ function opTodoDone(params: Record<string, unknown>): unknown {
     existing.replace(new RegExp(`^(- \\[ \\] ${escaped})$`, 'gm'), `- [x] ${item}`)
   );
 
-  const journalPath = path.join(pDir, 'journal', `${dateStr}.md`);
-  if (safeExistsSync(journalPath)) {
+  const journalPath = assertSafeRepositoryPath(path.join(pDir, 'journal', `${dateStr}.md`), {
+    allowMissingLeaf: true,
+  });
+  if (isExistingRegularFile(journalPath)) {
     const j = safeReadFile(journalPath, { encoding: 'utf8' }) as string;
     const doneIdx = j.indexOf('## Done');
     if (doneIdx >= 0) {
@@ -445,12 +538,14 @@ function opTodoDone(params: Record<string, unknown>): unknown {
 }
 
 function opTodoRollover(params: Record<string, unknown>): unknown {
-  const todayStr = (params.date as string) ?? isoDate();
+  const todayStr = normalizeDailyPeriod(params.date);
   const pDir = pr.active('personal');
   const journalDir = path.join(pDir, 'journal');
-  const todoPath = path.join(pDir, 'today', 'TODO.md');
+  const todoPath = assertSafeRepositoryPath(path.join(pDir, 'today', 'TODO.md'), {
+    allowMissingLeaf: true,
+  });
 
-  if (!safeExistsSync(todoPath)) return { rolledOver: 0, items: [] };
+  if (!isExistingRegularFile(todoPath)) return { rolledOver: 0, items: [] };
 
   const existing = safeReadFile(todoPath, { encoding: 'utf8' }) as string;
   const pendingLines = existing.split('\n').filter((l) => /^- \[ \] /.test(l));
@@ -460,8 +555,10 @@ function opTodoRollover(params: Record<string, unknown>): unknown {
   }
 
   // Append pending items to today's journal
-  const journalPath = path.join(journalDir, `${todayStr}.md`);
-  if (safeExistsSync(journalPath)) {
+  const journalPath = assertSafeRepositoryPath(path.join(journalDir, `${todayStr}.md`), {
+    allowMissingLeaf: true,
+  });
+  if (isExistingRegularFile(journalPath)) {
     const j = safeReadFile(journalPath, { encoding: 'utf8' }) as string;
     const todoIdx = j.indexOf('## TODO');
     if (todoIdx >= 0) {
@@ -487,14 +584,16 @@ function opTodoRollover(params: Record<string, unknown>): unknown {
 }
 
 function opWeeklyOpen(params: Record<string, unknown>): unknown {
-  const weekKey = (params.weekKey as string) ?? isoWeek();
+  const weekKey = normalizeWeeklyPeriod(params.weekKey);
   const pDir = personalDir();
   const weeklyDir = path.join(pDir, 'weekly');
   const journalDir = path.join(pDir, 'journal');
   ensureDir(weeklyDir);
   ensureDir(journalDir);
 
-  const weeklyPath = path.join(weeklyDir, `${weekKey}.md`);
+  const weeklyPath = assertSafeRepositoryPath(path.join(weeklyDir, `${weekKey}.md`), {
+    allowMissingLeaf: true,
+  });
   const dailyPaths: string[] = [];
   try {
     for (const entry of safeReaddir(journalDir)) {
@@ -530,7 +629,7 @@ function opWeeklyOpen(params: Record<string, unknown>): unknown {
 }
 
 function opNominatePromotion(params: Record<string, unknown>): unknown {
-  const mdPath = String(params.mdPath ?? '');
+  const mdPath = params.mdPath ? resolveVolatilePath(params.mdPath, 'mdPath') : '';
   const sourceRef = String(params.source_ref ?? (mdPath || 'volatile-face'));
   const summary = String(
     params.summary ?? 'Distillation candidate from volatile working-memory face'
@@ -558,7 +657,7 @@ function opNominatePromotion(params: Record<string, unknown>): unknown {
   });
   enqueueMemoryPromotionCandidate(candidate);
 
-  if (mdPath && safeExistsSync(mdPath)) {
+  if (mdPath && isExistingRegularFile(mdPath)) {
     touchSidecar(mdPath, { promotion_candidate_id: candidate.candidate_id, status: 'promoted' });
   }
 
@@ -566,16 +665,25 @@ function opNominatePromotion(params: Record<string, unknown>): unknown {
 }
 
 function opRead(params: Record<string, unknown>): unknown {
-  const mdPath = String(params.mdPath ?? '');
-  const content = safeExistsSync(mdPath)
+  const mdPath = resolveVolatilePath(params.mdPath, 'mdPath');
+  const content = isExistingRegularFile(mdPath)
     ? (safeReadFile(mdPath, { encoding: 'utf8' }) as string)
     : null;
   return { content, sidecar: loadSidecar(mdPath) };
 }
 
+function opConsolidationStatus(params: Record<string, unknown>): unknown {
+  const mdPath = params.mdPath
+    ? resolveVolatilePath(params.mdPath, 'mdPath')
+    : path.join(pr.active('personal'), 'MEMORY.md');
+  return { path: mdPath, ...consolidationStatus(mdPath) };
+}
+
 function opList(params: Record<string, unknown>): unknown {
-  const indexPath = pr.active('INDEX.volatile.json');
-  if (!safeExistsSync(indexPath)) return [];
+  const indexPath = assertSafeRepositoryPath(pr.active('INDEX.volatile.json'), {
+    allowMissingLeaf: true,
+  });
+  if (!isExistingRegularFile(indexPath)) return [];
   try {
     const all = loadJson<
       Array<{
@@ -604,6 +712,12 @@ function opRunGc(params: Record<string, unknown>): unknown {
   const results = { expired: 0, rolledOver: 0, warnings: [] as string[] };
 
   function scanDir(dir: string): void {
+    if (!safeExistsSync(dir)) return;
+    try {
+      if (!safeLstat(dir).isDirectory()) return;
+    } catch {
+      return;
+    }
     let entries: string[];
     try {
       entries = safeReaddir(dir);
@@ -611,8 +725,11 @@ function opRunGc(params: Record<string, unknown>): unknown {
       return;
     }
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry);
+      const fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
+        allowMissingLeaf: true,
+      });
       if (entry.endsWith('.volatile.json')) {
+        if (!isExistingRegularFile(fullPath)) continue;
         let sidecar: VolatileSidecar;
         try {
           sidecar = loadJson<VolatileSidecar>(fullPath);
@@ -658,6 +775,12 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
   const faces: Array<{ mdPath: string; sidecar: VolatileSidecar }> = [];
 
   function scanDir(dir: string): void {
+    if (!safeExistsSync(dir)) return;
+    try {
+      if (!safeLstat(dir).isDirectory()) return;
+    } catch {
+      return;
+    }
     let entries: string[];
     try {
       entries = safeReaddir(dir);
@@ -665,8 +788,11 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
       return;
     }
     for (const entry of entries) {
-      const fullPath = path.join(dir, entry);
+      const fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
+        allowMissingLeaf: true,
+      });
       if (entry.endsWith('.volatile.json')) {
+        if (!isExistingRegularFile(fullPath)) continue;
         try {
           const sidecar = loadJson<VolatileSidecar>(fullPath);
           faces.push({ mdPath: fullPath.replace(/\.volatile\.json$/, '.md'), sidecar });
@@ -684,8 +810,12 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
     (a, b) => a.sidecar.scope.localeCompare(b.sidecar.scope) || a.mdPath.localeCompare(b.mdPath)
   );
 
-  const jsonPath = pr.active('INDEX.volatile.json');
-  const mdIndexPath = pr.active('INDEX.volatile.md');
+  const jsonPath = assertSafeRepositoryPath(pr.active('INDEX.volatile.json'), {
+    allowMissingLeaf: true,
+  });
+  const mdIndexPath = assertSafeRepositoryPath(pr.active('INDEX.volatile.md'), {
+    allowMissingLeaf: true,
+  });
   const relPath = (p: string) =>
     p.startsWith(activeRoot) ? 'active' + p.slice(activeRoot.length) : p;
   const rows = faces
@@ -721,8 +851,12 @@ export function initMissionMemory(input: { missionId: string; tier?: VolatileTie
   nowPath: string;
 } {
   const dir = pr.volatile('mission', input.missionId, { tier: input.tier ?? 'confidential' });
-  const mdPath = path.join(dir, 'MEMORY.md');
-  const nowPath = path.join(dir, 'NOW.md');
+  const mdPath = assertSafeRepositoryPath(path.join(dir, 'MEMORY.md'), {
+    allowMissingLeaf: true,
+  });
+  const nowPath = assertSafeRepositoryPath(path.join(dir, 'NOW.md'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(mdPath))
     safeWriteFile(mdPath, memoryTemplate(`Mission ${input.missionId} — Working Memory`));
   if (!safeExistsSync(nowPath)) safeWriteFile(nowPath, nowTemplate());
@@ -761,6 +895,7 @@ const OPS: Record<string, (params: Record<string, unknown>) => unknown> = {
   'todo-rollover': opTodoRollover,
   'weekly-open': opWeeklyOpen,
   'nominate-promotion': opNominatePromotion,
+  'consolidation-status': opConsolidationStatus,
   'run-gc': opRunGc,
   'build-index': opBuildIndex,
   read: opRead,

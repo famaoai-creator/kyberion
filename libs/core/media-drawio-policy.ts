@@ -109,7 +109,3 @@ export function resolveMediaDrawioNodeSize(input: {
   );
   return match ? { width: match.width, height: match.height } : null;
 }
-
-export function resetMediaDrawioPolicyCatalogCache(): void {
-  catalog.reset();
-}

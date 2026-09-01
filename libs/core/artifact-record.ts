@@ -2,10 +2,11 @@ import type { ValidateFunction } from 'ajv';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -55,7 +56,21 @@ function ensureValidator(): ValidateFunction {
 }
 
 function artifactPath(artifactId: string): string {
-  return `${ARTIFACT_DIR}/${artifactId}.json`;
+  const normalized = String(artifactId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/]/u.test(normalized)) {
+    throw new Error(`[artifact-record] invalid artifact id: ${artifactId}`);
+  }
+  return assertSafeRepositoryPath(`${ARTIFACT_DIR}/${normalized}.json`, {
+    allowMissingLeaf: true,
+  });
+}
+
+function artifactRecordCatalog(filePath: string) {
+  return defineCatalog<ArtifactRecord>({
+    id: 'artifact-record',
+    path: filePath,
+    schema: ARTIFACT_SCHEMA_PATH,
+  });
 }
 
 export function createArtifactRecord(
@@ -80,7 +95,8 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
     );
     throw new Error(`Invalid artifact record: ${errors.join('; ')}`);
   }
-  if (!safeExistsSync(ARTIFACT_DIR)) safeMkdir(ARTIFACT_DIR, { recursive: true });
+  const artifactDir = assertSafeRepositoryPath(ARTIFACT_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(artifactDir)) safeMkdir(artifactDir, { recursive: true });
   const deliverableKind = inferDeliverableKind(record.kind);
   const qualityReport = deliverableKind
     ? evaluateDeliverableQuality(deliverableKind, {
@@ -126,14 +142,14 @@ export function saveArtifactRecord(record: ArtifactRecord): string {
 export function loadArtifactRecord(artifactId: string): ArtifactRecord | null {
   const filePath = artifactPath(artifactId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ArtifactRecord;
+  const parsed = artifactRecordCatalog(filePath).load();
   return validateArtifactRecord(parsed) ? parsed : null;
 }
 
 export function listArtifactRecords(): ArtifactRecord[] {
-  if (!safeExistsSync(ARTIFACT_DIR)) return [];
-  return safeReaddir(ARTIFACT_DIR)
+  const artifactDir = assertSafeRepositoryPath(ARTIFACT_DIR, { allowMissingLeaf: true });
+  if (!safeExistsSync(artifactDir)) return [];
+  return safeReaddir(artifactDir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => loadArtifactRecord(entry.replace(/\.json$/, '')))
     .filter((record): record is ArtifactRecord => Boolean(record))

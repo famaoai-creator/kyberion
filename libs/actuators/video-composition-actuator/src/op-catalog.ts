@@ -1,11 +1,12 @@
-import { withCatalogInputContract } from '@agent/core';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // AR-02: self-described op catalog — mirrors this actuator's action
 // dispatch (if/else style handleAction). None of these ops appear in the
 // shared pools, so every entry is strictly additive: pipelines reached them
 // via explicit step roles, and determineActuatorStepType threw unknown-op.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 const VIDEO_COMPOSITION_CONTRACTS: Record<string, InputSchema> = {
@@ -173,7 +174,7 @@ export const VIDEO_COMPOSITION_ACTUATOR_APPLY_OPS = [
   'validate_narrated_video_artifact',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const schema = VIDEO_COMPOSITION_CONTRACTS[op];
   const description = schema
     ? { op, kind, input_schema: schema, examples: VIDEO_COMPOSITION_EXAMPLES[op] || [{}] }
@@ -181,7 +182,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   return withCatalogInputContract('video-composition', op, kind, description);
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...VIDEO_COMPOSITION_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...VIDEO_COMPOSITION_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

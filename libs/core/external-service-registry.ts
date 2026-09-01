@@ -11,7 +11,8 @@
  */
 
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,19 @@ export interface ExternalServiceEntry {
 interface ExternalServiceRegistry {
   version: string;
   services: ExternalServiceEntry[];
+}
+
+interface ServiceProvider {
+  id: string;
+  aliases: string[];
+  topics: string[];
+  url_template: string;
+  notes?: string;
+}
+
+interface ServiceProviderCatalog {
+  version: string;
+  providers: ServiceProvider[];
 }
 
 // ─── Paths ──────────────────────────────────────────────────────────────────
@@ -51,16 +65,26 @@ const PERSONAL_SEED_PATH = pathResolver.knowledge(
  * Highest priority — overrides both seed layers.
  */
 const RUNTIME_PATH = pathResolver.shared('runtime/external-service-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/external-service-registry.schema.json'
+);
+const PROVIDER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-provider-catalog.schema.json'
+);
+
+const EMPTY_REGISTRY: ExternalServiceRegistry = { version: '1.0.0', services: [] };
+const EMPTY_PROVIDER_CATALOG: ServiceProviderCatalog = { version: '1.0.0', providers: [] };
 
 // ─── Internal Helpers ───────────────────────────────────────────────────────
 
 function parseRegistry(filePath: string): ExternalServiceRegistry | null {
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    return loadJson<ExternalServiceRegistry>(filePath);
-  } catch {
-    return null;
-  }
+  return defineCatalog<ExternalServiceRegistry>({
+    id: 'external-service-registry',
+    path: filePath,
+    schema: REGISTRY_SCHEMA_PATH,
+    fallback: EMPTY_REGISTRY,
+    fallbackOnInvalid: true,
+  }).load();
 }
 
 /**
@@ -86,6 +110,11 @@ function loadMerged(): ExternalServiceRegistry {
 }
 
 function saveRuntime(registry: ExternalServiceRegistry): void {
+  defineCatalog<ExternalServiceRegistry>({
+    id: 'external-service-registry',
+    path: RUNTIME_PATH,
+    schema: REGISTRY_SCHEMA_PATH,
+  }).validate(registry, RUNTIME_PATH);
   safeWriteFile(RUNTIME_PATH, JSON.stringify(registry, null, 2), { mkdir: true });
 }
 
@@ -218,19 +247,6 @@ export function topicToServiceId(topic: string): string {
 
 // ─── Provider Catalog ────────────────────────────────────────────────────────
 
-interface ServiceProvider {
-  id: string;
-  aliases: string[];
-  topics: string[];
-  url_template: string;
-  notes?: string;
-}
-
-interface ServiceProviderCatalog {
-  version: string;
-  providers: ServiceProvider[];
-}
-
 const PUBLIC_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
   'product/orchestration/service-provider-catalog.json'
 );
@@ -240,13 +256,13 @@ const PERSONAL_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
 
 function loadProviderCatalog(): ServiceProvider[] {
   const load = (p: string): ServiceProvider[] => {
-    if (!safeExistsSync(p)) return [];
-    try {
-      const parsed = loadJson<ServiceProviderCatalog>(p);
-      return parsed.providers || [];
-    } catch {
-      return [];
-    }
+    return defineCatalog<ServiceProviderCatalog>({
+      id: 'service-provider-catalog',
+      path: p,
+      schema: PROVIDER_SCHEMA_PATH,
+      fallback: EMPTY_PROVIDER_CATALOG,
+      fallbackOnInvalid: true,
+    }).load().providers;
   };
 
   const publicProviders = load(PUBLIC_PROVIDER_CATALOG_PATH);

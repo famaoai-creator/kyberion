@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   checkAllReasoningBackendAuth,
   checkReasoningBackendAuth,
+  probeReasoningBackendAuth,
 } from './reasoning-auth-preflight.js';
 
 describe('reasoning auth preflight', () => {
@@ -31,5 +32,40 @@ describe('reasoning auth preflight', () => {
     expect(
       results.every((entry) => entry.required_environment.every((name) => !name.includes('=')))
     ).toBe(true);
+  });
+
+  it('separates configured presence from provider verification', async () => {
+    const probe = vi.fn(async () => ({ available: true }));
+    const result = await probeReasoningBackendAuth(
+      'anthropic',
+      { ANTHROPIC_API_KEY: 'secret-value' },
+      undefined,
+      { probe }
+    );
+    expect(result.status).toBe('configured');
+    expect(result.probe.status).toBe('verified');
+    expect(result.probe.note).toContain('verified');
+    expect(probe).toHaveBeenCalledWith('anthropic', { ANTHROPIC_API_KEY: 'secret-value' });
+    expect(JSON.stringify(result)).not.toContain('secret-value');
+  });
+
+  it('fails verification without probing when configuration is missing', async () => {
+    const probe = vi.fn(async () => ({ available: true }));
+    const result = await probeReasoningBackendAuth('anthropic', {}, undefined, { probe });
+    expect(result.probe.status).toBe('failed');
+    expect(result.missing_environment).toContain('ANTHROPIC_API_KEY');
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it('reports a provider rejection without exposing the credential', async () => {
+    const result = await probeReasoningBackendAuth(
+      'anthropic',
+      { ANTHROPIC_API_KEY: 'secret-value' },
+      undefined,
+      { probe: async () => ({ available: false, reason: 'HTTP 401 unauthorized' }) }
+    );
+    expect(result.probe.status).toBe('failed');
+    expect(result.probe.note).toContain('401');
+    expect(JSON.stringify(result)).not.toContain('secret-value');
   });
 });

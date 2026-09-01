@@ -237,6 +237,37 @@ describe('surface-approval-ui', () => {
     expect(result).toMatchObject({ handled: true, record: { status: 'approved' } });
   });
 
+  it('keeps the shared intent authority and next action in approval text', () => {
+    const record = createSurfaceApprovalRequest({
+      surface: 'telegram',
+      channel: FIXTURE_CHANNEL,
+      threadTs: 'thread-contract',
+      correlationId: `surface-approval-test-${RUN_ID}-contract`,
+      requestedBy: 'agent-1',
+      draft: { title: 'Deploy', summary: 'Deploy the reviewed change.' },
+    });
+    const text = buildSurfaceApprovalText('telegram', record, {
+      request_id: 'ir_approval_contract',
+      normalized_intent: 'deploy_release',
+      missing_inputs: [],
+      resolution_shape: 'mission',
+      outcome_kind: 'service_change',
+      authority_level: 'approval_required',
+      next_action: {
+        kind: 'request_approval',
+        label: 'Approve this release.',
+        consequence: 'The release waits until approval is recorded.',
+      },
+      rationale: 'approval is required',
+    });
+
+    expect(text).toContain('Authority: 人間の承認が必要');
+    expect(text).toContain('Next action: Approve this release.');
+    expect(text).toContain('Consequence: The release waits until approval is recorded.');
+    expect(text).toContain('Outcome: サービス変更');
+    expect(text).not.toContain('approval_required');
+  });
+
   it('fails closed and durably expires stale or malformed approval requests', () => {
     const expired = createSurfaceApprovalRequest({
       surface: 'telegram',

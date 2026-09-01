@@ -1,8 +1,9 @@
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { missionDir } from '@agent/core/path-resolver';
+import * as pathResolver from '@agent/core/path-resolver';
 import {
-  logger,
-  missionDir,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
@@ -10,9 +11,9 @@ import {
   safeReaddir,
   safeStat,
   safeWriteFile,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 
 /**
  * E2E-05 Task 2/3: build-actuator core.
@@ -59,6 +60,10 @@ export interface BuildActuatorResult {
 const DEFAULT_BUILD_TIMEOUT_MS = 45 * 60 * 1000;
 const ERROR_SUMMARY_MAX_LINES = 10;
 
+function resolveBuildPath(ref: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
+}
+
 export function extractErrorSummary(logText: string): string[] {
   return logText
     .split('\n')
@@ -89,7 +94,7 @@ export function buildCommandForOp(input: BuildActuatorInput): {
   args: string[];
   cwd: string;
 } {
-  const projectDir = pathResolver.rootResolve(String(input.project_dir || '.'));
+  const projectDir = resolveBuildPath(String(input.project_dir || '.'));
   switch (input.op) {
     case 'ios_generate_project':
       return { command: 'xcodegen', args: ['generate'], cwd: projectDir };
@@ -156,11 +161,15 @@ function buildLogPath(op: BuildOp, missionId?: string): string {
   if (missionId) {
     const dir = path.join(missionDir(missionId, 'public'), 'evidence', 'build');
     safeMkdir(dir, { recursive: true });
-    return path.join(dir, `${op}-${stamp}.log`);
+    return assertSafeRepositoryPath(path.join(dir, `${op}-${stamp}.log`), {
+      allowMissingLeaf: true,
+    });
   }
   const dir = pathResolver.rootResolve('active/shared/tmp/build-logs');
   safeMkdir(dir, { recursive: true });
-  return path.join(dir, `${op}-${stamp}.log`);
+  return assertSafeRepositoryPath(path.join(dir, `${op}-${stamp}.log`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function collectArtifacts(op: BuildOp, projectDir: string): string[] {
@@ -171,7 +180,13 @@ function collectArtifacts(op: BuildOp, projectDir: string): string[] {
   if (op === 'android_bundle') {
     candidates.push(path.join(projectDir, 'app/build/outputs/bundle/release/app-release.aab'));
   }
-  return candidates.filter((candidate) => safeExistsSync(candidate));
+  return candidates.filter((candidate) => {
+    try {
+      return safeExistsSync(assertSafeRepositoryPath(candidate));
+    } catch {
+      return false;
+    }
+  });
 }
 
 function runBuildCommand(input: BuildActuatorInput): BuildActuatorResult {
@@ -266,7 +281,7 @@ export function scaffoldApp(input: BuildActuatorInput): BuildActuatorResult {
   if (!safeExistsSync(sourceDir)) {
     throw new Error(`scaffold fixture missing: ${sourceDir}`);
   }
-  const destDir = pathResolver.rootResolve(input.dest_dir);
+  const destDir = resolveBuildPath(input.dest_dir);
   // Placeholder style is __NAME__ (formatter-inert; `{{ }}` gets mangled by
   // YAML/Kotlin formatters into `{ { NAME } }`).
   const written = copyScaffoldDir(sourceDir, destDir, {

@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('decision-rights', () => {
   const tmpRoot = pathResolver.sharedTmp('decision-rights-resolver-test');
@@ -108,5 +114,40 @@ describe('decision-rights', () => {
     expect(evaluation?.requiresHumanAcceptance).toBe(true);
     expect(evaluation?.requiresEscalation).toBe(true);
     expect(evaluation?.escalationReason).toBe('final decision holder is human');
+  });
+
+  it('fails closed when a present decision-rights catalog violates its schema', () => {
+    safeMkdir(`${tmpRoot}/knowledge/product/governance`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/knowledge/product/governance/decision-rights.json`,
+      JSON.stringify({ version: '1.0.0', decisions: [] }, null, 2)
+    );
+
+    expect(() => resolveDecisionRightsMatrix(null, tmpRoot)).toThrow(
+      /Invalid catalog decision-rights/
+    );
+  });
+
+  it('does not preserve an invalid tenant in a derived path or result', () => {
+    const matrix = resolveDecisionRightsMatrix('../outside', tmpRoot);
+
+    expect(matrix.company_id).toBe('default');
+    expect(matrix.tenant_slug).toBeNull();
+    expect(matrix.source_path).not.toContain('outside');
+  });
+
+  it('rejects a symlinked tenant override before reading it', () => {
+    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeMkdir(`${tmpRoot}/outside`, { recursive: true });
+    safeWriteFile(
+      `${tmpRoot}/outside/decision-rights.json`,
+      JSON.stringify({ version: '1.0.0', decisions: [] })
+    );
+    safeSymlinkSync(
+      `${tmpRoot}/outside/decision-rights.json`,
+      `${tmpRoot}/customer/acme/decision-rights.json`
+    );
+
+    expect(() => resolveDecisionRightsMatrix('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 });

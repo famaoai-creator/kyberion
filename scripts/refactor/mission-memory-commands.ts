@@ -1,16 +1,20 @@
+import { auditChain } from '@agent/core/audit-chain';
 import {
-  auditChain,
   assertMemoryPromotionReviewReady,
-  getRegisteredEnv,
-  listMemoryPromotionCandidates,
-  logger,
-  promoteMemoryCandidateToKnowledge,
-  promotePersonalMemoryCandidates,
   reviewMemoryPromotionCandidate,
   reviewMemoryPromotionQueue,
-  updateMemoryPromotionCandidateStatus,
   type MemoryPromotionReview,
-} from '@agent/core';
+} from '@agent/core/memory-promotion-review';
+import {
+  listMemoryPromotionCandidates,
+  updateMemoryPromotionCandidateStatus,
+} from '@agent/core/memory-promotion-queue';
+import {
+  promoteMemoryCandidateToKnowledge,
+  promotePersonalMemoryCandidates,
+} from '@agent/core/memory-promotion-workflow';
+import { logger } from '@agent/core/core';
+import { getRegisteredEnv } from '@agent/core/foundation';
 import { getOptionValue } from './mission-cli-args.js';
 
 function registeredEnv(name: string): string | undefined {

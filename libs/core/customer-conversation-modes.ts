@@ -1,7 +1,14 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import type { DealRecord, DealStage } from './deal-store.js';
@@ -99,9 +106,17 @@ export function buildModePromptLines(mode: CustomerConversationMode): string[] {
  * cite documented workarounds instead of improvising.
  */
 export function loadSupportGrounding(tenantSlug: string): { knownIssues: string; found: boolean } {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[CUSTOMER_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
   const candidates = [
-    pathResolver.knowledge(path.join('confidential', tenantSlug, 'support', 'known-issues.md')),
-    pathResolver.knowledge('product/sales/known-issues.md'),
+    assertSafeRepositoryPath(
+      pathResolver.knowledge(path.join('confidential', tenantSlug, 'support', 'known-issues.md')),
+      { allowMissingLeaf: true }
+    ),
+    assertSafeRepositoryPath(pathResolver.knowledge('product/sales/known-issues.md'), {
+      allowMissingLeaf: true,
+    }),
   ];
   for (const candidate of candidates) {
     try {
@@ -129,11 +144,20 @@ export interface DealRequirementsCapture {
 }
 
 function dealRequirementsPath(tenantSlug: string, dealId: string): string {
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
   // Lives in the deal's document directory (customer/<tenant>/deals/<id>/,
   // same convention as deal-documents) — NOT as a sibling of DEAL-*.json,
   // which listDeals() would misread as a deal record.
-  return pathResolver.rootResolve(
-    path.join('customer', tenantSlug, 'deals', dealId, 'requirements.json')
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      path.join('customer', tenantSlug, 'deals', dealId, 'requirements.json')
+    ),
+    { allowMissingLeaf: true }
   );
 }
 

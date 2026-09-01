@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -8,9 +8,9 @@ import { enqueueDelegationNotification } from './delegation-notifications.js';
 import { sanitizeGapSamples } from './gap-phase.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -115,18 +115,24 @@ export type DelegatedTaskWorkerHandler = (wake: DelegatedTaskWorkerWake) => Prom
 // observability files (resolved lazily per call).
 function resolveTracePath(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_TRACE_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('observability/delegations.jsonl');
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('observability/delegations.jsonl');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function resolveStoreDir(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_STORE_DIR')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('observability/delegations');
+  const candidate = override
+    ? pathResolver.rootResolve(override)
+    : pathResolver.shared('observability/delegations');
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function ensureTraceDir(): void {
-  const traceDir = resolveTracePath().replace(/[/\\][^/\\]+$/, '');
+  const traceDir = assertSafeRepositoryPath(path.dirname(resolveTracePath()), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(traceDir)) {
     safeMkdir(traceDir, { recursive: true });
   }
@@ -142,7 +148,9 @@ function recordPath(delegationId: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, '-');
   if (!safeId) throw new Error('Delegation id is required.');
-  return `${resolveStoreDir()}/${safeId}.json`;
+  return assertSafeRepositoryPath(path.join(resolveStoreDir(), `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function childInboxPath(childSessionId: string): string {
@@ -150,7 +158,9 @@ function childInboxPath(childSessionId: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._-]+/g, '-');
   if (!safeId) throw new Error('Child session id is required.');
-  return path.join(resolveStoreDir(), 'child-inbox', `${safeId}.jsonl`);
+  return assertSafeRepositoryPath(path.join(resolveStoreDir(), 'child-inbox', `${safeId}.jsonl`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function requireDelegatedTaskRecord(
@@ -214,8 +224,8 @@ export function buildDelegatedTaskWorkerProcessSpec(
     command: process.execPath,
     args: [
       '--import',
-      pathResolver.rootResolve('scripts/ts-loader.mjs'),
-      pathResolver.rootResolve('scripts/delegated_task_worker.ts'),
+      assertSafeRepositoryPath(pathResolver.rootResolve('scripts/ts-loader.mjs')),
+      assertSafeRepositoryPath(pathResolver.rootResolve('scripts/delegated_task_worker.ts')),
       '--delegation-id',
       delegationId,
       '--owner',
@@ -408,7 +418,7 @@ function persistRecord(trace: DelegatedTaskTrace): void {
 }
 
 function persistRecordStrict(trace: DelegatedTaskTrace): void {
-  const dir = resolveStoreDir();
+  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   const { trace_id, ...rest } = trace;
   const record: DelegatedTaskRecord = { delegation_id: trace_id, ...rest };
@@ -755,8 +765,7 @@ export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskReco
   try {
     const filePath = recordPath(delegationId);
     if (!safeExistsSync(filePath)) return null;
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as DelegatedTaskRecord;
+    const parsed = readJson<DelegatedTaskRecord>(filePath);
     return parsed && typeof parsed.delegation_id === 'string' ? parsed : null;
   } catch {
     return null;
@@ -770,7 +779,7 @@ export function loadDelegatedTaskRecord(delegationId: string): DelegatedTaskReco
 export function listActiveDelegatedTaskRecords(limit = 8): DelegatedTaskRecord[] {
   const boundedLimit = Math.max(0, Math.floor(limit));
   if (boundedLimit === 0) return [];
-  const dir = resolveStoreDir();
+  const dir = assertSafeRepositoryPath(resolveStoreDir(), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) return [];
   const records: DelegatedTaskRecord[] = [];
   for (const entry of safeReaddir(dir)) {

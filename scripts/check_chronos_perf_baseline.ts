@@ -7,7 +7,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { chromium, type Page } from 'playwright';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface ChronosPerfSample {
   url: string;
@@ -79,7 +79,7 @@ async function waitFor(url: string): Promise<void> {
     }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error(`Chronos did not become ready at ${url}`);
+  throw new ScriptExitError(1, `Chronos did not become ready at ${url}`);
 }
 
 export async function runChronosPerfBaseline(argv: string[] = []): Promise<ChronosPerfReport> {
@@ -126,7 +126,22 @@ export const runCheckChronosPerf = defineScript({
   async run(context) {
     const report = await runChronosPerfBaseline(context.argv);
     context.print(report);
-    if (!report.passed) throw new Error('Chronos performance thresholds were not met');
+    if (!report.passed) {
+      throw new ScriptExitError(
+        1,
+        `Chronos performance thresholds were not met: ${report.samples
+          .filter(
+            (sample) =>
+              sample.avg_fps < report.thresholds.min_fps ||
+              (sample.js_heap_mib != null && sample.js_heap_mib > report.thresholds.max_heap_mib)
+          )
+          .map(
+            (sample) =>
+              `${sample.url} (fps=${sample.avg_fps}, heap_mib=${sample.js_heap_mib ?? 'n/a'})`
+          )
+          .join('; ')}`
+      );
+    }
     return report;
   },
 });

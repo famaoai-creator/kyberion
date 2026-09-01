@@ -66,7 +66,7 @@
       "id": "kyberion.governance-approval",
       "category": "governance_block",
       "label": "Approval required",
-      "remediation": "This action requires explicit approval per `approval-policy.json`. Run `pnpm cli approval` or follow the prompt to grant approval.",
+      "remediation": "This action requires explicit approval per `approval-policy.json`. Run `pnpm kyberion approvals` or follow the prompt to grant approval.",
       "patterns": [
         "approval[\\s_-]?required|enforceApprovalGate|approval gate|Reasoning budget exceeded|prompt budget exceeded|response budget exceeded|combined budget exceeded"
       ]
@@ -102,7 +102,7 @@
       "id": "secret.not-found",
       "category": "missing_secret",
       "label": "Secret not found",
-      "remediation": "Run `pnpm cli secret list` to see what is configured, then add the missing entry to your OS keychain.",
+      "remediation": "Run `pnpm setup:report --persona first-time-user` to review configured secrets and add the missing entry to your OS keychain.",
       "patterns": ["secret[\\s_-]?(not[\\s_-]?found|missing)|keychain.*not[\\s_-]?found"]
     },
     {
@@ -245,7 +245,7 @@
       "id": "actuator.contract-mismatch",
       "category": "invalid_input",
       "label": "Actuator contract mismatch",
-      "remediation": "The action or params do not match the actuator's contract schema. Run `pnpm cli info <actuator-name>` to see the contract schema path and verify the required fields.",
+      "remediation": "The action or params do not match the actuator's contract schema. Run `pnpm kyberion info <actuator-name>` to see the contract schema path and verify the required fields.",
       "patterns": [
         "contract.*schema|schema.*contract|actuator.*contract|required field.*missing|unexpected.*action.?type"
       ]
@@ -331,7 +331,7 @@
       "explanation": "This action requires explicit approval before it can proceed.",
       "required_role": "approver persona (governance_lead or ecosystem_architect)",
       "repair_steps": [
-        "Run `pnpm cli approval` to open the approval flow.",
+        "Run `pnpm kyberion approvals` to open the approval flow.",
         "The approver must set the approval flag in the mission state or auth-grants.json.",
         "After approval is recorded, re-run the operation."
       ]

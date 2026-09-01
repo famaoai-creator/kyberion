@@ -2,50 +2,62 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fc from 'fast-check';
 import { handleAction } from './index.js';
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  return {
-    ...actual,
-    retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
-    safeReadFile: vi.fn().mockReturnValue('file content'),
-    safeWriteFile: vi.fn(),
-    safeMkdir: vi.fn(),
-    safeExistsSync: vi.fn().mockReturnValue(false),
-    safeReaddir: vi.fn().mockReturnValue([]),
-    safeStat: vi.fn().mockReturnValue({
-      size: 100,
-      mtime: new Date(),
-      isFile: () => true,
-      isDirectory: () => false,
-    }),
-    safeExec: vi.fn().mockReturnValue(''),
-    safeAppendFileSync: vi.fn(),
-    safeCopyFileSync: vi.fn(),
-    safeMoveSync: vi.fn(),
-    safeRmSync: vi.fn(),
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
-    derivePipelineStatus: actual.derivePipelineStatus,
-    resolveVars: actual.resolveVars,
-    evaluateCondition: actual.evaluateCondition,
-    resolveWriteArtifactSpec: actual.resolveWriteArtifactSpec,
-    pathResolver: {
-      rootDir: vi.fn().mockReturnValue('/mock/root'),
-      resolve: vi.fn((p: string) => `/mock/root/${p}`),
-      rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
-    },
-  };
-});
+const fileMocks = vi.hoisted(() => ({
+  retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  safeReadFile: vi.fn().mockReturnValue('file content'),
+  safeWriteFile: vi.fn(),
+  safeMkdir: vi.fn(),
+  safeExistsSync: vi.fn().mockReturnValue(false),
+  safeReaddir: vi.fn().mockReturnValue([]),
+  safeStat: vi.fn().mockReturnValue({
+    size: 100,
+    mtime: new Date(),
+    isFile: () => true,
+    isDirectory: () => false,
+  }),
+  safeExec: vi.fn().mockReturnValue(''),
+  safeAppendFileSync: vi.fn(),
+  safeCopyFileSync: vi.fn(),
+  safeMoveSync: vi.fn(),
+  safeRmSync: vi.fn(),
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeReadFile: fileMocks.safeReadFile,
+  safeWriteFile: fileMocks.safeWriteFile,
+  safeMkdir: fileMocks.safeMkdir,
+  safeExistsSync: fileMocks.safeExistsSync,
+  safeReaddir: fileMocks.safeReaddir,
+  safeStat: fileMocks.safeStat,
+  safeExec: fileMocks.safeExec,
+  safeAppendFileSync: fileMocks.safeAppendFileSync,
+  safeCopyFileSync: fileMocks.safeCopyFileSync,
+  safeMoveSync: fileMocks.safeMoveSync,
+  safeRmSync: fileMocks.safeRmSync,
+}));
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: fileMocks.retry,
+}));
+
+vi.mock('@agent/core/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/core')>()),
+  logger: fileMocks.logger,
+}));
 
 describe('file-actuator', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { safeReadFile, safeExistsSync, safeReaddir, safeStat, safeExec } =
-      await import('@agent/core');
+      await import('@agent/core/secure-io');
     vi.mocked(safeReadFile).mockReturnValue('file content');
     vi.mocked(safeExistsSync).mockReturnValue(false);
     vi.mocked(safeReaddir).mockReturnValue([]);
@@ -72,7 +84,7 @@ describe('file-actuator', () => {
     });
 
     it('ステップが失敗した場合、残りのステップを実行しない', async () => {
-      const { safeReadFile } = await import('@agent/core');
+      const { safeReadFile } = await import('@agent/core/secure-io');
       vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
         if (String(filePath).includes('manifest.json')) {
           return JSON.stringify({ recovery_policy: {} });
@@ -106,8 +118,18 @@ describe('file-actuator', () => {
     });
 
     describe('capture ops', () => {
+      it('read でリポジトリ外のパスを拒否する', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'read', params: { path: '/tmp/external.txt' } }],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toContain('[RESOURCE_PATH_SCOPE]');
+      });
+
       it('read でファイルを読み込む', async () => {
-        const { safeReadFile } = await import('@agent/core');
+        const { safeReadFile } = await import('@agent/core/secure-io');
         vi.mocked(safeReadFile).mockReturnValueOnce('file content here');
 
         const result = await handleAction({
@@ -124,11 +146,11 @@ describe('file-actuator', () => {
         expect(result.status).toBe('succeeded');
         expect(result.context.file_content).toContain('[UNTRUSTED CONTENT WARNING]');
         expect(result.context.file_content).toContain('file content here');
-        expect((await import('@agent/core')).retry).toHaveBeenCalled();
+        expect((await import('@agent/core/async-utils')).retry).toHaveBeenCalled();
       });
 
       it('list でディレクトリ一覧を取得する', async () => {
-        const { safeReaddir } = await import('@agent/core');
+        const { safeReaddir } = await import('@agent/core/secure-io');
         vi.mocked(safeReaddir).mockReturnValueOnce(['file1.txt', 'file2.txt'] as any);
 
         const result = await handleAction({
@@ -147,7 +169,7 @@ describe('file-actuator', () => {
       });
 
       it('stat でファイル情報を取得する', async () => {
-        const { safeStat } = await import('@agent/core');
+        const { safeStat } = await import('@agent/core/secure-io');
         vi.mocked(safeStat).mockReturnValueOnce({
           size: 1024,
           mtime: new Date('2024-01-01'),
@@ -172,7 +194,7 @@ describe('file-actuator', () => {
       });
 
       it('exists でファイルの存在確認をする', async () => {
-        const { safeExistsSync } = await import('@agent/core');
+        const { safeExistsSync } = await import('@agent/core/secure-io');
         vi.mocked(safeExistsSync).mockReturnValueOnce(true);
 
         const result = await handleAction({
@@ -188,6 +210,16 @@ describe('file-actuator', () => {
 
         expect(result.status).toBe('succeeded');
         expect(result.context.file_exists).toBe(true);
+      });
+
+      it('exists でもリポジトリ外のパスを拒否する', async () => {
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'exists', params: { path: '/tmp/external.txt' } }],
+        });
+
+        expect(result.status).toBe('failed');
+        expect(result.results[0].error).toContain('[RESOURCE_PATH_SCOPE]');
       });
     });
 
@@ -252,7 +284,7 @@ describe('file-actuator', () => {
 
     describe('apply ops', () => {
       it('write でファイルを書き込む', async () => {
-        const { safeWriteFile } = await import('@agent/core');
+        const { safeWriteFile } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -271,7 +303,7 @@ describe('file-actuator', () => {
       });
 
       it('mkdir でディレクトリを作成する', async () => {
-        const { safeMkdir } = await import('@agent/core');
+        const { safeMkdir } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -289,7 +321,7 @@ describe('file-actuator', () => {
       });
 
       it('delete でファイルを削除する', async () => {
-        const { safeRmSync } = await import('@agent/core');
+        const { safeRmSync } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -307,7 +339,7 @@ describe('file-actuator', () => {
       });
 
       it('copy でファイルをコピーする', async () => {
-        const { safeCopyFileSync } = await import('@agent/core');
+        const { safeCopyFileSync } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -325,7 +357,7 @@ describe('file-actuator', () => {
       });
 
       it('move でファイルを移動する', async () => {
-        const { safeMoveSync } = await import('@agent/core');
+        const { safeMoveSync } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -343,7 +375,7 @@ describe('file-actuator', () => {
       });
 
       it('append でファイルに追記する', async () => {
-        const { safeAppendFileSync } = await import('@agent/core');
+        const { safeAppendFileSync } = await import('@agent/core/secure-io');
 
         const result = await handleAction({
           action: 'pipeline',
@@ -403,7 +435,7 @@ describe('file-actuator', () => {
       });
 
       it('nested control の失敗を親 pipeline に伝播する', async () => {
-        const { safeReadFile } = await import('@agent/core');
+        const { safeReadFile } = await import('@agent/core/secure-io');
         vi.mocked(safeReadFile).mockImplementation((filePath: string) => {
           if (String(filePath).includes('manifest.json')) {
             return JSON.stringify({ recovery_policy: {} });

@@ -8,6 +8,7 @@ import {
   safeReadFile,
   safeReaddir,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import {
@@ -21,6 +22,7 @@ import {
   getActiveTaskSession,
   getLatestCompletedTaskSession,
   loadTaskSession,
+  listTaskSessions,
   getTaskIntentBuilder,
   registerTaskIntentBuilder,
   recordTaskSessionHistory,
@@ -106,6 +108,49 @@ describe('task-session', () => {
     expect(session.outcome_contract.success_criteria.length).toBeGreaterThan(0);
     expect(session.work_loop?.resolution.execution_shape).toBe('task_session');
     expect(session.work_loop?.intent.label).toBe('capture_photo');
+  });
+
+  it('rejects schema-invalid persisted sessions without exposing them', () => {
+    const filePath = pathResolver.shared('runtime/task-sessions/TSK-TEST-INVALID.json');
+    safeWriteFile(
+      filePath,
+      JSON.stringify({ session_id: 'TSK-TEST-INVALID', status: 'executing' })
+    );
+
+    expect(loadTaskSession('TSK-TEST-INVALID')).toBeNull();
+  });
+
+  it('preserves the parse error contract for malformed persisted sessions', () => {
+    const filePath = pathResolver.shared('runtime/task-sessions/TSK-TEST-MALFORMED.json');
+    safeWriteFile(filePath, '{ malformed');
+
+    expect(() => loadTaskSession('TSK-TEST-MALFORMED')).toThrow(SyntaxError);
+  });
+
+  it('does not expose a valid task session through a symlinked session file', () => {
+    const sessionId = 'TSK-TEST-SYMLINK';
+    const linkPath = pathResolver.shared(`runtime/task-sessions/${sessionId}.json`);
+    const externalPath = pathResolver.sharedTmp(`task-session-${process.pid}-external.json`);
+    const session = createTaskSession({
+      sessionId,
+      surface: 'presence',
+      taskType: 'analysis',
+      status: 'planning',
+      goal: {
+        summary: 'symlink boundary test',
+        success_condition: 'the external record is not listed',
+      },
+    });
+    safeWriteFile(externalPath, JSON.stringify(session));
+    safeSymlinkSync(externalPath, linkPath);
+
+    try {
+      expect(listTaskSessions().some((entry) => entry.session_id === sessionId)).toBe(false);
+      expect(loadTaskSession(sessionId)).toBeNull();
+    } finally {
+      safeRmSync(linkPath, { force: true });
+      safeRmSync(externalPath, { force: true });
+    }
   });
 
   it('uses a reversible named seam for task intent builders', () => {
@@ -203,6 +248,56 @@ describe('task-session', () => {
     expect(session.control.requires_approval).toBe(true);
     expect(session.work_loop?.authority.requires_approval).toBe(true);
     expect(session.payload?.intent_id).toBe('restart-service');
+  });
+
+  it('preserves an explicit approval request when the intent policy is passive', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-EXPLICIT-APPROVAL',
+      surface: 'presence',
+      taskType: 'service_operation',
+      intentId: 'inspect-service',
+      requiresApproval: true,
+      goal: {
+        summary: 'サービスの状態を確認する',
+        success_condition: '確認結果を返す',
+      },
+      payload: { operation: 'logs' },
+    });
+
+    expect(session.control.requires_approval).toBe(true);
+    expect(session.requirements?.missing).not.toContain('approval_confirmation');
+  });
+
+  it('does not allow an explicit false to bypass policy-required approval', () => {
+    const session = createTaskSession({
+      sessionId: 'TSK-TEST-POLICY-APPROVAL',
+      surface: 'presence',
+      taskType: 'service_operation',
+      intentId: 'inspect-service',
+      requiresApproval: false,
+      goal: {
+        summary: 'サービスを再起動する',
+        success_condition: '再起動が承認付きで実行される',
+      },
+      payload: { operation: 'restart' },
+    });
+
+    expect(session.control.requires_approval).toBe(true);
+    expect(session.requirements?.missing).toContain('approval_confirmation');
+
+    const dualKeySession = createTaskSession({
+      sessionId: 'TSK-TEST-DUAL-KEY-APPROVAL',
+      surface: 'presence',
+      taskType: 'analysis',
+      requiresApproval: false,
+      goal: {
+        summary: 'Rotate a protected credential',
+        success_condition: 'The credential is rotated with dual-key approval.',
+      },
+      requirements: { missing: ['dual_key_confirmation'], collected: {} },
+    });
+
+    expect(dualKeySession.control.requires_approval).toBe(true);
   });
 
   it('records history updates', () => {

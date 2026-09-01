@@ -1,15 +1,16 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import {
   handleAction,
   dispatchVideoCompositionOperation,
 } from './video-composition-action-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const main = async () => {
   await runActuatorCli({
     name: 'video-composition-actuator',
+    args: process.argv,
     handleAction,
   });
 };

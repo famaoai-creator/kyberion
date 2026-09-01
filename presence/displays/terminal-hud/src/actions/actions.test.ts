@@ -6,14 +6,17 @@ import {
   clearWorkCoordinationNamespace,
   pathResolver,
 } from '@agent/core';
-import { safeRmSync } from '@agent/core/secure-io';
+import { safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { setHudExecForTesting, resetHudExec, distScript } from './exec.js';
 import { runMissionAction } from './mission-actions.js';
 import { runSurfaceAction } from './surface-actions.js';
 import { claimItem, releaseItem, advanceItemStatus } from './work-actions.js';
-import { registerScheduleFromPalette } from './schedule-actions.js';
+import { registerScheduleFromPalette, resolvePipelineFile } from './schedule-actions.js';
 
 const NAMESPACE = `terminal-hud-test-${process.pid}`;
+const pipelineLink = pathResolver.sharedTmp(`terminal-hud-boundary-${process.pid}.json`);
+const pipelineTarget = pathResolver.sharedTmp(`terminal-hud-boundary-target-${process.pid}.json`);
 
 beforeAll(() => {
   process.env.KYBERION_TUI_DISABLE_AUDIT = '1';
@@ -36,6 +39,10 @@ afterAll(() => {
       // best-effort cleanup; namespaced dirs are harmless if left behind
     }
   }
+  withExecutionContext('mission_controller', () => {
+    safeRmSync(pipelineLink, { force: true });
+    safeRmSync(pipelineTarget, { force: true });
+  });
   delete process.env.KYBERION_TUI_DISABLE_AUDIT;
 });
 
@@ -141,5 +148,14 @@ describe('registerScheduleFromPalette', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain('missing');
+  });
+
+  it('rejects a symlinked pipeline file', () => {
+    withExecutionContext('mission_controller', () => {
+      safeWriteFile(pipelineTarget, '{}');
+      safeSymlinkSync(pipelineTarget, pipelineLink);
+
+      expect(resolvePipelineFile(pipelineLink, pathResolver.rootDir())).toBeNull();
+    });
   });
 });

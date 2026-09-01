@@ -1,8 +1,5 @@
-import type { ValidateFunction } from 'ajv';
-
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface MediaSemanticRuleEntry {
   layout?: string;
@@ -29,10 +26,6 @@ interface MediaSemanticMapCatalog {
 
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-semantic-map.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-semantic-map.schema.json');
-
-let validateFn: ValidateFunction | null = null;
-let cachedCatalog: MediaSemanticMapCatalog | null = null;
-let cachedCatalogPath: string | null = null;
 
 const FALLBACK_RULES: MediaSemanticRuleEntry[] = [
   { layout: 'cover-statement', semantic_type: 'hero' },
@@ -85,46 +78,23 @@ const FALLBACK_PROPOSAL_SECTION_KEYWORDS: ProposalSectionKeywordRuleEntry[] = [
   { section_id: 'delivery-plan', keywords: ['delivery', 'plan', 'roadmap', 'phase'] },
 ];
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): MediaSemanticMapCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid media semantic map catalog at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as MediaSemanticMapCatalog;
-}
+const mediaSemanticMapCatalog = defineCatalog<MediaSemanticMapCatalog>({
+  id: 'media-semantic-map',
+  path: CATALOG_PATH,
+  schema: SCHEMA_PATH,
+  // Preserve the existing contract: a missing catalog is usable via the
+  // conservative built-in map, while a present but malformed catalog fails
+  // closed instead of silently changing media semantics.
+  fallback: () => ({
+    version: '1.0.0',
+    rules: FALLBACK_RULES,
+    proposal_evidence_rules: FALLBACK_PROPOSAL_EVIDENCE_RULES,
+    proposal_section_keywords: FALLBACK_PROPOSAL_SECTION_KEYWORDS,
+  }),
+});
 
 export function loadMediaSemanticMapCatalog(): MediaSemanticMapCatalog {
-  if (cachedCatalog && cachedCatalogPath === CATALOG_PATH) return cachedCatalog;
-  if (!safeExistsSync(CATALOG_PATH)) {
-    cachedCatalog = {
-      version: '1.0.0',
-      rules: FALLBACK_RULES,
-      proposal_evidence_rules: FALLBACK_PROPOSAL_EVIDENCE_RULES,
-      proposal_section_keywords: FALLBACK_PROPOSAL_SECTION_KEYWORDS,
-    };
-    cachedCatalogPath = CATALOG_PATH;
-    return cachedCatalog;
-  }
-  const source = loadJson<Record<string, unknown>>(CATALOG_PATH);
-  const { $schema: _schema, ...catalog } = source;
-  const parsed = validateCatalog(catalog, CATALOG_PATH);
-  cachedCatalog = parsed;
-  cachedCatalogPath = CATALOG_PATH;
-  return parsed;
+  return mediaSemanticMapCatalog.load();
 }
 
 export function resolveMediaSemanticType(layoutKey?: string, mediaKind?: string): string {
@@ -155,9 +125,4 @@ export function resolveProposalSectionKeywords(sectionId: string): string[] {
     (entry) => entry.section_id === normalized
   );
   return matched?.keywords || [];
-}
-
-export function resetMediaSemanticMapCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
 }

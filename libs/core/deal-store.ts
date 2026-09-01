@@ -1,9 +1,18 @@
 import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, loadJson, safeReaddir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  loadJson,
+  safeReaddir,
+  safeWriteFile,
+} from './secure-io.js';
+import { isValidTenantSlug } from './entity-scope.js';
 import type { ResolvedCustomerBinding } from './customer-channel-binding.js';
 import {
   createMemoryPromotionCandidate,
@@ -66,11 +75,27 @@ export interface DealRecord {
 }
 
 function dealsDir(tenantSlug: string): string {
-  return pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals'));
+  if (!isValidTenantSlug(tenantSlug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(path.join('customer', tenantSlug, 'deals')),
+    { allowMissingLeaf: true }
+  );
+}
+
+function requireSafeDealId(dealId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/.test(dealId)) {
+    throw new Error(`[DEAL_SCOPE] invalid deal id: ${dealId}`);
+  }
+  return dealId;
 }
 
 function dealPath(tenantSlug: string, dealId: string): string {
-  return path.join(dealsDir(tenantSlug), `${dealId}.json`);
+  return assertSafeRepositoryPath(
+    path.join(dealsDir(tenantSlug), `${requireSafeDealId(dealId)}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function dealLogPath(tenantSlug: string): string {
@@ -233,7 +258,10 @@ export function advanceDealStage(input: {
 
 function snapshotDealAgreement(deal: DealRecord): void {
   if (!deal.agreed) return;
-  const dir = path.join(dealsDir(deal.tenant_slug), deal.deal_id);
+  const dir = assertSafeRepositoryPath(
+    path.join(dealsDir(deal.tenant_slug), requireSafeDealId(deal.deal_id)),
+    { allowMissingLeaf: true }
+  );
   safeMkdir(dir, { recursive: true });
   let version = 1;
   try {
@@ -353,6 +381,22 @@ export interface PriceBook {
   }>;
 }
 
+const PRICE_BOOK_SCHEMA_PATH = pathResolver.knowledge('product/schemas/price-book.schema.json');
+const priceBookCatalogs = new Map<string, GovernedCatalog<PriceBook>>();
+
+function loadGovernedPriceBook(filePath: string): PriceBook {
+  let catalog = priceBookCatalogs.get(filePath);
+  if (!catalog) {
+    catalog = defineCatalog<PriceBook>({
+      id: 'price-book',
+      path: filePath,
+      schema: PRICE_BOOK_SCHEMA_PATH,
+    });
+    priceBookCatalogs.set(filePath, catalog);
+  }
+  return catalog.load();
+}
+
 export interface QuoteLineRequest {
   task_kind: string;
   size?: string;
@@ -374,17 +418,29 @@ export interface QuoteResult {
   unquotable: Array<{ task_kind: string; reason: string }>;
 }
 
-export function loadPriceBook(tenantSlug?: string): PriceBook | null {
+export function loadPriceBook(tenantSlug?: string, rootDir?: string): PriceBook | null {
+  const baseDir = rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
+  const requestedTenantSlug = tenantSlug?.trim() || null;
+  const resolvedTenantSlug =
+    requestedTenantSlug && isValidTenantSlug(requestedTenantSlug) ? requestedTenantSlug : null;
   const candidates = [
-    ...(tenantSlug
-      ? [pathResolver.knowledge(path.join('confidential', tenantSlug, 'sales', 'price-book.json'))]
+    ...(resolvedTenantSlug
+      ? [
+          path.join(
+            baseDir,
+            'knowledge',
+            'confidential',
+            resolvedTenantSlug,
+            'sales',
+            'price-book.json'
+          ),
+        ]
       : []),
-    pathResolver.knowledge('product/sales/price-book.json'),
+    path.join(baseDir, 'knowledge', 'product', 'sales', 'price-book.json'),
   ];
   for (const candidate of candidates) {
     try {
-      if (!safeExistsSync(candidate)) continue;
-      return loadJson<PriceBook>(candidate);
+      return loadGovernedPriceBook(candidate);
     } catch {
       continue;
     }

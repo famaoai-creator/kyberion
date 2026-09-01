@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { readJson as foundationReadJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -55,11 +56,25 @@ export interface MissionHygieneReport {
 
 function readJson<T>(filePath: string): T | null {
   try {
-    if (!safeExistsSync(filePath)) return null;
-    return loadJson<T>(filePath);
+    const safePath = safeMissionPath(filePath);
+    if (!safePath || !safeExistsSync(safePath)) return null;
+    return foundationReadJson<T>(safePath);
   } catch {
     return null;
   }
+}
+
+function safeMissionPath(filePath: string): string | null {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return null;
+  }
+}
+
+function safePathExists(filePath: string): boolean {
+  const safePath = safeMissionPath(filePath);
+  return safePath !== null && safeExistsSync(safePath);
 }
 
 function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
@@ -71,17 +86,21 @@ function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
   ];
   const found: Array<{ missionPath: string; tier: string }> = [];
   for (const root of roots) {
-    if (!safeExistsSync(root.dir)) continue;
+    const safeRoot = safeMissionPath(root.dir);
+    if (!safeRoot || !safeExistsSync(safeRoot)) continue;
     let entries: string[] = [];
     try {
-      entries = safeReaddir(root.dir);
+      entries = safeReaddir(safeRoot);
     } catch {
       continue;
     }
     for (const entry of entries) {
       if (['public', 'confidential', 'personal', 'ephemeral'].includes(entry)) continue;
-      const missionPath = path.join(root.dir, entry);
-      if (safeExistsSync(path.join(missionPath, 'mission-state.json'))) {
+      const missionPath = safeMissionPath(path.join(safeRoot, entry));
+      const statePath = missionPath
+        ? safeMissionPath(path.join(missionPath, 'mission-state.json'))
+        : null;
+      if (missionPath && statePath && safeExistsSync(statePath)) {
         found.push({ missionPath, tier: root.tier });
       }
     }
@@ -140,8 +159,8 @@ function classifyPlanned(missionPath: string): {
     };
   }
   const dispatched =
-    safeExistsSync(path.join(missionPath, 'coordination', 'tickets', 'dispatch-manifest.json')) ||
-    safeExistsSync(path.join(missionPath, 'evidence', 'workitem-dispatch-manifest.json'));
+    safePathExists(path.join(missionPath, 'coordination', 'tickets', 'dispatch-manifest.json')) ||
+    safePathExists(path.join(missionPath, 'evidence', 'workitem-dispatch-manifest.json'));
   if (!dispatched) {
     return {
       reason: 'ready_not_started',

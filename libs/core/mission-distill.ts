@@ -10,14 +10,57 @@ import { ledger } from './ledger.js';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { resolveMissionDistillMarkdownPolicy } from './mission-distill-markdown-policy.js';
-import { safeExistsSync, safeExec, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeExec,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { transitionStatus } from './mission-status.js';
 import { type MissionState } from './mission-types.js';
 import { findMissionPath } from './path-resolver.js';
 import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
-import { readJsonFile } from './cli-input.js';
 import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+
+const WISDOM_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
+const WISDOM_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/wisdom-policy.schema.json'
+);
+
+interface WisdomPolicyFile {
+  version: string;
+  name: string;
+  description?: string;
+  llm: LlmPolicyConfig;
+  rules: unknown[];
+  tier_mapping: Record<string, string>;
+}
+
+const wisdomPolicyCatalog = defineCatalog<WisdomPolicyFile>({
+  id: 'wisdom-policy',
+  path: WISDOM_POLICY_PATH,
+  schema: WISDOM_POLICY_SCHEMA_PATH,
+});
+
+export function loadWisdomPolicy(): WisdomPolicyFile | null {
+  if (!safeExistsSync(WISDOM_POLICY_PATH)) return null;
+  try {
+    return wisdomPolicyCatalog.load();
+  } catch (error: any) {
+    logger.warn(`⚠️ Failed to load wisdom-policy.json: ${error.message}`);
+    return null;
+  }
+}
+
+export function resolveWisdomOutputPath(outputDir: string, wisdomFileName: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(path.join(outputDir, wisdomFileName)), {
+    allowMissingLeaf: true,
+  });
+}
 
 const WISDOM_SCHEMA = z.object({
   title: z.string(),
@@ -33,49 +76,28 @@ const WISDOM_SCHEMA = z.object({
   }),
 });
 
-const WISDOM_POLICY_SCHEMA = z.object({
-  version: z.string().optional(),
-  name: z.string().optional(),
-  description: z.string().optional(),
-  llm: z
-    .object({
-      profiles: z
-        .record(
-          z.string(),
-          z.object({
-            description: z.string().optional(),
-            command: z.string(),
-            args: z.array(z.string()),
-            timeout_ms: z.number().optional(),
-            response_format: z.string().optional(),
-            adapter: z.string().optional(),
-          })
-        )
-        .optional(),
-      purpose_map: z.record(z.string(), z.string()).optional(),
-      default_profile: z.string().optional(),
-    })
-    .optional(),
-  rules: z.array(z.unknown()).optional(),
-  tier_mapping: z.record(z.string(), z.string()).optional(),
-});
-
 export function gatherDistillContext(
   missionId: string,
   state: MissionState,
   missionPath: string
 ): string {
   const parts: string[] = [];
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
 
   try {
-    const gitLog = safeExec('git', ['log', '--oneline', '-20'], { cwd: missionPath });
+    const gitLog = safeExec('git', ['log', '--oneline', '-20'], { cwd: safeMissionPath });
     parts.push('### Git History (last 20 commits)');
     parts.push(gitLog.trim());
   } catch (_) {
     parts.push('### Git History: unavailable');
   }
 
-  const ledgerPath = path.join(missionPath, 'evidence', 'ledger.jsonl');
+  const ledgerPath = assertSafeRepositoryPath(
+    path.join(safeMissionPath, 'evidence', 'ledger.jsonl'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
   if (safeExistsSync(ledgerPath)) {
     const ledgerContent = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
     const lines = ledgerContent.trim().split('\n');
@@ -196,6 +218,9 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     return;
   }
   const upperId = id.toUpperCase();
+  const missionPathCandidate = findMissionPath(upperId);
+  if (!missionPathCandidate) throw new Error(`Mission directory for ${upperId} not found.`);
+  const missionPath = assertSafeRepositoryPath(missionPathCandidate, { allowMissingLeaf: true });
   const state = loadState(upperId);
   if (!state)
     throw new Error(`Mission ${upperId} not found. Run "list" to see available missions.`);
@@ -210,9 +235,6 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     logger.error(`❌ Cannot distill mission ${upperId} (status: ${state.status}). ${hint}`);
     return;
   }
-
-  const missionPath = findMissionPath(upperId);
-  if (!missionPath) throw new Error(`Mission directory for ${upperId} not found.`);
 
   logger.info(`🧠 Distilling Wisdom for Mission ${upperId}...`);
 
@@ -238,26 +260,12 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     '```',
   ].join('\n');
 
-  const wisdomPolicyPath = pathResolver.knowledge('product/governance/wisdom-policy.json');
-  let wisdomPolicy: any = {};
-  if (safeExistsSync(wisdomPolicyPath)) {
-    try {
-      const parsed = readJsonFile<any>(wisdomPolicyPath);
-      const validated = WISDOM_POLICY_SCHEMA.safeParse(parsed);
-      if (validated.success) {
-        wisdomPolicy = validated.data;
-      } else {
-        logger.warn(`⚠️ wisdom-policy.json failed validation: ${validated.error.message}`);
-      }
-    } catch (err: any) {
-      logger.warn(`⚠️ Failed to load wisdom-policy.json: ${err.message}`);
-    }
-  }
+  const wisdomPolicy = loadWisdomPolicy();
 
   let wisdom: any = null;
   let llmUsed = false;
   try {
-    const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy.llm;
+    const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy?.llm;
     wisdom = await runAdaptiveStructuredLlmProfile('distill', fullPrompt, WISDOM_SCHEMA, {
       policy: llmPolicy,
       systemPrompt:
@@ -271,7 +279,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   }
 
   const defaultOutputDir = 'knowledge/product/evolution';
-  const mappedOutputDir = wisdomPolicy.tier_mapping?.[state.tier] || defaultOutputDir;
+  const mappedOutputDir = wisdomPolicy?.tier_mapping?.[state.tier] || defaultOutputDir;
   const outputDir = /(^|\/)incidents(\/|$)/.test(mappedOutputDir)
     ? defaultOutputDir
     : mappedOutputDir;
@@ -283,7 +291,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
   const wisdomFileName = `distill_${upperId.toLowerCase()}_${dateSlug}.md`;
-  const wisdomFilePath = pathResolver.rootResolve(path.join(outputDir, wisdomFileName));
+  const wisdomFilePath = resolveWisdomOutputPath(outputDir, wisdomFileName);
   const wisdomDirPath = path.dirname(wisdomFilePath);
 
   if (!safeExistsSync(wisdomDirPath)) safeMkdir(wisdomDirPath, { recursive: true });
@@ -300,11 +308,11 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     completed_at: completedAt,
     mode: llmUsed ? 'llm' : 'structural',
     llm_used: llmUsed,
-    output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),
+    output_path: wisdomFilePath,
   };
   state.context = {
     ...(state.context || {}),
-    distill_output_path: pathResolver.rootResolve(path.join(outputDir, wisdomFileName)),
+    distill_output_path: wisdomFilePath,
     distill_output_dir: outputDir,
   } as any;
   state.history.push({

@@ -100,7 +100,3 @@ export function resolveVoiceTaskDistillTargetKind(input: {
 }): VoiceTaskDistillTargetKind {
   return resolveVoiceTaskProfile(input)?.distill_target_kind || 'knowledge_hint';
 }
-
-export function resetVoiceTaskProfileCatalogCache(): void {
-  catalog.reset();
-}

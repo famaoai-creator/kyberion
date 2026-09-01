@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -26,7 +26,7 @@ import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -103,15 +103,27 @@ export function tenantIngestKnowledgeRoot(
   options: IngestLedgerPathOptions = {}
 ): string {
   assertTenantSlug(tenantSlug);
-  if (tenantSlug === COMMON_TENANT_SLUG) return `knowledge/confidential/${COMMON_TENANT_SLUG}`;
-  return resolveTenant(tenantSlug, options).knowledge_root;
+  const knowledgeRoot =
+    tenantSlug === COMMON_TENANT_SLUG
+      ? `knowledge/confidential/${COMMON_TENANT_SLUG}`
+      : resolveTenant(tenantSlug, options).knowledge_root;
+  const repositoryRoot = options.rootDir ?? pathResolver.rootDir();
+  assertSafeRepositoryPath(path.resolve(repositoryRoot, knowledgeRoot), {
+    allowMissingLeaf: true,
+  });
+  return knowledgeRoot;
 }
 
 /** Absolute path of the tenant's assets.jsonl ledger. */
 export function assetLedgerPath(tenantSlug: string, options: IngestLedgerPathOptions = {}): string {
-  const rootDir = options.rootDir ?? pathResolver.rootDir();
+  const rootDir = assertSafeRepositoryPath(options.rootDir ?? pathResolver.rootDir(), {
+    allowMissingLeaf: true,
+  });
   const knowledgeRoot = tenantIngestKnowledgeRoot(tenantSlug, options);
-  return path.join(rootDir, knowledgeRoot, INGEST_LEDGER_DIRNAME, 'assets.jsonl');
+  return assertSafeRepositoryPath(
+    path.join(rootDir, knowledgeRoot, INGEST_LEDGER_DIRNAME, 'assets.jsonl'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function assertAssetRecord(record: IngestAssetRecord): void {
@@ -157,6 +169,116 @@ function assertAssetRecord(record: IngestAssetRecord): void {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function requiredString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return value === undefined ? undefined : typeof value === 'string' ? value : undefined;
+}
+
+/** Normalize persisted ledger data before it participates in lineage or dedup. */
+export function normalizeIngestAssetRecord(
+  value: unknown,
+  options: IngestLedgerPathOptions = {}
+): IngestAssetRecord | null {
+  if (!isRecord(value)) return null;
+  const assetId = requiredString(value.asset_id);
+  const sourceSystem = requiredString(value.source_system);
+  const sourceId = requiredString(value.source_id);
+  const contentSha256 = requiredString(value.content_sha256);
+  const retrievedAt = requiredString(value.retrieved_at);
+  const ingestedAt = requiredString(value.ingested_at);
+  const ingestedBy = requiredString(value.ingested_by);
+  const targetPath = requiredString(value.target_path);
+  const version =
+    typeof value.version === 'number' && Number.isInteger(value.version) && value.version >= 1
+      ? value.version
+      : null;
+  if (
+    !assetId ||
+    !sourceSystem ||
+    !sourceId ||
+    !contentSha256 ||
+    !retrievedAt ||
+    !ingestedAt ||
+    !ingestedBy ||
+    !targetPath ||
+    !SHA256_RE.test(contentSha256) ||
+    version === null ||
+    (value.status !== 'active' && value.status !== 'superseded') ||
+    !Array.isArray(value.visible_to) ||
+    value.visible_to.length === 0 ||
+    value.visible_to.some((entry) => typeof entry !== 'string' || !entry.trim()) ||
+    !Array.isArray(value.transform_chain) ||
+    value.transform_chain.length === 0 ||
+    value.transform_chain.some((entry) => typeof entry !== 'string' || !entry.trim())
+  ) {
+    return null;
+  }
+  if (assetId !== deriveAssetId(sourceSystem, sourceId)) return null;
+  if (path.isAbsolute(targetPath) || targetPath.split(/[\\/]/u).includes('..')) return null;
+  for (const key of [
+    'source_url',
+    'source_version',
+    'approval_id',
+    'steward_approval_id',
+    'supersedes',
+  ]) {
+    if (Object.hasOwn(value, key) && optionalString(value[key]) === undefined) return null;
+  }
+  try {
+    assertSafeRepositoryPath(path.resolve(options.rootDir ?? pathResolver.rootDir(), targetPath), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return null;
+  }
+  return {
+    asset_id: assetId,
+    source_system: sourceSystem,
+    source_id: sourceId,
+    ...(optionalString(value.source_url) === undefined
+      ? {}
+      : { source_url: optionalString(value.source_url) }),
+    ...(optionalString(value.source_version) === undefined
+      ? {}
+      : { source_version: optionalString(value.source_version) }),
+    content_sha256: contentSha256,
+    retrieved_at: retrievedAt,
+    ingested_at: ingestedAt,
+    ingested_by: ingestedBy,
+    ...(optionalString(value.approval_id) === undefined
+      ? {}
+      : { approval_id: optionalString(value.approval_id) }),
+    ...(optionalString(value.steward_approval_id) === undefined
+      ? {}
+      : { steward_approval_id: optionalString(value.steward_approval_id) }),
+    visible_to: value.visible_to,
+    transform_chain: value.transform_chain,
+    target_path: targetPath,
+    version,
+    ...(optionalString(value.supersedes) === undefined
+      ? {}
+      : { supersedes: optionalString(value.supersedes) }),
+    status: value.status,
+  };
+}
+
+function assertTargetPath(record: IngestAssetRecord, options: IngestLedgerPathOptions): void {
+  if (path.isAbsolute(record.target_path)) {
+    throw new Error('[ingest-asset-ledger] target_path must be repository-relative');
+  }
+  assertSafeRepositoryPath(
+    path.resolve(options.rootDir ?? pathResolver.rootDir(), record.target_path),
+    { allowMissingLeaf: true }
+  );
+}
+
 /**
  * Reads every ledger line in append order. Corrupt lines are skipped (the
  * ledger is append-only evidence — one bad line must not block ingestion),
@@ -174,8 +296,11 @@ export function readAssetLedger(
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const record = JSON.parse(trimmed) as IngestAssetRecord;
-      if (record && typeof record.asset_id === 'string') records.push(record);
+      const record = normalizeIngestAssetRecord(
+        parseSafeJsonInput(trimmed, 'ingest asset ledger record'),
+        options
+      );
+      if (record) records.push(record);
     } catch {
       /* skip corrupt line */
     }
@@ -194,6 +319,7 @@ export function appendAssetRecord(
 ): IngestAssetRecord {
   assertTenantSlug(tenantSlug);
   assertAssetRecord(record);
+  assertTargetPath(record, options);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   safeMkdir(path.dirname(ledgerFile), { recursive: true });
   appendJsonLine(ledgerFile, record);

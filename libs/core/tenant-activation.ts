@@ -1,9 +1,10 @@
 import * as path from 'node:path';
+import { customerDirForSlug } from './customer-resolver.js';
 import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -89,16 +90,18 @@ function pathSegment(value: string): string {
 }
 
 function activationPath(input: TenantActivationScope, rootDir: string): string {
-  return path.join(
-    rootDir,
-    'customer',
-    input.customerSlug,
-    'onboarding',
-    'tenant-activation',
-    pathSegment(input.tenantSlug),
-    pathSegment(input.organizationId),
-    input.tier || 'confidential',
-    'activation.json'
+  const customerRoot = customerDirForSlug(input.customerSlug, rootDir);
+  return assertSafeRepositoryPath(
+    path.join(
+      customerRoot,
+      'onboarding',
+      'tenant-activation',
+      pathSegment(input.tenantSlug),
+      pathSegment(input.organizationId),
+      input.tier || 'confidential',
+      'activation.json'
+    ),
+    { allowMissingLeaf: true, rootDir }
   );
 }
 
@@ -115,11 +118,17 @@ function activationPathForRecord(record: TenantActivationRecord, rootDir: string
 }
 
 function legacyActivationPath(customerSlug: string, rootDir: string): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'tenant-activation.json');
+  return assertSafeRepositoryPath(
+    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'tenant-activation.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function bindingPath(customerSlug: string, rootDir: string): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json');
+  return assertSafeRepositoryPath(
+    path.join(customerDirForSlug(customerSlug, rootDir), 'onboarding', 'organization-context.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function nonEmpty(value: unknown): value is string {

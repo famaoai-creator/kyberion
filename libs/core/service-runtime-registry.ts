@@ -2,8 +2,15 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { secureFetch } from './network.js';
 import { getServiceEndpointRecord } from './service-binding.js';
 import { getAdapterDefault } from './adapter-default-preferences.js';
@@ -164,28 +171,31 @@ let cachedRegistryPath: string | null = null;
 let cachedRegistry: ServiceRuntimeRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_SERVICE_RUNTIME_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH,
+    { allowMissingLeaf: true }
   );
 }
 
-function loadRegistryFromPath(registryPath: string): ServiceRuntimeRegistry {
-  const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<ServiceRuntimeRegistry>(raw, 'service runtime registry');
-}
+const serviceRuntimeRegistryCatalog = defineCatalog<ServiceRuntimeRegistry>({
+  id: 'service-runtime-registry',
+  path: getRegistryPath,
+  schema: pathResolver.knowledge('product/schemas/service-runtime-registry.schema.json'),
+  fallback: FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback(error) {
+    if (!/missing:/u.test(String(error))) {
+      logger.warn(`[SERVICE_RUNTIME_REGISTRY] Invalid registry; using fallback: ${error}`);
+    }
+  },
+});
 
 function getRegistry(): ServiceRuntimeRegistry {
   const registryPath = getRegistryPath();
   if (cachedRegistryPath === registryPath && cachedRegistry) return cachedRegistry;
 
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedRegistry = FALLBACK_REGISTRY;
-    return cachedRegistry;
-  }
-
   try {
-    const parsed = loadRegistryFromPath(registryPath);
+    const parsed = serviceRuntimeRegistryCatalog.load();
     cachedRegistryPath = registryPath;
     cachedRegistry = parsed;
     return parsed;
@@ -212,7 +222,16 @@ function normalizeServiceId(serviceId?: string): string {
 
 function resolveManagedServicePath(record: ServiceRuntimeRecord): string {
   const subPath = record.managed_service_subpath || `service-runtimes/${record.service_id}`;
-  return path.join(resolveServiceRuntimeRoot(getServiceRuntimePolicy()), subPath);
+  if (path.isAbsolute(subPath)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] managed service subpath must be relative: ${subPath}`);
+  }
+  const root = resolveServiceRuntimeRoot(getServiceRuntimePolicy());
+  const candidate = path.resolve(root, subPath);
+  const relative = path.relative(root, candidate).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] managed service subpath escapes its root: ${subPath}`);
+  }
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 function resolveStatePath(record: ServiceRuntimeRecord): string {
@@ -222,10 +241,7 @@ function resolveStatePath(record: ServiceRuntimeRecord): string {
 function loadStateFromPath(statePath: string): ServiceRuntimeState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
-    return safeJsonParse<ServiceRuntimeState>(
-      safeReadFile(statePath, { encoding: 'utf8' }) as string,
-      'service runtime state'
-    );
+    return readJson<ServiceRuntimeState>(statePath);
   } catch {
     return null;
   }
@@ -328,9 +344,10 @@ async function runHttpProbe(
   }
 }
 
-export function resetServiceRuntimeRegistryCache(): void {
+export function _resetServiceRuntimeRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistry = null;
+  serviceRuntimeRegistryCatalog.reset();
 }
 
 export function getServiceRuntimeRegistry(): ServiceRuntimeRegistry {

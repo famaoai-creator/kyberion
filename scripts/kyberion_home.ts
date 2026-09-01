@@ -7,52 +7,64 @@
  * (inbox / approvals) is actionable in place; `ask` talks to the same brain
  * every other surface uses.
  */
-import { resolveOperatorDisplayName } from '@agent/core';
+import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
 import { readJson } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
-  createScreenRecordingBridge,
-  createDesktopEventFeed,
+  listInboxEntries,
+  markInboxEntry,
+} from '@agent/core/deliverable-inbox';
+import { createScreenRecordingBridge } from '@agent/core/screen-recording-bridge';
+import { createDesktopEventFeed } from '@agent/core/desktop-event-feed';
+import {
   computeDesktopRecordingHash,
   DesktopDemonstrationRecorder,
-  dispatchProcedure,
-  decideApprovalRequest,
-  loadDesktopPipeline,
-  listApprovalRequests,
-  listInboxEntries,
+  sanitizeDesktopObservationText,
+  sampleDesktopObservation,
+  validateDesktopRecording,
+} from '@agent/core/desktop-recording';
+import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
+import { decideApprovalRequest, listApprovalRequests } from '@agent/core/approval-store';
+import { loadDesktopPipeline } from '@agent/core/desktop-pipeline';
+import {
   loadProcedures,
-  loadNotificationPreferences,
-  materializeExecutionFeedbackCandidate,
-  promoteDesktopProcedure,
-  reconcileDesktopPromotionTransaction,
-  reconstructDesktopIntent,
-  intentDraftHash,
-  reviewDesktopIntent,
-  validateDesktopIntentDraft,
-  redactScreenVideoFrame,
   resolveAllowlistedRecordingRef,
   resolveProcedure,
-  validateBrowserExtensionRecording,
-  validateDesktopRecording,
-  sanitizeDesktopObservationText,
-  validateServiceRecording,
-  withExecutionContext,
-  pathResolver,
-  markInboxEntry,
-  runSurfaceMessageConversation,
+} from '@agent/core/procedure-registry';
+import {
+  loadNotificationPreferences,
   saveNotificationPreferences,
+} from '@agent/core/operator-notifications';
+import { materializeExecutionFeedbackCandidate } from '@agent/core/execution-feedback';
+import { promoteDesktopProcedure } from '@agent/core/desktop-recording-compiler';
+import { reconcileDesktopPromotionTransaction } from '@agent/core/desktop-promotion-transaction';
+import {
+  intentDraftHash,
+  reconstructDesktopIntent,
+  reviewDesktopIntent,
+  validateDesktopIntentDraft,
+} from '@agent/core/desktop-intent-reconstruction';
+import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
+import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
+import { validateServiceRecording } from '@agent/core/service-recording';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import {
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
   safeReadFile,
   safeWriteFile,
-  safeMkdir,
-  safeExistsSync,
-  sampleDesktopObservation,
-  osAutomationBridge,
-  type BrowserExtensionOperation,
-  type BrowserExtensionRecording,
-  type DesktopRecording,
-  type ServiceRecording,
-  type NotificationChannelTarget,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { osAutomationBridge } from '@agent/core/os-automation-bridge';
+import type {
+  BrowserExtensionOperation,
+  BrowserExtensionRecording,
+} from '@agent/core/browser-extension-bridge';
+import type { DesktopRecording } from '@agent/core/desktop-recording';
+import type { ServiceRecording } from '@agent/core/service-recording';
+import type { NotificationChannelTarget } from '@agent/core/operator-notifications';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { runDoctor } from './run_doctor.js';
 import {
@@ -68,7 +80,11 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { t as translate } from '@agent/core/t';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
-import type { VocabularyKey } from '@agent/core';
+import type { VocabularyKey } from '@agent/core/t';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+} from '@agent/core/intent-resolution-contract';
 
 let cliLocale: SupportedLocale = resolveLocale();
 
@@ -251,7 +267,12 @@ function handleApprovalsSubcommand(argv: {
   console.log(ui('recorder:recorder_approvals_summary'));
 }
 
-async function handleAskSubcommand(text: string, json: boolean, explain: boolean): Promise<void> {
+async function handleAskSubcommand(
+  text: string,
+  json: boolean,
+  explain: boolean,
+  clarify: boolean
+): Promise<void> {
   if (!text.trim()) {
     console.error(ui('recorder:recorder_ask_usage'));
     process.exitCode = 1;
@@ -279,12 +300,14 @@ async function handleAskSubcommand(text: string, json: boolean, explain: boolean
     console.log(JSON.stringify({ ...result, intentResolution, improvement }, null, 2));
     return;
   }
-  if (explain && intentResolution) {
+  if ((explain || clarify) && intentResolution) {
     console.log(`[intent] ${intentResolution.normalized_intent}`);
     console.log(`  request_id: ${intentResolution.request_id}`);
     console.log(`  shape: ${intentResolution.resolution_shape}`);
-    console.log(`  outcome: ${intentResolution.outcome_kind}`);
-    console.log(`  authority: ${intentResolution.authority_level}`);
+    console.log(`  outcome: ${renderIntentOutcomeLabel(intentResolution.outcome_kind, cliLocale)}`);
+    console.log(
+      `  authority: ${renderIntentAuthorityLabel(intentResolution.authority_level, cliLocale)}`
+    );
     console.log(`  missing_inputs: ${intentResolution.missing_inputs.join(', ') || '(none)'}`);
     console.log(`  next_action: ${intentResolution.next_action.kind}`);
     console.log(`  next_action_label: ${intentResolution.next_action.label}`);
@@ -294,7 +317,7 @@ async function handleAskSubcommand(text: string, json: boolean, explain: boolean
   if (intentResolution && intentResolution.normalized_intent !== 'unresolved_intent') {
     console.log(
       `[intent] ${intentResolution.normalized_intent} ` +
-        `(shape=${intentResolution.resolution_shape}, authority=${intentResolution.authority_level})`
+        `(shape=${intentResolution.resolution_shape}, authority=${renderIntentAuthorityLabel(intentResolution.authority_level, cliLocale)})`
     );
   } else if (intentResolution?.authority_level === 'human_clarification_required') {
     console.log(ui('recorder:recorder_intent_ambiguous'));
@@ -429,6 +452,13 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
   const recordingPath = resolveAllowlistedRecordingRef(entry.adapter.recording_ref);
   if (!recordingPath) {
     return { error: ui('recorder:recorder_recording_ref_invalid') };
+  }
+  if (!safeExistsSync(recordingPath) || !safeLstat(recordingPath).isFile()) {
+    return {
+      error: ui('recorder:recorder_recording_read_failed', {
+        error: 'recording is not a regular file',
+      }),
+    };
   }
   let raw: unknown;
   try {
@@ -633,6 +663,9 @@ function loadDesktopRecording(ref: string): {
   const recordingPath = resolveRecordingPath(ref);
   if (!recordingPath)
     return { error: 'recording path is outside the allowlisted recording stores' };
+  if (!safeExistsSync(recordingPath) || !safeLstat(recordingPath).isFile()) {
+    return { error: 'recording path must be an existing regular file' };
+  }
   try {
     const raw = readJson<unknown>(recordingPath);
     const validation = validateDesktopRecording(raw);
@@ -802,7 +835,10 @@ async function handleProcedureInspect(procedureId: string, json: boolean): Promi
   const entry = procedureEntryOrReport(procedureId);
   if (!entry) return;
   const loaded = loadProcedureRecording(entry);
-  const pipeline = entry.substrate === 'desktop' ? loadDesktopPipeline(entry.pipeline_ref) : null;
+  const pipeline =
+    entry.substrate === 'desktop'
+      ? loadDesktopPipeline(entry.pipeline_ref, { trustResolved: false })
+      : null;
   const desktopRecording =
     entry.substrate === 'desktop' && loaded.value ? (loaded.value as DesktopRecording) : undefined;
   const browserRecording =
@@ -1184,6 +1220,11 @@ export async function main(args: string[] = []): Promise<void> {
       default: false,
       description: 'show the shared intent-resolution contract before the reply',
     })
+    .option('clarify', {
+      type: 'boolean',
+      default: false,
+      description: 'show the shared clarification packet before the reply',
+    })
     .option('locale', {
       type: 'string',
       choices: ['en', 'ja', 'qps-ploc'],
@@ -1303,7 +1344,8 @@ export async function main(args: string[] = []): Promise<void> {
       await handleAskSubcommand(
         argv._.slice(1).map(String).join(' '),
         Boolean(argv.json),
-        Boolean(argv.explain)
+        Boolean(argv.explain),
+        Boolean(argv.clarify)
       );
       return;
     case 'doctor':

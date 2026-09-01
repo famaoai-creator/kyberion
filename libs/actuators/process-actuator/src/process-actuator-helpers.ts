@@ -1,21 +1,17 @@
-import {
-  logger,
-  createStandardYargs,
-  safeReadFile,
-  pathResolver,
-  runtimeSupervisor,
-  spawnManagedProcess,
-  stopManagedProcess,
-  loadSurfaceManifest,
-  loadSurfaceState,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import type { RuntimeResourceKind, RuntimeShutdownPolicy } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
+import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseProcessAction, type ProcessAction } from './process-action-input.js';
 
 const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/process-actuator/manifest.json'
@@ -28,32 +24,15 @@ const DEFAULT_PROCESS_RETRY = {
   jitter: true,
 };
 
-interface ProcessAction {
-  action: 'spawn' | 'stop' | 'list' | 'status' | 'list-surfaces' | 'pipeline';
-  steps?: any[];
-  context?: any;
-  params: {
-    resourceId?: string;
-    ownerId?: string;
-    ownerType?: string;
-    kind?: RuntimeResourceKind;
-    command?: string;
-    args?: string[];
-    cwd?: string;
-    env?: Record<string, string>;
-    shutdownPolicy?: RuntimeShutdownPolicy;
-    export_as?: string;
-  };
+function resolveProcessPath(ref: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: PROCESS_MANIFEST_PATH,
-    defaults: DEFAULT_PROCESS_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: PROCESS_MANIFEST_PATH,
+  defaults: DEFAULT_PROCESS_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function handleAction(input: ProcessAction) {
   const { action, steps, context } = input;
@@ -65,7 +44,21 @@ export async function handleAction(input: ProcessAction) {
         'process-actuator pipeline dispatch supports only a single step; use the main pipeline runner for multi-step sequences'
       );
     const step = steps[0];
-    const result = await handleAction({ action: step.op as any, params: step.params, context });
+    if (
+      typeof step !== 'object' ||
+      step === null ||
+      Array.isArray(step) ||
+      typeof (step as { op?: unknown }).op !== 'string'
+    ) {
+      throw new Error('process-actuator pipeline step requires an action op');
+    }
+    const result = await handleAction(
+      parseProcessAction({
+        action: (step as { op: string }).op,
+        params: (step as { params?: unknown }).params,
+        context,
+      })
+    );
     return { ...result, context: (result as any).context || context };
   }
 
@@ -104,7 +97,9 @@ export async function handleAction(input: ProcessAction) {
           args: params.args || [],
           shutdownPolicy: params.shutdownPolicy || 'manual',
           spawnOptions: {
-            cwd: params.cwd ? pathResolver.rootResolve(params.cwd) : pathResolver.rootDir(),
+            cwd: params.cwd
+              ? resolveProcessPath(String(params.cwd), false)
+              : pathResolver.rootDir(),
             env: { ...process.env, ...(params.env || {}) },
             stdio: ['pipe', 'pipe', 'pipe'],
           },
@@ -181,13 +176,13 @@ function isProcessRunning(pid: number): boolean {
 }
 
 const main = async () => {
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(process.argv)
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
-  const inputPath = pathResolver.rootResolve(argv.input as string);
+  const inputPath = resolveProcessPath(String(argv.input), false);
   const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
+  const result = await handleAction(parseProcessAction(JSON.parse(inputContent)));
   console.log(JSON.stringify(result, null, 2));
 };
 

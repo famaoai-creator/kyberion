@@ -9,7 +9,7 @@
  * easy to add fallback selectors as platforms re-skin.
  */
 
-import type { MeetingPlatform } from '@agent/core';
+import type { MeetingPlatform } from '@agent/core/meeting-session-types';
 
 export interface MeetingPreJoinSelectors {
   /** Optional input where the AI's display name goes (Meet for guests). */
@@ -143,10 +143,7 @@ export const ZOOM_SELECTORS: MeetingPreJoinSelectors = {
     'button[aria-label="Stop Video"]',
     'button[aria-label="ビデオの停止"]',
   ],
-  join_button: [
-    '.preview-join-button',
-    'button:has-text("Join")',
-  ],
+  join_button: ['.preview-join-button', 'button:has-text("Join")'],
   leave_button: [
     // Post-join confirmed 2026-05-26
     'button[aria-label="Leave"]',
@@ -203,9 +200,13 @@ export const TEAMS_SELECTORS: MeetingPreJoinSelectors = {
 
 export function selectorsForPlatform(platform: MeetingPlatform): MeetingPreJoinSelectors {
   switch (platform) {
-    case 'meet': return MEET_SELECTORS;
-    case 'zoom': return ZOOM_SELECTORS;
-    case 'teams': return TEAMS_SELECTORS;
-    default: return MEET_SELECTORS;
+    case 'meet':
+      return MEET_SELECTORS;
+    case 'zoom':
+      return ZOOM_SELECTORS;
+    case 'teams':
+      return TEAMS_SELECTORS;
+    default:
+      return MEET_SELECTORS;
   }
 }

@@ -1,11 +1,7 @@
-import type { ContextSecurityScope } from '@agent/core';
+import type { ContextSecurityScope } from '@agent/core/context-security-scope';
 
 export type ExecutionKind =
-  | 'reasoning_single'
-  | 'reasoning_ensemble'
-  | 'agent_delegation'
-  | 'agent_a2a'
-  | 'deterministic';
+  'reasoning_single' | 'reasoning_ensemble' | 'agent_delegation' | 'agent_a2a' | 'deterministic';
 
 export type IdempotencyClass = 'read' | 'idempotent_write' | 'non_idempotent' | 'external_effect';
 

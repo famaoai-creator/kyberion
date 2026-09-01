@@ -1,6 +1,7 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type UiUxGovernanceViolation = {
   rule: 'hardcoded-color' | 'missing-semantic-token' | 'status-vocabulary-bypass';
@@ -127,12 +128,18 @@ export const runCheckUiUxGovernance = defineScript({
     } else if (report.status === 'pass') {
       context.print(`[check:ui-ux] OK (${report.checked_files} files, owner=${report.owner})`);
     } else {
-      console.error(`[check:ui-ux] ${report.violations.length} violation(s) detected:`);
-      for (const violation of report.violations) {
-        console.error(`- ${violation.rule}: ${violation.path} — ${violation.detail}`);
-      }
+      throw new ScriptExitError(
+        1,
+        [
+          `${report.violations.length} violation(s) detected:`,
+          ...report.violations.map(
+            (violation) => `- ${violation.rule}: ${violation.path} — ${violation.detail}`
+          ),
+        ].join('\n')
+      );
     }
-    if (report.status === 'fail') process.exitCode = 1;
+    if (report.status === 'fail') throw new ScriptExitError(1);
+    return report;
   },
 });
 

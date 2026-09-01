@@ -1,14 +1,15 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
 import { createAjv } from './foundation/ajv.js';
+import { assertCapabilityAllowed } from './capability-restriction-policy.js';
 
 /**
  * Creates a pre-configured yargs instance with common options.
  */
-export function createStandardYargs(args = process.argv) {
+export function createStandardYargs(args: string[]) {
   return yargs(hideBin(args))
     .option('input', {
       alias: 'i',
@@ -30,19 +31,52 @@ export function createStandardYargs(args = process.argv) {
     .alias('h', 'help');
 }
 
+/** Capture process arguments only at an explicit CLI boundary. */
+export function currentProcessArgv(): string[] {
+  return [...process.argv];
+}
+
 /**
  * Serve-mode framing: every response line is `PREFIX + JSON`, so clients
  * can pick results out of a stdout that also carries actuator logs.
  */
 export const ACTUATOR_SERVE_RESULT_PREFIX = '@@kyberion-actuator-result@@';
 
-interface ActuatorServeRequest {
-  id?: unknown;
+export interface ActuatorServeRequest {
+  id: string | null;
   input?: unknown;
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function normalizeActuatorServeRequest(value: unknown): ActuatorServeRequest {
+  if (!isJsonRecord(value)) throw new Error('actuator serve request must be a JSON object');
+  if (value.id !== undefined && value.id !== null) {
+    if (typeof value.id !== 'string' || !value.id.trim()) {
+      throw new Error('actuator serve request.id must be a non-empty string');
+    }
+    return { id: value.id, input: value.input };
+  }
+  return { id: null, input: value.input };
 }
 
 function formatUnknownError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Run a package-local actuator entrypoint through one shared error boundary. */
+export async function runActuatorCliEntryPoint(
+  run: () => Promise<void>,
+  name: string
+): Promise<void> {
+  try {
+    await run();
+  } catch (error: unknown) {
+    console.error(`[${name}] ${formatUnknownError(error)}`);
+    process.exitCode = 1;
+  }
 }
 
 /**
@@ -69,7 +103,8 @@ async function runActuatorServeLoop(opts: {
       if (!line) continue;
       let request: ActuatorServeRequest;
       try {
-        request = JSON.parse(line) as ActuatorServeRequest;
+        const parsed: unknown = JSON.parse(line);
+        request = normalizeActuatorServeRequest(parsed);
       } catch (err: unknown) {
         emit({ ok: false, error: `invalid JSON request: ${formatUnknownError(err)}` });
         continue;
@@ -92,8 +127,9 @@ export async function runActuatorCli(opts: {
   /** Reuse an already-defined SDK actuator instead of creating a CLI-only ABI. */
   actuator?: ActuatorDefinition;
   printResult?: (result: unknown) => void;
-  args?: string[];
+  args: string[];
 }): Promise<void> {
+  assertCapabilityAllowed(opts.name);
   const actuator =
     opts.actuator ||
     (() => {
@@ -127,7 +163,7 @@ export async function runActuatorCli(opts: {
         },
       });
     })();
-  const argv = await createStandardYargs(opts.args || process.argv)
+  const argv = await createStandardYargs(opts.args)
     .option('input', { alias: 'i', type: 'string' })
     .option('serve', {
       type: 'boolean',
@@ -145,7 +181,9 @@ export async function runActuatorCli(opts: {
     console.error(`[${opts.name}] --input is required (or use --serve)`);
     throw new Error('--input is required (or use --serve)');
   }
-  const inputPath = pathResolver.rootResolve(String(argv.input));
+  const inputPath = assertSafeRepositoryPath(pathResolver.rootResolve(String(argv.input)), {
+    allowMissingLeaf: true,
+  });
 
   let inputContent: string;
   try {

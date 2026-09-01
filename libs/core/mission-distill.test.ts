@@ -37,7 +37,14 @@ vi.mock('./ledger.js', async (importOriginal) => {
 });
 
 import * as pathResolver from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import {
   createMemoryPromotionCandidate,
@@ -48,7 +55,7 @@ import {
 } from './memory-promotion-queue.js';
 import { loadDistillCandidateRecord } from './distill-candidate-registry.js';
 import { loadState } from './mission-state.js';
-import { distillMission } from './mission-distill.js';
+import { distillMission, resolveWisdomOutputPath } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
 import { safeExec } from './secure-io.js';
 
@@ -215,5 +222,32 @@ describe('mission-distill end-to-end promotion flow', () => {
     expect(hints).toContain('Distilled wisdom from mission');
     expect(hints).toContain(`source_ref: ${queued.candidate_id}`);
     expect(hints).toContain(`knowledge/product/evolution/${wisdomFileName}`);
+  });
+});
+
+describe('resolveWisdomOutputPath', () => {
+  it('rejects output directories outside the repository root', () => {
+    expect(() => resolveWisdomOutputPath('../../outside-wisdom', 'distill.md')).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
+  it('rejects a symbolic-link output directory', () => {
+    const suffix = `${process.pid}-${Date.now()}`;
+    const target = pathResolver.shared(`tmp/mission-distill-output-target-${suffix}`);
+    const link = pathResolver.shared(`tmp/mission-distill-output-link-${suffix}`);
+    safeMkdir(target, { recursive: true });
+    safeSymlinkSync(target, link);
+    try {
+      expect(() =>
+        resolveWisdomOutputPath(
+          `active/shared/tmp/mission-distill-output-link-${suffix}`,
+          'distill.md'
+        )
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(link, { force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
   });
 });

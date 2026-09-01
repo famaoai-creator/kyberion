@@ -16,32 +16,16 @@ interface MediaStylePolicyCatalog {
 const CATALOG_PATH = pathResolver.knowledge('product/governance/media-style-policy.json');
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/media-style-policy.schema.json');
 
-const FALLBACK_SIGNAL_TONE_RANKS: Record<string, number> = {
-  danger: 0,
-  critical: 0,
-  high: 0,
-  warning: 1,
-  medium: 1,
-  info: 2,
-  success: 3,
-  low: 3,
-};
-
-const FALLBACK_BORDER_KEY_SIDES: MediaBorderKeySideEntry[] = [
-  { key_char: 'T', side: 'top' },
-  { key_char: 'B', side: 'bottom' },
-  { key_char: 'L', side: 'left' },
-  { key_char: 'R', side: 'right' },
-];
-
 const catalog = defineCatalog<MediaStylePolicyCatalog>({
   id: 'media-style-policy',
   path: CATALOG_PATH,
   schema: SCHEMA_PATH,
   fallback: () => ({
     version: '1.0.0',
-    signal_tone_ranks: FALLBACK_SIGNAL_TONE_RANKS,
-    border_key_sides: FALLBACK_BORDER_KEY_SIDES,
+    // A missing policy must not silently recreate the governed catalog in code.
+    // Keep only conservative behavior until the catalog is restored.
+    signal_tone_ranks: {},
+    border_key_sides: [],
   }),
   onFallback: (error, fallback) =>
     recordConfigFallback({ knowledgePath: CATALOG_PATH, error, defaults: fallback }),
@@ -57,7 +41,7 @@ export function resolveSignalToneRank(tone?: string): number {
     .toLowerCase();
   if (!normalized) return 2;
   const catalog = loadMediaStylePolicyCatalog();
-  return catalog.signal_tone_ranks[normalized] ?? FALLBACK_SIGNAL_TONE_RANKS[normalized] ?? 2;
+  return catalog.signal_tone_ranks[normalized] ?? 2;
 }
 
 export function resolveBorderKeySides(key: string): Array<'top' | 'bottom' | 'left' | 'right'> {
@@ -71,8 +55,4 @@ export function resolveBorderKeySides(key: string): Array<'top' | 'bottom' | 'le
     if (normalized.includes(entry.key_char)) sides.add(entry.side);
   }
   return Array.from(sides);
-}
-
-export function resetMediaStylePolicyCatalogCache(): void {
-  catalog.reset();
 }

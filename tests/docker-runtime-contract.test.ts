@@ -30,7 +30,7 @@ describe('Docker runtime contract', () => {
     const compose = read('docker-compose.yml');
     expect(compose).toContain('pnpm install --frozen-lockfile');
     expect(compose).toContain('pnpm build');
-    expect(compose).toContain('node dist/scripts/cli.js list implemented');
+    expect(compose).toContain('node dist/scripts/kyberion.js list implemented');
     expect(compose).not.toContain('dist/scripts/bootstrap.js');
   });
 });

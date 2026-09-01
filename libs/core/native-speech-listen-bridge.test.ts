@@ -128,6 +128,19 @@ describe('listenNativeSpeech', () => {
     await expect(promise).rejects.toThrow('native_speech_invalid_json');
   });
 
+  it('rejects parsed results whose root or fields violate the result contract', async () => {
+    const { normalizeNativeSpeechListenResult } = await import('./native-speech-listen-bridge.js');
+    expect(() => normalizeNativeSpeechListenResult([], { locale: 'en-US' })).toThrow(
+      'native speech result must be a JSON object'
+    );
+    expect(() => normalizeNativeSpeechListenResult({ ok: 'true' }, { locale: 'en-US' })).toThrow(
+      'native speech result.ok must be boolean'
+    );
+    expect(() =>
+      normalizeNativeSpeechListenResult({ ok: true, text: 42 }, { locale: 'en-US' })
+    ).toThrow('native speech result.text must be a string');
+  });
+
   it('rejects with stderr if stdout is empty and close code is non-zero', async () => {
     const fakeChild = createFakeChild();
     mocks.spawn.mockReturnValue(fakeChild);

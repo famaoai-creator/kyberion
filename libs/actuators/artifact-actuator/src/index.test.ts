@@ -1,12 +1,9 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import { describe, expect, it } from 'vitest';
-import {
-  compileSchemaFromPath,
-  pathResolver,
-  registerOpGuard,
-  resetOpPreflight,
-} from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { pathResolver } from '@agent/core/path-resolver';
+import { registerOpGuard, resetOpPreflight } from '@agent/core/op-preflight';
 import { handleArtifactAction } from './artifact-actuator-helpers.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;

@@ -3,7 +3,7 @@ import type { VideoCompositionSceneRole } from './video-composition-contract.js'
 import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-design-system.js';
 import { resolveTenantDesign } from './tenant-design-resolver.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
-import { webThemePackToCssVars, type WebThemePack } from './web-design-system.js';
+import { isWebThemePack, webThemePackToCssVars } from './web-design-system.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';
 
@@ -803,16 +803,6 @@ function resolveVideoTenantDesign(brief: VideoContentBrief) {
     brandName: profile.brand_name,
     designSystemId: profile.design_system_id,
   });
-}
-
-function isWebThemePack(value: unknown): value is WebThemePack {
-  return Boolean(
-    value &&
-    typeof value === 'object' &&
-    typeof (value as WebThemePack).theme === 'object' &&
-    typeof (value as WebThemePack).theme?.colors === 'object' &&
-    typeof (value as WebThemePack).theme?.fonts === 'object'
-  );
 }
 
 function inferLayoutVariant(

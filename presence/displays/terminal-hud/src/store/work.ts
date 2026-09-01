@@ -2,11 +2,11 @@ import {
   listWorkItems,
   listActiveWorkLeases,
   listBoards,
-  listTaskSessions,
-  pathResolver,
   type WorkItem,
   type WorkLease,
-} from '@agent/core';
+} from '@agent/core/work-coordination';
+import { listTaskSessions } from '@agent/core/task-session';
+import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';

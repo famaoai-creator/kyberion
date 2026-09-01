@@ -2,12 +2,14 @@ import {
   loadSurfaceManifest,
   loadSurfaceState,
   readSurfaceLogTail,
-  listDaemonHeartbeatStatuses,
-  pathResolver,
   type SurfaceRuntimeDefinition,
   type SurfaceRuntimeStateRecord,
+} from '@agent/core/surface-runtime';
+import {
+  listDaemonHeartbeatStatuses,
   type DaemonHeartbeatStatus,
-} from '@agent/core';
+} from '@agent/core/daemon-heartbeat';
+import { pathResolver } from '@agent/core/path-resolver';
 import { theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { DetailLine, PanelViewModel } from './types.js';

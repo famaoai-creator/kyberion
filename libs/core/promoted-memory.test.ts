@@ -273,6 +273,45 @@ describe('promoted-memory', () => {
     expect(hints).toContain('active/shared/tmp/hints-source.md');
   });
 
+  it('falls back from external hints overrides without writing outside the repository', () => {
+    const previousHints = safeReadFile(hintsPath, { encoding: 'utf8' }) as string;
+    const previousHintsPath = process.env.KYBERION_HINTS_PATH;
+    const previousArchivePath = process.env.KYBERION_HINTS_ARCHIVE_DIR;
+    process.env.KYBERION_HINTS_PATH = '/tmp/external-promoted-memory-hints.md';
+    process.env.KYBERION_HINTS_ARCHIVE_DIR = '/tmp/external-promoted-memory-archive';
+    try {
+      const candidate = createDistillCandidateRecord({
+        source_type: 'task_session',
+        tier: 'personal',
+        title: 'External override boundary',
+        summary: 'The governed fallback remains inside the repository.',
+        status: 'promoted',
+        target_kind: 'knowledge_hint',
+        evidence_refs: ['active/shared/tmp/hints-source.md'],
+        metadata: {
+          hint_scope: 'boundary review',
+          hint_triggers: ['external override'],
+          recommended_refs: ['knowledge/public/procedures/browser/navigate-web.md'],
+        },
+      });
+
+      const saved = savePromotedMemoryRecord(candidate, { executionRole: 'mission_controller' });
+      rememberWrite(pathResolver.resolve(saved.logicalPath));
+      expect(safeReadFile(hintsPath, { encoding: 'utf8' })).toContain(
+        'The governed fallback remains inside the repository.'
+      );
+    } finally {
+      try {
+        withExecutionContext('ecosystem_architect', () => safeWriteFile(hintsPath, previousHints));
+      } finally {
+        if (previousHintsPath === undefined) delete process.env.KYBERION_HINTS_PATH;
+        else process.env.KYBERION_HINTS_PATH = previousHintsPath;
+        if (previousArchivePath === undefined) delete process.env.KYBERION_HINTS_ARCHIVE_DIR;
+        else process.env.KYBERION_HINTS_ARCHIVE_DIR = previousArchivePath;
+      }
+    }
+  });
+
   it('rotates older hint sections into archive when the live file exceeds the cap', () => {
     const makeSection = (index: number) =>
       [

@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
+import {
+  renderIntentAuthorityLabel,
+  renderIntentOutcomeLabel,
+  type IntentResolutionContract,
+} from './intent-resolution-contract.js';
 import { readJson } from './foundation/json.js';
 import { safeExec, safeExistsSync, safeRmSync } from './secure-io.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
@@ -313,6 +318,7 @@ export function stashMissionProposalForConfirmation(params: {
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
   fallbackSummary?: string;
+  intentResolution?: IntentResolutionContract;
 }): string {
   saveMissionProposalState({
     surface: params.surface,
@@ -324,7 +330,17 @@ export function stashMissionProposalForConfirmation(params: {
   });
   const summary =
     String(params.proposal.summary || params.fallbackSummary || '').trim() || 'Mission proposal';
-  return `${summary}\n1) 作成する 2) やめる`;
+  return [
+    `${summary}\n1) 作成する 2) やめる`,
+    ...(params.intentResolution
+      ? [
+          `Authority: ${renderIntentAuthorityLabel(params.intentResolution.authority_level, 'ja')}`,
+          `Next action: ${params.intentResolution.next_action.label}`,
+          `Consequence: ${params.intentResolution.next_action.consequence}`,
+          `Outcome: ${renderIntentOutcomeLabel(params.intentResolution.outcome_kind, 'ja')}`,
+        ]
+      : []),
+  ].join('\n');
 }
 
 export function isSlackMissionConfirmation(text: string): boolean {

@@ -1,22 +1,31 @@
 import {
   ControlPlaneClientError,
-  createNextActionContract,
   createControlPlaneClient,
-  createStandardYargs,
-  findIntentOutcomePattern,
   getControlPlaneRemediationPlan,
-  listMemoryPromotionCandidates,
-  loadIntentOutcomePatterns,
-  logger,
-  pathResolver,
-  safeExec,
-  summarizeMissionSeedAssessment,
+} from '@agent/core/control-plane-client';
+import {
+  createNextActionContract,
   validateNextActionContract,
+} from '@agent/core/next-action-contract';
+import {
+  findIntentOutcomePattern,
+  loadIntentOutcomePatterns,
+} from '@agent/core/intent-outcome-patterns';
+import { listMemoryPromotionCandidates } from '@agent/core/memory-promotion-queue';
+import { summarizeMissionSeedAssessment } from '@agent/core/mission-seed-assessment';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 export { summarizeMissionSeedAssessment };
 
@@ -44,20 +53,28 @@ const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/media-design-systems/design-md-imports.json'
 );
 
+function loadCatalogJson<T = any>(filePath: string): T {
+  const safePath = assertSafeRepositoryPath(filePath);
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[control-plane] catalog must be a regular file: ${filePath}`);
+  }
+  return readJson<T>(safePath);
+}
+
 function loadArtifactLibraryIndex(): any {
-  return readJson(ARTIFACT_LIBRARY_INDEX_PATH);
+  return loadCatalogJson(ARTIFACT_LIBRARY_INDEX_PATH);
 }
 
 function loadDesignMdIndex(): any {
-  return readJson(DESIGN_MD_INDEX_PATH);
+  return loadCatalogJson(DESIGN_MD_INDEX_PATH);
 }
 
 function loadDesignMdThemes(): any {
-  return readJson(DESIGN_MD_THEME_PATH);
+  return loadCatalogJson(DESIGN_MD_THEME_PATH);
 }
 
 function loadDesignMdSystems(): any {
-  return readJson(DESIGN_MD_SYSTEM_PATH);
+  return loadCatalogJson(DESIGN_MD_SYSTEM_PATH);
 }
 
 function normalizeCatalogQuery(input: unknown): string {
@@ -85,13 +102,19 @@ function searchArtifactLibraryProfiles(query?: string): any[] {
   });
 }
 
+export function resolveArtifactLibraryResource(file: string): string {
+  return assertSafeRepositoryPath(path.resolve(ARTIFACT_LIBRARY_DIR, String(file)), {
+    allowMissingLeaf: false,
+  });
+}
+
 function resolveArtifactLibraryProfile(profileId: string): any {
   const index = loadArtifactLibraryIndex();
   const normalizedProfileId = String(profileId || '').trim();
   for (const pack of asArray(index.packs)) {
     if (!asArray<string>(pack.profiles).includes(normalizedProfileId)) continue;
-    const fullPath = path.resolve(ARTIFACT_LIBRARY_DIR, String(pack.file));
-    const doc = readJson<any>(fullPath);
+    const fullPath = resolveArtifactLibraryResource(String(pack.file));
+    const doc = loadCatalogJson<any>(fullPath);
     return {
       profile_id: normalizedProfileId,
       domain: pack.domain,
@@ -190,15 +213,47 @@ function summarizeSurfaceRuntimeOutput(output: unknown, fallback: string): strin
     return fallback;
   }
   try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    const status = String(parsed.status || 'ok');
-    const id = parsed.id ? String(parsed.id) : undefined;
-    const detail = parsed.detail ? String(parsed.detail) : undefined;
-    const port = parsed.port ? String(parsed.port) : undefined;
+    const parsed = parseSurfaceRuntimeCommandOutput(JSON.parse(text) as unknown);
+    const status = parsed.status || 'ok';
+    const id = parsed.id;
+    const detail = parsed.detail;
+    const port = parsed.port === undefined ? undefined : String(parsed.port);
     return [status, id, detail, port ? `port ${port}` : undefined].filter(Boolean).join(' · ');
   } catch (_) {
     return formatExecTail(text, fallback);
   }
+}
+
+export interface SurfaceRuntimeCommandOutput {
+  status?: string;
+  id?: string;
+  detail?: string;
+  port?: string | number;
+}
+
+export function parseSurfaceRuntimeCommandOutput(value: unknown): SurfaceRuntimeCommandOutput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('invalid_surface_runtime_output');
+  }
+  const record = value as Record<string, unknown>;
+  for (const field of ['status', 'id', 'detail'] as const) {
+    if (record[field] !== undefined && typeof record[field] !== 'string') {
+      throw new Error(`invalid_surface_runtime_output_${field}`);
+    }
+  }
+  if (
+    record.port !== undefined &&
+    typeof record.port !== 'string' &&
+    (typeof record.port !== 'number' || !Number.isFinite(record.port))
+  ) {
+    throw new Error('invalid_surface_runtime_output_port');
+  }
+  return {
+    ...(record.status !== undefined ? { status: record.status as string } : {}),
+    ...(record.id !== undefined ? { id: record.id as string } : {}),
+    ...(record.detail !== undefined ? { detail: record.detail as string } : {}),
+    ...(record.port !== undefined ? { port: record.port as string | number } : {}),
+  };
 }
 
 function formatExecTail(output: unknown, fallback: string): string {
@@ -237,7 +292,7 @@ function attemptSurfaceFix(surface: SurfaceKind): string {
     }
     return steps.join(' -> ');
   } catch (error) {
-    const reconcileOutput = safeExec('pnpm', ['surfaces:reconcile'], {
+    const reconcileOutput = safeExec('pnpm', ['surfaces', 'reconcile'], {
       cwd: pathResolver.rootDir(),
       timeoutMs: 120_000,
     });
@@ -1161,8 +1216,8 @@ Environment:
 `);
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'control_plane_cli', ...args])
     .option('json', { type: 'boolean', default: false, description: 'Print raw JSON' })
     .option('surface', {
       type: 'string',
@@ -1213,10 +1268,25 @@ async function main(): Promise<void> {
   await handleChronos(action, rest, Boolean(argv.json));
 }
 
-main().catch((error) => {
-  logger.error(error?.message || String(error));
-  if (error instanceof ControlPlaneClientError && error.suggestedCommand) {
-    process.stderr.write(`Suggested fix: ${error.suggestedCommand}\n`);
-  }
-  process.exitCode = 1;
+const runControlPlaneCli = defineScript({
+  name: 'control-plane',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error) {
+      logger.error(error?.message || String(error));
+      if (error instanceof ControlPlaneClientError && error.suggestedCommand) {
+        process.stderr.write(`Suggested fix: ${error.suggestedCommand}\n`);
+      }
+      process.exitCode = 1;
+    }
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'control_plane_cli.ts') ||
+  isDirectScript(import.meta.url, 'control_plane_cli.js')
+) {
+  void runControlPlaneCli();
+}

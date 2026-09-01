@@ -59,6 +59,10 @@ vi.mock('./core.js', () => ({
   },
 }));
 
+vi.mock('./delegation-concurrency.js', () => ({
+  registerKillSwitchTerminationRegistrar: vi.fn(),
+}));
+
 describe('kill-switch', () => {
   beforeEach(() => {
     vi.resetModules();

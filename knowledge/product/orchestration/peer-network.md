@@ -109,7 +109,7 @@ Records without an explicit, valid tenant remain quarantined. After a tenant res
 pnpm peer:runtime-recovery request --tenant-id <tenant> \
   --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/<tenant>/<restore-id> \
   --requested-by <operator>
-pnpm cli approve <approval-id> peer-recovery
+pnpm kyberion approve <approval-id> peer-recovery
 pnpm peer:runtime-recovery resume --tenant-id <tenant> \
   --quarantine-path active/shared/runtime/peer-recovery-quarantine/tenants/<tenant>/<restore-id> \
   --approval-id <approval-id>

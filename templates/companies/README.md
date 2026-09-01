@@ -24,7 +24,7 @@ Kyberion に「会社」を運営させるための業態別テンプレート�
 ## 実体化(bootstrap)
 
 ```bash
-pnpm company:bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社"
+pnpm onboard company bootstrap --vertical saas-product-company --slug acme --name "ACME株式会社"
 export KYBERION_CUSTOMER=acme
 ```
 

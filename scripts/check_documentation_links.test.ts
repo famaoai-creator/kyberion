@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDocumentationTargets } from './check_documentation_links.js';
 
 describe('check_documentation_links', () => {

@@ -1,8 +1,15 @@
+import * as path from 'node:path';
 import type { PlanningPacket } from './channel-surface.js';
-import { emitMissionTaskEvent, missionTaskEventsPath } from './mission-task-events.js';
+import {
+  emitMissionTaskEvent,
+  missionTaskEventsPath,
+  parseMissionTaskEventIdentity,
+  type MissionTaskEventIdentity,
+} from './mission-task-events.js';
 import { ledger } from './ledger.js';
-import { missionDir } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile } from './secure-io.js';
+import { findMissionPath, missionDir } from './path-resolver.js';
+import { parseSafeJsonInput, readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import {
   provisionMissionEntry,
   writeProvisionedJson,
@@ -56,13 +63,25 @@ const TASK_EVENT_STATUS_MAP: Partial<
   accepted: 'task_accepted',
 };
 
+function safeMissionArtifactPath(missionId: string, relativePath: string): string {
+  const missionPath = assertSafeRepositoryPath(
+    findMissionPath(missionId) || missionDir(missionId, 'public'),
+    {
+      allowMissingLeaf: true,
+    }
+  );
+  return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
 export function createMissionProgressController(
   dependencies: MissionProgressControllerDependencies
 ): MissionProgressController {
   function loadAllNextTasks(missionId: string): PlannedNextTask[] {
-    const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+    const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
     if (!safeExistsSync(nextTasksPath)) return [];
-    return dependencies.validatePlannedNextTasks(loadJson<unknown>(nextTasksPath), missionId);
+    return dependencies.validatePlannedNextTasks(readJson<unknown>(nextTasksPath), missionId);
   }
 
   function loadPlannedNextTasks(missionId: string): PlannedNextTask[] {
@@ -73,9 +92,9 @@ export function createMissionProgressController(
   }
 
   function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
-    const nextTasksPath = `${missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+    const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
     const existingTasks = safeExistsSync(nextTasksPath)
-      ? dependencies.validatePlannedNextTasks(loadJson<unknown>(nextTasksPath), missionId)
+      ? dependencies.validatePlannedNextTasks(readJson<unknown>(nextTasksPath), missionId)
       : [];
     const existingById = new Map(existingTasks.map((task) => [task.task_id, task]));
     const mergedTasks = tasks.map((task) => {
@@ -105,10 +124,9 @@ export function createMissionProgressController(
   }
 
   function syncPlanningArtifacts(missionId: string): void {
-    const missionPath = missionDir(missionId, 'public');
-    const planPath = `${missionPath}/PLAN.md`;
-    const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
-    const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
+    const planPath = safeMissionArtifactPath(missionId, 'PLAN.md');
+    const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
+    const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
 
     if (
       !safeExistsSync(planPath) ||
@@ -143,7 +161,7 @@ export function createMissionProgressController(
       });
     }
 
-    const nextTasks = loadJson<unknown>(nextTasksPath);
+    const nextTasks = readJson<unknown>(nextTasksPath);
     ledger.record('MISSION_PLAN_READY', {
       mission_id: missionId,
       role: 'planner',
@@ -187,10 +205,10 @@ export function createMissionProgressController(
     if (!validation.valid || !validation.value) {
       throw new Error(`Invalid planning packet for ${missionId}: ${validation.errors.join('; ')}`);
     }
-    const missionPath = missionDir(missionId, 'public');
+    const planPath = safeMissionArtifactPath(missionId, 'PLAN.md');
     writeProvisionedText({
       missionId,
-      filePath: `${missionPath}/PLAN.md`,
+      filePath: planPath,
       targetPath: 'PLAN.md',
       provisioned: provisionMissionEntry(validation.value.plan_markdown.trimEnd() + '\n'),
     });
@@ -254,7 +272,7 @@ export function createMissionProgressController(
     const nextTasks = validation.value.next_tasks.map((_, index) => ({ ...derivedTasks[index] }));
     // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
     // the planner may add tasks around them but never drop or restructure them.
-    const nextTasksPath = `${missionPath}/NEXT_TASKS.json`;
+    const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
     const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
     if (seededTasks.length > 0) {
       const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
@@ -282,7 +300,9 @@ export function createMissionProgressController(
   }
 
   function readExistingTaskEventKeys(missionId: string): Set<string> {
-    const taskEventsPath = missionTaskEventsPath(missionId);
+    const taskEventsPath = assertSafeRepositoryPath(missionTaskEventsPath(missionId), {
+      allowMissingLeaf: true,
+    });
     if (!safeExistsSync(taskEventsPath)) return new Set();
     const raw = safeReadFile(taskEventsPath, { encoding: 'utf8' }) as string;
     return new Set(
@@ -291,15 +311,13 @@ export function createMissionProgressController(
         .filter(Boolean)
         .map((line) => {
           try {
-            const parsed = JSON.parse(line) as { event_type?: string; task_id?: string };
-            return parsed.event_type && parsed.task_id
-              ? `${parsed.event_type}:${parsed.task_id}`
-              : null;
+            return parseMissionTaskEventIdentity(parseSafeJsonInput(line, 'mission task event'));
           } catch {
-            return null;
+            return undefined;
           }
         })
-        .filter((value): value is string => Boolean(value))
+        .filter((value): value is MissionTaskEventIdentity => value?.mission_id === missionId)
+        .map((value) => `${value.event_type}:${value.task_id}`)
     );
   }
 
@@ -336,8 +354,7 @@ export function createMissionProgressController(
   }
 
   function reconcileMissionProgress(missionId: string): void {
-    const missionPath = missionDir(missionId, 'public');
-    const taskBoardPath = `${missionPath}/TASK_BOARD.md`;
+    const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
     if (!safeExistsSync(taskBoardPath)) return;
 
     const tasks = loadAllNextTasks(missionId);
@@ -408,7 +425,7 @@ export function createMissionProgressController(
   }
 
   function markTaskBoardInProgress(missionId: string): void {
-    const taskBoardPath = `${missionDir(missionId, 'public')}/TASK_BOARD.md`;
+    const taskBoardPath = safeMissionArtifactPath(missionId, 'TASK_BOARD.md');
     if (!safeExistsSync(taskBoardPath)) return;
     const currentTaskBoard = safeReadFile(taskBoardPath, { encoding: 'utf8' }) as string;
     const updatedTaskBoard = currentTaskBoard

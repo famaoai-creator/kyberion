@@ -1,4 +1,6 @@
-import { evaluateCondition, pathResolver } from '@agent/core';
+import { evaluateCondition } from '@agent/core/src/logic-utils';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   removeVirtualPasskeyAuthenticator,
@@ -130,7 +132,9 @@ export async function opControl(
         params.message || 'Operator input required. Press Enter to continue.'
       );
       const continueFile = params.continue_file
-        ? pathResolver.rootResolve(resolve(params.continue_file))
+        ? assertSafeRepositoryPath(pathResolver.rootResolve(resolve(params.continue_file)), {
+            allowMissingLeaf: true,
+          })
         : pathResolver.shared(`runtime/browser/${sessionId}.continue`);
       const approval = browserRuntimeHelpers.beginOperatorApproval({
         sessionId,
@@ -210,7 +214,7 @@ export async function opControl(
       });
     }
     case 'ref': {
-      const { resolveRef } = await import('@agent/core');
+      const { resolveRef } = await import('@agent/core/src/pipeline-engine');
       const refPath = resolve(params.path);
       const bindResolved: Record<string, any> = {};
       if (params.bind) {

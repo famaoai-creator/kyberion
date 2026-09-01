@@ -6,19 +6,43 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('Presence Studio OS control-plane route contract', () => {
+  it('uses the canonical governed standard-intent catalog for the surface list', () => {
+    const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    const routeStart = source.indexOf("presenceStudioData.app.get('/api/standard-intents'");
+    const routeEnd = source.indexOf("presenceStudioData.app.get('/api/", routeStart + 1);
+    const route = source.slice(routeStart, routeEnd === -1 ? undefined : routeEnd);
+
+    expect(source).toContain(
+      "import { loadStandardIntentCatalog } from '@agent/core/intent-resolution'"
+    );
+    expect(route).toContain('loadStandardIntentCatalog()');
+    expect(route).not.toContain('readJson');
+  });
+
   it('resolves server-side authority and propagates it to every OS operation', () => {
     const source = readRepoFile('presence/displays/presence-studio/server.ts');
+    const routeStart = source.indexOf("presenceStudioData.app.get('/api/os/control-plane'");
+    const decisionRouteStart = source.indexOf(
+      "presenceStudioData.app.post('/api/os/held-actions/:actionId/decision'"
+    );
+    const applyRouteStart = source.indexOf(
+      "presenceStudioData.app.post('/api/os/held-actions/:actionId/apply'"
+    );
+    const route = source.slice(routeStart, decisionRouteStart);
+    const decisionRoute = source.slice(decisionRouteStart, applyRouteStart);
+    const applyRoute = source.slice(applyRouteStart);
 
-    expect(source).toContain('resolvePresenceStudioViewerContext(req)');
-    expect(source).toContain('cloudflareOsSurface.snapshot(');
-    expect(source).toContain("res.setHeader('Cache-Control', 'private, no-store')");
-    expect(source).toContain(
+    expect(route).toContain('resolvePresenceStudioViewerContext(req)');
+    expect(route).toContain('cloudflareOsSurface.snapshot(');
+    expect(route).toContain("res.setHeader('Cache-Control', 'private, no-store')");
+    expect(route).toContain(
       "typeof rawMissionId === 'string' ? rawMissionId : undefined,\n      access"
     );
-    expect(source).toContain('decideHeldAction(actionId, decision, access)');
-    expect(source).toContain('applyHeldAction(actionId, access)');
-    expect(source).toContain('res.status(502).json({');
-    expect(source).not.toContain('error: error?.message || String(error)');
+    expect(route).not.toContain('error: error?.message || String(error)');
+    expect(decisionRoute).toMatch(/decideHeldAction\(\s*actionId,\s*decision,\s*access\s*\)/u);
+    expect(decisionRoute).toContain('presenceStudioApprovalDecisionSchema.safeParse(req.body)');
+    expect(applyRoute).toContain('applyHeldAction(actionId, access)');
+    expect(applyRoute).toContain('res.status(502).json({');
   });
 
   it('keeps the operator UI aware of failure status and external-effect confirmation', () => {
@@ -31,6 +55,22 @@ describe('Presence Studio OS control-plane route contract', () => {
     expect(source).toContain('window.confirm(uiText(');
     expect(source).toContain('item.failureRecorded');
     expect(source).not.toContain('item.applyError');
+  });
+
+  it('renders the voice intent-resolution contract in the operator view', () => {
+    const source = readRepoFile('presence/displays/presence-studio/static/index.html');
+
+    expect(source).toContain('id="intent-resolution"');
+    expect(source).toContain('renderIntentResolution(body.intentResolution)');
+    expect(source).toContain('function parseIntentResolutionContract(value)');
+    expect(source).toContain('contract = parseIntentResolutionContract(contract)');
+    expect(source).toContain('Object.keys(value)');
+    expect(source).toContain('item.normalized_intent');
+    expect(source).toContain('item.authority_level');
+    expect(source).toContain('item.outcome_kind');
+    expect(source).toContain('nextAction.consequence');
+    expect(source).toContain('authorityLabels[item.authority_level]');
+    expect(source).toContain('outcomeLabels[item.outcome_kind]');
   });
 
   it('does not rewrite the governed voice-consent evidence when recording starts', () => {

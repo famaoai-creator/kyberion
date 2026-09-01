@@ -1,23 +1,30 @@
+import { loadJson } from '@agent/core/foundation';
+import { distillHttpResponse } from '@agent/core/observation-distill';
+import { executeLlmDecideOp } from '@agent/core/semantic-decide';
+import { logger } from '@agent/core/core';
+import { secureFetch } from '@agent/core/network';
 import {
-  loadJson,
-  distillHttpResponse,
-  executeLlmDecideOp,
-  logger,
-  secureFetch,
+  assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
   safeExec,
-  pathResolver,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   resolveVars,
   evaluateCondition,
   getPathValue,
   resolveWriteArtifactSpec,
-  retry,
-  buildGovernedRetryOptions,
-  buildUnknownActuatorOpError,
-  executeAdfSteps,
-} from '@agent/core';
+} from '@agent/core/src/logic-utils';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { buildUnknownActuatorOpError } from '@agent/core/actuator-op-registry';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
 import { getRegisteredEnv } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { sendA2AMessage, pollA2AInbox } from './a2a-transport.js';
@@ -47,6 +54,12 @@ function assertUnsafeShellAllowed() {
   }
 }
 
+const buildNetworkRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: NETWORK_MANIFEST_PATH,
+  defaults: DEFAULT_RETRY_POLICY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
+
 function buildRetryOptions(stepParams: Record<string, any>) {
   const explicitRetry =
     stepParams && typeof stepParams.retry === 'object' && !Array.isArray(stepParams.retry)
@@ -56,16 +69,15 @@ function buildRetryOptions(stepParams: Record<string, any>) {
     explicitRetry.maxRetries = Number(stepParams.max_retries);
   if (stepParams?.retry_delay_ms !== undefined)
     explicitRetry.initialDelayMs = Number(stepParams.retry_delay_ms);
-  return buildGovernedRetryOptions({
-    manifestPath: NETWORK_MANIFEST_PATH,
-    defaults: DEFAULT_RETRY_POLICY,
-    override: explicitRetry,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
+  return buildNetworkRetryOptions(explicitRetry);
 }
 
 function buildUnknownNetworkOpError(op: string): Error {
   return buildUnknownActuatorOpError('network', op);
+}
+
+function resolveNetworkPath(ref: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
 }
 
 export interface PipelineStep {
@@ -94,32 +106,31 @@ export async function handleAction(input: NetworkAction) {
 }
 
 // AR-01 Task 2: the hand-rolled step loop is replaced by the canonical
-// engine (executeAdfSteps), so control-op / vars / condition semantics and
+// shared ADF engine, so control-op / vars / condition semantics and
 // step budgets match every other runner. One deliberate semantic change:
 // nested control failures now propagate instead of being silently absorbed
 // (the old loop took res.context regardless of nested status — AR-06's
 // no-silent-failure rule says that was a bug, not a feature).
 async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, options: any = {}) {
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
   let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
 
-  if (
-    initialCtx.context_path &&
-    safeExistsSync(pathResolver.rootResolve(initialCtx.context_path))
-  ) {
-    const saved = loadJson<Record<string, unknown>>(
-      pathResolver.rootResolve(initialCtx.context_path)
-    );
+  const contextPath = initialCtx.context_path
+    ? resolveNetworkPath(String(initialCtx.context_path))
+    : undefined;
+  if (contextPath && safeExistsSync(contextPath)) {
+    const saved = loadJson<Record<string, unknown>>(contextPath);
     ctx = { ...ctx, ...saved };
   }
 
-  const result = await executeAdfSteps(
-    steps as Parameters<typeof executeAdfSteps>[0],
-    ctx,
-    { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-    {
+  const result = await runAdfActuatorPipeline({
+    actuatorId: 'network',
+    steps,
+    context: ctx,
+    options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+    handlers: {
       capture: opCapture,
       transform: opTransform,
       apply: async (op, params, currentCtx) => {
@@ -127,12 +138,15 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
         return currentCtx;
       },
       control: opControl,
-    }
-  );
+    },
+  });
   ctx = result.context;
 
   if (initialCtx.context_path) {
-    safeWriteFile(pathResolver.rootResolve(initialCtx.context_path), JSON.stringify(ctx, null, 2));
+    safeWriteFile(
+      resolveNetworkPath(String(initialCtx.context_path)),
+      JSON.stringify(ctx, null, 2)
+    );
   }
 
   return result;
@@ -254,7 +268,7 @@ async function opApply(op: string, params: any, ctx: any) {
     case 'write_file':
     case 'write_artifact':
       const spec = resolveWriteArtifactSpec(params, ctx, (value) => resolveVars(value, ctx));
-      const outPath = pathResolver.rootResolve(spec.path);
+      const outPath = resolveNetworkPath(String(spec.path));
       const content =
         typeof spec.content === 'string'
           ? spec.content
@@ -272,7 +286,7 @@ async function opApply(op: string, params: any, ctx: any) {
         method: params.method || 'local',
         encrypt: params.encrypt !== false,
         target_public_key: params.target_public_key
-          ? pathResolver.rootResolve(resolveVars(params.target_public_key, ctx))
+          ? resolveNetworkPath(String(resolveVars(params.target_public_key, ctx)))
           : undefined,
       });
       break;

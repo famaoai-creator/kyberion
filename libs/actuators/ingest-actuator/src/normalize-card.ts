@@ -14,8 +14,9 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver, resolveTenant, type TenantRegistryPathOptions } from '@agent/core';
-import { compileSchema, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveTenant, type TenantRegistryPathOptions } from '@agent/core/tenant-registry';
+import { compileSchema, defineCatalog } from '@agent/core/foundation';
 import type { IngestIr } from './parse-document.js';
 
 // Tracked source, resolved against the real repo root on purpose (same
@@ -26,6 +27,9 @@ const CARD_SCHEMA_PATH = pathResolver.rootResolve(
 );
 const TAXONOMY_PATH = pathResolver.rootResolve(
   'knowledge/product/governance/knowledge-taxonomy.json'
+);
+const TAXONOMY_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/knowledge-taxonomy.schema.json'
 );
 
 const cardValidate = compileSchema(CARD_SCHEMA_PATH);
@@ -42,12 +46,14 @@ interface TaxonomyFile {
   directory_defaults?: TaxonomyDirectoryDefault[];
 }
 
-let cachedTaxonomy: TaxonomyFile | null = null;
+const taxonomyCatalog = defineCatalog<TaxonomyFile>({
+  id: 'knowledge-taxonomy',
+  path: TAXONOMY_PATH,
+  schema: TAXONOMY_SCHEMA_PATH,
+});
 
 function loadTaxonomy(): TaxonomyFile {
-  if (cachedTaxonomy) return cachedTaxonomy;
-  cachedTaxonomy = readJson<TaxonomyFile>(TAXONOMY_PATH);
-  return cachedTaxonomy;
+  return taxonomyCatalog.load();
 }
 
 /** Longest matching directory_defaults entry for a repo-relative path. */

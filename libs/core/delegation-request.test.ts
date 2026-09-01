@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   createAssistantDelegationRequest,
+  getAssistantDelegationRequestPath,
+  getAssistantDelegationResultPath,
   validateAssistantDelegationRequest,
 } from './delegation-request.js';
 
 describe('assistant delegation request', () => {
+  it('rejects request ids that could escape the governed temporary stores', () => {
+    expect(() => getAssistantDelegationRequestPath('../escape')).toThrow(
+      '[ASSISTANT_DELEGATION_REQUEST_ID]'
+    );
+    expect(() => getAssistantDelegationResultPath('nested/result')).toThrow(
+      '[ASSISTANT_DELEGATION_REQUEST_ID]'
+    );
+  });
+
   it('creates a governed delegation artifact with provider preferences', () => {
     const { request, requestPath } = createAssistantDelegationRequest({
       source: { origin: 'cli', channel: 'run_intent' },

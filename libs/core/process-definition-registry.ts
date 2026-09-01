@@ -1,6 +1,13 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { isRecord } from './foundation/text.js';
 
 export type ProcessDefinitionKind =
   'mission_workflow_catalog' | 'scenario_pack' | 'playbook_directory' | 'phase_directory';
@@ -43,7 +50,9 @@ export interface ProcessDefinitionRegistryAudit {
   errors: string[];
 }
 
-const REGISTRY_PATH = pathResolver.knowledge('product/governance/process-definition-registry.json');
+const REGISTRY_PATH = assertSafeRepositoryPath(
+  pathResolver.knowledge('product/governance/process-definition-registry.json')
+);
 
 const registryCatalog = defineCatalog<ProcessDefinitionRegistry>({
   id: 'process-definition-registry',
@@ -56,7 +65,7 @@ export function loadProcessDefinitionRegistry(): ProcessDefinitionRegistry {
 }
 
 function rootPath(relativePath: string): string {
-  return pathResolver.rootResolve(relativePath);
+  return assertSafeRepositoryPath(relativePath, { allowMissingLeaf: true });
 }
 
 function countJsonArray(payload: Record<string, unknown>, key: string): number {
@@ -128,7 +137,12 @@ export function auditProcessDefinitionRegistry(
       sources.push(audit);
       continue;
     }
-    const payload = loadJson<Record<string, unknown>>(resolved);
+    const payload = loadJson<unknown>(resolved);
+    if (!isRecord(payload)) {
+      errors.push(`${source.id}: expected JSON object at ${source.path}`);
+      sources.push(audit);
+      continue;
+    }
     const actualCounts: Record<string, number> = {};
     for (const key of Object.keys(source.expected_counts ?? {})) {
       actualCounts[key] = countJsonArray(payload, key);

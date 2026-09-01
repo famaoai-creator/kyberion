@@ -65,11 +65,17 @@ describe('risky-op-registry', () => {
         agentId: 'mission_controller',
         correlationId: 'caller-supplied-id',
         channel: 'slack',
+        hasHuman: false,
+        hasUI: false,
+        nonInteractive: true,
       });
 
       const call = mock.mock.calls.at(-1)?.[0];
       expect(call?.correlationId).toBe('caller-supplied-id');
       expect(call?.channel).toBe('slack');
+      expect(call?.hasHuman).toBe(false);
+      expect(call?.hasUI).toBe(false);
+      expect(call?.nonInteractive).toBe(true);
     });
   });
 });

@@ -2,14 +2,15 @@ import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { logger } from './core.js';
-import { createAjv } from './foundation/ajv.js';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { compileSchema } from './foundation/ajv.js';
 import {
+  assertSafeRepositoryPath,
   loadJson,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -17,7 +18,12 @@ import {
   buildOrganizationWorkLoopSummary,
   type OrganizationWorkLoopSummary,
 } from './work-design.js';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
+import {
+  loadResolvedStandardIntentCatalog,
+  resolveIntentResolutionPacket,
+  type IntentResolutionOptions,
+  type IntentResolutionPacket,
+} from './intent-resolution.js';
 import { resolveAnalysisExecutionContract } from './analysis-contract.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
 import {
@@ -157,7 +163,6 @@ interface ValidationResult<T> {
   value?: T;
 }
 
-const ajv = createAjv();
 const TASK_SESSION_SCHEMA_PATH = pathResolver.knowledge('product/schemas/task-session.schema.json');
 const TASK_SESSION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/task-session-policy.schema.json'
@@ -169,11 +174,18 @@ const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
 const SURFACE_MANIFEST_DIR = pathResolver.knowledge('product/governance/surfaces');
 const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 
+function taskSessionCatalog(filePath: string) {
+  return defineCatalog<TaskSession>({
+    id: 'task-session',
+    path: filePath,
+    schema: TASK_SESSION_SCHEMA_PATH,
+  });
+}
+
 let taskSessionValidateFn: ValidateFunction | null = null;
-let taskSessionPolicyValidateFn: ValidateFunction | null = null;
 function ensureTaskSessionValidator(): ValidateFunction {
   if (taskSessionValidateFn) return taskSessionValidateFn;
-  taskSessionValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_SCHEMA_PATH);
+  taskSessionValidateFn = compileSchema(TASK_SESSION_SCHEMA_PATH);
   return taskSessionValidateFn;
 }
 
@@ -205,19 +217,14 @@ type TaskSessionPolicyFile = {
   intents: TaskSessionIntentPolicy[];
 };
 
-function ensureTaskSessionPolicyValidator(): ValidateFunction {
-  if (taskSessionPolicyValidateFn) return taskSessionPolicyValidateFn;
-  taskSessionPolicyValidateFn = compileSchemaFromPath(ajv, TASK_SESSION_POLICY_SCHEMA_PATH);
-  return taskSessionPolicyValidateFn;
-}
+const taskSessionPolicyCatalog = defineCatalog<TaskSessionPolicyFile>({
+  id: 'task-session-policy',
+  path: TASK_SESSION_POLICY_PATH,
+  schema: TASK_SESSION_POLICY_SCHEMA_PATH,
+});
 
 function loadTaskSessionPolicy(): TaskSessionPolicyFile {
-  const value = loadJson<TaskSessionPolicyFile>(TASK_SESSION_POLICY_PATH);
-  const validate = ensureTaskSessionPolicyValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid task-session-policy: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value;
+  return taskSessionPolicyCatalog.load();
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
@@ -227,11 +234,19 @@ function errorsFrom(validate: ValidateFunction): string[] {
 }
 
 function taskSessionDir(rootDir = pathResolver.rootDir()): string {
-  return path.resolve(rootDir, 'active/shared/runtime/task-sessions');
+  return assertSafeRepositoryPath(path.resolve(rootDir, 'active/shared/runtime/task-sessions'), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function taskSessionPath(sessionId: string, rootDir = pathResolver.rootDir()): string {
-  return `${taskSessionDir(rootDir)}/${sessionId}.json`;
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[TASK_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(path.join(taskSessionDir(rootDir), `${normalized}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 function collectTaskSessionEvidenceRefs(session: TaskSession): string[] {
@@ -287,14 +302,6 @@ function recordTaskSessionCompletionLearning(session: TaskSession): void {
   }
 }
 
-function extractServiceNameFromUtterance(trimmed: string): string | undefined {
-  const serviceMatch =
-    trimmed.match(
-      /([A-Za-z0-9._-]+)\s*(?:の|を)?\s*(?:再起動|restart|起動|停止|stop|status|状態|ログ)/i
-    ) || trimmed.match(/service\s+([A-Za-z0-9._-]+)/i);
-  return serviceMatch?.[1];
-}
-
 function isRunningPid(pid: unknown): pid is number {
   if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
   try {
@@ -306,9 +313,10 @@ function isRunningPid(pid: unknown): pid is number {
 }
 
 function loadRunningServiceIds(): string[] {
-  if (!safeExistsSync(SERVICE_PID_FILE)) return [];
   try {
-    const parsed = loadJson<Record<string, unknown>>(SERVICE_PID_FILE);
+    const safePidFile = assertSafeRepositoryPath(SERVICE_PID_FILE);
+    if (!safeExistsSync(safePidFile)) return [];
+    const parsed = loadJson<Record<string, unknown>>(safePidFile);
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)
@@ -328,11 +336,12 @@ type SurfaceStartableChoice = {
 };
 
 function loadSurfaceStateRunningIds(): Set<string> {
-  if (!safeExistsSync(SURFACE_STATE_PATH)) return new Set();
   try {
+    const safeStatePath = assertSafeRepositoryPath(SURFACE_STATE_PATH);
+    if (!safeExistsSync(safeStatePath)) return new Set();
     const parsed = loadJson<{
       surfaces?: Record<string, { pid?: unknown }>;
-    }>(SURFACE_STATE_PATH);
+    }>(safeStatePath);
     return new Set(
       Object.entries(parsed.surfaces || {})
         .filter(([, record]) => isRunningPid(record?.pid))
@@ -344,16 +353,19 @@ function loadSurfaceStateRunningIds(): Set<string> {
 }
 
 function loadStartableServiceChoices(): SurfaceStartableChoice[] {
-  if (!safeExistsSync(SURFACE_MANIFEST_DIR)) return [];
+  const safeManifestDir = assertSafeRepositoryPath(SURFACE_MANIFEST_DIR, {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeManifestDir) || !safeLstat(safeManifestDir).isDirectory()) return [];
   const runningIds = loadSurfaceStateRunningIds();
-  return safeReaddir(SURFACE_MANIFEST_DIR)
+  return safeReaddir(safeManifestDir)
     .filter((entry) => entry.endsWith('.json'))
     .sort()
     .flatMap((entry) => {
       try {
-        const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(
-          pathResolver.knowledge(`product/governance/surfaces/${entry}`)
-        );
+        const manifestPath = assertSafeRepositoryPath(path.join(safeManifestDir, entry));
+        if (!safeLstat(manifestPath).isFile()) return [];
+        const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(manifestPath);
         return (manifest.surfaces || [])
           .filter((surface) => surface && surface.enabled !== false)
           .map((surface) => {
@@ -388,19 +400,29 @@ function inferRequiresApproval(input: {
   payload?: TaskSession['payload'];
   workLoop?: OrganizationWorkLoopSummary;
 }): boolean {
-  if (typeof input.requiresApproval === 'boolean') return input.requiresApproval;
-  if (input.workLoop?.authority?.requires_approval === true) return true;
+  // A policy-derived approval requirement is a safety floor. An explicit
+  // false must not be able to bypass a dangerous intent's resolved policy.
   if (input.payload?.approval_required === true) return true;
-  return (
+  if (input.workLoop?.authority?.requires_approval === true) return true;
+  if (input.requiresApproval === true) return true;
+  if (
     Array.isArray(input.requirements?.missing) &&
-    input.requirements.missing.includes('approval_confirmation')
-  );
+    input.requirements.missing.some(
+      (requirement) =>
+        requirement === 'approval_confirmation' || requirement === 'dual_key_confirmation'
+    )
+  ) {
+    return true;
+  }
+  if (input.requiresApproval === false) return false;
+  return false;
 }
 
 function applyApprovalPolicy(
   intentId: string,
   payload: Record<string, unknown>,
-  requirements: NonNullable<TaskSession['requirements']>
+  requirements: NonNullable<TaskSession['requirements']>,
+  options: { includeMetadata?: boolean } = {}
 ): {
   payload: Record<string, unknown>;
   requirements: {
@@ -419,8 +441,12 @@ function applyApprovalPolicy(
   return {
     payload: {
       ...payload,
-      approval_required: policy.requiresApproval,
-      approval_rule_id: policy.matchedRuleId,
+      ...(options.includeMetadata === false
+        ? {}
+        : {
+            approval_required: policy.requiresApproval,
+            approval_rule_id: policy.matchedRuleId,
+          }),
     },
     requirements: nextRequirements,
   };
@@ -445,8 +471,39 @@ export function createTaskSession(input: {
   outcomeContract?: OutcomeContract;
 }): TaskSession {
   const now = new Date().toISOString();
-  const requiresApproval = inferRequiresApproval(input);
   const correlationId = input.correlationId;
+  const baseRequirements = input.requirements || { missing: [], collected: {} };
+  const basePayload = input.intentId
+    ? {
+        ...(input.payload || {}),
+        ...(input.intentId ? { intent_id: input.intentId } : {}),
+      }
+    : input.payload;
+  const approvalPolicy = input.intentId
+    ? resolveApprovalPolicy({ intentId: input.intentId, payload: basePayload || {} })
+    : undefined;
+  const approvalApplied = input.intentId
+    ? applyApprovalPolicy(input.intentId, basePayload || {}, baseRequirements, {
+        // Conditional task-session payload schemas intentionally reject
+        // generic policy metadata. Keep the policy in control/requirements;
+        // specialized builders may still opt into the metadata fields.
+        includeMetadata: false,
+      })
+    : { payload: basePayload, requirements: baseRequirements };
+  const requirements = approvalApplied.requirements;
+  const payload = approvalApplied.payload;
+  const requiresApproval = inferRequiresApproval({
+    ...input,
+    // Approval is monotone at this boundary: keep an explicit caller request
+    // and a policy-required request. Policy requirements below also prevent
+    // an explicit false from bypassing a dangerous intent.
+    requiresApproval:
+      input.requiresApproval === true || approvalPolicy?.requiresApproval === true
+        ? true
+        : input.requiresApproval,
+    requirements,
+    payload,
+  });
   const workLoop =
     input.workLoop ||
     buildOrganizationWorkLoopSummary({
@@ -484,13 +541,6 @@ export function createTaskSession(input: {
     verificationMethod: outcomeContract.verification_method,
   });
 
-  const payload = input.intentId
-    ? {
-        ...(input.payload || {}),
-        ...(input.intentId ? { intent_id: input.intentId } : {}),
-      }
-    : input.payload;
-
   return {
     session_id: provisionalSessionId,
     correlation_id: correlationId,
@@ -501,11 +551,11 @@ export function createTaskSession(input: {
     goal: input.goal,
     project_context: input.projectContext,
     work_loop: workLoop,
-    requirements: input.requirements,
+    requirements,
     control: {
       interruptible: true,
       requires_approval: requiresApproval,
-      awaiting_user_input: Boolean(input.requirements?.missing?.length),
+      awaiting_user_input: Boolean(requirements?.missing?.length),
     },
     outcome_contract: normalizedOutcomeContract,
     history: [],
@@ -650,7 +700,10 @@ function deriveBookingCategory(trimmed: string): BookingCategory | 'default' {
 }
 
 // ─── Dynamic Task Intent Registry ──────────────────────────────────────────────
-export type TaskSessionIntentBuilder = (trimmed: string) => TaskSessionIntent;
+export type TaskSessionIntentBuilder = (
+  trimmed: string,
+  resolvedPacket?: IntentResolutionPacket
+) => TaskSessionIntent;
 
 const taskIntentBuilderSeam = createSeam<TaskSessionIntentBuilder>({
   key: 'task-intent-builder',
@@ -717,9 +770,9 @@ registerTaskIntentBuilder('evolve-agent-harness', (trimmed) => {
     },
   };
 });
-registerTaskIntentBuilder('inspect-service', (trimmed) => {
+registerTaskIntentBuilder('inspect-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('inspect-service', trimmed);
-  const serviceMatch = extractServiceNameFromUtterance(trimmed);
+  const serviceMatch = resolvedPacket?.selected_parameters?.service_name;
   const intent: TaskSessionIntent = {
     ...base,
     requirements: {
@@ -743,9 +796,9 @@ registerTaskIntentBuilder('inspect-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('stop-service', (trimmed) => {
+registerTaskIntentBuilder('stop-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('stop-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const activeServices = loadRunningServiceIds();
   const intent: TaskSessionIntent = {
     ...base,
@@ -780,9 +833,9 @@ registerTaskIntentBuilder('stop-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('start-service', (trimmed) => {
+registerTaskIntentBuilder('start-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('start-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const startableServices = loadStartableServiceChoices();
   const intent: TaskSessionIntent = {
     ...base,
@@ -817,9 +870,9 @@ registerTaskIntentBuilder('start-service', (trimmed) => {
     payload: approvalApplied.payload,
   };
 });
-registerTaskIntentBuilder('restart-service', (trimmed) => {
+registerTaskIntentBuilder('restart-service', (trimmed, resolvedPacket) => {
   const base = buildPolicyBackedIntent('restart-service', trimmed);
-  const serviceName = extractServiceNameFromUtterance(trimmed);
+  const serviceName = resolvedPacket?.selected_parameters?.service_name;
   const intent: TaskSessionIntent = {
     ...base,
     requirements: {
@@ -1077,16 +1130,20 @@ registerTaskIntentBuilder('fetch-external-data', (trimmed) => {
   };
 });
 
-export function classifyTaskSessionIntent(utterance: string): TaskSessionIntent | null {
+export function classifyTaskSessionIntent(
+  utterance: string,
+  resolvedPacket?: IntentResolutionPacket,
+  options: IntentResolutionOptions = {}
+): TaskSessionIntent | null {
   const trimmed = utterance.trim();
   if (!trimmed) return null;
-  const packet = resolveIntentResolutionPacket(trimmed);
+  const packet = resolvedPacket || resolveIntentResolutionPacket(trimmed, options);
   const intentId = packet.selected_intent_id;
   const builder = intentId ? getTaskIntentBuilder(intentId) : undefined;
-  if (builder) return builder(trimmed);
+  if (builder) return builder(trimmed, packet);
   if (!intentId) return null;
 
-  const intent = loadStandardIntentCatalog().find((entry) => entry.id === intentId);
+  const intent = loadResolvedStandardIntentCatalog(options).find((entry) => entry.id === intentId);
   if (intent?.resolution?.shape !== 'task_session') return null;
   try {
     const built = buildPolicyBackedIntent(intentId, trimmed);
@@ -1174,10 +1231,24 @@ export function loadTaskSession(
   sessionId: string,
   options: { rootDir?: string } = {}
 ): TaskSession | null {
-  const filePath = taskSessionPath(sessionId, options.rootDir || pathResolver.rootDir());
-  if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as TaskSession;
+  let filePath: string;
+  try {
+    filePath = taskSessionPath(sessionId, options.rootDir || pathResolver.rootDir());
+    if (!safeExistsSync(filePath)) return null;
+  } catch {
+    return null;
+  }
+  let parsed: TaskSession;
+  try {
+    assertSafeRepositoryPath(filePath);
+    parsed = taskSessionCatalog(filePath).load();
+  } catch (error) {
+    if (error instanceof SyntaxError) throw error;
+    logger.warn(
+      `[TASK_SESSION] Invalid session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
   const result = validateTaskSession(parsed);
   if (!result.valid) {
     logger.warn(`[TASK_SESSION] Invalid session ${sessionId}: ${result.errors.join('; ')}`);

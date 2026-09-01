@@ -1,12 +1,10 @@
-import {
-  logger,
-  safeExec,
-  evaluateAutonomousOpsAction,
-  withExecutionContextAsync,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { safeExec } from '@agent/core/secure-io';
+import { evaluateAutonomousOpsAction } from '@agent/core/autonomous-ops-gate';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { createCheckpoint } from './refactor/mission-maintenance.js';
 import { listActiveMissions, loadState } from './refactor/mission-state.js';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 function getGitHash(cwd: string): string {
   return safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim();
 }
@@ -73,13 +71,11 @@ if (
   isDirectScript(import.meta.url, 'auto_checkpoint.ts') ||
   isDirectScript(import.meta.url, 'auto_checkpoint.js')
 ) {
-  runAutoCheckpoint().then(
-    (code) => (process.exitCode = code),
-    (error) => {
-      logger.error(`[auto-checkpoint] failed: ${(error as Error).message ?? error}`);
-      process.exitCode = 1;
-    }
-  );
+  void defineScript({
+    name: 'auto:checkpoint',
+    flags: [],
+    run: () => runAutoCheckpoint(),
+  })();
 }
 
 export { runAutoCheckpoint };

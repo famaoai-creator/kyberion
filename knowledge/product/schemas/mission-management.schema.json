@@ -1,23 +1,50 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-management.schema.json",
   "title": "Mission Management Schema",
   "description": "Configuration for mission import, export, PR generation, and task management.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "version": { "type": "string" },
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
     "directories": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "active": { "type": "string" },
-        "archive": { "type": "string" },
-        "exports": { "type": "string" }
+        "active": { "$ref": "#/definitions/repoRelativePath" },
+        "personal": { "$ref": "#/definitions/repoRelativePath" },
+        "confidential": { "$ref": "#/definitions/repoRelativePath" },
+        "public": { "$ref": "#/definitions/repoRelativePath" },
+        "archive": { "$ref": "#/definitions/repoRelativePath" },
+        "exports": { "$ref": "#/definitions/repoRelativePath" },
+        "global_ledger": { "$ref": "#/definitions/repoRelativePath" },
+        "global_coordination": { "$ref": "#/definitions/repoRelativePath" },
+        "global_channel_coordination": { "$ref": "#/definitions/repoRelativePath" },
+        "global_runtime_locks": { "$ref": "#/definitions/repoRelativePath" },
+        "global_observability": { "$ref": "#/definitions/repoRelativePath" },
+        "global_channel_observability": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_coordination": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_events": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_tasks": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_claims": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_handoffs": { "$ref": "#/definitions/repoRelativePath" },
+        "mission_reviews": { "$ref": "#/definitions/repoRelativePath" }
       }
     },
     "mep_version": { "type": "string" },
+    "mission_control_model": { "type": "string" },
     "rehydrate_map": {
       "type": "object",
       "additionalProperties": { "type": "string" }
     }
   },
-  "required": ["version", "directories"]
+  "required": ["version", "directories"],
+  "definitions": {
+    "repoRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:[\\\\/])(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+$"
+    }
+  }
 }

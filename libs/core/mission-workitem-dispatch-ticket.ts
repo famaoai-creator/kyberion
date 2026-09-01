@@ -14,10 +14,7 @@ import { type TaskResultBlock } from './channel-surface-types.js';
 import { type OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import { closeTaskArtifacts } from './mission-artifact-closure.js';
 import { revokeGrantsForTaskBestEffort } from './task-scoped-grants.js';
-import {
-  readJsonFile as readJsonFileFromDispatchIO,
-  writeJsonFile as writeJsonFileFromDispatchIO,
-} from './mission-dispatch-io.js';
+import { readJsonFile as readJsonFileFromDispatchIO } from './mission-dispatch-io.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 /**
@@ -174,6 +171,7 @@ export function evaluateAcceptanceCriteriaEvidence(input: {
 
 export function updateTicketManifest(
   missionPath: string,
+  missionId: string,
   taskId: string,
   updater: (record: Record<string, unknown>, ticketState: 'done' | 'review' | 'blocked') => void,
   ticketState: 'done' | 'review' | 'blocked'
@@ -186,7 +184,7 @@ export function updateTicketManifest(
   const index = manifest.records.findIndex((record) => String(record.task_id || '') === taskId);
   if (index < 0) return;
   updater(manifest.records[index], ticketState);
-  writeJsonFileFromDispatchIO(manifestFile, manifest);
+  writeDispatchArtifact(manifestFile, manifest, { missionId, missionPath });
 }
 
 export const TICKET_STATE_TO_TASK_STATUS: Record<string, string> = {
@@ -211,6 +209,7 @@ export const TASK_STATUS_RANK: Record<string, number> = {
 
 export function updateNextTasksReflection(
   missionPath: string,
+  missionId: string,
   taskId: string,
   payload: Record<string, unknown>,
   ticketState?: string
@@ -234,7 +233,7 @@ export function updateNextTasksReflection(
       ...payload,
     },
   };
-  writeJsonFileFromDispatchIO(nextTasksFile, tasks);
+  writeDispatchArtifact(nextTasksFile, tasks, { missionId, missionPath });
 }
 
 export function appendComment(
@@ -386,10 +385,14 @@ export async function reflectTicketOutcome(input: {
     body: reflectionBody,
     reflected_at: new Date().toISOString(),
   };
-  writeDispatchArtifact(reflectionPath, reflectionPayload);
+  writeDispatchArtifact(reflectionPath, reflectionPayload, {
+    missionId: input.missionId,
+    missionPath: input.missionPath,
+  });
 
   updateTicketManifest(
     input.missionPath,
+    input.missionId,
     taskId,
     (record, state) => {
       record.reflection_status = ticketState;
@@ -406,6 +409,7 @@ export async function reflectTicketOutcome(input: {
 
   updateNextTasksReflection(
     input.missionPath,
+    input.missionId,
     taskId,
     {
       reflected_at: new Date().toISOString(),
@@ -478,7 +482,10 @@ export async function reflectTicketOutcome(input: {
         cognitive_route: cognitiveRouteSummary,
         drift_watchdog_summary: input.driftWatchdogSummary,
       };
-      writeJsonFileFromDispatchIO(githubPath, githubIssue);
+      writeDispatchArtifact(githubPath, githubIssue, {
+        missionId: input.missionId,
+        missionPath: input.missionPath,
+      });
 
       if (repoInfo.owner && repoInfo.repo && issueNumber) {
         try {
@@ -543,7 +550,10 @@ export async function reflectTicketOutcome(input: {
         cognitive_route: cognitiveRouteSummary,
         drift_watchdog_summary: input.driftWatchdogSummary,
       };
-      writeJsonFileFromDispatchIO(jiraPath, jiraIssue);
+      writeDispatchArtifact(jiraPath, jiraIssue, {
+        missionId: input.missionId,
+        missionPath: input.missionPath,
+      });
 
       if (issueKey && jiraInfo.domain) {
         try {

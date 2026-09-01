@@ -82,8 +82,8 @@ CIの多くのcheckerは `@agent/core` のpackage entrypointや `dist/` を読�
 - [ ] `pnpm install --frozen-lockfile` が成功する（依存関係やlockfileを変更した場合は必須）。
 - [ ] `pnpm run build` が成功する。
 - [ ] build後に `pnpm run typecheck` が成功する。
-- [ ] `pnpm run check:esm`、`pnpm run check:packaging-contract` が成功する。
-- [ ] `pnpm run lint` と `pnpm run format:check:ci` が成功する。
+- [ ] `pnpm run check -- --scope pr --only esm`、`pnpm run check -- --scope pr --only packaging-contract` が成功する。
+- [ ] `pnpm run lint` と `pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml` が成功する。
 - [ ] source treeに `.js`、`.d.ts`、sourceをshadowするbuild artifactがない。
 
 ## 3. 変更範囲別のテスト
@@ -94,21 +94,21 @@ CIの多くのcheckerは `@agent/core` のpackage entrypointや `dist/` を読�
 
 ```bash
 pnpm exec vitest run <変更に対応するテスト>
-pnpm run test:core
+pnpm test -- --suite core
 ```
 
 coreがtier-guarded pathやmission stateを扱う場合は、CIと同じ環境を使う。
 
 ```bash
-KYBERION_PERSONA=worker MISSION_ROLE=mission_controller pnpm run test:core
+KYBERION_PERSONA=worker MISSION_ROLE=mission_controller pnpm test -- --suite core
 ```
 
 ### scripts、actuators、integration
 
 ```bash
-pnpm run test:scripts
-pnpm run test:actuators
-pnpm run test:integration
+pnpm test -- --suite scripts
+pnpm test -- --suite actuators
+pnpm test -- --suite integration
 ```
 
 変更が複数領域にまたがる場合、1つのsuiteだけでgreenと判断しない。CIの `test (smoke)`、`test (core)`、`test (actuators)`、`test (scripts)`、`test (integration)` に対応する証跡を揃える。
@@ -132,7 +132,7 @@ pnpm exec vitest run <surfaceまたはIntentの関連テスト>
 
 - [ ] `pnpm pipeline --input pipelines/baseline-check.json` が成功した。
 - [ ] ADFを直接実行せず、draft → preflight → auto-repair → commit → executeの契約を確認した。
-- [ ] `pnpm run check:contract-schemas`、`pnpm check -- --only governance-rules`、`pnpm check -- --only work-scope-policy` を実行した。
+- [ ] `pnpm run check -- --scope full --only contract-schemas`、`pnpm check -- --only governance-rules`、`pnpm check -- --only work-scope-policy` を実行した。
 
 ## 4. validateとCIの対応関係
 
@@ -143,10 +143,10 @@ pnpm exec vitest run <surfaceまたはIntentの関連テスト>
 ```bash
 pnpm run validate
 pnpm run test
-pnpm run test:core
-pnpm run test:actuators
-pnpm run test:scripts
-pnpm run test:integration
+pnpm test -- --suite core
+pnpm test -- --suite actuators
+pnpm test -- --suite scripts
+pnpm test -- --suite integration
 ```
 
 実行時間や環境制約で全suiteを実行できない場合は、未実行としてPR本文に明記し、CIで確認する対象を隠さない。
@@ -165,16 +165,16 @@ pnpm run test:integration
 
 ## 6. よくある失敗と先回り
 
-| CI症状                               | 先に確認すること                                                                                                  |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| pseudo-locale drift                  | `pnpm run generate:pseudo-locale` → `pnpm check -- --only pseudo-locale`                                          |
-| knowledge index / manifest drift     | `pnpm run generate:knowledge-index` → `pnpm check -- --only catalogs`                                             |
-| `ERR_MODULE_NOT_FOUND` for `dist/`   | buildを最初に実行したか。fresh checkoutでdistを前提にしていないか                                                 |
-| scriptsだけ失敗                      | `pnpm run test:scripts` を単独実行し、gitignored runtime queue / fixture依存を除く                                |
-| integrationだけ失敗                  | `pnpm run test:integration` と失敗テストのfocused runを実行し、surface delegation / approval / tenant scopeを確認 |
-| surfaceの応答がclarificationへ変わる | shared compilerに入る条件とprovider / mission専用委譲の境界を比較                                                 |
-| ローカルではpass、CIで失敗           | clean checkout、Node 24、Linux CJK font、macOS SQLite FTS5、Windows native testの差を確認                         |
-| PRに不要な変更が混ざる               | `git diff origin/main...HEAD`、dedicated worktree、明示的なpath stagingを確認                                     |
+| CI症状                               | 先に確認すること                                                                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| pseudo-locale drift                  | `pnpm run generate:pseudo-locale` → `pnpm check -- --only pseudo-locale`                                                 |
+| knowledge index / manifest drift     | `pnpm run generate:knowledge-index` → `pnpm check -- --only catalogs`                                                    |
+| `ERR_MODULE_NOT_FOUND` for `dist/`   | buildを最初に実行したか。fresh checkoutでdistを前提にしていないか                                                        |
+| scriptsだけ失敗                      | `pnpm test -- --suite scripts` を単独実行し、gitignored runtime queue / fixture依存を除く                                |
+| integrationだけ失敗                  | `pnpm test -- --suite integration` と失敗テストのfocused runを実行し、surface delegation / approval / tenant scopeを確認 |
+| surfaceの応答がclarificationへ変わる | shared compilerに入る条件とprovider / mission専用委譲の境界を比較                                                        |
+| ローカルではpass、CIで失敗           | clean checkout、Node 24、Linux CJK font、macOS SQLite FTS5、Windows native testの差を確認                                |
+| PRに不要な変更が混ざる               | `git diff origin/main...HEAD`、dedicated worktree、明示的なpath stagingを確認                                            |
 
 ## 完了条件
 

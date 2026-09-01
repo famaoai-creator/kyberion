@@ -7,6 +7,19 @@
  * summary to stdout that pipelines used to consume via system:shell.
  */
 
-import { reconcileUnclassifiedErrors } from '@agent/core';
+import { reconcileUnclassifiedErrors } from '@agent/core/reconcile-ops';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
-process.stdout.write(JSON.stringify(reconcileUnclassifiedErrors(), null, 2));
+export const main = defineScript({
+  name: 'reconcile-unclassified-errors',
+  flags: [],
+  run(context) {
+    context.print(JSON.stringify(reconcileUnclassifiedErrors(), null, 2));
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'reconcile_unclassified_errors.ts') ||
+  isDirectScript(import.meta.url, 'reconcile_unclassified_errors.js')
+)
+  void main();

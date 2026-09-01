@@ -5,7 +5,14 @@ import { saveProjectTrackRecord } from './project-track-registry.js';
 import { saveState, loadState } from './mission-state.js';
 import { reassignMissionToProject } from './project-management.js';
 import { resolveProjectLedgerPath, syncProjectLedger } from './mission-project-ledger.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+} from './secure-io.js';
 import type { MissionState } from './mission-types.js';
 
 const MISSION_ID = 'MSN-PM-TEST-REASSIGN';
@@ -188,5 +195,18 @@ describe('mission Project reassignment', () => {
         dry_run: true,
       })
     ).rejects.toThrow('must match project scope');
+  });
+
+  it('rejects a project ledger path that traverses a symbolic link', () => {
+    const targetPath = pathResolver.sharedTmp(`mission-ledger-target-${process.pid}`);
+    const linkPath = pathResolver.sharedTmp(`mission-ledger-link-${process.pid}`);
+    safeMkdir(targetPath, { recursive: true });
+    safeSymlinkSync(targetPath, linkPath, 'dir');
+    try {
+      expect(() => resolveProjectLedgerPath(linkPath)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeUnlinkSync(linkPath);
+      safeRmSync(targetPath, { force: true, recursive: true });
+    }
   });
 });

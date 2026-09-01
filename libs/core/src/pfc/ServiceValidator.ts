@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module';
+import { readJson } from '../../foundation/json.js';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { loadServiceEndpointsCatalog } from '../../service-binding.js';
 import {
@@ -6,7 +7,8 @@ import {
   collectServicePresetCliFallbacks,
   getServicePresetPolicy,
 } from '../../service-preset-policy.js';
-import { safeReadFile, safeExistsSync, safeExec } from '../../secure-io.js';
+import type { ServicePresetRecord } from '../../service-preset-registry.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeExec } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
 import { secretGuard } from '../../secret-guard.js';
 
@@ -116,7 +118,28 @@ export async function validateServiceAuth(
 }
 
 export function inspectServiceAuth(serviceId: string, presetPath?: string): ServiceAuthInspection {
-  const resolvedPresetPath = presetPath ? pathResolver.rootResolve(presetPath) : undefined;
+  let resolvedPresetPath: string | undefined;
+  if (presetPath) {
+    try {
+      resolvedPresetPath = assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
+        allowMissingLeaf: true,
+      });
+    } catch {
+      return {
+        serviceId,
+        presetPath,
+        authStrategy: 'unknown',
+        valid: false,
+        reason: 'Preset path must remain inside the repository and cannot traverse symlinks.',
+        requiredSecrets: [],
+        foundSecrets: [],
+        missingSecrets: [],
+        cliFallbacks: [],
+        oauthAvailable: false,
+        setupHint: 'Use a repository-relative service preset path.',
+      };
+    }
+  }
   if (!resolvedPresetPath || !safeExistsSync(resolvedPresetPath)) {
     return {
       serviceId,
@@ -133,8 +156,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
   }
 
   try {
-    const presetRaw = safeReadFile(resolvedPresetPath, { encoding: 'utf8' }) as string;
-    const preset = JSON.parse(presetRaw);
+    const preset = readJson<ServicePresetRecord>(resolvedPresetPath);
     const presetPolicy = getServicePresetPolicy(preset);
     const oauthAvailable = Boolean(preset.oauth && typeof preset.oauth === 'object');
     const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();

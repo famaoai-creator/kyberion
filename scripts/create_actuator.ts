@@ -19,7 +19,9 @@
 
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createStandardYargs, logger, safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -107,7 +109,13 @@ function buildPackage(description: string, name: string, fullName: string): stri
 }
 
 function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
-  return `import { defineActuator, logger, runActuatorCli } from '@agent/core';
+  return `import { defineActuator } from '@agent/core/actuator-sdk';
+import { logger } from '@agent/core/core';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 const executeInputSchema = {
   type: 'object',
@@ -155,15 +163,10 @@ export const actuator = defineActuator({
 });
 
 export async function main(): Promise<void> {
-  await runActuatorCli({ name: '${fullName}', actuator });
+  await runActuatorCli({ args: currentProcessArgv(), name: '${fullName}', actuator });
 }
 
-if (import.meta.main) {
-  main().catch((err: unknown) => {
-    logger.error(err instanceof Error ? err.message : String(err));
-    process.exitCode = 1;
-  });
-}
+if (import.meta.main) void runActuatorCliEntryPoint(main, '${fullName}');
 `;
 }
 
@@ -304,7 +307,7 @@ async function main(args: string[]): Promise<void> {
   console.log('  3. Add an entry to CAPABILITIES_GUIDE.md');
   console.log('  4. Run: pnpm build');
   console.log(
-    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm validate enforces this via check:op-registry)'
+    '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
   );
 }
 

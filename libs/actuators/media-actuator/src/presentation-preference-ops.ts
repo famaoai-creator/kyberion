@@ -1,15 +1,30 @@
 import {
+  assertSafeRepositoryPath,
   loadJson,
-  pathResolver,
-  registerPresentationPreferenceProfile,
   safeExistsSync,
-  type PresentationPreferenceProfile,
-} from '@agent/core';
+  safeLstat,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { registerPresentationPreferenceProfile } from '@agent/core/presentation-preference-registry';
+import type { PresentationPreferenceProfile } from '@agent/core/types';
 
 export interface RegisterPresentationPreferenceProfileInput {
   profile?: PresentationPreferenceProfile;
   profile_path?: string;
   registry_path?: string;
+}
+
+function resolveProfilePath(profilePath: string): string | null {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(profilePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved)) return null;
+  if (!safeLstat(resolved).isFile()) {
+    throw new Error(
+      `[register_presentation_preference_profile] profile_path must be a regular file: ${profilePath}`
+    );
+  }
+  return resolved;
 }
 
 /**
@@ -25,8 +40,11 @@ export function registerPresentationPreferenceProfileOp(
 } {
   const profile =
     input.profile ??
-    (input.profile_path && safeExistsSync(pathResolver.rootResolve(input.profile_path))
-      ? loadJson<PresentationPreferenceProfile>(pathResolver.rootResolve(input.profile_path))
+    (input.profile_path
+      ? (() => {
+          const profilePath = resolveProfilePath(input.profile_path);
+          return profilePath ? loadJson<PresentationPreferenceProfile>(profilePath) : null;
+        })()
       : null);
   if (!profile || typeof profile !== 'object') {
     throw new Error(
@@ -36,7 +54,11 @@ export function registerPresentationPreferenceProfileOp(
 
   const registryPath = registerPresentationPreferenceProfile(
     profile as PresentationPreferenceProfile,
-    input.registry_path ? pathResolver.rootResolve(input.registry_path) : undefined
+    input.registry_path
+      ? assertSafeRepositoryPath(pathResolver.rootResolve(input.registry_path), {
+          allowMissingLeaf: true,
+        })
+      : undefined
   );
 
   return {

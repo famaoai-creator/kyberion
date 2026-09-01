@@ -66,4 +66,8 @@ describe('artifact-record', () => {
       quality_score: 50,
     });
   });
+
+  it('rejects artifact ids that could escape the artifact-record namespace', () => {
+    expect(() => loadArtifactRecord('../outside')).toThrow('[artifact-record] invalid artifact id');
+  });
 });

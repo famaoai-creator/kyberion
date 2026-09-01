@@ -1,4 +1,10 @@
-import { loadJson, safeExistsSync, safeLstat, safeReaddir, safeStat } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+  safeReaddir,
+} from '@agent/core/secure-io';
 import * as path from 'node:path';
 
 export function cloneJsonValue<T>(value: T): T {
@@ -28,17 +34,21 @@ export function deepMergeCatalog(base: any, next: any): any {
 }
 
 export function readJsonFilesRecursively(dirPath: string): any[] {
-  if (!safeExistsSync(dirPath)) return [];
-  const entries = safeReaddir(dirPath).sort();
+  const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDirPath) || !safeLstat(safeDirPath).isDirectory()) return [];
+  const entries = safeReaddir(safeDirPath).sort();
   const docs: any[] = [];
   for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry);
+    const fullPath = path.join(safeDirPath, entry);
     const stat = safeLstat(fullPath);
+    if (stat.isSymbolicLink()) continue;
     if (stat.isDirectory()) {
       docs.push(...readJsonFilesRecursively(fullPath));
       continue;
     }
-    if (entry.endsWith('.json')) docs.push(loadJson(fullPath));
+    if (stat.isFile() && entry.endsWith('.json')) {
+      docs.push(loadJson(assertSafeRepositoryPath(fullPath)));
+    }
   }
   return docs;
 }
@@ -47,23 +57,31 @@ export function loadJsonCatalog(
   rootDir: string,
   input: { directoryPath: string; filePath: string; fallback: any }
 ): any {
-  const docs = readJsonFilesRecursively(path.resolve(rootDir, input.directoryPath));
+  const docs = readJsonFilesRecursively(
+    assertSafeRepositoryPath(path.resolve(rootDir, input.directoryPath), {
+      allowMissingLeaf: true,
+    })
+  );
   if (docs.length > 0) {
     return docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(input.fallback));
   }
-  const filePath = path.resolve(rootDir, input.filePath);
-  return safeExistsSync(filePath) ? loadJson(filePath) : cloneJsonValue(input.fallback);
+  const filePath = assertSafeRepositoryPath(path.resolve(rootDir, input.filePath), {
+    allowMissingLeaf: true,
+  });
+  return safeExistsSync(filePath) && safeLstat(filePath).isFile()
+    ? loadJson(filePath)
+    : cloneJsonValue(input.fallback);
 }
 
 export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
-  return loadJson(filePath);
+  return loadJson(assertSafeRepositoryPath(filePath));
 }
 
 export function loadTenantEntries(rootDir: string): { override_path: string }[] {
   const entries: { override_path: string }[] = [];
   const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
   try {
-    const registry = loadJsonValue(indexPath);
+    const registry = loadJsonValue(assertSafeRepositoryPath(indexPath));
     if (Array.isArray(registry.tenants)) {
       entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
     }
@@ -71,10 +89,11 @@ export function loadTenantEntries(rootDir: string): { override_path: string }[] 
     // The registry is optional; use the deterministic directory fallback below.
   }
   try {
-    const confidentialDir = path.join(rootDir, 'knowledge/confidential');
+    const confidentialDir = assertSafeRepositoryPath(path.join(rootDir, 'knowledge/confidential'));
     const slugs = safeReaddir(confidentialDir).filter((name) => {
       try {
-        return safeStat(path.join(confidentialDir, name)).isDirectory();
+        const tenantPath = path.join(confidentialDir, name);
+        return safeLstat(tenantPath).isDirectory() && !!assertSafeRepositoryPath(tenantPath);
       } catch {
         return false;
       }
@@ -107,7 +126,11 @@ export function resolveConfidentialTenantOverride(
     const key = brandName.toLowerCase();
     for (const entry of cachedTenantRegistry.entries) {
       try {
-        const override = loadJsonValue(path.resolve(rootDir, entry.override_path));
+        const override = loadJsonValue(
+          assertSafeRepositoryPath(path.resolve(rootDir, entry.override_path), {
+            allowMissingLeaf: true,
+          })
+        );
         if (
           designSystemId &&
           override.design_system_id &&

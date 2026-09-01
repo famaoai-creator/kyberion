@@ -9,6 +9,7 @@ import { pathResolver } from '../libs/core/path-resolver.js';
 import { getAllFiles } from '../libs/core/fs-utils.js';
 import { findSensitivePathMatch } from '../libs/core/sensitive-path-policy.js';
 import { getRegisteredEnvText, setRegisteredEnv } from '../libs/core/foundation/env.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function removeIfExists(targetPath: string): void {
   if (!isProjectGeneratedFile(targetPath)) return;
@@ -47,4 +48,13 @@ function main(): void {
   });
 }
 
-main();
+export const runClean = defineScript({
+  name: 'clean',
+  flags: [],
+  run() {
+    main();
+  },
+});
+
+if (isDirectScript(import.meta.url, 'clean.ts') || isDirectScript(import.meta.url, 'clean.js'))
+  void runClean();

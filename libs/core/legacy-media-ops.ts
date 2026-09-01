@@ -34,7 +34,3 @@ export function isLegacyMediaOp(op: string): boolean {
   if (!normalized) return false;
   return loadLegacyMediaOpsCatalog().ops.includes(normalized);
 }
-
-export function resetLegacyMediaOpsCatalogCache(): void {
-  catalog.reset();
-}

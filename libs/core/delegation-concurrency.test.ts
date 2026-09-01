@@ -49,6 +49,10 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/json.js', () => ({
+  readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
+}));
+
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));
@@ -60,6 +64,7 @@ import {
   DelegationWallClockExceededError,
   terminateAllActiveDelegationChildren,
   wireDelegationKillSwitchIntegration,
+  registerKillSwitchTerminationRegistrar,
   peekPersistedDelegationChildrenRegistry,
   getRecordedDelegationTimeouts,
   resetDelegationConcurrencyStateForTests,
@@ -87,6 +92,7 @@ describe('delegation-concurrency', () => {
     recordGovernanceAction.mockClear();
     onKillSwitchTermination.mockClear();
     resetDelegationConcurrencyStateForTests();
+    registerKillSwitchTerminationRegistrar((listener) => onKillSwitchTermination(listener));
     delete process.env.KYBERION_DELEGATION_MAX_CONCURRENCY;
     delete process.env.KYBERION_DELEGATION_PROVIDER_MAX_CONCURRENCY;
     delete process.env.KYBERION_DELEGATION_PROVIDER_CAPS;

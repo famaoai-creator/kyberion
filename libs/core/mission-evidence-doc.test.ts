@@ -14,7 +14,12 @@ interface SampleDoc {
 }
 
 function isSampleDoc(d: unknown): d is SampleDoc {
-  return Boolean(d && typeof d === 'object' && (d as any).kind === 'sample' && typeof (d as any).value === 'string');
+  return Boolean(
+    d &&
+    typeof d === 'object' &&
+    (d as any).kind === 'sample' &&
+    typeof (d as any).value === 'string'
+  );
 }
 
 describe('MissionEvidenceDoc', () => {
@@ -29,7 +34,7 @@ describe('MissionEvidenceDoc', () => {
         mission_id: FIX_MISSION,
         tier: 'confidential',
         assigned_persona: 'ecosystem_architect',
-      }),
+      })
     );
   });
 
@@ -47,6 +52,12 @@ describe('MissionEvidenceDoc', () => {
     doc.write({ kind: 'sample', value: 'hello' });
     expect(doc.exists()).toBe(true);
     expect(doc.read()).toEqual({ kind: 'sample', value: 'hello' });
+    const receipts = fs.readFileSync(
+      path.join(MISSION_DIR, 'coordination', 'provisioned-entries.jsonl'),
+      'utf8'
+    );
+    expect(receipts).toContain('"target_path":"evidence/sample.json"');
+    expect(receipts).toContain('"phase":"verified"');
   });
 
   it('returns null for an absent doc', () => {
@@ -66,7 +77,7 @@ describe('MissionEvidenceDoc', () => {
     });
     fs.writeFileSync(
       path.join(MISSION_DIR, 'evidence', 'bad.json'),
-      JSON.stringify({ kind: 'wrong-shape' }),
+      JSON.stringify({ kind: 'wrong-shape' })
     );
     expect(doc.read()).toBeNull();
   });
@@ -80,7 +91,7 @@ describe('MissionEvidenceDoc', () => {
     });
     const { audit_event_id } = doc.write(
       { kind: 'sample', value: 'with-audit' },
-      { action: 'sample.event', reason: 'because tests', metadata: { foo: 'bar' } },
+      { action: 'sample.event', reason: 'because tests', metadata: { foo: 'bar' } }
     );
     expect(audit_event_id).toMatch(/^/);
     expect(doc.read()).toEqual({ kind: 'sample', value: 'with-audit' });
@@ -93,5 +104,27 @@ describe('MissionEvidenceDoc', () => {
     });
     const out = doc.write({ kind: 'sample', value: 'silent' });
     expect(out.audit_event_id).toBe('');
+  });
+
+  it('rejects evidence traversal and symlinked evidence files', () => {
+    const traversal = new MissionEvidenceDoc<SampleDoc>({
+      mission_id: FIX_MISSION,
+      filename: '../outside.json',
+    });
+    expect(() => traversal.exists()).toThrow('[MISSION_EVIDENCE_DOC_SCOPE]');
+
+    const targetPath = path.join(MISSION_DIR, 'evidence', 'real.json');
+    const linkedPath = path.join(MISSION_DIR, 'evidence', 'linked.json');
+    fs.writeFileSync(targetPath, JSON.stringify({ kind: 'sample', value: 'external' }));
+    fs.symlinkSync(targetPath, linkedPath);
+    try {
+      const linked = new MissionEvidenceDoc<SampleDoc>({
+        mission_id: FIX_MISSION,
+        filename: 'linked.json',
+      });
+      expect(() => linked.read()).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.unlinkSync(linkedPath);
+    }
   });
 });

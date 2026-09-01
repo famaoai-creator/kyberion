@@ -11,7 +11,12 @@ import * as pathResolver from '../path-resolver.js';
 import { customerRoot, customerIsConfigured } from '../customer-resolver.js';
 import { safeMkdir, safeExistsSync } from '../secure-io.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning-egress-scope.js';
-import { sanitizeTraceForPersistence, validateTraceReplay } from '../trace-schema.js';
+import {
+  sanitizeTraceForPersistence,
+  validateTraceReplay,
+  type ExactTelemetryAttributes,
+  type TraceSpanKind,
+} from '../trace-schema.js';
 
 export interface TraceEvent {
   name: string;
@@ -116,7 +121,12 @@ export class TraceContext {
   }
 
   /** Start a new child span */
-  startSpan(name: string, attributes?: Record<string, string | number | boolean>): string {
+  startSpan<Name extends string>(
+    name: Name,
+    attributes?: Name extends TraceSpanKind
+      ? ExactTelemetryAttributes<Extract<Name, TraceSpanKind>>
+      : Record<string, string | number | boolean>
+  ): string {
     const correlationId = this.trace.metadata.correlationId;
     const span: TraceSpan = {
       spanId: randomUUID(),

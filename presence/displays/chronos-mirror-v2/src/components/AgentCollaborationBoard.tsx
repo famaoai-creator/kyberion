@@ -17,6 +17,7 @@ type Attention = {
 };
 
 type CollaborationProjection = {
+  revision: number;
   generated_at: string;
   partial: boolean;
   status_flags: Array<'sequence_gap' | 'unknown_event' | 'stale_runtime'>;
@@ -184,23 +185,12 @@ export function AgentCollaborationBoard({
   const [error, setError] = React.useState<string | null>(null);
   const [missionId, setMissionId] = React.useState('');
   const [refreshing, setRefreshing] = React.useState(false);
+  const schedulerRef = React.useRef<LiveSyncScheduler<CollaborationProjection> | null>(null);
 
-  const refresh = React.useCallback(async () => {
+  const refresh = React.useCallback(() => {
     setRefreshing(true);
-    try {
-      const query = buildCollaborationQuery(tenant, missionId);
-      const response = await fetch(`/api/collaboration${query}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok || !payload.ok)
-        throw new Error(payload.error || uxText('chronos_ac_load_error', locale));
-      setProjection(payload.projection);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setRefreshing(false);
-    }
-  }, [locale, missionId, tenant]);
+    schedulerRef.current?.invalidate();
+  }, []);
 
   const loadProjection = React.useCallback(async () => {
     const query = buildCollaborationQuery(tenant, missionId);
@@ -216,16 +206,22 @@ export function AgentCollaborationBoard({
   }, [tenant]);
 
   React.useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  React.useEffect(() => {
     const scheduler = new LiveSyncScheduler<CollaborationProjection>({
       fetchSnapshot: loadProjection,
-      onSnapshot: setProjection,
+      onSnapshot: (snapshot) => {
+        setProjection(snapshot);
+        setRefreshing(false);
+        setError(null);
+      },
+      onError: (reason) => {
+        setRefreshing(false);
+        setError(reason instanceof Error ? reason.message : String(reason));
+      },
       isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
       debounceMs: 120,
+      revisionOf: (snapshot) => snapshot.revision,
     });
+    schedulerRef.current = scheduler;
     const unbindVisibility = bindVisibilityToLiveSync(scheduler);
     const eventSource =
       typeof window !== 'undefined' && 'EventSource' in window
@@ -244,8 +240,9 @@ export function AgentCollaborationBoard({
       eventSource?.close();
       unbindVisibility();
       scheduler.stop();
+      if (schedulerRef.current === scheduler) schedulerRef.current = null;
     };
-  }, [loadProjection, tenant]);
+  }, [loadProjection]);
 
   const overview = projection?.overview;
   const eventById = React.useMemo(

@@ -8,7 +8,7 @@ import {
 } from './event-scope.js';
 import { findMissionPath } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { loadProjectRecord } from './project-registry.js';
 import type { TierLevel } from './types.js';
 
@@ -41,7 +41,10 @@ function normalizeMissionId(missionId?: string): string | undefined {
 function readMissionScope(missionId: string): EventScope | null {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return null;
-  const statePath = path.join(missionPath, 'mission-state.json');
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+  const statePath = assertSafeRepositoryPath(path.join(safeMissionPath, 'mission-state.json'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(statePath)) return null;
 
   const state = readJson<MissionScopeState>(statePath);

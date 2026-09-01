@@ -45,6 +45,62 @@ describe('actuator-op-registry', () => {
     expect(determineActuatorStepType('system', 'voice_input_toggle')).toBe('apply');
   });
 
+  it('classifies every built-in core leaf op from the core registry domain', () => {
+    const captureOps = [
+      'run_first_win_lifecycle',
+      'run_health_degradation_watch',
+      'run_tenant_drift_watch',
+      'run_ui_ux_governance',
+      'run_vitest',
+    ];
+    const transformOps = ['calculate_productivity_score', 'parse_proposal_brief', 'transform'];
+    const applyOps = [
+      'apply_onboarding',
+      'capture_avatar_photo',
+      'generate_avatar',
+      'grant_voice_consent',
+      'programmatic_tool_call',
+      'ptc',
+      'register_avatar',
+      'run_ai_audit',
+      'run_auto_checkpoint',
+      'run_backup_create',
+      'run_backup_restore_drill',
+      'run_campaign_suite',
+      'run_catalog_integrity',
+      'run_compliance_scan',
+      'run_dependency_vulnerability_scan',
+      'run_doc_examples_check',
+      'run_i18n_hardcoding',
+      'run_marketing_video_dry_run',
+      'run_mesh_delivery',
+      'run_mission_create',
+      'run_mission_start_from_issues',
+      'run_oauth_setup',
+      'run_pipeline',
+      'run_promote_procedure',
+      'run_registry_manager',
+      'run_software_quality_report',
+      'run_soak_endurance',
+      'run_soak_restart_e2e',
+      'run_translation_coverage',
+      'validate_productivity_dry_run',
+      'wait',
+    ];
+    expect(captureOps).toHaveLength(5);
+    expect(transformOps).toHaveLength(3);
+    expect(applyOps).toHaveLength(31);
+    for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
+    for (const op of transformOps) expect(determineActuatorStepType('core', op)).toBe('transform');
+    for (const op of applyOps) expect(determineActuatorStepType('core', op)).toBe('apply');
+    const registeredCoreOps = listRegisteredDomainOps('core');
+    expect([
+      ...(registeredCoreOps.capture || []),
+      ...(registeredCoreOps.transform || []),
+      ...(registeredCoreOps.apply || []),
+    ]).toHaveLength(39);
+  });
+
   it('prefers apply semantics when provider ops overlap', () => {
     expect(determineActuatorStepType('gemini', 'prompt')).toBe('apply');
     expect(determineActuatorStepType('gh', 'pr')).toBe('apply');
@@ -107,6 +163,15 @@ describe('actuator-op-registry', () => {
       '[OP_RESOLUTION_MANIFEST]'
     );
     expect(() => resolveActuatorModulePath('service-actuator', '/tmp/escape.js')).toThrow(
+      '[OP_RESOLUTION_MANIFEST]'
+    );
+    expect(() => resolveActuatorModulePath('../outside', 'src/index.js')).toThrow(
+      '[OP_RESOLUTION_MANIFEST]'
+    );
+    expect(() => resolveActuatorModulePath('nested/actuator', 'src/index.js')).toThrow(
+      '[OP_RESOLUTION_MANIFEST]'
+    );
+    expect(() => resolveActuatorModulePath('nested\\actuator', 'src/index.js')).toThrow(
       '[OP_RESOLUTION_MANIFEST]'
     );
   });

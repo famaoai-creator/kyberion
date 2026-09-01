@@ -1,9 +1,7 @@
-import {
-  loadCapabilityBundleRegistry,
-  scanProviderCapabilities,
-  safeExec,
-  findSkillInstallPackageMapEntry,
-} from '@agent/core';
+import { loadCapabilityBundleRegistry } from '@agent/core/capability-bundle-registry';
+import { scanProviderCapabilities } from '@agent/core/provider-capability-scanner';
+import { safeExec } from '@agent/core/secure-io';
+import { findSkillInstallPackageMapEntry } from '@agent/core/skill-install-package-map';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';

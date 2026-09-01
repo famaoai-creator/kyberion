@@ -43,7 +43,3 @@ export function resolveSpreadsheetStyleIndex(role: string): number {
   const catalog = loadSpreadsheetStylePolicyCatalog();
   return catalog.role_indices[normalized] ?? FALLBACK_CATALOG.role_indices[normalized] ?? 0;
 }
-
-export function resetSpreadsheetStylePolicyCatalogCache(): void {
-  catalog.reset();
-}

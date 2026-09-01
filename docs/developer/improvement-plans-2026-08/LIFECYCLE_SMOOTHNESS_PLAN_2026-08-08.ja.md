@@ -24,7 +24,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 | 段                            | 状態                                                                                                                                                                                              | 一次エビデンス                                                                                                             |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | baseline-check                | `all_clear`(ただしインフラ健全性のみ。下記の停止をどれも検出しない)                                                                                                                               | `run_baseline_check.js` 実行結果                                                                                           |
-| オンボーディング              | **未完走**: `draft phase=identity` のまま。接続 0 ready / 4 blocked(comfyui・whisper・voice・meeting)、テナント 0、チュートリアル未開始                                                           | `pnpm dashboard:onboarding` 出力                                                                                           |
+| オンボーディング              | **未完走**: `draft phase=identity` のまま。接続 0 ready / 4 blocked(comfyui・whisper・voice・meeting)、テナント 0、チュートリアル未開始                                                           | `pnpm dashboard -- --once --focus onboarding` 出力                                                                         |
 | モデル(reasoning backend)選択 | 検出のみで**選択が永続化されない**。`claude` CLI は repo 内 placeholder が本物(`~/.local/bin/claude` 2.1.226 認証済み)を PATH で隠し、毎回 unavailable 警告 → 無言フォールバック                  | `scripts/onboarding_wizard.ts:491-566` / `libs/core/shell-claude-cli-backend.ts:599-708` / `node_modules/.bin/claude` shim |
 | 組織・目標・サービス登録      | **書き込み系ファサードが存在しない**。core の writer(`saveOrganizationPurpose` 等)はテストからしか呼ばれない。実在する唯一の組織 state は `sample_fixture: true` のフィクスチャ。OKR 0 objectives | `scripts/organization_operating_model.ts:117-133` / `libs/core/organization-operating-model.ts:1033,1133`                  |
 | プロジェクト                  | `pnpm project` は CRUD 完備だが**組織と接続されない**(create に organization/context フラグなし、`active_project_ids` を書くコマンドなし)。管理プロジェクト 5 件はどれも組織未所属                | `scripts/project_controller.ts:53-57` / `libs/core/organization-operating-model.ts:1941-1953`                              |
@@ -33,7 +33,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 | スケジュールタスク            | **chronos-daemon が 2026-08-02 から死んだまま 6 日間、25 宣言スケジュール中 0 件発火**。heartbeat 監視・launchd/cron 常駐化・死亡アラートなし。15/25 は一度も実行歴なし、4 件は failed のまま放置 | `active/shared/runtime/heartbeats/chronos-daemon.json`(pid 消滅)/ `pipeline-schedules.json`                                |
 | 通知                          | `ops-alerts.jsonl` 669 件中 **553 件が `operator_notification_undelivered`(no_channel_configured)**。webhook 未設定のため全て pull 依存                                                           | `libs/core/ops-alert.ts:58`                                                                                                |
 | 持続的改善ループ              | 構造的には閉じている(trace → hints → 次回 intent 注入)が、auto-learned hints は全件「Step X produced a file artifact…」の定型文(confidence 0.5 固定)で**信号ゼロ**                                | `libs/core/src/feedback-loop.ts:43-135` / `feedback-loop/hints/auto-learned.json`                                          |
-| 運用サーフェス                | UI サーフェス(chronos-mirror-v2:3000 / concierge:3050 / operator-surface:3331 ほか)は enabled 宣言にもかかわらず**全ポート無応答**。`pnpm surfaces:status` は policy ロード以外**何も出力しない** | `lsof` / `pnpm surfaces:status` 実行結果                                                                                   |
+| 運用サーフェス                | UI サーフェス(chronos-mirror-v2:3000 / concierge:3050 / operator-surface:3331 ほか)は enabled 宣言にもかかわらず**全ポート無応答**。`pnpm surfaces status` は policy ロード以外**何も出力しない** | `lsof` / `pnpm surfaces status` 実行結果                                                                                   |
 
 ### 2.2 診断:3 つの構造欠陥
 
@@ -47,7 +47,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 
 ### 完了時の利用者体験
 
-- `pnpm onboard` が persona・identity・モデル選択・通知チャネルまで永続化して完了し、`dashboard:onboarding` が「Next: 組織を設定」へ進む。
+- `pnpm onboard` が persona・identity・モデル選択・通知チャネルまで永続化して完了し、`pnpm dashboard -- --once --focus onboarding` が「Next: 組織を設定」へ進む。
 - `pnpm organization purpose set` / `service add` / `objective add` で組織と目標を登録でき、`pnpm project create --organization-id` で最初のプロジェクトが組織に所属する。
 - スケジューラは launchd 常駐で、死ねば 1 時間以内に baseline-check が `needs_attention` を返し通知が届く。
 - ミッションの放置・ゴミは hygiene が定期的に検出し、改善バックログに自動起票される。
@@ -74,13 +74,13 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 ### P1 — オンボーディングの完走性
 
 - **LC-04 ドキュメント・カタログ整合**
-  (a) `onboard:reset` を package.json に登録(スクリプトは実装済み・doc は既に案内済み)。(b) `phases/onboarding.md` Stage 2 の「onboard が dist を生成する」誤記を修正し、`customer/{slug}/` overlay の出力先を追記。(c) reasoning backend カタログを 4 ソース(INITIALIZATION.md / reasoning_setup ガイダンス / 対話メニュー / CLAUDE.md)で統一し、`probeReasoningBackend` に grok を追加、重複プローブ(codex/gemini/agy が同一関数内で 2 回)を除去。
+  (a) `onboard reset` を package.json に登録(スクリプトは実装済み・doc は既に案内済み)。(b) `phases/onboarding.md` Stage 2 の「onboard が dist を生成する」誤記を修正し、`customer/{slug}/` overlay の出力先を追記。(c) reasoning backend カタログを 4 ソース(INITIALIZATION.md / reasoning_setup ガイダンス / 対話メニュー / CLAUDE.md)で統一し、`probeReasoningBackend` に grok を追加、重複プローブ(codex/gemini/agy が同一関数内で 2 回)を除去。
 - **LC-05 モデル選択の永続化**
   wizard の reasoning phase を「検出のみ」から「選択して `.env.local` に `KYBERION_REASONING_BACKEND` を書く」へ。既に何かの CLI が居ると選択プロンプトが一度も出ない `reasoning_setup.ts:103-123` の条件(`must > 0`)を「未永続化なら必ず確認」に変更。
   受け入れ基準: onboarding 完了後、auto-discovery ではなく記録された選択が使われる。
 - **LC-06 外部サービス認証のガイド接続**
   wizard services phase のドラフト収集の次段として `setup_oauth.ts` / secret 設定への誘導を接続し、`services:setup` の「missing auth の next action が services:setup 自身」という循環を修正。blocked 4 接続(comfyui・whisper・voice・meeting)それぞれの必要変数は既に表示されているので、入力→検証→ready 化の一本道を作る。
-  受け入れ基準: `dashboard:onboarding` の Connection Review で 4 接続のうち設定意思のあるものが blocked → ready に遷移できる。
+  受け入れ基準: `pnpm dashboard -- --once --focus onboarding` の Connection Review で 4 接続のうち設定意思のあるものが blocked → ready に遷移できる。
 - **LC-07 persona 登録の永続化**
   `KYBERION_PERSONA` は現在プロセス内でしか設定されず、後日の personal-tier 操作(Terminal HUD 等)が黙って権限不足になる。onboarding summary で選択 persona をプロファイル(`.env.local` または `my-identity.json` 連動の起動スクリプト)に永続化し、authority.ts の要求値と onboarding 出力を接続する。
 
@@ -93,7 +93,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
   `project create/bootstrap` に `--organization-id` / `--tenant-slug` を追加し、`pnpm work create-item` に `--context`(または `--mission-id --project-id --work-shape` 個別フラグ)を追加。mission dispatcher の metadata 経由持ち回り(`mission-ticket-dispatch.ts:337-356`)を typed context に置換、`importExternalWorkItem` 更新分岐の context 欠落も修正。ORGANIZATION_VIEW_SCOPE_ARCHITECTURE の pending step 2 の実装に相当。
   受け入れ基準: 新規 work item の `context` に organization_id〜work_shape が CLI から直接入り、metadata 持ち回り経路が deprecated warn を出す。
 - **LC-10 facade 名の整理**
-  `pnpm org`(実体は role/authority ツール)と `pnpm organization` の混同を解消(`org` → `role` へのリネーム or CLAUDE.md/GLOSSARY の記述修正)。`OPERATOR_UX_GUIDE.md` に `pnpm organization` の節を追加(現在ゼロ言及)。
+  role/authority ツールと `pnpm organization` の混同を解消し、role authoring を `pnpm organization role` に統合。`OPERATOR_UX_GUIDE.md` に `pnpm organization` の節を追加(現在ゼロ言及)。
 
 ### P2 — ミッション衛生と作業エルゴノミクス
 
@@ -103,7 +103,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
   (a) `reconcile-work --generate` スキャフォールド(現況 git 状態から manifest 雛形とハッシュを自動生成)。(b) finish のゲート失敗時に exit code 非ゼロ + 機械可読な gate 結果出力(現在は log して return、exit 0 の経路がある)。(c) CLAUDE.md/AGENTS.md から reconcile-work ゲートへのリンクを 1 行追加(現在は finish が失敗して初めて学ぶ)。(d) `MISSION_ROLE=slack_bridge` 等の enqueue 役割要件を OPERATOR_UX_GUIDE に記載。
 - **LC-13 CLI 起動税の削減**
   read-only サブコマンド(`--help` / `list` / `status`)でのプロバイダ探索・embedding bootstrap・kill-switch monitor 起動(約 1 秒 + ログ約 20 行)を遅延初期化にする。
-- **LC-14 `surfaces:status` の修復とサーフェス起動の運転化**
+- **LC-14 `surfaces status` の修復とサーフェス起動の運転化**
   status が何も表示しない欠陥を修復し、enabled 宣言済みサーフェス(chronos-mirror-v2 / concierge / operator-surface)の常駐化を LC-01 と同じ supervisor 系に載せる。state.json(7/14 から未更新)の鮮度も status に表示。
 
 ### P2 — 改善ループの信号品質
@@ -113,7 +113,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 - **LC-16 自動ループと STATUS ledger の接続**
   failed schedule・hygiene 検出・undelivered 通知などの機械検出イベントを、手動監査で健全に回っている STATUS ledger / improvement-plans バックログへ自動起票する経路(`organization learning enqueue` の活用)を作る。「機械が見つけ、人（またはミッション）が裁く」形でループを閉じる。
 - **LC-17 First-Win E2E チェックの拡張**
-  既存の `check:first-win-smoke` を「onboard(非対話 `onboard:apply`)→ organization authoring → project attach → mission create→finish → schedule tick → hints 生成」の通し検証に拡張し、CI ではなく定期スケジュール(週次)で実環境相当に対して走らせる。**本計画全体の受け入れ基準を兼ねる。**
+  既存の `check:first-win-smoke` を「onboard(非対話 `onboard apply`)→ organization authoring → project attach → mission create→finish → schedule tick → hints 生成」の通し検証に拡張し、CI ではなく定期スケジュール(週次)で実環境相当に対して走らせる。**本計画全体の受け入れ基準を兼ねる。**
 
 ## 5. 実装順序
 
@@ -138,11 +138,11 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
   - **LC-01 完了**: baseline-check に L10 レイヤ(`scheduler_alive` / `schedules_firing` / failed-schedule sweep)追加(`scripts/run_baseline_check.ts`)。stale heartbeat で critical ops-alert(日次デデュープ)。`pnpm chronos:install` / `chronos:uninstall`(launchd 生成セレモニー、既定 dry-run)。実機で LaunchAgent 導入済み(`com.kyberion.chronos`)。
   - **LC-02 完了**: `pnpm ops:alerts`(サマリ / `--redeliver` / `--ack`、履歴は append-only)。baseline-check と `services:setup` に通知チャネル未設定警告。`services:setup` の customer overlay 読み取りは LC-06 で sensitive-path mediation に接続。
   - **LC-03 完了**: `shell-claude-cli-backend.ts` に placeholder 署名検出+周知ディレクトリへのフォールバック解決(実機で `~/.local/bin/claude` を自動選択、警告消滅、failover chain に claude-cli 復帰)。`KYBERION_CLAUDE_CLI_BIN` / `pnpm approve-builds` の修復ガイダンスを reasoning:setup / INITIALIZATION.md に追記。
-  - **LC-04 完了**: `onboard:reset` 登録、phases/onboarding.md Stage 2 修正+customer overlay 出力先追記、backend カタログを `loadReasoningBackendPolicy().allowed_modes` を単一情報源として 4 ソース統一、`probeReasoningBackend` に grok 追加+重複プローブ除去+明示バックエンドの個別プローブ(`probeExplicitReasoningBackend`)。
-  - **LC-05 完了**: wizard reasoning phase で選択→ `.env.local` に `KYBERION_REASONING_BACKEND` 永続化(上書きは確認制)。`onboard:apply` に `reasoning_backend` フィールド。identity→services スキップバグ修正。
+  - **LC-04 完了**: `onboard reset` 登録、phases/onboarding.md Stage 2 修正+customer overlay 出力先追記、backend カタログを `loadReasoningBackendPolicy().allowed_modes` を単一情報源として 4 ソース統一、`probeReasoningBackend` に grok 追加+重複プローブ除去+明示バックエンドの個別プローブ(`probeExplicitReasoningBackend`)。
+  - **LC-05 完了**: wizard reasoning phase で選択→ `.env.local` に `KYBERION_REASONING_BACKEND` 永続化(上書きは確認制)。`onboard apply` に `reasoning_backend` フィールド。identity→services スキップバグ修正。
   - **LC-08 完了**: `pnpm organization` に authoring サブコマンド公開(`init` / `purpose set` / `objective add` / `domain add` / `service add`(親 domain `service_ids` 同期)/ `operation add` / `project attach|detach`(プロジェクトレジストリ実在検証))。core builder 関数群+テスト追加。OPERATOR_UX_GUIDE に組織登録節(LC-10 の doc 部分を前倒し)。
   - **LC-06 完了**: `services:setup` の self-referential next action を廃止し、OAuth 対応 preset は `setup_oauth.ts`、secret-backed preset は Secret Guard の入力指示へ分岐。`pnpm onboard -- --services-only --service <id>` を追加し、ComfyUI / Whisper / Voice / Meeting の入力を readiness 必須キーへ変換して connection document を `ready` / `blocked` として保存。customer overlay の読み取りも mediation 下で実行。
-  - **LC-07 完了**: wizard / `onboard:apply` が選択 persona を `.env.local`、`my-identity.json`、`agent-identity.json`、onboarding summary/state に記録。`authority.resolveIdentityContext` は明示 env、mission state に続く profile persona fallback を持ち、後続プロセスでも権限不足へ黙って落ちない。
+  - **LC-07 完了**: wizard / `onboard apply` が選択 persona を `.env.local`、`my-identity.json`、`agent-identity.json`、onboarding summary/state に記録。`authority.resolveIdentityContext` は明示 env、mission state に続く profile persona fallback を持ち、後続プロセスでも権限不足へ黙って落ちない。
   - **LC-06/07 検証**: typecheck / build:packages / build:repo、対象 6 テストファイル 38 件、contract-schemas / script-integrity / process-registry / env-registry / esm / golden を通過。サービス setup の live probe は既存の外部 CLI probe が長時間化するため実機コマンド全体は中断し、next-action の純粋ロジックをテストで検証。
   - 検証: `pnpm typecheck` / `build:packages` / `build:repo` / `build:actuators` クリーン、対象 10 テストファイル 124 件全通過、check:script-integrity / process-registry / env-registry / governance-rules / esm / golden 通過。baseline-check 実機で `needs_attention`(L10、heartbeat 停止 5.8 日)を正しく検出。
   - 副次修正: `procedure-registry.test.ts` のキャッシュテストを密閉化(personal カタログ存在マシンで恒常失敗していた)。
@@ -156,6 +156,6 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 - 残: LC-17 の実環境受入証跡(外部認証・実機スケジューラ)。LC-09〜LC-16 は実装済み。
 - 2026-08-08(Phase 3着手): **LC-09〜LC-12の実装を開始**。project create/bootstrapの組織・tenant入力、work create-itemのtyped context、mission ticket dispatchのtyped context、外部work item更新時のcontext保持、hygieneのactive/distilling検出と組織 learning enqueue、reconcile-work scaffold生成、finish gate失敗の非0終了、AGENTS/Operator guideの導線を追加。reconcile既存テストのcommit-bound 4件は、未コミット作業ツリーでは既知条件により失敗するため、コミット後に再検証する。
 - 2026-08-08(Phase 4着手): **LC-13/LC-15を実装**。CLIのhelp/list/info等のread-onlyコマンドではreasoning・embedding・voiceのruntime bootstrapを遅延し、`list --check`と実行系だけが起動するようにした。feedback-loopは成功artifactの存在だけから定型hintを生成せず、低信号なauto-learned hintの蓄積を抑制する。
-- 2026-08-08(Phase 4続行): **LC-14/LC-16を実装**。`run_with_env` が子プロセスstdoutを転送するよう修正し、`pnpm surfaces:status` がJSONのhealth・stale state・next actionを表示するようにした。scheduler失敗と未達ops-alertを決定論的なorganization learning候補へ接続し、候補は提案状態のまま人またはミッションが裁く。残りはLC-17のFirst-Win通し検証拡張。
-- 2026-08-08(Phase 4 LC-17): **First-Win lifecycle dry-runを実装**。`onboard:apply --dry-run` → `organization init --dry-run` → `project create --dry-run` → `mission create --dry-run` → weekly schedule tick → meaningful hint生成を1コマンドで検証する`check:first-win-lifecycle`と、月曜週次の`first-win-lifecycle-weekly` pipelineを追加。project facadeにもcreate dry-runと純粋なrecord builderを追加した。外部認証・実機schedule発火を伴うapply/live受入は次の実環境証跡に残す。
+- 2026-08-08(Phase 4続行): **LC-14/LC-16を実装**。`run_with_env` が子プロセスstdoutを転送するよう修正し、`pnpm surfaces status` がJSONのhealth・stale state・next actionを表示するようにした。scheduler失敗と未達ops-alertを決定論的なorganization learning候補へ接続し、候補は提案状態のまま人またはミッションが裁く。残りはLC-17のFirst-Win通し検証拡張。
+- 2026-08-08(Phase 4 LC-17): **First-Win lifecycle dry-runを実装**。`onboard apply --dry-run` → `organization init --dry-run` → `project create --dry-run` → `mission create --dry-run` → weekly schedule tick → meaningful hint生成を1コマンドで検証する`check:first-win-lifecycle`と、月曜週次の`first-win-lifecycle-weekly` pipelineを追加。project facadeにもcreate dry-runと純粋なrecord builderを追加した。外部認証・実機schedule発火を伴うapply/live受入は次の実環境証跡に残す。
 - 2026-08-09(Phase 4 LC-17): **live 受入 harness を実装・レビュー修正**。`scripts/first_win_lifecycle_smoke.ts --live` は、明示した identity と一意な `--run-id` に対して onboarding → organization init → project create/attach → mission create/start/verify/distill/finish → weekly pipeline 実行を追跡する。書き込みは `KYBERION_FIRST_WIN_LIVE=1` と `--confirm-live FIRST-WIN-LIFECYCLE-LIVE` の二重ゲートを要求し、開始前に組織・プロジェクト・ミッション(アーカイブ含む)・派生作業パスの衝突を拒否する。ミッション各段階は成功ログに加えて `mission-state.json` の期待状態を照合し、未完了の途中段階を JSON で返す。通常の `validate` / weekly dry-run には接続しない。残りは実環境での外部認証・スケジューラ受入証跡。

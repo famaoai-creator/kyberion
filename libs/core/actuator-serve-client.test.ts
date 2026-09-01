@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ActuatorServeClient } from './actuator-serve-client.js';
+import { ActuatorServeClient, normalizeActuatorServeResponse } from './actuator-serve-client.js';
 import { ACTUATOR_SERVE_RESULT_PREFIX } from './cli-utils.js';
 
 /**
@@ -27,6 +27,18 @@ function fakeServeCommand(): string[] {
 }
 
 describe('actuator serve client', () => {
+  it('rejects malformed response envelopes before matching pending requests', () => {
+    expect(() => normalizeActuatorServeResponse([])).toThrow(
+      'actuator serve response must be a JSON object'
+    );
+    expect(() => normalizeActuatorServeResponse({ id: 'r1', ok: 'yes' })).toThrow(
+      'actuator serve response.ok must be boolean'
+    );
+    expect(() =>
+      normalizeActuatorServeResponse({ id: 'r1', ok: true, result: ['unexpected'] })
+    ).toThrow('actuator serve response.result must be a JSON object');
+  });
+
   it('round-trips requests through a warm process, ignoring log lines', async () => {
     const client = new ActuatorServeClient({ command: fakeServeCommand(), label: 'fake' });
     try {

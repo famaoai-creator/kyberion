@@ -17,14 +17,11 @@
  * is the dedup registry append under active/shared/runtime/ingest/.
  */
 
-import {
-  logger,
-  resolveVars,
-  stalenessReport,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-  type IngestSourceObservation,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { resolvePipelineContextValues } from '@agent/core/src/logic-utils';
+import { stalenessReport, type IngestSourceObservation } from '@agent/core/ingest-asset-ledger';
+import { defineCatalogBackedActuator, runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import { describeOps } from './op-catalog.js';
 import { commitIngest, type IngestCommitInput } from './commit.js';
 import { dedupContent, type DedupInput } from './dedup.js';
 import { normalizeCard, type NormalizeCardInput } from './normalize-card.js';
@@ -86,29 +83,6 @@ interface IngestParams extends Record<string, unknown> {
  * `"ir": "{{ir}}"` wires the parse output into normalize without
  * stringification); anything else gets plain string interpolation.
  */
-function resolveDeep(value: unknown, ctx: Record<string, unknown>): unknown {
-  if (typeof value === 'string') {
-    const exact = /^\{\{\s*([^{}]+?)\s*\}\}$/.exec(value);
-    if (exact) {
-      const direct = ctx[exact[1]];
-      if (direct !== undefined) return direct;
-    }
-    return resolveVars(value, ctx);
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => resolveDeep(item, ctx));
-  }
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
-        resolveDeep(item, ctx),
-      ])
-    );
-  }
-  return value;
-}
-
 async function executeOp(
   op: IngestOp | string,
   params: IngestParams,
@@ -171,31 +145,6 @@ async function executeOp(
   }
 }
 
-async function executePipeline(
-  steps: Array<{ type?: string; op: string; params?: IngestParams }>,
-  ctx: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-  let currentCtx = ctx;
-  for (const step of steps) {
-    const resolvedParams = resolveDeep(step.params ?? {}, currentCtx) as IngestParams;
-    ensureDefaultOpPreflight();
-    const preflight = await runOpPreflight({
-      op: `ingest:${step.op}`,
-      params: resolvedParams,
-      context: currentCtx,
-      source: 'actuator',
-    });
-    if (preflight.decision !== 'allow') {
-      throw new Error(
-        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ingest:${step.op} was not admitted.`}`
-      );
-    }
-    const params = preflight.input as IngestParams;
-    currentCtx = await executeOp(step.op, params, currentCtx);
-  }
-  return currentCtx;
-}
-
 export async function handleAction(input: {
   action: string;
   steps?: Array<{ type?: string; op: string; params?: IngestParams }>;
@@ -206,12 +155,26 @@ export async function handleAction(input: {
     input.context ?? (input.params?.context as Record<string, unknown>) ?? {};
 
   if (input.action === 'pipeline' && Array.isArray(input.steps)) {
-    return executePipeline(input.steps, ctx);
+    return runActuatorPipeline({
+      actuatorId: 'ingest',
+      steps: input.steps,
+      context: ctx,
+      resolveParams: (params, context) =>
+        resolvePipelineContextValues(params, context) as IngestParams,
+      execute: executeOp,
+    });
   }
 
   // Direct op call
   const { context: _context, ...params } = input.params ?? {};
-  const newCtx = await executePipeline([{ op: input.action, params }], ctx);
+  const newCtx = await runActuatorPipeline({
+    actuatorId: 'ingest',
+    steps: [{ op: input.action, params }],
+    context: ctx,
+    resolveParams: (rawParams, context) =>
+      resolvePipelineContextValues(rawParams, context) as IngestParams,
+    execute: executeOp,
+  });
   return { ...newCtx, status: 'succeeded' };
 }
 
@@ -229,5 +192,3 @@ export const actuator = defineCatalogBackedActuator({
   describeOps,
   handleAction: (input) => handleAction(input as Parameters<typeof handleAction>[0]),
 });
-import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
-import { describeOps } from './op-catalog.js';

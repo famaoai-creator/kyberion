@@ -1,12 +1,13 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleAction } from './meeting-actuator-helpers.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 
 const main = async () => {
   await runActuatorCli({
     name: 'meeting-actuator',
+    args: process.argv,
     handleAction,
   });
 };

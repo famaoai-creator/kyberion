@@ -31,6 +31,8 @@ import {
   safeExec,
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { normalizePersistedAuditEntry } from './audit-chain.js';
 
 function kyberionEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
@@ -54,6 +56,7 @@ import {
 import { probeOpenRouterBackendAvailability } from './openrouter-backend.js';
 import { probeGeminiApiBackendAvailability } from './gemini-api-backend.js';
 import { probeGrokApiBackendAvailability } from './grok-api-backend.js';
+import { probeAnthropicApiBackendAvailability } from './anthropic-api-probe.js';
 import {
   normalizeReasoningBackendMode,
   type ReasoningBackendMode,
@@ -89,10 +92,13 @@ export async function probeExplicitReasoningBackend(
   deps: {
     binaryProbe?: (command: string, args: readonly string[]) => boolean;
     claudeProbe?: () => { available: boolean; reason?: string };
+    anthropicProbe?: (env: NodeJS.ProcessEnv) => Promise<{ available: boolean; reason?: string }>;
   } = {}
 ): Promise<{ available: boolean; reason?: string }> {
   const binaryProbe = deps.binaryProbe ?? binaryAvailable;
   const claudeProbe = deps.claudeProbe ?? (() => probeShellClaudeCliAvailability(env));
+  const anthropicProbe =
+    deps.anthropicProbe ?? ((selectedEnv) => probeAnthropicApiBackendAvailability(selectedEnv));
   const backend = normalizeReasoningBackendMode(backendRaw as ReasoningBackendMode);
 
   const unavailable = (detail: string): { available: boolean; reason: string } => ({
@@ -149,10 +155,12 @@ export async function probeExplicitReasoningBackend(
       return binaryProbe('gh', ['copilot', '--', '--help'])
         ? { available: true }
         : unavailable('`gh copilot -- --help` failed');
-    case 'anthropic':
-      return env.ANTHROPIC_API_KEY
+    case 'anthropic': {
+      const probe = await anthropicProbe(env);
+      return probe.available
         ? { available: true }
-        : unavailable('ANTHROPIC_API_KEY is not set');
+        : unavailable(probe.reason ?? 'Anthropic API probe failed');
+    }
     case 'gemini-api': {
       const probe = await probeGeminiApiBackendAvailability(env);
       return probe.available
@@ -305,26 +313,21 @@ async function probeAuditChain(): Promise<{ available: boolean; reason?: string 
     // First run / fresh checkout — creating it later is normal.
     return { available: true };
   }
+  let lineNumber = 0;
   try {
     const text = safeReadFile(chainPath, { encoding: 'utf8' }) as string;
-    let lineNumber = 0;
     for (const raw of text.split('\n')) {
       lineNumber += 1;
       const line = raw.trim();
       if (!line) continue;
-      const entry = JSON.parse(line);
-      if (typeof entry.id !== 'string' || typeof entry.action !== 'string') {
-        return {
-          available: false,
-          reason: `audit-chain malformed at line ${lineNumber}: missing id/action`,
-        };
-      }
+      const entry = parseSafeJsonInput(line, 'environment audit entry');
+      normalizePersistedAuditEntry(entry);
     }
     return { available: true };
   } catch (err: any) {
     return {
       available: false,
-      reason: `audit-chain parse failed: ${err?.message ?? err}`,
+      reason: `audit-chain parse failed at line ${lineNumber}: ${err?.message ?? err}`,
     };
   }
 }

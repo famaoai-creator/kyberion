@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
@@ -21,7 +21,7 @@ export class WindowsNativeOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const result = recognizeTextWithWindowsNativeApi(request.path);
+    const result = recognizeTextWithWindowsNativeApi(resolveOcrImagePath(request.path));
     if (!result || result.status !== 'succeeded') {
       return {
         status: 'failed',
@@ -51,6 +51,49 @@ function getMimeType(filePath: string): string {
   return 'application/octet-stream';
 }
 
+function resolveOcrImagePath(requestPath: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(requestPath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function firstRecord(value: unknown): Record<string, unknown> | undefined {
+  return Array.isArray(value) && isRecord(value[0]) ? value[0] : undefined;
+}
+
+export function parseGeminiOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const candidate = firstRecord(value.candidates);
+  const content = candidate && isRecord(candidate.content) ? candidate.content : undefined;
+  const part = content && firstRecord(content.parts);
+  return part ? nonEmptyString(part.text) : undefined;
+}
+
+export function parseClaudeOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const content = firstRecord(value.content);
+  return content ? nonEmptyString(content.text) : undefined;
+}
+
+export function parseOpenAiOcrResponse(value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const choice = firstRecord(value.choices);
+  const message = choice && isRecord(choice.message) ? choice.message : undefined;
+  return message ? nonEmptyString(message.content) : undefined;
+}
+
+export function parseLocalVlmOcrResponse(value: unknown): string | undefined {
+  return isRecord(value) ? nonEmptyString(value.response) : undefined;
+}
+
 export class TesseractOcrProvider implements OcrProvider {
   readonly id = 'tesseract';
   readonly dataEgress = 'none' as const; // tesseract.js, in-process
@@ -66,8 +109,7 @@ export class TesseractOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const logicalPath = request.path;
-    const resolvedPath = pathResolver.rootResolve(logicalPath);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const lang = request.language || 'eng';
     let worker: any = null;
 
@@ -129,8 +171,8 @@ export class AppleVisionOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const scriptPath = pathResolver.resolve('libs/core/native-ocr.swift');
-    const resolvedImagePath = pathResolver.rootResolve(request.path);
+    const scriptPath = assertSafeRepositoryPath(pathResolver.resolve('libs/core/native-ocr.swift'));
+    const resolvedImagePath = resolveOcrImagePath(request.path);
 
     return new Promise((resolve, reject) => {
       const args = [scriptPath, resolvedImagePath];
@@ -234,7 +276,7 @@ export class LlmApiOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const resolvedPath = pathResolver.rootResolve(request.path);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const buffer = safeReadFile(resolvedPath, { encoding: null }) as Buffer;
     const base64Data = buffer.toString('base64');
     const mimeType = getMimeType(request.path);
@@ -290,7 +332,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: { 'Content-Type': 'application/json' },
@@ -298,7 +340,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       params: { key: apiKey },
       authenticateRequest: true,
     });
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = parseGeminiOcrResponse(data);
+    if (text === undefined) throw new Error('gemini_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'gemini_api',
@@ -339,7 +382,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: {
@@ -350,7 +393,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       data: payload,
       authenticateRequest: true,
     });
-    const text = data.content?.[0]?.text || '';
+    const text = parseClaudeOcrResponse(data);
+    if (text === undefined) throw new Error('claude_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'claude_api',
@@ -388,7 +432,7 @@ export class LlmApiOcrProvider implements OcrProvider {
       ],
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url,
       headers: {
@@ -398,7 +442,8 @@ export class LlmApiOcrProvider implements OcrProvider {
       data: payload,
       authenticateRequest: true,
     });
-    const text = data.choices?.[0]?.message?.content || '';
+    const text = parseOpenAiOcrResponse(data);
+    if (text === undefined) throw new Error('openai_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: 'openai_api',
@@ -454,7 +499,7 @@ export class LocalVlmOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const resolvedPath = pathResolver.rootResolve(request.path);
+    const resolvedPath = resolveOcrImagePath(request.path);
     const buffer = safeReadFile(resolvedPath, { encoding: null }) as Buffer;
     const base64Data = buffer.toString('base64');
 
@@ -466,14 +511,15 @@ export class LocalVlmOcrProvider implements OcrProvider {
       stream: false,
     };
 
-    const data = await secureFetch<any>({
+    const data = await secureFetch<unknown>({
       method: 'POST',
       url: this.endpoint,
       headers: { 'Content-Type': 'application/json' },
       data: payload,
       kyberion_allow_local_network: true,
     });
-    const text = data.response || '';
+    const text = parseLocalVlmOcrResponse(data);
+    if (text === undefined) throw new Error('local_vlm_ocr_invalid_response');
     return {
       status: 'succeeded',
       provider: this.id,

@@ -1,7 +1,7 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
-import { safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
 import { truncateTextWithCount } from './text-truncation.js';
 import {
@@ -135,7 +135,14 @@ function buildApprovalContext(
 }
 
 function buildOutputPath(sessionId: string): string {
-  return pathResolver.sharedTmp(`claude-task-sessions/${sessionId}.txt`);
+  const normalized = String(sessionId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error('[CLAUDE_TASK_SESSION_ID] session id must be a single path segment');
+  }
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`claude-task-sessions/${normalized}.txt`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export async function executeApprovedClaudeTaskSession(

@@ -6,7 +6,8 @@
  * requested PR title does not satisfy the repository's PR-title policy.
  */
 
-import { safeExec, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec } from '@agent/core/secure-io';
 import { checkTitle } from './check_pr_title.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 

@@ -232,6 +232,13 @@ describe('security-screen (QM-04)', () => {
       expect(listed.find((r) => r.id === record.id)?.content).toContain('curl evil');
     });
 
+    it('rejects an external quarantine directory', () => {
+      process.env.KYBERION_SECURITY_QUARANTINE_DIR = '/tmp/kyberion-external-quarantine';
+      expect(() =>
+        recordQuarantine({ source: 'external', content: 'payload', reason: 'test' })
+      ).toThrow(/RESOURCE_PATH_SCOPE/);
+    });
+
     it('produces a stub that names the quarantine id, not the content', () => {
       const stub = quarantineStub({ id: 'q-1', source: 'attachment:x', reason: 'test' });
       expect(stub).toContain('q-1');

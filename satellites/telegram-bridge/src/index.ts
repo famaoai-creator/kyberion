@@ -1,42 +1,56 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { installProcessGuards } from '@agent/core';
-import { appendJsonLine, readJson } from '@agent/core/foundation';
+import { installProcessGuards } from '@agent/core/process-guards';
+import {
+  appendJsonLine,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  readJson,
+  readJsonLines,
+} from '@agent/core/foundation';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
+import { logger } from '@agent/core/core';
+import * as pathResolver from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+} from '@agent/core/secure-io';
+import {
+  formatChannelThreadContext,
+  runChannelTurn,
+  type ChannelAdapter,
+} from '@agent/core/channel-adapter';
+import {
+  buildBridgeEmptyReplyText,
+  chunkSurfaceMessage,
+  isSurfaceFormatError,
+  postBridgeError,
+  stripSurfaceMarkup,
+} from '@agent/core/bridge-error-reply';
+import { resolveCustomerBinding } from '@agent/core/customer-channel-binding';
+import { runCustomerConversation } from '@agent/core/customer-conversation';
+import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
+import {
+  resolveMissionProposalReply,
+  stashMissionProposalForConfirmation,
+} from '@agent/core/surface-mission-proposals';
+import {
+  buildSurfaceApprovalActions,
+  buildSurfaceApprovalText,
+  createSurfaceApprovalRequest,
+  resolveSurfaceApprovalReply,
+  runSurfaceMessageConversation,
+} from '@agent/core/channel-surface';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('telegram-bridge');
-
-import {
-  resolveOperatorLocale,
-  createStandardYargs,
-  startBridgeTypingLoop,
-  logger,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  runSurfaceMessageConversation,
-  runChannelTurn,
-  formatChannelThreadContext,
-  type ChannelAdapter,
-  safeReadFile,
-  buildBridgeEmptyReplyText,
-  chunkSurfaceMessage,
-  postBridgeError,
-  resolveCustomerBinding,
-  runCustomerConversation,
-  createSurfaceOutboxDrainGuard,
-  drainSurfaceOutbox,
-  resolveMissionProposalReply,
-  stashMissionProposalForConfirmation,
-  buildSurfaceApprovalActions,
-  buildSurfaceApprovalText,
-  createSurfaceApprovalRequest,
-  resolveSurfaceApprovalReply,
-  evaluateSurfaceActorAccess,
-  isSurfaceFormatError,
-  stripSurfaceMarkup,
-} from '@agent/core';
 
 export interface TelegramUser {
   id: number | string;
@@ -85,6 +99,12 @@ export interface TelegramBridgeInput {
   update?: TelegramUpdate;
 }
 
+export interface TelegramSendInput {
+  chatId: string | number;
+  text: string;
+  parseMode?: string;
+}
+
 export interface TelegramBridgeOptions {
   token?: string;
   apiBaseUrl?: string;
@@ -112,6 +132,12 @@ export interface TelegramWebhookReceipt {
   reply?: TelegramSendReceipt;
 }
 
+interface TelegramApiResponse {
+  ok?: boolean;
+  description?: string;
+  result?: unknown;
+}
+
 const TELEGRAM_SURFACE_AGENT_ID = 'telegram-surface-agent';
 const TELEGRAM_THREAD_HISTORY_ROOT = 'active/shared/runtime/telegram-bridge/thread-history';
 
@@ -123,6 +149,31 @@ export interface TelegramThreadHistoryEntry {
   threadTs: string;
   chatId: string;
   receivedAt: string;
+}
+
+export function parseTelegramThreadHistoryEntry(value: unknown): TelegramThreadHistoryEntry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const role = record.role === 'user' || record.role === 'assistant' ? record.role : undefined;
+  const stringField = (field: string): string | undefined =>
+    typeof record[field] === 'string' ? record[field] : undefined;
+  const authorLabel = stringField('authorLabel');
+  const text = stringField('text');
+  const messageId = stringField('messageId');
+  const threadTs = stringField('threadTs');
+  const chatId = stringField('chatId');
+  const receivedAt = stringField('receivedAt');
+  if (!role || !authorLabel || !text || !messageId || !threadTs || !chatId || !receivedAt)
+    return null;
+  return {
+    role,
+    authorLabel,
+    text,
+    messageId,
+    threadTs,
+    chatId,
+    receivedAt,
+  };
 }
 
 function resolveUpdate(raw: TelegramBridgeInput | TelegramUpdate): TelegramUpdate {
@@ -138,6 +189,20 @@ function pickMessage(update: TelegramUpdate): TelegramMessage | undefined {
 
 function pickText(message: TelegramMessage): string {
   return (message.text || message.caption || '').trim();
+}
+
+function parseTelegramApiResponse(value: unknown): TelegramApiResponse {
+  if (!value || typeof value !== 'object') return {};
+  const record = value as Record<string, unknown>;
+  return {
+    ok: typeof record.ok === 'boolean' ? record.ok : undefined,
+    description: typeof record.description === 'string' ? record.description : undefined,
+    result: record.result,
+  };
+}
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function sanitizePathSegment(value: string): string {
@@ -157,21 +222,14 @@ function resolveTelegramThreadHistoryPath(threadTs: string): string {
 
 function readTelegramThreadHistory(threadTs: string): TelegramThreadHistoryEntry[] {
   const resolved = resolveTelegramThreadHistoryPath(threadTs);
-  if (!safeExistsSync(resolved)) return [];
-  const raw = String(safeReadFile(resolved, { encoding: 'utf8' }) || '').trim();
-  if (!raw) return [];
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line) as TelegramThreadHistoryEntry;
-      } catch {
-        return null;
-      }
-    })
-    .filter((entry): entry is TelegramThreadHistoryEntry => Boolean(entry));
+  return readJsonLines<TelegramThreadHistoryEntry>(resolved, {
+    onMalformed: 'skip',
+    map: (value) => {
+      const entry = parseTelegramThreadHistoryEntry(value);
+      if (!entry) throw new Error('invalid Telegram thread history entry');
+      return entry;
+    },
+  });
 }
 
 function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
@@ -179,8 +237,8 @@ function appendTelegramThreadHistory(entry: TelegramThreadHistoryEntry): void {
     const resolved = resolveTelegramThreadHistoryPath(entry.threadTs);
     safeMkdir(path.dirname(resolved), { recursive: true });
     appendJsonLine(resolved, entry);
-  } catch (error: any) {
-    logger.warn(`⚠️ [TelegramBridge] Failed to persist thread history: ${error?.message || error}`);
+  } catch (error: unknown) {
+    logger.warn(`⚠️ [TelegramBridge] Failed to persist thread history: ${errorDetail(error)}`);
   }
 }
 
@@ -201,7 +259,51 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   }
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (!raw) return {};
-  return JSON.parse(raw);
+  return parseSafeJsonInput(raw, 'request body');
+}
+
+/** Keep HTTP bridge entrypoints on a single JSON-object input boundary. */
+export async function readTelegramJsonObject(
+  req: IncomingMessage
+): Promise<Record<string, unknown>> {
+  const value = await readJsonBody(req);
+  return parseSafeJsonObjectValue(value, 'request body');
+}
+
+export function parseTelegramSendInput(value: unknown): TelegramSendInput {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('telegram send input must be a JSON object');
+  }
+  const record = value as Record<string, unknown>;
+  const unexpected = Object.keys(record).find(
+    (key) => !['chatId', 'text', 'parseMode'].includes(key)
+  );
+  if (unexpected) throw new Error(`unexpected telegram send field: ${unexpected}`);
+
+  const chatId = record.chatId;
+  if (!(
+    (typeof chatId === 'string' && chatId.trim().length > 0 && chatId.length <= 128) ||
+    (typeof chatId === 'number' && Number.isSafeInteger(chatId))
+  )) {
+    throw new Error('telegram send chatId must be a non-empty string or safe integer');
+  }
+  const text = record.text;
+  if (typeof text !== 'string' || !text.trim() || text.length > 20_000) {
+    throw new Error('telegram send text must be a non-empty string up to 20000 characters');
+  }
+  const parseMode = record.parseMode;
+  let normalizedParseMode: string | undefined;
+  if (parseMode !== undefined) {
+    if (typeof parseMode !== 'string' || parseMode.length > 32) {
+      throw new Error('telegram send parseMode must be a string up to 32 characters');
+    }
+    normalizedParseMode = parseMode;
+  }
+  return {
+    chatId: typeof chatId === 'string' ? chatId.trim() : chatId,
+    text,
+    ...(normalizedParseMode !== undefined ? { parseMode: normalizedParseMode } : {}),
+  };
 }
 
 function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
@@ -251,7 +353,7 @@ async function sendTelegramMessageSingle(
       ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
     }),
   });
-  let body = (await response.json().catch(() => null)) as any;
+  let body = parseTelegramApiResponse(await response.json().catch(() => null));
 
   if (!response.ok || body?.ok === false) {
     const description = body?.description || response.statusText || '';
@@ -273,7 +375,7 @@ async function sendTelegramMessageSingle(
           ...(input.replyMarkup ? { reply_markup: input.replyMarkup } : {}),
         }),
       });
-      body = (await response.json().catch(() => null)) as any;
+      body = parseTelegramApiResponse(await response.json().catch(() => null));
     }
   }
 
@@ -356,7 +458,13 @@ function buildTelegramApprovalReplyMarkup(
   return {
     inline_keyboard: [
       buildSurfaceApprovalActions(record).map((action) => ({
-        text: action.decision === 'approved' ? '承認' : '却下',
+        text: t(
+          action.decision === 'approved'
+            ? 'bridge:approval_approve_button'
+            : 'bridge:approval_reject_button',
+          undefined,
+          resolveOperatorLocale()
+        ),
         callback_data: action.callbackData,
       })),
     ],
@@ -590,6 +698,7 @@ export async function handleTelegramUpdate(
               sourceText: text,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
+              intentResolution: result.intentResolution,
             });
             const reply = await sendTelegramMessage({ chatId, text: prompt }, options);
             appendTelegramThreadHistory({
@@ -626,7 +735,7 @@ export async function handleTelegramUpdate(
               reply = await sendTelegramMessage(
                 {
                   chatId,
-                  text: buildSurfaceApprovalText('telegram', record),
+                  text: buildSurfaceApprovalText('telegram', record, result.intentResolution),
                   replyMarkup: buildTelegramApprovalReplyMarkup(record),
                 },
                 options
@@ -685,17 +794,27 @@ export async function handleTelegramUpdate(
   };
 }
 
+export function resolveTelegramBridgeInputPath(inputPath: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`Telegram bridge input must be an existing regular file: ${inputPath}`);
+  }
+  return resolved;
+}
+
 async function handleInputFile(inputPath: string, options: TelegramBridgeOptions): Promise<void> {
-  const resolved = pathResolver.rootResolve(inputPath);
+  const resolved = resolveTelegramBridgeInputPath(inputPath);
   const parsed = readJson<TelegramBridgeInput | TelegramUpdate>(resolved);
 
   if ('action' in parsed && parsed.action === 'send') {
     const payload = await sendTelegramMessage(
-      {
-        chatId: parsed.chatId || '',
-        text: parsed.text || '',
+      parseTelegramSendInput({
+        chatId: parsed.chatId,
+        text: parsed.text,
         parseMode: parsed.parseMode,
-      },
+      }),
       options
     );
     console.log(JSON.stringify(payload, null, 2));
@@ -707,7 +826,7 @@ async function handleInputFile(inputPath: string, options: TelegramBridgeOptions
 }
 
 async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(process.argv)
     .option('input', {
       alias: 'i',
       type: 'string',
@@ -765,26 +884,23 @@ async function main(): Promise<void> {
         return;
       }
       if (req.method === 'POST' && url === webhookPath) {
-        const body = (await readJsonBody(req)) as TelegramUpdate;
+        const body = (await readTelegramJsonObject(req)) as TelegramUpdate;
         const receipt = await handleTelegramUpdate(body, options);
         sendJson(res, 200, receipt);
         return;
       }
       if (req.method === 'POST' && url === '/send') {
-        const body = (await readJsonBody(req)) as TelegramBridgeInput;
-        const payload = await sendTelegramMessage(
-          { chatId: body.chatId || '', text: body.text || '', parseMode: body.parseMode },
-          options
-        );
+        const body = (await readTelegramJsonObject(req)) as TelegramBridgeInput;
+        const payload = await sendTelegramMessage(parseTelegramSendInput(body), options);
         sendJson(res, 200, payload);
         return;
       }
       sendJson(res, 404, { ok: false, error: 'not_found' });
-    } catch (error: any) {
-      logger.error(`❌ [TelegramBridge] Request failed: ${error?.message || error}`);
+    } catch (error: unknown) {
+      logger.error(`❌ [TelegramBridge] Request failed: ${errorDetail(error)}`);
       sendJson(res, 400, {
         ok: false,
-        error: error?.message || String(error),
+        error: errorDetail(error),
       });
     }
   });

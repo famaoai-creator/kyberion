@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -7,6 +9,7 @@ import {
   indexHistoryEntry,
   rebuildMissionHistorySearchIndex,
   rebuildHistorySearchIndex,
+  rebuildPublicHistorySearchIndexFromLocalSources,
   resolveMissionHistoryScope,
   resolveHistoryTier,
   searchMissionHistory,
@@ -22,6 +25,11 @@ const PRIVATE_CONVERSATION_PATH = `active/shared/runtime/a2a-conversations/${PRI
 const PRIVATE_DATABASE_PATH = pathResolver.shared(
   `runtime/history-search/confidential/${PRIVATE_MISSION_ID}.sqlite`
 );
+const TRACE_FIXTURE_PATH = pathResolver.shared(
+  `logs/traces/traces-history-search-test-${process.pid}.jsonl`
+);
+const VALID_TRACE_TOKEN = `validtracesignal${process.pid}${Date.now()}`;
+const INVALID_TRACE_TOKEN = `invalidtracesignal${process.pid}${Date.now()}`;
 
 function entry(
   input: Partial<HistoryIndexEntry> & Pick<HistoryIndexEntry, 'entryId' | 'content'>
@@ -113,6 +121,7 @@ describe('history-search-index', () => {
         `${PRIVATE_DATABASE_PATH}-wal`,
         `${PRIVATE_DATABASE_PATH}-shm`,
         pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH),
+        TRACE_FIXTURE_PATH,
       ]) {
         try {
           safeRmSync(file, { force: true });
@@ -202,6 +211,50 @@ describe('history-search-index', () => {
     expect(resolveHistoryTier({ text: 'private', tier: 'confidential' })).toBe('confidential');
   });
 
+  it('skips malformed persisted traces before indexing their spans', () => {
+    process.env.KYBERION_HISTORY_SEARCH_DB = DB_PATH;
+    const validTrace = {
+      traceId: `trace-${process.pid}-${Date.now()}`,
+      rootSpan: {
+        spanId: `span-${process.pid}-${Date.now()}`,
+        name: 'mission',
+        startTime: '2026-07-18T00:00:00.000Z',
+        status: 'ok',
+        events: [{ name: VALID_TRACE_TOKEN, timestamp: '2026-07-18T00:00:00.000Z' }],
+        artifacts: [],
+        knowledgeRefs: [],
+        children: [],
+      },
+      metadata: {
+        startedAt: '2026-07-18T00:00:00.000Z',
+        tier: 'public',
+      },
+    };
+    const invalidTrace = {
+      ...validTrace,
+      traceId: `invalid-${process.pid}-${Date.now()}`,
+      rootSpan: {
+        ...validTrace.rootSpan,
+        spanId: `invalid-span-${process.pid}-${Date.now()}`,
+        status: 'broken',
+        events: [{ name: INVALID_TRACE_TOKEN }],
+      },
+    };
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(pathResolver.shared('logs/traces'), { recursive: true });
+      safeWriteFile(
+        TRACE_FIXTURE_PATH,
+        `${JSON.stringify(validTrace)}\n${JSON.stringify(invalidTrace)}\n`
+      );
+    });
+
+    rebuildPublicHistorySearchIndexFromLocalSources();
+    expect(searchHistory({ query: VALID_TRACE_TOKEN, tiers: ['public'] }).results).toEqual([
+      expect.objectContaining({ sourceType: 'trace', tier: 'public' }),
+    ]);
+    expect(searchHistory({ query: INVALID_TRACE_TOKEN, tiers: ['public'] }).results).toEqual([]);
+  });
+
   it('rebuilds and searches an isolated private mission index only with matching mission authority', () => {
     withExecutionContext('mission_controller', () => {
       safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
@@ -211,6 +264,8 @@ describe('history-search-index', () => {
           tier: 'confidential',
           mission_id: PRIVATE_MISSION_ID,
           history: [
+            'malformed history row',
+            { event: { unexpected: true }, note: ['not text'] },
             {
               ts: '2026-07-18T00:00:00.000Z',
               event: 'PRIVATE_CHECK',
@@ -230,7 +285,7 @@ describe('history-search-index', () => {
           result: 'private result',
           mission_id: PRIVATE_MISSION_ID,
           tier: 'confidential',
-        })}\n`
+        })}\n${JSON.stringify(['malformed conversation row'])}\n${JSON.stringify({ tier: 'confidential', prompt: { unexpected: true } })}\n`
       );
     });
 
@@ -263,5 +318,27 @@ describe('history-search-index', () => {
     expect(() => searchMissionHistory({ missionId: PRIVATE_MISSION_ID, mode: 'browse' })).toThrow(
       'requires MISSION_ID'
     );
+  });
+
+  it('rejects a symlinked private mission before reading its history state', () => {
+    const missionId = `MSN-HA02-SYMLINK-${process.pid}-${Date.now()}`;
+    const linkedMissionPath = pathResolver.missionDir(missionId, 'confidential');
+    const boundaryRoot = pathResolver.sharedTmp('history-search-boundary');
+    const targetMissionPath = path.join(boundaryRoot, 'target-mission');
+    fs.mkdirSync(targetMissionPath, { recursive: true });
+    fs.writeFileSync(
+      path.join(targetMissionPath, 'mission-state.json'),
+      JSON.stringify({ tier: 'confidential', mission_id: missionId, history: [] })
+    );
+    fs.mkdirSync(path.dirname(linkedMissionPath), { recursive: true });
+    fs.symlinkSync(targetMissionPath, linkedMissionPath, 'dir');
+
+    try {
+      expect(() => resolveMissionHistoryScope(missionId)).toThrow('Mission path is unsafe');
+      expect(fs.existsSync(path.join(targetMissionPath, 'mission-state.json'))).toBe(true);
+    } finally {
+      fs.rmSync(linkedMissionPath, { recursive: true, force: true });
+      fs.rmSync(boundaryRoot, { recursive: true, force: true });
+    }
   });
 });

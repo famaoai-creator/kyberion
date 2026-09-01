@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/cloudflare-os-surface', () => ({
   CloudflareOsReadOnlySurface: class {
     snapshot = mocks.snapshot;
   },

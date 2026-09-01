@@ -14,7 +14,12 @@
  *
  * スキーマは README.md 参照。
  */
-import { safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
@@ -344,6 +349,14 @@ function renderGateSection(
   </script>`;
 }
 
+export function resolveRenderBriefInputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
+export function resolveRenderBriefOutputPath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
 /** CLI: static preview only. Deciding requires serve-brief (see below). */
 export const runRenderBrief = defineScript({
   name: 'mission-alignment:render-brief',
@@ -353,13 +366,14 @@ export const runRenderBrief = defineScript({
     if (!src) {
       throw new ScriptExitError(1, 'usage: render-brief <mission-brief.json> [out.html]');
     }
-    const out = argv[1] || src.replace(/\.json$/iu, '') + '.html';
-    if (!safeExistsSync(src)) {
+    const safeSrc = resolveRenderBriefInputPath(src);
+    if (!safeExistsSync(safeSrc) || !safeLstat(safeSrc).isFile()) {
       throw new ScriptExitError(1, `brief not found: ${src}`);
     }
-    const brief = readJson<MissionBrief>(src);
+    const out = resolveRenderBriefOutputPath(argv[1] || safeSrc.replace(/\.json$/iu, '') + '.html');
+    const brief = readJson<MissionBrief>(safeSrc);
     const rendered = renderMissionBriefHtml(brief);
-    safeWriteFile(out, rendered, { mkdir: true, encoding: 'utf8' });
+    safeWriteFile(resolveRenderBriefOutputPath(out), rendered, { mkdir: true, encoding: 'utf8' });
     print(`rendered mission brief → ${out}`);
     print(missingStaticPreviewMessage());
     print(`  node dist/scripts/mission_alignment_request.js --mission <ID>`);

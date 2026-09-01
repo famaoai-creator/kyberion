@@ -14,8 +14,10 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeReadFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { writeGovernedArtifactJson, ensureGovernedArtifactDir } from './artifact-store.js';
+import type { IntentResolutionContract } from './intent-resolution-contract.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,8 @@ export interface CoworkArtifactPacket {
   summary: string;
   /** Next suggested action for the operator. */
   next_action?: string;
+  /** Structured explanation of how the source request was resolved. */
+  intent_resolution?: IntentResolutionContract;
   /** Artifact payload: relative path(s) or inline content. */
   artifacts: CoworkArtifact[];
 }
@@ -55,6 +59,7 @@ export interface DeliverToCoworkOptions {
   title?: string;
   summary?: string;
   nextAction?: string;
+  intentResolution?: IntentResolutionContract;
 }
 
 // ─── Outbox helpers ───────────────────────────────────────────────────────────
@@ -81,7 +86,7 @@ function outboxLogicalPath(deliveryId: string): string {
  */
 export function deliverToCowork(
   artifacts: CoworkArtifact[],
-  options: DeliverToCoworkOptions = {},
+  options: DeliverToCoworkOptions = {}
 ): string {
   const deliveryId = `COWORK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
 
@@ -95,6 +100,7 @@ export function deliverToCowork(
     title: options.title ?? 'Kyberion Result',
     summary: options.summary ?? 'A Kyberion operation completed.',
     next_action: options.nextAction,
+    ...(options.intentResolution ? { intent_resolution: options.intentResolution } : {}),
     artifacts,
   };
 
@@ -107,7 +113,14 @@ export function deliverToCowork(
  * List pending (unread) delivery packets in the Cowork outbox.
  */
 export function listCoworkOutbox(): CoworkArtifactPacket[] {
-  const outboxPath = pathResolver.resolve(outboxLogicalDir());
+  let outboxPath: string;
+  try {
+    outboxPath = assertSafeRepositoryPath(pathResolver.resolve(outboxLogicalDir()), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return [];
+  }
   if (!safeExistsSync(outboxPath)) return [];
 
   let files: string[];
@@ -121,8 +134,8 @@ export function listCoworkOutbox(): CoworkArtifactPacket[] {
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
     try {
-      const raw = safeReadFile(path.join(outboxPath, file), { encoding: 'utf8' }) as string;
-      results.push(JSON.parse(raw) as CoworkArtifactPacket);
+      const filePath = assertSafeRepositoryPath(path.join(outboxPath, file));
+      results.push(readJson<CoworkArtifactPacket>(filePath));
     } catch {
       // Skip corrupt entries
     }
@@ -141,11 +154,10 @@ export function buildOperatorInteractionPacket(params: {
   missionId?: string;
   traceId?: string;
   nextAction?: string;
+  intentResolution?: IntentResolutionContract;
 }): CoworkArtifactPacket {
   const deliveryId = `COWORK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`;
-  const summary = params.result.length > 500
-    ? params.result.slice(0, 500) + '…'
-    : params.result;
+  const summary = params.result.length > 500 ? params.result.slice(0, 500) + '…' : params.result;
 
   return {
     delivery_id: deliveryId,
@@ -155,6 +167,7 @@ export function buildOperatorInteractionPacket(params: {
     title: params.title,
     summary,
     next_action: params.nextAction,
+    ...(params.intentResolution ? { intent_resolution: params.intentResolution } : {}),
     artifacts: [
       {
         content: params.result,

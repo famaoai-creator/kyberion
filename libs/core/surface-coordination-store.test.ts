@@ -23,6 +23,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeSymlinkSync,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -152,6 +153,40 @@ describe('surface coordination outbox recovery', () => {
     ).toBe(false);
     expect(safeExistsSync(invalidPath)).toBe(false);
     expect(safeReaddir(quarantineDir).filter((name) => name.includes(testPrefix))).toHaveLength(1);
+  });
+
+  it('does not follow symlinked outbox records during discovery', () => {
+    const externalPath = pathResolver.resolve(`active/shared/tmp/${testPrefix}-external.json`);
+    const symlinkPath = path.join(outboxDir, `${testPrefix}-SYMLINK.json`);
+    withExecutionContext('surface_runtime', () => {
+      safeWriteFile(
+        externalPath,
+        JSON.stringify({
+          surface: testSurface,
+          message_id: `${testPrefix}-external`,
+          correlation_id: `${testPrefix}-external-correlation`,
+          channel: 'external-channel',
+          thread_ts: '',
+          text: 'must not be exposed',
+          source: 'surface',
+          created_at: new Date().toISOString(),
+        })
+      );
+      safeSymlinkSync(externalPath, symlinkPath);
+    });
+
+    try {
+      expect(
+        listSurfaceOutboxMessages(testSurface).some(
+          (message) => message.correlation_id === `${testPrefix}-external-correlation`
+        )
+      ).toBe(false);
+    } finally {
+      withExecutionContext('surface_runtime', () => {
+        safeUnlinkSync(symlinkPath);
+        safeUnlinkSync(externalPath);
+      });
+    }
   });
 
   it('reuses an existing outbox record for the same producer deduplication key', () => {

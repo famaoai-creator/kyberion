@@ -5,7 +5,8 @@
   "required": ["actuator_id", "version", "capabilities"],
   "properties": {
     "actuator_id": {
-      "type": "string"
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
     "version": {
       "type": "string"

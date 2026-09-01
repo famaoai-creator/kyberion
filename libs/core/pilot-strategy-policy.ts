@@ -46,7 +46,3 @@ export function loadPilotStrategyPolicyCatalog(): PilotStrategyPolicyCatalog {
 export function resolvePilotStrategyPolicy(): PilotStrategyPolicyCatalog {
   return loadPilotStrategyPolicyCatalog();
 }
-
-export function resetPilotStrategyPolicyCatalogCache(): void {
-  catalog.reset();
-}

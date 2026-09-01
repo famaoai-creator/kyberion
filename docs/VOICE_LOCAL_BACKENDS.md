@@ -15,9 +15,9 @@ voice path; optional runtimes are only selected after their health probe passes.
 Install and inspect all managed optional runtimes with:
 
 ```sh
-pnpm voice:setup
-pnpm voice:setup --apply
-pnpm voice:health
+pnpm kyberion voice setup
+pnpm kyberion voice setup --apply
+pnpm pipeline voice-health-check
 ```
 
 Select a TTS engine through the existing voice selection command/API. For a

@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
@@ -72,22 +73,34 @@ function pinFilePath(): string {
   if (missionId) {
     for (const tier of ['personal', 'confidential', 'public']) {
       const missionDir = pathResolver.rootResolve(path.join('active/missions', tier, missionId));
-      if (safeExistsSync(path.join(missionDir, 'mission-state.json'))) {
-        return path.join(missionDir, 'provider-pins.json');
+      const missionStatePath = assertSafeRepositoryPath(
+        path.join(missionDir, 'mission-state.json'),
+        { allowMissingLeaf: true }
+      );
+      if (safeExistsSync(missionStatePath)) {
+        return assertSafeRepositoryPath(path.join(missionDir, 'provider-pins.json'), {
+          allowMissingLeaf: true,
+        });
       }
     }
-    return pathResolver.rootResolve(
-      path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        path.join('active/shared/runtime/provider-pins', `${missionId}.json`)
+      ),
+      { allowMissingLeaf: true }
     );
   }
-  return pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json');
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve('active/shared/runtime/provider-pins/default.json'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function readPinFile(): PinFile {
   try {
     const filePath = pinFilePath();
     if (!safeExistsSync(filePath)) return { version: PIN_FILE_VERSION, pins: {} };
-    const parsed = loadJson<PinFile>(filePath);
+    const parsed = readJson<PinFile>(filePath);
     if (parsed && typeof parsed.pins === 'object' && parsed.pins !== null) return parsed;
   } catch {
     /* treat as empty */

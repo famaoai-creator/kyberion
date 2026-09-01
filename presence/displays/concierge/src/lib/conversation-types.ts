@@ -1,4 +1,7 @@
-import type { IntentResolutionContract } from '@agent/core';
+import {
+  parseIntentResolutionContract,
+  type IntentResolutionContract,
+} from '@agent/core/intent-resolution-contract-parser';
 
 /**
  * Shared request/response contract for the concierge conversation core
@@ -39,4 +42,39 @@ export interface ConversationMessageResponse {
   promoted?: ConversationPromotion;
   nextActions?: ConversationNextAction[];
   intentResolution?: IntentResolutionContract;
+}
+
+export interface VoiceHubConversationResponse {
+  reply: string;
+  intentResolution?: IntentResolutionContract;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/** Narrow the voice-hub response before it enters the conversation surface. */
+export function parseVoiceHubConversationResponse(
+  value: unknown
+): VoiceHubConversationResponse | undefined {
+  if (!isRecord(value)) return undefined;
+  const replyFields = ['reply', 'replyText', 'text', 'response'] as const;
+  for (const field of replyFields) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') return undefined;
+  }
+  const reply = replyFields
+    .map((field) => value[field])
+    .find(
+      (candidate): candidate is string =>
+        typeof candidate === 'string' && candidate.trim().length > 0
+    )
+    ?.trim();
+  if (!reply) return undefined;
+
+  let intentResolution: IntentResolutionContract | undefined;
+  if (value.intentResolution !== undefined) {
+    intentResolution = parseIntentResolutionContract(value.intentResolution);
+    if (!intentResolution) return undefined;
+  }
+  return { reply, ...(intentResolution ? { intentResolution } : {}) };
 }

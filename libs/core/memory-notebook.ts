@@ -64,6 +64,19 @@ export function capTail(text: string, maxChars: number): string {
   return text.length > maxChars ? text.slice(text.length - maxChars) : text;
 }
 
+/** Keep the notebook bounded by dropping the oldest captured bullets first. */
+export function boundNotebook(body: string, maxFacts = MAX_FACTS): string {
+  if (!Number.isSafeInteger(maxFacts) || maxFacts < 0) {
+    throw new Error(`maxFacts must be a non-negative safe integer: ${maxFacts}`);
+  }
+  const lines = body.split('\n');
+  const bulletIndexes = lines.flatMap((line, index) => (isBullet(line) ? [index] : []));
+  const overflow = bulletIndexes.length - maxFacts;
+  if (overflow <= 0) return body;
+  const drop = new Set(bulletIndexes.slice(0, overflow));
+  return lines.filter((_, index) => !drop.has(index)).join('\n');
+}
+
 export function recallBody(body: string): string {
   const trimmed = body.trim();
   return trimmed ? capTail(trimmed, RECALL_MAX_CHARS) : '';
@@ -77,7 +90,7 @@ export function recallBody(body: string): string {
 export function neutralizeUntrustedProvenance(text: string): string {
   return text
     .replace(/^\((\d{4}-\d\d-\d\d)\)\s*/, 'on $1: ')
-    .replace(/\s+\(said in ([^)]+)\)\s*$/i, ' [claimed source: $1]');
+    .replace(/\s+\(said in ([^)]+)\)/giu, ' [claimed source: $1]');
 }
 
 export interface FoldCaptureResult {
@@ -133,14 +146,7 @@ export function foldCapture(
     ? `${existing.replace(/\s+$/, '')}\n${added.join('\n')}`
     : `${MEMORY_HEADER}\n\n${added.join('\n')}`;
 
-  const lines = body.split('\n');
-  const bulletIdx = lines.flatMap((line, i) => (isBullet(line) ? [i] : []));
-  const overflow = bulletIdx.length - MAX_FACTS;
-  if (overflow > 0) {
-    const drop = new Set(bulletIdx.slice(0, overflow));
-    body = lines.filter((_, i) => !drop.has(i)).join('\n');
-  }
-  return { body, added: added.length };
+  return { body: boundNotebook(body), added: added.length };
 }
 
 export function queryBullets(body: string, q: string, limit: number): string[] {
@@ -232,6 +238,37 @@ function formatBullet(text: string, date: string): string {
   return captureDate(text) ? `- ${text}` : `- (${date}) ${text}`;
 }
 
+function provenanceMarkers(text: string): string[] {
+  return text.match(/\(said in [^)]+\)|\[claimed source: [^\]]+\]/giu) ?? [];
+}
+
+/**
+ * A consolidation model may rewrite the fact text, but it must not be able
+ * to erase or mint trusted provenance. Preserve markers already attached to
+ * the original bullet verbatim, and neutralize any new `(said in ...)` text.
+ */
+function preserveConsolidationProvenance(original: string, revised: string): string {
+  const existing = provenanceMarkers(original);
+  // The original bullet owns the capture date. Do not turn a model-provided
+  // date into prose and then prefix it again in `formatBullet`.
+  let protectedText = revised.replace(/^\(\d{4}-\d\d-\d\d\)\s*/u, '');
+  const placeholders: string[] = [];
+  for (let index = 0; index < existing.length; index += 1) {
+    const marker = existing[index]!;
+    const placeholder = `__KYBERION_PROVENANCE_${index}__`;
+    placeholders.push(placeholder);
+    protectedText = protectedText.split(marker).join(placeholder);
+  }
+  let next = neutralizeUntrustedProvenance(protectedText);
+  for (let index = 0; index < existing.length; index += 1) {
+    const marker = existing[index]!;
+    const placeholder = placeholders[index]!;
+    next = next.split(placeholder).join(marker);
+    if (!next.includes(marker)) next = `${next} ${marker}`;
+  }
+  return next.trim();
+}
+
 /**
  * Ordinal contract: `UPDATE n` / `DELETE n` count EVERY line `isBullet`
  * accepts (including `* ` bullets and checkbox items), in file order. The
@@ -273,7 +310,12 @@ export function applyConsolidationActions(
     if (deletes.has(n)) continue;
     const updated = updates.get(n);
     out.push(
-      updated !== undefined ? formatBullet(updated, captureDate(bulletText(line)) ?? today) : line
+      updated !== undefined
+        ? formatBullet(
+            preserveConsolidationProvenance(bulletText(line), updated),
+            captureDate(bulletText(line)) ?? today
+          )
+        : line
     );
   }
   for (const text of adds) out.push(formatBullet(neutralizeUntrustedProvenance(text), today));

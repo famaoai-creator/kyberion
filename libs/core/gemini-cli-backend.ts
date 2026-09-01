@@ -8,7 +8,10 @@ import { spawn } from 'node:child_process';
 import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
-import { buildSafeExecEnv } from './secure-io.js';
+import {
+  buildProviderChildEnv,
+  resolveActiveProviderPermissionArgs,
+} from './provider-permission-profiles.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
 import { assertReasoningEgressAllowed } from './reasoning-egress-scope.js';
 import type {
@@ -56,6 +59,28 @@ export class GeminiCliBackend implements ReasoningBackend {
     this.model = options.model ?? resolveRuntimeModelId('gemini-default');
     this.timeoutMs = options.timeoutMs ?? 5 * 60 * 1000;
     this.extraArgs = options.extraArgs ?? [];
+  }
+
+  /** Keep caller extras, but never let them widen an ambient sandbox policy. */
+  private permissionArgs(
+    active = resolveActiveProviderPermissionArgs('gemini')
+  ): readonly string[] {
+    if (!active) return this.extraArgs;
+
+    const filtered: string[] = [];
+    for (let index = 0; index < this.extraArgs.length; index += 1) {
+      const arg = this.extraArgs[index]!;
+      if (arg === '-y' || arg === '--yolo' || arg === '--sandbox' || arg.startsWith('--sandbox=')) {
+        continue;
+      }
+      if (arg === '--approval-mode') {
+        index += 1;
+        continue;
+      }
+      if (arg.startsWith('--approval-mode=')) continue;
+      filtered.push(arg);
+    }
+    return [...filtered, ...active];
   }
 
   async divergePersonas(input: DivergeHypothesisInput): Promise<HypothesisSketch[]> {
@@ -208,12 +233,20 @@ export class GeminiCliBackend implements ReasoningBackend {
 
   async delegateTask(instruction: string, context?: string): Promise<string> {
     assertReasoningEgressAllowed(this.name);
+    const activePermissionArgs = resolveActiveProviderPermissionArgs('gemini');
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
-      '-y', // YOLO mode for autonomous task execution
-      ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...(activePermissionArgs
+        ? [
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.permissionArgs(activePermissionArgs),
+          ]
+        : [
+            '-y', // YOLO mode for autonomous task execution
+            ...(this.model ? ['--model', this.model] : []),
+            ...this.extraArgs,
+          ]),
     ];
     // For delegation, we don't necessarily want JSON format, we want it to just do the work.
     // However, the caller expects a string result (the report).
@@ -248,7 +281,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-o',
       'json',
       ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...this.permissionArgs(),
     ];
 
     const stdout = await this.spawnCli(args);
@@ -304,7 +337,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       '-o',
       'json',
       ...(this.model ? ['--model', this.model] : []),
-      ...this.extraArgs,
+      ...this.permissionArgs(),
     ];
 
     const stdout = await this.spawnCli(args);
@@ -354,7 +387,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     return new Promise((resolve, reject) => {
       const child = spawn(this.bin, args, {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env },
+        env: buildProviderChildEnv({ provider: 'gemini' }),
       });
       let stdout = '';
       let stderr = '';
@@ -426,7 +459,7 @@ export async function runGeminiCliQuery<T>(params: {
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(bin, args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: buildSafeExecEnv(),
+      env: buildProviderChildEnv({ provider: 'gemini' }),
     });
     let out = '';
     let err = '';

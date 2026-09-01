@@ -4,13 +4,15 @@ import { randomBytes } from 'node:crypto';
 import {
   isEncryptedConnectionEnvelope,
   overrideSecretEncryptionKeyForTests,
-  pathResolver,
+} from '@agent/core/secret-encryption';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
   safeExistsSync,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { migrateConnectionDocuments } from './encrypt_connection_documents.js';
 
 let dir: string;

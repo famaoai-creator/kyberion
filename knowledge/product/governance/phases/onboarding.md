@@ -22,10 +22,10 @@ runtime_stages: [intake, classification]
 ```bash
 pnpm pipeline --input pipelines/baseline-check.json
 pnpm install
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm build
 pnpm setup:report --persona first-time-user
-pnpm surfaces:reconcile
+pnpm surfaces reconcile
 ```
 
 baseline が `needs_recovery` または `fatal_error` の場合は、通常の onboarding を開始せず、
@@ -38,8 +38,8 @@ baseline が `needs_recovery` または `fatal_error` の場合は、通常の o
 ```bash
 pnpm onboard
 # または
-pnpm onboard:apply --identity <reviewed-identity-json> --dry-run
-pnpm onboard:apply --identity <reviewed-identity-json>
+pnpm onboard apply --identity <reviewed-identity-json> --dry-run
+pnpm onboard apply --identity <reviewed-identity-json>
 ```
 
 成果物は identity、vision、agent identity、onboarding state / summary、connection 候補、

@@ -13,6 +13,7 @@ import {
   missionDir,
   projectWorkspaceDir,
   findMissionPath,
+  isSafeMissionManagementPath,
 } from './path-resolver.js';
 
 describe('path-resolver core', () => {
@@ -113,6 +114,18 @@ describe('path-resolver portability helpers', () => {
 
   it('rejects flag-shaped mission ids without creating a directory', () => {
     expect(() => missionDir('--ID')).toThrow(/invalid mission id/i);
+  });
+
+  it('rejects traversal-shaped mission ids during mission lookup', () => {
+    expect(() => findMissionPath('../outside')).toThrow(/invalid mission id/i);
+  });
+
+  it('accepts only repo-relative mission management paths', () => {
+    expect(isSafeMissionManagementPath('active/missions/public')).toBe(true);
+    expect(isSafeMissionManagementPath('../outside')).toBe(false);
+    expect(isSafeMissionManagementPath('/outside')).toBe(false);
+    expect(isSafeMissionManagementPath('C:\\outside')).toBe(false);
+    expect(isSafeMissionManagementPath('')).toBe(false);
   });
 
   it('rejects tier names as tenant workspace segments', () => {

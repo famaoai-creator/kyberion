@@ -10,7 +10,7 @@
     "required_inputs": "List the variables or bindings the fragment expects.",
     "produced_channels": "List the channels or artifacts the fragment emits.",
     "failure_modes": "List the common failure states the caller should handle.",
-    "verification_command": "pnpm cli preview pipelines/fragments/_template.json"
+    "verification_command": "pnpm kyberion preview pipelines/fragments/_template.json"
   },
   "steps": [
     {

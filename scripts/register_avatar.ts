@@ -1,12 +1,23 @@
 import * as path from 'node:path';
 import {
+  assertSafeRepositoryPath,
   safeCopyFileSync,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
+  return isJsonRecord(value) ? value : null;
+}
 
 function parseArgs(argv: string[]): Record<string, string> {
   const result: Record<string, string> = {};
@@ -22,14 +33,39 @@ function parseArgs(argv: string[]): Record<string, string> {
   return result;
 }
 
+export interface AvatarRegistrationPaths {
+  srcAvatar: string;
+  destAvatarDir: string;
+  destAvatar: string;
+  identityJsonPath: string;
+}
+
+export function resolveAvatarRegistrationPaths(
+  args: Record<string, string>
+): AvatarRegistrationPaths {
+  const srcAvatar = assertSafeRepositoryPath(
+    pathResolver.resolve(args['src-avatar'] || 'active/shared/tmp/avatar.png'),
+    { allowMissingLeaf: true }
+  );
+  const destAvatarDir = assertSafeRepositoryPath(
+    pathResolver.resolve(args['dest-avatar-dir'] || 'knowledge/personal'),
+    { allowMissingLeaf: true }
+  );
+  const destAvatar = assertSafeRepositoryPath(
+    pathResolver.resolve(args['dest-avatar'] || path.join(destAvatarDir, 'avatar.png')),
+    { allowMissingLeaf: true }
+  );
+  const identityJsonPath = assertSafeRepositoryPath(
+    pathResolver.resolve(args['identity-path'] || path.join(destAvatarDir, 'my-identity.json')),
+    { allowMissingLeaf: true }
+  );
+  return { srcAvatar, destAvatarDir, destAvatar, identityJsonPath };
+}
+
 function main(argv: string[]) {
   const args = parseArgs(argv);
-  const srcAvatar = path.resolve(args['src-avatar'] || 'active/shared/tmp/avatar.png');
-  const destAvatarDir = path.resolve(args['dest-avatar-dir'] || 'knowledge/personal');
-  const destAvatar = path.resolve(args['dest-avatar'] || path.join(destAvatarDir, 'avatar.png'));
-  const identityJsonPath = path.resolve(
-    args['identity-path'] || path.join(destAvatarDir, 'my-identity.json')
-  );
+  const { srcAvatar, destAvatarDir, destAvatar, identityJsonPath } =
+    resolveAvatarRegistrationPaths(args);
   const profileName = args['profile-name'] || 'user';
   const language = args.language || 'Japanese';
   const interactionStyle = args['interaction-style'] || 'Concierge';
@@ -38,6 +74,9 @@ function main(argv: string[]) {
 
   if (!safeExistsSync(srcAvatar)) {
     throw new Error(`Source avatar not found at ${srcAvatar}`);
+  }
+  if (!safeLstat(srcAvatar).isFile()) {
+    throw new Error(`Source avatar must be a regular file: ${srcAvatar}`);
   }
 
   console.log(`Copying avatar from ${srcAvatar} to ${destAvatar}...`);
@@ -64,9 +103,15 @@ function main(argv: string[]) {
     safeWriteFile(identityJsonPath, JSON.stringify(defaultIdentity, null, 2), { encoding: 'utf8' });
   } else {
     console.log(`Reading identity file from ${identityJsonPath}...`);
-    const identityContent = safeReadFile(identityJsonPath, { encoding: 'utf8' }) as string;
+    if (!safeLstat(identityJsonPath).isFile()) {
+      throw new Error(`Identity file must be a regular file: ${identityJsonPath}`);
+    }
     try {
-      const identity = JSON.parse(identityContent);
+      const identityValue = readJson<unknown>(identityJsonPath);
+      const identity = normalizeIdentityRecord(identityValue);
+      if (!identity) {
+        throw new Error('identity JSON root must be an object');
+      }
       if (args['profile-name']) identity.name = profileName;
       if (args.language) identity.language = language;
       if (args['interaction-style']) identity.interaction_style = interactionStyle;
@@ -75,8 +120,10 @@ function main(argv: string[]) {
 
       console.log('Updating identity file to register avatar...');
       safeWriteFile(identityJsonPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
-    } catch (err: any) {
-      throw new Error(`Failed to parse identity JSON: ${err.message}`);
+    } catch (err: unknown) {
+      throw new Error(
+        `Failed to parse identity JSON: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
   }
 

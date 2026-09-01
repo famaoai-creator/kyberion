@@ -1,17 +1,15 @@
-import {
-  logger,
-  executeServicePreset,
-  derivePipelineStatus,
-  createActuatorTrace,
-  finalizeActuatorTrace,
-  safeExistsSync,
-  waitForJob,
-  classifyError,
-  normalizeEventScope,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
-import type { GenerationJob } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { executeServicePreset } from '@agent/core/service-engine';
+import { derivePipelineStatus } from '@agent/core/pipeline-contract';
+import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { waitForJob } from '@agent/core/job-lifecycle';
+import { classifyError } from '@agent/core/error-classifier';
+import { normalizeEventScope } from '@agent/core/event-scope';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
+import type { GenerationJob } from '@agent/core/src/types/generation-job';
 import { handleCaptureAction } from './capture-actions.js';
 import { transitionGenerationJob } from './generation-job-state.js';
 import { MEDIA_GENERATION_ACTIONS } from './op-catalog.js';
@@ -135,7 +133,7 @@ async function handlePromptBasedGeneration(action: string, params: any) {
       !prepared.params.workflow_path &&
       !prepared.params.image_adf
     ) {
-      const { generateImage } = await import('@agent/core');
+      const { generateImage } = await import('@agent/core/image-generation-bridge');
       const backend = resolveGenerationBackend(action, prepared.params);
       const bridgeRes = await generateImage({
         prompt: typeof prepared.params.prompt === 'string' ? prepared.params.prompt : '',
@@ -630,20 +628,9 @@ async function collectGenerationArtifact(params: any) {
   }
 }
 
-async function handleSingleAction(input: MediaActionInput) {
+async function executeSingleAction(input: MediaActionInput) {
   const action = String(input.action || '');
-  ensureDefaultOpPreflight();
-  const preflight = await runOpPreflight({
-    op: `media-generation:${action || 'unknown'}`,
-    params: input.params || {},
-    source: 'actuator',
-  });
-  if (preflight.decision !== 'allow') {
-    throw new Error(
-      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation media-generation:${action || 'unknown'} was not admitted.`}`
-    );
-  }
-  const params = preflight.input;
+  const params = input.params || {};
   if (!SUPPORTED_ACTIONS.has(String(action))) {
     throw new Error(`Unsupported media generation action: ${String(action)}`);
   }
@@ -665,6 +652,22 @@ async function handleSingleAction(input: MediaActionInput) {
 
   logger.info(`🎬 [MEDIA-GEN:PROXY] Dispatching "${action}" to Service Engine...`);
   return await executeServicePreset('media-generation', action, params);
+}
+
+async function handleSingleAction(input: MediaActionInput) {
+  const action = String(input.action || '');
+  ensureDefaultOpPreflight();
+  const preflight = await runOpPreflight({
+    op: `media-generation:${action || 'unknown'}`,
+    params: input.params || {},
+    source: 'actuator',
+  });
+  if (preflight.decision !== 'allow') {
+    throw new Error(
+      `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation media-generation:${action || 'unknown'} was not admitted.`}`
+    );
+  }
+  return executeSingleAction({ ...input, params: preflight.input as Record<string, unknown> });
 }
 
 function mergeTraceEvidence(
@@ -697,16 +700,32 @@ export async function handleAction(input: MediaActionInput): Promise<MediaAction
     try {
       const results: Array<Record<string, unknown>> = [];
       let pipelineFailed = false;
-      for (const step of input.steps || []) {
-        traceCtx.startSpan(`media-generation:${String(step?.action || 'step')}`);
+      const steps = (input.steps || []).map((step) => ({
+        ...step,
+        op: String(step.action || ''),
+      }));
+      for (const step of steps) {
+        const action = step.op || 'step';
+        traceCtx.startSpan(`media-generation:${action}`);
         try {
-          const stepResult = await handleSingleAction(step);
+          const pipeline = await runActuatorPipeline({
+            actuatorId: 'media-generation',
+            steps: [step],
+            context: { result: undefined as MediaActionResult | undefined },
+            execute: async (op, params, context) => ({
+              ...context,
+              result: await executeSingleAction({ action: op, params }),
+            }),
+          });
+          const stepResult = pipeline.result || { action, status: 'succeeded' };
           results.push(stepResult);
-          if (stepResult?.status === 'failed' || stepResult?.status === 'error') {
+          if (stepResult?.status === 'failed') {
             pipelineFailed = true;
             traceCtx.endSpan(
               'error',
-              stepResult?.message ?? `step failed: ${String(step?.action || 'step')}`
+              typeof stepResult?.message === 'string'
+                ? stepResult.message
+                : `step failed: ${action}`
             );
           } else {
             traceCtx.endSpan('ok');

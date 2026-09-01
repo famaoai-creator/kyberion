@@ -1,9 +1,9 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleSystemAction } from './system-action-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 export { describeOps };
 export {
@@ -33,6 +33,7 @@ export {
 const main = async () => {
   await runActuatorCli({
     name: 'system-actuator',
+    args: process.argv,
     handleAction: handleSystemAction,
   });
 };

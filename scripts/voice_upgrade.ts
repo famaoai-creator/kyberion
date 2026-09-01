@@ -8,13 +8,13 @@
  *   - tier 2  (local):   Whisper + Style-Bert-VITS2, requires Python + GPU.
  *
  * Usage:
- *   pnpm voice:upgrade-cloud     # → tier 1
- *   pnpm voice:upgrade-local     # → tier 2
+ *   pnpm voice:upgrade cloud     # → tier 1
+ *   pnpm voice:upgrade local     # → tier 2
  *   pnpm voice:upgrade --tier 0  # explicit downgrade
  *
  * What it does (this is currently a *configurator*, not a runtime switch):
  *   1. Validates prerequisites for the target tier (API key, Python, etc).
- *   2. Writes the chosen tier to KYBERION_VOICE_TIER in the user's
+ *   2. Writes the chosen tier to `voice_tier` in the user's
  *      customer/{slug}/voice/profile.json (or knowledge/personal/voice/profile.json).
  *   3. Prints the next-step commands needed to actually run that tier.
  *
@@ -23,55 +23,81 @@
  */
 
 import * as path from 'node:path';
+import * as customerResolver from '@agent/core/customer-resolver';
+import { classifyError, formatClassification } from '@agent/core/error-classifier';
+import { getRegisteredEnv } from '@agent/core/env-validator';
+import { pathResolver } from '@agent/core/path-resolver';
+import { probeNativeTts } from '@agent/core/native-tts';
 import {
-  pathResolver,
-  customerResolver,
-  probeNativeTts,
-  classifyError,
-  formatClassification,
-  getRegisteredEnv,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 
 type Tier = 0 | 1 | 2;
 
 interface UpgradeReport {
   requested_tier: Tier;
   applied: boolean;
+  dry_run: boolean;
+  prerequisites_ok: boolean;
   prerequisites: { name: string; ok: boolean; detail?: string }[];
   next_steps: string[];
   config_path: string;
 }
 
-function printUsage(): void {
-  console.log('Usage: voice_upgrade --tier {0|1|2}');
-  console.log('');
-  console.log('Examples:');
-  console.log('  pnpm voice:upgrade-cloud');
-  console.log('  pnpm voice:upgrade-local');
-  console.log('  pnpm voice:upgrade --tier 0');
+function formatUsage(): string {
+  return [
+    'Usage: voice_upgrade <cloud|local> | --tier {0|1|2}',
+    '',
+    'Examples:',
+    '  pnpm voice:upgrade cloud',
+    '  pnpm voice:upgrade local',
+    '  pnpm voice:upgrade --tier 0',
+    '  pnpm voice:upgrade -- --dry-run cloud',
+  ].join('\n');
 }
 
-function parseArgs(args: string[]): Tier {
-  if (args.includes('--help') || args.includes('-h')) {
-    printUsage();
-    throw new ScriptExitError(0);
+export function parseVoiceUpgradeArgs(args: readonly string[]): { tier?: Tier; help: boolean } {
+  let tier: Tier | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--help' || arg === '-h') return { help: true };
+    if (arg === '--tier') {
+      const value = args[index + 1];
+      if (!value || value.startsWith('-')) throw new Error('--tier requires 0, 1, or 2');
+      index += 1;
+      const parsed = Number(value);
+      if (parsed !== 0 && parsed !== 1 && parsed !== 2)
+        throw new Error(`--tier must be 0, 1, or 2 (got ${value})`);
+      if (tier !== undefined) throw new Error('voice upgrade target was specified more than once');
+      tier = parsed as Tier;
+      continue;
+    }
+    if (arg === 'cloud' || arg === 'local') {
+      if (tier !== undefined) throw new Error('voice upgrade target was specified more than once');
+      tier = arg === 'cloud' ? 1 : 2;
+      continue;
+    }
+    if (arg.startsWith('-')) throw new Error(`unknown option '${arg}'`);
+    throw new Error(`unknown voice upgrade target '${arg}'`);
   }
-  const tierIdx = args.indexOf('--tier');
-  if (tierIdx >= 0 && args[tierIdx + 1]) {
-    const t = parseInt(args[tierIdx + 1], 10);
-    if (t === 0 || t === 1 || t === 2) return t;
-    throw new Error(`--tier must be 0, 1, or 2 (got ${args[tierIdx + 1]})`);
-  }
-  // Inferred from script alias (set by package.json scripts).
-  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'cloud') return 1;
-  if (getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS') === 'local') return 2;
-  printUsage();
-  throw new Error('Missing --tier');
+  if (tier !== undefined) return { tier, help: false };
+  // Keep direct callers using the old environment bridge compatible while the
+  // package aliases converge on the explicit subcommand above.
+  const legacyAlias = getRegisteredEnv<string>('KYBERION_VOICE_UPGRADE_ALIAS');
+  if (legacyAlias === 'cloud') return { tier: 1, help: false };
+  if (legacyAlias === 'local') return { tier: 2, help: false };
+  throw new Error(`Missing voice upgrade target.\n${formatUsage()}`);
 }
 
 async function checkTier0(): Promise<{ name: string; ok: boolean; detail?: string }[]> {
@@ -141,12 +167,17 @@ function profilePath(): string {
   return pathResolver.knowledge('personal/voice/profile.json');
 }
 
+export function resolveVoiceProfileResourcePath(filePath: string): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+}
+
 function writeTier(tier: Tier): string {
-  const out = profilePath();
+  const out = resolveVoiceProfileResourcePath(profilePath());
   const dir = path.dirname(out);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   let existing: Record<string, unknown> = {};
   if (safeExistsSync(out)) {
+    if (!safeLstat(out).isFile()) throw new Error(`voice profile is not a regular file: ${out}`);
     try {
       existing = readJson<Record<string, unknown>>(out);
     } catch {
@@ -164,11 +195,20 @@ function writeTier(tier: Tier): string {
           ? 'Tier 1: cloud voice (Anthropic / OpenAI). Requires API key.'
           : 'Tier 2: local Whisper + Style-Bert-VITS2. Requires Python + GPU.',
   };
-  safeWriteFile(out, JSON.stringify(updated, null, 2) + '\n', { encoding: 'utf8' });
+  safeWriteFile(resolveVoiceProfileResourcePath(out), JSON.stringify(updated, null, 2) + '\n', {
+    encoding: 'utf8',
+  });
   return out;
 }
 
-function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
+function nextStepsForTier(tier: Tier, prereqsOk: boolean, dryRun: boolean): string[] {
+  if (dryRun) {
+    return [
+      prereqsOk
+        ? `Dry-run: tier ${tier} would be configured; the profile was not written.`
+        : 'Dry-run: prerequisites are incomplete; the profile was not written.',
+    ];
+  }
   if (!prereqsOk) {
     return [
       'Resolve the prerequisites above before running voice. Re-run this command after resolving.',
@@ -189,66 +229,60 @@ function nextStepsForTier(tier: Tier, prereqsOk: boolean): string[] {
     case 2:
       return [
         'Tier 2 (local) is configured.',
-        'Run `pnpm voice:setup --apply` to install governed mlx-audio / mlx-whisper runtimes.',
+        'Run `pnpm kyberion voice setup --apply` to install governed mlx-audio / mlx-whisper runtimes.',
         'Follow docs/developer/VOICE_FIRST_WIN.md for the Tier 1 → Tier 2 path, then start the Style-Bert-VITS2 local server.',
         'Run `pnpm chronos:dev` and verify presence surface routes through local voice.',
       ];
   }
 }
 
-async function main(args: string[]): Promise<void> {
-  let tier: Tier;
+export async function main(
+  args: string[],
+  shared: { dryRun?: boolean; check?: boolean } = {}
+): Promise<UpgradeReport | string> {
+  let parsed: { tier?: Tier; help: boolean };
   try {
-    tier = parseArgs(args);
+    parsed = parseVoiceUpgradeArgs(stripSharedScriptFlags(args));
   } catch (err: any) {
-    if (err instanceof ScriptExitError) throw err;
     throw new ScriptExitError(2, formatClassification(classifyError(err)));
   }
+  if (parsed.help) return formatUsage();
+  const tier = parsed.tier!;
+  const dryRun = shared.dryRun === true || shared.check === true;
 
-  console.log(`🎙️  Voice tier upgrade → tier ${tier}`);
   let prereqs: { name: string; ok: boolean; detail?: string }[];
   if (tier === 0) prereqs = await checkTier0();
   else if (tier === 1) prereqs = checkTier1();
   else prereqs = checkTier2();
-
-  console.log('\nPrerequisites:');
-  for (const p of prereqs) {
-    const icon = p.ok ? '✅' : '❌';
-    console.log(`  ${icon}  ${p.name}${p.detail ? ` — ${p.detail}` : ''}`);
-  }
 
   // For tier 1, "ok" means at least one provider is set.
   const required =
     tier === 1
       ? prereqs.find((p) => p.name === 'At least one cloud voice provider')!.ok
       : prereqs.every((p) => p.ok || p.name === 'Style-Bert-VITS2 server'); // tier-2 server is informational
-  const configPath = writeTier(tier);
+  const configPath = resolveVoiceProfileResourcePath(profilePath());
   const report: UpgradeReport = {
     requested_tier: tier,
-    applied: required,
+    applied: required && !dryRun,
+    dry_run: dryRun,
+    prerequisites_ok: required,
     prerequisites: prereqs,
-    next_steps: nextStepsForTier(tier, required),
+    next_steps: nextStepsForTier(tier, required, dryRun),
     config_path: configPath,
   };
-
-  console.log('\nNext steps:');
-  for (const s of report.next_steps) console.log(`  • ${s}`);
-  console.log(`\n📝 Profile written: ${path.relative(pathResolver.rootDir(), configPath)}`);
-
-  if (!required) {
-    console.error(
-      `\n⚠️  Tier ${tier} prerequisites not fully satisfied. Profile written but tier is not active until prerequisites are resolved.`
-    );
-    throw new Error(`Voice tier ${tier} prerequisites are not fully satisfied`);
-  }
-  console.log(`\n✅ Voice tier ${tier} configured.`);
+  if (required && !dryRun) writeTier(tier);
+  return report;
 }
 
 export const runVoiceUpgrade = defineScript({
   name: 'voice:upgrade',
-  flags: [],
-  run(context) {
-    return main(context.argv);
+  run: async ({ argv, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    print(result);
+    if (typeof result !== 'string' && !result.prerequisites_ok && !result.dry_run) {
+      throw new ScriptExitError(1, '', true);
+    }
+    return result;
   },
 });
 

@@ -5,8 +5,14 @@ import {
   type StructuredOutputSchemaName,
   resolveStructuredOutputSchema,
 } from './structured-output-contracts.js';
-import { safeExistsSync, safeExec, safeReadFile } from './secure-io.js';
-import { safeWriteFile, safeMkdir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeExec,
+  safeReadFile,
+  safeWriteFile,
+  safeMkdir,
+} from './secure-io.js';
 import { signA2AContent, verifyA2AContent } from './a2a-envelope-signature.js';
 import { createLogger } from './logger.js';
 import {
@@ -138,17 +144,37 @@ function firstString(...values: unknown[]): string | undefined {
   return undefined;
 }
 
+function safeOptionalGatePath(filePath: string): string | undefined {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  } catch {
+    return undefined;
+  }
+}
+
 export function writeMissionGateRecord(input: MissionGateRecordInput): string {
-  const recordDir = input.recordPath ?? input.evidenceDir;
+  const recordPath = input.recordPath
+    ? assertSafeRepositoryPath(input.recordPath, { allowMissingLeaf: true })
+    : undefined;
+  const recordDir = recordPath
+    ? path.dirname(recordPath)
+    : input.evidenceDir
+      ? assertSafeRepositoryPath(input.evidenceDir, { allowMissingLeaf: true })
+      : undefined;
   if (!recordDir) {
     throw new Error('A recordPath or evidenceDir is required to write a mission gate record.');
   }
   safeMkdir(recordDir, { recursive: true });
-  const recordPath = input.recordPath
-    ? input.recordPath
-    : path.join(recordDir, `${input.gateId}-${Date.now().toString(36)}.json`);
+  const targetPath =
+    recordPath ||
+    assertSafeRepositoryPath(
+      path.join(recordDir, `${input.gateId}-${Date.now().toString(36)}.json`),
+      {
+        allowMissingLeaf: true,
+      }
+    );
   safeWriteFile(
-    recordPath,
+    targetPath,
     JSON.stringify(
       {
         mission_id: input.missionId,
@@ -159,7 +185,7 @@ export function writeMissionGateRecord(input: MissionGateRecordInput): string {
       2
     )
   );
-  return recordPath;
+  return targetPath;
 }
 
 export function recordMissionGateOverride(input: MissionGateOverrideInput): string {
@@ -202,7 +228,10 @@ async function evaluateGateCheck(
       if (evidencePaths.length === 0) {
         return { passed: false, reason: 'No evidence paths were provided.' };
       }
-      const missing = evidencePaths.filter((entry) => !safeExistsSync(entry));
+      const missing = evidencePaths.filter((entry) => {
+        const safePath = safeOptionalGatePath(entry);
+        return !safePath || !safeExistsSync(safePath);
+      });
       return missing.length === 0
         ? { passed: true }
         : { passed: false, reason: `Missing evidence: ${missing.join(', ')}` };
@@ -317,17 +346,18 @@ async function evaluateGateCheck(
       if (!artifactPath) {
         return { passed: false, reason: 'No deliverable path was provided.' };
       }
-      if (!safeExistsSync(artifactPath)) {
+      const safeArtifactPath = safeOptionalGatePath(artifactPath);
+      if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `Deliverable not found: ${artifactPath}` };
       }
-      const raw = safeReadFile(artifactPath, { encoding: 'utf8' }) as string;
+      const raw = safeReadFile(safeArtifactPath, { encoding: 'utf8' }) as string;
       let artifact: unknown = raw;
       try {
         artifact = JSON.parse(raw);
       } catch {
         // Non-JSON deliverables (markdown, text) are evaluated as raw text.
       }
-      const extension = artifactPath.split('.').pop() ?? '';
+      const extension = safeArtifactPath.split('.').pop() ?? '';
       const kind =
         firstString(params.kind, params.deliverable_kind) ?? inferDeliverableKind(extension);
       if (!kind) {
@@ -359,7 +389,8 @@ async function evaluateGateCheck(
       if (!artifactPath) {
         return { passed: false, reason: 'llm_review: no deliverable path was provided.' };
       }
-      if (!safeExistsSync(artifactPath)) {
+      const safeArtifactPath = safeOptionalGatePath(artifactPath);
+      if (!safeArtifactPath || !safeExistsSync(safeArtifactPath)) {
         return { passed: false, reason: `llm_review: deliverable not found: ${artifactPath}` };
       }
       const criteria = toStringList(params.criteria);
@@ -374,7 +405,7 @@ async function evaluateGateCheck(
           reason: 'llm_review requires a real reasoning backend (stub active).',
         };
       }
-      const content = String(safeReadFile(artifactPath, { encoding: 'utf8' })).slice(0, 24_000);
+      const content = String(safeReadFile(safeArtifactPath, { encoding: 'utf8' })).slice(0, 24_000);
       const prompt = [
         'あなたは品質ゲートの審査員です。以下の成果物を判定基準に照らして審査してください。',
         '出力は次のJSONのみ(コードフェンス可): {"pass": true|false, "reasons": ["..."], "improvements": ["..."]}',

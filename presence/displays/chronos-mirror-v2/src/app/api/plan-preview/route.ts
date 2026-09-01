@@ -5,6 +5,7 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { compileUserIntentFlow } from '@agent/core/intent-contract';
 import { loadOrganizationProfile } from '@agent/core/organization-profile';
 import { buildPlanPreview } from '../../../lib/plan-preview';
+import { readChronosJsonObject } from '../../../lib/request-input';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
@@ -21,7 +22,9 @@ export async function POST(req: NextRequest) {
     const resolvedViewer = resolveViewerContextForRequest(req);
     if (resolvedViewer.response) return resolvedViewer.response;
 
-    const body = await req.json();
+    const parsedBody = await readChronosJsonObject(req, 'Chronos plan preview');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
     const requestText = typeof body?.requestText === 'string' ? body.requestText.trim() : '';
     if (!requestText) {
       return NextResponse.json({ error: 'Missing requestText' }, { status: 400 });

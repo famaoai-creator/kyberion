@@ -1,7 +1,7 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { describe, expect, it, vi } from 'vitest';
 import {
   compileUserIntentFlow,
@@ -165,6 +165,14 @@ describe('intent-contract compiler', () => {
     expect(flow.routingDecision?.owner).toBe('document-specialist');
     expect(flow.routingDecision?.delegates).toContain('nerve-agent');
     expect(flow.clarificationPacket).toBeUndefined();
+  });
+
+  it('fails closed on array-shaped LLM JSON instead of treating it as a contract', async () => {
+    const flow = await compileUserIntentFlow(
+      { text: '提案資料を作って' },
+      { askFn: async () => '[]' }
+    );
+    expect(flow.source).toBe('fallback');
   });
 
   it('attaches capability bundle ids when the resolved intent maps to a governed bundle', async () => {
@@ -469,6 +477,30 @@ describe('intent-contract compiler', () => {
     expect(flow.clarificationPacket?.interaction_type).toBe('clarification');
     expect(flow.clarificationPacket?.readiness).toBe('needs_clarification');
     expect(formatClarificationPacket(flow.clarificationPacket!)).toContain('project_brief');
+  });
+
+  it('keeps fallback classification aligned with an injected resolution packet', async () => {
+    const flow = await compileUserIntentFlow(
+      {
+        text: 'unrelated text',
+        resolutionPacket: {
+          kind: 'intent_resolution_packet',
+          utterance: 'unrelated text',
+          selected_intent_id: 'bootstrap-project',
+          selected_confidence: 0.9,
+          selected_resolution: {
+            shape: 'project_bootstrap',
+            result_shape: 'project_created',
+          },
+          candidates: [],
+        },
+      },
+      { askFn: async () => 'not json' }
+    );
+
+    expect(flow.intentContract.intent_id).toBe('bootstrap-project');
+    expect(flow.intentContract.required_inputs).toEqual(['project_brief']);
+    expect(flow.intentContract.resolution.execution_shape).toBe('project_bootstrap');
   });
 
   it('falls back to the meeting operations path when the request is clearly about a meeting', async () => {
@@ -1016,10 +1048,10 @@ describe('intent-contract compiler', () => {
       }
     );
 
-    expect(mismatchFlow.intentContract.resolution.execution_shape).toBe('project_bootstrap');
-    expect(events[0]?.attributes?.shape_disagreement).toBe(true);
+    expect(mismatchFlow.intentContract.resolution.execution_shape).toBe('direct_reply');
+    expect(events[0]?.attributes?.shape_disagreement).toBe(false);
     expect(events[0]?.attributes?.selected_resolution_shape).toBe('direct_reply');
-    expect(events[0]?.attributes?.contract_execution_shape).toBe('project_bootstrap');
+    expect(events[0]?.attributes?.contract_execution_shape).toBe('direct_reply');
 
     events.length = 0;
 

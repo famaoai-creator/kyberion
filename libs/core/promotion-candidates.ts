@@ -1,6 +1,7 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -21,14 +22,26 @@ const MAX_ENTRIES = 200;
 export const PROMOTION_CANDIDATE_MIN_RUNS = 3;
 
 function ledgerPath(): string {
-  return pathResolver.rootResolve(LEDGER_RELATIVE_PATH);
+  return assertSafeRepositoryPath(pathResolver.rootResolve(LEDGER_RELATIVE_PATH), {
+    allowMissingLeaf: true,
+  });
+}
+
+function candidatePath(relativePath: string): string | null {
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(relativePath), {
+      allowMissingLeaf: true,
+    });
+  } catch {
+    return null;
+  }
 }
 
 function readLedger(): AdhocRunTally[] {
   try {
     const filePath = ledgerPath();
     if (!safeExistsSync(filePath)) return [];
-    const parsed = loadJson<unknown>(filePath);
+    const parsed = readJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -40,6 +53,7 @@ export function recordAdhocPipelineRun(relativePath: string): number {
   const normalized = String(relativePath || '').trim();
   if (!normalized) return 0;
   try {
+    if (!candidatePath(normalized)) return 0;
     const filePath = ledgerPath();
     safeMkdir(path.dirname(filePath), { recursive: true });
     const entries = readLedger();
@@ -70,8 +84,9 @@ export function listPromotionCandidates(
   minRuns: number = PROMOTION_CANDIDATE_MIN_RUNS
 ): AdhocRunTally[] {
   return readLedger()
-    .filter(
-      (entry) => entry.count >= minRuns && safeExistsSync(pathResolver.rootResolve(entry.path))
-    )
+    .filter((entry) => {
+      const filePath = candidatePath(entry.path);
+      return entry.count >= minRuns && filePath !== null && safeExistsSync(filePath);
+    })
     .sort((left, right) => right.count - left.count);
 }

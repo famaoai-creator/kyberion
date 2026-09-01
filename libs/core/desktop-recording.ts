@@ -1,16 +1,13 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
 import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { pathResolver } from './path-resolver.js';
 import { redactSensitiveString } from './network.js';
 import { scrubContent } from './pii-scrubber.js';
 
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 let desktopRecordingValidator: ValidateFunction | null = null;
 
 export type DesktopObservationTier = 0 | 1 | 3;
@@ -138,10 +135,7 @@ export interface DesktopRecordingValidationResult {
 
 function getDesktopRecordingValidator(): ValidateFunction {
   if (!desktopRecordingValidator) {
-    const ajv = createAjv();
-    addFormats(ajv);
-    desktopRecordingValidator = compileSchemaFromPath(
-      ajv,
+    desktopRecordingValidator = compileSchema(
       pathResolver.knowledge('product/schemas/desktop-recording.schema.json')
     );
   }

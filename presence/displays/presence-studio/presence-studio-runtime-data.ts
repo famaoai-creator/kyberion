@@ -1,10 +1,44 @@
 import express from 'express';
-import { installProcessGuards } from '@agent/core';
-import { appendJsonLine, readJson } from '@agent/core/foundation';
-import { t as catalogT, type VocabularyKey } from '@agent/core/t';
-import { normalizeLocale } from '@agent/core/locale-normalize';
+import { installProcessGuards } from '@agent/core/process-guards';
+import { readJson } from '@agent/core/foundation';
+import { type VocabularyKey } from '@agent/core/t';
+import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
+import {
+  createBrowserConversationSession,
+  getActiveBrowserConversationSession,
+  saveBrowserConversationSession,
+} from '@agent/core/browser-conversation-session';
+import {
+  buildSurfaceLauncherNextActions,
+  buildSurfaceLauncherRecommendations,
+  getSurfaceDirectory,
+  getSurfaceDirectorySummary,
+  getSurfaceScenarioGuide,
+} from '@agent/core/surface-ux';
+import { getPresenceAvatarProfile } from '@agent/core/presence-avatar';
+import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
+import { listProjectRecords } from '@agent/core/project-registry';
+import { listTaskSessions } from '@agent/core/task-session';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeLstat,
+  safeReaddir,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { saveBrowserOnboardingVoiceSample } from '@agent/core/browser-onboarding';
+import { startInRoomMinutesSession } from '@agent/core/in-room-minutes-recorder';
+import { checkMeetingParticipationConsent } from '@agent/core/meeting-participation-coordinator';
+import { createCompanionWebThemePack, webThemePackToCssVars } from '@agent/core/web-design-system';
+import { installShellSpeechToTextBridgeIfAvailable } from '@agent/core/speech-to-text-bridge';
+import type { A2UIMessage } from '@agent/core/a2ui';
+import { buildPresenceSurfaceFrame, type PresenceTimelineAdf } from '@agent/core/presence-surface';
+import { parseGuspStimulusLine, type GuspStimulus } from '../../bridge/nexus-stimulus.js';
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { z } from 'zod';
 import {
@@ -12,22 +46,10 @@ import {
   requirePresenceStudioAccess,
   requirePresenceStudioRateLimit,
   PresenceStudioViewerError,
-  presenceStudioEmailDeliverSchema,
-  presenceStudioEmailDraftSchema,
-  presenceStudioLocationSchema,
-  presenceStudioBrowserBootstrapSchema,
-  summarizePresenceStudioIdentity,
-  summarizePresenceStudioState,
-  presenceStudioVoiceMinutesSchema,
-  presenceStudioVoiceIngestSchema,
-  presenceStudioVoiceNativeListenSchema,
-  presenceStudioVoiceSelectionSchema,
-  presenceStudioVoiceStimulusSchema,
-  resolvePresenceStudioViewerContext,
-  presenceStudioHeadlessScope,
   narrowPresenceStudioTenant,
+  presenceStudioHeadlessScope,
+  resolvePresenceStudioViewerContext,
   validateLocalServiceUrl,
-  requirePresenceStudioLocalAdmin,
 } from './security.js';
 import {
   authorizePresenceOperation,
@@ -37,75 +59,8 @@ import {
   presenceEnvelope,
   readPresenceHeadlessOverview,
 } from './headless.js';
-import {
-  buildPresenceSurfaceFrame,
-  CloudflareOsSurface,
-  buildTrackGateReadinessSummaries,
-  applyBrowserOnboarding,
-  createBrowserConversationSession,
-  createPresenceVoiceStimulus,
-  decideApprovalRequest,
-  executeServicePreset,
-  getReasoningBackend,
-  getActiveBrowserConversationSession,
-  getActiveTaskSession,
-  getPresenceAvatarProfile,
-  getBrowserOnboardingState,
-  buildSurfaceLauncherNextActions,
-  buildSurfaceLauncherRecommendations,
-  getSurfaceAgentCatalogEntry,
-  getSurfaceDirectory,
-  getSurfaceDirectorySummary,
-  getSurfaceScenarioGuide,
-  listAgentRuntimeSnapshots,
-  listApprovalRequests,
-  listArtifactRecords,
-  listBrowserConversationSessions,
-  listDistillCandidateRecords,
-  listMissionSeedRecords,
-  listProjectRecords,
-  listManagedProjects,
-  listProjectTrackRecords,
-  listServiceBindingRecords,
-  listTaskSessions,
-  listSurfaceAsyncRequestsAcrossChannels,
-  listSurfaceNotificationsAcrossChannels,
-  listSurfaceAgentCatalog,
-  logger,
-  loadJson,
-  pathResolver,
-  resolveWorkDesign,
-  safeExistsSync,
-  safeMkdir,
-  safeExec,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeWriteFile,
-  saveBrowserConversationSession,
-  type A2UIMessage,
-  type PresenceTimelineAdf,
-  validatePresenceTimeline,
-  checkMeetingParticipationConsent,
-  createCompanionWebThemePack,
-  webThemePackToCssVars,
-  installShellSpeechToTextBridgeIfAvailable,
-  probeMicCapture,
-  previewBrowserOnboarding,
-  saveBrowserOnboardingVoiceSample,
-  getVoiceSelectionSnapshot,
-  saveVoiceSelectionPreferences,
-  startInRoomMinutesSession,
-  withExecutionContext,
-} from '@agent/core';
-import {
-  executeEmailDelivery,
-  extractFirstJsonBlock,
-  generateEmailReplyDraft,
-  listEmailAccountProviders,
-  readEmailDraftArtifact as readSharedEmailDraftArtifact,
-  resolveEmailTriagePath,
-} from '@agent/core/email-workflow';
+import { probeMicCapture } from '@agent/core/mic-capture';
+import { resolveEmailTriagePath } from '@agent/core/email-workflow';
 import { collectDoctorReport } from '../../../scripts/run_doctor.js';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
@@ -211,7 +166,7 @@ export function buildOutcomeInboxItem(item: any) {
     downloadable:
       typeof item.path === 'string' &&
       isAllowedArtifactDownloadPath(item.path) &&
-      safeExistsSync(item.path),
+      resolveSafeExistingFile(item.path) !== null,
     distill_titles: relatedCandidates.map((candidate) => candidate.title),
     promoted_refs: relatedCandidates.map((candidate) => candidate.promoted_ref).filter(Boolean),
     work_loop: item?.work_loop,
@@ -227,6 +182,7 @@ export interface PresenceStudioState {
 export interface BrowserRuntimeSessionSummary {
   session_id: string;
   active_tab_id?: string;
+  cdp_url?: string;
   tabs?: Array<{
     tab_id: string;
     url?: string;
@@ -235,6 +191,7 @@ export interface BrowserRuntimeSessionSummary {
   }>;
   updated_at?: string;
   lease_status?: string;
+  lease_expires_at?: string;
   retained?: boolean;
 }
 
@@ -244,6 +201,11 @@ export interface BrowserSnapshotSummary {
   url?: string;
   title?: string;
   element_count?: number;
+}
+
+export interface PresenceBrowserRuntimeDataOptions {
+  browserSessionDir?: string;
+  browserSnapshotDir?: string;
 }
 
 export interface PresenceLocationContext {
@@ -262,19 +224,6 @@ export interface ArtifactRecordShape {
   artifact_id: string;
   kind: string;
   path?: string;
-}
-
-export interface StandardIntentCatalog {
-  intents?: Array<{
-    id?: string;
-    category?: string;
-    description?: string;
-    surface_examples?: string[];
-    plan_outline?: string[];
-    outcome_ids?: string[];
-    specialist_id?: string;
-    resolution?: Record<string, unknown>;
-  }>;
 }
 
 export interface VoiceMinutesArtifact {
@@ -337,6 +286,64 @@ export const activeTimelineTimers = new Map<string, NodeJS.Timeout[]>();
 export const SPEECH_STATE_POLL_MS = Number(process.env.PRESENCE_STUDIO_SPEECH_STATE_POLL_MS || 400);
 export let latestSpeechSseState = 'idle';
 export let speechStatePollInFlight = false;
+
+export interface VoiceHubSpeechState {
+  status: 'idle' | 'speaking';
+  text?: string;
+  startedAt?: number;
+  pid?: number;
+  engine_id?: string;
+}
+
+export interface VoiceHubSpeechStateResponse {
+  ok: true;
+  speech: VoiceHubSpeechState;
+}
+
+function isSafeRecord(value: unknown): value is Record<string, unknown> {
+  return (
+    Boolean(value) &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    !Object.keys(value as Record<string, unknown>).some((key) =>
+      ['__proto__', 'constructor', 'prototype'].includes(key)
+    )
+  );
+}
+
+export function parseVoiceHubSpeechStateResponse(
+  value: unknown
+): VoiceHubSpeechStateResponse | undefined {
+  if (!isSafeRecord(value) || value.ok !== true || !isSafeRecord(value.speech)) return undefined;
+  const speech = value.speech;
+  if (speech.status !== 'idle' && speech.status !== 'speaking') return undefined;
+  const result: VoiceHubSpeechState = { status: speech.status };
+  for (const key of ['text', 'engine_id'] as const) {
+    if (speech[key] !== undefined && typeof speech[key] !== 'string') return undefined;
+    if (typeof speech[key] === 'string') result[key] = speech[key];
+  }
+  for (const key of ['startedAt', 'pid'] as const) {
+    if (speech[key] !== undefined) {
+      if (
+        typeof speech[key] !== 'number' ||
+        !Number.isFinite(speech[key]) ||
+        (key === 'pid' && (!Number.isInteger(speech[key]) || speech[key] < 1))
+      )
+        return undefined;
+      result[key] = speech[key];
+    }
+  }
+  return { ok: true, speech: result };
+}
+
+export function parseStimuliTailContent(content: string, limit = 20): GuspStimulus[] {
+  return content
+    .split('\n')
+    .filter((line) => line.trim().length > 0)
+    .slice(-Math.max(1, Math.floor(limit)))
+    .map(parseGuspStimulusLine)
+    .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
+}
 
 process.env.MISSION_ROLE ||= 'surface_runtime';
 export const cloudflareOsSurface = new CloudflareOsSurface();
@@ -402,6 +409,16 @@ export function isAllowedKnowledgeRefPath(logicalPath: string): boolean {
   return allowedRoots.some(
     (root) => resolved === root || resolved.startsWith(`${root}${path.sep}`)
   );
+}
+
+/** Resolve an existing repository file only after rechecking its real entry type. */
+export function resolveSafeExistingFile(filePath: string): string | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return safeExistsSync(safePath) && safeLstat(safePath).isFile() ? safePath : null;
+  } catch {
+    return null;
+  }
 }
 
 export function ensureStimuliDir(): void {
@@ -479,7 +496,8 @@ export function resolveVoiceMinutesDir(missionId?: string): string {
 
 export function readEmailTriageArtifact(): EmailTriageArtifact {
   const path = resolveEmailTriagePath();
-  if (!safeExistsSync(path)) {
+  const safePath = resolveSafeExistingFile(path);
+  if (!safePath) {
     return {
       exists: false,
       path,
@@ -487,7 +505,7 @@ export function readEmailTriageArtifact(): EmailTriageArtifact {
       content: '',
     };
   }
-  const content = String(safeReadFile(path, { encoding: 'utf8' }) || '');
+  const content = String(safeReadFile(safePath, { encoding: 'utf8' }) || '');
   return {
     exists: true,
     path,
@@ -705,7 +723,7 @@ export function applyTimelineEvent(
       updatePresenceSurface(surfaceId, { transcript: [] });
       break;
     default:
-      logger.warn(`[presence-studio] unsupported timeline op ${(event as any).op}`);
+      logger.warn(`[presence-studio] unsupported timeline op ${event.op}`);
   }
   state.lastUpdatedAt = new Date().toISOString();
   emitState();
@@ -750,13 +768,14 @@ export async function pollVoiceHubSpeechStateForSse(): Promise<void> {
   try {
     const response = await fetch(`${VOICE_HUB_URL}/api/speech/state`);
     if (!response.ok) return;
-    const payload = (await response.json()) as { speech?: { status?: string } };
-    const nextState = String(payload?.speech?.status || 'idle');
+    const payload = parseVoiceHubSpeechStateResponse(await response.json().catch(() => null));
+    if (!payload) return;
+    const nextState = payload.speech.status;
     if (nextState === latestSpeechSseState) return;
     latestSpeechSseState = nextState;
     broadcast('speech_state', {
       ok: true,
-      speech: payload?.speech || { status: nextState },
+      speech: payload.speech,
     });
   } catch {
     // Best effort only.
@@ -765,20 +784,43 @@ export async function pollVoiceHubSpeechStateForSse(): Promise<void> {
   }
 }
 
-export function listBrowserRuntimeSessions(): BrowserRuntimeSessionSummary[] {
-  const dir = pathResolver.shared('runtime/browser/sessions');
-  return safeExistsSync(dir)
-    ? safeReaddir(dir)
-        .filter((entry) => entry.endsWith('.json'))
-        .map((entry) => readJson<BrowserRuntimeSessionSummary>(path.join(dir, entry)))
-        .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')))
-    : [];
+export function listBrowserRuntimeSessions(
+  options: PresenceBrowserRuntimeDataOptions = {}
+): BrowserRuntimeSessionSummary[] {
+  const dir = options.browserSessionDir || pathResolver.shared('runtime/browser/sessions');
+  try {
+    const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return [];
+    return safeReaddir(safeDir)
+      .filter((entry) => entry.endsWith('.json'))
+      .flatMap((entry) => {
+        try {
+          const filePath = assertSafeRepositoryPath(path.join(safeDir, entry));
+          if (!safeLstat(filePath).isFile()) return [];
+          return [readJson<BrowserRuntimeSessionSummary>(filePath)];
+        } catch {
+          return [];
+        }
+      })
+      .sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+  } catch {
+    return [];
+  }
 }
 
-export function loadBrowserSnapshotSummary(sessionId: string): BrowserSnapshotSummary | null {
-  const filePath = pathResolver.shared(`runtime/browser/snapshots/${sessionId}.json`);
-  if (!safeExistsSync(filePath)) return null;
-  return readJson<BrowserSnapshotSummary>(filePath);
+export function loadBrowserSnapshotSummary(
+  sessionId: string,
+  options: PresenceBrowserRuntimeDataOptions = {}
+): BrowserSnapshotSummary | null {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/u.test(sessionId)) return null;
+  try {
+    const dir = options.browserSnapshotDir || pathResolver.shared('runtime/browser/snapshots');
+    const filePath = assertSafeRepositoryPath(path.join(dir, `${sessionId}.json`));
+    if (!safeLstat(filePath).isFile()) return null;
+    return readJson<BrowserSnapshotSummary>(filePath);
+  } catch {
+    return null;
+  }
 }
 
 export function pickPresenceBrowserRuntimeSession(
@@ -801,11 +843,9 @@ export function pickPresenceBrowserRuntimeSession(
         snapshot.url !== 'about:blank' &&
         Number(snapshot.element_count || 0) > 0
       );
-      const hasReconnectPath = Boolean((item as any).cdp_url);
+      const hasReconnectPath = Boolean(item.cdp_url);
       const leaseExpiresAt =
-        typeof (item as any).lease_expires_at === 'string'
-          ? Date.parse((item as any).lease_expires_at)
-          : Number.NaN;
+        typeof item.lease_expires_at === 'string' ? Date.parse(item.lease_expires_at) : Number.NaN;
       const leaseIsFresh = !Number.isFinite(leaseExpiresAt) || leaseExpiresAt >= now;
       const likelySyntheticSession =
         /^browser-(admin|cdp|cdp-reconnect|lease|pause|passkey|passkey-flow|profile|test|video|video-lease)$/.test(
@@ -1187,4 +1227,12 @@ export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
   'presence_studio:recording_stopping',
   'presence_studio:minutes_created',
   'presence_studio:recording_short',
+  'tui:tui_cockpit_authority_autonomous',
+  'tui:tui_cockpit_authority_approval',
+  'tui:tui_cockpit_authority_clarification',
+  'tui:tui_cockpit_outcome_answer',
+  'tui:tui_cockpit_outcome_artifact',
+  'tui:tui_cockpit_outcome_approval_ready_plan',
+  'tui:tui_cockpit_outcome_service_change',
+  'tui:tui_cockpit_outcome_status_report',
 ] as const satisfies readonly VocabularyKey[];

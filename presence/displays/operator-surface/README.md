@@ -16,7 +16,7 @@ Strategy: [`knowledge/product/architecture/operator-surface-strategy.md`](../../
 | `/audit`            | Audit-chain timeline (filtered by tenant)                                             |
 | `/health`           | Mission counts, recent audit volume, override events                                  |
 | `/surfaces`         | Read-only surface concierge: auth boundary, runtime state, scenario fit, next command |
-| `/intent-snapshots` | Placeholder for the diff view (full implementation deferred)                          |
+| `/intent-snapshots` | Read-only intent history with consecutive-snapshot drift summaries                    |
 | `/knowledge`        | Public-tier knowledge browser                                                         |
 
 The data layer (`src/lib/data.ts`) imports **only** read APIs from

@@ -37,7 +37,14 @@ describe('setup report', () => {
     mocks.setupServices.mockResolvedValue({
       status: 'ok',
       rows: [],
-      summary: { total: 0, ready: 0, authMissing: 0, connectionMissing: 0, customerConnections: 0, personalConnections: 0 },
+      summary: {
+        total: 0,
+        ready: 0,
+        authMissing: 0,
+        connectionMissing: 0,
+        customerConnections: 0,
+        personalConnections: 0,
+      },
     });
     mocks.runReasoningSetup.mockResolvedValue({ must: 0, should: 1, nice: 2 });
     mocks.collectDoctorReport.mockResolvedValue({
@@ -56,6 +63,7 @@ describe('setup report', () => {
 
     expect(mocks.setupSurfaces).toHaveBeenCalledTimes(1);
     expect(mocks.setupServices).toHaveBeenCalledTimes(1);
+    expect(mocks.runReasoningSetup).toHaveBeenCalledWith({ quiet: false });
     expect(mocks.runReasoningSetup).toHaveBeenCalledTimes(1);
     expect(mocks.collectDoctorReport).toHaveBeenCalledTimes(1);
     expect(report.reasoning).toEqual({ must: 0, should: 1, nice: 2 });
@@ -110,7 +118,14 @@ describe('setup report', () => {
     mocks.setupServices.mockResolvedValue({
       status: 'ok',
       rows: [],
-      summary: { total: 2, ready: 0, authMissing: 1, connectionMissing: 1, customerConnections: 0, personalConnections: 0 },
+      summary: {
+        total: 2,
+        ready: 0,
+        authMissing: 1,
+        connectionMissing: 1,
+        customerConnections: 0,
+        personalConnections: 0,
+      },
     });
     mocks.runReasoningSetup.mockResolvedValue({ must: 1, should: 0, nice: 0 });
     mocks.collectDoctorReport.mockResolvedValue({
@@ -129,6 +144,7 @@ describe('setup report', () => {
 
     expect(mocks.setupSurfaces).toHaveBeenCalledWith({ quiet: true });
     expect(mocks.setupServices).toHaveBeenCalledWith({ quiet: true });
+    expect(mocks.runReasoningSetup).toHaveBeenCalledWith({ quiet: true });
     expect(report.surfaces.summary.missing).toBe(1);
     expect(report.services.summary.authMissing).toBe(1);
     expect(report.doctor.totalMissing).toBe(2);
@@ -146,12 +162,12 @@ describe('setup report', () => {
     expect(report.recommendedSurfaces[2]).toMatchObject({
       title: 'Slack thread surface',
       readiness: 'needs_setup',
-      suggestedCommand: 'pnpm surfaces:setup',
+      suggestedCommand: 'pnpm surfaces setup',
     });
     expect(report.nextActions).toHaveLength(3);
     expect(report.nextActions[0]).toMatchObject({
       title: 'Reconcile surface readiness',
-      suggested_command: 'pnpm surfaces:reconcile',
+      suggested_command: 'pnpm surfaces reconcile',
     });
     expect(report.nextActions[1]).toMatchObject({
       title: 'Repair service setup',

@@ -5,7 +5,13 @@ import {
   resolveVision,
 } from './vision-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('vision-resolver', () => {
   const tmpRoot = pathResolver.sharedTmp('vision-resolver-test');
@@ -51,6 +57,19 @@ describe('vision-resolver', () => {
 
     expect(vision.source_kind).toBe('tenant');
     expect(vision.raw).toContain('Tenant boundary first');
+  });
+
+  it('rejects tenant values that could escape the vision scope', () => {
+    expect(() => resolveVision('../outside', tmpRoot)).toThrow('[VISION_TENANT_SCOPE]');
+    expect(() => resolveVision('acme/other', tmpRoot)).toThrow('[VISION_TENANT_SCOPE]');
+    expect(() => resolveVision('shared', tmpRoot)).toThrow('[VISION_TENANT_SCOPE]');
+  });
+
+  it('rejects a symlinked tenant overlay before reading its vision', () => {
+    safeMkdir(`${tmpRoot}/customer`, { recursive: true });
+    safeSymlinkSync(tmpRoot, `${tmpRoot}/customer/acme`, 'dir');
+
+    expect(() => resolveVision('acme', tmpRoot)).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
   // CO-01: getGoldenRule() (libs/core/core.ts) calls resolveVision() with no

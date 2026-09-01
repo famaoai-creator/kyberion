@@ -1,9 +1,10 @@
 import {
   enqueueMissionOrchestrationEvent,
-  logger,
   startMissionOrchestrationWorker,
-} from '@agent/core';
+} from '@agent/core/mission-orchestration-events';
+import { logger } from '@agent/core/core';
 import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface LegacySlackKickoffInput {
@@ -18,6 +19,14 @@ function printUsage(): void {
   logger.info('Usage: run_slack_mission_kickoff <job-path>');
 }
 
+export function resolveSlackMissionKickoffInputPath(inputPath: string): string {
+  const resolved = assertSafeRepositoryPath(inputPath);
+  if (!safeLstat(resolved).isFile()) {
+    throw new Error(`Slack kickoff input must be a regular file: ${inputPath}`);
+  }
+  return resolved;
+}
+
 async function main(argv: string[]) {
   const jobPath = argv[0];
   if (!jobPath || jobPath === '--help' || jobPath === '-h') {
@@ -25,7 +34,7 @@ async function main(argv: string[]) {
     throw new ScriptExitError(jobPath ? 0 : 2);
   }
 
-  const input = readJson<LegacySlackKickoffInput>(jobPath);
+  const input = readJson<LegacySlackKickoffInput>(resolveSlackMissionKickoffInputPath(jobPath));
   const event = enqueueMissionOrchestrationEvent({
     eventType: 'mission_team_prewarm_requested',
     missionId: input.missionId,

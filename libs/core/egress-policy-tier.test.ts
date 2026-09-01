@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
-import { evaluateEgressPolicy, resetEgressPolicyCache } from './egress-policy.js';
+import { evaluateEgressPolicy, _resetEgressPolicyCacheForTests } from './egress-policy.js';
 
 const POLICY_DIR = pathResolver.sharedTmp('egress-tier-tests');
 const POLICY_PATH = path.join(POLICY_DIR, 'egress-policy.json');
@@ -19,7 +19,7 @@ function writePolicy(policy: Record<string, unknown>): void {
   safeMkdir(POLICY_DIR, { recursive: true });
   safeWriteFile(POLICY_PATH, JSON.stringify(policy));
   process.env.KYBERION_EGRESS_POLICY_PATH = POLICY_PATH;
-  resetEgressPolicyCache();
+  _resetEgressPolicyCacheForTests();
 }
 
 beforeEach(() => {
@@ -34,7 +34,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.KYBERION_EGRESS_POLICY_PATH;
-  resetEgressPolicyCache();
+  _resetEgressPolicyCacheForTests();
 });
 
 describe('public material', () => {

@@ -1,12 +1,81 @@
-import {
-  createNextActionContract,
-  createOutcomeContract,
-  resolveIntentResolutionContract,
-} from '@agent/core';
+import { createNextActionContract } from '@agent/core/next-action-contract';
+import { createOutcomeContract } from '@agent/core/outcome-contract';
+import { resolveIntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import { readGovernanceJson, type ContractCheck } from './check_contract_schemas_shared.js';
 
 export function createContractSchemaChecksPart1(): ContractCheck[] {
   return [
+    {
+      id: 'surface-roles',
+      schemaPath: 'knowledge/product/schemas/surface-roles.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/surface-roles.json')],
+      invalidPayloads: [
+        { version: '1.0.0', roles: [{ id: 'unsafe', dir: '../outside' }] },
+        { version: '1.0.0', roles: [{ id: 'missing-write-mode' }] },
+      ],
+    },
+    {
+      id: 'mcp-tool-catalog',
+      schemaPath: 'knowledge/product/schemas/mcp-tool-catalog.schema.json',
+      validPayloads: [
+        {
+          version: '1.0.0',
+          default_tier_visibility: ['public'],
+          tools: [
+            {
+              name: 'kyberion.pipeline.list',
+              allowed_tiers: ['public'],
+              allowed_caller_roles: ['operator', 'cowork'],
+            },
+          ],
+          pipeline_run_allowlist: ['pipelines/vital-check.json'],
+        },
+      ],
+      invalidPayloads: [
+        { pipeline_run_allowlist: [123] },
+        {
+          pipeline_run_allowlist: [],
+          tools: [{ name: 'missing-scope', allowed_tiers: ['public'] }],
+        },
+      ],
+    },
+    {
+      id: 'knowledge-feedback-policy',
+      schemaPath: 'knowledge/product/schemas/knowledge-feedback-policy.schema.json',
+      validPayloads: [
+        {
+          version: '1.0.0',
+          description: 'bounded feedback aggregate policy',
+          defaults: { max_usage_entries: 100, max_usage_bytes: 1024 },
+          tenant_overrides: { 'tenant-a': { max_usage_entries: 50 } },
+        },
+      ],
+      invalidPayloads: [
+        { defaults: { max_usage_entries: 0 } },
+        { tenant_overrides: { 'tenant-a': { max_usage_bytes: 'unbounded' } } },
+      ],
+    },
+    {
+      id: 'lifecycle-hooks',
+      schemaPath: 'knowledge/product/schemas/lifecycle-hooks.schema.json',
+      validPayloads: [
+        {
+          hooks: [
+            {
+              id: 'deny-secrets',
+              event: 'pre_tool_use',
+              matcher: 'secret',
+              command: ['node', 'scripts/deny-secret-hook.js'],
+              timeout_ms: 1000,
+            },
+          ],
+        },
+      ],
+      invalidPayloads: [
+        { hooks: [{ event: 'pre_tool_use', command: 'node scripts/hook.js' }] },
+        { hooks: [{ id: 'empty-command', event: 'pre_tool_use', command: [] }] },
+      ],
+    },
     {
       id: 'intent-resolution',
       schemaPath: 'knowledge/product/schemas/intent-resolution.schema.json',

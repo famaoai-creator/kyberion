@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import {
   inferGovernedDeliveryMode,
   type IntentCompilerProvider,
@@ -133,12 +133,28 @@ function createRequestId() {
   return `assistant-compiler-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function assertRequestIdPathSegment(requestId: string): string {
+  const normalized = String(requestId || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[ASSISTANT_COMPILER_REQUEST_ID] request id must be a single path segment`);
+  }
+  return normalized;
+}
+
 export function getAssistantCompilerRequestPath(requestId: string) {
-  return pathResolver.sharedTmp(`assistant-compiler-requests/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`assistant-compiler-requests/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function getAssistantCompilerResultPath(requestId: string) {
-  return pathResolver.sharedTmp(`assistant-compiler-results/${requestId}.json`);
+  const safeRequestId = assertRequestIdPathSegment(requestId);
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(`assistant-compiler-results/${safeRequestId}.json`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function validateAssistantCompilerRequest(value: unknown): {

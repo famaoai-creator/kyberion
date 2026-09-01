@@ -1,5 +1,5 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface IntentOutcomePattern {
   intent_id: string;
@@ -12,13 +12,19 @@ export interface IntentOutcomePattern {
 }
 
 interface IntentOutcomePatternCatalog {
-  patterns?: IntentOutcomePattern[];
+  version: string;
+  notes: string[];
+  patterns: IntentOutcomePattern[];
 }
 
+const intentOutcomePatternCatalog = defineCatalog<IntentOutcomePatternCatalog>({
+  id: 'intent-outcome-patterns',
+  path: () => pathResolver.knowledge('product/governance/intent-outcome-patterns.json'),
+  schema: pathResolver.knowledge('product/schemas/intent-outcome-patterns.schema.json'),
+});
+
 export function loadIntentOutcomePatterns(): IntentOutcomePattern[] {
-  const filePath = pathResolver.knowledge('product/governance/intent-outcome-patterns.json');
-  const parsed = loadJson<IntentOutcomePatternCatalog>(filePath);
-  return Array.isArray(parsed.patterns) ? parsed.patterns : [];
+  return intentOutcomePatternCatalog.load().patterns;
 }
 
 export function findIntentOutcomePattern(intentId?: string): IntentOutcomePattern | null {

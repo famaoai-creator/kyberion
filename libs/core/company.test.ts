@@ -222,4 +222,10 @@ describe('company', () => {
     expect(company.decision_rights_ref.data?.source_kind).toBe('public');
     expect(company.decision_rights_ref.data?.decisions).toHaveLength(0);
   });
+
+  it('rejects tenant values that could escape the customer scope', () => {
+    expect(() => resolveCompany('../outside', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+    expect(() => resolveCompany('acme/other', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+    expect(() => resolveCompany('public', tmpRoot)).toThrow('[COMPANY_TENANT_SCOPE]');
+  });
 });

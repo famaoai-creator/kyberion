@@ -8,6 +8,7 @@ import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   buildProviderChildEnv,
+  resolveEffectiveProviderPermissionProfile,
   resolveProviderPermissionArgs,
   type ProviderPermissionProfileName,
 } from './provider-permission-profiles.js';
@@ -82,8 +83,9 @@ class CodexCliQuery {
     // Resolved before any file I/O or spawn so a typed refusal (e.g.
     // planner, which codex has no safe no-exec mode for) never touches the
     // filesystem or attempts to spawn the CLI.
-    const sandboxArgs = params.profile
-      ? this.resolvePermissionArgs(params.profile)
+    const effectiveProfile = resolveEffectiveProviderPermissionProfile('codex', params.profile);
+    const sandboxArgs = effectiveProfile
+      ? this.resolvePermissionArgs(effectiveProfile)
       : ['--sandbox', params.mode];
 
     const schemaJson = normalizeCodexSchema(

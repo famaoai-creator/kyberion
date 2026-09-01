@@ -48,7 +48,3 @@ export function loadChangelogPolicyCatalog(): ChangelogPolicyCatalog {
 export function resolveChangelogPolicy(): ChangelogPolicyCatalog {
   return loadChangelogPolicyCatalog();
 }
-
-export function resetChangelogPolicyCatalogCache(): void {
-  catalog.reset();
-}

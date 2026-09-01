@@ -1,20 +1,12 @@
-import type { ValidateFunction } from 'ajv';
-import * as addFormatsModule from 'ajv-formats';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { compileSchemaFromPath } from './schema-loader.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ContextualIntentFrame } from './contextual-intent-frame.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
-import { createAjv } from './foundation/ajv.js';
-
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const ajv = createAjv();
-addFormats(ajv);
 const LEARNING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/contextual-intent-learning.schema.json'
 );
@@ -23,8 +15,10 @@ function learningStorePath(scope?: ScopeContext): string {
   const base =
     getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH')?.trim() ||
     pathResolver.knowledge('personal/contextual-intent-learning.json');
-  if (!scope?.tenant_slug) return base;
-  return `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
+  const candidate = !scope?.tenant_slug
+    ? base
+    : `${physicalScopedPath(path.dirname(base), { ...scope, scope_kind: scope.mission_id ? 'mission' : 'tenant' })}/${path.basename(base)}`;
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 export interface ContextualIntentLearningEntry {
@@ -51,39 +45,34 @@ export interface ContextualIntentLearningStore {
   entries: ContextualIntentLearningEntry[];
 }
 
-let contextualIntentLearningValidateFn: ValidateFunction | null = null;
-
-function ensureContextualIntentLearningValidator(): ValidateFunction {
-  if (contextualIntentLearningValidateFn) return contextualIntentLearningValidateFn;
-  contextualIntentLearningValidateFn = compileSchemaFromPath(ajv, LEARNING_SCHEMA_PATH);
-  return contextualIntentLearningValidateFn;
-}
-
 function defaultStore(): ContextualIntentLearningStore {
   return { version: '1.0.0', entries: [] };
 }
 
+function contextualIntentLearningCatalog(
+  scope?: ScopeContext
+): GovernedCatalog<ContextualIntentLearningStore> {
+  return defineCatalog<ContextualIntentLearningStore>({
+    id: 'contextual-intent-learning',
+    path: learningStorePath(scope),
+    schema: LEARNING_SCHEMA_PATH,
+    fallback: defaultStore,
+    fallbackOnInvalid: true,
+  });
+}
+
 function readStore(scope?: ScopeContext): ContextualIntentLearningStore {
-  const filePath = learningStorePath(scope);
-  if (!safeExistsSync(filePath)) return defaultStore();
-  try {
-    const parsed = readJson<ContextualIntentLearningStore>(filePath);
-    const validate = ensureContextualIntentLearningValidator();
-    if (!validate(parsed)) return defaultStore();
-    return parsed;
-  } catch {
-    return defaultStore();
-  }
+  return contextualIntentLearningCatalog(scope).load();
 }
 
 function writeStore(store: ContextualIntentLearningStore, scope?: ScopeContext): void {
   const filePath = learningStorePath(scope);
-  const validate = ensureContextualIntentLearningValidator();
-  if (!validate(store)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid contextual-intent-learning store: ${errors}`);
+  try {
+    contextualIntentLearningCatalog(scope).validate(store, filePath);
+  } catch (error) {
+    throw new Error(
+      `Invalid contextual-intent-learning store: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
   const dir = path.dirname(filePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });

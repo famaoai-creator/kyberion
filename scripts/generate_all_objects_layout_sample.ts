@@ -1,13 +1,14 @@
+import { generateNativePptx } from '@agent/core/media-contracts';
 import {
-  generateNativePptx,
   PPTX_PALETTE as C,
   textElement as txt,
   shapeElement as shape,
   lineElement as line,
   sectionHeaderElements,
   footerElements,
-} from '@agent/core';
-import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core';
+} from '@agent/core/layout-primitives';
+import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const TOTAL_PAGES = 16;
 
@@ -1459,18 +1460,48 @@ const protocol: PptxDesignProtocol = {
   ],
 };
 
-async function main() {
+async function main(
+  print: (value: unknown) => void,
+  options: { dryRun: boolean; check: boolean; json: boolean }
+): Promise<{ ok: true; path: string; dry_run?: boolean }> {
   const outPath = 'active/shared/tmp/all_objects_layout_sample.pptx';
-  console.log(
-    'Generating premium masterclass PowerPoint presentation (16 slides comprehensive museum)...'
-  );
-  try {
-    await generateNativePptx(protocol, outPath);
-    console.log(`Successfully generated PowerPoint file at: ${outPath}`);
-  } catch (error) {
-    console.error('Error during generation:', error);
-    process.exitCode = 1;
+  if (options.dryRun || options.check) {
+    print(
+      options.json
+        ? {
+            ok: true,
+            dry_run: true,
+            operation: 'generate-all-objects-layout-sample',
+            path: outPath,
+          }
+        : `Would generate PowerPoint file at: ${outPath}`
+    );
+    return { ok: true, path: outPath, dry_run: true };
   }
+  if (options.json) {
+    print({ ok: true, operation: 'generate-all-objects-layout-sample', status: 'started' });
+  } else {
+    print(
+      'Generating premium masterclass PowerPoint presentation (16 slides comprehensive museum)...'
+    );
+  }
+  await generateNativePptx(protocol, outPath);
+  print(
+    options.json
+      ? { ok: true, operation: 'generate-all-objects-layout-sample', path: outPath }
+      : `Successfully generated PowerPoint file at: ${outPath}`
+  );
+  return { ok: true, path: outPath };
 }
 
-main();
+export const runGenerateAllObjectsLayoutSample = defineScript({
+  name: 'generate:all-objects-layout-sample',
+  flags: ['json', 'dry-run', 'check'],
+  run: ({ print, dryRun, check, json }) => main(print, { dryRun, check, json }),
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_all_objects_layout_sample.ts') ||
+  isDirectScript(import.meta.url, 'generate_all_objects_layout_sample.js')
+)
+  void runGenerateAllObjectsLayoutSample();

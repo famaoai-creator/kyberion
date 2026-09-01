@@ -4,7 +4,7 @@ import { assessContextualClarification } from './contextual-intent-clarification
 import { buildContextualIntentFrame } from './contextual-intent-frame.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { classifyTaskSessionIntent } from './task-session.js';
 import {
@@ -25,8 +25,15 @@ import {
   summarizeRelevantExecutionProfilesForIntentIds,
   summarizeRelevantExecutionProfilesForIntentIdsCompact,
 } from './intent-execution-profile-registry.js';
-import { loadStandardIntentCatalog, resolveIntentResolutionPacket } from './intent-resolution.js';
-import type { IntentResolutionPacket, StandardIntentDefinition } from './intent-resolution.js';
+import {
+  loadResolvedStandardIntentCatalog,
+  resolveIntentResolutionPacket,
+} from './intent-resolution.js';
+import type {
+  IntentResolutionOptions,
+  IntentResolutionPacket,
+  StandardIntentDefinition,
+} from './intent-resolution.js';
 import {
   loadReasoningLevelPolicy,
   resolveReasoningLevelDecision,
@@ -212,8 +219,17 @@ interface IntentCompilerTargetResolutionOptions extends Pick<
 
 let intentContractValidateFn: ValidateFunction | null = null;
 let workLoopValidateFn: ValidateFunction | null = null;
-let intentPolicyValidateFn: ValidateFunction | null = null;
-let workPolicyValidateFn: ValidateFunction | null = null;
+const intentPolicyCatalog = defineCatalog<IntentPolicyFile>({
+  id: 'intent-policy',
+  path: INTENT_POLICY_PATH,
+  schema: INTENT_POLICY_SCHEMA_PATH,
+});
+
+const workPolicyCatalog = defineCatalog<WorkPolicyFile>({
+  id: 'work-policy',
+  path: WORK_POLICY_PATH,
+  schema: WORK_POLICY_SCHEMA_PATH,
+});
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
@@ -225,18 +241,6 @@ function ensureWorkLoopValidator(): ValidateFunction {
   if (workLoopValidateFn) return workLoopValidateFn;
   workLoopValidateFn = compileSchema(WORK_LOOP_SCHEMA_PATH);
   return workLoopValidateFn;
-}
-
-function ensureIntentPolicyValidator(): ValidateFunction {
-  if (intentPolicyValidateFn) return intentPolicyValidateFn;
-  intentPolicyValidateFn = compileSchema(INTENT_POLICY_SCHEMA_PATH);
-  return intentPolicyValidateFn;
-}
-
-function ensureWorkPolicyValidator(): ValidateFunction {
-  if (workPolicyValidateFn) return workPolicyValidateFn;
-  workPolicyValidateFn = compileSchema(WORK_POLICY_SCHEMA_PATH);
-  return workPolicyValidateFn;
 }
 
 function errorsFrom(validate: ValidateFunction): string[] {
@@ -314,11 +318,14 @@ function extractJsonObject(text: string): string | null {
   return text.slice(start, end + 1);
 }
 
-function parseJsonObject<T>(text: string): T | null {
+function parseJsonObject(text: string): Record<string, unknown> | null {
   const json = extractJsonObject(text.trim());
   if (!json) return null;
   try {
-    return JSON.parse(json) as T;
+    const parsed: unknown = JSON.parse(json);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
@@ -445,10 +452,11 @@ function resolveIntentAwareCompilerTarget(
 
 export function summarizeRelevantIntents(
   text: string,
-  packet?: ReturnType<typeof resolveIntentResolutionPacket>
+  packet?: ReturnType<typeof resolveIntentResolutionPacket>,
+  options: IntentResolutionOptions = {}
 ): { text: string; omitted_count: number } {
   const policy = loadIntentPolicy();
-  const intents = loadStandardIntentCatalog();
+  const intents = loadResolvedStandardIntentCatalog(options);
   const resolvedPacket = packet || resolveIntentResolutionPacket(text);
   const catalogById = new Map(intents.map((intent) => [String(intent.id || ''), intent]));
   const scored = resolvedPacket.candidates
@@ -490,9 +498,12 @@ function summarizeRelevantExecutionProfilesByIntentIds(
   });
 }
 
-function findStandardIntentById(intentId?: string): StandardIntentDefinition | undefined {
+function findStandardIntentById(
+  intentId?: string,
+  options: IntentResolutionOptions = {}
+): StandardIntentDefinition | undefined {
   if (!intentId) return undefined;
-  return loadStandardIntentCatalog().find((intent) => intent.id === intentId);
+  return loadResolvedStandardIntentCatalog(options).find((intent) => intent.id === intentId);
 }
 
 function resolvePolicyRoutingDecision(
@@ -551,27 +562,11 @@ function isApprovalWorkflowRequest(text: string): boolean {
 }
 
 function loadIntentPolicy(): IntentPolicyFile {
-  const value = readJson<IntentPolicyFile>(INTENT_POLICY_PATH);
-  const validate = ensureIntentPolicyValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid intent-policy: ${errors}`);
-  }
-  return value;
+  return intentPolicyCatalog.load();
 }
 
 function loadWorkPolicy(): WorkPolicyFile {
-  const value = readJson<WorkPolicyFile>(WORK_POLICY_PATH);
-  const validate = ensureWorkPolicyValidator();
-  if (!validate(value)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid work-policy: ${errors}`);
-  }
-  return value;
+  return workPolicyCatalog.load();
 }
 
 function matchesRoutingValue(value: string | undefined, expected: string[] | undefined): boolean {
@@ -655,6 +650,7 @@ function toExecutionBriefSeed(
     trackName: input.trackName,
     serviceBindings: input.serviceBindings,
     summaryHint: extras.summaryHint,
+    contextualFrame: extras.contextualFrame || input.resolutionPacket?.contextual_frame,
   };
 }
 
@@ -669,19 +665,25 @@ function buildFallbackIntentContract(
   input: CompileUserIntentFlowInput,
   executionBrief?: ActuatorExecutionBrief
 ): IntentContract {
-  const packet = resolveIntentPacketForInput(input);
+  const packet = input.resolutionPacket || resolveIntentPacketForInput(input);
   const selectedIntent = packet.selected_intent_id
-    ? findStandardIntentById(packet.selected_intent_id)
+    ? findStandardIntentById(packet.selected_intent_id, {
+        tier: input.tier,
+        tenantId: resolveTenantId(input),
+      })
     : undefined;
   const selectedPlatformId =
     typeof input.runtimeContext?.platform_id === 'string'
       ? input.runtimeContext.platform_id
       : packet.selected_parameters?.platform_id;
-  const classified = classifyTaskSessionIntent(input.text);
+  const classified = classifyTaskSessionIntent(input.text, packet, {
+    tier: input.tier,
+    tenantId: resolveTenantId(input),
+  });
   const selectedShape = normalizeShape(
     packet.selected_resolution?.shape || (executionBrief ? 'task_session' : 'direct_reply')
   );
-  const contextualFrame = buildContextualIntentFrame(input.text);
+  const contextualFrame = packet.contextual_frame || buildContextualIntentFrame(input.text);
   const correlationId = resolveCorrelationId(input);
   if (
     isApprovalWorkflowRequest(input.text) ||
@@ -902,7 +904,10 @@ function buildExecutionBriefPrompt(input: CompileUserIntentFlowInput): string {
     '- Keep the brief human-readable and minimal.',
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet).text,
+    summarizeRelevantIntents(input.text, packet, {
+      tier: input.tier,
+      tenantId: resolveTenantId(input),
+    }).text,
     '',
     'Request context:',
     JSON.stringify(
@@ -1014,7 +1019,10 @@ function buildIntentContractPrompt(
     ),
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet).text,
+    summarizeRelevantIntents(input.text, packet, {
+      tier: input.tier,
+      tenantId: resolveTenantId(input),
+    }).text,
     '',
     'Relevant capability bundles:',
     summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
@@ -1077,7 +1085,10 @@ function buildWorkLoopPrompt(
     JSON.stringify(input.runtimeContext || {}, null, 2),
     '',
     'Relevant governed intents:',
-    summarizeRelevantIntents(input.text, packet).text,
+    summarizeRelevantIntents(input.text, packet, {
+      tier: input.tier,
+      tenantId: resolveTenantId(input),
+    }).text,
     '',
     'Relevant capability bundles:',
     summarizeRelevantCapabilityBundlesByIntentIds(bundleIntentIds),
@@ -1147,7 +1158,7 @@ async function compileExecutionBriefWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildExecutionBriefPrompt(input));
-  const parsed = parseJsonObject<ActuatorExecutionBrief>(raw);
+  const parsed = parseJsonObject(raw);
   return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
 }
 
@@ -1159,7 +1170,7 @@ async function compileIntentContractWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildIntentContractPrompt(input, executionBrief));
-  const parsed = parseJsonObject<IntentContract>(raw);
+  const parsed = parseJsonObject(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
   if (!result.valid) return null;
@@ -1178,7 +1189,7 @@ async function compileWorkLoopWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
-  const parsed = parseJsonObject<OrganizationWorkLoopSummary>(raw);
+  const parsed = parseJsonObject(raw);
   if (!parsed) return null;
   const result = validateWorkLoop(parsed);
   if (!result.valid) return null;
@@ -1267,7 +1278,10 @@ export async function compileUserIntentFlow(
   };
   const reasoningPolicy = loadReasoningLevelPolicy();
   const selectedIntent = resolutionPacket.selected_intent_id
-    ? findStandardIntentById(resolutionPacket.selected_intent_id)
+    ? findStandardIntentById(resolutionPacket.selected_intent_id, {
+        tier: input.tier,
+        tenantId: resolveTenantId(input),
+      })
     : undefined;
   const compilerTarget = resolveIntentCompilerTarget({
     provider: options.provider,

@@ -7,6 +7,7 @@ import {
   resolveCodexBinary,
   runCodexCliQuery,
 } from './codex-cli-query.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
@@ -281,6 +282,29 @@ describe('codex-cli-query', () => {
 
       expect(mocks.spawnMock).not.toHaveBeenCalled();
       expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    });
+
+    it('ambient read-only sandbox overrides a write-mode query before spawn', async () => {
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+      const policy = resolveSandboxPolicy({
+        provider: 'codex',
+        mode: 'read-only',
+        networkAccess: true,
+      });
+
+      await withSandboxPolicy(policy, () =>
+        runCodexCliQuery({
+          systemPrompt: 'sys',
+          userPrompt: 'usr',
+          schema: z.object({ ok: z.boolean() }),
+          mode: 'workspace-write',
+          options: { bin: 'codex', model: 'codex-default', cwd: 'fake/workspace' },
+        })
+      );
+
+      const [, argv] = mocks.spawnMock.mock.calls[0];
+      expect(argv).toEqual(expect.arrayContaining(['--sandbox', 'read-only']));
+      expect(argv).not.toContain('workspace-write');
     });
   });
 

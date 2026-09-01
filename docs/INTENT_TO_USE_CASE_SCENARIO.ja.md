@@ -36,7 +36,7 @@ clarification / approval / runtime recovery / execution
 
 ```sh
 pnpm build
-pnpm intent:scenario "既存のSTT/VAD/TTSでリアルタイム音声チャットを試したい"
+pnpm intent:run "既存のSTT/VAD/TTSでリアルタイム音声チャットを試したい" --scenario-only
 ```
 
 結果の `use_case_scenario.handoff` を確認する。

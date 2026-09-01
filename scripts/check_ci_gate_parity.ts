@@ -1,6 +1,8 @@
-import { pathResolver, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { readJson } from '@agent/core/foundation';
+import { safeReadFile } from '@agent/core/secure-io';
 import { loadGateManifest } from './run_checks.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const WORKFLOW_SCOPE_REFS = {
   pr: '.github/workflows/pr-validation.yml',
@@ -24,7 +26,9 @@ export function collectPnpmScriptReferences(value: string): string[] {
 export function checkCiGateParity(): string[] {
   const failures: string[] = [];
   const manifest = loadGateManifest();
-  const packageJson = JSON.parse(read('package.json')) as { scripts?: Record<string, string> };
+  const packageJson = readJson<{ scripts?: Record<string, string> }>(
+    pathResolver.rootResolve('package.json')
+  );
   const declaredGates = new Set(
     manifest.gates.flatMap((gate) => [gate.id, ...(gate.script ? [gate.script] : [])])
   );
@@ -90,7 +94,7 @@ export const runCheckCiGateParity = defineScript({
   run(context) {
     const failures = checkCiGateParity();
     if (failures.length > 0) {
-      throw new Error(failures.join('; '));
+      throw new ScriptExitError(1, failures.map((failure) => `- ${failure}`).join('\n'));
     }
     context.print('[check:ci-gate-parity] OK');
   },

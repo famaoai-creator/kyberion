@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "adf-execution-policy.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_steps": { "type": "number", "minimum": 1 },
+        "max_hooks_per_step": { "type": "number", "minimum": 1 },
+        "max_foreach_items": { "type": "number", "minimum": 1 },
+        "max_branch_depth": { "type": "number", "minimum": 1 },
+        "max_transform_script_chars": { "type": "number", "minimum": 1 }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_local_network": { "type": "boolean" }
+      }
+    }
+  }
+}

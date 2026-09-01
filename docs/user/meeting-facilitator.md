@@ -80,8 +80,8 @@ will not speak.
 Use a dry run when you want to verify the workflow contract without a live call.
 
 ```bash
-pnpm cli preview pipelines/meeting-proxy-workflow.json
-pnpm run test:meeting-dry-run
+pnpm kyberion preview pipelines/meeting-proxy-workflow.json
+pnpm test -- --suite meeting-dry-run
 ```
 
 This checks the structure of the workflow and shows the intended stages

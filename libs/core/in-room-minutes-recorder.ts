@@ -17,7 +17,13 @@ import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from 
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
 import { wavHeader } from './pcm-wav.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeWriteFile,
+} from './secure-io.js';
 import { EnergyVad, type EnergyVadOptions } from './voice-activity-detector.js';
 import type { AudioChunk } from './meeting-session-types.js';
 import { resolveLocale } from './locale.js';
@@ -46,19 +52,31 @@ export interface InRoomMinutesSession {
   stop(): Promise<{ minutesPath: string | null; transcriptPath: string; segments: number }>;
 }
 
+function resolveMissionEvidenceDir(missionId: string): string {
+  const evidenceDir = missionEvidenceDir(missionId);
+  if (!evidenceDir) {
+    throw new Error(`[in-room-minutes] mission evidence dir not found for ${missionId}`);
+  }
+  return assertSafeRepositoryPath(evidenceDir, { allowMissingLeaf: true });
+}
+
 function defaultRunMinutesPipeline(input: {
   missionId: string;
   transcriptPath: string;
 }): Promise<{ minutesPath: string }> {
   return new Promise((resolve, reject) => {
-    const minutesPath = path.join(missionEvidenceDir(input.missionId), 'minutes.md');
-    const runner = rootResolve('dist/scripts/run_pipeline.js');
+    const evidenceDir = resolveMissionEvidenceDir(input.missionId);
+    const minutesPath = assertSafeRepositoryPath(path.join(evidenceDir, 'minutes.md'), {
+      allowMissingLeaf: true,
+    });
+    const runner = assertSafeRepositoryPath(rootResolve('dist/scripts/run_pipeline.js'));
+    const pipeline = assertSafeRepositoryPath(rootResolve('pipelines/meeting-followup.json'));
     const child = spawn(
       'node',
       [
         runner,
         '--input',
-        rootResolve('pipelines/meeting-followup.json'),
+        pipeline,
         '--context',
         JSON.stringify({
           mission_id: input.missionId,
@@ -94,10 +112,14 @@ export async function startInRoomMinutesSession(
     );
   }
 
-  const evidenceDir = missionEvidenceDir(missionId);
-  const audioDir = path.join(evidenceDir, 'audio');
+  const evidenceDir = resolveMissionEvidenceDir(missionId);
+  const audioDir = assertSafeRepositoryPath(path.join(evidenceDir, 'audio'), {
+    allowMissingLeaf: true,
+  });
   safeMkdir(audioDir, { recursive: true });
-  const transcriptPath = path.join(evidenceDir, 'transcript.md');
+  const transcriptPath = assertSafeRepositoryPath(path.join(evidenceDir, 'transcript.md'), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(transcriptPath)) {
     safeWriteFile(
       transcriptPath,
@@ -134,7 +156,10 @@ export async function startInRoomMinutesSession(
     const pcm = Buffer.concat(segmentBuffers, segmentBytes);
     segmentBuffers = [];
     segmentBytes = 0;
-    const audioPath = path.join(audioDir, `segment-${String(segment).padStart(3, '0')}.wav`);
+    const audioPath = assertSafeRepositoryPath(
+      path.join(audioDir, `segment-${String(segment).padStart(3, '0')}.wav`),
+      { allowMissingLeaf: true }
+    );
     safeWriteFile(audioPath, Buffer.concat([wavHeader(pcm.length, sampleRateHz), pcm]));
     try {
       // I18N-06: an unset recording language follows the resolved locale

@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SurfaceConversationResult } from '@agent/core/channel-surface';
-import type { IntentResolutionContract } from '@agent/core';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract-parser';
+import { isSimpleGreetingText } from '@agent/core/intent-contract';
+import { checkAndRepairSurfaceUxContract } from '@agent/core/surface-ux-contract';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { readRequestObject } from '../../../lib/request-input';
+import { conciergeConversationScope, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeLocale } from '../../../lib/i18n';
-import type {
+import {
   ConversationMessageResponse,
-  ConversationNextAction,
-  ConversationPromotion,
-  ConversationShape,
+  parseVoiceHubConversationResponse,
+  type ConversationNextAction,
+  type ConversationPromotion,
+  type ConversationShape,
 } from '../../../lib/conversation-types';
 
 export const dynamic = 'force-dynamic';
@@ -34,7 +39,8 @@ const VOICE_HUB_TIMEOUT_MS = 3000;
 /** Primary path: voice-hub (rich reply + TTS + presence reflection). */
 async function replyViaVoiceHub(
   text: string,
-  speaker: string
+  speaker: string,
+  scope: import('@agent/core/event-scope').EventScopeInput
 ): Promise<{ reply: string; intentResolution?: IntentResolutionContract }> {
   const resp = await fetch(`${VOICE_HUB_URL}/api/ingest-text`, {
     method: 'POST',
@@ -44,24 +50,23 @@ async function replyViaVoiceHub(
       intent: 'conversation',
       source_id: 'concierge',
       speaker,
+      scope,
       reflect_to_surface: true,
       auto_reply: true,
     }),
     signal: AbortSignal.timeout(VOICE_HUB_TIMEOUT_MS),
   });
   if (!resp.ok) throw new Error(`voice-hub responded ${resp.status}`);
-  const data = (await resp.json()) as {
-    reply?: unknown;
-    replyText?: unknown;
-    text?: unknown;
-    response?: unknown;
-    intentResolution?: IntentResolutionContract;
-  };
-  const reply = String(data.reply ?? data.replyText ?? data.text ?? data.response ?? '').trim();
+  const data = parseVoiceHubConversationResponse(await resp.json());
+  if (!data) throw new Error('invalid voice-hub response');
+  const { reply } = data;
   // An empty reply is a silent failure from the user's perspective; degrade
   // to the orchestrator instead of returning nothing.
   if (!reply) throw new Error('empty voice-hub reply');
-  return { reply, intentResolution: data.intentResolution };
+  return {
+    reply,
+    intentResolution: data.intentResolution,
+  };
 }
 
 function viewFromIntentResolution(
@@ -80,6 +85,25 @@ function viewFromIntentResolution(
     };
   }
   return { shape: 'reply' };
+}
+
+function prepareReplyForDelivery(
+  reply: string,
+  requestText: string,
+  intentResolution?: IntentResolutionContract
+): string {
+  const check = checkAndRepairSurfaceUxContract(reply, {
+    allow_conversational_reply: isSimpleGreetingText(requestText),
+    approval_required: intentResolution?.authority_level === 'approval_required',
+  });
+  if (check.repaired) {
+    console.info('[concierge] repaired voice-hub reply before delivery');
+  } else if (!check.verdict.valid) {
+    console.warn(
+      `[concierge] voice-hub reply violates surface UX contract: ${check.verdict.violations.join('; ')}`
+    );
+  }
+  return check.text;
 }
 
 /**
@@ -141,7 +165,8 @@ async function replyViaOrchestrator(
   text: string,
   speaker: string,
   sessionId: string | undefined,
-  locale: ConciergeLocale
+  locale: ConciergeLocale,
+  scope: import('@agent/core/event-scope').EventScopeInput
 ): Promise<ConversationMessageResponse> {
   const [channelSurface, pathResolverModule] = await Promise.all([
     import('@agent/core/channel-surface'),
@@ -155,8 +180,9 @@ async function replyViaOrchestrator(
     actorId: speaker,
     threadTs: sessionId,
     cwd: pathResolverModule.pathResolver.rootDir(),
+    scope,
   });
-  const reply = String(conversation?.text ?? '').trim();
+  const reply = typeof conversation?.text === 'string' ? conversation.text.trim() : '';
   if (!reply) throw new Error('empty orchestrator reply');
   const view = deriveConversationView(conversation, locale);
   const intentView =
@@ -178,30 +204,49 @@ export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
+  const scope = conciergeConversationScope(resolved.context);
+
+  const parsedBody = await readRequestObject(req);
+  if (!parsedBody.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: conciergeText(
+          'api.text_required',
+          resolveConciergeLocale(req.headers.get('accept-language') || undefined)
+        ),
+      },
+      { status: 400 }
+    );
+  }
+  const { body } = parsedBody;
   const locale = resolveConciergeLocale(
-    typeof body.locale === 'string' ? body.locale : req.headers.get('accept-language') || undefined
+    typeof body?.locale === 'string' ? body.locale : req.headers.get('accept-language') || undefined
   );
-  const text = String(body.text ?? '').trim();
+  const text = typeof body?.text === 'string' ? body.text.trim() : '';
   if (!text) {
     return NextResponse.json(
       { ok: false, error: conciergeText('api.text_required', locale) },
       { status: 400 }
     );
   }
-  const speaker = typeof body.speaker === 'string' && body.speaker ? body.speaker : 'Sovereign';
+  const speaker = typeof body?.speaker === 'string' && body.speaker ? body.speaker : 'Sovereign';
   const sessionId =
-    typeof body.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim() : undefined;
+    typeof body?.sessionId === 'string' && body.sessionId.trim()
+      ? body.sessionId.trim()
+      : undefined;
 
   // Try voice-hub first (rich path). The bridge returns the same intent
   // resolution contract as the in-process orchestrator path.
   try {
-    const voiceReply = await replyViaVoiceHub(text, speaker);
+    const voiceReply = await replyViaVoiceHub(text, speaker, scope);
     const intentView = voiceReply.intentResolution
       ? viewFromIntentResolution(voiceReply.intentResolution)
       : { shape: 'reply' as const };
     const payload: ConversationMessageResponse = {
-      reply: voiceReply.reply,
+      reply: prepareReplyForDelivery(voiceReply.reply, text, voiceReply.intentResolution),
       mode: 'voice-hub',
       ...intentView,
       ...(voiceReply.intentResolution ? { intentResolution: voiceReply.intentResolution } : {}),
@@ -215,7 +260,7 @@ export async function POST(req: NextRequest) {
 
   // Degrade to the orchestrator directly (no voice-hub needed).
   try {
-    const payload = await replyViaOrchestrator(text, speaker, sessionId, locale);
+    const payload = await replyViaOrchestrator(text, speaker, sessionId, locale, scope);
     return NextResponse.json(payload);
   } catch (error) {
     console.warn(

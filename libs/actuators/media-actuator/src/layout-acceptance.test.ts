@@ -9,7 +9,7 @@
  */
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, WCAG_AA_BODY_TEXT } from '@agent/core';
+import { contrastRatio, WCAG_AA_BODY_TEXT } from '@agent/core/design-qa';
 import { handleAction } from './index.js';
 
 const LONG_JP =

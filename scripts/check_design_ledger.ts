@@ -1,6 +1,7 @@
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type DesignNoteStatus = 'proposed' | 'implemented' | 'rejected';
 
@@ -112,13 +113,16 @@ export const runCheckDesignLedger = defineScript({
   run(context) {
     const violations = validateDesignLedger();
     if (violations.length > 0) {
-      for (const violation of violations) {
-        console.error(`[check:design-ledger] ${violation.file}: ${violation.message}`);
-      }
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        [
+          'violations detected:',
+          ...violations.map((violation) => `- ${violation.file}: ${violation.message}`),
+        ].join('\n')
+      );
     }
     context.print('[check:design-ledger] OK');
+    return { violations };
   },
 });
 

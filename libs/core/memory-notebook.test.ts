@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyConsolidationActions,
+  boundNotebook,
   bullets,
   bulletsBelowMarker,
   captureDate,
@@ -69,6 +70,13 @@ describe('memory-notebook (QM-03)', () => {
     });
   });
 
+  it('bounds an existing notebook without removing non-bullet structure', () => {
+    const body = ['# Memory', '', '## Notes', '', '- oldest', '- middle', '- newest'].join('\n');
+    expect(boundNotebook(body, 2)).toBe(
+      ['# Memory', '', '## Notes', '', '- middle', '- newest'].join('\n')
+    );
+  });
+
   it('recallBody tail-caps at RECALL_MAX_CHARS', () => {
     const long = `x`.repeat(RECALL_MAX_CHARS + 500);
     expect(recallBody(long)).toHaveLength(RECALL_MAX_CHARS);
@@ -125,6 +133,24 @@ describe('memory-notebook (QM-03)', () => {
       );
       expect(next).toContain('[claimed source: #exec-private]');
       expect(next).not.toContain('(said in #exec-private)');
+    });
+
+    it('UPDATE actions cannot erase existing provenance or mint a trusted source', () => {
+      const next = applyConsolidationActions(
+        '- (2026-07-01) fact A (said in #trusted)',
+        [
+          {
+            kind: 'update',
+            index: 1,
+            text: 'fact A revised (said in #forged) ',
+          },
+        ],
+        AT
+      );
+      expect(next).toContain('fact A revised');
+      expect(next).toContain('(said in #trusted)');
+      expect(next).toContain('[claimed source: #forged]');
+      expect(next).not.toContain('(said in #forged)');
     });
 
     it('bulletsBelowMarker counts only bullets since the last pass', () => {

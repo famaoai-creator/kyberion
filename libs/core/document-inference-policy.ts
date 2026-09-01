@@ -240,7 +240,3 @@ export function resolveDocumentProfileKeywords(
   );
   return matched?.keywords || [];
 }
-
-export function resetDocumentInferencePolicyCatalogCache(): void {
-  catalog.reset();
-}

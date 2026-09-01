@@ -13,19 +13,32 @@ const mocks = vi.hoisted(() => ({
   createStandardYargs: vi.fn(),
 }));
 
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal();
+vi.mock('@agent/core/environment-capability', () => ({
+  loadEnvironmentManifest: mocks.loadEnvironmentManifest,
+  probeManifest: mocks.probeManifest,
+}));
+
+vi.mock('@agent/core/environment-capability-probes', () => ({
+  installCoreEnvironmentProbes: vi.fn(),
+}));
+
+vi.mock('@agent/core/tool-runtime-registry', () => ({
+  listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+}));
+
+vi.mock('@agent/core/coreaudio-device-inventory', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
-    ...(actual as any),
-    loadEnvironmentManifest: mocks.loadEnvironmentManifest,
-    probeManifest: mocks.probeManifest,
-    safeExecResult: mocks.safeExecResult,
-    safeExistsSync: mocks.safeExistsSync,
-    safeReaddir: mocks.safeReaddir,
-    listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+    ...actual,
     createCoreAudioDeviceInventoryBridge: mocks.createCoreAudioDeviceInventoryBridge,
   };
 });
+
+vi.mock('@agent/core/secure-io', () => ({
+  safeExecResult: mocks.safeExecResult,
+  safeExistsSync: mocks.safeExistsSync,
+  safeReaddir: mocks.safeReaddir,
+}));
 
 vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: mocks.createStandardYargs,

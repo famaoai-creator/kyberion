@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { safeMkdir, safeWriteFile } from '@agent/core';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { validateDesignLedger } from './check_design_ledger.js';
 
 const fixtureRoot = pathResolver.shared('tmp/design-ledger-check');

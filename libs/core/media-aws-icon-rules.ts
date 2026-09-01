@@ -171,7 +171,3 @@ export function resolveMediaAwsIconCandidates(resourceType: string): string[] {
   }
   return [];
 }
-
-export function resetMediaAwsIconRuleCatalogCache(): void {
-  catalog.reset();
-}

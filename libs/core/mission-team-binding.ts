@@ -4,7 +4,12 @@ import { assertMissionIdArgument, findMissionPath, missionDir } from './path-res
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
+import {
+  provisionMissionEntry,
+  writeProvisionedJson,
+  writeProvisionedText,
+} from './mission-orchestration-journal.js';
 import type {
   MissionTeamGovernance,
   MissionTeamOrganizationProfileSummary,
@@ -140,11 +145,20 @@ function resolveMissionBindingPaths(
     missionPathHint ||
     findMissionPath(normalizedMissionId) ||
     missionDir(normalizedMissionId, 'public');
+  const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
   return {
-    missionPath,
-    teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
-    staffingAssignmentsPath: path.join(missionPath, 'staffing-assignments.json'),
-    executionLedgerPath: path.join(missionPath, 'execution-ledger.jsonl'),
+    missionPath: safeMissionPath,
+    teamBlueprintPath: assertSafeRepositoryPath(path.join(safeMissionPath, 'team-blueprint.json'), {
+      allowMissingLeaf: true,
+    }),
+    staffingAssignmentsPath: assertSafeRepositoryPath(
+      path.join(safeMissionPath, 'staffing-assignments.json'),
+      { allowMissingLeaf: true }
+    ),
+    executionLedgerPath: assertSafeRepositoryPath(
+      path.join(safeMissionPath, 'execution-ledger.jsonl'),
+      { allowMissingLeaf: true }
+    ),
   };
 }
 
@@ -319,20 +333,39 @@ export function initializeMissionTeamBindings(
   missionPath: string,
   plan: MissionTeamPlan
 ): MissionBindingPaths {
-  const paths: MissionBindingPaths = {
-    missionPath,
-    teamBlueprintPath: path.join(missionPath, 'team-blueprint.json'),
-    staffingAssignmentsPath: path.join(missionPath, 'staffing-assignments.json'),
-    executionLedgerPath: path.join(missionPath, 'execution-ledger.jsonl'),
-  };
+  const paths = resolveMissionBindingPaths(plan.mission_id, missionPath);
 
-  safeMkdir(missionPath, { recursive: true });
+  safeMkdir(paths.missionPath, { recursive: true });
   const blueprint = buildMissionTeamBlueprint(plan);
   const staffingAssignments = buildMissionStaffingAssignments(plan);
-  safeWriteFile(paths.teamBlueprintPath, JSON.stringify(blueprint, null, 2));
-  safeWriteFile(paths.staffingAssignmentsPath, JSON.stringify(staffingAssignments, null, 2));
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: paths.teamBlueprintPath,
+    targetPath: path.relative(paths.missionPath, paths.teamBlueprintPath).split(path.sep).join('/'),
+    missionPathHint: paths.missionPath,
+    provisioned: provisionMissionEntry(blueprint),
+  });
+  writeProvisionedJson({
+    missionId: plan.mission_id,
+    filePath: paths.staffingAssignmentsPath,
+    targetPath: path
+      .relative(paths.missionPath, paths.staffingAssignmentsPath)
+      .split(path.sep)
+      .join('/'),
+    missionPathHint: paths.missionPath,
+    provisioned: provisionMissionEntry(staffingAssignments),
+  });
   if (!safeExistsSync(paths.executionLedgerPath)) {
-    safeWriteFile(paths.executionLedgerPath, '');
+    writeProvisionedText({
+      missionId: plan.mission_id,
+      filePath: paths.executionLedgerPath,
+      targetPath: path
+        .relative(paths.missionPath, paths.executionLedgerPath)
+        .split(path.sep)
+        .join('/'),
+      missionPathHint: paths.missionPath,
+      provisioned: provisionMissionEntry(''),
+    });
   }
   return paths;
 }
@@ -432,9 +465,10 @@ function resolveMissionLedgerScope(
 ): EventScope {
   let state: Record<string, unknown> = {};
   const statePath = path.join(missionPath, 'mission-state.json');
-  if (safeExistsSync(statePath)) {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (safeExistsSync(safeStatePath)) {
     try {
-      state = readJson<Record<string, unknown>>(statePath);
+      state = readJson<Record<string, unknown>>(safeStatePath);
     } catch {
       state = {};
     }
@@ -484,7 +518,16 @@ export function appendMissionExecutionLedgerEntry(
   };
   safeMkdir(paths.missionPath, { recursive: true });
   if (!safeExistsSync(paths.executionLedgerPath)) {
-    safeWriteFile(paths.executionLedgerPath, '');
+    writeProvisionedText({
+      missionId,
+      filePath: paths.executionLedgerPath,
+      targetPath: path
+        .relative(paths.missionPath, paths.executionLedgerPath)
+        .split(path.sep)
+        .join('/'),
+      missionPathHint: paths.missionPath,
+      provisioned: provisionMissionEntry(''),
+    });
   }
   const entry: MissionExecutionLedgerEntry = {
     ts: new Date().toISOString(),

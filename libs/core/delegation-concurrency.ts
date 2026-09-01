@@ -81,14 +81,10 @@
 import * as path from 'node:path';
 import { Semaphore } from './semaphore.js';
 import { logger } from './core.js';
+import { readJson } from './foundation/json.js';
+import { recordGovernanceAction } from './governance-action-recorder.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeExecResult,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeExecResult, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 const DEFAULT_GLOBAL_MAX_CONCURRENCY = 4;
@@ -307,8 +303,7 @@ function readPersistedRegistry(): DelegationChildRecord[] {
   try {
     const filePath = delegationChildrenRegistryPath();
     if (!safeExistsSync(filePath)) return [];
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
+    const parsed = readJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -398,20 +393,12 @@ function recordDelegationTimeout(provider: string, budgetMs: number, id: string)
   // detector reads (policy_violations), so repeated timeouts for the same
   // logical actor can themselves escalate through the existing graduated
   // response (warn -> isolate -> kill) without a second detector.
-  import('./kill-switch.js')
-    .then(({ recordGovernanceAction }) => {
-      recordGovernanceAction(
-        'delegation-concurrency',
-        'wall_clock_timeout',
-        `provider=${provider} id=${id} budgetMs=${budgetMs}`,
-        true
-      );
-    })
-    .catch((err) => {
-      logger.warn(
-        `[delegation-concurrency] failed to record governance action for timeout (non-fatal): ${err instanceof Error ? err.message : String(err)}`
-      );
-    });
+  recordGovernanceAction(
+    'delegation-concurrency',
+    'wall_clock_timeout',
+    `provider=${provider} id=${id} budgetMs=${budgetMs}`,
+    true
+  );
 }
 
 export class DelegationWallClockExceededError extends Error {
@@ -548,32 +535,49 @@ export function terminateAllActiveDelegationChildren(reason: string): { terminat
   return { terminatedIds };
 }
 
-let killSwitchWirePromise: Promise<void> | null = null;
+type KillSwitchTerminationListener = (agentId: string, reason: string) => void;
+type KillSwitchTerminationRegistrar = (listener: KillSwitchTerminationListener) => () => void;
+
+let killSwitchTerminationRegistrar: KillSwitchTerminationRegistrar | undefined;
+let killSwitchTerminationDisposer: (() => void) | null = null;
+let killSwitchWiringRequested = false;
 
 /**
- * Register {@link terminateAllActiveDelegationChildren} as a kill-switch
- * termination listener (dynamic import — mirrors the existing
- * `kill-switch.js` lazy-import pattern elsewhere in this repo, and keeps
- * importing *this* module free of side effects). Idempotent and memoized:
- * safe to call from every dispatch, only wires once. Returns the wiring
- * promise so tests can await it deterministically; production callers may
- * fire-and-forget.
+ * Register the optional kill-switch listener seam. The kill-switch module is
+ * the owner of the termination event; delegation-concurrency only supplies
+ * the callback, keeping this resource-governance module independent of the
+ * kill-switch dependency graph.
+ */
+export function registerKillSwitchTerminationRegistrar(
+  registrar: KillSwitchTerminationRegistrar
+): () => void {
+  killSwitchTerminationRegistrar = registrar;
+  if (killSwitchWiringRequested) installKillSwitchTerminationListener();
+  return () => {
+    if (killSwitchTerminationRegistrar !== registrar) return;
+    killSwitchTerminationDisposer?.();
+    killSwitchTerminationDisposer = null;
+    killSwitchTerminationRegistrar = undefined;
+  };
+}
+
+function installKillSwitchTerminationListener(): void {
+  if (killSwitchTerminationDisposer || !killSwitchTerminationRegistrar) return;
+  killSwitchTerminationDisposer = killSwitchTerminationRegistrar((agentId, reason) => {
+    terminateAllActiveDelegationChildren(`kill-switch:${agentId}:${reason}`);
+  });
+}
+
+/**
+ * Request registration of {@link terminateAllActiveDelegationChildren} as a
+ * kill-switch termination listener. Idempotent and safe to call from every
+ * dispatch. The owner module registers the registrar separately, so this
+ * module never imports kill-switch and cannot form a runtime cycle with it.
  */
 export function wireDelegationKillSwitchIntegration(): Promise<void> {
-  if (killSwitchWirePromise) return killSwitchWirePromise;
-  killSwitchWirePromise = import('./kill-switch.js')
-    .then(({ onKillSwitchTermination }) => {
-      onKillSwitchTermination((agentId, reason) => {
-        terminateAllActiveDelegationChildren(`kill-switch:${agentId}:${reason}`);
-      });
-    })
-    .catch((err) => {
-      logger.warn(
-        `[delegation-concurrency] failed to wire kill-switch integration (non-fatal): ${err instanceof Error ? err.message : String(err)}`
-      );
-      killSwitchWirePromise = null; // allow a later call to retry
-    });
-  return killSwitchWirePromise;
+  killSwitchWiringRequested = true;
+  installKillSwitchTerminationListener();
+  return Promise.resolve();
 }
 
 /** Test-only: reset every module-level singleton (semaphores, counters, registries, wiring memo). */
@@ -583,5 +587,8 @@ export function resetDelegationConcurrencyStateForTests(): void {
   activeChildren.clear();
   recordedTimeouts.length = 0;
   idCounter = 0;
-  killSwitchWirePromise = null;
+  killSwitchTerminationDisposer?.();
+  killSwitchTerminationDisposer = null;
+  killSwitchTerminationRegistrar = undefined;
+  killSwitchWiringRequested = false;
 }

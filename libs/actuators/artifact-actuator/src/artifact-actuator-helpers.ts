@@ -5,13 +5,14 @@ import {
   readGovernedArtifactJson,
   resolveGovernedArtifactPath,
   writeGovernedArtifactJson,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
   type GovernedArtifactRole,
-} from '@agent/core';
-import { pathResolver } from '@agent/core';
+} from '@agent/core/artifact-store';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
 
 export interface ArtifactAction {
   action:
@@ -52,14 +53,11 @@ const DEFAULT_ARTIFACT_RETRY = {
   jitter: true,
 };
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: ARTIFACT_MANIFEST_PATH,
-    defaults: DEFAULT_ARTIFACT_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: ARTIFACT_MANIFEST_PATH,
+  defaults: DEFAULT_ARTIFACT_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function handleArtifactAction(input: ArtifactAction) {
   const params = input.params || ({} as ArtifactAction['params']);
@@ -139,7 +137,10 @@ export async function handleArtifactAction(input: ArtifactAction) {
           admittedParams.logicalDir
         );
         const packId = admittedParams.packId || `delivery-pack-${Date.now()}`;
-        const logicalPath = pathResolver.rootResolve(`${admittedParams.logicalDir}/${packId}.json`);
+        const logicalPath = `${admittedParams.logicalDir}/${packId}.json`;
+        assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+          allowMissingLeaf: true,
+        });
         const payload = {
           kind: 'delivery-pack',
           pack_id: packId,

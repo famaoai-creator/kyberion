@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
@@ -8,14 +8,22 @@ import {
   resolveVoiceBackend,
   probeMediaBackendAvailability,
   resetMediaBackendAvailabilityCache,
+  resetMediaBackendRegistryCache,
+  _resetMediaBackendAvailabilityCacheForTests,
   resolveMediaBackendWithAvailability,
 } from './media-backend-registry.js';
 
 describe('media backend registry', () => {
   beforeEach(() => {
-    resetMediaBackendAvailabilityCache();
+    _resetMediaBackendAvailabilityCacheForTests();
     delete process.env.KYBERION_RUNWAY_API_KEY;
     delete process.env.RUNWAYML_API_SECRET;
+    delete process.env.KYBERION_MEDIA_BACKEND_REGISTRY_PATH;
+  });
+
+  afterEach(() => {
+    delete process.env.KYBERION_MEDIA_BACKEND_REGISTRY_PATH;
+    resetMediaBackendRegistryCache();
   });
 
   it('caches availability probes and exposes bounded probe metadata', async () => {
@@ -32,6 +40,14 @@ describe('media backend registry', () => {
     expect(new Date(second.cache_expires_at).getTime()).toBeGreaterThan(
       new Date(second.probed_at).getTime()
     );
+  });
+
+  it('retains public cache reset APIs for consumers', () => {
+    expect(resetMediaBackendAvailabilityCache).toEqual(expect.any(Function));
+    expect(resetMediaBackendRegistryCache).toEqual(expect.any(Function));
+    resetMediaBackendAvailabilityCache();
+    resetMediaBackendRegistryCache();
+    expect(getMediaBackendRegistry().default_backend_ids.image).toBe('media-generation.comfyui');
   });
 
   it('force bypasses the availability probe cache', async () => {
@@ -75,6 +91,14 @@ describe('media backend registry', () => {
         (backend) => backend.backend_id === 'media-generation.apple_playground'
       )
     ).toBe(true);
+  });
+
+  it('uses the conservative fallback for an external registry override', () => {
+    process.env.KYBERION_MEDIA_BACKEND_REGISTRY_PATH =
+      '/tmp/kyberion-media-backend-registry-external.json';
+    resetMediaBackendRegistryCache();
+
+    expect(getMediaBackendRegistry().version).toBe('fallback');
   });
 
   it('resolves image, voice, and video backends through the same abstraction', () => {

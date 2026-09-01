@@ -986,6 +986,12 @@
         </section>
       </div>
       <div class="grid" style="margin-top: 18px;">
+        <section class="panel" id="intent-resolution-panel">
+          <div class="label">Intent Resolution</div>
+          <div class="list" id="intent-resolution"></div>
+        </section>
+      </div>
+      <div class="grid" style="margin-top: 18px;">
         <section class="panel" id="async-panel">
           <div class="label">In Progress</div>
           <div class="list" id="async-requests"></div>
@@ -1265,6 +1271,7 @@
       const subtitleEl = document.getElementById("subtitle");
       const transcriptEl = document.getElementById("transcript");
       const stimuliEl = document.getElementById("stimuli");
+      const intentResolutionEl = document.getElementById("intent-resolution");
       const asyncRequestsEl = document.getElementById("async-requests");
       const notificationsEl = document.getElementById("notifications");
       const approvalInboxEl = document.getElementById("approval-inbox");
@@ -2047,6 +2054,7 @@
           throw new Error(`voice ingest failed: HTTP ${response.status}`);
         }
         const body = await response.json();
+        renderIntentResolution(body.intentResolution);
         await loadAsyncState();
         if (latestState) render(latestState);
         return body;
@@ -2091,6 +2099,7 @@
           if (!response.ok) {
             throw new Error(`${body.error || `HTTP ${response.status}`} (${deviceLabel}, ${body.elapsed_ms || "?"}ms)`);
           }
+          renderIntentResolution(body.intentResolution);
           setNativeMicState(false, `Native STT heard on ${deviceLabel}: ${body.stt?.text || body.replyText || "ok"} (${body.stt?.elapsed_ms || "?"}ms)`);
         } catch (error) {
           setNativeMicState(false, `Native STT failed on ${deviceLabel}: ${error.message || error}`);
@@ -2150,6 +2159,87 @@
         }
       }
 
+      function parseIntentResolutionContract(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+        const ownKeys = Object.keys(value);
+        const allowedKeys = [
+          "request_id", "normalized_intent", "missing_inputs", "resolution_shape",
+          "outcome_kind", "authority_level", "next_action", "project_context", "rationale"
+        ];
+        if (ownKeys.some((key) => !allowedKeys.includes(key))) return null;
+        const shapes = ["direct_answer", "task_session", "mission", "project_bootstrap"];
+        const outcomes = ["answer", "artifact", "approval_ready_plan", "service_change", "status_report"];
+        const authorities = ["autonomous", "approval_required", "human_clarification_required"];
+        const actionKinds = ["request_approval", "provide_input", "continue"];
+        const nonEmpty = (entry) => typeof entry === "string" && entry.trim().length > 0;
+        if (!nonEmpty(value.request_id) || !nonEmpty(value.normalized_intent) ||
+            !Array.isArray(value.missing_inputs) || !value.missing_inputs.every(nonEmpty) ||
+            !shapes.includes(value.resolution_shape) || !outcomes.includes(value.outcome_kind) ||
+            !authorities.includes(value.authority_level) || !nonEmpty(value.rationale)) return null;
+        const action = value.next_action;
+        if (!action || typeof action !== "object" || Array.isArray(action) ||
+            Object.keys(action).some((key) => !["kind", "label", "consequence"].includes(key)) ||
+            !actionKinds.includes(action.kind) || !nonEmpty(action.label) ||
+            !nonEmpty(action.consequence)) return null;
+        let projectContext;
+        if (value.project_context !== undefined) {
+          const context = value.project_context;
+          if (!context || typeof context !== "object" || Array.isArray(context) ||
+              Object.keys(context).some((key) => !["project_id", "confidence"].includes(key)) ||
+              (context.project_id !== undefined && !nonEmpty(context.project_id)) ||
+              typeof context.confidence !== "number" || !Number.isFinite(context.confidence) ||
+              context.confidence < 0 || context.confidence > 1) return null;
+          projectContext = {
+            ...(context.project_id ? { project_id: context.project_id } : {}),
+            confidence: context.confidence
+          };
+        }
+        return {
+          request_id: value.request_id,
+          normalized_intent: value.normalized_intent,
+          missing_inputs: [...value.missing_inputs],
+          resolution_shape: value.resolution_shape,
+          outcome_kind: value.outcome_kind,
+          authority_level: value.authority_level,
+          next_action: { kind: action.kind, label: action.label, consequence: action.consequence },
+          ...(projectContext ? { project_context: projectContext } : {}),
+          rationale: value.rationale
+        };
+      }
+
+      function renderIntentResolution(contract) {
+        if (!intentResolutionEl) return;
+        contract = parseIntentResolutionContract(contract);
+        if (!contract) {
+          renderList(intentResolutionEl, [], () => "");
+          return;
+        }
+        const missing = contract.missing_inputs.length
+          ? contract.missing_inputs.join(", ")
+          : uiText("none", "なし");
+        const nextAction = contract.next_action;
+        const authorityLabels = {
+          autonomous: uiTextKey("tui:tui_cockpit_authority_autonomous", uiText("Can proceed", "そのまま進められます")),
+          approval_required: uiTextKey("tui:tui_cockpit_authority_approval", uiText("Human approval required", "人間の承認が必要です")),
+          human_clarification_required: uiTextKey("tui:tui_cockpit_authority_clarification", uiText("Human clarification required", "人間の確認が必要です")),
+        };
+        const outcomeLabels = {
+          answer: uiTextKey("tui:tui_cockpit_outcome_answer", uiText("Answer", "回答")),
+          artifact: uiTextKey("tui:tui_cockpit_outcome_artifact", uiText("Artifact", "成果物")),
+          approval_ready_plan: uiTextKey("tui:tui_cockpit_outcome_approval_ready_plan", uiText("Approval-ready plan", "承認可能な計画")),
+          service_change: uiTextKey("tui:tui_cockpit_outcome_service_change", uiText("Service change", "サービス変更")),
+          status_report: uiTextKey("tui:tui_cockpit_outcome_status_report", uiText("Status report", "状況レポート")),
+        };
+        renderList(intentResolutionEl, [contract], (item) => `
+          <div class="small">${escapeHtml(uiText("understanding", "理解"))}: <span class="mono">${escapeHtml(item.normalized_intent || "unresolved_intent")}</span></div>
+          <div class="small">${escapeHtml(uiText("missing input", "不足入力"))}: <span class="mono">${escapeHtml(missing)}</span></div>
+          <div class="small">${escapeHtml(uiText("authority", "権限"))}: <span class="mono">${escapeHtml(authorityLabels[item.authority_level] || uiText("Unknown", "不明"))}</span></div>
+          <div class="small">${escapeHtml(uiText("outcome", "結果"))}: <span class="mono">${escapeHtml(outcomeLabels[item.outcome_kind] || uiText("Unknown", "不明"))}</span></div>
+          <div class="small">${escapeHtml(uiText("next action", "次の操作"))}: <span class="mono">${escapeHtml(nextAction.label || nextAction.kind || "unknown")}</span></div>
+          <div class="small">${escapeHtml(uiText("consequence", "影響"))}: <span class="mono">${escapeHtml(nextAction.consequence || "unknown")}</span></div>`
+        );
+      }
+
       function renderFirstRunLauncher(payload) {
         if (!firstRunSummaryEl || !firstRunSurfacesEl || !firstRunNextEl) return;
         if (!payload || payload.ok === false) {
@@ -2177,7 +2267,7 @@
         firstRunSurfacesEl.innerHTML = recommendedRows.map(({ recommendation, rows: matchedRows }) => {
           const blocked = matchedRows.flatMap((row) => Array.isArray(row.blocked_by) ? row.blocked_by : []);
           const bestFor = matchedRows.map((row) => row.best_for).filter(Boolean).join(" / ");
-          const nextCommand = recommendation.suggestedCommand || (matchedRows[0] && matchedRows[0].next_command) || "pnpm surfaces:status";
+          const nextCommand = recommendation.suggestedCommand || (matchedRows[0] && matchedRows[0].next_command) || "pnpm surfaces status";
           return (
             `<div class="first-run-card">
               <strong>${escapeHtml(recommendation.title || "Surface")}</strong>

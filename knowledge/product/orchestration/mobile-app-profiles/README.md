@@ -10,8 +10,8 @@
 CLI:
 
 ```bash
-node dist/scripts/cli.js mobile-profiles
-node dist/scripts/cli.js mobile-profiles example-mobile-login-passkey
+pnpm kyberion mobile-profiles
+pnpm kyberion mobile-profiles example-mobile-login-passkey
 ```
 
 Reference handoff adapter templates:

@@ -22,12 +22,30 @@
         "properties": {
           "period_id": { "type": "string" },
           "label": { "type": "string" },
-          "revenue_jpy": { "type": ["number", "null"] },
-          "operating_cost_jpy": { "type": ["number", "null"] },
-          "gross_profit_jpy": { "type": ["number", "null"] },
-          "cash_balance_jpy": { "type": ["number", "null"] },
-          "budget_jpy": { "type": ["number", "null"] },
-          "forecast_jpy": { "type": ["number", "null"] },
+          "revenue_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
+          "operating_cost_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
+          "gross_profit_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
+          "cash_balance_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
+          "budget_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
+          "forecast_jpy": {
+            "type": ["number", "string", "null"],
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$"
+          },
           "note": { "type": ["string", "null"] }
         }
       }

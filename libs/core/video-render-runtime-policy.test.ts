@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeWriteFile } from '@agent/core';
-import { getVideoRenderRuntimePolicy, resetVideoRenderRuntimePolicyCache } from './video-render-runtime-policy.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import {
+  getVideoRenderRuntimePolicy,
+  _resetVideoRenderRuntimePolicyCacheForTests,
+} from './video-render-runtime-policy.js';
 
 describe('video render runtime policy', () => {
   const tmpDir = pathResolver.sharedTmp('video-render-runtime-policy-tests');
@@ -8,7 +12,7 @@ describe('video render runtime policy', () => {
 
   afterEach(() => {
     delete process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH;
-    resetVideoRenderRuntimePolicyCache();
+    _resetVideoRenderRuntimePolicyCacheForTests();
   });
 
   it('loads override policy files', () => {
@@ -34,7 +38,7 @@ describe('video render runtime policy', () => {
           quality: 'high',
           command_timeout_ms: 120000,
         },
-      }),
+      })
     );
     process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH = overridePath;
 
@@ -43,5 +47,22 @@ describe('video render runtime policy', () => {
     expect(policy.queue.concurrency).toBe(2);
     expect(policy.render.enable_backend_rendering).toBe(true);
     expect(policy.render.backend).toBe('hyperframes_cli');
+  });
+
+  it('falls back when an override fails schema validation', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(overridePath, JSON.stringify({ version: 'invalid' }));
+    process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH = overridePath;
+
+    const policy = getVideoRenderRuntimePolicy();
+    expect(policy.version).toBe('fallback');
+    expect(policy.queue.concurrency).toBe(1);
+  });
+
+  it('rejects a policy override outside the repository', () => {
+    process.env.KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH =
+      '/tmp/kyberion-video-render-policy-external.json';
+
+    expect(() => getVideoRenderRuntimePolicy()).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 });

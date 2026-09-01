@@ -58,4 +58,19 @@ describe('prompt visibility ledger', () => {
       'MISSION_LOG_CORRUPT:prompt_visibility_record'
     );
   });
+
+  it('rejects ledger paths outside the repository root', () => {
+    const outside = path.join(pathResolver.rootDir(), '..', 'prompt-visibility-outside.jsonl');
+    expect(() =>
+      appendPromptVisibilityRecord({
+        missionPath: root,
+        ledgerPath: outside,
+        missionId: 'MSN-PVR-SCOPE',
+        source: 'test',
+        form: 'pack',
+        content: 'secret',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(() => loadPromptVisibilityLedger(outside)).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });

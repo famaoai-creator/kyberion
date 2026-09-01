@@ -1,4 +1,5 @@
 {
+  "$schema": "../../schemas/agentic-source-review-rules.schema.json",
   "kind": "agentic-source-review-rules",
   "version": "1.0.0",
   "description": "Deterministic rule hierarchy for selecting domain, language, framework and vulnerability review guidance.",

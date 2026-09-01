@@ -1,15 +1,26 @@
-import { createStandardYargs, logger } from '@agent/core';
-import {
-  assertProtocolServiceRegistered,
-  createPeerMessagingServer,
-  recordProtocolServiceLifecycle,
-  type PeerMessageEnvelope,
-} from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
+import { createPeerMessagingServer } from '@agent/core/peer-messaging';
+import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
+import type { PeerMessageEnvelope } from '@agent/core/peer-messaging';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-async function main(): Promise<void> {
+function normalizePeerServerArguments(args: string[]): string[] {
+  return stripSharedScriptFlags(args);
+}
+
+async function main(
+  args: string[] = [],
+  options: { dryRun?: boolean; check?: boolean } = {}
+): Promise<unknown> {
   assertProtocolServiceRegistered('peer-messaging');
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs([
+    'node',
+    'peer_messaging_server',
+    ...normalizePeerServerArguments(args),
+  ])
     .option('peer-id', {
       type: 'string',
       demandOption: true,
@@ -51,6 +62,16 @@ async function main(): Promise<void> {
     );
   }
   if (!tenantId) throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
+  if (options.dryRun === true || options.check === true) {
+    return {
+      dry_run: true,
+      operation: 'peer-messaging-server.listen',
+      peer_id: peerId,
+      tenant_id: tenantId,
+      host: String(argv.host),
+      port: Number(argv.port),
+    };
+  }
 
   const server = createPeerMessagingServer({
     peerId,
@@ -73,18 +94,39 @@ async function main(): Promise<void> {
   });
 
   await server.listen(Number(argv.port), String(argv.host));
-  recordProtocolServiceLifecycle({
-    serviceId: 'peer-messaging',
-    action: 'start',
-    status: 'started',
-    scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
-    principal: { kind: 'service', id: peerId },
-    requestedBy: peerId,
-    metadata: { host: String(argv.host), port: Number(argv.port) },
-  });
-  logger.success(
-    `[peer-messaging-server] peer ${peerId} listening on http://${String(argv.host)}:${Number(argv.port)}`
-  );
+  let lifecycleStarted = false;
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: 'peer-messaging',
+      action: 'start',
+      status: 'started',
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+      principal: { kind: 'service', id: peerId },
+      requestedBy: peerId,
+      metadata: { host: String(argv.host), port: Number(argv.port) },
+    });
+    lifecycleStarted = true;
+    logger.success(
+      `[peer-messaging-server] peer ${peerId} listening on http://${String(argv.host)}:${Number(argv.port)}`
+    );
+  } catch (error) {
+    if (lifecycleStarted) {
+      try {
+        recordProtocolServiceLifecycle({
+          serviceId: 'peer-messaging',
+          action: 'stop',
+          status: 'stopped',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+          principal: { kind: 'service', id: peerId },
+          requestedBy: peerId,
+        });
+      } catch {
+        // Preserve the startup failure; the server is still closed below.
+      }
+    }
+    await server.close();
+    throw error;
+  }
 
   const shutdown = async () => {
     try {
@@ -98,14 +140,23 @@ async function main(): Promise<void> {
       });
     } finally {
       await server.close();
-      process.exitCode = 0;
     }
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runPeerMessagingServer = defineScript({
+  name: 'peer:messaging-server',
+  run: async ({ argv, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    if (result) print(result);
+    return result;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_messaging_server.ts') ||
+  isDirectScript(import.meta.url, 'peer_messaging_server.js')
+)
+  void runPeerMessagingServer();

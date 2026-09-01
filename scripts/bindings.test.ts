@@ -15,4 +15,14 @@ describe('DH-03 seam bindings dump', () => {
     const provider = bindings.find((binding) => binding.providers.length > 0)?.providers[0];
     expect(provider?.metadata.reason).toMatch(/^(provenance|source):/u);
   });
+
+  it('reports reasoning selection provenance without probing or exposing values', () => {
+    const selection = loadCoreSeamBindings().find(
+      (binding) => binding.key === 'reasoning-backend'
+    )?.reasoning_selection;
+    expect(selection?.mode).toBeTypeOf('string');
+    expect(selection?.reason).toBeTypeOf('string');
+    expect(['memory', 'disk', 'unavailable']).toContain(selection?.provider_probe);
+    expect(selection?.reason).not.toMatch(/secret|token|key=[^A-Z]/iu);
+  });
 });

@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { dispatchA2UI, type A2UIMessage } from './a2ui.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface ComputerSurfacePatch {
   sessionId: string;
@@ -20,7 +20,17 @@ const COMPUTER_SURFACE_ID = 'computer-surface';
 const COMPUTER_SESSION_DIR = pathResolver.shared('runtime/computer/sessions');
 let computerSurfaceCreated = false;
 
+function computerSessionPath(sessionId: string): string {
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(sessionId)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid computer session id: ${sessionId}`);
+  }
+  return assertSafeRepositoryPath(path.join(COMPUTER_SESSION_DIR, `${sessionId}.json`), {
+    allowMissingLeaf: true,
+  });
+}
+
 export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIMessage[] {
+  computerSessionPath(patch.sessionId);
   const messages: A2UIMessage[] = [];
   if (!computerSurfaceCreated) {
     messages.push({
@@ -66,7 +76,7 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
     safeMkdir(COMPUTER_SESSION_DIR, { recursive: true });
   }
 
-  const sessionPath = path.join(COMPUTER_SESSION_DIR, `${patch.sessionId}.json`);
+  const sessionPath = computerSessionPath(patch.sessionId);
   safeWriteFile(
     sessionPath,
     JSON.stringify(
@@ -83,7 +93,7 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
         updatedAt: patch.updatedAt || new Date().toISOString(),
       },
       null,
-      2,
-    ),
+      2
+    )
   );
 }

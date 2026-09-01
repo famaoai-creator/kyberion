@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
 import {
   assertTenantOperational,
   readTenantProfile,
@@ -34,10 +33,10 @@ import { bootstrapManagedProject, type ProjectBootstrapResult } from './project-
 import { createWorkItem, getWorkItem, updateWorkItem, type WorkItem } from './work-coordination.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -46,20 +45,14 @@ import {
   loadJson,
 } from './secure-io.js';
 
-type AddFormatsPlugin = typeof import('ajv-formats').default;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-context-binding.schema.json'
 );
-const validator: ValidateFunction = compileSchemaFromPath(ajv, SCHEMA_PATH);
+const validator: ValidateFunction = compileSchema(SCHEMA_PATH);
 const FIRST_WORK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/onboarding-first-work.schema.json'
 );
-const firstWorkValidator: ValidateFunction = compileSchemaFromPath(ajv, FIRST_WORK_SCHEMA_PATH);
+const firstWorkValidator: ValidateFunction = compileSchema(FIRST_WORK_SCHEMA_PATH);
 const CUSTOMER_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/;
 
 export type OnboardingContextBindingStatus = 'draft' | 'confirmed' | 'active' | 'blocked';
@@ -191,11 +184,17 @@ function assertCustomerSlug(slug: string): string {
 }
 
 function contextPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json');
+  return assertSafeRepositoryPath(
+    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'organization-context.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function firstWorkPath(customerSlug: string, rootDir = pathResolver.rootDir()): string {
-  return path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json');
+  return assertSafeRepositoryPath(
+    path.join(rootDir, 'customer', customerSlug, 'onboarding', 'first-work-resolution.json'),
+    { allowMissingLeaf: true, rootDir }
+  );
 }
 
 function firstWorkId(binding: OnboardingContextBinding, intent: string): string {

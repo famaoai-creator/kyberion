@@ -13,7 +13,7 @@
  * importing `auditChain.record` directly will trip the test.
  */
 
-import { auditChain } from '@agent/core';
+import { auditChain } from '@agent/core/audit-chain';
 // Next.js resolves this source module directly; a `.js` suffix makes webpack
 // look for a physical JavaScript file instead of the colocated TypeScript file.
 import { getTenantScope } from './data';

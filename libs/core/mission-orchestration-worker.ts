@@ -18,6 +18,8 @@ import {
   goalIdForWorkItem,
   runGoalDrivenWorkItem,
   provisionGoalDrivenTaskKnowledge,
+  resolveManualGoalDriveScope,
+  isGoalDrivenTaskResumable,
 } from './mission-orchestration-worker-part-dispatch.js';
 import {
   isDraftRefineCandidate,
@@ -42,6 +44,8 @@ export {
   goalIdForWorkItem,
   runGoalDrivenWorkItem,
   provisionGoalDrivenTaskKnowledge,
+  resolveManualGoalDriveScope,
+  isGoalDrivenTaskResumable,
   isDraftRefineCandidate,
   isBestOfNCandidate,
   persistPlanningPacket,

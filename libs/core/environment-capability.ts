@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -305,7 +306,21 @@ async function runProbe(
       const evidenceDir = pathResolver.missionEvidenceDir(missionId);
       if (!evidenceDir)
         return { available: false, reason: `mission '${missionId}' has no evidence dir` };
-      const file = path.join(evidenceDir, probe.filename);
+      if (!isSafeMissionEvidenceFilename(probe.filename)) {
+        return {
+          available: false,
+          reason: `mission-evidence filename must be a single repository-local file name: ${probe.filename}`,
+        };
+      }
+      let file: string;
+      try {
+        file = assertSafeRepositoryPath(path.join(evidenceDir, probe.filename));
+      } catch (err: any) {
+        return {
+          available: false,
+          reason: `mission-evidence path rejected: ${err?.message ?? String(err)}`,
+        };
+      }
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
       if (!probe.require_field) return { available: true };
       try {
@@ -627,13 +642,33 @@ export function verifyReady(
  * ------------------------------------------------------------------ */
 
 function receiptPath(manifestId: string, missionId?: string): string {
+  const normalizedManifestId = assertEnvironmentManifestId(manifestId);
   if (missionId) {
+    pathResolver.assertMissionIdArgument(missionId);
     const evidenceDir =
       pathResolver.missionEvidenceDir(missionId) ??
       pathResolver.rootResolve(`active/missions/confidential/${missionId}/evidence`);
-    return path.join(evidenceDir, `env-setup-receipt.${manifestId}.json`);
+    return assertSafeRepositoryPath(
+      path.join(evidenceDir, `env-setup-receipt.${normalizedManifestId}.json`),
+      { allowMissingLeaf: true }
+    );
   }
-  return pathResolver.rootResolve(`active/shared/state/env-setup-receipts/${manifestId}.json`);
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(`active/shared/state/env-setup-receipts/${normalizedManifestId}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+function assertEnvironmentManifestId(value: unknown): string {
+  const manifestId = String(value || '').trim();
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(manifestId)) {
+    throw new Error(`[environment-capability] invalid manifest id for receipt path: ${manifestId}`);
+  }
+  return manifestId;
+}
+
+function isSafeMissionEvidenceFilename(value: unknown): value is string {
+  return typeof value === 'string' && /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/u.test(value.trim());
 }
 
 function writeReceipt(receipt: SetupReceipt, missionId?: string): void {
@@ -801,7 +836,15 @@ export function listEnvironmentManifestIds(): string[] {
   const ids: string[] = [];
   try {
     for (const entry of safeReaddir(dir)) {
-      if (entry.endsWith('.json')) ids.push(entry.slice(0, -'.json'.length));
+      if (!entry.endsWith('.json')) continue;
+      const candidate = path.join(dir, entry);
+      try {
+        const stat = safeLstat(candidate);
+        if (!stat.isFile()) continue;
+        ids.push(entry.slice(0, -'.json'.length));
+      } catch {
+        // A concurrently removed or inaccessible entry is not a manifest.
+      }
     }
   } catch (err: any) {
     logger.warn(`[environment-capability] listEnvironmentManifestIds: ${err?.message ?? err}`);

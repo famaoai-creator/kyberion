@@ -1,3 +1,5 @@
+import { defineScript, isDirectScript } from '../lib/harness.js';
+
 async function main() {
   const timeline = {
     action: 'presence_timeline',
@@ -35,7 +37,14 @@ async function main() {
   console.log(JSON.stringify(body, null, 2));
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exitCode = 1;
+const runPresenceTimelineDemo = defineScript({
+  name: 'presence-demo-timeline',
+  flags: [],
+  run: main,
 });
+
+if (
+  isDirectScript(import.meta.url, 'presence/demo_presence_timeline.ts') ||
+  isDirectScript(import.meta.url, 'presence/demo_presence_timeline.js')
+)
+  void runPresenceTimelineDemo();

@@ -205,3 +205,28 @@ describe('defer re-evaluation loop (Task 4)', () => {
     ]);
   });
 });
+
+describe('vulnerability ledger shape boundary', () => {
+  it('skips malformed findings instead of letting them affect re-evaluation', () => {
+    const ledgerPath = pathResolver.sharedTmp('vuln-ledger-tests/malformed-ledger.jsonl');
+    safeMkdir(pathResolver.sharedTmp('vuln-ledger-tests'), { recursive: true });
+    safeWriteFile(
+      ledgerPath,
+      [
+        JSON.stringify({
+          findings: [
+            finding({ package_name: 'valid-package' }),
+            { package_name: 'bad-package', decision: 'defer', reachability: '1' },
+            ['not-a-finding'],
+          ],
+        }),
+        JSON.stringify({ findings: 'not-an-array' }),
+        '[]',
+      ].join('\n')
+    );
+
+    const state = readPreviousLedgerState(ledgerPath);
+
+    expect([...state.findings.keys()]).toEqual(['valid-package']);
+  });
+});

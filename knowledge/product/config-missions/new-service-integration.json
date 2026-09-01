@@ -41,5 +41,5 @@
   "target_kind": "tenant",
   "scope_kind": "tenant",
   "tier": "confidential",
-  "notes": "After applying, run `pnpm vital` to verify the service appears in the active-services registry."
+  "notes": "After applying, run `pnpm pipeline vital-check` to verify the service appears in the active-services registry."
 }

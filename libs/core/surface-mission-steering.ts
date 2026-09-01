@@ -729,6 +729,8 @@ async function enqueueMissionSteeringInput(input: {
   delivery: 'steer' | 'follow_up';
   text: string;
   surface: SurfaceAsyncChannel;
+  tier?: 'personal' | 'confidential' | 'public';
+  tenantSlug?: string;
   channel?: string;
   threadTs?: string;
 }): Promise<SurfaceConversationResult> {
@@ -737,6 +739,8 @@ async function enqueueMissionSteeringInput(input: {
     delivery: input.delivery,
     text: input.text,
     surface: input.surface,
+    ...(input.tier ? { tier: input.tier } : {}),
+    ...(input.tenantSlug ? { tenantSlug: input.tenantSlug } : {}),
     ...(input.channel ? { channel: input.channel } : {}),
     ...(input.threadTs ? { threadTs: input.threadTs } : {}),
   });
@@ -813,6 +817,8 @@ async function handleMissionSteeringTurn(
         delivery: 'steer',
         text: match.note!,
         surface: key.surface,
+        tier: context.input.scope?.tier,
+        tenantSlug: context.input.scope?.tenant_slug,
         channel: key.channel,
         threadTs: key.threadTs,
       });
@@ -822,6 +828,8 @@ async function handleMissionSteeringTurn(
         delivery: 'follow_up',
         text: match.note!,
         surface: key.surface,
+        tier: context.input.scope?.tier,
+        tenantSlug: context.input.scope?.tenant_slug,
         channel: key.channel,
         threadTs: key.threadTs,
       });

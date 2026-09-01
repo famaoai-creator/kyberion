@@ -1,4 +1,5 @@
-import { appendJsonLine, readJson } from '../foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from '../foundation/json.js';
+import { defineCatalog } from '../foundation/governed-catalog.js';
 /**
  * KP-05: knowledge delivery telemetry + task_result knowledge_feedback
  * aggregation — the return half of the loop KP-01 opened up.
@@ -27,7 +28,12 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from '../secure-io.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -128,40 +134,58 @@ const DEFAULT_KNOWLEDGE_FEEDBACK_CAP: KnowledgeFeedbackCap = {
   max_usage_bytes: 10 * 1024 * 1024,
 };
 
-function feedbackPolicyPath(): string {
-  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH')?.trim();
-  return override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.knowledge('product/governance/knowledge-feedback-policy.json');
+interface KnowledgeFeedbackPolicyFile {
+  version?: string;
+  description?: string;
+  defaults?: Partial<KnowledgeFeedbackCap>;
+  tenant_overrides?: Record<string, Partial<KnowledgeFeedbackCap>>;
 }
 
-function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {
+function feedbackPolicyPath(): string {
+  const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_POLICY_PATH')?.trim();
+  const canonical = pathResolver.knowledge('product/governance/knowledge-feedback-policy.json');
+  if (!override) return canonical;
+  try {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+      allowMissingLeaf: true,
+    });
+  } catch (error) {
+    logger.warn(`[KP-05] ignoring unsafe knowledge feedback policy override: ${String(error)}`);
+    return canonical;
+  }
+}
+
+const knowledgeFeedbackPolicyCatalog = defineCatalog<KnowledgeFeedbackPolicyFile>({
+  id: 'knowledge-feedback-policy',
+  path: feedbackPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/knowledge-feedback-policy.schema.json'),
+  fallback: { defaults: { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP }, tenant_overrides: {} },
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    logger.warn(`[KP-05] knowledge feedback policy fallback: ${String(error)}`);
+  },
+});
+
+export function loadKnowledgeFeedbackCap(scope?: ScopeContext): KnowledgeFeedbackCap {
   const filePath = feedbackPolicyPath();
   if (!safeExistsSync(filePath)) return { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP };
-  try {
-    const parsed = readJson<{
-      defaults?: Partial<KnowledgeFeedbackCap>;
-      tenant_overrides?: Record<string, Partial<KnowledgeFeedbackCap>>;
-    }>(filePath);
-    const override = scope?.tenant_slug ? parsed.tenant_overrides?.[scope.tenant_slug] : undefined;
-    const values = {
-      ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP,
-      ...(parsed.defaults || {}),
-      ...(override || {}),
-    };
-    return {
-      max_usage_entries:
-        typeof values.max_usage_entries === 'number' && values.max_usage_entries > 0
-          ? Math.floor(values.max_usage_entries)
-          : DEFAULT_KNOWLEDGE_FEEDBACK_CAP.max_usage_entries,
-      max_usage_bytes:
-        typeof values.max_usage_bytes === 'number' && values.max_usage_bytes > 0
-          ? Math.floor(values.max_usage_bytes)
-          : DEFAULT_KNOWLEDGE_FEEDBACK_CAP.max_usage_bytes,
-    };
-  } catch {
-    return { ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP };
-  }
+  const parsed = knowledgeFeedbackPolicyCatalog.load();
+  const override = scope?.tenant_slug ? parsed.tenant_overrides?.[scope.tenant_slug] : undefined;
+  const values = {
+    ...DEFAULT_KNOWLEDGE_FEEDBACK_CAP,
+    ...(parsed.defaults || {}),
+    ...(override || {}),
+  };
+  return {
+    max_usage_entries:
+      typeof values.max_usage_entries === 'number' && values.max_usage_entries > 0
+        ? Math.floor(values.max_usage_entries)
+        : DEFAULT_KNOWLEDGE_FEEDBACK_CAP.max_usage_entries,
+    max_usage_bytes:
+      typeof values.max_usage_bytes === 'number' && values.max_usage_bytes > 0
+        ? Math.floor(values.max_usage_bytes)
+        : DEFAULT_KNOWLEDGE_FEEDBACK_CAP.max_usage_bytes,
+  };
 }
 
 function scopedRuntimePath(base: string, scope?: ScopeContext): string {
@@ -186,35 +210,58 @@ function scopedRuntimePath(base: string, scope?: ScopeContext): string {
     const feedbackRoot = 'active/shared/runtime/feedback-loop';
     if (relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)) {
       const suffix = relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '');
-      return pathResolver.rootResolve(
-        path.posix.join(
-          physicalScopedPath(feedbackRoot, eventScope),
-          ...(suffix ? suffix.split('/') : [])
-        )
+      return assertSafeRepositoryPath(
+        pathResolver.rootResolve(
+          path.posix.join(
+            physicalScopedPath(feedbackRoot, eventScope),
+            ...(suffix ? suffix.split('/') : [])
+          )
+        ),
+        { allowMissingLeaf: true }
       );
     }
-    return pathResolver.rootResolve(physicalScopedPath(relativeBase, eventScope));
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(physicalScopedPath(relativeBase, eventScope)),
+      { allowMissingLeaf: true }
+    );
   } catch {
-    return base;
+    return assertSafeRepositoryPath(base, { allowMissingLeaf: true });
   }
+}
+
+function safeRuntimeOverride(override: string | undefined, fallback: string): string {
+  if (override) {
+    try {
+      return assertSafeRepositoryPath(pathResolver.rootResolve(override), {
+        allowMissingLeaf: true,
+      });
+    } catch (error) {
+      logger.warn(`[KP-05] ignoring unsafe runtime path override: ${String(error)}`);
+    }
+  }
+  return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
 }
 
 function deliveryLogDir(scope?: ScopeContext): string {
   const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_DELIVERY_DIR')?.trim();
-  const base = override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.shared('runtime/feedback-loop/knowledge-delivery');
+  const base = safeRuntimeOverride(
+    override,
+    pathResolver.shared('runtime/feedback-loop/knowledge-delivery')
+  );
   return scopedRuntimePath(base, scope);
 }
 
 function usageAggregatePath(scope?: ScopeContext): string {
   const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_USAGE_PATH')?.trim();
-  const base = override
-    ? pathResolver.rootResolve(override)
-    : pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json');
+  const base = safeRuntimeOverride(
+    override,
+    pathResolver.shared('runtime/feedback-loop/knowledge-usage/usage.json')
+  );
   if (!scope?.tenant_slug) return base;
   const directory = scopedRuntimePath(path.dirname(base), scope);
-  return path.join(directory, path.basename(base));
+  return assertSafeRepositoryPath(path.join(directory, path.basename(base)), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function knowledgeDeliveryLogDir(scope?: ScopeContext): string {
@@ -227,11 +274,11 @@ export function knowledgeUsageAggregatePath(scope?: ScopeContext): string {
 
 function scopedFeedbackPath(kind: 'human' | 'gaps', scope?: ScopeContext): string {
   const feedbackDir = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_DIR')?.trim();
-  const base = feedbackDir
-    ? pathResolver.rootResolve(feedbackDir)
-    : pathResolver.shared('runtime/feedback-loop');
+  const base = safeRuntimeOverride(feedbackDir, pathResolver.shared('runtime/feedback-loop'));
   const scopedDirectory = scopedRuntimePath(base, scope);
-  return path.join(scopedDirectory, `knowledge-${kind}.jsonl`);
+  return assertSafeRepositoryPath(path.join(scopedDirectory, `knowledge-${kind}.jsonl`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): string {
@@ -299,15 +346,11 @@ export function recordKnowledgeGap(input: {
   let priorCount = 0;
   if (safeExistsSync(target)) {
     try {
-      priorCount = String(safeReadFile(target, { encoding: 'utf8' }))
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as KnowledgeGapRecord)
-        .filter(
-          (row) =>
-            row.topic === topic &&
-            JSON.stringify(row.scope || {}) === JSON.stringify(input.scope || {})
-        ).length;
+      priorCount = readJsonLines<KnowledgeGapRecord>(target, { onMalformed: 'skip' }).filter(
+        (row) =>
+          row.topic === topic &&
+          JSON.stringify(row.scope || {}) === JSON.stringify(input.scope || {})
+      ).length;
     } catch {
       priorCount = 0;
     }
@@ -377,8 +420,7 @@ function loadUsageAggregate(scope?: ScopeContext): KnowledgeUsageAggregateEntry[
   const filePath = usageAggregatePath(scope);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
+    const parsed = readJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];

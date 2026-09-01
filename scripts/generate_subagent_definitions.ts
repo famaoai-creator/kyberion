@@ -20,11 +20,11 @@
  * Generated files are committed artifacts, never hand-edited (each file
  * carries its own "DO NOT EDIT BY HAND" header). `--check` regenerates
  * in-memory and diffs against the files on disk — same shape as
- * `generate_op_registry.ts --check` / `check:op-registry`.
+ * `generate_op_registry.ts --check` / `generate:op-registry -- --check`.
  *
  * Usage:
  *   pnpm agents:generate                 — write Claude and AGY definitions
- *   pnpm check:subagent-definitions      — fail if any definition drifted
+ *   pnpm agents:generate -- --check      — fail if any definition drifted
  */
 
 import * as path from 'node:path';
@@ -33,16 +33,20 @@ import {
   DEFAULT_TEAM_ROLE_CAPABILITY_PROFILE,
   SUBAGENT_CAPABILITY_PROFILES,
   SUBAGENT_PROFILE_CLI_TOOLS,
+} from '@agent/core/subagent-capability-profiles';
+import {
   SUBAGENT_SECURE_IO_CONSTRAINT,
   SUBAGENT_SHARED_DIRECTORY_RULES_LINES,
-  buildWorkingPrinciplesLines,
+} from '@agent/core/subagent-prompt-framing';
+import { buildWorkingPrinciplesLines } from '@agent/core/working-principles';
+import {
   renderRuntimeInstructions,
   runtimeInstructionsForProvider,
-  pathResolver,
-  resolveCapabilityProfileForTeamRole,
-  safeExistsSync,
-  safeReadFile,
-} from '@agent/core';
+} from '@agent/core/reasoning-runtime-instructions';
+import { loadTeamRoleIndex } from '@agent/core/mission-team-index';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveCapabilityProfileForTeamRole } from '@agent/core/subagent-capability-profiles';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 import {
   buildAgyAgentDefinitionSource,
@@ -104,11 +108,11 @@ interface TeamRoleDefinition {
 
 function loadTeamRole(role: string): TeamRoleDefinition {
   const filePath = pathResolver.knowledge(`product/orchestration/team-roles/${role}.json`);
-  if (!safeExistsSync(filePath)) {
+  const teamRole = loadTeamRoleIndex()[role];
+  if (!teamRole) {
     throw new Error(`[SSOT_MISSING] No team-role definition at ${filePath}`);
   }
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-  return JSON.parse(raw) as TeamRoleDefinition;
+  return { role, ...teamRole };
 }
 
 export function resolveProfile(role: string): SubagentProfileName {
@@ -167,7 +171,7 @@ export function buildAgentDefinitionSource(role: string, provider = 'claude'): s
   lines.push('<!--');
   lines.push('GENERATED FILE — DO NOT EDIT BY HAND.');
   lines.push('Regenerate with: pnpm agents:generate');
-  lines.push('Check drift with: pnpm check:subagent-definitions');
+  lines.push('Check drift with: pnpm agents:generate -- --check');
   lines.push('Sources (SSoT):');
   lines.push(`  - knowledge/product/orchestration/team-roles/${role}.json`);
   if (authorityRole) {

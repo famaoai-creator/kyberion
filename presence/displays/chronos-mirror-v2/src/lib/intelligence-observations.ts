@@ -1,11 +1,19 @@
+import { pathResolver } from '@agent/core/path-resolver';
+import path from 'node:path';
 import {
-  pathResolver,
-} from "@agent/core/path-resolver";
-import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
-} from "@agent/core/secure-io";
+} from '@agent/core/secure-io';
+import {
+  numberField,
+  optionalStringField,
+  parseJsonRecord,
+  recordField,
+  stringField,
+} from './json-record';
 
 export interface OrchestrationEventSummary {
   ts: string;
@@ -17,10 +25,10 @@ export interface OrchestrationEventSummary {
 export interface ControlActionSummary {
   event_id?: string;
   ts: string;
-  kind: "mission" | "surface";
+  kind: 'mission' | 'surface';
   target: string;
   operation: string;
-  status: "queued" | "completed" | "failed";
+  status: 'queued' | 'completed' | 'failed';
   requested_by: string;
   error?: string;
 }
@@ -52,12 +60,12 @@ export interface BrowserSessionSummary {
   updated_at: string;
   last_trace_path?: string;
   lease_expires_at?: string;
-  lease_status: "active" | "released" | "expired";
+  lease_status: 'active' | 'released' | 'expired';
   retained: boolean;
   action_trail_count: number;
   recent_actions: Array<{
     op: string;
-    kind: "control" | "capture" | "apply";
+    kind: 'control' | 'capture' | 'apply';
     tab_id?: string;
     ref?: string;
     selector?: string;
@@ -77,103 +85,155 @@ export interface BrowserConversationSessionSummary {
   candidate_target_count: number;
 }
 
-export function collectRecentEvents(): OrchestrationEventSummary[] {
-  const files = [
-    pathResolver.shared("observability/channels/slack/missions.jsonl"),
-    pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+export interface BrowserObservationCollectionOptions {
+  browserSessionsDir?: string;
+  browserConversationSessionsDir?: string;
+}
+
+export interface IntelligenceObservationCollectionOptions {
+  observationFiles?: readonly string[];
+}
+
+function safeObservationDirectory(directory: string): string | null {
+  try {
+    const safeDirectory = assertSafeRepositoryPath(directory, { allowMissingLeaf: true });
+    return safeExistsSync(safeDirectory) && safeLstat(safeDirectory).isDirectory()
+      ? safeDirectory
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function safeObservationFile(directory: string, entry: string): string | null {
+  return safeObservationPath(path.join(directory, entry));
+}
+
+function safeObservationPath(filePath: string): string | null {
+  try {
+    const safeFilePath = assertSafeRepositoryPath(filePath, {
+      allowMissingLeaf: true,
+    });
+    return safeExistsSync(safeFilePath) && safeLstat(safeFilePath).isFile() ? safeFilePath : null;
+  } catch {
+    return null;
+  }
+}
+
+export function collectRecentEvents(
+  options: IntelligenceObservationCollectionOptions = {}
+): OrchestrationEventSummary[] {
+  const files = options.observationFiles || [
+    pathResolver.shared('observability/channels/slack/missions.jsonl'),
+    pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
   ];
   const lines: OrchestrationEventSummary[] = [];
   for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: "utf8" }) as string;
-    for (const line of raw.trim().split("\n")) {
+    const safeFile = safeObservationPath(file);
+    if (!safeFile) continue;
+    const raw = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
+    for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       try {
-        const event = JSON.parse(line) as any;
+        const event = parseJsonRecord(line);
+        if (!event) continue;
         lines.push({
-          ts: event.ts || new Date().toISOString(),
-          decision: event.decision || event.event_type || "event",
-          mission_id: event.mission_id || event.resource_id,
-          why: event.why,
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          decision: stringField(event, 'decision', stringField(event, 'event_type', 'event')),
+          mission_id:
+            optionalStringField(event, 'mission_id') || optionalStringField(event, 'resource_id'),
+          why: optionalStringField(event, 'why'),
         });
       } catch {
         // Ignore malformed lines.
       }
     }
   }
-  return lines
-    .sort((a, b) => b.ts.localeCompare(a.ts))
-    .slice(0, 8);
+  return lines.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
 }
 
-export function collectControlActions(): ControlActionSummary[] {
-  const file = pathResolver.shared("observability/mission-control/orchestration-events.jsonl");
-  if (!safeExistsSync(file)) return [];
+export function collectControlActions(
+  options: IntelligenceObservationCollectionOptions = {}
+): ControlActionSummary[] {
+  const file = safeObservationPath(
+    options.observationFiles?.[0] ||
+      pathResolver.shared('observability/mission-control/orchestration-events.jsonl')
+  );
+  if (!file) return [];
 
   const lifecycle = new Map<string, ControlActionSummary>();
-  const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
-  for (const line of raw.trim().split("\n")) {
+  for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
-      const event = JSON.parse(line) as any;
-      const decision = event.decision || event.event_type;
-      const eventId = typeof event.event_id === "string" ? event.event_id : undefined;
+      const event = parseJsonRecord(line);
+      if (!event) continue;
+      const payload = recordField(event.payload);
+      const decision = stringField(event, 'decision', stringField(event, 'event_type'));
+      const eventId = optionalStringField(event, 'event_id');
 
       if (
-        decision === "mission_orchestration_event_enqueued" &&
-        (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
+        decision === 'mission_orchestration_event_enqueued' &&
+        (event.event_type === 'mission_control_requested' ||
+          event.event_type === 'surface_control_requested') &&
         eventId
       ) {
-        const queuedTarget = event.event_type === "surface_control_requested"
-          ? event.payload?.surfaceId || "surface-runtime"
-          : event.mission_id || "system";
+        const eventType = stringField(event, 'event_type');
+        const queuedTarget =
+          eventType === 'surface_control_requested'
+            ? stringField(payload, 'surfaceId', 'surface-runtime')
+            : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: queuedTarget,
-          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
-          status: "queued",
-          requested_by: event.requested_by || "unknown",
+          operation: stringField(payload, 'operation', eventType),
+          status: 'queued',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
         });
         continue;
       }
 
       if (
-        (decision === "mission_control_action_applied" || decision === "surface_control_action_applied") &&
-        typeof event.operation === "string"
+        (decision === 'mission_control_action_applied' ||
+          decision === 'surface_control_action_applied') &&
+        typeof event.operation === 'string'
       ) {
-        const syntheticId = `${decision}:${event.mission_id || event.resource_id || "system"}:${event.operation}:${event.ts || ""}`;
+        const syntheticId = `${decision}:${stringField(event, 'mission_id', stringField(event, 'resource_id', 'system'))}:${stringField(event, 'operation')}:${stringField(event, 'ts')}`;
         lifecycle.set(syntheticId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: decision === "mission_control_action_applied" ? "mission" : "surface",
-          target: event.mission_id || event.resource_id || "system",
-          operation: event.operation,
-          status: "completed",
-          requested_by: event.requested_by || "unknown",
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
+          target: stringField(event, 'mission_id', stringField(event, 'resource_id', 'system')),
+          operation: stringField(event, 'operation'),
+          status: 'completed',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
         });
         continue;
       }
 
       if (
-        decision === "mission_orchestration_event_failed" &&
-        (event.event_type === "mission_control_requested" || event.event_type === "surface_control_requested") &&
+        decision === 'mission_orchestration_event_failed' &&
+        (event.event_type === 'mission_control_requested' ||
+          event.event_type === 'surface_control_requested') &&
         eventId
       ) {
-        const failedTarget = event.event_type === "surface_control_requested"
-          ? event.payload?.surfaceId || "surface-runtime"
-          : event.mission_id || "system";
+        const eventType = stringField(event, 'event_type');
+        const failedTarget =
+          eventType === 'surface_control_requested'
+            ? stringField(payload, 'surfaceId', 'surface-runtime')
+            : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: event.ts || new Date().toISOString(),
-          kind: event.event_type === "mission_control_requested" ? "mission" : "surface",
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: failedTarget,
-          operation: typeof event.payload?.operation === "string" ? event.payload.operation : event.event_type,
-          status: "failed",
-          requested_by: event.requested_by || "unknown",
-          error: typeof event.error === "string" ? event.error : undefined,
+          operation: stringField(payload, 'operation', eventType),
+          status: 'failed',
+          requested_by: stringField(event, 'requested_by', 'unknown'),
+          error: optionalStringField(event, 'error'),
         });
       }
     } catch {
@@ -186,27 +246,33 @@ export function collectControlActions(): ControlActionSummary[] {
     .slice(0, 10);
 }
 
-export function collectControlActionDetails(): Record<string, ControlActionDetail[]> {
-  const file = pathResolver.shared("observability/mission-control/orchestration-events.jsonl");
-  if (!safeExistsSync(file)) return {};
+export function collectControlActionDetails(
+  options: IntelligenceObservationCollectionOptions = {}
+): Record<string, ControlActionDetail[]> {
+  const file = safeObservationPath(
+    options.observationFiles?.[0] ||
+      pathResolver.shared('observability/mission-control/orchestration-events.jsonl')
+  );
+  if (!file) return {};
 
   const details: Record<string, ControlActionDetail[]> = {};
-  const raw = safeReadFile(file, { encoding: "utf8" }) as string;
+  const raw = safeReadFile(file, { encoding: 'utf8' }) as string;
 
-  for (const line of raw.trim().split("\n")) {
+  for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
     try {
-      const event = JSON.parse(line) as any;
-      const eventId = typeof event.event_id === "string" ? event.event_id : undefined;
+      const event = parseJsonRecord(line);
+      if (!event) continue;
+      const eventId = optionalStringField(event, 'event_id');
       if (!eventId) continue;
       if (
-        event.event_type !== "mission_control_requested" &&
-        event.event_type !== "surface_control_requested" &&
-        event.decision !== "mission_control_action_applied" &&
-        event.decision !== "surface_control_action_applied" &&
-        event.decision !== "mission_orchestration_event_started" &&
-        event.decision !== "mission_orchestration_event_completed" &&
-        event.decision !== "mission_orchestration_event_failed"
+        stringField(event, 'event_type') !== 'mission_control_requested' &&
+        stringField(event, 'event_type') !== 'surface_control_requested' &&
+        stringField(event, 'decision') !== 'mission_control_action_applied' &&
+        stringField(event, 'decision') !== 'surface_control_action_applied' &&
+        stringField(event, 'decision') !== 'mission_orchestration_event_started' &&
+        stringField(event, 'decision') !== 'mission_orchestration_event_completed' &&
+        stringField(event, 'decision') !== 'mission_orchestration_event_failed'
       ) {
         continue;
       }
@@ -215,14 +281,14 @@ export function collectControlActionDetails(): Record<string, ControlActionDetai
         details[eventId] = [];
       }
       details[eventId].push({
-        ts: event.ts || new Date().toISOString(),
-        decision: event.decision || "event",
-        event_type: event.event_type,
-        mission_id: event.mission_id,
-        resource_id: event.resource_id,
-        operation: event.operation,
-        why: event.why,
-        error: event.error,
+        ts: stringField(event, 'ts', new Date().toISOString()),
+        decision: stringField(event, 'decision', 'event'),
+        event_type: optionalStringField(event, 'event_type'),
+        mission_id: optionalStringField(event, 'mission_id'),
+        resource_id: optionalStringField(event, 'resource_id'),
+        operation: optionalStringField(event, 'operation'),
+        why: optionalStringField(event, 'why'),
+        error: optionalStringField(event, 'error'),
       });
     } catch {
       // Ignore malformed lines.
@@ -230,36 +296,42 @@ export function collectControlActionDetails(): Record<string, ControlActionDetai
   }
 
   for (const key of Object.keys(details)) {
-    details[key] = details[key]
-      .sort((a, b) => b.ts.localeCompare(a.ts))
-      .slice(0, 8);
+    details[key] = details[key].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 8);
   }
 
   return details;
 }
 
-export function collectOwnerSummaries(): OwnerSummary[] {
+export function collectOwnerSummaries(
+  options: IntelligenceObservationCollectionOptions = {}
+): OwnerSummary[] {
   const summaries: OwnerSummary[] = [];
-  const files = [
-    pathResolver.shared("observability/channels/slack/missions.jsonl"),
-    pathResolver.shared("observability/mission-control/orchestration-events.jsonl"),
+  const files = options.observationFiles || [
+    pathResolver.shared('observability/channels/slack/missions.jsonl'),
+    pathResolver.shared('observability/mission-control/orchestration-events.jsonl'),
   ];
 
   for (const file of files) {
-    if (!safeExistsSync(file)) continue;
-    const raw = safeReadFile(file, { encoding: "utf8" }) as string;
-    for (const line of raw.trim().split("\n")) {
+    const safeFile = safeObservationPath(file);
+    if (!safeFile) continue;
+    const raw = safeReadFile(safeFile, { encoding: 'utf8' }) as string;
+    for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
       try {
-        const event = JSON.parse(line) as any;
-        if ((event.decision || event.event_type) !== "mission_owner_notified") continue;
+        const event = parseJsonRecord(line);
+        if (!event) continue;
+        if (
+          stringField(event, 'decision', stringField(event, 'event_type')) !==
+          'mission_owner_notified'
+        )
+          continue;
         summaries.push({
-          ts: event.ts || new Date().toISOString(),
-          mission_id: event.mission_id || "unknown",
-          accepted_count: Number(event.accepted_count || 0),
-          reviewed_count: Number(event.reviewed_count || 0),
-          completed_count: Number(event.completed_count || 0),
-          requested_count: Number(event.requested_count || 0),
+          ts: stringField(event, 'ts', new Date().toISOString()),
+          mission_id: stringField(event, 'mission_id', 'unknown'),
+          accepted_count: numberField(event, 'accepted_count'),
+          reviewed_count: numberField(event, 'reviewed_count'),
+          completed_count: numberField(event, 'completed_count'),
+          requested_count: numberField(event, 'requested_count'),
         });
       } catch {
         // Ignore malformed lines.
@@ -269,18 +341,25 @@ export function collectOwnerSummaries(): OwnerSummary[] {
   return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
 }
 
-export function collectBrowserSessions(): BrowserSessionSummary[] {
-  const sessionDir = pathResolver.shared("runtime/browser/sessions");
-  if (!safeExistsSync(sessionDir)) return [];
+export function collectBrowserSessions(
+  options: BrowserObservationCollectionOptions = {}
+): BrowserSessionSummary[] {
+  const sessionDir = safeObservationDirectory(
+    options.browserSessionsDir || pathResolver.shared('runtime/browser/sessions')
+  );
+  if (!sessionDir) return [];
 
   const sessions: BrowserSessionSummary[] = [];
   for (const entry of safeReaddir(sessionDir)) {
-    if (!entry.endsWith(".json")) continue;
+    if (!entry.endsWith('.json')) continue;
     try {
-      const raw = safeReadFile(pathResolver.shared(`runtime/browser/sessions/${entry}`), { encoding: "utf8" }) as string;
-      const parsed = JSON.parse(raw) as BrowserSessionSummary;
-      if (!parsed?.session_id) continue;
-      sessions.push(parsed);
+      const filePath = safeObservationFile(sessionDir, entry);
+      if (!filePath) continue;
+      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const parsed = parseJsonRecord(raw);
+      const sessionId = parsed ? optionalStringField(parsed, 'session_id') : undefined;
+      if (!parsed || !sessionId) continue;
+      sessions.push(parsed as unknown as BrowserSessionSummary);
     } catch {
       // Ignore malformed session files.
     }
@@ -289,27 +368,41 @@ export function collectBrowserSessions(): BrowserSessionSummary[] {
   return sessions.sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 12);
 }
 
-export function collectBrowserConversationSessions(): BrowserConversationSessionSummary[] {
-  const sessionDir = pathResolver.shared("runtime/browser/conversation-sessions");
-  if (!safeExistsSync(sessionDir)) return [];
+export function collectBrowserConversationSessions(
+  options: BrowserObservationCollectionOptions = {}
+): BrowserConversationSessionSummary[] {
+  const sessionDir = safeObservationDirectory(
+    options.browserConversationSessionsDir ||
+      pathResolver.shared('runtime/browser/conversation-sessions')
+  );
+  if (!sessionDir) return [];
 
   const sessions: BrowserConversationSessionSummary[] = [];
   for (const entry of safeReaddir(sessionDir)) {
-    if (!entry.endsWith(".json")) continue;
+    if (!entry.endsWith('.json')) continue;
     try {
-      const raw = safeReadFile(pathResolver.shared(`runtime/browser/conversation-sessions/${entry}`), { encoding: "utf8" }) as string;
-      const parsed = JSON.parse(raw) as any;
-      if (!parsed?.session_id) continue;
+      const filePath = safeObservationFile(sessionDir, entry);
+      if (!filePath) continue;
+      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
+      const parsed = parseJsonRecord(raw);
+      if (!parsed) continue;
+      const sessionId = optionalStringField(parsed, 'session_id');
+      if (!sessionId) continue;
+      const goal = recordField(parsed.goal);
+      const activeStep = recordField(parsed.active_step);
+      const conversationContext = recordField(parsed.conversation_context);
       sessions.push({
-        session_id: parsed.session_id,
-        surface: parsed.surface || "unknown",
-        status: parsed.status || "unknown",
-        mode: parsed.mode || "interactive",
-        updated_at: parsed.updated_at || new Date(0).toISOString(),
-        goal_summary: parsed.goal?.summary || "",
-        active_step: parsed.active_step?.description,
-        pending_confirmation: parsed.conversation_context?.pending_confirmation === true,
-        candidate_target_count: Array.isArray(parsed.candidate_targets) ? parsed.candidate_targets.length : 0,
+        session_id: sessionId,
+        surface: stringField(parsed, 'surface', 'unknown'),
+        status: stringField(parsed, 'status', 'unknown'),
+        mode: stringField(parsed, 'mode', 'interactive'),
+        updated_at: stringField(parsed, 'updated_at', new Date(0).toISOString()),
+        goal_summary: stringField(goal, 'summary'),
+        active_step: optionalStringField(activeStep, 'description'),
+        pending_confirmation: conversationContext.pending_confirmation === true,
+        candidate_target_count: Array.isArray(parsed.candidate_targets)
+          ? parsed.candidate_targets.length
+          : 0,
       });
     } catch {
       // Ignore malformed session files.

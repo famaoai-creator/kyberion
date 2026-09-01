@@ -1,9 +1,11 @@
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { compileSchemaFromPath } from './schema-loader.js';
-import { safeReadFile } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { withoutSchemaMetadata } from './test-governance-payload.js';
 import {
   loadWorkScopePolicy,
@@ -157,13 +159,14 @@ describe('work-scope-decision', () => {
     expect(validate(policy)).toBe(true);
     expect(loadWorkScopePolicy().version).toBe('1.0.0');
 
-    const foundationJson = await import('./foundation/json.js');
-    const spy = vi
-      .spyOn(foundationJson, 'readJson')
-      .mockReturnValue({ version: 1 } as unknown) as unknown as {
-      mockRestore(): void;
-    };
-    expect(() => loadWorkScopePolicy()).toThrow('Invalid work-scope-policy');
-    spy.mockRestore();
+    const invalidCatalogPath = pathResolver.sharedTmp('work-scope-policy-invalid.json');
+    safeWriteFile(invalidCatalogPath, JSON.stringify({ version: 1 }));
+    const invalidCatalog = defineCatalog<unknown>({
+      id: 'work-scope-policy-test',
+      path: invalidCatalogPath,
+      schema: path.resolve(root, 'knowledge/product/schemas/work-scope-policy.schema.json'),
+    });
+    expect(() => invalidCatalog.load()).toThrow('Invalid catalog work-scope-policy-test');
+    safeRmSync(invalidCatalogPath, { force: true });
   });
 });

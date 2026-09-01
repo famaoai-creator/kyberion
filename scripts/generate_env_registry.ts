@@ -24,8 +24,10 @@
 
 import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
-import { getRegisteredEnv, readJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { getRegisteredEnv } from '@agent/core/foundation';
+import { loadEnvRegistryFile } from '@agent/core/env-validator';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
@@ -51,13 +53,88 @@ export interface EnvRegistryFile {
   entries: EnvRegistryEntry[];
 }
 
+const ENV_CATEGORIES = new Set<EnvCategory>([
+  'secret',
+  'path',
+  'flag',
+  'tuning',
+  'provider',
+  'runtime',
+]);
+const ENV_TYPES = new Set<EnvType>(['string', 'boolean', 'number', 'enum', 'path']);
+const ENV_NAME_RE = /^KYBERION_[A-Z0-9_]+$/;
+
 export function validateEnvRegistryQuality(registry: EnvRegistryFile): string[] {
   const failures: string[] = [];
-  for (const entry of registry.entries) {
+  if (!registry || !Array.isArray(registry.entries)) {
+    return ['registry.entries must be an array'];
+  }
+
+  const seenNames = new Set<string>();
+  for (const [index, rawEntry] of registry.entries.entries()) {
+    if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
+      failures.push(`entries[${index}]: entry must be an object`);
+      continue;
+    }
+    const entry = rawEntry as Partial<EnvRegistryEntry>;
+    const label = typeof entry.name === 'string' && entry.name ? entry.name : `entries[${index}]`;
+    if (
+      typeof entry.name !== 'string' ||
+      !ENV_NAME_RE.test(entry.name) ||
+      entry.name.endsWith('_')
+    ) {
+      failures.push(`${label}: name must match KYBERION_[A-Z0-9_]+ and not end with an underscore`);
+    } else if (seenNames.has(entry.name)) {
+      failures.push(`${entry.name}: duplicate registry entry`);
+    } else {
+      seenNames.add(entry.name);
+    }
+    if (typeof entry.category !== 'string' || !ENV_CATEGORIES.has(entry.category as EnvCategory)) {
+      failures.push(
+        `${label}: category must be one of secret, path, flag, tuning, provider, runtime`
+      );
+    }
+    if (typeof entry.type !== 'string' || !ENV_TYPES.has(entry.type as EnvType)) {
+      failures.push(`${label}: type must be one of string, boolean, number, enum, path`);
+    }
+    if (typeof entry.required !== 'boolean') {
+      failures.push(`${label}: required must be boolean`);
+    }
+    if (typeof entry.documented !== 'boolean') {
+      failures.push(`${label}: documented must be boolean`);
+    }
+    if (typeof entry.description !== 'string') {
+      failures.push(`${label}: description must be a string`);
+    }
+    if (entry.type === 'enum') {
+      if (
+        !Array.isArray(entry.enum) ||
+        entry.enum.length === 0 ||
+        entry.enum.some((value) => typeof value !== 'string' || !value.trim())
+      ) {
+        failures.push(`${label}: enum type must define a non-empty string enum`);
+      } else if (new Set(entry.enum).size !== entry.enum.length) {
+        failures.push(`${label}: enum values must be unique`);
+      }
+    } else if (entry.enum !== undefined) {
+      failures.push(`${label}: enum is only valid when type is enum`);
+    }
+
+    if (typeof entry.required !== 'boolean' || typeof entry.documented !== 'boolean') continue;
     if (entry.required && entry.documented !== true) {
       failures.push(`${entry.name}: required entries must be documented`);
     }
-    if ((entry.required || entry.documented) && !entry.description.trim()) {
+    if (entry.category === 'secret' && entry.documented !== true) {
+      failures.push(`${entry.name}: secret entries must be documented`);
+    }
+    if (entry.category === 'flag' && entry.documented !== true) {
+      failures.push(`${entry.name}: flag entries must be documented`);
+    }
+    if (
+      (entry.required || entry.documented) &&
+      typeof entry.description === 'string' &&
+      !entry.description.trim()
+    ) {
       failures.push(`${entry.name}: required/documented entries must have a description`);
     }
     if (entry.required && entry.category === 'secret') {
@@ -87,7 +164,7 @@ const EXCLUDED_PATH_SEGMENTS = [
   '/vault/',
   '/tests/',
 ];
-const ENV_NAME_RE = /KYBERION_[A-Z0-9_]+/g;
+const ENV_DISCOVERY_RE = /KYBERION_[A-Z0-9_]+/g;
 
 export function classifyEnvName(name: string): { category: EnvCategory; type: EnvType } {
   // Flag prefixes win over the secret keyword scan: KYBERION_ALLOW_FILE_SECRETS
@@ -104,7 +181,10 @@ export function classifyEnvName(name: string): { category: EnvCategory; type: En
   if (/(?:_TOKENS|_COUNT|_LIMIT|_MAX|_MIN|_SIZE|_TTL|_RETRIES|_FACTOR|_SEC|_SECONDS)$/.test(name)) {
     return { category: 'tuning', type: 'number' };
   }
-  if (/SECRET|TOKEN|_KEY$|_KEY_|PASSWORD|CREDENTIAL/.test(name)) {
+  if (/_RING$/.test(name)) {
+    return { category: 'tuning', type: 'number' };
+  }
+  if (/SECRET|TOKEN|_KEY$|_KEY_|PASSWORD|PASSPHRASE|(?:^|_)PASS(?:_|$)|CREDENTIAL/.test(name)) {
     return { category: 'secret', type: 'string' };
   }
   if (/(_PATH|_DIR|_ROOT|_BIN|_FILE)$/.test(name) || name === 'KYBERION_ROOT') {
@@ -136,7 +216,7 @@ export function discoverEnvNames(rootDir: string): string[] {
         continue;
       }
       const content = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-      for (const match of content.matchAll(ENV_NAME_RE)) {
+      for (const match of content.matchAll(ENV_DISCOVERY_RE)) {
         // A trailing underscore is a dynamic prefix (for example
         // KYBERION_REASONING_ROLE_${role}), not a concrete registry key.
         if (!match[0].endsWith('_')) names.add(match[0]);
@@ -171,7 +251,7 @@ export function mergeRegistry(
     } satisfies EnvRegistryEntry;
   });
   return {
-    $schema: '../schemas/governance-catalog.schema.json',
+    $schema: '../schemas/env-registry.schema.json',
     version: existing?.version || '1.0.0',
     description:
       existing?.description ||
@@ -249,9 +329,7 @@ export const main = defineGenerator({
       true;
     const rootDir = pathResolver.rootDir();
     const discovered = discoverEnvNames(rootDir);
-    const existing = safeExistsSync(REGISTRY_PATH)
-      ? readJson<EnvRegistryFile>(REGISTRY_PATH)
-      : null;
+    const existing = safeExistsSync(REGISTRY_PATH) ? loadEnvRegistryFile() : null;
     const built = mergeRegistry(discovered, existing);
     const qualityFailures = validateEnvRegistryQuality(built);
     if (qualityFailures.length > 0) {

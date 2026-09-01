@@ -1,8 +1,9 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -15,6 +16,20 @@ import { notifyOperator } from './operator-notifications.js';
 import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
+
+function safeMissionRoot(missionPath: string): string {
+  return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
+}
+
+function safeMissionArtifactPath(missionPath: string, relativePath: string): string {
+  return assertSafeRepositoryPath(path.join(safeMissionRoot(missionPath), relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function safeRepositoryPath(filePath: string, allowMissingLeaf = true): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf });
+}
 
 /**
  * Mission Retrospective Loop — the self-improvement back-edge for PROCESS and
@@ -117,8 +132,8 @@ function collectMissionUsageStats(
     if (entry.estimated === true) tokenUsage.estimated_entries += 1;
   }
 
-  const supervisorEventsPath = pathResolver.shared(
-    'observability/mission-control/agent-runtime-supervisor-events.jsonl'
+  const supervisorEventsPath = safeRepositoryPath(
+    pathResolver.shared('observability/mission-control/agent-runtime-supervisor-events.jsonl')
   );
   for (const entry of readJsonl(supervisorEventsPath)) {
     if (entry.decision !== 'agent_runtime_ask_completed') continue;
@@ -175,33 +190,146 @@ export interface ProcessImprovementProposal {
   created_at: string;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+const PROPOSAL_KINDS: readonly ProcessImprovementProposal['kind'][] = [
+  'team_composition',
+  'workflow_rule',
+  'process_step',
+  'tooling',
+];
+const PROPOSAL_STATUSES: readonly ProcessImprovementProposal['status'][] = [
+  'proposed',
+  'approved',
+  'rejected',
+  'applied',
+];
+
+function isRecord(value: unknown): value is JsonRecord {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Reject malformed durable proposals before lifecycle mutation or display. */
+export function normalizeProcessImprovementProposal(
+  value: unknown
+): ProcessImprovementProposal | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    !isNonEmptyString(value.proposal_id) ||
+    !isNonEmptyString(value.mission_id) ||
+    !isNonEmptyString(value.target) ||
+    !isNonEmptyString(value.proposal) ||
+    typeof value.rationale !== 'string' ||
+    !isNonEmptyString(value.created_at) ||
+    !PROPOSAL_KINDS.includes(value.kind as ProcessImprovementProposal['kind']) ||
+    !PROPOSAL_STATUSES.includes(value.status as ProcessImprovementProposal['status']) ||
+    !Array.isArray(value.evidence) ||
+    !value.evidence.every((entry) => typeof entry === 'string')
+  ) {
+    return undefined;
+  }
+  return {
+    proposal_id: value.proposal_id,
+    mission_id: value.mission_id,
+    kind: value.kind as ProcessImprovementProposal['kind'],
+    target: value.target,
+    proposal: value.proposal,
+    rationale: value.rationale,
+    evidence: value.evidence,
+    status: value.status as ProcessImprovementProposal['status'],
+    created_at: value.created_at,
+  };
+}
+
+function normalizeProposalDraft(
+  value: unknown
+):
+  | Pick<ProcessImprovementProposal, 'kind' | 'target' | 'proposal' | 'rationale' | 'evidence'>
+  | undefined {
+  if (!isRecord(value) || !isNonEmptyString(value.proposal)) return undefined;
+  if (
+    (value.kind !== undefined &&
+      !PROPOSAL_KINDS.includes(value.kind as ProcessImprovementProposal['kind'])) ||
+    (value.target !== undefined && typeof value.target !== 'string') ||
+    (value.rationale !== undefined && typeof value.rationale !== 'string') ||
+    (value.evidence !== undefined &&
+      (!Array.isArray(value.evidence) ||
+        !value.evidence.every((entry) => typeof entry === 'string')))
+  ) {
+    return undefined;
+  }
+  return {
+    kind: (value.kind as ProcessImprovementProposal['kind'] | undefined) || 'process_step',
+    target: (value.target as string | undefined) || 'unspecified',
+    proposal: value.proposal,
+    rationale: (value.rationale as string | undefined) || '',
+    evidence: (value.evidence as string[] | undefined) || [],
+  };
+}
+
 const IMPROVEMENT_QUEUE_PATH = 'coordination/process-improvements/queue.jsonl';
 
 export function processImprovementQueuePath(): string {
-  return pathResolver.shared(IMPROVEMENT_QUEUE_PATH);
+  return safeRepositoryPath(pathResolver.shared(IMPROVEMENT_QUEUE_PATH));
 }
 
-function readJsonl(filePath: string): Array<Record<string, unknown>> {
+function readJsonl(filePath: string): JsonRecord[] {
   try {
-    if (!safeExistsSync(filePath)) return [];
-    return String(safeReadFile(filePath, { encoding: 'utf8' }))
+    const safePath = safeRepositoryPath(filePath);
+    if (!safeExistsSync(safePath)) return [];
+    return String(safeReadFile(safePath, { encoding: 'utf8' }))
       .split('\n')
       .filter((line) => line.trim())
-      .map((line) => {
+      .flatMap((line) => {
         try {
-          return JSON.parse(line) as Record<string, unknown>;
+          const parsed: unknown = parseSafeJsonInput(line, 'improvement queue entry');
+          return isRecord(parsed) ? [parsed] : [];
         } catch {
-          return null;
+          return [];
         }
-      })
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+      });
   } catch {
     return [];
   }
 }
 
 function readJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
+  try {
+    return loadOptionalJson<T>(safeRepositoryPath(filePath));
+  } catch {
+    return null;
+  }
+}
+
+function readMissionJsonIfPresent<T>(missionPath: string, relativePath: string): T | null {
+  try {
+    return readJsonIfPresent<T>(safeMissionArtifactPath(missionPath, relativePath));
+  } catch {
+    return null;
+  }
+}
+
+function readMissionJsonl(
+  missionPath: string,
+  relativePath: string
+): Array<Record<string, unknown>> {
+  try {
+    return readJsonl(safeMissionArtifactPath(missionPath, relativePath));
+  } catch {
+    return [];
+  }
+}
+
+function missionArtifactExists(missionPath: string, relativePath: string): boolean {
+  try {
+    return safeExistsSync(safeMissionArtifactPath(missionPath, relativePath));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -213,12 +341,20 @@ function resolveRetrospectiveMissionPath(missionId: string): string | null {
   const candidates = [
     findMissionPath(missionId),
     pathResolver.rootResolve(path.join('active', 'archive', 'missions', missionId.toUpperCase())),
-  ].filter((candidate): candidate is string => Boolean(candidate && safeExistsSync(candidate)));
+  ].flatMap((candidate) => {
+    if (!candidate) return [];
+    try {
+      const safeCandidate = safeMissionRoot(candidate);
+      return safeExistsSync(safeCandidate) ? [safeCandidate] : [];
+    } catch {
+      return [];
+    }
+  });
   if (candidates.length === 0) return null;
   const withRecords = candidates.find(
     (candidate) =>
-      safeExistsSync(path.join(candidate, 'coordination')) ||
-      safeExistsSync(path.join(candidate, 'NEXT_TASKS.json'))
+      missionArtifactExists(candidate, 'coordination') ||
+      missionArtifactExists(candidate, 'NEXT_TASKS.json')
   );
   return withRecords || candidates[0];
 }
@@ -255,8 +391,9 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
   if (!missionPath) return stats;
 
   const nextTasks =
-    readJsonIfPresent<Array<{ assigned_to?: { role?: string } }>>(
-      path.join(missionPath, 'NEXT_TASKS.json')
+    readMissionJsonIfPresent<Array<{ assigned_to?: { role?: string } }>>(
+      missionPath,
+      'NEXT_TASKS.json'
     ) || [];
   stats.task_total = nextTasks.length;
   for (const task of nextTasks) {
@@ -264,9 +401,9 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     stats.tasks_by_role[role] = (stats.tasks_by_role[role] || 0) + 1;
   }
 
-  const ticketManifest = readJsonIfPresent<{
+  const ticketManifest = readMissionJsonIfPresent<{
     records?: Array<{ task_id?: string; status?: string; notes?: string[] }>;
-  }>(path.join(missionPath, 'coordination', 'tickets', 'dispatch-manifest.json'));
+  }>(missionPath, 'coordination/tickets/dispatch-manifest.json');
   for (const record of ticketManifest?.records || []) {
     const notes = Array.isArray(record.notes) ? record.notes.map(String) : [];
     if (record.status === 'failed') {
@@ -277,24 +414,23 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     }
   }
 
-  const taskEvents = readJsonl(
-    path.join(missionPath, 'coordination', 'events', 'task-events.jsonl')
-  );
+  const taskEvents = readMissionJsonl(missionPath, 'coordination/events/task-events.jsonl');
   for (const event of taskEvents) {
     const decision = String(event.decision || '');
     if (decision === 'best_of_judged') stats.best_of_judgements += 1;
-    const payload = (event.payload || {}) as Record<string, unknown>;
+    const payload = isRecord(event.payload) ? event.payload : {};
     if (payload.rework_requested === true) stats.rework_events += 1;
   }
 
-  const dispatchEvents = readJsonl(
-    path.join(missionPath, 'coordination', 'events', 'workitem-dispatch.jsonl')
+  const dispatchEvents = readMissionJsonl(
+    missionPath,
+    'coordination/events/workitem-dispatch.jsonl'
   );
   stats.dispatch_rounds_observed = dispatchEvents.filter(
     (event) => String(event.event || '') === 'dispatch_started'
   ).length;
 
-  const dispatchManifest = readJsonIfPresent<{
+  const dispatchManifest = readMissionJsonIfPresent<{
     records?: Array<{
       item_id?: string;
       team_role?: string;
@@ -305,7 +441,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
       notes?: string[];
       response_excerpt?: string;
     }>;
-  }>(path.join(missionPath, 'evidence', 'workitem-dispatch-manifest.json'));
+  }>(missionPath, 'evidence/workitem-dispatch-manifest.json');
   for (const record of dispatchManifest?.records || []) {
     const notes = Array.isArray(record.notes) ? record.notes.map(String) : [];
     if (record.team_role && record.assignee_peer_id) {
@@ -329,13 +465,13 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     }
   }
 
-  const state = readJsonIfPresent<{
+  const state = readMissionJsonIfPresent<{
     context?: {
       goal_reconciliation_round?: number;
       mission_finish_gate_last_reason?: string;
       mission_finish_gate_failure_count?: number;
     };
-  }>(path.join(missionPath, 'mission-state.json'));
+  }>(missionPath, 'mission-state.json');
   stats.goal_reconciliation_rounds = Number(state?.context?.goal_reconciliation_round || 0);
   if (state?.context?.mission_finish_gate_last_reason) {
     stats.finish_gate_failures.push({
@@ -344,11 +480,13 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     });
   }
 
-  stats.clarifications = readJsonl(
-    path.join(missionPath, 'coordination', 'events', 'task-events.jsonl')
-  ).filter((event) =>
-    String((event.payload as Record<string, unknown> | undefined)?.clarification_packet_path || '')
-  ).length;
+  stats.clarifications = readMissionJsonl(
+    missionPath,
+    'coordination/events/task-events.jsonl'
+  ).filter((event) => {
+    const payload = isRecord(event.payload) ? event.payload : undefined;
+    return String(payload?.clarification_packet_path || '');
+  }).length;
 
   return stats;
 }
@@ -360,7 +498,10 @@ function enqueueProposal(proposal: ProcessImprovementProposal): void {
 }
 
 export function listProcessImprovementProposals(): ProcessImprovementProposal[] {
-  return readJsonl(processImprovementQueuePath()) as unknown as ProcessImprovementProposal[];
+  return readJsonl(processImprovementQueuePath()).flatMap((entry) => {
+    const proposal = normalizeProcessImprovementProposal(entry);
+    return proposal ? [proposal] : [];
+  });
 }
 
 /**
@@ -407,8 +548,9 @@ export function applyProcessImprovementProposal(proposalId: string): {
     throw new Error(`proposal ${proposalId} is ${current.status}; approve it before applying`);
   }
   const workOrderDir = pathResolver.shared('coordination/process-improvements/applied');
-  safeMkdir(workOrderDir, { recursive: true });
-  const workOrderPath = path.join(workOrderDir, `${proposalId}.md`);
+  const safeWorkOrderDir = safeRepositoryPath(workOrderDir);
+  safeMkdir(safeWorkOrderDir, { recursive: true });
+  const workOrderPath = safeRepositoryPath(path.join(safeWorkOrderDir, `${proposalId}.md`));
   safeWriteFile(
     workOrderPath,
     [
@@ -514,22 +656,24 @@ export async function runMissionRetrospective(
       const raw = await backend.prompt(buildRetrospectivePrompt(stats));
       const start = raw.indexOf('{');
       const end = raw.lastIndexOf('}');
-      const parsed =
-        start >= 0 && end > start
-          ? (JSON.parse(raw.slice(start, end + 1)) as {
-              proposals?: Array<Partial<ProcessImprovementProposal>>;
+      const parsed: unknown =
+        start >= 0 && end > start ? JSON.parse(raw.slice(start, end + 1)) : { proposals: [] };
+      const proposalDrafts =
+        isRecord(parsed) && Array.isArray(parsed.proposals)
+          ? parsed.proposals.flatMap((entry) => {
+              const draft = normalizeProposalDraft(entry);
+              return draft ? [draft] : [];
             })
-          : { proposals: [] };
-      for (const entry of parsed.proposals || []) {
-        if (!entry?.proposal) continue;
+          : [];
+      for (const entry of proposalDrafts) {
         proposals.push({
           proposal_id: `PIP-${randomUUID().slice(0, 8).toUpperCase()}`,
           mission_id: missionId,
-          kind: (entry.kind as ProcessImprovementProposal['kind']) || 'process_step',
-          target: String(entry.target || 'unspecified'),
-          proposal: String(entry.proposal),
-          rationale: String(entry.rationale || ''),
-          evidence: Array.isArray(entry.evidence) ? entry.evidence.map(String) : [],
+          kind: entry.kind,
+          target: entry.target,
+          proposal: entry.proposal,
+          rationale: entry.rationale,
+          evidence: entry.evidence,
           status: 'proposed',
           created_at: new Date().toISOString(),
         });
@@ -566,13 +710,13 @@ export async function runMissionRetrospective(
     `> 提案の承認/却下は queue (${IMPROVEMENT_QUEUE_PATH}) を更新し、承認済みのみ blueprint / workflow catalog へ反映すること。`,
   ];
   const reportPath = missionPath
-    ? path.join(missionPath, 'evidence', 'retrospective.md')
-    : pathResolver.shared(path.join('tmp', `retrospective-${missionId}.md`));
+    ? safeMissionArtifactPath(missionPath, 'evidence/retrospective.md')
+    : safeRepositoryPath(pathResolver.shared(path.join('tmp', `retrospective-${missionId}.md`)));
   safeMkdir(path.dirname(reportPath), { recursive: true });
   safeWriteFile(reportPath, reportLines.join('\n'));
   if (missionPath) {
     safeWriteFile(
-      path.join(missionPath, 'evidence', 'retrospective.json'),
+      safeMissionArtifactPath(missionPath, 'evidence/retrospective.json'),
       JSON.stringify({ stats, proposals }, null, 2)
     );
   }

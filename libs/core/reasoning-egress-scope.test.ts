@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
-import { resetEgressPolicyCache } from './egress-policy.js';
+import { _resetEgressPolicyCacheForTests } from './egress-policy.js';
 import {
   ReasoningEgressDeniedError,
   assertReasoningEgressAllowed,
@@ -20,6 +20,7 @@ import {
   reasoningBackendEndpoint,
   withReasoningPayloadScope,
 } from './reasoning-egress-scope.js';
+import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 
 const POLICY_DIR = pathResolver.sharedTmp('reasoning-egress-tests');
 const POLICY_PATH = path.join(POLICY_DIR, 'egress-policy.json');
@@ -36,12 +37,12 @@ beforeEach(() => {
     })
   );
   process.env.KYBERION_EGRESS_POLICY_PATH = POLICY_PATH;
-  resetEgressPolicyCache();
+  _resetEgressPolicyCacheForTests();
 });
 
 afterEach(() => {
   delete process.env.KYBERION_EGRESS_POLICY_PATH;
-  resetEgressPolicyCache();
+  _resetEgressPolicyCacheForTests();
 });
 
 describe('scope propagation', () => {
@@ -71,6 +72,17 @@ describe('scope propagation', () => {
 });
 
 describe('assertReasoningEgressAllowed', () => {
+  it('honors an active network-disabled sandbox before provider egress checks', () => {
+    const policy = resolveSandboxPolicy({
+      provider: 'codex',
+      mode: 'workspace-write',
+      networkAccess: false,
+    });
+    withSandboxPolicy(policy, () => {
+      expect(() => assertReasoningEgressAllowed('anthropic')).toThrow('SANDBOX_NETWORK_DENIED');
+    });
+  });
+
   it('permits an explicitly allowlisted public endpoint when no scope is declared', () => {
     expect(() => assertReasoningEgressAllowed('anthropic')).not.toThrow();
   });

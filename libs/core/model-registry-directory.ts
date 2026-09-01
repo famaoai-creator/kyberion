@@ -1,7 +1,16 @@
 import * as path from 'node:path';
 
-import { loadJson, safeExistsSync, safeReaddir } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
+
+const MODEL_REGISTRY_DIRECTORY_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-registry-directory-index.schema.json'
+);
+const MODEL_REGISTRY_DIRECTORY_ENTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-registry-directory-entry.schema.json'
+);
 
 export type ModelRegistryDirectoryIndex = {
   version: string;
@@ -31,30 +40,75 @@ function hasExactKeys(value: Record<string, unknown>, expected: string[]): boole
 }
 
 function assertDirectoryIndex(value: unknown, indexPath: string): ModelRegistryDirectoryIndex {
-  if (!isRecord(value) || !hasExactKeys(value, ['version', 'default_model_id', 'model_order'])) {
-    throw new Error(`Invalid model registry directory index at ${indexPath}`);
-  }
+  try {
+    const index = defineCatalog<ModelRegistryDirectoryIndex>({
+      id: 'model-registry-directory-index',
+      path: indexPath,
+      schema: MODEL_REGISTRY_DIRECTORY_INDEX_SCHEMA_PATH,
+    }).validate(value, indexPath);
+    if (!isRecord(index) || !hasExactKeys(index, ['version', 'default_model_id', 'model_order'])) {
+      throw new Error(`Invalid model registry directory index at ${indexPath}`);
+    }
 
-  const { version, default_model_id: defaultModelId, model_order: modelOrder } = value;
-  if (
-    typeof version !== 'string' ||
-    version.length === 0 ||
-    typeof defaultModelId !== 'string' ||
-    defaultModelId.length === 0 ||
-    !Array.isArray(modelOrder) ||
-    modelOrder.length === 0 ||
-    modelOrder.some((modelId) => typeof modelId !== 'string' || modelId.length === 0) ||
-    new Set(modelOrder).size !== modelOrder.length ||
-    !modelOrder.includes(defaultModelId)
-  ) {
-    throw new Error(`Invalid model registry directory index at ${indexPath}`);
-  }
+    const { version, default_model_id: defaultModelId, model_order: modelOrder } = index;
+    if (
+      typeof version !== 'string' ||
+      version.length === 0 ||
+      typeof defaultModelId !== 'string' ||
+      defaultModelId.length === 0 ||
+      !Array.isArray(modelOrder) ||
+      modelOrder.length === 0 ||
+      modelOrder.some((modelId) => typeof modelId !== 'string' || modelId.length === 0) ||
+      new Set(modelOrder).size !== modelOrder.length ||
+      !modelOrder.includes(defaultModelId)
+    ) {
+      throw new Error(`Invalid model registry directory index at ${indexPath}`);
+    }
 
-  return {
-    version,
-    default_model_id: defaultModelId,
-    model_order: [...modelOrder],
-  };
+    return {
+      version,
+      default_model_id: defaultModelId,
+      model_order: [...modelOrder],
+    };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('Invalid model registry directory index')
+    ) {
+      throw error;
+    }
+    throw new Error(`Invalid model registry directory index at ${indexPath}`, { cause: error });
+  }
+}
+
+function loadDirectoryIndex(indexPath: string): ModelRegistryDirectoryIndex {
+  try {
+    const safeIndexPath = assertSafeRepositoryPath(indexPath);
+    return assertDirectoryIndex(
+      defineCatalog<ModelRegistryDirectoryIndex>({
+        id: 'model-registry-directory-index',
+        path: safeIndexPath,
+        schema: MODEL_REGISTRY_DIRECTORY_INDEX_SCHEMA_PATH,
+      }).load(),
+      safeIndexPath
+    );
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.startsWith('Invalid model registry directory index')
+    ) {
+      throw error;
+    }
+    throw new Error(`Invalid model registry directory index at ${indexPath}`, { cause: error });
+  }
+}
+
+function loadDirectoryEntry<T extends { model_id?: unknown }>(filePath: string): T {
+  return defineCatalog<T>({
+    id: 'model-registry-directory-entry',
+    path: assertSafeRepositoryPath(filePath),
+    schema: MODEL_REGISTRY_DIRECTORY_ENTRY_SCHEMA_PATH,
+  }).load();
 }
 
 /**
@@ -74,15 +128,16 @@ export function modelRegistryFileName(modelId: string): string {
 export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
   directory: string
 ): ModelRegistryDirectory<T> | null {
-  if (!safeExistsSync(directory)) return null;
+  const safeDirectory = assertSafeRepositoryPath(directory, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDirectory)) return null;
 
-  const indexPath = path.join(directory, 'index.json');
+  const indexPath = path.join(safeDirectory, 'index.json');
   if (!safeExistsSync(indexPath)) {
     throw new Error(`Model registry directory index missing at ${indexPath}`);
   }
-  const index = assertDirectoryIndex(loadJson<unknown>(indexPath), indexPath);
+  const index = loadDirectoryIndex(indexPath);
 
-  const files = safeReaddir(directory)
+  const files = safeReaddir(safeDirectory)
     .filter((entry) => entry.endsWith('.json') && entry !== 'index.json')
     .sort();
   if (!files.length) throw new Error(`Model registry directory is empty: ${directory}`);
@@ -90,7 +145,7 @@ export function readModelRegistryDirectory<T extends { model_id?: unknown }>(
   const entries: Array<ModelRegistryDirectoryEntry<T>> = [];
   const modelsById = new Map<string, T>();
   for (const file of files) {
-    const model = loadJson<T>(path.join(directory, file));
+    const model = loadDirectoryEntry<T>(path.join(safeDirectory, file));
     const modelId = model.model_id;
     if (typeof modelId !== 'string' || modelId.length === 0) {
       throw new Error(`Model registry item ${file} must define a non-empty string model_id`);

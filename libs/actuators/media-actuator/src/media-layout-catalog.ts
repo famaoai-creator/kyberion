@@ -5,15 +5,15 @@ import {
   loadTenantEntries,
   resolveConfidentialTenantOverride,
 } from './media-catalog-loaders.js';
+import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import {
-  safeReadFile,
-  pathResolver,
-  buildGovernedRetryOptions,
   fitTextToBox,
   measureTextBlock,
-  resolvePptxSurfaceDesign,
   type LayoutFitResult,
-} from '@agent/core';
+} from '@agent/core/src/native-pptx-engine/text-metrics';
+import { resolvePptxSurfaceDesign } from '@agent/core/src/native-pptx-engine/design-cascade';
 import * as path from 'node:path';
 const MEDIA_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/media-actuator/manifest.json');
 const DEFAULT_MEDIA_RETRY = {
@@ -28,14 +28,11 @@ function cloneJsonValue<T>(value: T): T {
   return value === undefined ? value : JSON.parse(JSON.stringify(value));
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: MEDIA_MANIFEST_PATH,
-    defaults: DEFAULT_MEDIA_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: MEDIA_MANIFEST_PATH,
+  defaults: DEFAULT_MEDIA_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 function mergePptxShape(base: any, overrides: any): any {
   return {
@@ -227,7 +224,10 @@ function resolveLayoutTemplate(
   // Priority 1: tenant override with an explicit confidential catalog path
   if (tenantOverride?.layout_template_catalog) {
     try {
-      const catalogPath = path.resolve(rootDir, tenantOverride.layout_template_catalog);
+      const catalogPath = assertSafeRepositoryPath(
+        path.resolve(rootDir, tenantOverride.layout_template_catalog),
+        { allowMissingLeaf: true }
+      );
       const catalog = loadJsonValue(catalogPath);
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];

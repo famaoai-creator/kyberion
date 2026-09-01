@@ -1,5 +1,10 @@
 import { getSubagentCapabilityProfile } from './subagent-capability-profiles.js';
-import { resolveSandboxPolicy } from './sandbox-policy.js';
+import {
+  getActiveSandboxPolicy,
+  requireSandboxEnforcement,
+  resolveSandboxPolicy,
+  type SandboxPolicy,
+} from './sandbox-policy.js';
 
 /**
  * Provider-neutral permission projection + child-process env minimization
@@ -32,9 +37,71 @@ import { resolveSandboxPolicy } from './sandbox-policy.js';
  * given — see each backend's `resolvePermissionArgs` helper).
  */
 
-export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok';
+export type ProviderId = 'claude' | 'codex' | 'agy' | 'grok' | 'gemini';
 
-export const PROVIDER_IDS: readonly ProviderId[] = ['claude', 'codex', 'agy', 'grok'] as const;
+export const PROVIDER_IDS: readonly ProviderId[] = [
+  'claude',
+  'codex',
+  'agy',
+  'grok',
+  'gemini',
+] as const;
+
+/**
+ * Project the ambient provider-neutral sandbox into one of the existing
+ * provider permission profiles. The ambient policy is authoritative when a
+ * reasoning call runs inside `withSandboxPolicy`; an explicit profile may
+ * narrow the call further, but can never widen a read-only policy.
+ *
+ * Providers are resolved again when the ambient policy was created for a
+ * different provider (for example, after failover). This keeps the requested
+ * mode while re-evaluating whether the new provider can enforce it.
+ */
+export function resolveEffectiveProviderPermissionProfile(
+  provider: ProviderId,
+  requested?: ProviderPermissionProfileName
+): ProviderPermissionProfileName | undefined {
+  const active = getActiveSandboxPolicy();
+  if (!active) return requested;
+
+  const policy: SandboxPolicy =
+    active.provider === provider
+      ? active
+      : resolveSandboxPolicy({
+          provider,
+          mode: active.mode,
+          networkAccess: active.networkAccess,
+          ...(active.writableRoots ? { writableRoots: active.writableRoots } : {}),
+        });
+  requireSandboxEnforcement(policy);
+
+  if (policy.mode === 'read-only') {
+    // Planner is stricter than explorer and must remain planner. Otherwise
+    // force the read-only projection even when the caller omitted a profile
+    // or requested implementer.
+    return requested === 'planner' ? 'planner' : 'explorer';
+  }
+  if (policy.mode === 'workspace-write') return requested ?? 'implementer';
+  // `requireSandboxEnforcement` rejects danger-full-access above. Keep an
+  // explicit branch so future modes cannot silently widen access.
+  throw new Error(`[SANDBOX_POLICY_PARTIAL] unsupported sandbox mode: ${policy.mode}`);
+}
+
+/** Resolve the active policy directly to provider argv, or return undefined
+ * when no ambient policy is installed so legacy callers remain byte-stable. */
+export function resolveActiveProviderPermissionArgs(
+  provider: ProviderId
+): readonly string[] | undefined {
+  const profile = resolveEffectiveProviderPermissionProfile(provider);
+  if (!profile) return undefined;
+  const resolution = resolveProviderPermissionArgs(profile, provider);
+  if (resolution.kind === 'refused') {
+    throw new Error(
+      `[${provider}-adapter] permission profile "${profile}" refused: ${resolution.reason}`
+    );
+  }
+  return resolution.args;
+}
 
 /** KD-05 tier names this module has a permission projection for. */
 export type ProviderPermissionProfileName = 'implementer' | 'explorer' | 'planner';
@@ -94,6 +161,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ['--permission-mode', 'bypassPermissions'],
       'Grok Build full auto-approve path for implementer-tier write/exec work.'
     ),
+    gemini: ok(
+      ['--sandbox', '--approval-mode', 'yolo'],
+      'Gemini CLI yolo mode remains inside its provider sandbox for workspace-write work.'
+    ),
   },
   explorer: {
     claude: ok(
@@ -124,6 +195,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
       ],
       'Read-leaning: deny shell/write tools; remaining read/search tools stay available under default permission mode.'
     ),
+    gemini: ok(
+      ['--sandbox', '--approval-mode', 'plan'],
+      'Gemini CLI plan mode is the provider read-only projection.'
+    ),
   },
   planner: {
     claude: ok(
@@ -142,6 +217,10 @@ export const PROVIDER_PERMISSION_MATRIX: Readonly<
     grok: ok(
       ['--permission-mode', 'plan'],
       'Grok Build plan mode produces a plan without executing tools.'
+    ),
+    gemini: ok(
+      ['--sandbox', '--approval-mode', 'plan'],
+      'Gemini CLI plan mode is the provider no-write projection.'
     ),
   },
 } as const;
@@ -242,6 +321,7 @@ const PROVIDER_REQUIRED_ENV_KEYS: Readonly<Record<ProviderId, readonly string[]>
   // OAuth session for Grok Build typically lives under ~/.grok; no extra config
   // home override is required for headless -p invocations.
   grok: [],
+  gemini: [],
 };
 
 /**
@@ -255,6 +335,7 @@ const PROVIDER_CREDENTIAL_ENV_KEYS: Readonly<Record<ProviderId, readonly string[
   // Grok Build primarily uses OAuth via `grok login`; optional direct API key
   // still allowed through when present.
   grok: ['XAI_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_API_KEY'],
 };
 
 /**

@@ -2,7 +2,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, pathResolver } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import * as pathResolver from '@agent/core/path-resolver';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;

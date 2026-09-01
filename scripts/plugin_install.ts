@@ -4,7 +4,7 @@
  * Stages a plugin source into the managed-copy directory, prints the
  * provenance-derived trust label, and — for anything other than `official`
  * — the pending approval id and how to approve it via the existing
- * approval CLI (`pnpm cli -- approvals` / `pnpm cli -- approve <id>
+ * approval CLI (`pnpm kyberion approvals` / `pnpm kyberion approve <id>
  * <channel>`). Installing (staging + listing) never itself requires
  * approval; only activation does (enforced at load time by
  * `skill-plugin-loader.ts`, not by this script).
@@ -15,7 +15,10 @@
  *   pnpm plugin:install --source ./some/plugin --id my-plugin
  *   pnpm plugin:install --source ./some/plugin --id my-plugin --requested-by alice
  */
-import { createStandardYargs, importPluginPack, installPluginManaged, logger } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { importPluginPack } from '@agent/core/plugin-pack';
+import { installPluginManaged } from '@agent/core/plugin-managed-install';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function runPluginInstall(args: string[] = []): number {
@@ -77,7 +80,7 @@ export function runPluginInstall(args: string[] = []): number {
         ...importRecord.skipped.map((skip) => `  skipped:   ${skip.plugin_id} — ${skip.reason}`),
         '',
         'Every installed plugin is third-party by provenance and stays pending_approval',
-        'until approved (pnpm cli -- approvals); it is never executed before then.',
+        'until approved (pnpm kyberion approvals); it is never executed before then.',
       ].join('\n') + '\n'
     );
     return exitCode;
@@ -134,8 +137,8 @@ export function runPluginInstall(args: string[] = []): number {
         `  Storage channel:      ${record.approvalChannel}`,
         '',
         'To review and decide:',
-        `  pnpm cli -- approvals`,
-        `  pnpm cli -- approve ${record.approvalRequestId} ${record.approvalChannel}`,
+        `  pnpm kyberion approvals`,
+        `  pnpm kyberion approve ${record.approvalRequestId} ${record.approvalChannel}`,
         '',
         'The plugin is skipped (never executed) at skill-load time until then.',
       ].join('\n') + '\n'

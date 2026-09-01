@@ -1,9 +1,15 @@
 import { appendJsonLine } from './foundation/json.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
-import { safeAppendFileSync, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+} from './secure-io.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import { redactCollaborationSummary } from './agent-collaboration-events.js';
 import {
@@ -36,6 +42,44 @@ export interface MissionTaskEventInput {
   causation_id?: string;
   correlation_id?: string;
   scope?: EventScopeInput;
+}
+
+export interface MissionTaskEventIdentity {
+  event_type: MissionTaskEventType;
+  mission_id: string;
+  task_id: string;
+}
+
+/** Parse the identity fields used by task-event deduplication. */
+export function parseMissionTaskEventIdentity(
+  value: unknown
+): MissionTaskEventIdentity | undefined {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.mission_id !== 'string' ||
+    !record.mission_id.trim() ||
+    typeof record.task_id !== 'string' ||
+    !record.task_id.trim() ||
+    typeof record.event_type !== 'string'
+  ) {
+    return undefined;
+  }
+  switch (record.event_type) {
+    case 'task_issued':
+    case 'task_submitted':
+    case 'task_reviewed':
+    case 'task_completed':
+    case 'task_accepted':
+    case 'participant_context_resolved':
+      return {
+        event_type: record.event_type,
+        mission_id: record.mission_id,
+        task_id: record.task_id,
+      };
+    default:
+      return undefined;
+  }
 }
 
 /** Shared task events contain bounded metadata only; payload remains mission-local. */
@@ -73,7 +117,9 @@ export function missionTaskEventsPath(
     (tenantSlug
       ? pathResolver.tenantMissionDir(missionId, tenantSlug, fallbackTier)
       : missionDir(missionId, fallbackTier));
-  return `${missionPath}/coordination/events/task-events.jsonl`;
+  return assertSafeRepositoryPath(`${missionPath}/coordination/events/task-events.jsonl`, {
+    allowMissingLeaf: true,
+  });
 }
 
 function ensureTaskEventDirs(
@@ -85,12 +131,17 @@ function ensureTaskEventDirs(
   globalEventPath: string;
 } {
   const missionEventPath = missionTaskEventsPath(missionId, tier, tenantSlug);
-  const globalEventsDir = pathResolver.shared('observability/mission-control');
+  const globalEventsDir = assertSafeRepositoryPath(
+    pathResolver.shared('observability/mission-control'),
+    { allowMissingLeaf: true }
+  );
   safeMkdir(nodePath.dirname(missionEventPath));
   safeMkdir(globalEventsDir);
   return {
     missionEventPath,
-    globalEventPath: `${globalEventsDir}/task-events.jsonl`,
+    globalEventPath: assertSafeRepositoryPath(`${globalEventsDir}/task-events.jsonl`, {
+      allowMissingLeaf: true,
+    }),
   };
 }
 
@@ -146,9 +197,10 @@ function resolveTaskEventScope(input: MissionTaskEventInput): EventScope {
       : missionDir(input.mission_id, 'public'));
   let authority: EventScope;
   try {
-    const state = JSON.parse(
-      String(safeReadFile(`${missionPath}/mission-state.json`, { encoding: 'utf8' }) || '{}')
-    ) as Record<string, unknown>;
+    const statePath = assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
+      allowMissingLeaf: true,
+    });
+    const state = readJsonIfPresent<Record<string, unknown>>(statePath) ?? {};
     authority = normalizeEventScope({
       mission_id: input.mission_id,
       tier: (state.tier_scope || state.tier || 'public') as 'personal' | 'confidential' | 'public',

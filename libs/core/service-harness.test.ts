@@ -5,6 +5,7 @@ import {
   createServiceExecutionReceipt,
   describeServiceHarness,
   planServiceOperation,
+  persistServiceExecutionReceipt,
   verifyServiceOperationResult,
 } from './service-harness.js';
 import { getServicePresetRecord } from './service-preset-registry.js';
@@ -93,5 +94,12 @@ describe('service harness contract', () => {
       kind: 'result_present',
     });
     expect(verifyServiceOperationResult(operation!, null).status).toBe('failed');
+  });
+
+  it('persists service receipts only through the governed runtime directory', () => {
+    const plan = planServiceOperation('github', 'list_repos');
+    const receipt = createServiceExecutionReceipt(plan, { ok: true });
+    const persisted = persistServiceExecutionReceipt(receipt);
+    expect(persisted.receipt_path).toContain('active/shared/runtime/service-receipts');
   });
 });

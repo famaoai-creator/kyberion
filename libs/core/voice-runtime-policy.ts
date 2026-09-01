@@ -2,6 +2,7 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export interface VoiceRuntimePolicy {
   version: string;
@@ -60,7 +61,10 @@ const FALLBACK_POLICY: VoiceRuntimePolicy = {
 };
 
 function getPolicyPath(): string {
-  return getRegisteredEnvText('KYBERION_VOICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_VOICE_RUNTIME_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
+    { allowMissingLeaf: true }
+  );
 }
 
 const policyCatalog = defineCatalog<VoiceRuntimePolicy>({
@@ -70,7 +74,7 @@ const policyCatalog = defineCatalog<VoiceRuntimePolicy>({
   fallback: FALLBACK_POLICY,
 });
 
-export function resetVoiceRuntimePolicyCache(): void {
+export function _resetVoiceRuntimePolicyCacheForTests(): void {
   policyCatalog.reset();
 }
 

@@ -6,8 +6,14 @@
  * triggered the run.
  */
 
-import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface Args {
@@ -54,6 +60,22 @@ function normalizeRef(ref: string): string {
   return ref.trim().replace(/^v/i, '');
 }
 
+function resolveInputPath(filePath: string): string {
+  const resolved = assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(resolved) || !safeLstat(resolved).isFile()) {
+    throw new Error(`CHANGELOG must be an existing regular file: ${filePath}`);
+  }
+  return resolved;
+}
+
+function resolveOutputPath(filePath: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: true,
+  });
+}
+
 function extractReleaseSection(changelog: string, ref: string): string {
   const target = normalizeRef(ref);
   const lines = changelog.split(/\r?\n/);
@@ -92,16 +114,13 @@ function main(argv: string[]): void {
     printUsage();
     return;
   }
-  const changelogPath = pathResolver.rootResolve(args.input);
-  if (!safeExistsSync(changelogPath)) {
-    throw new Error(`CHANGELOG not found: ${path.relative(pathResolver.rootDir(), changelogPath)}`);
-  }
+  const changelogPath = resolveInputPath(args.input);
 
   const changelog = safeReadFile(changelogPath, { encoding: 'utf8' }) as string;
   const section = extractReleaseSection(changelog, args.ref);
 
   if (args.output) {
-    safeWriteFile(args.output, section, { encoding: 'utf8' });
+    safeWriteFile(resolveOutputPath(args.output), section, { encoding: 'utf8' });
     console.log(`✅ wrote release notes to ${args.output}`);
     return;
   }
@@ -121,4 +140,4 @@ if (
     },
   })();
 
-export { extractReleaseSection, normalizeRef };
+export { extractReleaseSection, normalizeRef, resolveInputPath, resolveOutputPath };

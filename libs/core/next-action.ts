@@ -156,8 +156,8 @@ function buildPipelineFailureNextAction(
         reason: classification.remediation,
         next_action_type: context.surfaceId ? 'repair_surface' : 'inspect_artifact',
         suggested_command: context.surfaceId
-          ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-          : 'pnpm surfaces:status',
+          ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+          : 'pnpm surfaces status',
       });
     case 'dep.missing-binary':
     case 'dep.missing-module':
@@ -180,7 +180,7 @@ function buildPipelineFailureNextAction(
         title: 'Inspect configured secrets',
         reason: classification.remediation,
         next_action_type: 'inspect_artifact',
-        suggested_command: 'pnpm cli secret list',
+        suggested_command: 'pnpm setup:report --persona first-time-user',
       });
     case 'kyberion.path-scope':
       return buildNextAction({
@@ -196,7 +196,7 @@ function buildPipelineFailureNextAction(
         title: 'Request the required approval',
         reason: classification.remediation,
         next_action_type: 'run_command',
-        suggested_command: 'pnpm cli approval',
+        suggested_command: 'pnpm kyberion approvals',
       });
     case 'mission.not-found':
       return buildNextAction({
@@ -228,8 +228,8 @@ function buildPipelineFailureNextAction(
       reason: classification.remediation,
       next_action_type: context.surfaceId ? 'repair_surface' : 'inspect_artifact',
       suggested_command: context.surfaceId
-        ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-        : 'pnpm surfaces:status',
+        ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+        : 'pnpm surfaces status',
     });
   }
 
@@ -256,7 +256,7 @@ function buildPipelineFailureNextAction(
       title: 'Inspect configured secrets',
       reason: classification.remediation,
       next_action_type: 'inspect_artifact',
-      suggested_command: 'pnpm cli secret list',
+      suggested_command: 'pnpm setup:report --persona first-time-user',
     });
   }
 
@@ -323,8 +323,8 @@ export function buildNextActionFromError(
           : 'inspect_artifact',
       suggested_command:
         context.surfaceStateHealth && context.surfaceStateHealth !== 'healthy'
-          ? `pnpm surfaces:repair -- --surface ${context.surfaceId}`
-          : `pnpm surfaces:status -- --surface ${context.surfaceId}`,
+          ? `pnpm surfaces repair -- --surface ${context.surfaceId}`
+          : `pnpm surfaces status -- --surface ${context.surfaceId}`,
     });
   }
 

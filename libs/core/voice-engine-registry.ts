@@ -1,10 +1,9 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 
 export type VoiceEngineStatus = 'active' | 'shadow' | 'disabled';
 export type VoiceEngineKind = 'native_local' | 'voice_clone_service';
@@ -71,13 +70,15 @@ let cachedRegistryDir: string | null = null;
 let cachedRegistry: VoiceEngineRegistry | null = null;
 
 function getRegistryPath(): string {
-  return (
-    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH
-  );
+  const configured =
+    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_PATH')?.trim() || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function getRegistryDir(): string {
-  return getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
+  const configured =
+    getRegisteredEnvText('KYBERION_VOICE_ENGINE_REGISTRY_DIR')?.trim() || DEFAULT_REGISTRY_DIR;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 const voiceEngineCatalog = defineCatalog<VoiceEngineRegistry>({
@@ -88,11 +89,16 @@ const voiceEngineCatalog = defineCatalog<VoiceEngineRegistry>({
 });
 
 function loadRegistryFromPath(registryPath: string): VoiceEngineRegistry {
-  return voiceEngineCatalog.validate(readJson<unknown>(registryPath), registryPath);
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath);
+  return defineCatalog<VoiceEngineRegistry>({
+    id: 'voice-engine-registry.entry',
+    path: safeRegistryPath,
+    schema: pathResolver.knowledge('product/schemas/voice-engine-registry.schema.json'),
+  }).load();
 }
 
 function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
-  const dir = pathResolver.rootResolve(registryDir);
+  const dir = assertSafeRepositoryPath(registryDir, { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) {
     throw new Error(`Voice engine registry directory not found: ${dir}`);
   }
@@ -109,7 +115,7 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
   let defaultEngineId = '';
 
   for (const file of files) {
-    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
     if (!safeStat(filePath).isFile()) {
       continue;
     }
@@ -148,7 +154,7 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
   };
 }
 
-export function resetVoiceEngineRegistryCache(): void {
+export function _resetVoiceEngineRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistryDir = null;
   cachedRegistry = null;
@@ -156,15 +162,24 @@ export function resetVoiceEngineRegistryCache(): void {
 }
 
 export function getVoiceEngineRegistry(): VoiceEngineRegistry {
-  const registryPath = getRegistryPath();
-  const registryDir = getRegistryDir();
+  let registryPath: string;
+  let registryDir: string;
+  try {
+    registryPath = getRegistryPath();
+    registryDir = getRegistryDir();
+  } catch (error: any) {
+    logger.warn(
+      `[VOICE_ENGINE_REGISTRY] Unsafe registry path; using fallback: ${error?.message || error}`
+    );
+    cachedRegistryPath = null;
+    cachedRegistryDir = null;
+    cachedRegistry = FALLBACK_REGISTRY;
+    return cachedRegistry;
+  }
   if (cachedRegistryPath === registryPath && cachedRegistryDir === registryDir && cachedRegistry)
     return cachedRegistry;
 
-  if (
-    registryPath === DEFAULT_REGISTRY_PATH &&
-    safeExistsSync(pathResolver.rootResolve(registryDir))
-  ) {
+  if (registryPath === DEFAULT_REGISTRY_PATH && safeExistsSync(registryDir)) {
     try {
       const parsed = loadRegistryDirectory(registryDir);
       cachedRegistryPath = registryPath;

@@ -38,6 +38,12 @@ jobs:
       - name: Run manifest-driven release checks
         run: pnpm run check -- --scope release
 
+      - name: Build and verify source distribution
+        run: |
+          pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output "active/shared/exports/release/kyberion-${GITHUB_REF_NAME}.tar.gz"
+          pnpm run release:source-archive -- --check --output "active/shared/exports/release/kyberion-${GITHUB_REF_NAME}.tar.gz"
+          pnpm run release:install-smoke -- --ref "${GITHUB_SHA}"
+
       - name: Run full test suite
         run: pnpm exec vitest run
 
@@ -47,4 +53,4 @@ jobs:
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file active/shared/tmp/release-notes.md
+        run: gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file active/shared/tmp/release-notes.md active/shared/exports/release/kyberion-${{ github.ref_name }}.tar.gz active/shared/exports/release/SHA256SUMS

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/provider-capabilities.schema.json",
+  "title": "Provider capability catalog",
+  "description": "Knowledge-driven provider and model capability declarations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["providers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "provenance": { "$ref": "#/definitions/provenance" },
+    "providers": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/definitions/provider" }
+    }
+  },
+  "definitions": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["models", "capabilities", "modelCapabilities"],
+      "properties": {
+        "models": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "modelCapabilities": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      }
+    }
+  }
+}

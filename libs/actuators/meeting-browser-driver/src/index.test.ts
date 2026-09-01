@@ -6,7 +6,7 @@ import {
   redactMeetingUrl,
   resolveMeetingPlatform,
   validateMeetingTarget,
-} from '@agent/core';
+} from '@agent/core/meeting-join-driver';
 import {
   installBrowserMeetingJoinDriver,
   createBrowserMeetingJoinDriver,
@@ -18,27 +18,44 @@ import {
   ZOOM_SELECTORS,
 } from './index.js';
 
-// Mock @agent/core for cookie-store tests
-vi.mock('@agent/core', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@agent/core')>();
-  const safeReadFile = vi.fn().mockReturnValue('[]');
+vi.mock('@agent/core/core', () => ({
+  logger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock('@agent/core/path-resolver', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/path-resolver')>();
   return {
     ...actual,
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      success: vi.fn(),
-    },
     pathResolver: {
       ...actual.pathResolver,
       rootResolve: vi.fn((p: string) => `/mock/root/${p}`),
     },
+  };
+});
+
+vi.mock('@agent/core/secure-io', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/secure-io')>();
+  return {
+    ...actual,
+    assertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
     safeExistsSync: vi.fn().mockReturnValue(false),
-    safeReadFile,
-    loadJson: vi.fn((filePath: string) => JSON.parse(String(safeReadFile(filePath)))),
+    safeLstat: vi.fn(() => ({ isFile: () => true })),
+    safeReadFile: vi.fn().mockReturnValue('[]'),
     safeWriteFile: vi.fn(),
     safeMkdir: vi.fn(),
+  };
+});
+
+vi.mock('@agent/core/foundation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation')>();
+  return {
+    ...actual,
+    loadJson: vi.fn(() => []),
   };
 });
 
@@ -217,7 +234,7 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file does not exist', async () => {
-    const { safeExistsSync } = await import('@agent/core');
+    const { safeExistsSync } = await import('@agent/core/secure-io');
     vi.mocked(safeExistsSync).mockReturnValue(false);
 
     const { readCookies } = await import('./cookie-store.js');
@@ -226,9 +243,11 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns parsed cookies when file exists', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
+    const { loadJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify([{ name: 'session', value: 'abc' }]));
+    vi.mocked(loadJson).mockReturnValue([{ name: 'session', value: 'abc' }]);
 
     const { readCookies } = await import('./cookie-store.js');
     const cookies = readCookies('test-account');
@@ -236,9 +255,13 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file contains invalid JSON', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
+    const { loadJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue('not-valid-json');
+    vi.mocked(loadJson).mockImplementation(() => {
+      throw new SyntaxError('invalid JSON');
+    });
 
     const { readCookies } = await import('./cookie-store.js');
     const cookies = readCookies('test-account');
@@ -246,9 +269,11 @@ describe('cookie-store', () => {
   });
 
   it('readCookies returns empty array when file contains non-array JSON', async () => {
-    const { safeExistsSync, safeReadFile } = await import('@agent/core');
+    const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
+    const { loadJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify({ not: 'an array' }));
+    vi.mocked(loadJson).mockReturnValue({ not: 'an array' });
 
     const { readCookies } = await import('./cookie-store.js');
     const cookies = readCookies('test-account');
@@ -256,7 +281,7 @@ describe('cookie-store', () => {
   });
 
   it('writeCookies calls safeWriteFile with serialized cookies', async () => {
-    const { safeWriteFile, safeMkdir } = await import('@agent/core');
+    const { safeWriteFile, safeMkdir } = await import('@agent/core/secure-io');
 
     const { writeCookies } = await import('./cookie-store.js');
     const testCookies = [{ name: 'session', value: 'xyz' }];
@@ -273,5 +298,10 @@ describe('cookie-store', () => {
     const { cookiePathFor } = await import('./cookie-store.js');
     const cookiePath = cookiePathFor('my-account');
     expect(cookiePath).toContain('my-account.json');
+  });
+
+  it('rejects an account slug that would escape the cookie directory', async () => {
+    const { cookiePathFor } = await import('./cookie-store.js');
+    expect(() => cookiePathFor('../outside')).toThrow(/single safe path segment/);
   });
 });

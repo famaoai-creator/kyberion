@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pathResolver, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver, safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core';
 import { NextRequest } from 'next/server';
 
 // route.ts calls guardRequest(req), which needs a NextRequest (cookies API
@@ -99,5 +99,22 @@ describe('identity route', () => {
     expect(payload.onboarded).toBe(false);
     expect(payload.sovereign.name).toBe('Op');
     expect(payload.agent).toBeNull();
+  });
+
+  it('does not read an identity file through a symlink', async () => {
+    safeWriteFile(
+      path.join(currentFixtureDir, 'identity-target.json'),
+      JSON.stringify({ name: 'linked identity' })
+    );
+    safeSymlinkSync(
+      path.join(currentFixtureDir, 'identity-target.json'),
+      path.join(currentFixtureDir, 'my-identity.json')
+    );
+
+    const response = await GET(request());
+    const payload = await response.json();
+
+    expect(payload.sovereign).toBeNull();
+    expect(payload.onboarded).toBe(false);
   });
 });

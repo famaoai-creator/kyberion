@@ -1,4 +1,4 @@
-import type { GenerationJob } from '@agent/core';
+import type { GenerationJob } from '@agent/core/src/types/generation-job';
 
 export type GenerationJobStatus = GenerationJob['status'];
 

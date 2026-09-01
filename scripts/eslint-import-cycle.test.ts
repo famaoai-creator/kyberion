@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 
 const FIXTURE_DIR = pathResolver.rootResolve('tests/fixtures/eslint-import-cycle');
 

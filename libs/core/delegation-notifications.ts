@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 /**
  * KC-06: claim-based delegation completion notifications.
  *
@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { pathResolver } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export interface DelegationNotification {
   notification_id: string;
@@ -54,8 +54,12 @@ export interface DelegationNotificationFilter {
 // parallel suites never clobber the real queue file (resolved lazily per call).
 function resolveQueuePath(): string {
   const override = getRegisteredEnvText('KYBERION_DELEGATION_NOTIFICATIONS_PATH')?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return pathResolver.shared('runtime/delegations/notifications.jsonl');
+  return assertSafeRepositoryPath(
+    override
+      ? pathResolver.rootResolve(override)
+      : pathResolver.shared('runtime/delegations/notifications.jsonl'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function ensureQueueDir(): void {
@@ -70,23 +74,6 @@ function excerpt(value: string | undefined): string {
   return normalized.length > EXCERPT_MAX_CHARS
     ? `${normalized.slice(0, EXCERPT_MAX_CHARS - 1)}…`
     : normalized;
-}
-
-function parseJsonl(raw: string): DelegationNotification[] {
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const parsed = JSON.parse(line) as Partial<DelegationNotification>;
-      return {
-        ...(parsed as DelegationNotification),
-        report_provenance: parsed.report_provenance ?? {
-          source: 'child' as const,
-          delegation_id: String(parsed.delegation_id || ''),
-        },
-      };
-    });
 }
 
 export function enqueueDelegationNotification(input: {
@@ -133,8 +120,18 @@ export function enqueueDelegationNotification(input: {
 
 export function listDelegationNotifications(): DelegationNotification[] {
   if (!safeExistsSync(resolveQueuePath())) return [];
-  const raw = safeReadFile(resolveQueuePath(), { encoding: 'utf8' }) as string;
-  return parseJsonl(raw);
+  return readJsonLines<DelegationNotification>(resolveQueuePath(), {
+    map: (value) => {
+      const parsed = value as Partial<DelegationNotification>;
+      return {
+        ...(parsed as DelegationNotification),
+        report_provenance: parsed.report_provenance ?? {
+          source: 'child' as const,
+          delegation_id: String(parsed.delegation_id || ''),
+        },
+      };
+    },
+  });
 }
 
 /**

@@ -22,11 +22,21 @@ import { findMissionPath } from './path-resolver.js';
 import { getWorkItem, updateWorkItem } from './work-coordination.js';
 import { logger } from './core.js';
 import {
+  computeApprovalPayloadHash,
+  createApprovalRequest,
+  isApprovalRequestExpired,
+  listApprovalRequests,
+  loadApprovalRequest,
+  validateHumanFinalDecision,
+  type ApprovalRequestRecord,
+} from './approval-store.js';
+import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
 } from './mission-review-gates.js';
 import { hasAuthority, resolveIdentityContext } from './authority.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -38,6 +48,7 @@ import { sha256 } from './marketing-workload.js';
 import { withLock } from './src/lock-utils.js';
 import { loadState, saveState } from './mission-state.js';
 import { readCanonicalWorkGraphTasks } from './work-graph-projection.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
 const ADOPTABLE_TASK_STATUSES = new Set([
@@ -50,6 +61,7 @@ const ADOPTABLE_TASK_STATUSES = new Set([
   'review',
 ]);
 const TIER_WEIGHT = { public: 1, confidential: 3, personal: 4 } as const;
+export const MISSION_RECONCILIATION_APPROVAL_CHANNEL = 'mission-reconciliation';
 
 export interface MissionWorkReconciliationEvidence {
   path: string;
@@ -93,6 +105,7 @@ export interface MissionWorkReconciliationResult {
   already_reconciled_task_ids: string[];
   auto_completed_repair_task_ids: string[];
   work_item_ids_updated: string[];
+  approval_request_id?: string;
   receipt_path?: string;
 }
 
@@ -166,13 +179,86 @@ function isInside(parent: string, candidate: string): boolean {
   return relative === '' || (!relative.startsWith('..') && !nodePath.isAbsolute(relative));
 }
 
-function resolveInsideRoot(rawPath: string, label: string): string {
+function resolveInsideRoot(
+  rawPath: string,
+  label: string,
+  options: { allowMissingLeaf?: boolean; allowRoot?: boolean } = {}
+): string {
   const root = nodePath.resolve(pathResolver.rootDir());
   const resolved = nodePath.resolve(root, rawPath);
   if (!isInside(root, resolved)) {
     throw new Error(`${label} must remain inside the Kyberion repository: ${rawPath}`);
   }
-  return resolved;
+  if (resolved === root) {
+    if (options.allowRoot) return resolved;
+    throw new Error(`${label} must identify a repository resource below the repository root.`);
+  }
+  return assertSafeRepositoryPath(resolved, { allowMissingLeaf: options.allowMissingLeaf });
+}
+
+function reconciliationEffectBinding(missionId: string): string {
+  return `mission-work-reconciliation:${missionId.toUpperCase()}`;
+}
+
+function reconciliationApprovalPayload(
+  missionId: string,
+  manifestHash: string,
+  sourceCommit: string
+): Record<string, string> {
+  return {
+    mission_id: missionId.toUpperCase(),
+    manifest_sha256: manifestHash,
+    source_commit: sourceCommit,
+    effect: reconciliationEffectBinding(missionId),
+  };
+}
+
+function assertReconciliationApproval(
+  approvalRequestId: string,
+  missionId: string,
+  manifestHash: string,
+  sourceCommit: string
+): ApprovalRequestRecord {
+  const approval = loadApprovalRequest(MISSION_RECONCILIATION_APPROVAL_CHANNEL, approvalRequestId);
+  const humanApproval = approval?.workflow?.approvals?.find(
+    (entry) =>
+      entry.status === 'approved' && entry.decidedByType === 'human' && entry.authenticated === true
+  );
+  if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
+    throw new Error(
+      `[POLICY_VIOLATION] reconcile-work requires an approved mission_gate request: ${approvalRequestId}`
+    );
+  }
+  if (isApprovalRequestExpired(approval)) {
+    throw new Error(`[POLICY_VIOLATION] reconciliation approval has expired: ${approval.id}`);
+  }
+  if (approval.source?.missionId?.toUpperCase() !== missionId.toUpperCase()) {
+    throw new Error('[POLICY_VIOLATION] reconciliation approval is bound to a different mission');
+  }
+  const effectBinding = reconciliationEffectBinding(missionId);
+  if (approval.accountability?.effectBinding !== effectBinding) {
+    throw new Error('[POLICY_VIOLATION] reconciliation approval is bound to a different effect');
+  }
+  const payloadHash = computeApprovalPayloadHash(
+    reconciliationApprovalPayload(missionId, manifestHash, sourceCommit)
+  );
+  if (approval.accountability?.payloadHash !== payloadHash) {
+    throw new Error(
+      '[POLICY_VIOLATION] reconciliation approval is bound to a different manifest or source commit'
+    );
+  }
+  if (!humanApproval) {
+    throw new Error('[POLICY_VIOLATION] reconcile-work requires an authenticated human approval');
+  }
+  validateHumanFinalDecision({
+    accountability: approval.accountability,
+    decidedByType: humanApproval.decidedByType,
+    authenticated: humanApproval.authenticated,
+    authMethod: humanApproval.authMethod,
+    payloadHash: humanApproval.payloadHash,
+    effectBinding: humanApproval.effectBinding,
+  });
+  return approval;
 }
 
 function readJson<T>(filePath: string, label: string): T {
@@ -185,6 +271,96 @@ function readJson<T>(filePath: string, label: string): T {
   }
 }
 
+/** Open the human approval request required before reconciliation can mutate a mission. */
+export function createMissionWorkReconciliationApprovalRequest(input: {
+  missionId: string;
+  manifestPath: string;
+  requestedBy?: string;
+}): ApprovalRequestRecord {
+  assertMissionControllerAuthority();
+  const missionId = input.missionId.toUpperCase();
+  if (!findMissionPath(missionId)) throw new Error(`Mission ${missionId} not found`);
+  const manifestPath = resolveInsideRoot(input.manifestPath, 'manifest');
+  const manifestRaw = safeReadFile(manifestPath) as Buffer;
+  const manifest = readJson<MissionWorkReconciliationManifest>(manifestPath, 'manifest');
+  const validator = getManifestValidator();
+  if (!validator(manifest)) {
+    throw new Error(`Invalid reconciliation manifest: ${formatSchemaErrors(validator)}`);
+  }
+  if (manifest.mission_id.toUpperCase() !== missionId) {
+    throw new Error(
+      `Manifest mission_id ${manifest.mission_id} does not match requested mission ${missionId}`
+    );
+  }
+
+  const manifestHash = sha256(manifestRaw);
+  const effectBinding = reconciliationEffectBinding(missionId);
+  const payloadHash = computeApprovalPayloadHash(
+    reconciliationApprovalPayload(missionId, manifestHash, manifest.source.commit)
+  );
+  const existing = listApprovalRequests({
+    storageChannels: [MISSION_RECONCILIATION_APPROVAL_CHANNEL],
+    kind: 'mission_gate',
+    status: ['pending', 'approved'],
+  }).find(
+    (record) =>
+      record.source?.missionId?.toUpperCase() === missionId &&
+      record.accountability?.payloadHash === payloadHash &&
+      !isApprovalRequestExpired(record)
+  );
+  if (existing) return existing;
+
+  const requestedBy =
+    input.requestedBy?.trim() ||
+    getRegisteredEnvText('KYBERION_PERSONA') ||
+    process.env.USER ||
+    'mission_controller';
+  return createApprovalRequest('mission_controller', {
+    channel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
+    storageChannel: MISSION_RECONCILIATION_APPROVAL_CHANNEL,
+    threadTs: missionId,
+    correlationId: effectBinding,
+    requestedBy,
+    kind: 'mission_gate',
+    draft: {
+      title: `Adopt externally completed work: ${missionId}`,
+      summary: 'Approve adoption of hash-bound work completed outside dispatch-workitems.',
+      details: `Manifest: ${pathResolver.toRepoRelative(manifestPath)}\nManifest SHA-256: ${manifestHash}\nSource commit: ${manifest.source.commit}\nTasks: ${manifest.tasks.map((task) => task.task_id).join(', ')}`,
+      severity: 'high',
+    },
+    source: { missionId },
+    requestedByContext: {
+      surface: 'terminal',
+      actorId: requestedBy,
+      actorRole: 'mission-work-reconciliation',
+      missionId,
+    },
+    justification: {
+      reason:
+        'Adopting external work mutates canonical mission task state and requires operator approval.',
+      requestedEffects: [effectBinding],
+    },
+    risk: {
+      level: 'high',
+      restartScope: 'manual',
+      requiresStrongAuth: true,
+      policyId: 'PI-05',
+    },
+    workflow: {
+      workflowId: `pi-05-reconciliation-${missionId}`,
+      mode: 'all_required',
+      requiredRoles: ['sovereign'],
+      stages: [],
+      approvals: [{ role: 'sovereign', status: 'pending' }],
+    },
+    accountability: {
+      finalDecision: 'human_only',
+      payloadHash,
+      effectBinding,
+    },
+  });
+}
+
 function formatSchemaErrors(validator: ValidateFunction): string {
   return (validator.errors || [])
     .map((error) => `${error.instancePath || '/'} ${error.message || 'is invalid'}`)
@@ -192,7 +368,9 @@ function formatSchemaErrors(validator: ValidateFunction): string {
 }
 
 function assertSourceCommit(manifest: MissionWorkReconciliationManifest): string {
-  const repository = resolveInsideRoot(manifest.source.repository, 'source.repository');
+  const repository = resolveInsideRoot(manifest.source.repository, 'source.repository', {
+    allowRoot: true,
+  });
   if (!safeExistsSync(nodePath.join(repository, '.git'))) {
     throw new Error(`source.repository is not a Git repository: ${manifest.source.repository}`);
   }
@@ -614,7 +792,8 @@ export function generateMissionWorkReconciliationScaffold(input: {
   if (!missionPath) throw new Error(`Mission ${missionId} not found`);
   const manifestPath = resolveInsideRoot(
     input.outputPath || `active/shared/tmp/reconciliation-${missionId}.scaffold.json`,
-    'output'
+    'output',
+    { allowMissingLeaf: true }
   );
   const sharedTmpRoot = nodePath.resolve(pathResolver.rootResolve('active/shared/tmp'));
   if (!isInside(sharedTmpRoot, manifestPath) && !isInside(missionPath, manifestPath)) {
@@ -677,6 +856,7 @@ export async function reconcileMissionExistingWork(input: {
   missionId: string;
   manifestPath: string;
   dryRun?: boolean;
+  approvalRequestId?: string;
 }): Promise<MissionWorkReconciliationResult> {
   assertMissionControllerAuthority();
   const missionId = input.missionId.toUpperCase();
@@ -708,6 +888,19 @@ export async function reconcileMissionExistingWork(input: {
 
   const sourceRepository = assertSourceCommit(manifest);
   const manifestHash = sha256(manifestRaw);
+  if (!input.dryRun) {
+    if (!input.approvalRequestId?.trim()) {
+      throw new Error(
+        '[POLICY_VIOLATION] reconcile-work apply requires --approval-request-id for an authenticated human approval'
+      );
+    }
+    assertReconciliationApproval(
+      input.approvalRequestId,
+      missionId,
+      manifestHash,
+      manifest.source.commit
+    );
+  }
   const manifestTaskIds = manifest.tasks.map((task) => task.task_id);
   if (new Set(manifestTaskIds).size !== manifestTaskIds.length) {
     throw new Error('Manifest contains duplicate task_id values');
@@ -782,6 +975,7 @@ export async function reconcileMissionExistingWork(input: {
       already_reconciled_task_ids: alreadyReconciledTaskIds,
       auto_completed_repair_task_ids: [] as string[],
       work_item_ids_updated: [] as string[],
+      ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
     };
     if (input.dryRun) return { status: 'dry_run_ready', ...resultBase };
 
@@ -800,7 +994,10 @@ export async function reconcileMissionExistingWork(input: {
           reviewDir,
           `reconciled-${safeTaskId}-${safeReviewId}.json`
         );
-        safeWriteFile(artifactReviewReceiptPath, JSON.stringify(artifactReview.receipt, null, 2));
+        writeDispatchArtifact(artifactReviewReceiptPath, artifactReview.receipt, {
+          missionId,
+          missionPath,
+        });
         plannedTask.artifact_review_profile = artifactReview.profile;
         plannedTask.artifact_review_receipt = nodePath
           .relative(missionPath, artifactReviewReceiptPath)
@@ -907,6 +1104,7 @@ export async function reconcileMissionExistingWork(input: {
         payload: {
           manifest_sha256: manifestHash,
           source_commit: manifest.source.commit,
+          ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
           verification_command: manifestTask.verification.command,
         },
       });
@@ -924,12 +1122,16 @@ export async function reconcileMissionExistingWork(input: {
         payload: {
           manifest_sha256: manifestHash,
           source_commit: manifest.source.commit,
+          ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         },
       });
     }
 
     if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
-      safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(tasks, null, 2));
+      writeDispatchArtifact(nodePath.join(missionPath, 'NEXT_TASKS.json'), tasks, {
+        missionId,
+        missionPath,
+      });
     }
     const receipt: MissionWorkReconciliationResult & { adopted_at: string; reason: string } = {
       status: 'applied',
@@ -938,7 +1140,7 @@ export async function reconcileMissionExistingWork(input: {
       adopted_at: adoptedAt,
       reason: manifest.reason,
     };
-    safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
+    writeDispatchArtifact(receiptPath, receipt, { missionId, missionPath });
 
     const currentState = loadState(missionId);
     if (!currentState) throw new Error(`Mission ${missionId} state disappeared during reconcile`);
@@ -948,6 +1150,7 @@ export async function reconcileMissionExistingWork(input: {
         manifest_sha256: manifestHash,
         source_commit: manifest.source.commit,
         task_ids: [...reconciledTaskIds, ...alreadyReconciledTaskIds],
+        ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         receipt_path: receiptRelative,
       },
     } as typeof currentState.context;
@@ -978,6 +1181,7 @@ export async function reconcileMissionExistingWork(input: {
         manifest_sha256: manifestHash,
         source_commit: manifest.source.commit,
         task_ids: reconciledTaskIds,
+        ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         receipt_path: receiptRelative,
       },
     });

@@ -40,6 +40,40 @@ const SCRIPTS_ROOT = path.join(PROJECT_ROOT_DIR, 'scripts');
 const VAULT_ROOT = path.join(PROJECT_ROOT_DIR, 'vault');
 const VISION_ROOT = path.join(PROJECT_ROOT_DIR, 'vision');
 const INDEX_PATHS = [path.join(KNOWLEDGE_ROOT, 'product/orchestration/global_actuator_index.json')];
+const MISSION_MANAGEMENT_CONFIG_PATH = path.join(
+  KNOWLEDGE_ROOT,
+  'product/governance/mission-management-config.json'
+);
+
+/**
+ * Path-resolver bootstrap cannot import secure-io or the governed catalog
+ * without recreating their initialization cycle. Keep its raw config probe
+ * narrow and apply the same repo-relative path contract as the governed
+ * mission-management loader before using any directory value.
+ */
+export function isSafeMissionManagementPath(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  if (path.isAbsolute(value) || /^[A-Za-z]:[\\/]/u.test(value)) return false;
+  if (value.split(/[\\/]/u).some((segment) => segment === '..')) return false;
+  const resolved = path.resolve(PROJECT_ROOT_DIR, value);
+  const relative = path.relative(PROJECT_ROOT_DIR, resolved);
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+type MissionTier = 'personal' | 'confidential' | 'public';
+
+function readConfiguredMissionSubPath(tier: MissionTier): string | undefined {
+  if (!rawExistsSync(MISSION_MANAGEMENT_CONFIG_PATH)) return undefined;
+  try {
+    const config = JSON.parse(rawReadTextFile(MISSION_MANAGEMENT_CONFIG_PATH)) as {
+      directories?: Record<string, unknown>;
+    };
+    const candidate = config.directories?.[tier];
+    return isSafeMissionManagementPath(candidate) ? candidate : undefined;
+  } catch (_) {
+    return undefined;
+  }
+}
 
 export function rootDir() {
   return PROJECT_ROOT_DIR;
@@ -206,17 +240,7 @@ export function missionDir(
   tenantSlug?: string
 ) {
   assertMissionIdArgument(missionId);
-  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
-  let subPath = 'active/missions';
-
-  if (rawExistsSync(configPath)) {
-    try {
-      const config = JSON.parse(rawReadTextFile(configPath));
-      subPath = config.directories?.[tier] || subPath;
-    } catch (_) {
-      /* Fallback to default */
-    }
-  }
+  const subPath = readConfiguredMissionSubPath(tier) || 'active/missions';
 
   const dir = tenantSlug
     ? path.join(PROJECT_ROOT_DIR, subPath, normalizeTenantWorkspaceSegment(tenantSlug), missionId)
@@ -378,16 +402,7 @@ export function tenantMissionDir(
   tier: 'personal' | 'confidential' | 'public' = 'confidential'
 ): string {
   assertMissionIdArgument(missionId);
-  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
-  let subPath = 'active/missions';
-  if (rawExistsSync(configPath)) {
-    try {
-      const config = JSON.parse(rawReadTextFile(configPath));
-      subPath = config.directories?.[tier] || subPath;
-    } catch (_) {
-      /* fallback */
-    }
-  }
+  const subPath = readConfiguredMissionSubPath(tier) || 'active/missions';
   const dir = path.join(
     PROJECT_ROOT_DIR,
     subPath,
@@ -424,26 +439,19 @@ function isMissionDirectory(candidate: string): boolean {
  * Priority: personal -> confidential -> public
  */
 export function findMissionPath(missionId: string): string | null {
-  const configPath = path.join(KNOWLEDGE_ROOT, 'product/governance/mission-management-config.json');
-  const tiers: ('personal' | 'confidential' | 'public')[] = ['personal', 'confidential', 'public'];
+  assertMissionIdArgument(missionId);
+  const tiers: MissionTier[] = ['personal', 'confidential', 'public'];
 
-  if (rawExistsSync(configPath)) {
-    try {
-      const config = JSON.parse(rawReadTextFile(configPath));
-      for (const tier of tiers) {
-        const subPath = config.directories?.[tier];
-        if (subPath) {
-          const tenant = currentTenantSlug();
-          if (tenant) {
-            const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
-            if (isMissionDirectory(scopedPath)) return scopedPath;
-          }
-          const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
-          if (isMissionDirectory(fullPath)) return fullPath;
-        }
+  for (const tier of tiers) {
+    const subPath = readConfiguredMissionSubPath(tier);
+    if (subPath) {
+      const tenant = currentTenantSlug();
+      if (tenant) {
+        const scopedPath = path.join(PROJECT_ROOT_DIR, subPath, tenant, missionId);
+        if (isMissionDirectory(scopedPath)) return scopedPath;
       }
-    } catch (_) {
-      /* Fallback to legacy search */
+      const fullPath = path.join(PROJECT_ROOT_DIR, subPath, missionId);
+      if (isMissionDirectory(fullPath)) return fullPath;
     }
   }
 

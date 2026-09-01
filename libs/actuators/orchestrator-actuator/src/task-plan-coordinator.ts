@@ -1,18 +1,14 @@
-import {
-  getAgentExecutionPort,
-  logger,
-  missionEvidenceDir,
-  readTaskPlan,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
-  type AgentExecutionPort,
-  type ExecuteTaskPlanParams,
-  type ExecuteTaskPlanResult,
-  type TaskExecutionRecord,
-  type TaskPlan,
-  type TaskPlanCoordinatorPort,
-} from '@agent/core';
+import { getAgentExecutionPort, type AgentExecutionPort } from '@agent/core/agent-execution-port';
+import { logger } from '@agent/core/core';
+import { missionEvidenceDir } from '@agent/core/path-resolver';
+import { readTaskPlan, type TaskPlan } from '@agent/core/sdlc-artifact-store';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
+import type {
+  ExecuteTaskPlanParams,
+  ExecuteTaskPlanResult,
+  TaskExecutionRecord,
+  TaskPlanCoordinatorPort,
+} from '@agent/core/task-plan-coordinator-port';
 import * as path from 'node:path';
 
 const LOG_FILE = 'task-execution-log.jsonl';

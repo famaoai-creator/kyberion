@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCompletionNextAction, formatCompletionNextAction } from './next-action.js';
+import { classifyError } from './error-classifier.js';
+import {
+  buildCompletionNextAction,
+  buildNextActionFromError,
+  formatCompletionNextAction,
+} from './next-action.js';
+
+describe('next-action remediation commands', () => {
+  it('suggests the setup report for missing secrets', () => {
+    const action = buildNextActionFromError(classifyError('secret missing from keychain'));
+
+    expect(action).toMatchObject({
+      next_action_type: 'inspect_artifact',
+      suggested_command: 'pnpm setup:report --persona first-time-user',
+    });
+  });
+
+  it('suggests the governed approval queue command', () => {
+    const action = buildNextActionFromError(classifyError('approval required to proceed'));
+
+    expect(action).toMatchObject({
+      next_action_type: 'run_command',
+      suggested_command: 'pnpm kyberion approvals',
+    });
+  });
+});
 
 describe('next-action completion path', () => {
   it('builds a structured completion summary for satisfied goals', () => {

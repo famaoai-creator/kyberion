@@ -18,25 +18,25 @@
  */
 
 import * as path from 'node:path';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { delegateStructured, getReasoningBackend } from '@agent/core/reasoning-backend';
 import {
-  createStandardYargs,
-  delegateStructured,
-  finalizeAndPersist,
   getInstalledReasoningMode,
-  getReasoningBackend,
   installReasoningBackends,
-  logger,
-  pathResolver,
+} from '@agent/core/reasoning-bootstrap';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
-  TraceContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 
 export const AI_AUDIT_CASES_SCHEMA = z.object({
@@ -458,8 +458,8 @@ export function renderReport(report: AiAuditReport, reportPath: string): string 
   return lines.join('\n');
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'run_ai_audit', ...args])
     .option('dir', { type: 'string', describe: 'Invariants directory (default: tests_ai)' })
     .option('json', { type: 'boolean', default: false, describe: 'Print the raw report JSON' })
     .option('concurrency', { type: 'number', describe: 'Parallel invariant audits (default: 3)' })
@@ -479,12 +479,14 @@ async function main(): Promise<void> {
   process.exitCode = exitCode;
 }
 
-const isDirectRun =
+export const runAiAuditScript = defineScript({
+  name: 'ai-audit',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
+if (
   isDirectScript(import.meta.url, 'run_ai_audit.ts') ||
-  isDirectScript(import.meta.url, 'run_ai_audit.js');
-if (isDirectRun) {
-  main().catch((error) => {
-    console.error(`[ai-audit] fatal: ${error?.message ?? error}`);
-    process.exitCode = 1;
-  });
-}
+  isDirectScript(import.meta.url, 'run_ai_audit.js')
+)
+  void runAiAuditScript();

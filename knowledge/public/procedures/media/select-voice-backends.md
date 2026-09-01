@@ -15,11 +15,11 @@ Presence Studio の音声入出力を、用途・プライバシー・品質・�
 2. ローカル音声ランタイムを使う場合は、準備状況を確認する。
 
    ```bash
-   pnpm voice:setup --json
-   pnpm voice:health
+   pnpm kyberion voice setup --json
+   pnpm pipeline voice-health-check
    ```
 
-   `mlx_audio` は Qwen3-TTS、`mlx_whisper` はローカル STT 用である。未準備の場合は、表示された手順に従ってから `pnpm voice:setup --apply` を実行する。
+   `mlx_audio` は Qwen3-TTS、`mlx_whisper` はローカル STT 用である。未準備の場合は、表示された手順に従ってから `pnpm kyberion voice setup --apply` を実行する。
 
 ## 選択手順
 
@@ -63,9 +63,9 @@ curl -s http://127.0.0.1:3031/api/voice/selection
 
 音声が動かない場合は、次の順で切り分ける。
 
-1. `voice:setup` でランタイムが準備済みか確認する。
-2. `voice:health` で bridge とエンジンの準備状態を確認する。
-3. `pnpm voice:route:probe` で入力デバイスとルートを確認する。
+1. `kyberion voice setup` でランタイムが準備済みか確認する。
+2. `pnpm pipeline voice-health-check` で bridge とエンジンの準備状態を確認する。
+3. `pnpm voice:route probe -- --json` で入力デバイスとルートを確認する。
 4. 入力デバイスが見つからない場合は、OS のマイク権限、CoreAudio、仮想デバイス（例: BlackHole）を確認する。これは STT エンジン未準備とは別の問題である。
 5. Hosted STT のみ失敗する場合は、URL、API key、ネットワーク、送信先のヘルスを確認し、機密会話では Auto またはローカルへ戻す。
 
@@ -83,7 +83,7 @@ curl -s http://127.0.0.1:3031/api/voice/selection
 1. TTS は `knowledge/product/governance/voice-engines/<engine_id>.json` に `tts_adapter_id`、必要なら `runtime_id`、`bridge_script`、`live_presence`、`fallback_engine_id` を登録する。
 2. 既存の `native_tts` または `python_bridge` に適合することを確認する。ランタイムは `tool-runtime-registry` で管理し、UI や voice-hub にエンジン ID の分岐を追加しない。
 3. STT は選択候補とアダプターの定義を `libs/core/voice-provider-adapters.ts` の契約に合わせる。既存アダプターで表現できない新しい通信方式・実行方式だけは、アダプター実装と契約テストを一度追加する。
-4. `pnpm run build`、音声選択テスト、`pnpm voice:health`、`pnpm voice:route:probe` で、候補表示・可用性・実行経路が一致することを確認する。
+4. `pnpm run build`、音声選択テスト、`pnpm pipeline voice-health-check`、`pnpm voice:route probe -- --json` で、候補表示・可用性・実行経路が一致することを確認する。
 
 新しいエンジンを追加するたびに `satellites/voice-hub/server.ts` や Presence Studio の選択 UI を編集する設計にはしない。未知の `tts_adapter_id` は安全側で `unsupported` となり、実行されない。
 

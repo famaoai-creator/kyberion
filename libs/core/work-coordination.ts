@@ -1,4 +1,4 @@
-import { appendJsonLine, readJsonIfPresent } from './foundation/json.js';
+import { appendJsonLine, readJsonIfPresent, readJsonLines } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
@@ -8,7 +8,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
@@ -95,7 +95,7 @@ let coordinationNamespaceOverride: string | null = null;
 let coordinationRootOverride: string | null = null;
 
 export function setWorkCoordinationNamespace(namespace: string | null | undefined): void {
-  coordinationNamespaceOverride = namespace ? String(namespace).trim() : null;
+  coordinationNamespaceOverride = namespace ? normalizeCoordinationNamespace(namespace) : null;
 }
 
 export function clearWorkCoordinationNamespace(): void {
@@ -131,22 +131,44 @@ function randomId(prefix: string): string {
 }
 
 function coordinationNamespace(): string {
-  return (
+  const configured =
     coordinationNamespaceOverride ||
-    String(getRegisteredEnvText('KYBERION_WORK_COORDINATION_NAMESPACE') || '').trim()
-  );
+    String(getRegisteredEnvText('KYBERION_WORK_COORDINATION_NAMESPACE') || '').trim();
+  return configured ? normalizeCoordinationNamespace(configured) : '';
+}
+
+function normalizeCoordinationNamespace(value: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] invalid work coordination namespace: ${value}`);
+  }
+  return normalized;
+}
+
+function coordinationBase(): string {
+  const base = path.resolve(coordinationRootOverride || pathResolver.rootDir());
+  assertSafeRepositoryPath(path.join(base, '.work-coordination-root'), {
+    allowMissingLeaf: true,
+  });
+  return base;
 }
 
 function runtimeRoot(): string {
   const namespace = coordinationNamespace();
-  const base = coordinationRootOverride || pathResolver.rootDir();
-  return path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT);
+  const base = coordinationBase();
+  return assertSafeRepositoryPath(
+    path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT),
+    { allowMissingLeaf: true }
+  );
 }
 
 function observabilityRoot(): string {
   const namespace = coordinationNamespace();
-  const base = coordinationRootOverride || pathResolver.rootDir();
-  return path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT);
+  const base = coordinationBase();
+  return assertSafeRepositoryPath(
+    path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT),
+    { allowMissingLeaf: true }
+  );
 }
 
 function itemsPath(): string {
@@ -171,30 +193,27 @@ function ensureStore(): void {
 }
 
 function readJsonl<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
-  return raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  return readJsonLines<T>(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }));
 }
 
 function appendJsonl(logicalPath: string, record: unknown): void {
   withExecutionContext('infrastructure_sentinel', () => {
     ensureStore();
-    appendJsonLine(logicalPath, record);
+    appendJsonLine(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), record);
   });
 }
 
 function readJson<T>(logicalPath: string): T | null {
-  return readJsonIfPresent<T>(logicalPath);
+  return readJsonIfPresent<T>(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }));
 }
 
 function writeJson(logicalPath: string, value: unknown): void {
   withExecutionContext('infrastructure_sentinel', () => {
     ensureStore();
-    safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
+    safeWriteFile(
+      assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }),
+      JSON.stringify(value, null, 2)
+    );
   });
 }
 

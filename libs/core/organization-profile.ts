@@ -1,10 +1,8 @@
 import * as path from 'node:path';
-import type { ValidateFunction } from 'ajv';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
-import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/organization-profile.schema.json'
@@ -12,8 +10,6 @@ const ORGANIZATION_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
 const ORGANIZATION_PROFILE_PATH = pathResolver.knowledge(
   'product/governance/organization-profile.json'
 );
-
-let organizationProfileValidateFn: ValidateFunction | null = null;
 
 export interface OrganizationProfileLlmOverride {
   description?: string;
@@ -49,23 +45,27 @@ export interface OrganizationProfile {
   };
 }
 
-function ensureOrganizationProfileValidator(): ValidateFunction {
-  if (organizationProfileValidateFn) return organizationProfileValidateFn;
-  organizationProfileValidateFn = compileSchema(ORGANIZATION_PROFILE_SCHEMA_PATH);
-  return organizationProfileValidateFn;
+function loadOrganizationProfileCatalog(filePath: string): OrganizationProfile {
+  return defineCatalog<OrganizationProfile>({
+    id: 'organization-profile',
+    path: filePath,
+    schema: ORGANIZATION_PROFILE_SCHEMA_PATH,
+  }).load();
 }
 
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
+/** Load a known organization-profile path through the canonical schema boundary. */
+export function loadOrganizationProfileAtPath(filePath: string): OrganizationProfile {
+  return loadOrganizationProfileCatalog(assertSafeRepositoryPath(filePath));
 }
 
 export function loadOrganizationProfile(rootDir?: string): OrganizationProfile | null {
   const customerSlug = customerResolver.activeCustomer();
   const rootScopedCustomerPath =
     rootDir && customerSlug
-      ? path.join(rootDir, 'customer', customerSlug, 'organization-profile.json')
+      ? assertSafeRepositoryPath(
+          path.join(rootDir, 'customer', customerSlug, 'organization-profile.json'),
+          { allowMissingLeaf: true, rootDir }
+        )
       : null;
   const activeCustomerPath = rootDir
     ? null
@@ -76,20 +76,24 @@ export function loadOrganizationProfile(rootDir?: string): OrganizationProfile |
     rootScopedCustomerPath,
     activeCustomerPath,
     rootDir
-      ? path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json')
+      ? assertSafeRepositoryPath(
+          path.join(rootDir, 'knowledge', 'public', 'governance', 'organization-profile.json'),
+          { allowMissingLeaf: true, rootDir }
+        )
       : null,
     rootDir ? null : ORGANIZATION_PROFILE_PATH,
   ].filter((entry): entry is string => Boolean(entry));
 
   for (const profilePath of candidatePaths) {
-    if (!safeExistsSync(profilePath)) continue;
+    let safeProfilePath: string;
     try {
-      const parsed = readJson<OrganizationProfile>(profilePath);
-      const validate = ensureOrganizationProfileValidator();
-      if (!validate(parsed)) {
-        throw new Error(`Invalid organization-profile: ${errorsFrom(validate).join('; ')}`);
-      }
-      return parsed;
+      safeProfilePath = assertSafeRepositoryPath(profilePath, { allowMissingLeaf: true, rootDir });
+    } catch {
+      continue;
+    }
+    if (!safeExistsSync(safeProfilePath)) continue;
+    try {
+      return loadOrganizationProfileCatalog(safeProfilePath);
     } catch {
       // try next candidate
     }

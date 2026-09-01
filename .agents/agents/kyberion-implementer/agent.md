@@ -15,7 +15,7 @@ commandExecutionPolicy: sandbox
 <!--
 GENERATED FILE — DO NOT EDIT BY HAND.
 Regenerate with: pnpm agents:generate
-Check drift with: pnpm check:subagent-definitions
+Check drift with: pnpm agents:generate -- --check
 Projection: AGY CLI custom subagent (`.agents/agents/<name>/agent.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
 Adapter: scripts/agy-agent-definition-adapter.ts
@@ -24,7 +24,7 @@ Adapter: scripts/agy-agent-definition-adapter.ts
 <!--
 GENERATED FILE — DO NOT EDIT BY HAND.
 Regenerate with: pnpm agents:generate
-Check drift with: pnpm check:subagent-definitions
+Check drift with: pnpm agents:generate -- --check
 Sources (SSoT):
   - knowledge/product/orchestration/team-roles/implementer.json
   - knowledge/product/roles/software_developer/PROCEDURE.md

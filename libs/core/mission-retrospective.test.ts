@@ -5,6 +5,35 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const realFsSecureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const resolved = path.resolve(filePath);
+    const relative = path.relative(root, resolved);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(`[RESOURCE_PATH_SCOPE] ${filePath}`);
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`[RESOURCE_PATH_SYMLINK] ${filePath}`);
+        }
+      } catch (error: any) {
+        if (error?.code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error(`Resource path does not exist: ${resolved}`);
+    }
+    return resolved;
+  },
   safeAppendFileSync: (filePath: string, data: string) => {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.appendFileSync(filePath, data, 'utf8');
@@ -193,6 +222,42 @@ describe('mission retrospective loop', () => {
     expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
   });
 
+  it('skips malformed JSONL records and does not count non-object events', () => {
+    fs.writeFileSync(
+      path.join(missionDir, 'coordination', 'events', 'task-events.jsonl'),
+      [
+        JSON.stringify([]),
+        JSON.stringify(null),
+        JSON.stringify({ decision: 'best_of_judged', payload: [] }),
+        '{broken json',
+      ].join('\n') + '\n'
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+    expect(stats.best_of_judgements).toBe(1);
+    expect(stats.rework_events).toBe(0);
+    expect(stats.clarifications).toBe(0);
+  });
+
+  it('does not read symlinked mission telemetry into the retrospective', () => {
+    const taskEventsPath = path.join(missionDir, 'coordination', 'events', 'task-events.jsonl');
+    const externalEventsPath = path.join(tmpRoot, 'external-task-events.jsonl');
+    fs.writeFileSync(
+      externalEventsPath,
+      JSON.stringify({ decision: 'best_of_judged', payload: {} }) + '\n'
+    );
+    fs.unlinkSync(taskEventsPath);
+    fs.symlinkSync(externalEventsPath, taskEventsPath, 'file');
+
+    try {
+      const stats = mod.collectMissionExecutionStats(MISSION);
+      expect(stats.best_of_judgements).toBe(0);
+      expect(fs.existsSync(externalEventsPath)).toBe(true);
+    } finally {
+      fs.unlinkSync(taskEventsPath);
+    }
+  });
+
   it('queues LLM proposals for operator ratification and notifies', async () => {
     backendPrompt.mockResolvedValue(
       JSON.stringify({
@@ -223,6 +288,26 @@ describe('mission retrospective loop', () => {
     // the prompt is grounded in the deterministic stats
     expect(String(backendPrompt.mock.calls[0][0])).toContain('EXECUTION STATS');
     expect(String(backendPrompt.mock.calls[0][0])).toContain('goal_reconciliation_rounds');
+  });
+
+  it('rejects malformed LLM proposal shapes and malformed queued records', async () => {
+    backendPrompt.mockResolvedValue(
+      JSON.stringify({
+        proposals: [
+          [],
+          { proposal: 42 },
+          { proposal: 'valid', kind: 'unknown', evidence: ['ok'] },
+          { proposal: 'valid', kind: 'tooling', evidence: ['ok'] },
+        ],
+      })
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(result.proposals).toHaveLength(1);
+
+    const queuePath = mod.processImprovementQueuePath();
+    fs.appendFileSync(queuePath, `${JSON.stringify([])}\n${JSON.stringify({ proposal: 'bad' })}\n`);
+    expect(mod.listProcessImprovementProposals()).toHaveLength(1);
+    expect(mod.normalizeProcessImprovementProposal([])).toBeUndefined();
   });
 
   it('records agent×role outcomes into the performance index and adjusts selection scores', async () => {

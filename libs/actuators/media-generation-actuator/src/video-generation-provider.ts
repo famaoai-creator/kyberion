@@ -1,12 +1,8 @@
-import {
-  getMediaBackendRecord,
-  pathResolver,
-  safeMkdir,
-  safeWriteFile,
-  secureFetch,
-  sleep,
-  type MediaBackendRecord,
-} from '@agent/core';
+import { getMediaBackendRecord, type MediaBackendRecord } from '@agent/core/media-backend-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { secureFetch } from '@agent/core/network';
+import { sleep } from '@agent/core/async-utils';
 import * as path from 'node:path';
 
 export type VideoProviderStatus = 'submitted' | 'running' | 'succeeded' | 'failed' | 'canceled';
@@ -173,7 +169,11 @@ function runwayRatio(request: VideoGenerationRequest): string | undefined {
 
 function targetPath(request: VideoGenerationRequest, providerJobId: string): string {
   const configured = request.target_path?.trim();
-  if (configured) return configured;
+  if (configured) {
+    return assertSafeRepositoryPath(pathResolver.rootResolve(configured), {
+      allowMissingLeaf: true,
+    });
+  }
   return pathResolver.sharedTmp(`video-generation/${providerJobId}.mp4`);
 }
 

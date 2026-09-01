@@ -13,7 +13,7 @@ commandExecutionPolicy: sandbox
 <!--
 GENERATED FILE — DO NOT EDIT BY HAND.
 Regenerate with: pnpm agents:generate
-Check drift with: pnpm check:subagent-definitions
+Check drift with: pnpm agents:generate -- --check
 Projection: AGY CLI custom subagent (`.agents/agents/<name>/agent.md`)
 Source: Kyberion team-role, procedure, capability-profile, and working-principles SSoT
 Adapter: scripts/agy-agent-definition-adapter.ts
@@ -22,7 +22,7 @@ Adapter: scripts/agy-agent-definition-adapter.ts
 <!--
 GENERATED FILE — DO NOT EDIT BY HAND.
 Regenerate with: pnpm agents:generate
-Check drift with: pnpm check:subagent-definitions
+Check drift with: pnpm agents:generate -- --check
 Sources (SSoT):
   - knowledge/product/orchestration/team-roles/devils_advocate.json
   - knowledge/product/roles/ecosystem_architect/PROCEDURE.md
@@ -68,7 +68,7 @@ You are a delegated explorer sub-agent. You are read-only: you may search and re
 
 ### 2. Physical Integrity Enforcement
 
-- `pnpm vital` を定期的に実行し、システムの健全性を監視する。
+- `pnpm pipeline vital-check` を定期的に実行し、システムの健全性を監視する。
 - ビルドエラーやテストの失敗を放置せず、即座に修復フェーズ（Recovery）に移行する。
 
 ### 3. Knowledge Management (3-Tier)
