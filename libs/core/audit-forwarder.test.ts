@@ -8,6 +8,7 @@ import {
   resetAuditForwarder,
   stubAuditForwarder,
   ShellAuditForwarder,
+  parseAuditForwarderHeaders,
   type AuditForwarder,
 } from './audit-forwarder.js';
 import type { AuditEntry } from './audit-chain.js';
@@ -34,10 +35,13 @@ const sample: AuditEntry = {
 describe('audit-forwarder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => '',
-    } as any));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '',
+      } as any)
+    );
   });
 
   afterEach(() => resetAuditForwarder());
@@ -48,6 +52,15 @@ describe('audit-forwarder', () => {
 
   it('stub publish is a no-op', () => {
     expect(() => stubAuditForwarder.publish(sample)).not.toThrow();
+  });
+
+  it('fails closed for malformed, array, and dangerous header JSON', () => {
+    expect(parseAuditForwarderHeaders('{"Authorization":"Bearer token","X-Trace":"1"}')).toEqual({
+      Authorization: 'Bearer token',
+      'X-Trace': '1',
+    });
+    expect(parseAuditForwarderHeaders('[]')).toEqual({});
+    expect(parseAuditForwarderHeaders('{"__proto__":{"Authorization":"injected"}}')).toEqual({});
   });
 
   it('resolves a registered forwarder', async () => {
@@ -125,7 +138,9 @@ describe('audit-forwarder', () => {
       const seen: string[] = [];
       const sink: AuditForwarder = {
         name: 'sink',
-        publish: (e) => { seen.push(e.id); },
+        publish: (e) => {
+          seen.push(e.id);
+        },
       };
       const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp']);
       await filter.publish({ ...sample, id: 'A1', tenantSlug: 'acme-corp' });
@@ -138,7 +153,9 @@ describe('audit-forwarder', () => {
       const seen: string[] = [];
       const sink: AuditForwarder = {
         name: 'sink',
-        publish: (e) => { seen.push(e.id); },
+        publish: (e) => {
+          seen.push(e.id);
+        },
       };
       const filter = new TenantFilteringAuditForwarder(sink, ['acme-corp'], true);
       await filter.publish({ ...sample, id: 'B1' });
