@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 interface OperatorPacketAction {
   id: string;
   priority?: 'now' | 'next' | 'later';
@@ -65,13 +67,8 @@ const INTERACTION_TYPES = new Set([
 ]);
 const RESPONSE_STYLES = new Set(['clarify-first', 'preview-and-confirm', 'status-summary']);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    Object.keys(value).every((key) => !DANGEROUS_KEYS.has(key))
-  );
+function isSafePacketRecord(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && Object.keys(value).every((key) => !DANGEROUS_KEYS.has(key));
 }
 
 function nonEmptyString(value: unknown): value is string {
@@ -90,7 +87,7 @@ function stringArray(value: unknown): string[] | undefined {
 
 function parseAction(value: unknown): OperatorPacketAction | undefined {
   if (
-    !isRecord(value) ||
+    !isSafePacketRecord(value) ||
     !nonEmptyString(value.id) ||
     !nonEmptyString(value.action) ||
     !optionalString(value.reason) ||
@@ -140,7 +137,7 @@ function parseQuestions(
     return value === undefined ? undefined : undefined;
   const questions = value.map((candidate) => {
     if (
-      !isRecord(candidate) ||
+      !isSafePacketRecord(candidate) ||
       !nonEmptyString(candidate.id) ||
       !nonEmptyString(candidate.question) ||
       !nonEmptyString(candidate.reason) ||
@@ -167,7 +164,7 @@ function parseFindings(value: unknown): SystemStatusReportLike['findings'] | und
     return value === undefined ? undefined : undefined;
   const findings = value.map((candidate) => {
     if (
-      !isRecord(candidate) ||
+      !isSafePacketRecord(candidate) ||
       !nonEmptyString(candidate.id) ||
       !nonEmptyString(candidate.severity) ||
       !nonEmptyString(candidate.message) ||
@@ -187,7 +184,7 @@ function parseFindings(value: unknown): SystemStatusReportLike['findings'] | und
 
 /** Validate packet files before display or next-action execution. */
 export function parseInteractionPacket(value: unknown): ParsedPacket | undefined {
-  if (!isRecord(value) || !nonEmptyString(value.kind)) return undefined;
+  if (!isSafePacketRecord(value) || !nonEmptyString(value.kind)) return undefined;
   if (value.kind === 'operator-response-preview') {
     return value.format === 'plain-text' && nonEmptyString(value.text)
       ? { kind: value.kind, format: value.format, text: value.text }

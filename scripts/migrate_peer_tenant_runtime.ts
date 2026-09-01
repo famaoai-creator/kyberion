@@ -24,7 +24,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -113,10 +113,6 @@ const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isSafeJsonTree(value: unknown): boolean {

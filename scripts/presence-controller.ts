@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -34,10 +34,6 @@ interface Channel {
 
 interface ChannelRegistry {
   channels: Channel[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parsePresenceStimulus(value: unknown): Stimulus | undefined {

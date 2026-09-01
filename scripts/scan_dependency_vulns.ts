@@ -9,7 +9,7 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
-import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -234,10 +234,6 @@ const PATCH_DECISIONS: PatchDecision[] = [
   'defer',
   'approval',
 ];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

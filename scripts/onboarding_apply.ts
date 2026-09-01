@@ -20,6 +20,7 @@ import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
   compileSchema,
+  isRecord,
   parseSafeJsonInput,
   readJson,
   setRegisteredEnv,
@@ -68,10 +69,6 @@ interface ApplyInput {
    * wizard's reasoning-phase selection (LC-05).
    */
   reasoning_backend?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {
