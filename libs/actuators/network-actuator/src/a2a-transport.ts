@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -114,7 +115,9 @@ export async function pollA2AInbox(): Promise<A2AInboxMessage[]> {
     }
 
     try {
-      const message = parseA2AInboxMessage(JSON.parse(content) as unknown);
+      const message = parseA2AInboxMessage(
+        parseSafeJsonInput(content, `[A2A_Transport] inbox message ${file}`)
+      );
       if (!message) throw new Error('invalid A2A message envelope');
       messages.push(message);
       // Move to processed or delete
@@ -180,9 +183,14 @@ async function _decryptPayload(encryptedBlob: string): Promise<string> {
   let pass: string;
   try {
     pass = parseA2ASecretValue(
-      JSON.parse(
-        safeExec('node', [pathResolver.capabilityEntry('secret-actuator'), '--input', getPassInput])
-      ) as unknown
+      parseSafeJsonInput(
+        safeExec('node', [
+          pathResolver.capabilityEntry('secret-actuator'),
+          '--input',
+          getPassInput,
+        ]),
+        '[A2A_Transport] secret actuator response'
+      )
     );
   } finally {
     safeUnlinkSync(getPassInput);
