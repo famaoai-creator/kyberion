@@ -5,6 +5,7 @@ import { probeServiceRuntime, getServiceRuntimeRecord } from '@agent/core/servic
 import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import { inspectServiceAuth } from '@agent/core/service-validator';
 import { safeExecResult } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { isRecord } from '@agent/core/foundation/text';
 
 type ServicePreflightStatus = 'ready' | 'needs_attention' | 'unavailable';
@@ -66,7 +67,7 @@ export function parseJsonProbeOutput(output: string): {
   }
   const lastLine = trimmed.split(/\r?\n/).filter(Boolean).pop() || trimmed;
   try {
-    const payload = JSON.parse(lastLine) as unknown;
+    const payload = parseSafeJsonInput(lastLine, 'service probe output');
     if (!isRecord(payload)) return { ok: false, reason: 'invalid_json_output' };
     const status = typeof payload.status === 'string' ? payload.status.toLowerCase() : '';
     return {

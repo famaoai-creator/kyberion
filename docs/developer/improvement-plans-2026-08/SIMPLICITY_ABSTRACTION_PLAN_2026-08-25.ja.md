@@ -10511,6 +10511,12 @@ SX-05／SX-07 の command entry を再監査し、manifest-driven gate が直接
 
 package scripts は実測 **153 → 151 件**。`check:cli-manifest`、`check:script-integrity`、`check:ci-gate-parity`、first-win／wire-error の対象 gate、CLI／registry 関連 **4 files / 34 tests passed**、Prettier、`git diff --check` を確認した。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 130
+
+service preflight の voice／meeting bridge stdout を再監査し、JSON parse 後に object root だけを確認していた外部応答を foundation の `parseSafeJsonInput` 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の `invalid_json_output` と readiness fallback へ閉じ、status 判定と direct probe の既存 semantics は変更していない。
+
+検証: `service_preflight` **2 files / 7 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る scripts **≤120**、全 script harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
