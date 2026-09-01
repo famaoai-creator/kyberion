@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest } from '../../../lib/api-guard';
 import * as customerResolver from '@agent/core/customer-resolver';
+import { readJson as readFoundationJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeReadFile,
@@ -36,7 +36,7 @@ function readJson<T>(fileName: string): T | null {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(full) || !safeLstat(full).isFile()) return null;
-    return loadJson<T>(full);
+    return readFoundationJson<T>(full);
   } catch {
     return null;
   }

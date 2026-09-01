@@ -12,9 +12,9 @@ import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findMissionPath } from '@agent/core/path-resolver';
+import { readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeReaddir,
@@ -126,7 +126,7 @@ export function resolveApprovalTenant(record: ApprovalRequestRecord): string | u
   try {
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return undefined;
-    const state = loadJson<{ tenant_slug?: string; tenant_id?: string }>(safeStatePath);
+    const state = readJson<{ tenant_slug?: string; tenant_id?: string }>(safeStatePath);
     return state.tenant_slug || state.tenant_id;
   } catch {
     return undefined;
@@ -173,7 +173,7 @@ function collectMissionStates(): MissionState[] {
         });
         if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) continue;
         try {
-          const state = loadJson<MissionState>(statePath);
+          const state = readJson<MissionState>(statePath);
           if (state?.mission_id) states.push(state);
         } catch {
           // Ignore malformed mission state files.

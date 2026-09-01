@@ -1,11 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-} from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { isRecord } from './foundation/text.js';
 
@@ -137,7 +132,7 @@ export function auditProcessDefinitionRegistry(
       sources.push(audit);
       continue;
     }
-    const payload = loadJson<unknown>(resolved);
+    const payload = readJson<unknown>(resolved);
     if (!isRecord(payload)) {
       errors.push(`${source.id}: expected JSON object at ${source.path}`);
       sources.push(audit);

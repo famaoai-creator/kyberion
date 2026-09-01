@@ -22,14 +22,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  loadJson,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-  safeExec,
-} from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat, safeExec } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { normalizePersistedAuditEntry } from './audit-chain.js';
@@ -393,7 +387,7 @@ function readRootEnginesNodeRange(): string | null {
   try {
     const pkgPath = pathResolver.rootResolve('package.json');
     if (!safeExistsSync(pkgPath)) return null;
-    const pkg = loadJson<{ engines?: { node?: unknown } }>(pkgPath);
+    const pkg = readJson<{ engines?: { node?: unknown } }>(pkgPath);
     const range = pkg.engines?.node;
     return typeof range === 'string' && range.trim() !== '' ? range : null;
   } catch {
