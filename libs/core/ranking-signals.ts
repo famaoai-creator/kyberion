@@ -11,6 +11,7 @@
  */
 
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import type { ScopeContext } from './scope-context.js';
 
@@ -239,6 +240,6 @@ export function knowledgeMetadataScore(
     : 0;
   const proximityScore =
     knowledgeScopeProximityScore(metadata, currentScopeContext) * proximityWeight;
-  const usageYieldScore = Math.max(0, Math.min(1, metadata.usage_yield ?? 0)) * usageYieldWeight;
+  const usageYieldScore = clamp(metadata.usage_yield ?? 0, 0, 1) * usageYieldWeight;
   return scopeScore + authorityScore + recencyScore + proximityScore + usageYieldScore;
 }
