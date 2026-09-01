@@ -189,6 +189,11 @@ describe('delegation-chain (NI-03)', () => {
 
     it('rejects malformed inputs (never throws)', () => {
       expect(parseDelegationChain('{not json[')).toBeNull();
+      expect(
+        parseDelegationChain(
+          '[{"actor":"a","granted_scope":{"capabilities":["file:read"],"meta":{"__proto__":{}}},"granted_at":"t"}]'
+        )
+      ).toBeNull(); // dangerous nested JSON key
       expect(parseDelegationChain({ actor: 'x' })).toBeNull(); // not an array
       expect(parseDelegationChain([{ granted_scope: {}, granted_at: 'now' }])).toBeNull(); // no actor
       expect(parseDelegationChain([{ actor: 'a', granted_scope: {} }])).toBeNull(); // no granted_at
