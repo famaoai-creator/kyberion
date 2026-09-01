@@ -11101,6 +11101,12 @@ SX-03 のスコア境界を継続監査し、trust engineのdimension score、me
 
 検証: trust engine／metrics／intent reconciliation **3 files / 24 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は direct clampを含む追加domain境界、およびSX-04〜SX-14の未完了項目、voice provider実機依存、provider CLIの実OS-level enforcement probeである。
 
+## 2026-09-02 再レビュー修正 227
+
+SX-03 の運用系上限値を継続監査し、history searchの結果数、source analysisの対象ファイル数、managed processのtail bytesを `foundation/text` の canonical `clamp`へ移行した。既定値、数値変換、既存の上下限、検索・解析・プロセス監視の出力契約は維持した。
+
+検証: history search／source analysis／managed process **3 files / 21 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は direct clampを含む追加domain境界、およびSX-04〜SX-14の未完了項目、voice provider実機依存、provider CLIの実OS-level enforcement probeである。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -13,7 +13,7 @@ import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readJson, readJsonLines } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
-import { isRecord } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 import { validateTraceReplay } from './trace-schema.js';
 
 /**
@@ -532,7 +532,7 @@ export function searchHistory(options: HistorySearchOptions = {}): HistorySearch
   if (mode === 'discovery' && !query) throw new Error('History discovery requires a query');
   if (mode === 'scroll' && !options.sessionId) throw new Error('History scroll requires sessionId');
   const tiers: HistorySearchTier[] = options.tiers?.length ? options.tiers : ['public'];
-  const maxResults = Math.max(1, Math.min(100, options.maxResults || DEFAULT_MAX_RESULTS));
+  const maxResults = clamp(options.maxResults || DEFAULT_MAX_RESULTS, 1, 100);
   let rebuilt = false;
 
   ensureSchema();

@@ -6,6 +6,7 @@ import {
   type RuntimeShutdownPolicy,
 } from './runtime-supervisor.js';
 import { createLogger } from './logger.js';
+import { clamp } from './foundation/text.js';
 
 const logger = createLogger('managed-process');
 
@@ -115,7 +116,7 @@ export function armWatch(
   let lastOutputAt = Date.now();
   let quietEmitted = false;
   let tail = '';
-  const maxTailBytes = Math.max(1024, Math.min(options.maxTailBytes || 64 * 1024, 256 * 1024));
+  const maxTailBytes = clamp(options.maxTailBytes || 64 * 1024, 1024, 256 * 1024);
   const minTriggerIntervalMs = Math.max(0, options.minTriggerIntervalMs ?? 1000);
 
   const emit = (
