@@ -11,7 +11,7 @@
  */
 
 import * as path from 'node:path';
-import { loadJson } from '@agent/core/foundation';
+import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -341,11 +341,8 @@ export interface AuditEventRow {
   mission_id?: string;
 }
 
-const AUDIT_EVENT_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
 function isAuditRecord(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return Object.keys(value).every((key) => !AUDIT_EVENT_DANGEROUS_KEYS.has(key));
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function auditStringField(
@@ -365,7 +362,7 @@ function auditStringField(
 function parseAuditEvent(raw: string): AuditEventRow | null {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseSafeJsonInput(raw, 'operator-surface audit event');
   } catch {
     return null;
   }

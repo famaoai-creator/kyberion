@@ -4,6 +4,7 @@ import {
   safeLstat,
   safeReadFile,
 } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 
 const MAX_TAIL_BYTES = 2 * 1024 * 1024;
 
@@ -34,7 +35,7 @@ export function tailJsonl<T>(filePath: string, maxLines: number, parse: JsonlPar
   const parsed: T[] = [];
   for (const line of tailLines(filePath, maxLines)) {
     try {
-      const value = parse(JSON.parse(line));
+      const value = parse(parseSafeJsonInput(line, 'terminal HUD JSONL entry'));
       if (value !== null) parsed.push(value);
     } catch {
       // skip malformed lines; append-only JSONL may have a partial last line
