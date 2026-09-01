@@ -148,16 +148,16 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for agy cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_CLI_LOG_FILE",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for agy cli log file; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_CLI_MODEL",
@@ -172,16 +172,16 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for agy cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_SANDBOX",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for agy sandbox; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AGY_SDK_API_KEY",
@@ -198,7 +198,7 @@
       "type": "string",
       "required": false,
       "description": "Working directory passed from the AGY SDK adapter to its Python bridge.",
-      "documented": false,
+      "documented": true,
       "subsystem": "reasoning"
     },
     {
@@ -296,16 +296,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for anthropic native deferred tools; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ANTIGRAVITY_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for antigravity cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_API_TOKEN",
@@ -321,32 +321,32 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for apple fm; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_APPLE_FM_SAMPLE_AUDIO",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for apple fm sample audio; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_BUS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audio bus; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_DEVICE_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audio device uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIO_PERMISSION_CONFIRMED",
@@ -378,8 +378,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audit continuity enforce; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_COMMAND",
@@ -394,16 +394,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for audit forwarder headers; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for audit forwarder timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_AUDIT_FORWARDER_URL",
@@ -444,48 +444,48 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for best of n; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BEST_OF_PROVIDERS_LIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for best of providers live; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_DEVICE_LABEL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole device label; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_INPUT_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole input uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_OUTPUT_UID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole output uid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLACKHOLE_SCRIPT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for blackhole script; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_PASSWORD",
@@ -500,8 +500,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for bluebubbles send method; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BLUEBUBBLES_URL",
@@ -524,32 +524,32 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for brand font stack; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_BRAND_MONO_STACK",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for brand mono stack; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CHRONOS_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for chronos idle timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_AGENT_TOOLS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for claude agent tools; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_CLI_BIN",
@@ -565,8 +565,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for claude cli extra args; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_CLI_MODEL",
@@ -581,8 +581,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for claude cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CLAUDE_FAST_MODEL",
@@ -698,80 +698,80 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for comfy output dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COMPUTER_SURFACE_PRINCIPAL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for computer surface principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for confidential operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_BUFFER_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context buffer tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_PACK_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for context pack id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_RESERVE_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context reserve tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXT_WINDOW_TOKENS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for context window tokens; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXTUAL_INTENT_LEARNING_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for contextual intent learning path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for contextual intent memory path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COPILOT_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for copilot cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_COPILOT_MODEL",
@@ -786,8 +786,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation archive history path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_REPORT_PATH",
@@ -803,24 +803,24 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for curation scan roots; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_SLO_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation slo config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_TAXONOMY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for curation taxonomy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_CURATION_TENANT_ROOTDIR",
@@ -933,32 +933,32 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for deploy config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_PROJECT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for deploy project; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOY_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for deploy timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_DEPLOYMENT_PROJECT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for deployment project; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DISABLE_AGENT_RUNTIME_SUPERVISOR_DAEMON",
@@ -981,16 +981,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for dispatch max rounds; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_DRAFT_REFINE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for draft refine; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_EGRESS_POLICY",
@@ -1015,8 +1015,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for email from; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ENABLE_SERVICE_ACTUATE_TOOL",
@@ -1031,8 +1031,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for entity governance; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ENTITY_GOVERNANCE_STRICT_WARNINGS",
@@ -1065,8 +1065,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for first win live; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_FLUID_AUDIO_STT_COMMAND",
@@ -1091,8 +1091,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for format; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GATE_OVERRIDE_SIGNATURE",
@@ -1108,8 +1108,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for gemini cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_CLI_MODEL",
@@ -1124,8 +1124,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for gemini cli timeout; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_FAST_MODEL",
@@ -1148,8 +1148,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for gemini tts voice; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GEMINI_URL",
@@ -1182,24 +1182,24 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for generation schedule interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GLOBAL_INFLIGHT_LIMIT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for global inflight limit; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_GOAL_LOOP_MAX_ROUNDS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for goal loop max rounds; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_API_KEY",
@@ -1230,16 +1230,16 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for grok cli bin; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_CLI_EXTRA_ARGS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for grok cli extra args; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_GROK_CLI_MODEL",
@@ -1254,88 +1254,88 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for grok cli timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_HARNESS_SUBAGENT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for harness subagent; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_HINTS_ARCHIVE_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for hints archive dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_HINTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for hints path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_HISTORY_SEARCH_DB",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for history search db; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_HOST_AGENT_ACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for host agent active; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_IMESSAGE_WAKE_WORD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for imessage wake word; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_IN_SESSION_SUBAGENT",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for in session subagent; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INGEST_QUOTA_TEST",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ingest quota test; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INJECTION_SCOPE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for injection scope; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INJECTION_SUSPECTED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for injection suspected; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_COMPILER_MODEL",
@@ -1406,24 +1406,24 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for ki cache dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_KI_CACHE_MAX_MB",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ki cache max mb; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_KILL_SWITCH_INTERVAL_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for kill switch interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_DELIVERY_DIR",
@@ -1495,8 +1495,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for live blackhole test; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LLAMACPP_KEY",
@@ -1527,8 +1527,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for llm concurrency; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LM_STUDIO_MODEL",
@@ -1635,8 +1635,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for locale; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_LOCALHOST_AUTOADMIN",
@@ -1652,8 +1652,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for managed python version; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MANIFEST_SIGNING_KEY",
@@ -1705,16 +1705,16 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for media backend probe ttl ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEDIA_BACKEND_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for media backend registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEET_EXTENSION_TOKEN",
@@ -1729,48 +1729,48 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for memory autopromote; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MEMORY_QUEUE_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for memory queue path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_HUB_OBSERVABILITY_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mesh hub observability root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_HUB_RUNTIME_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mesh hub runtime root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_NAMESPACE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mesh namespace; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_PEER_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mesh peer id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_MESH_SHARED_SECRET",
@@ -1854,8 +1854,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for mission task trace dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_MLX_EMBED_MODEL",
@@ -1903,8 +1903,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for mos principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_NEMOTRON_KEY",
@@ -1944,16 +1944,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for nhi id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_NON_INTERACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for non interactive; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OAUTH_CALLBACK_HOST",
@@ -1968,8 +1968,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for oauth callback path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_OAUTH_CALLBACK_PORT",
@@ -1985,8 +1985,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for oauth service id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OLLAMA_KEY",
@@ -2017,8 +2017,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for onboarding non interactive ok; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPENAI_MODEL",
@@ -2112,8 +2112,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_OPS_ALERT_WEBHOOK_URL",
@@ -2128,8 +2128,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for organization id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_OS_GUARDED_SURFACE_URL",
@@ -2160,16 +2160,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for peer network catalog; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_PORT",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for peer port; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PEER_SHARED_SECRET",
@@ -2193,104 +2193,104 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal operator learning dispatch registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_PRESENTATION_PREFERENCE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal presentation preference registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_SURFACE_QUERY_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal surface query config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PERSONAL_VOICE_PROFILE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for personal voice profile registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PHASE_GATE_MODE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for phase gate mode; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PIPELINE_FALLBACK_ACTIVE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for pipeline fallback active; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PREFIX",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for prefix; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PRESENCE_AVATAR_PROFILES_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for presence avatar profiles path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PRESENTATION_PREFERENCE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for presentation preference registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for project id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_NAME",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for project name; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROJECT_ROOT",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for project root; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_CAPABILITY_PROBE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider capability probe; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_CAPABILITY_REFRESH",
@@ -2305,32 +2305,32 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider capability routing; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_DEMOTION_TTL_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for provider demotion ttl ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_DISCOVERY_REFRESH",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider discovery refresh; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_EGRESS_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for provider egress policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_PROVIDER_ENV_ALLOWLIST",
@@ -2355,24 +2355,24 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for provider priority; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PTC_CHILD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ptc child; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_PTY_IDLE_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for pty idle timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_PYTHON",
@@ -2415,8 +2415,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for reasoning in place retries; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_MODEL",
@@ -2431,40 +2431,40 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for reasoning profile; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_REASONING_RETRY_BASE_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for reasoning retry base ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_REMINDER_CC_AFTER_N",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for reminder cc after n; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_RESTRICTED_ACTIONS_POLICY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for restricted actions policy; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_RESTRICTED_APPROVED_ITEMS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for restricted approved items; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_ROOT",
@@ -2480,8 +2480,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for runtime sweep interval ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_RUNWAY_API_KEY",
@@ -2549,56 +2549,56 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for security quarantine dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SECURITY_QUARANTINE_MAX_BYTES",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for security quarantine max bytes; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_ENDPOINTS_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service endpoints dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_ENDPOINTS_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service endpoints path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_PRESETS_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service presets dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SERVICE_RUNTIME_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for service runtime registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SHARE_GRANTS_HMAC_KEY",
@@ -2613,8 +2613,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for share grants path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SHELL_COMMAND_POLICY_PATH",
@@ -2695,16 +2695,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for speaker fairness must threshold; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SPEAKER_FAIRNESS_TOTAL_THRESHOLD",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for speaker fairness total threshold; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SPEND_GUARD_TEST",
@@ -2848,8 +2848,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for style keys; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SUDO",
@@ -2891,16 +2891,16 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for surface query config path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_SURFACE_QUERY_PHASE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for surface query phase; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_SURFACE_QUERY_ROLE",
@@ -2916,16 +2916,16 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for task grants path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TASK_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for task id; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TASK_MODEL_ROUTING",
@@ -2941,16 +2941,16 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for task scenario dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TELEMETRY",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for telemetry; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TEN_VAD_PYTHON",
@@ -3002,8 +3002,8 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for terminal disconnect timeout ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_HOST",
@@ -3018,16 +3018,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for terminal restore runtime; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_SESSION_RETENTION_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional numeric tuning value for terminal session retention ms; leave unset to use the governed default.",
+      "documented": true
     },
     {
       "name": "KYBERION_TERMINAL_TOKEN",
@@ -3042,48 +3042,48 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for test observability dir; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TIER",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for tier; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TIMEZONE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for timezone; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_ACTUATOR_ROUTING_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool actuator routing policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TOOL_RUNTIME_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for tool runtime registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_TRUST_PROXY",
@@ -3124,16 +3124,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for tui disable audit; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_UI_LOCALE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for ui locale; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VAD",
@@ -3150,32 +3150,32 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for video composition template registry path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIDEO_RENDER_RUN_MODE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for video render run mode; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIDEO_RENDER_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path override for video render runtime policy path; keep it inside governed repository or runtime storage.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIEWER_PRINCIPAL",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for viewer principal; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VIEWER_SCOPE",
@@ -3320,8 +3320,8 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows ai; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AI_ENDPOINT",
@@ -3344,16 +3344,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows aumid; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_IMAGE_GENERATOR",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for windows image generator; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_STT_BACKEND",
@@ -3368,16 +3368,16 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for wisdom llm profile; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WORK_COORDINATION_NAMESPACE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional runtime setting for work coordination namespace; leave unset to use the built-in configuration.",
+      "documented": true
     },
     {
       "name": "KYBERION_WORKITEM_RESPONSE_TIMEOUT_MS",
