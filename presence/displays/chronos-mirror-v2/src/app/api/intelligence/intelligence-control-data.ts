@@ -115,12 +115,9 @@ import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
 import * as intelligenceData from './intelligence-observation-data';
 import {
-  numberField,
-  optionalStringField,
-  parseJsonRecord,
-  recordField,
-  stringField,
-} from '../../../lib/json-record';
+  parseDashboardJsonRecord,
+  parseDashboardOwnerSummaryLine,
+} from '@agent/core/dashboard-event-parser';
 
 export function readSafeObservationFile(filePath: string): string | null {
   try {
@@ -130,6 +127,61 @@ export function readSafeObservationFile(filePath: string): string | null {
   } catch {
     return null;
   }
+}
+
+const CONTROL_EVENT_STRING_KEYS = [
+  'ts',
+  'decision',
+  'event_type',
+  'event_id',
+  'mission_id',
+  'resource_id',
+  'operation',
+  'requested_by',
+  'error',
+  'action_id',
+  'outcome',
+  'why',
+] as const;
+const CONTROL_PAYLOAD_STRING_KEYS = ['surfaceId', 'operation'] as const;
+
+function controlEventText(event: Record<string, unknown>, key: string): string | undefined {
+  const value = event[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+export function parseControlEventLine(line: string): Record<string, unknown> | null {
+  const event = parseDashboardJsonRecord(line);
+  if (!event) return null;
+  if (!controlEventTimestamp(event)) return null;
+  if (CONTROL_EVENT_STRING_KEYS.some((key) => key in event && typeof event[key] !== 'string')) {
+    return null;
+  }
+  if (event.payload !== undefined) {
+    const payload = event.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const payloadRecord = payload as Record<string, unknown>;
+    if (
+      CONTROL_PAYLOAD_STRING_KEYS.some(
+        (key) => key in payloadRecord && typeof payloadRecord[key] !== 'string'
+      )
+    ) {
+      return null;
+    }
+  }
+  return event;
+}
+
+function controlEventTimestamp(event: Record<string, unknown>): string | null {
+  const timestamp = controlEventText(event, 'ts');
+  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : null;
+}
+
+function controlPayloadText(event: Record<string, unknown>, key: string): string | undefined {
+  if (!event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) {
+    return undefined;
+  }
+  return controlEventText(event.payload as Record<string, unknown>, key);
 }
 
 export function collectRecentEvents(
@@ -146,19 +198,17 @@ export function collectRecentEvents(
     if (raw === null) continue;
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
-      try {
-        const event = parseJsonRecord(line);
-        if (!event) continue;
-        lines.push({
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          decision: stringField(event, 'decision', stringField(event, 'event_type', 'event')),
-          mission_id:
-            optionalStringField(event, 'mission_id') || optionalStringField(event, 'resource_id'),
-          why: optionalStringField(event, 'why'),
-        });
-      } catch {
-        // Ignore malformed lines.
-      }
+      const event = parseControlEventLine(line);
+      if (!event) continue;
+      const ts = controlEventTimestamp(event);
+      const decision = controlEventText(event, 'decision') || controlEventText(event, 'event_type');
+      if (!ts || !decision) continue;
+      lines.push({
+        ts,
+        decision,
+        mission_id: controlEventText(event, 'mission_id') || controlEventText(event, 'resource_id'),
+        why: controlEventText(event, 'why'),
+      });
     }
   }
   return lines
@@ -180,107 +230,108 @@ export function collectControlActions(
 
   for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
-    try {
-      const event = parseJsonRecord(line);
-      if (!event) continue;
-      const payload = recordField(event.payload);
-      const decision = stringField(event, 'decision', stringField(event, 'event_type'));
-      const eventType = stringField(event, 'event_type');
-      const eventId = optionalStringField(event, 'event_id');
+    const event = parseControlEventLine(line);
+    if (!event) continue;
+    const decision = controlEventText(event, 'decision') || controlEventText(event, 'event_type');
+    const eventType = controlEventText(event, 'event_type');
+    const eventId = controlEventText(event, 'event_id');
+    const ts = controlEventTimestamp(event);
+    if (!decision || !ts) continue;
 
-      if (
-        decision === 'mission_orchestration_event_enqueued' &&
-        (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
-        eventId
-      ) {
-        const queuedTarget =
-          eventType === 'surface_control_requested'
-            ? stringField(payload, 'surfaceId', 'surface-runtime')
-            : stringField(event, 'mission_id', 'system');
-        lifecycle.set(eventId, {
-          event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
-          target: queuedTarget,
-          operation: stringField(payload, 'operation', eventType),
-          status: 'queued',
-          requested_by: stringField(event, 'requested_by', 'unknown'),
-        });
-        continue;
-      }
+    if (
+      decision === 'mission_orchestration_event_enqueued' &&
+      (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
+      eventId
+    ) {
+      const queuedTarget =
+        eventType === 'surface_control_requested'
+          ? controlPayloadText(event, 'surfaceId') || 'surface-runtime'
+          : controlEventText(event, 'mission_id') || 'system';
+      lifecycle.set(eventId, {
+        event_id: eventId,
+        ts,
+        kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
+        target: queuedTarget,
+        operation: controlPayloadText(event, 'operation') || eventType,
+        status: 'queued',
+        requested_by: controlEventText(event, 'requested_by') || 'unknown',
+      });
+      continue;
+    }
 
-      if (
-        (decision === 'mission_control_action_applied' ||
-          decision === 'surface_control_action_applied') &&
-        stringField(event, 'operation').length > 0
-      ) {
-        const operation = stringField(event, 'operation');
-        const syntheticId = `${decision}:${stringField(event, 'mission_id', stringField(event, 'resource_id', 'system'))}:${operation}:${stringField(event, 'ts')}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
-          target: stringField(event, 'mission_id', stringField(event, 'resource_id', 'system')),
-          operation,
-          status: 'completed',
-          requested_by: stringField(event, 'requested_by', 'unknown'),
-        });
-        continue;
-      }
+    if (
+      (decision === 'mission_control_action_applied' ||
+        decision === 'surface_control_action_applied') &&
+      Boolean(controlEventText(event, 'operation'))
+    ) {
+      const operation = controlEventText(event, 'operation')!;
+      const target =
+        controlEventText(event, 'mission_id') || controlEventText(event, 'resource_id') || 'system';
+      const syntheticId = `${decision}:${target}:${operation}:${ts}`;
+      lifecycle.set(syntheticId, {
+        event_id: eventId,
+        ts,
+        kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
+        target,
+        operation,
+        status: 'completed',
+        requested_by: controlEventText(event, 'requested_by') || 'unknown',
+      });
+      continue;
+    }
 
-      if (decision === 'memory_promote_pending_applied') {
-        const syntheticId = `${decision}:${stringField(event, 'resource_id', 'memory-promotion-queue')}:${stringField(event, 'ts')}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          kind: 'surface',
-          target: stringField(event, 'resource_id', 'memory-promotion-queue'),
-          operation: 'memory_promote_pending',
-          status: 'completed',
-          requested_by: stringField(event, 'requested_by', 'unknown'),
-          error: optionalStringField(event, 'error'),
-        });
-        continue;
-      }
+    if (decision === 'memory_promote_pending_applied') {
+      const target = controlEventText(event, 'resource_id') || 'memory-promotion-queue';
+      const syntheticId = `${decision}:${target}:${ts}`;
+      lifecycle.set(syntheticId, {
+        event_id: eventId,
+        ts,
+        kind: 'surface',
+        target,
+        operation: 'memory_promote_pending',
+        status: 'completed',
+        requested_by: controlEventText(event, 'requested_by') || 'unknown',
+        error: controlEventText(event, 'error'),
+      });
+      continue;
+    }
 
-      if (decision === 'next_action_executed') {
-        const operation = stringField(event, 'operation', 'next_action_execute');
-        const syntheticId = `${decision}:${stringField(event, 'resource_id', 'next-actions')}:${operation}:${stringField(event, 'ts')}`;
-        lifecycle.set(syntheticId, {
-          event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          kind: 'surface',
-          target: stringField(event, 'resource_id', 'next-actions'),
-          operation,
-          status: stringField(event, 'outcome') === 'failed' ? 'failed' : 'completed',
-          requested_by: stringField(event, 'requested_by', 'unknown'),
-          error: optionalStringField(event, 'error'),
-        });
-        continue;
-      }
+    if (decision === 'next_action_executed') {
+      const operation = controlEventText(event, 'operation') || 'next_action_execute';
+      const target = controlEventText(event, 'resource_id') || 'next-actions';
+      const syntheticId = `${decision}:${target}:${operation}:${ts}`;
+      lifecycle.set(syntheticId, {
+        event_id: eventId,
+        ts,
+        kind: 'surface',
+        target,
+        operation,
+        status: controlEventText(event, 'outcome') === 'failed' ? 'failed' : 'completed',
+        requested_by: controlEventText(event, 'requested_by') || 'unknown',
+        error: controlEventText(event, 'error'),
+      });
+      continue;
+    }
 
-      if (
-        decision === 'mission_orchestration_event_failed' &&
-        (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
-        eventId
-      ) {
-        const failedTarget =
-          eventType === 'surface_control_requested'
-            ? stringField(payload, 'surfaceId', 'surface-runtime')
-            : stringField(event, 'mission_id', 'system');
-        lifecycle.set(eventId, {
-          event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
-          target: failedTarget,
-          operation: stringField(payload, 'operation', eventType),
-          status: 'failed',
-          requested_by: stringField(event, 'requested_by', 'unknown'),
-          error: optionalStringField(event, 'error'),
-        });
-      }
-    } catch {
-      // Ignore malformed lines.
+    if (
+      decision === 'mission_orchestration_event_failed' &&
+      (eventType === 'mission_control_requested' || eventType === 'surface_control_requested') &&
+      eventId
+    ) {
+      const failedTarget =
+        eventType === 'surface_control_requested'
+          ? controlPayloadText(event, 'surfaceId') || 'surface-runtime'
+          : controlEventText(event, 'mission_id') || 'system';
+      lifecycle.set(eventId, {
+        event_id: eventId,
+        ts,
+        kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
+        target: failedTarget,
+        operation: controlPayloadText(event, 'operation') || eventType,
+        status: 'failed',
+        requested_by: controlEventText(event, 'requested_by') || 'unknown',
+        error: controlEventText(event, 'error'),
+      });
     }
   }
 
@@ -562,45 +613,42 @@ export function collectControlActionDetails(
 
   for (const line of raw.trim().split('\n')) {
     if (!line.trim()) continue;
-    try {
-      const event = parseJsonRecord(line);
-      if (!event) continue;
-      const eventId = optionalStringField(event, 'event_id');
-      if (!eventId) continue;
-      const eventType = stringField(event, 'event_type');
-      const decision = stringField(event, 'decision');
-      if (
-        eventType !== 'mission_control_requested' &&
-        eventType !== 'surface_control_requested' &&
-        decision !== 'mission_control_action_applied' &&
-        decision !== 'surface_control_action_applied' &&
-        decision !== 'next_action_executed' &&
-        decision !== 'memory_promote_pending_applied' &&
-        decision !== 'mission_orchestration_event_started' &&
-        decision !== 'mission_orchestration_event_completed' &&
-        decision !== 'mission_orchestration_event_failed'
-      ) {
-        continue;
-      }
-
-      if (!details[eventId]) {
-        details[eventId] = [];
-      }
-      details[eventId].push({
-        ts: stringField(event, 'ts', new Date().toISOString()),
-        decision: stringField(event, 'decision', 'event'),
-        event_type: optionalStringField(event, 'event_type'),
-        mission_id: optionalStringField(event, 'mission_id'),
-        resource_id: optionalStringField(event, 'resource_id'),
-        operation: optionalStringField(event, 'operation'),
-        action_id: optionalStringField(event, 'action_id'),
-        outcome: optionalStringField(event, 'outcome'),
-        why: optionalStringField(event, 'why'),
-        error: optionalStringField(event, 'error'),
-      });
-    } catch {
-      // Ignore malformed lines.
+    const event = parseControlEventLine(line);
+    if (!event) continue;
+    const eventId = controlEventText(event, 'event_id');
+    const eventType = controlEventText(event, 'event_type');
+    const decision = controlEventText(event, 'decision');
+    const ts = controlEventTimestamp(event);
+    if (!eventId || !ts) continue;
+    if (
+      eventType !== 'mission_control_requested' &&
+      eventType !== 'surface_control_requested' &&
+      decision !== 'mission_control_action_applied' &&
+      decision !== 'surface_control_action_applied' &&
+      decision !== 'next_action_executed' &&
+      decision !== 'memory_promote_pending_applied' &&
+      decision !== 'mission_orchestration_event_started' &&
+      decision !== 'mission_orchestration_event_completed' &&
+      decision !== 'mission_orchestration_event_failed'
+    ) {
+      continue;
     }
+
+    if (!details[eventId]) {
+      details[eventId] = [];
+    }
+    details[eventId].push({
+      ts,
+      decision: decision || 'event',
+      event_type: eventType,
+      mission_id: controlEventText(event, 'mission_id'),
+      resource_id: controlEventText(event, 'resource_id'),
+      operation: controlEventText(event, 'operation'),
+      action_id: controlEventText(event, 'action_id'),
+      outcome: controlEventText(event, 'outcome'),
+      why: controlEventText(event, 'why'),
+      error: controlEventText(event, 'error'),
+    });
   }
 
   for (const key of Object.keys(details)) {
@@ -635,27 +683,12 @@ export function collectOwnerSummaries(
     if (raw === null) continue;
     for (const line of raw.trim().split('\n')) {
       if (!line.trim()) continue;
-      try {
-        const event = parseJsonRecord(line);
-        if (!event) continue;
-        if (
-          stringField(event, 'decision', stringField(event, 'event_type')) !==
-          'mission_owner_notified'
-        )
-          continue;
-        const missionId = optionalStringField(event, 'mission_id');
-        if (!intelligenceData.missionVisibleToScope(missionId, tenantSlugs, tierAccess)) continue;
-        summaries.push({
-          ts: stringField(event, 'ts', new Date().toISOString()),
-          mission_id: missionId || 'unknown',
-          accepted_count: numberField(event, 'accepted_count'),
-          reviewed_count: numberField(event, 'reviewed_count'),
-          completed_count: numberField(event, 'completed_count'),
-          requested_count: numberField(event, 'requested_count'),
-        });
-      } catch {
-        // Ignore malformed lines.
+      const summary = parseDashboardOwnerSummaryLine(line);
+      if (!summary) continue;
+      if (!intelligenceData.missionVisibleToScope(summary.mission_id, tenantSlugs, tierAccess)) {
+        continue;
       }
+      summaries.push(summary);
     }
   }
   return summaries.sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 6);
