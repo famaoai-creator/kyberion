@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import {
   resolveFirstWinResourcePath,
   validateFirstWinLifecycleLiveOptions,
@@ -14,6 +20,17 @@ afterEach(() => {
 });
 
 describe('first-win lifecycle resource boundary', () => {
+  it('uses the shared safe parser for command JSON output', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/first_win_lifecycle_smoke.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('parseSafeJsonInput(');
+    expect(source).not.toContain('JSON.parse(');
+  });
+
   it('rejects repository-external identity resources', () => {
     expect(() => resolveFirstWinResourcePath('/tmp/first-win-identity.json')).toThrow(
       '[RESOURCE_PATH_SCOPE]'

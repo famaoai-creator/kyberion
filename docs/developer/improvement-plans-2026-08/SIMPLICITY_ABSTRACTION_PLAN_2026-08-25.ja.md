@@ -10591,6 +10591,12 @@ Onboarding の stdin JSON と Mission Controller refactor router の `--context`
 
 検証: dependency vulnerability scan **2 files / 7 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 143
+
+First-Win lifecycle smoke の外部CLI JSON output recoveryを再監査し、logger行に埋め込まれたJSON候補を直接 `JSON.parse` していた残存を foundation safe/object parserへ移行した。malformed／primitive／配列／nested dangerous key は従来の `null` recoveryへ閉じ、live acceptance の成功判定へ unsafe tree が混入しないことを source-boundary test で固定した。
+
+検証: First-Win lifecycle **2 files / 12 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
