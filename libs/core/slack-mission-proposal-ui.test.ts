@@ -68,5 +68,8 @@ describe('Slack mission proposal UI (UX-04)', () => {
     expect(() => parseSlackMissionProposalAction(JSON.stringify({ decision: 'later' }))).toThrow(
       'Invalid Slack mission proposal decision'
     );
+    expect(() =>
+      parseSlackMissionProposalAction('{"decision":"approved","__proto__":{"x":1}}')
+    ).toThrow('dangerous JSON key');
   });
 });

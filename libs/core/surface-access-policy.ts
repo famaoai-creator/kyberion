@@ -1,3 +1,6 @@
+import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+
 export interface SurfaceAccessDecision {
   allowed: boolean;
   configured: boolean;
@@ -31,7 +34,7 @@ function normalizeIds(value: unknown): string[] | null {
 
 function parseCommonAllowlist(raw: string, surface: string): ParsedAllowlist | null {
   try {
-    const parsed = JSON.parse(raw) as unknown;
+    const parsed = parseSafeJsonInput(raw, 'surface allowlist');
     if (Array.isArray(parsed)) {
       return { ids: normalizeIds(parsed) || [], source: 'common' };
     }
@@ -134,4 +137,3 @@ export function describeSurfaceAllowlistConfiguration(surface: string): {
   const decision = evaluateSurfaceActorAccess(surface, '', { defaultAllow: true });
   return { configured: decision.configured, source: decision.source };
 }
-import { getRegisteredEnvText } from './foundation/env.js';

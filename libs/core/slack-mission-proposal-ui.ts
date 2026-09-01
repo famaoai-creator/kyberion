@@ -2,6 +2,7 @@ import type {
   MissionProposal,
   SlackMissionProposalActionPayload,
 } from './channel-surface-types.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import {
   renderIntentAuthorityLabel,
   renderIntentOutcomeLabel,
@@ -106,8 +107,8 @@ export function slackMissionProposalFallbackText(
 }
 
 export function parseSlackMissionProposalAction(value: string): SlackMissionProposalActionPayload {
-  const parsed = JSON.parse(value) as Partial<SlackMissionProposalActionPayload>;
-  if (parsed.decision !== 'approved' && parsed.decision !== 'rejected') {
+  const parsed = parseSafeJsonObjectInput(value, 'Slack mission proposal action');
+  if (!parsed || (parsed.decision !== 'approved' && parsed.decision !== 'rejected')) {
     throw new Error('Invalid Slack mission proposal decision');
   }
   return { decision: parsed.decision };

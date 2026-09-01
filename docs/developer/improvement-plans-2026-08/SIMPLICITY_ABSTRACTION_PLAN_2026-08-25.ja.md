@@ -10747,6 +10747,12 @@ Slack bridgeの承認／理由確認／オンボーディング action payload�
 
 検証: Slack approval／onboarding boundary **2 files / 4 tests passed**、root typecheck、Prettier、`git diff --check`。既存の `tests/channel-surface-agent.test.ts` は承認・delegation環境依存ケース5件が別途失敗したため、今回の成功判定には含めない。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 169
+
+Slack mission proposal actionとsurface actor allowlistのJSON境界を再監査し、外部入力をparse後の型アサーションまたは独自parseだけで承認判断・allowlist解決へ渡していた残存をshared safe parserへ統一した。mission proposalのdecisionを許可値へ限定し、allowlistではprimitive／配列要素型／dangerous keyの既存fail-closed判定を維持した。正常なSlack proposal表示、surface default、Telegram deny-by-default semanticsは変更していない。
+
+検証: Slack proposal／surface access **4 files / 14 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
