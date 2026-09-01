@@ -11137,6 +11137,12 @@ SX-03 の追加された明示的な数値境界を継続監査し、trigger sto
 
 検証: trigger runner／contextual intent frame **3 files / 15 tests passed**、root typecheck、foundation adoption、`git diff --check`。残るSX-03は追加のdomain-specific clamp／時刻 helper、およびSX-04〜SX-14の未完了項目、voice provider実機依存、provider CLIの実OS-level enforcement probeである。
 
+## 2026-09-02 再レビュー修正 233
+
+SX-08 の承認分岐を再監査し、4 bridge が共有承認テキストを使う場合に `understanding` と `missing input` を欠落させ、Slack の承認カードも同じ2項目を表示していなかったため補完した。承認の authority／next action／consequence／outcome、承認ボタン、既存の空入力表示は維持し、契約の4問（理解・不足・次・成果）をテキスト／Slackカードでも揃えた。
+
+検証: surface approval／Slack approval／channel adapter／UX surface／Chronos A2UI **5 files / 58 tests passed**、root typecheck、PR gate、`git diff --check`。残る改善計画は全surfaceの実ブラウザ／外部provider実機確認、SX-04〜SX-14の未完了項目、およびvoice provider／provider CLIの実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
