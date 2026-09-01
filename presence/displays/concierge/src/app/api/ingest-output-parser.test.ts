@@ -13,5 +13,11 @@ describe('parseIngestCliVerdict', () => {
       parseIngestCliVerdict('[ingest] committed {"target_path":42}', '[ingest] committed ')
     ).toBeNull();
     expect(parseIngestCliVerdict('[ingest] DRY RUN\n[]', '[ingest] DRY RUN')).toBeNull();
+    expect(
+      parseIngestCliVerdict(
+        '[ingest] DRY RUN\n{"dry_run":true,"__proto__":{"target_path":"escape"}}',
+        '[ingest] DRY RUN'
+      )
+    ).toBeNull();
   });
 });

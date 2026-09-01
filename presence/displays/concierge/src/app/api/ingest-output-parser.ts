@@ -1,3 +1,5 @@
+import { parseSafeJsonInput } from '@agent/core/foundation';
+
 export interface IngestCliVerdict {
   dry_run?: boolean;
   would_commit?: boolean;
@@ -14,7 +16,7 @@ export function parseIngestCliVerdict(stdout: string, marker: string): IngestCli
   const brace = stdout.indexOf('{', at);
   if (brace < 0) return null;
   try {
-    const parsed: unknown = JSON.parse(stdout.slice(brace));
+    const parsed: unknown = parseSafeJsonInput(stdout.slice(brace), 'ingest CLI verdict');
     if (!isRecord(parsed)) return null;
     if (parsed.dry_run !== undefined && typeof parsed.dry_run !== 'boolean') return null;
     if (parsed.would_commit !== undefined && typeof parsed.would_commit !== 'boolean') return null;

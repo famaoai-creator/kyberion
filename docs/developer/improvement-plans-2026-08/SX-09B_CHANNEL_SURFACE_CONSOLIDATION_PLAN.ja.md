@@ -315,3 +315,9 @@ Concierge の voice/listen-once proxy を再監査し、backend／device／local
 Concierge の config-missions プリセット読込を再監査し、repository-local JSON を `JSON.parse` 後に domain parser へ渡していた残存を検出した。共有 `parseSafeJsonInput` を preset read 前へ接続し、malformed／primitive／配列／nested dangerous key を既存の unreadable preset skip へ閉じた。preset の一覧・入力 spec・draft creation semantics は変更していない。
 
 検証: Concierge config-missions resource boundary **1 file / 1 test passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 27
+
+Concierge ingest の外部CLI verdict parserを再監査し、marker後のJSON出力を直接 `JSON.parse` してから型判定していた残存を検出した。共有 `parseSafeJsonInput` を先行させ、malformed／primitive／配列／nested dangerous key を既存の verdict 不在扱いへ閉じた。dry-run／commit の判定と target path の既存型検証は変更していない。
+
+検証: Concierge ingest output parser **1 file / 1 test passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
