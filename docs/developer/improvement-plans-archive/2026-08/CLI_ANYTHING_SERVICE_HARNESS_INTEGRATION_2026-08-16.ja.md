@@ -120,7 +120,7 @@ personal procedure catalog + pipelines/service/*.json
 - `pnpm vitest run libs/core/service-harness.test.ts libs/actuators/service-actuator/src/index.test.ts`
 - `pnpm run generate:service-harness-registry`
 - `pnpm run check:service-harness-registry`
-- `pnpm run service:harness -- --service github --action describe --detail false`
+- `pnpm kyberion service harness --service github --action describe --detail false`
 - `pnpm run check -- --scope full --only contract-schemas`
 - `pnpm run check -- --scope full --only catalogs`
 - `pnpm run typecheck`

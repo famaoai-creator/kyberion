@@ -573,7 +573,7 @@
     {
       "path": "product/architecture/mission-team-composition-model.md",
       "tier": "public",
-      "size": 5309,
+      "size": 5318,
       "type": "md"
     },
     {
@@ -1275,7 +1275,7 @@
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 43364,
+      "size": 43859,
       "type": "json"
     },
     {
@@ -1911,7 +1911,7 @@
     {
       "path": "product/governance/model-registry/README.md",
       "tier": "public",
-      "size": 789,
+      "size": 798,
       "type": "md"
     },
     {
@@ -2199,7 +2199,7 @@
     {
       "path": "product/governance/phases/alignment.md",
       "tier": "public",
-      "size": 5354,
+      "size": 5363,
       "type": "md"
     },
     {
@@ -2325,7 +2325,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 11787,
+      "size": 11789,
       "type": "md"
     },
     {
@@ -3633,7 +3633,7 @@
     {
       "path": "product/orchestration/git-flow-standards.md",
       "tier": "public",
-      "size": 3125,
+      "size": 3139,
       "type": "md"
     },
     {
@@ -4047,7 +4047,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 6672,
+      "size": 6726,
       "type": "md"
     },
     {
@@ -4167,7 +4167,7 @@
     {
       "path": "product/orchestration/same-tenant-peer-quickstart.ja.md",
       "tier": "public",
-      "size": 6269,
+      "size": 6283,
       "type": "md"
     },
     {
@@ -4923,7 +4923,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 471830,
+      "size": 471871,
       "type": "json"
     },
     {
@@ -5907,7 +5907,7 @@
     {
       "path": "product/roles/knowledge_steward/PROCEDURE.md",
       "tier": "public",
-      "size": 5109,
+      "size": 5115,
       "type": "md"
     },
     {
@@ -6699,7 +6699,7 @@
     {
       "path": "product/schemas/cli-commands.schema.json",
       "tier": "public",
-      "size": 2296,
+      "size": 2483,
       "type": "json"
     },
     {
@@ -10911,7 +10911,7 @@
     {
       "path": "public/procedures/media/promote-voice-profile.md",
       "tier": "public",
-      "size": 1775,
+      "size": 1784,
       "type": "md"
     },
     {
@@ -10923,7 +10923,7 @@
     {
       "path": "public/procedures/media/realtime-voice-conversation.md",
       "tier": "public",
-      "size": 8351,
+      "size": 8378,
       "type": "md"
     },
     {

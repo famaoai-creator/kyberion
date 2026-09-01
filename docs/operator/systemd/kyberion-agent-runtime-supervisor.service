@@ -9,7 +9,7 @@ WorkingDirectory=/home/kyberion/kyberion
 Environment=NODE_ENV=production
 Environment=KYBERION_CUSTOMER=customer-slug
 EnvironmentFile=-/etc/kyberion/env
-ExecStart=/usr/bin/pnpm agent-runtime:daemon
+ExecStart=/usr/bin/pnpm kyberion agent-runtime daemon
 Restart=on-failure
 RestartSec=10
 

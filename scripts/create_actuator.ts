@@ -3,8 +3,8 @@
  * create_actuator.ts — Scaffold a new Kyberion actuator from the canonical template.
  *
  * Usage:
- *   pnpm create:actuator <name>           e.g. pnpm create:actuator my-feature
- *   pnpm create:actuator <name> --desc "What this actuator does"
+ *   pnpm kyberion create actuator <name>           e.g. pnpm kyberion create actuator my-feature
+ *   pnpm kyberion create actuator <name> --desc "What this actuator does"
  *
  * Generates:
  *   libs/actuators/<name>-actuator/
@@ -285,7 +285,7 @@ function parseCliArgs(args: string[]): ActuatorScaffoldInput {
   const positional = argv._.map(String).filter(Boolean);
   const name = (argv.name as string | undefined) || positional[0];
   if (!name || name.startsWith('-')) {
-    throw new Error('Usage: pnpm create:actuator <name> [--desc "description"]');
+    throw new Error('Usage: pnpm kyberion create actuator <name> [--desc "description"]');
   }
 
   return {

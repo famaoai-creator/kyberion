@@ -42,7 +42,7 @@ jobs:
         run: |
           pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output "active/shared/exports/release/kyberion-${GITHUB_REF_NAME}.tar.gz"
           pnpm run release:source-archive -- --check --output "active/shared/exports/release/kyberion-${GITHUB_REF_NAME}.tar.gz"
-          pnpm run release:install-smoke -- --ref "${GITHUB_SHA}"
+          pnpm kyberion release install-smoke --ref "${GITHUB_SHA}"
 
       - name: Run full test suite
         run: pnpm exec vitest run

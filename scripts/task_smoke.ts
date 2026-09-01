@@ -82,7 +82,7 @@ export async function main(
 ): Promise<void> {
   const scenarioId = argv.find((arg) => !arg.startsWith('--'));
   if (!scenarioId) {
-    throw new Error('Usage: pnpm task:smoke <scenario-id>');
+    throw new Error('Usage: pnpm kyberion task smoke <scenario-id>');
   }
 
   const scenario = loadScenario(scenarioId);

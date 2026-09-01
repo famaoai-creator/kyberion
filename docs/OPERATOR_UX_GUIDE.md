@@ -297,7 +297,7 @@ For Google Workspace email and Meet work:
   - create a Google Meet space with the authenticated Google account
 - `gws schema meet.spaces.create`
   - inspect the exact request shape before creating a Meet space
-- `pnpm gws:meet:create -- --json '{}'`
+- `pnpm kyberion gws meet-create --json '{}'`
   - Kyberion wrapper for creating a Google Meet space from the terminal
 
 ### Email Triage Quick Start

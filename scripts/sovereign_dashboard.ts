@@ -614,7 +614,7 @@ function drawSkillLandscape() {
 
   if (!skillIndex || !Array.isArray(skillIndex.s) || skillIndex.s.length === 0) {
     dashboardLog(chalk.dim('  (No governed skill catalog found)'));
-    dashboardLog(chalk.dim('  Run `pnpm run sync:component-inventory` to refresh the index.'));
+    dashboardLog(chalk.dim('  Run `pnpm kyberion sync component-inventory` to refresh the index.'));
     dashboardLog('');
     return;
   }

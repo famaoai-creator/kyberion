@@ -22,7 +22,7 @@ export async function main(
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   // pnpm passes the conventional separator through to the script. Remove it
-  // so `pnpm run service:harness -- --service ...` behaves like direct Node
+  // so `pnpm kyberion service harness --service ...` behaves like direct Node
   // execution while preserving yargs' normal option parsing.
   const normalizedArgs = args[0] === '--' ? args.slice(1) : args;
 

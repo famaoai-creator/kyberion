@@ -57,7 +57,7 @@ git diff --check
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `knowledge/`、語彙、ユーザー向け文言 | `pnpm run generate:pseudo-locale`、`pnpm check -- --only pseudo-locale`、`pnpm run generate:knowledge-index`、`pnpm check -- --only catalogs` |
 | vocabulary key / generated type      | `pnpm run generate:vocabulary-types`、`pnpm check -- --only vocabulary-types`                                                                 |
-| actuator manifest / operation        | `pnpm sync:component-inventory`、`pnpm run generate:op-registry`、`pnpm check -- --only op-registry`                                          |
+| actuator manifest / operation        | `pnpm kyberion sync component-inventory`、`pnpm run generate:op-registry`、`pnpm check -- --only op-registry`                                 |
 | `agent-profiles/`                    | `agent-profile-index.json` を再生成し、差分を確認する                                                                                         |
 | `surfaces/*.json`                    | `active-surfaces.json` のsnapshotを同期し、`pnpm check -- --only governance-rules` を実行する                                                 |
 | `service-endpoints.json`             | 対応する `service-endpoints/` の正本が存在することを確認する                                                                                  |
@@ -124,7 +124,7 @@ pnpm test -- --suite integration
 
 ```bash
 pnpm run build
-pnpm run smoke:intent -- --output active/shared/tmp/intent-smoke
+pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke
 pnpm exec vitest run <surfaceまたはIntentの関連テスト>
 ```
 

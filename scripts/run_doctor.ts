@@ -210,7 +210,9 @@ export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
       );
     }
     if (report.dead_letter_count > 0) {
-      lines.push('  - inspect dead letters via `pnpm mesh:deliver --json` and mesh-hub-inspection');
+      lines.push(
+        '  - inspect dead letters via `pnpm kyberion mesh deliver --json` and mesh-hub-inspection'
+      );
     }
     return lines;
   } catch (err) {

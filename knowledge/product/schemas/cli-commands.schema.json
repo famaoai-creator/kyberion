@@ -56,15 +56,18 @@
     "scriptCommand": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "script", "command", "noun", "verb", "audience"],
+      "required": ["id", "command", "noun", "verb", "audience"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "script": { "type": "string", "minLength": 1 },
+        "module": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
         "command": { "type": "string", "minLength": 1 },
         "noun": { "type": "string", "minLength": 1 },
         "verb": { "type": "string", "minLength": 1 },
         "audience": { "type": "string", "enum": ["user", "operator", "dev"] }
-      }
+      },
+      "oneOf": [{ "required": ["script"] }, { "required": ["module"] }]
     }
   }
 }

@@ -17,7 +17,7 @@
       "role": "source",
       "op": "system:shell",
       "produces": { "channel": "performance_report", "type": "ShellResult" },
-      "params": { "cmd": "pnpm run check:chronos-perf" }
+      "params": { "cmd": "pnpm kyberion check chronos-perf" }
     },
     {
       "id": "report",

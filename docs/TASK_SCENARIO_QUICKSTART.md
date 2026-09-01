@@ -64,7 +64,7 @@ pnpm kyberion task scenario init daily-email-triage
 pnpm kyberion task scenario run daily-email-triage --dry-run
 ```
 
-The `pnpm task:list`, `pnpm task:init`, `pnpm task:run`, and `pnpm task:smoke`
+The `pnpm task:list`, `pnpm task:init`, `pnpm task:run`, and `pnpm kyberion task smoke`
 commands remain supported for compatibility with existing automation.
 
 ## Related docs
