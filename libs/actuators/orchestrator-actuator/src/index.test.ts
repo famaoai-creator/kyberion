@@ -75,6 +75,17 @@ describe('orchestrator-actuator', () => {
     mocks.safeExistsSync.mockReturnValue(true);
   });
 
+  it('keeps non-JSON command output as text but rejects dangerous JSON', async () => {
+    const { parseJsonCommandOutput } = await import('./orchestrator-execution-brief-helpers.js');
+
+    expect(parseJsonCommandOutput('plain command output')).toEqual({
+      raw: 'plain command output',
+    });
+    expect(() => parseJsonCommandOutput('{"constructor":{"polluted":true}}')).toThrow(
+      'command output contains a dangerous JSON key'
+    );
+  });
+
   it('renders a music pipeline bundle into an execution plan set', async () => {
     const bundle = {
       kind: 'actuator-pipeline-bundle',
