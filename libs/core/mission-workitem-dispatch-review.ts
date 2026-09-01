@@ -24,6 +24,7 @@ import {
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -695,12 +696,11 @@ export function parseIndependentReviewerVerdict(text: string): WorkItemDispatchR
 
   if (json) {
     try {
-      const candidate: unknown = JSON.parse(json);
-      if (typeof candidate !== 'object' || candidate === null || Array.isArray(candidate)) {
+      const record = parseSafeJsonObjectInput(json, 'independent reviewer verdict');
+      if (!record) {
         jsonShapeInvalid = true;
         throw new Error('review verdict must be an object');
       }
-      const record = candidate as Record<string, unknown>;
       const parseBoolean = (value: unknown): boolean | undefined => {
         if (typeof value === 'boolean') return value;
         if (value === 'true') return true;
@@ -737,7 +737,9 @@ export function parseIndependentReviewerVerdict(text: string): WorkItemDispatchR
         : [];
       findings.push(...candidateFindings);
     } catch {
-      // fall through to text heuristics
+      // A structured response was present but invalid; do not let words inside
+      // the rejected JSON influence the reviewer decision.
+      jsonShapeInvalid = true;
     }
   }
 

@@ -409,6 +409,9 @@ describe('mission planning packet helpers', () => {
       gaps: ['planning review verdict block missing'],
     });
     expect(parsePlanningReviewVerdict('{"approve":"yes"}').approve).toBe(false);
+    expect(parsePlanningReviewVerdict('{"approve":true,"meta":{"__proto__":{}}}').approve).toBe(
+      false
+    );
   });
 
   it('requires independent review for high-risk task packets', () => {

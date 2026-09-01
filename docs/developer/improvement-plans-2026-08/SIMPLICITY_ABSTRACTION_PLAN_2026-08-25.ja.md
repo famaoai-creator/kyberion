@@ -10825,6 +10825,12 @@ Mission gateのschema input、deliverable JSON、LLM review verdictを再監査�
 
 検証: mission gate engine／override **2 files / 16 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 182
+
+Mission planning review、best-of judge、independent reviewerのモデルverdictを再監査し、直接 `JSON.parse` の結果をplanning／candidate／work itemの判定へ渡していた境界をshared safe object parserへ移行した。不正なstructured JSONは本文の承認ヒューリスティックへフォールバックせずfail-closedとし、正常なobject抽出、schema validation、文字列型のfinding／hint正規化は維持した。
+
+検証: planning／best-of／work item reviewer **3 files / 55 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
