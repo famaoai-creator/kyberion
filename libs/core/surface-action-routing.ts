@@ -1,3 +1,5 @@
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+
 export type SurfaceRoutingIntent =
   | 'conversation'
   | 'browser_open_site'
@@ -48,7 +50,9 @@ function extractJsonObject(text: string): string | null {
   return stripped.slice(start, end + 1);
 }
 
-export function validateSurfaceActionRoutingDecision(value: unknown): value is SurfaceActionRoutingDecision {
+export function validateSurfaceActionRoutingDecision(
+  value: unknown
+): value is SurfaceActionRoutingDecision {
   if (!value || typeof value !== 'object') return false;
   const record = value as Record<string, unknown>;
   if (record.kind !== 'surface_action_routing') return false;
@@ -59,14 +63,19 @@ export function validateSurfaceActionRoutingDecision(value: unknown): value is S
     const browser = record.browser;
     if (!browser || typeof browser !== 'object') return false;
     const browserRecord = browser as Record<string, unknown>;
-    if (typeof browserRecord.url !== 'string' && typeof browserRecord.site_query !== 'string') return false;
+    if (typeof browserRecord.url !== 'string' && typeof browserRecord.site_query !== 'string')
+      return false;
   }
 
   if (record.intent === 'surface_query') {
     const query = record.query;
     if (!query || typeof query !== 'object') return false;
     const queryRecord = query as Record<string, unknown>;
-    if (!['location', 'weather', 'knowledge_search', 'web_search'].includes(String(queryRecord.query_type || ''))) {
+    if (
+      !['location', 'weather', 'knowledge_search', 'web_search'].includes(
+        String(queryRecord.query_type || '')
+      )
+    ) {
       return false;
     }
   }
@@ -75,17 +84,20 @@ export function validateSurfaceActionRoutingDecision(value: unknown): value is S
     const delegate = record.delegate;
     if (!delegate || typeof delegate !== 'object') return false;
     const delegateRecord = delegate as Record<string, unknown>;
-    if (!['chronos-mirror', 'nerve-agent'].includes(String(delegateRecord.receiver || ''))) return false;
+    if (!['chronos-mirror', 'nerve-agent'].includes(String(delegateRecord.receiver || '')))
+      return false;
   }
 
   return true;
 }
 
-export function parseSurfaceActionRoutingDecision(text: string): SurfaceActionRoutingDecision | null {
+export function parseSurfaceActionRoutingDecision(
+  text: string
+): SurfaceActionRoutingDecision | null {
   const json = extractJsonObject(text);
   if (!json) return null;
   try {
-    const parsed = JSON.parse(json) as unknown;
+    const parsed = parseSafeJsonInput(json, 'surface action routing decision');
     return validateSurfaceActionRoutingDecision(parsed) ? parsed : null;
   } catch {
     return null;
