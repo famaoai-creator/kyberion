@@ -3,7 +3,6 @@
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeReadFile,
   safeMkdir,
   safeExec,
@@ -54,7 +53,7 @@ import {
   runTaskModelRoutingSummary,
 } from '@agent/core/report-ops';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
-import { getRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnv, readJson } from '@agent/core/foundation';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
@@ -472,7 +471,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: loadJson<unknown>(
+        [params.export_as || 'last_capture_data']: readJson<unknown>(
           resolveSystemPath(String(resolve(params.path)))
         ),
       };
@@ -667,7 +666,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
             let state: any = null;
             if (safeExistsSync(statePath)) {
               try {
-                state = loadJson<unknown>(statePath);
+                state = readJson<unknown>(statePath);
               } catch (err) {
                 logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
               }
@@ -703,7 +702,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           const pkgPath = path.join(actuatorPath, 'package.json');
           if (safeLstat(actuatorPath).isDirectory() && safeExistsSync(pkgPath)) {
             try {
-              const pkg = loadJson<{
+              const pkg = readJson<{
                 name?: unknown;
                 description?: unknown;
                 version?: unknown;
@@ -915,7 +914,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
       const results = sampled.map((s) => ({
         missionId: s.missionId,
-        trace: loadJson<unknown>(assertSafeRepositoryPath(s.path)),
+        trace: readJson<unknown>(assertSafeRepositoryPath(s.path)),
       }));
       return { ...ctx, [params.export_as || 'sampled_traces']: results };
     }

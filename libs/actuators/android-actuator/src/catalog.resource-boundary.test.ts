@@ -12,6 +12,6 @@ describe('android catalog resource boundary', () => {
     );
 
     expect(source).toContain('const safeDefaultsPath = assertSafeRepositoryPath(');
-    expect(source).toContain('loadJson<unknown>(safeDefaultsPath)');
+    expect(source).toContain('readJson<unknown>(safeDefaultsPath)');
   });
 });
