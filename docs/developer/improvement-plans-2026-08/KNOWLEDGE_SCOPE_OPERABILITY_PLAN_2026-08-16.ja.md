@@ -152,7 +152,7 @@ KS-16 checker を PR CI に入れ意味論検査へ拡張し、新区画を rete
 ## 受け入れ条件
 
 1. `pnpm scope --json` と MCP `kyberion.scope.current` が同一の `{scope, provenance, knowledge_roots}` を返し、各フィールドの出所が明示される。
-2. `pnpm scope use --tenant A --project P` 後の `pnpm knowledge:rank --explain` が active roots と `excluded_by_scope` 件数を出力し、`mission-state.json` のみの環境でも `MISSION_ID` から同じ scope が推論される(provenance=`mission-state`)。
+2. `pnpm scope use --tenant A --project P` 後の `pnpm kyberion knowledge rank --explain` が active roots と `excluded_by_scope` 件数を出力し、`mission-state.json` のみの環境でも `MISSION_ID` から同じ scope が推論される(provenance=`mission-state`)。
 3. pack render に `Scope-rejected knowledge` 行が出て、dispatch observability の件数と一致する。同 project 配下 doc が pack で common doc より上位。
 4. tenant A の intent-contract outcome / usage / gap 記録が tenant B の候補選択・ranking・curation report に一切現れない。
 5. tenant retrieval が空だったミッションは gap lane に記録され、3 回以上で promotion queue に ingest 提案候補が 1 件立つ(自動起票・承認は手動)。

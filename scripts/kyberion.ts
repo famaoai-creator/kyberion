@@ -100,7 +100,7 @@ export function formatCliManifestHelp(manifest = loadCliManifest()): string {
       const displayCommand = command.command.endsWith(' default')
         ? command.command.slice(0, -' default'.length)
         : command.command;
-      return `  ${displayCommand.padEnd(28)} ${command.script} [${command.audience}]`;
+      return `  ${displayCommand.padEnd(28)} ${command.script ?? command.module} [${command.audience}]`;
     });
   return [
     'Kyberion commands (governed registry):',
@@ -126,11 +126,23 @@ async function runScriptCommand(
   if (scriptCommand.script === 'kyberion') {
     throw new Error('The kyberion package script cannot dispatch itself');
   }
-  const result = await safeExecResultAsync(
-    'pnpm',
-    ['run', scriptCommand.script, ...args.slice(command.split(' ').length)],
-    { cwd: pathResolver.rootDir(), timeoutMs: 120_000 }
-  );
+  const commandArgs = args.slice(command.split(' ').length);
+  const result = scriptCommand.module
+    ? await safeExecResultAsync(
+        process.execPath,
+        [
+          '--import',
+          pathResolver.rootResolve('scripts/ts-loader.mjs'),
+          pathResolver.rootResolve(scriptCommand.module),
+          ...(scriptCommand.args || []),
+          ...commandArgs,
+        ],
+        { cwd: pathResolver.rootDir(), timeoutMs: 120_000 }
+      )
+    : await safeExecResultAsync('pnpm', ['run', scriptCommand.script!, ...commandArgs], {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 120_000,
+      });
   if (result.stdout.trim()) print(result.stdout.trim());
   if (result.status !== 0) {
     const detail = result.stderr.trim() || result.error?.message || 'script command failed';

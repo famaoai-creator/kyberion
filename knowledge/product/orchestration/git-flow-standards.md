@@ -32,7 +32,7 @@ Kyberion の改善タスクは、原則として以下の順で進める。
 2. **worktree を作成**: `git worktree add -b <prefix>/<feature-name> <worktree-path> origin/main` か、最新の `main` を起点に同等の手順を取る。
 3. **実装・テスト**: ハイブリッドTDDフローに従い、依存する変更は同じ worktree にまとめて実装とカバレッジを確保する。
 4. **CI 事前チェック**: PR を出す前に、少なくとも `pnpm validate` を実行する。重い場合でも、変更に直結するチェック群は必ず走らせる。
-5. **PR タイトル検査**: `pnpm check:pr-title -- --title "<proposed title>"` を実行し、PR タイトルが Conventional Commits に沿っているか確認する。`pr:create` を使う場合も同じ制約に従う。
+5. **PR タイトル検査**: `pnpm check:pr-title -- --title "<proposed title>"` を実行し、PR タイトルが Conventional Commits に沿っているか確認する。`pnpm kyberion pr create` を使う場合も同じ制約に従う。
 6. **セルフレビュー**: `local-reviewer` を実行し、差分の整合性を確認。
 7. **PR 作成**: `gh pr create` (GitHub CLI) または Web UI を使用。レビューコメントが付いたら、同じ branch / worktree で修正する。
    - **本文必須項目**: 概要、変更点、**ローカルでの実行エビデンス（テストパスのログ等）**。

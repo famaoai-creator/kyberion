@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertRequiredEnvironment,
   formatCliManifestHelp,
+  main,
   resolveCommand,
   resolveCommandPath,
   resolveScriptCommand,
@@ -68,6 +69,18 @@ describe('kyberion command router', () => {
     });
     expect(resolveCommandPath(['onboard', 'apply', '--identity', 'identity.json'])).toBe('onboard');
     expect(resolveCommandPath(['onboard', 'reset', '--force'])).toBe('onboard');
+  });
+
+  it('dispatches module-backed commands without a package-script alias', async () => {
+    expect(resolveScriptCommand('chronos uninstall')).toMatchObject({
+      module: 'scripts/install_chronos_launchd.ts',
+      args: ['--uninstall'],
+    });
+
+    const output: unknown[] = [];
+    await main(['chronos', 'uninstall'], (value) => output.push(value));
+    expect(output).toHaveLength(1);
+    expect(output[0]).toEqual(expect.stringContaining('Uninstall steps'));
   });
 
   it('rejects unknown commands instead of falling back to an executable surface', () => {

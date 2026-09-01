@@ -47,7 +47,7 @@ jobs:
         run: |
           pnpm run release:source-archive -- --ref "${GITHUB_SHA}" --output active/shared/exports/ci/kyberion-source.tar.gz
           pnpm run release:source-archive -- --check --output active/shared/exports/ci/kyberion-source.tar.gz
-          pnpm run release:install-smoke -- --ref "${GITHUB_SHA}"
+          pnpm kyberion release install-smoke --ref "${GITHUB_SHA}"
       - name: Upload source archive evidence
         uses: actions/upload-artifact@v4
         with:
@@ -173,7 +173,7 @@ jobs:
         run: pnpm run build
 
       - name: Run lightweight intent smoke suite
-        run: pnpm run smoke:intent -- --output /tmp/intent-smoke
+        run: pnpm kyberion smoke intent --output /tmp/intent-smoke
 
       - name: Upload intent smoke logs
         if: always()

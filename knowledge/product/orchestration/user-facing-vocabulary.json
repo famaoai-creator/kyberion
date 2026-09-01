@@ -3394,9 +3394,9 @@
         "qps-ploc": "⟦  ṗñṗɱ ƈȧṗȧƀïŀïŧïėş    Ƈħėƈķ ẇħïƈħ ȧƈŧůȧŧőř ƈȧṗȧƀïŀïŧïėş ƒïŧ ŧħïş ėñṽïřőñɱėñŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
       "cli_help_journal": {
-        "en": "  pnpm mission:journal Inspect mission history",
-        "ja": "  pnpm mission:journal ミッション履歴を確認",
-        "qps-ploc": "⟦  ṗñṗɱ ɱïşşïőñ:ĵőůřñȧŀ Ïñşṗėƈŧ ɱïşşïőñ ħïşŧőřẏ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+        "en": "  pnpm kyberion mission journal Inspect mission history",
+        "ja": "  pnpm kyberion mission journal ミッション履歴を確認",
+        "qps-ploc": "⟦  ṗñṗɱ ķẏƀėřïőñ ɱïşşïőñ ĵőůřñȧŀ Ïñşṗėƈŧ ɱïşşïőñ ħïşŧőřẏ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "cli_help_email_usage": {
         "en": "Usage: pnpm kyberion email <status|draft|latest-draft|deliver|archive-inbox> [options]",

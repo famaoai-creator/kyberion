@@ -54,7 +54,7 @@ function flag(argv: string[], name: string): string {
 
 function usage(): never {
   throw new Error(
-    'Usage: pnpm background-review:mission-e2e --mission-id <active-mission-id> [--surface presence|slack]'
+    'Usage: pnpm kyberion background-review mission-e2e --mission-id <active-mission-id> [--surface presence|slack]'
   );
 }
 

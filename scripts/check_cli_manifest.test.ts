@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkCliManifest, loadCliManifest } from './check_cli_manifest.js';
+import { checkCliManifest, loadCliManifest, MAX_PACKAGE_SCRIPTS } from './check_cli_manifest.js';
 
 describe('CLI manifest', () => {
   it('accepts the repository command map', () => {
@@ -133,5 +133,70 @@ describe('CLI manifest', () => {
 
     expect(failures).toContain('script command references missing package script: stale');
     expect(failures).toContain('package script missing command registry entry: missing');
+  });
+
+  it('accepts module-backed commands after their package alias is removed', () => {
+    const failures = checkCliManifest(
+      {
+        version: 1,
+        commands: [
+          {
+            id: 'operator-home.default',
+            command: '',
+            noun: 'home',
+            verb: 'default',
+            entry: 'operator-home',
+            audience: 'user',
+          },
+        ],
+        entrypoints: [
+          { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] },
+          { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+        ],
+        script_commands: [
+          {
+            id: 'module.command',
+            module: 'scripts/install_chronos_launchd.ts',
+            args: ['--uninstall'],
+            command: 'chronos uninstall',
+            noun: 'chronos',
+            verb: 'uninstall',
+            audience: 'operator',
+          },
+        ],
+      },
+      { packageScripts: new Set() }
+    );
+
+    expect(failures).toEqual(['entrypoint command missing registry entry: help']);
+  });
+
+  it('enforces the package-script count ratchet', () => {
+    const failures = checkCliManifest(
+      {
+        version: 1,
+        commands: [
+          {
+            id: 'operator-home.default',
+            command: '',
+            noun: 'home',
+            verb: 'default',
+            entry: 'operator-home',
+            audience: 'user',
+          },
+        ],
+        entrypoints: [
+          { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] },
+          { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['help'] },
+        ],
+      },
+      {
+        packageScripts: new Set(Array.from({ length: MAX_PACKAGE_SCRIPTS + 1 }, (_, i) => `s${i}`)),
+      }
+    );
+
+    expect(failures).toContain(
+      `package scripts exceed the SX-05 ratchet: ${MAX_PACKAGE_SCRIPTS + 1} > ${MAX_PACKAGE_SCRIPTS}`
+    );
   });
 });

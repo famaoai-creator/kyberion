@@ -23,9 +23,9 @@ Use this catalog to exchange messages between Kyberion instances.
 - `peer:server` starts a Kyberion peer listener on an HTTP port.
 - `peer:conversation-server` starts a conversation-capable Kyberion peer listener.
 - `peer:register` stores a peer endpoint and shared secret in the tenant confidential catalog.
-- `peer:send` resolves a peer from the tenant catalog and sends a signed envelope.
+- `kyberion peer send` resolves a peer from the tenant catalog and sends a signed envelope.
 - `peer:conversation` opens, sends, lists, and closes peer conversation sessions.
-- `peer:collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
+- `kyberion peer collaboration` lists and explicitly accepts or rejects governed proposals created from conversation handoffs.
 - Messages are stored as inbox / outbox / event JSONL records under `active/shared/runtime/peer-messaging/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-messaging/tenants/{tenant}/peers/{peer}/`.
 - Conversation sessions are stored under `active/shared/runtime/peer-conversations/tenants/{tenant}/peers/{peer}/` and `active/shared/observability/peer-conversations/tenants/{tenant}/peers/{peer}/`.
 - Mesh Hub registrations, presence, capabilities, delivery ledger, proposals, and events use `.../mesh-hub/{namespace}/tenants/{tenant}/...`; a namespace may be empty.
@@ -38,7 +38,7 @@ Use this catalog to exchange messages between Kyberion instances.
 1. Start one peer on `127.0.0.1:4100`.
 2. Start another peer on `127.0.0.1:4101`.
 3. On the sender host, register the remote peer with `pnpm peer:register --tenant-id demo --peer-id kyberion-local-b --base-url http://127.0.0.1:4101 --shared-secret-env KYBERION_PEER_SHARED_SECRET_B --exposure same_host`.
-4. Send a message with `KYBERION_TENANT_ID=demo pnpm peer:send --from-peer-id kyberion-local-a --to-peer-id kyberion-local-b --subject status --payload '{}'`.
+4. Send a message with `KYBERION_TENANT_ID=demo pnpm kyberion peer send --from-peer-id kyberion-local-a --to-peer-id kyberion-local-b --subject status --payload '{}'`.
 
 ## Same-host governed collaboration
 
@@ -63,8 +63,8 @@ before persisting a pending proposal.
 Inspect and decide proposals locally:
 
 ```bash
-pnpm peer:collaboration list --tenant-id default --peer-id kyberion-local-b --status pending
-pnpm peer:collaboration accept \
+pnpm kyberion peer collaboration list --tenant-id default --peer-id kyberion-local-b --status pending
+pnpm kyberion peer collaboration accept \
   --tenant-id default \
   --peer-id kyberion-local-b \
   --proposal-id <proposal-id> \
@@ -82,7 +82,7 @@ embedded WorkItem/A2A proposal.
 1. Bind the peer listener to `0.0.0.0` or the machine's LAN address.
 2. Register the peer's LAN `base_url` in the catalog.
 3. Set `allow_local_network: true`.
-4. Use the same `peer:send` command and point it at the LAN peer ID.
+4. Use the same `kyberion peer send` command and point it at the LAN peer ID.
 
 ## Envelope rules
 

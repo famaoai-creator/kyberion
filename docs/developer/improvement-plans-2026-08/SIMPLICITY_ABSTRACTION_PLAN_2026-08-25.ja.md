@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-01
+last_updated: 2026-09-02
 status: active
 ---
 
@@ -10522,6 +10522,12 @@ service preflight の voice／meeting bridge stdout を再監査し、JSON parse
 pipeline の provider capability／inline shell 出力を再監査し、外部 provider response と shell stdout を直接 `JSON.parse` していた残存を foundation の safe parser 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の text fallback semantics を維持したまま structured context へ流れないようにした。provider capability の export channel、shell の `export_as`、command／env／blackhole routing semantics は変更していない。
 
 検証: `scripts/run_pipeline.test.ts` **1 file / 71 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
+## 2026-09-02 再レビュー修正 132
+
+SX-05 の command entry を再監査し、重複していた31件のpackage script aliasを削除して、command registryのmodule-backed entryへ移行した。`kyberion <noun> <verb>` がregistryのmoduleをts-loader経由で直接起動し、必要な固定引数（chronos uninstall／release install-smoke）もmanifestで宣言する。これにより、機能を残したままpackage scriptsを実測 **151 → 120** に削減し、release／CI／systemd／macOS LaunchAgent／operator docsの実行例も同じ入口へ揃えた。moduleの存在、package scriptとの同期、script-integrity、generated knowledge index／pseudo-localeを機械検証する。
+
+検証: module-backed `chronos uninstall` 実走、CLI manifest／script-integrity／CI gate parity、package scripts ≤120 ratchet、catalogs／pseudo-locale full gate、CLI／release／launchd **4 files / 44 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る12 surfaceの全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
 ## 参照
 

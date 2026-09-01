@@ -47,7 +47,7 @@ export type KnowledgeScopeHealthReport = {
 };
 
 export const KNOWLEDGE_SCOPE_HEALTH_USAGE =
-  'Usage: pnpm knowledge:scope-health [--json] [--alert] [--fail] [--quiet]';
+  'Usage: pnpm kyberion knowledge scope-health [--json] [--alert] [--fail] [--quiet]';
 
 export interface LegacyUnscopedFile {
   path: string;
@@ -250,8 +250,8 @@ function buildHealthAlert(report: KnowledgeScopeHealthReport): OpsAlertInput {
     recommendation:
       'Repair the registered tenant knowledge root or allowlist, then run the scope health watchdog again. Quarantine legacy feedback rather than copying it into a tenant scope without provenance.',
     options: [
-      'pnpm knowledge:scope-health -- --json',
-      'pnpm knowledge:scope-health -- --json --alert',
+      'pnpm kyberion knowledge scope-health --json',
+      'pnpm kyberion knowledge scope-health --json --alert',
       'Review active/shared/runtime/feedback-loop and the tenant registry before migration.',
     ],
     dedupe_key: 'knowledge-scope-health',

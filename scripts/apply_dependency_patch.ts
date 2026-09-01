@@ -17,8 +17,8 @@
  * pnpm subprocess).
  *
  * Usage:
- *   pnpm patch:dependency -- --package <name> --to <version>          # propose
- *   pnpm patch:dependency -- --package <name> --to <version> --apply  # execute
+ *   pnpm kyberion patch dependency --package <name> --to <version>          # propose
+ *   pnpm kyberion patch dependency --package <name> --to <version> --apply  # execute
  */
 
 import * as path from 'node:path';
