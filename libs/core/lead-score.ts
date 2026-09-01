@@ -1,3 +1,5 @@
+import { clamp } from './foundation/text.js';
+
 export interface LeadScoreSignals {
   has_budget: boolean;
   has_timeline: boolean;
@@ -26,9 +28,7 @@ const SCORE_WEIGHTS: Array<[keyof LeadScoreSignals, number, string]> = [
   ['strategic_fit', 15, '事業要件との整合がある'],
 ];
 
-function clampScore(score: number): number {
-  return Math.max(0, Math.min(100, score));
-}
+const clampScore = (score: number): number => clamp(score, 0, 100);
 
 function buildReasons(signals: LeadScoreSignals): string[] {
   const reasons: string[] = [];
