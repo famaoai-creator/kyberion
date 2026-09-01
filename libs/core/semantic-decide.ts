@@ -1,5 +1,6 @@
 import { createLogger } from './logger.js';
 import { tryRepairJson } from './json-repair.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 // AR-07: in-loop semantic decision primitive. Deterministic ops distill an
 // observation (DOM inventory, UI tree, log tail); this helper asks the
@@ -100,7 +101,7 @@ export async function decideFromObservation(
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'semantic decision response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }

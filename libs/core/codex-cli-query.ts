@@ -4,6 +4,7 @@ import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import * as pathResolver from './path-resolver.js';
 import { safeExecResult, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
@@ -139,7 +140,7 @@ class CodexCliQuery {
         raw.length
       );
       const clean = extractJsonPayload(raw);
-      const parsedJson = JSON.parse(clean);
+      const parsedJson = parseSafeJsonInput(clean, 'Codex CLI structured response');
       const parsed = params.schema.safeParse(parsedJson);
       if (!parsed.success) {
         throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);

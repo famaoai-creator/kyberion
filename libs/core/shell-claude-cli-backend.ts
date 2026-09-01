@@ -35,6 +35,7 @@ import {
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isClaudeCliAuthenticated } from './claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
@@ -717,7 +718,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     const stdout = await this.spawnCli(args, params.userPrompt);
     let cliResult: any;
     try {
-      cliResult = JSON.parse(stdout);
+      cliResult = parseSafeJsonInput(stdout, 'Claude CLI response');
     } catch (err: any) {
       throw new Error(
         `[shell-claude-cli] failed to parse CLI JSON output: ${err?.message ?? err}. Raw: ${stdout.slice(0, 500)}`

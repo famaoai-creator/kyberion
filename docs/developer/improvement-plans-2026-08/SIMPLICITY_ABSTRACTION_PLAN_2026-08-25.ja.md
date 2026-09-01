@@ -10487,6 +10487,12 @@ scripts の外部／永続 JSON 境界を再監査し、service recording input�
 
 検証: scripts JSON boundary **8 files / 52 tests passed**、typecheck、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-01 再レビュー修正 126
+
+provider CLI／structured reasoning の外部応答を再監査し、Gemini／Grok／Claude／Codex／MLX の CLI／session／embedding response、semantic decision、structured reasoning、mission LLM の直接 `JSON.parse` を safe parser 前段へ移行した。さらに共通 `tryRepairJson` の修復結果も safe parser で再検証し、修復経路の dangerous key 混入を防止した。malformed／primitive／配列／nested dangerous key は既存の provider error／fallback／schema rejection path へ閉じ、provider permission、structured schema、fallback、session proof semantics は変更していない。
+
+検証: provider CLI／structured output **10 files / 96 tests passed**、直接 parse の残存は repair candidate の内部検証 1 箇所のみ、typecheck、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

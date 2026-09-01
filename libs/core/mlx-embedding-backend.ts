@@ -15,6 +15,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
@@ -112,7 +113,9 @@ export class MlxEmbeddingBackend implements EmbeddingBackend {
 
     for (const line of stdout.trim().split('\n').reverse()) {
       try {
-        const parsed = normalizeMlxEmbeddingResponse(JSON.parse(line));
+        const parsed = normalizeMlxEmbeddingResponse(
+          parseSafeJsonInput(line, 'MLX embedding response')
+        );
         if (!parsed) continue;
         if (parsed.error !== undefined) throw new Error(`[mlx-embedding] ${parsed.error}`);
         if (parsed.vectors !== undefined) {

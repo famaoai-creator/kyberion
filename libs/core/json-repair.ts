@@ -5,12 +5,14 @@
  * when the input cannot be made parseable through low-risk structural fixes.
  */
 
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+
 export function tryRepairJson(input: string): unknown | null {
   const repaired = repairJsonString(input);
   if (repaired === null) return null;
 
   try {
-    return JSON.parse(repaired);
+    return parseSafeJsonInput(repaired, 'repaired JSON');
   } catch {
     return null;
   }
@@ -43,12 +45,7 @@ function buildCandidates(input: string): string[] {
   const quotedKeys = quoteUnquotedKeys(noTrailingCommas);
   const doubleQuoted = replaceSingleQuotedStrings(quotedKeys);
 
-  return unique([
-    extracted,
-    noTrailingCommas,
-    quotedKeys,
-    doubleQuoted,
-  ]);
+  return unique([extracted, noTrailingCommas, quotedKeys, doubleQuoted]);
 }
 
 function stripMarkdownFence(input: string): string {
@@ -93,7 +90,8 @@ function extractJsonFragment(input: string): string | null {
       continue;
     }
     if (ch === '}' || ch === ']') {
-      if (stack.length === 0 || stack[stack.length - 1] !== ch) return input.slice(start, i + 1).trim();
+      if (stack.length === 0 || stack[stack.length - 1] !== ch)
+        return input.slice(start, i + 1).trim();
       stack.pop();
       if (stack.length === 0) return input.slice(start, i + 1).trim();
     }

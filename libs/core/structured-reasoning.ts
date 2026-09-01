@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -348,7 +349,7 @@ export const structuredReasoningSpecs = {
 // ── JSON extraction (defensive against fences / surrounding prose) ────────────
 function tryParse(candidate: string): unknown | undefined {
   try {
-    return JSON.parse(candidate);
+    return parseSafeJsonInput(candidate, 'structured reasoning response');
   } catch {
     return undefined;
   }
