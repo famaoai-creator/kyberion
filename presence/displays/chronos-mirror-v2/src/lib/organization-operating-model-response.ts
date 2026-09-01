@@ -1,4 +1,4 @@
-import { isRecord } from '@agent/core/foundation';
+import { isRecord } from './json-primitives';
 import type { OrganizationOperatingModelView } from '../components/OrganizationOperatingModel';
 
 type JsonRecord = Record<string, unknown>;

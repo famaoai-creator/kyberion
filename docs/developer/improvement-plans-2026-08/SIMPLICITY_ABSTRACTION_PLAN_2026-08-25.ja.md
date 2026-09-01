@@ -11518,6 +11518,20 @@ guard、approved recording／intent の検証、deal review、onboarding binding
 `git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 267
+
+前回の CI／本番 build 再確認で、Chronos intelligence API が利用する `@agent/core/dashboard-event-parser`
+の package export 欠落と、client bundle から `@agent/core/foundation` の Node.js 依存 barrel を辿る境界違反を
+検出した。core package に parser の explicit export を追加し、Chronos の client-side JSON response parser
+群は browser-safe な `json-primitives` へ、localStorage／client component が利用する JSON record reader は
+同等の dangerous-key 再帰検証を持つローカル実装へ分離した。server-only の secure-io／foundation が client
+bundle に混入しないため、package resolution と clean webpack build の双方で検証可能な構成にした。
+
+検証: Chronos production build、対象 **4 test files / 17 tests passed**、core build、root typecheck、foundation
+adoption、PR gate **33/33**、Prettier、ESLint、`git diff --check`。残る改善計画は追加の direct reader caller、
+catalog／script／ADF／surface contract の未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および
+voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

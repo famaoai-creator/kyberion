@@ -1,4 +1,4 @@
-import { isRecord } from '@agent/core/foundation';
+import { isRecord } from './json-primitives';
 
 type HeldAction = {
   id: string;
