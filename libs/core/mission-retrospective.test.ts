@@ -310,6 +310,14 @@ describe('mission retrospective loop', () => {
     expect(mod.normalizeProcessImprovementProposal([])).toBeUndefined();
   });
 
+  it('does not promote dangerous LLM proposal responses', async () => {
+    backendPrompt.mockResolvedValue(
+      '{"proposals":[{"kind":"tooling","proposal":"unsafe"}],"meta":{"__proto__":{}}}'
+    );
+    const result = await mod.runMissionRetrospective(MISSION);
+    expect(result.proposals).toHaveLength(0);
+  });
+
   it('records agent×role outcomes into the performance index and adjusts selection scores', async () => {
     // add outcomes to the dispatch manifest fixture
     fs.mkdirSync(path.join(missionDir, 'evidence'), { recursive: true });
