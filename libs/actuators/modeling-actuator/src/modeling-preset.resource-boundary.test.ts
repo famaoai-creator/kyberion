@@ -14,7 +14,7 @@ describe('modeling preset resource boundary', () => {
     );
 
     expect(source).toContain('safePresetPath = assertSafeRepositoryPath(');
-    expect(source).toContain('loadJson<{');
+    expect(source).toContain('readJson<{');
     expect(source).toContain('}>(safePresetPath)');
   });
 });
