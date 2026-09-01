@@ -1,4 +1,5 @@
 import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 
 /**
@@ -8,10 +9,6 @@ import { pathResolver } from './path-resolver.js';
 const PREF_PATH = pathResolver.knowledge('personal/user-preferences.json');
 
 export type UserPreferences = Record<string, unknown>;
-
-function isRecord(value: unknown): value is UserPreferences {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /**
  * Parse the persisted preference root without making arbitrary JSON values
