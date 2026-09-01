@@ -40,6 +40,10 @@ from urllib.parse import urlparse
 _SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = _SCRIPT_DIR.parents[2]
 
+_VOICE_SCRIPT_DIR = ROOT / "libs/actuators/voice-actuator/scripts"
+sys.path.insert(0, str(_VOICE_SCRIPT_DIR))
+from json_boundary import JsonInputError, parse_json_object
+
 PLAYWRIGHT_JOIN = ROOT / "libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs"
 MEETING_JOIN_BACKEND = "meeting-browser-driver"
 VOICE_BRIDGE    = ROOT / "libs/actuators/voice-actuator/scripts/voice_learning_bridge.py"
@@ -257,7 +261,7 @@ class MeetingBridge:
         lines = [l for l in result.stdout.strip().splitlines() if l.strip()]
         for line in reversed(lines):
             try:
-                payload = json.loads(line)
+                payload = parse_json_object(line, "meeting join result")
                 if "status" in payload:
                     sys.stderr.write(f"[bridge] join result: {payload}\n")
                     payload.setdefault("join_backend", self._join_backend_label())
@@ -276,7 +280,7 @@ class MeetingBridge:
                     if url_policy:
                         payload.setdefault("url_policy", url_policy)
                     return payload
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, JsonInputError):
                 continue
 
         stderr_snippet = (result.stderr or "")[-400:]
@@ -321,9 +325,9 @@ class MeetingBridge:
                 gen_result = {}
                 for line in reversed(r.stdout.strip().splitlines()):
                     try:
-                        gen_result = json.loads(line)
+                        gen_result = parse_json_object(line, "meeting TTS result")
                         break
-                    except json.JSONDecodeError:
+                    except (json.JSONDecodeError, JsonInputError):
                         continue
                 if gen_result.get("status") not in ("success", "ok"):
                     return _err(f"TTS generation failed: {gen_result.get('message', r.stderr[-200:])}")
@@ -438,8 +442,8 @@ def main():
         sys.exit(1)
 
     try:
-        payload = json.loads(raw_payload)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw_payload, "meeting input")
+    except (json.JSONDecodeError, JsonInputError) as exc:
         print(json.dumps(_err(f"invalid JSON input: {exc}")))
         sys.exit(1)
 

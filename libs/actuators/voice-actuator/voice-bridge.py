@@ -1,8 +1,11 @@
 import sys
 import json
 import os
-import torch
 from pathlib import Path
+
+_VOICE_SCRIPT_DIR = Path(__file__).resolve().parent / "scripts"
+sys.path.insert(0, str(_VOICE_SCRIPT_DIR))
+from json_boundary import parse_json_object
 
 # Style-Bert-VITS2 Voice Bridge
 # Real Implementation for Generative TTS
@@ -20,6 +23,7 @@ def speak(text, language="JP", voice_model_path="model"):
         return {"status": "fallback_success", "engine": "macOS-say", "reason": "model_incomplete"}
 
     try:
+        import torch
         from style_bert_vits2.tts_model import TTSModel
         
         # Load Model (using MPS for Mac acceleration if available)
@@ -53,7 +57,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     try:
-        input_data = json.loads(sys.argv[1])
+        input_data = parse_json_object(sys.argv[1], "legacy voice input")
         action = input_data.get("action")
         params = input_data.get("params", {})
         
