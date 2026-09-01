@@ -11071,6 +11071,12 @@ SX-03 の score clamp 残差を再監査し、patch decision／autonomous ops ga
 
 検証: patch decision／autonomous ops gate **3 files / 15 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は映像系の丸め・domain-specific clamp と追加時刻 helper、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe である。
 
+## 2026-09-02 再レビュー修正 222
+
+SX-03 の映像brief clamp残差を再監査し、narrated video／video content brief の duration、fps、dimension の範囲制限を `foundation/text` の canonical `clamp`へ移行した。fps／dimensionの整数丸め、既存の上下限、video固有のformat／storyboard正規化は維持した。
+
+検証: narrated brief／video content brief／beat timing **3 files / 19 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は追加のdomain-specific clamp／時刻 helper、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

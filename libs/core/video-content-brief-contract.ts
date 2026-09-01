@@ -4,6 +4,7 @@ import { buildVideoDesignCssVars, resolveVideoModeDefaults } from './video-desig
 import { resolveTenantDesign } from './tenant-design-resolver.js';
 import { resolveCreativeDesign } from './creative-design-resolver.js';
 import { isWebThemePack, webThemePackToCssVars } from './web-design-system.js';
+import { clamp } from './foundation/text.js';
 
 export type VideoPresentationMode = 'howto' | 'promo' | 'vtuber';
 
@@ -956,11 +957,11 @@ function sumStoryboardDuration(storyboard: VideoStoryboard): number {
 }
 
 function clampDuration(value: number): number {
-  return Math.max(3, Math.min(300, value));
+  return clamp(value, 3, 300);
 }
 
 function clampFps(value: number): number {
-  return Math.max(1, Math.min(60, Math.round(value)));
+  return clamp(Math.round(value), 1, 60);
 }
 
 function roundTo2(value: number): number {
@@ -972,7 +973,7 @@ function capitalize(value: string): string {
 }
 
 function clampDimension(value: number): number {
-  return Math.max(320, Math.min(7680, Math.round(value)));
+  return clamp(Math.round(value), 320, 7680);
 }
 
 function normalizeAspectRatio(value: string): string | undefined {
