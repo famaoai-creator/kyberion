@@ -24,7 +24,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const AUTHORITY_ROLE = 'physical_namespace_migration';
@@ -259,14 +259,14 @@ function parseRows(source: string): ParsedRow[] {
       .filter(Boolean)
       .map((line) => {
         try {
-          return { raw: line, record: JSON.parse(line) as unknown };
+          return { raw: line, record: parseSafeJsonInput(line, 'peer tenant migration JSONL row') };
         } catch {
           return { raw: line };
         }
       });
   }
   try {
-    return [{ raw: raw.trim(), record: JSON.parse(raw) as unknown }];
+    return [{ raw: raw.trim(), record: parseSafeJsonInput(raw, 'peer tenant migration JSON row') }];
   } catch {
     return [{ raw: raw.trim() }];
   }

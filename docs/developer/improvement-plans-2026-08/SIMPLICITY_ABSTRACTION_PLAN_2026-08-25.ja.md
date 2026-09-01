@@ -10657,6 +10657,12 @@ Mission Controllerのlegacy positional `relationships` JSONを再監査し、直
 
 検証: mission controller **1 file / 75 tests passed**、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 154
+
+Peer／Mesh Hub tenant runtime migrationのlegacy JSON／JSONL読込を再監査し、直接 `JSON.parse` をfoundation safe parserへ移行した。malformed／nested dangerous keyをtenant推論やmigration destinationの決定に利用せず、既存のunknown record／quarantine semanticsへ閉じ込めた。migration planの厳格なschema検証と明示tenant overrideの運用は維持した。
+
+検証: peer tenant migration **1 file / 3 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
