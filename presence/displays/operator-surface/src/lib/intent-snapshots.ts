@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import {
   isRecord,
-  loadJson,
+  clamp,
+  readJson as readFoundationJson,
   readJsonLines as readFoundationJsonLines,
 } from '@agent/core/foundation';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
@@ -34,7 +35,7 @@ function readJson<T>(filePath: string): T | null {
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return loadJson<T>(safePath);
+    return readFoundationJson<T>(safePath);
   } catch {
     return null;
   }
@@ -166,7 +167,7 @@ function missionRows(
 export function listIntentSnapshotRows(
   options: { tenantScope?: string; limit?: number } = {}
 ): IntentSnapshotRow[] {
-  const limit = Math.max(1, Math.min(500, options.limit ?? 100));
+  const limit = clamp(options.limit ?? 100, 1, 500);
   const locations = [...listMissionLocations('public'), ...listMissionLocations('confidential')];
   return locations
     .flatMap((location) => missionRows(location, options.tenantScope))
