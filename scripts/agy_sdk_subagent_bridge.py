@@ -274,6 +274,9 @@ async def run() -> None:
             except json.JSONDecodeError as exc:
                 emit({"event": "error", "error": f"[SUBAGENT_UNAVAILABLE] Invalid bridge JSON: {exc}"})
                 continue
+            if not isinstance(request, dict):
+                emit({"event": "error", "error": "[SUBAGENT_UNAVAILABLE] Bridge JSON must be an object"})
+                continue
             if request.get("op") == "ask":
                 if current and not current.done():
                     emit({"id": request.get("id"), "ok": False, "error": "[SUBAGENT_UNAVAILABLE] AGY bridge is busy."})

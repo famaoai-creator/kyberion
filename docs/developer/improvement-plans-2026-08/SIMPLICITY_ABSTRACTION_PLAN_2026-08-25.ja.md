@@ -11281,6 +11281,17 @@ voice bridge の実行確認で、`zero_shot_bridge.py` が Python 3.9 では PE
 `git diff --check`。残る改善計画は legacy voice root bridge／meeting／AGY の Python boundary、全surfaceの実ブラウザ／
 外部provider実機確認、SX-03〜SX-13の未完了項目、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 247
+
+残存していた legacy voice root bridge／meeting bridge／AGY NDJSON bridge の入力境界を再監査し、配列／primitive
+payload が `.get` や `setdefault` へ到達する経路を修正した。meeting の subprocess JSON も object 以外を結果候補から
+除外し、legacy voice は optional な `torch` を生成分岐へ遅延 import して、依存欠落時にも入力エラー／既存 fallback を
+遮断しないようにした。既存の output envelope、provider fallback、busy/cancel semantics は変更していない。
+
+検証: meeting／legacy voice の配列入力 boundary 実行、対象 3 Python bridge の syntax check、`git diff --check`。
+残る改善計画は Python bridge の全 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13の
+未完了項目、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
