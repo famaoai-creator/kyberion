@@ -11017,6 +11017,12 @@ SX-03 の private helper 残差をさらに整理し、artifact store／delivera
 
 検証: artifact／deliverable／share／audit／foundation adoption **5 files / 66 tests passed**、root typecheck、catalog integrity、PR scope check、`git diff --check`。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 213
+
+SX-03 の private helper 残差をさらに整理し、Apple Intelligence／Apple Speech／Claude CLI／Cloudflare OS／iMessage の provider／bridge 境界に残っていた汎用 `isRecord` を `foundation/text` の canonical helperへ移行した。各 provider の response shape、native delegation の fail-closed 判定、OS capability／provenance／message validation は維持し、汎用 record 判定の重複だけを削除した。
+
+検証: provider／bridge **6 files / 68 tests passed**、foundation adoption、root typecheck、`git diff --check`。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
