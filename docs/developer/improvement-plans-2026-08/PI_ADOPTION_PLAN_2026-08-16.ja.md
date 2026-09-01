@@ -92,7 +92,7 @@ pi は Node/Bun/Deno/ブラウザで動く「最小コア + 攻撃的に拡張�
 
 **kyberion の現状**: MCP server engine / Chronos API route / peer messaging の error 直列化は route ごと(`error.message` をそのまま返す箇所あり)。tenant 名・path・stack が別 tenant の viewer に漏れうる。
 
-**実装**: `libs/core/wire-error.ts` に `WireSafeError{code, message(固定文言), correlation_id}` と `toWireError(err)`(未知 error は `internal` + correlation_id、cause は audit/log にのみ)を置き、MCP engine・Chronos `api/**`・peer server の catch を全て通す。`check:wire-error-boundary`(route の catch で `err.message` を返していない)を CI に。受入: 内部 error の message/stack/path が response body に含まれない fixture、correlation_id で audit から追跡できる。
+**実装**: `libs/core/wire-error.ts` に `WireSafeError{code, message(固定文言), correlation_id}` と `toWireError(err)`(未知 error は `internal` + correlation_id、cause は audit/log にのみ)を置き、MCP engine・Chronos `api/**`・peer server の catch を全て通す。`pnpm check -- --scope pr --only wire-error-boundary`(route の catch で `err.message` を返していない)を CI に。受入: 内部 error の message/stack/path が response body に含まれない fixture、correlation_id で audit から追跡できる。
 
 ### PI-03: trust resource 集合の列挙と `restricted-skills.json` 消費者(P0 / S)
 
@@ -788,7 +788,7 @@ First-Win lifecycle smoke の live identity／schedule pipeline／dry-run fixtur
 ## 7. 検証コマンド(実装時)
 
 - PI-01: `pnpm vitest run libs/core/spend-guard.test.ts libs/core/metrics.test.ts libs/core/cost-report.test.ts` + tier 境界 fixture
-- PI-02: `pnpm run check:wire-error-boundary`(新設)+ MCP/Chronos route tests
+- PI-02: `pnpm check -- --scope pr --only wire-error-boundary`(manifest gate)+ MCP/Chronos route tests
 - PI-03: `pnpm vitest run libs/core/skill-plugin-loader.test.ts libs/core/approval-gate.test.ts`
 - PI-04: `pnpm vitest run libs/core/worker-context-compaction.test.ts`(5 連続圧縮 golden・overflow 1 回)
 - PI-06: `node --import ./scripts/ts-loader.mjs scripts/generate_trace_docs.ts -- --check && pnpm check -- --scope full --only reference-drift`

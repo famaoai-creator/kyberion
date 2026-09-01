@@ -1269,13 +1269,13 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 20801,
+      "size": 21129,
       "type": "json"
     },
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 43816,
+      "size": 43364,
       "type": "json"
     },
     {
