@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 import {
   type StructuredOutputSchemaName,
@@ -251,7 +252,7 @@ async function evaluateGateCheck(
         (typeof params.text === 'string'
           ? (() => {
               try {
-                return JSON.parse(params.text as string);
+                return parseSafeJsonInput(params.text as string, 'mission gate schema input');
               } catch {
                 return undefined;
               }
@@ -353,7 +354,7 @@ async function evaluateGateCheck(
       const raw = safeReadFile(safeArtifactPath, { encoding: 'utf8' }) as string;
       let artifact: unknown = raw;
       try {
-        artifact = JSON.parse(raw);
+        artifact = parseSafeJsonInput(raw, 'mission gate deliverable');
       } catch {
         // Non-JSON deliverables (markdown, text) are evaluated as raw text.
       }
@@ -432,14 +433,17 @@ async function evaluateGateCheck(
             reason: `llm_review: unparsable verdict: ${response.slice(0, 200)}`,
           };
         }
-        const verdict = JSON.parse(jsonMatch[0]) as {
-          pass?: boolean;
-          reasons?: string[];
-          improvements?: string[];
-        };
+        const verdict = parseSafeJsonObjectInput(jsonMatch[0], 'llm review verdict');
+        if (!verdict) throw new Error('llm review verdict must be a JSON object');
         const reasons = [
-          ...(verdict.reasons ?? []),
-          ...(verdict.improvements ?? []).map((improvement) => `改善提案: ${improvement}`),
+          ...(Array.isArray(verdict.reasons)
+            ? verdict.reasons.filter((reason): reason is string => typeof reason === 'string')
+            : []),
+          ...(Array.isArray(verdict.improvements)
+            ? verdict.improvements
+                .filter((improvement): improvement is string => typeof improvement === 'string')
+                .map((improvement) => `改善提案: ${improvement}`)
+            : []),
         ]
           .filter(Boolean)
           .join(' / ');
