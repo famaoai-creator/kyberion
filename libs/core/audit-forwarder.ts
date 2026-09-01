@@ -24,6 +24,7 @@ import { logger } from './core.js';
 import { redactSensitiveObject } from './network.js';
 import { registerAuditForwarderPublisher, type AuditEntry } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 
 export interface AuditForwarder {
   name: string;
@@ -36,6 +37,24 @@ const auditForwarderSeam = createSeam<AuditForwarder>({
   catalog: coreSeamCatalog,
 });
 let registeredDisposer: (() => void) | null = null;
+
+export function parseAuditForwarderHeaders(raw: string | undefined): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'audit forwarder headers');
+    if (!parsed) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string'
+      )
+    );
+  } catch (err: any) {
+    logger.warn(
+      `[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`
+    );
+    return {};
+  }
+}
 
 export function registerAuditForwarder(forwarder: AuditForwarder): () => void {
   registeredDisposer = auditForwarderSeam.register(forwarder.name, forwarder, {
@@ -227,16 +246,7 @@ export function installAuditForwarderIfAvailable(env: NodeJS.ProcessEnv = proces
     );
   }
   if (url) {
-    let headers: Record<string, string> = {};
-    try {
-      if (env.KYBERION_AUDIT_FORWARDER_HEADERS) {
-        headers = JSON.parse(env.KYBERION_AUDIT_FORWARDER_HEADERS);
-      }
-    } catch (err: any) {
-      logger.warn(
-        `[audit-forwarder] failed to parse KYBERION_AUDIT_FORWARDER_HEADERS: ${err?.message ?? err}`
-      );
-    }
+    const headers = parseAuditForwarderHeaders(env.KYBERION_AUDIT_FORWARDER_HEADERS);
     forwarders.push(
       new HttpAuditForwarder({
         url,
