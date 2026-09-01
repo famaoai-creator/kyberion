@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -411,7 +412,10 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
-          const parsed = normalizePersistedTrace(JSON.parse(trimmed), options);
+          const parsed = normalizePersistedTrace(
+            parseSafeJsonInput(trimmed, 'trace feed entry'),
+            options
+          );
           if (!parsed) continue;
           const summary = summarizePersistedTrace(parsed, filePath);
           if (!summary) continue;
@@ -459,7 +463,10 @@ export function collectTraceDetail(
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
-          const parsed = normalizePersistedTrace(JSON.parse(trimmed), options);
+          const parsed = normalizePersistedTrace(
+            parseSafeJsonInput(trimmed, 'trace feed entry'),
+            options
+          );
           if (!parsed) continue;
           if (parsed.traceId !== traceId) continue;
           const detail = detailPersistedTrace(parsed, filePath);
