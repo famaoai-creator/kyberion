@@ -12,6 +12,7 @@ import {
   updateManagedProject,
 } from '@agent/core/project-management';
 import type { ProjectTrackRecord } from '@agent/core/project-track-registry';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ProjectTier = 'personal' | 'confidential' | 'public';
@@ -41,6 +42,10 @@ function csvOption(argv: string[], name: string): string[] | undefined {
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+export function parseProjectMetadata(raw: string | undefined): Record<string, unknown> | undefined {
+  return raw ? parseSafeJsonObjectInput(raw, '--metadata') : undefined;
 }
 
 function jsonOutput(value: unknown): void {
@@ -251,7 +256,7 @@ export async function main(args: string[] = []): Promise<void> {
         ...(csvOption(argv, '--pipeline-refs')
           ? { pipeline_refs: csvOption(argv, '--pipeline-refs') }
           : {}),
-        ...(metadataRaw ? { metadata: JSON.parse(metadataRaw) as Record<string, unknown> } : {}),
+        ...(metadataRaw ? { metadata: parseProjectMetadata(metadataRaw) } : {}),
       };
       const record = updateManagedProject(projectId, patch);
       if (json) jsonOutput(record);

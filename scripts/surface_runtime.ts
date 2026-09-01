@@ -31,7 +31,7 @@ import { auditChain } from '@agent/core/audit-chain';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =
@@ -897,6 +897,22 @@ export function normalizeSurfaceRuntimeArgs(args: readonly string[]): string[] {
   return normalized;
 }
 
+export function parseSurfaceRegisterArgs(value: string): string[] {
+  let parsed: unknown;
+  try {
+    parsed = parseSafeJsonInput(value, 'surface register args');
+  } catch (error) {
+    if (error instanceof Error && error.message === 'surface register args must be valid JSON') {
+      return value.split(' ');
+    }
+    throw error;
+  }
+  if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry !== 'string')) {
+    throw new Error('surface register args must be a JSON array of strings');
+  }
+  return parsed;
+}
+
 const main = async (args: string[] = [], options: { dryRun?: boolean; check?: boolean } = {}) => {
   const normalizedArgs = normalizeSurfaceRuntimeArgs(args);
   const argv = await createStandardYargs(['node', 'surface_runtime', ...normalizedArgs])
@@ -983,11 +999,7 @@ const main = async (args: string[] = [], options: { dryRun?: boolean; check?: bo
         command: argv.command as string,
         args: argv.args
           ? (() => {
-              try {
-                return JSON.parse(argv.args as string);
-              } catch {
-                return (argv.args as string).split(' ');
-              }
+              return parseSurfaceRegisterArgs(argv.args as string);
             })()
           : [],
         port: argv.port as number,
