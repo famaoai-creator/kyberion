@@ -14,6 +14,7 @@ import type {
 import { validateModelRegistrySnapshot } from '@agent/core/model-registry-contract';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 const DIRECTORY = pathResolver.rootResolve('knowledge/product/governance/model-registry');
@@ -89,7 +90,8 @@ const outputPaths = [
 export const runSyncModelRegistry = defineGenerator({
   id: 'model-registry',
   outputs: outputPaths,
-  normalize: (content) => JSON.stringify(JSON.parse(content)),
+  normalize: (content) =>
+    JSON.stringify(parseSafeJsonObjectInput(content, 'model registry generated output')),
   render,
 });
 

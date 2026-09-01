@@ -13,6 +13,8 @@ describe('audit mirror reconcile entrypoint', () => {
 
     expect(source).toContain('context.print(outcome.result)');
     expect(source).toContain('new ScriptExitError(');
+    expect(source).toContain('parseSafeJsonInput(line,');
+    expect(source).not.toContain('JSON.parse(line)');
     expect(source).not.toContain('console.log(');
   });
 

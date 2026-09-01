@@ -11,6 +11,8 @@ describe('sync_model_registry', () => {
     expect(source).toContain('loadModelRegistry()');
     expect(source).toContain('defineGenerator');
     expect(source).toContain('runSyncModelRegistry');
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('readJson<');
   });
 });
