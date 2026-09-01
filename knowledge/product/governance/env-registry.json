@@ -1364,40 +1364,40 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for exported intent-contract memory artifacts; the global default is active/shared/exports/intent-contract-memory and tenant runs remain physically scoped.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_REPORT_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the intent-contract memory sync report; the global default is active/shared/runtime/reports/intent-contract-memory-sync-latest.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_RUNTIME_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the global intent-contract memory runtime file; relative values resolve from the repository root and tenant-scoped runs use their physical scope path.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_SCHEMA_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the intent-contract memory schema used by the sync command; the default is knowledge/product/schemas/intent-contract-memory.schema.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_INTENT_CONTRACT_MEMORY_SEED_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the governance seed used by intent-contract memory sync; tenant-scoped memory cannot be promoted into the global seed without the governed brokered path.",
+      "documented": true
     },
     {
       "name": "KYBERION_KI_CACHE_DIR",
@@ -1428,8 +1428,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for knowledge feedback delivery logs; the default is active/shared/runtime/feedback-loop/knowledge-delivery and scoped runs append under their tenant or mission path.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_FEEDBACK_DIR",
@@ -1444,32 +1444,32 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge feedback policy catalog; unsafe paths are rejected and the canonical product governance policy remains the fallback.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_REFS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Comma-separated knowledge references attached to ambient reasoning visibility for the active mission context.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_SCOPE_HEALTH_HISTORY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge-scope health history report; the default is active/shared/runtime/feedback-loop/knowledge-scope-health.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_SCOPE_RECONCILIATION_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the knowledge-scope reconciliation report; the default is active/shared/runtime/reports/knowledge-scope-reconciliation-latest.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_KNOWLEDGE_TIER",
@@ -1485,8 +1485,8 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for aggregated knowledge usage and yield data; the default is active/shared/runtime/feedback-loop/knowledge-usage/usage.json and scoped reads preserve tenant containment.",
+      "documented": true
     },
     {
       "name": "KYBERION_LIVE_BLACKHOLE_TEST",
