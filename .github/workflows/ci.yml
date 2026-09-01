@@ -58,6 +58,12 @@ jobs:
           if-no-files-found: error
 
       - name: Run manifest-driven full checks
+        env:
+          # The tenant-registry gate verifies the personal-tier tenant spine.
+          # Give the governed checker its read authority explicitly instead of
+          # relying on a developer shell's ambient role.
+          KYBERION_PERSONA: worker
+          MISSION_ROLE: mission_controller
         run: pnpm run check -- --scope full
 
       # After build: the checker imports @agent/core, which resolves to the

@@ -24,7 +24,7 @@
     "test:unit": "node --import ./scripts/ts-loader.mjs scripts/test_suite.ts --suite unit",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "build": "node --import ./scripts/ts-loader.mjs scripts/clean.ts && pnpm run build:packages && pnpm run build:actuators && pnpm --filter @presence/terminal-hud run build && pnpm run build:repo && pnpm run build:ui",
+    "build": "node --import ./scripts/ts-loader.mjs scripts/clean_entrypoint.ts && pnpm run build:packages && pnpm run build:actuators && pnpm --filter @presence/terminal-hud run build && pnpm run build:repo && pnpm run build:ui",
     "build:packages": "pnpm --filter @agent/core run build && pnpm --filter @agent/shared-media run build && pnpm --filter @agent/shared-nerve run build && pnpm --filter @agent/shared-network run build && pnpm --filter @agent/shared-vision run build",
     "build:actuators": "tsc -p tsconfig.actuators.json",
     "build:repo": "tsc",

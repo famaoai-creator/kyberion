@@ -10499,6 +10499,12 @@ provider CLI／structured reasoning の外部応答を再監査し、Gemini／Gr
 
 検証: shared／OS adapter **4 files / 30 tests passed**、typecheck、module-boundaries、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-01 CI 再レビュー修正 128
+
+fresh checkout の `pnpm run build` を再検証し、`clean.ts` が package dist の生成前に import する共通 `scripts/lib/harness.ts` の core 依存を package export から source-relative boundary へ戻した。これにより、初期化時に `@agent/core/dist/secure-io.js` が未生成でも clean／build が開始できる。runtime の package export、secure-io／governance の実装、clean の削除対象 semantics は変更していない。
+
+検証: `CI=1 pnpm run build` のfresh checkout相当の初期化と package build は成功済み。さらに root TypeScript compile、`check:esm`、`check:script-integrity`、tenant-registry（`worker`／`mission_controller`）を修正後に再確認した。canonical full gate は `68` 中 `67` passed（唯一の golden／vital-check 差分は、現ワークツリーにのみ存在する未追跡 identity／active mission state と clean checkout基準 snapshot の差分であり、再baselineしていない）。fresh checkout の build 前提を満たすため `clean.ts` は source-relative core boundary を使い、通常の harness は package export を維持して ESM 境界を守る。tenant-registry gate には明示的な実行ロールを与え、personal-tier の検査が ambient shell に依存しないようにした。PR CI は修正前 SHA の build failure（全OS／security／lint-and-validate）を検出していたため、修正後 SHA で再実行して確認する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
