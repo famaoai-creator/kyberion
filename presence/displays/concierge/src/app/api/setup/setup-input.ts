@@ -1,6 +1,8 @@
 import type { RequestInputObject } from '../../../lib/request-input';
 import {
   RequestInputError,
+  requireKnownFormKeys,
+  requireKnownRequestKeys,
   optionalRequestString,
   requireRequestObject,
 } from '../../../lib/request-input';
@@ -8,6 +10,8 @@ import {
 export type SetupInputObject = RequestInputObject;
 export {
   RequestInputError as SetupInputError,
+  requireKnownFormKeys,
+  requireKnownRequestKeys,
   optionalRequestString as optionalSetupString,
   requireRequestObject as requireSetupObject,
 };
