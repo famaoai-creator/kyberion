@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -28,10 +29,6 @@ export type HeldActionStatus =
 export type ResourceScope = 'read' | 'write';
 export type IntroductionMode = 'warn' | 'enforce';
 export type OsKnowledgeTier = 'personal' | 'confidential' | 'public';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 /** Validate the execution envelope without pretending to know generic `T`. */
 export function normalizeGovernedCodeEnvelope(value: unknown): { value: unknown } | undefined {

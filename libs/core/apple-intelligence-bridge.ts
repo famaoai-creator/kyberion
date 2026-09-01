@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -41,10 +42,6 @@ const SWIFT_MODULE_CACHE_DIR = `${BINARY_CACHE_DIR}/module-cache`;
 export interface AppleIntelligenceAvailability {
   available: boolean;
   reason?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeAppleIntelligenceAvailability(

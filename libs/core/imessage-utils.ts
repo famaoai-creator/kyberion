@@ -4,6 +4,7 @@ import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 
 export interface IMessageAttachment {
   id: string;
@@ -55,10 +56,6 @@ const IMESSAGE_TAPBACK_TYPES: Record<number, IMessageTapbackKind> = {
   2005: 'question',
   3000: 'remove',
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function normalizeExternalId(value: unknown): string | undefined {
   if (typeof value === 'string' && value.trim()) return value.trim();
