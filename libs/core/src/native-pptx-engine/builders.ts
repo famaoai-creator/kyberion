@@ -1,5 +1,6 @@
 import { resolveEastAsianFontFamily, resolveLatinFontFamily } from '../../design-fonts.js';
 import type { PptxElement, PptxStyle } from '../types/pptx-protocol.js';
+import { clamp } from '../../foundation/text.js';
 
 function inToEmu(inches: number): number {
   return Math.round(inches * 914400);
@@ -13,7 +14,7 @@ function inToEmu(inches: number): number {
  */
 function cornerRadiusGuideValue(r: number): number {
   const guide = r > 0 && r <= 1 ? r * 100000 : r;
-  return Math.max(0, Math.min(50000, Math.round(guide)));
+  return clamp(Math.round(guide), 0, 50000);
 }
 
 /**
