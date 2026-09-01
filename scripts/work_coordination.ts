@@ -42,7 +42,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -55,29 +55,13 @@ function csv(value: unknown): string[] {
     .filter(Boolean);
 }
 
-const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-function isSafeJsonValue(value: unknown): boolean {
-  if (Array.isArray(value)) return value.every(isSafeJsonValue);
-  if (value === null || typeof value !== 'object') return true;
-  return Object.keys(value).every(
-    (key) =>
-      !JSON_DANGEROUS_KEYS.has(key) && isSafeJsonValue((value as Record<string, unknown>)[key])
-  );
-}
-
 export function parseWorkCoordinationJson(value: unknown): Record<string, unknown> | undefined {
   if (typeof value !== 'string' || !value.trim()) return undefined;
-  const parsed: unknown = JSON.parse(value);
-  if (
-    parsed === null ||
-    typeof parsed !== 'object' ||
-    Array.isArray(parsed) ||
-    !isSafeJsonValue(parsed)
-  ) {
+  try {
+    return parseSafeJsonObjectInput(value, 'work coordination context');
+  } catch {
     throw new Error('Expected a safe JSON object.');
   }
-  return parsed as Record<string, unknown>;
 }
 
 const WORK_SHAPES = new Set<NonNullable<WorkItemContext['work_shape']>>([

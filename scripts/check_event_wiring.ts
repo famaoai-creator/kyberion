@@ -13,6 +13,7 @@
  */
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -241,7 +242,9 @@ export function checkEventStoreRetention(sources: EventWiringSources): string[] 
 
   let declaredPaths: string[];
   try {
-    const catalog = JSON.parse(raw) as { entries?: Array<{ path?: string }> };
+    const catalog = parseSafeJsonObjectInput(raw, `${catalogPath}`) as {
+      entries?: Array<{ path?: string }>;
+    };
     declaredPaths = (catalog.entries || [])
       .map((entry) => String(entry.path || ''))
       .filter(Boolean);
