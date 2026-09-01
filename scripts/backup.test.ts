@@ -64,6 +64,11 @@ describe('backup cli', () => {
     expect(() => parseRestoredBackupManifest('[]')).toThrow('root must be a JSON object');
     expect(() =>
       parseRestoredBackupManifest(
+        '{"format":"kyberion-backup-v1","scope":"all","entries":[],"__proto__":{}}'
+      )
+    ).toThrow('Backup manifest is not valid JSON');
+    expect(() =>
+      parseRestoredBackupManifest(
         JSON.stringify({
           format: 'kyberion-backup-v1',
           scope: 'tenant',
