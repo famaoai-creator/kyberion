@@ -10,5 +10,6 @@ describe('parseHookPayload', () => {
     expect(parseHookPayload('[{"prompt":"hello"}]')).toEqual({});
     expect(parseHookPayload('"hello"')).toEqual({});
     expect(parseHookPayload('{')).toEqual({});
+    expect(parseHookPayload('{"__proto__":{"polluted":true}}')).toEqual({});
   });
 });

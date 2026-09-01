@@ -10681,6 +10681,12 @@ Contract semver checkerのactuator contract schema fingerprintを再監査し、
 
 検証: contract semver **1 file / 20 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 158
+
+Claude Code hook、Work Coordination、event wiring checker、service lifecycle controlのJSON入力／外部応答境界を再監査し、直接 `JSON.parse` と重複した危険キー判定をshared safe parserへ統一した。hookのfail-open、work coordinationの公開エラー、event catalogのunparseable診断、service runtimeのplain-text fallbackは維持しつつ、primitive／配列／nested dangerous keyをtyped処理へ渡さないようにした。
+
+検証: **3 files / 22 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
