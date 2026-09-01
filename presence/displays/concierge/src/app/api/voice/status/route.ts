@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isRecord } from '@agent/core/foundation';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
 import { resolveConciergeViewer } from '../../../../lib/viewer-context';
 import type { VoiceStatusResponse } from '../../../../lib/voice-types';
@@ -92,8 +93,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ available: false } satisfies VoiceStatusResponse, { status: 502 });
   }
   return NextResponse.json(payload);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

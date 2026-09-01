@@ -1,12 +1,10 @@
+import { isRecord } from '@agent/core/foundation';
+
 export type TenantDesignResponse = {
   source: string;
   brand_name: string | null;
   css_vars: Record<string, string>;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function parseTenantDesignResponse(value: unknown): TenantDesignResponse | undefined {
   if (!isRecord(value)) return undefined;

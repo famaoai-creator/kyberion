@@ -2,6 +2,7 @@ import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
 } from '@agent/core/intent-resolution-contract-parser';
+import { isRecord } from '@agent/core/foundation';
 
 /**
  * Shared request/response contract for the concierge conversation core
@@ -47,10 +48,6 @@ export interface ConversationMessageResponse {
 export interface VoiceHubConversationResponse {
   reply: string;
   intentResolution?: IntentResolutionContract;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** Narrow the voice-hub response before it enters the conversation surface. */
