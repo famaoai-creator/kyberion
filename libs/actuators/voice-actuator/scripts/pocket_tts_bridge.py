@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from json_boundary import JsonInputError, parse_json_object
 
 _MODEL = None
 _VOICE_CACHE: dict[str, object] = {}
@@ -87,8 +88,8 @@ def main() -> None:
         print(json.dumps({"status": "error", "error": "No input on stdin"}))
         raise SystemExit(1)
     try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
+        payload = parse_json_object(raw, "pocket TTS input")
+    except JsonInputError as exc:
         print(json.dumps({"status": "error", "error": f"Invalid JSON: {exc}"}))
         raise SystemExit(1)
 
