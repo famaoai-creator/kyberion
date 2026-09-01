@@ -3195,104 +3195,105 @@
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional path to the Python voice-learning bridge; when unset, the bundled voice-actuator bridge is used.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_ENGINE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory override for the split voice-engine registry files; used with the canonical registry path when present.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_ENGINE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit voice-engine registry path; the selected file is validated against the voice-engine schema before use.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_HUB_TTS_CONFIG_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice-hub text-to-speech language configuration; the default is knowledge/product/presence/voice-hub-tts.json.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_LANGUAGE",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Language hint passed to the Python voice bridge; when unset, the unified locale resolver supplies the language.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_OUTPUT_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory for generated Python voice artifacts; the default is active/shared/tmp/voice-out under the current repository.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PLAY_BLACKHOLE",
       "category": "runtime",
-      "type": "string",
+      "type": "boolean",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Set to 1 to send Python voice output through the configured BlackHole playback bridge; it has no effect without KYBERION_BLACKHOLE_SCRIPT.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_ID",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Voice profile identifier forwarded to the Python/TTS bridge; the Python bridge is not installed unless this value is present.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_REGISTRY_DIR",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Directory override for split voice-profile registry files; canonical overlays remain enabled when no explicit registry file is selected.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_PROFILE_REGISTRY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit base voice-profile registry path; selecting it disables the automatic personal and customer overlay lookup.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_RUNTIME_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice runtime policy catalog; the default is knowledge/product/governance/voice-runtime-policy.json and invalid input falls back conservatively.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Override for the voice sample-ingestion policy catalog; the selected file is schema-validated before profile registration.",
+      "documented": true
     },
     {
       "name": "KYBERION_VOICE_UPGRADE_ALIAS",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["cloud", "local"],
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Compatibility alias for the voice upgrade target; cloud selects tier 1 and local selects tier 2 when no explicit CLI target is supplied.",
+      "documented": true
     },
     {
       "name": "KYBERION_WINDOWS_AI",
