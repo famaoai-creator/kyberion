@@ -5,6 +5,7 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import type {
   DefectCandidate,
@@ -280,10 +281,6 @@ export interface DefectTransitionEvent {
   reason: string;
   evidence_refs: string[];
   occurred_at: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isDefectStatus(value: unknown): value is DefectStatus {
