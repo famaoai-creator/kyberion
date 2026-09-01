@@ -90,6 +90,16 @@ describe('a2a-transport', () => {
     expect(safeExistsSync(path.join(A2A_QUARANTINE, 'invalid-shape.a2a'))).toBe(true);
   });
 
+  it('quarantines JSON containing a dangerous key before envelope validation', async () => {
+    writeInboxFile(
+      'dangerous.a2a',
+      '{"header":{"msg_id":"dangerous"},"body":{"constructor":{"polluted":true}}}'
+    );
+
+    await expect(pollA2AInbox()).resolves.toEqual([]);
+    expect(safeExistsSync(path.join(A2A_QUARANTINE, 'dangerous.a2a'))).toBe(true);
+  });
+
   it('processes good messages and quarantines bad ones in the same poll', async () => {
     writeInboxFile('good.a2a', JSON.stringify({ header: { msg_id: 'good' }, body: {} }));
     writeInboxFile('poison.a2a', '{not-json');

@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { loadJson } from '@agent/core/foundation';
+import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   safeReadFile,
   safeWriteFile,
@@ -290,7 +290,9 @@ async function opTransform(op: string, params: any, ctx: any) {
       const hydrated = resolveVars(input, ctx);
       return {
         ...ctx,
-        [params.export_as || 'last_transform']: params.is_json ? JSON.parse(hydrated) : hydrated,
+        [params.export_as || 'last_transform']: params.is_json
+          ? parseSafeJsonInput(hydrated, 'variable_hydrate JSON')
+          : hydrated,
       };
     case 'request_to_execution_brief': {
       const catalog = loadActuatorRequestArchetypes();

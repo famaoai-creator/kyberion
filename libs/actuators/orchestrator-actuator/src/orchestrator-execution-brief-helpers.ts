@@ -1,6 +1,6 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
-import { loadJson } from '@agent/core/foundation';
+import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -709,11 +709,7 @@ export function executeExecutionPlanSet(
         timeoutMs: 120000,
       });
       let parsed: unknown = rawOutput.trim();
-      try {
-        parsed = JSON.parse(rawOutput);
-      } catch {
-        // leave as raw string
-      }
+      parsed = parseJsonCommandOutput(rawOutput);
       const reportedStatus =
         typeof parsed === 'object' && parsed && 'status' in (parsed as Record<string, unknown>)
           ? String((parsed as Record<string, unknown>).status)
@@ -760,9 +756,10 @@ export function collectCommandHealth(command: string, args: string[]) {
 
 export function parseJsonCommandOutput(output: string): unknown {
   try {
-    return JSON.parse(output);
-  } catch {
-    return { raw: output.trim() };
+    return parseSafeJsonInput(output, 'command output', { preserveParseError: true });
+  } catch (error) {
+    if (error instanceof SyntaxError) return { raw: output.trim() };
+    throw error;
   }
 }
 

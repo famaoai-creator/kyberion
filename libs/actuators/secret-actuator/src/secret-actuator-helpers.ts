@@ -7,6 +7,7 @@ import {
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -71,8 +72,9 @@ function loadRegistry(): KeychainRegistry {
     return { entries: [] };
   }
   try {
-    return JSON.parse(
-      withVaultIo(() => safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' })) as string
+    return parseSafeJsonInput(
+      withVaultIo(() => safeReadFile(KEYCHAIN_REGISTRY_PATH, { encoding: 'utf8' })) as string,
+      'secret keychain registry'
     ) as KeychainRegistry;
   } catch {
     return { entries: [] };
