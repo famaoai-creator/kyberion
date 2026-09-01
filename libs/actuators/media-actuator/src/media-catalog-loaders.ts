@@ -1,10 +1,10 @@
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 export function cloneJsonValue<T>(value: T): T {
@@ -47,7 +47,7 @@ export function readJsonFilesRecursively(dirPath: string): any[] {
       continue;
     }
     if (stat.isFile() && entry.endsWith('.json')) {
-      docs.push(loadJson(assertSafeRepositoryPath(fullPath)));
+      docs.push(readJson(assertSafeRepositoryPath(fullPath)));
     }
   }
   return docs;
@@ -69,12 +69,12 @@ export function loadJsonCatalog(
     allowMissingLeaf: true,
   });
   return safeExistsSync(filePath) && safeLstat(filePath).isFile()
-    ? loadJson(filePath)
+    ? readJson(filePath)
     : cloneJsonValue(input.fallback);
 }
 
 export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
-  return loadJson(assertSafeRepositoryPath(filePath));
+  return readJson(assertSafeRepositoryPath(filePath));
 }
 
 export function loadTenantEntries(rootDir: string): { override_path: string }[] {
