@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './runtime-model-defaults.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from './ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
@@ -67,6 +68,37 @@ function nonEmptyString(value: unknown): string | undefined {
 
 function firstRecord(value: unknown): Record<string, unknown> | undefined {
   return Array.isArray(value) && isRecord(value[0]) ? value[0] : undefined;
+}
+
+function parseAppleVisionLines(value: unknown): OcrResult['lines'] {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (!isRecord(entry) || typeof entry.text !== 'string') return [];
+    const confidence = typeof entry.confidence === 'number' ? entry.confidence : 0;
+    const bbox = isRecord(entry.bbox) ? entry.bbox : undefined;
+    const hasBoundingBox =
+      bbox &&
+      typeof bbox.x0 === 'number' &&
+      typeof bbox.y0 === 'number' &&
+      typeof bbox.x1 === 'number' &&
+      typeof bbox.y1 === 'number';
+    return [
+      {
+        text: entry.text,
+        confidence,
+        ...(hasBoundingBox
+          ? {
+              boundingBox: {
+                x: bbox.x0 as number,
+                y: bbox.y0 as number,
+                width: (bbox.x1 as number) - (bbox.x0 as number),
+                height: (bbox.y1 as number) - (bbox.y0 as number),
+              },
+            }
+          : {}),
+      },
+    ];
+  });
 }
 
 export function parseGeminiOcrResponse(value: unknown): string | undefined {
@@ -244,16 +276,17 @@ export class AppleVisionOcrProvider implements OcrProvider {
         }
 
         try {
-          const parsed = JSON.parse(raw);
+          const parsed = parseSafeJsonObjectInput(raw, 'apple vision OCR response');
+          if (!parsed) throw new Error('apple vision OCR response must not be empty');
           if (parsed.error) {
-            return reject(new Error(parsed.error));
+            return reject(new Error(String(parsed.error)));
           }
           resolve({
             status: parsed.status === 'succeeded' ? 'succeeded' : 'failed',
             provider: this.id,
-            text: parsed.text || '',
-            confidence: parsed.confidence || 0,
-            lines: parsed.lines,
+            text: typeof parsed.text === 'string' ? parsed.text : '',
+            confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+            lines: parseAppleVisionLines(parsed.lines),
             elapsedMs: Date.now() - startedAt,
           });
         } catch (error: any) {

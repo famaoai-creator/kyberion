@@ -212,6 +212,19 @@ describe('AppleVisionOcrProvider', () => {
 
     expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
   });
+
+  it('rejects dangerous native OCR response objects', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+
+    const provider = new AppleVisionOcrProvider();
+    const promise = provider.recognize({ path: 'test.png' });
+
+    fakeChild.stdout.emit('data', '{"status":"succeeded","meta":{"__proto__":{}}}');
+    fakeChild.emit('close', 0);
+
+    await expect(promise).rejects.toThrow('apple_vision_invalid_json');
+  });
 });
 
 describe('TesseractOcrProvider', () => {
