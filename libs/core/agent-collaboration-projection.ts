@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
+import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import {
@@ -465,7 +466,7 @@ export function composeAgentCollaborationProjection(
   input: AgentCollaborationEvent[],
   options: ComposeCollaborationProjectionOptions = {}
 ): AgentCollaborationProjection {
-  const limit = Math.max(1, Math.min(options.limit || 100, 500));
+  const limit = clamp(options.limit || 100, 1, 500);
   const deduped = new Map<string, AgentCollaborationEvent>();
   for (const event of input.filter((event) => eventMatches(event, options))) {
     deduped.set(`${event.source}:${event.source_event_id}`, event);

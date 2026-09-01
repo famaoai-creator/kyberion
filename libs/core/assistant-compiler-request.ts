@@ -1,6 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { clamp } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import {
   inferGovernedDeliveryMode,
@@ -332,7 +333,7 @@ function normalizeIntentContractFromRaw(
       typeof raw.clarification_needed === 'boolean'
         ? raw.clarification_needed
         : requiredInputs.length > 0,
-    confidence: typeof raw.confidence === 'number' ? Math.min(1, Math.max(0, raw.confidence)) : 0.6,
+    confidence: typeof raw.confidence === 'number' ? clamp(raw.confidence, 0, 1) : 0.6,
     why:
       typeof raw.why === 'string' && raw.why.trim().length > 0
         ? raw.why
