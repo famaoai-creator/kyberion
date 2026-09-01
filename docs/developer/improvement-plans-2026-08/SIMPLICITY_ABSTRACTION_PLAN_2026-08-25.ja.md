@@ -10573,6 +10573,12 @@ File Actuator の `read_json`／`json_parse`／CLI action input／`rg --json` �
 
 検証: File Actuator／secure JSON **3 files / 65 tests passed**、File Actuator typecheck、root typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 140
+
+MCP server の JSON helper を再監査し、`mcp-json.ts` が foundation と同じ dangerous-key tree 判定を独自実装し、直接 `JSON.parse` していた残存を修正した。`parseSafeJsonObject` は共通 object parser、`parseMcpTextPayload` は共通 safe parserへ接続し、malformed／primitive／配列／nested dangerous key の既存 null／raw-text fallback semantics を維持した。
+
+検証: MCP JSON boundary **1 file / 5 tests passed**、Prettier、`git diff --check`。MCP server の既存39テストと package typecheck は後続の全体検証で確認する。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
