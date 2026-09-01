@@ -20,6 +20,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ProbeResult {
@@ -90,6 +91,9 @@ export function runMarketingVideoDryRun(input: {
   const outputRoot = resolveMarketingVideoPath(input.outputRoot, 'output root', true);
   const brief = safeReadFile(briefPath, { encoding: 'utf8' }) as string;
   const brand = safeReadFile(brandPath, { encoding: 'utf8' }) as string;
+  const parsedBrief = parseSafeJsonObjectInput(brief, 'campaign brief JSON') as {
+    intake: Parameters<typeof validateMarketingIntake>[0];
+  };
   const runId = sha256(
     JSON.stringify({
       generator: GENERATOR_VERSION,
@@ -182,8 +186,9 @@ export function runMarketingVideoDryRun(input: {
     thumbnailPath,
   ]);
 
-  const probe = JSON.parse(
-    safeExec('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', videoPath])
+  const probe = parseSafeJsonObjectInput(
+    safeExec('ffprobe', ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', videoPath]),
+    'ffprobe video output'
   ) as ProbeResult;
   const blackDetection = safeExecResult(
     'ffmpeg',
@@ -222,7 +227,7 @@ export function runMarketingVideoDryRun(input: {
     silenceOutput,
     /silence_duration:\s*([0-9.]+)/g
   );
-  const imageProbe = JSON.parse(
+  const imageProbe = parseSafeJsonObjectInput(
     safeExec('ffprobe', [
       '-v',
       'error',
@@ -231,7 +236,8 @@ export function runMarketingVideoDryRun(input: {
       '-of',
       'json',
       thumbnailPath,
-    ])
+    ]),
+    'ffprobe thumbnail output'
   ) as ImageProbeResult;
   const sensitiveMetadataKeys = Object.keys(imageProbe.format?.tags || {}).filter((key) =>
     /gps|location|author|artist|comment|description|copyright/i.test(key)
@@ -307,9 +313,6 @@ export function runMarketingVideoDryRun(input: {
       2
     )
   );
-  const parsedBrief = JSON.parse(brief) as {
-    intake: Parameters<typeof validateMarketingIntake>[0];
-  };
   const intakeGate = validateMarketingIntake(parsedBrief.intake);
   const sensitiveDataScan = scanMarketingTextForSensitiveData([
     {
