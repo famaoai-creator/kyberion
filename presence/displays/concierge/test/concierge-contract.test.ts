@@ -122,7 +122,7 @@ describe('concierge surface contract', () => {
     // Both paths failing must produce a loud, actionable 503 — never silence.
     expect(route).toContain("mode: 'unavailable'");
     expect(route).toContain('503');
-    expect(route).toContain('replyText');
+    expect(route).toContain('reply');
     expect(route).toContain('intentResolution');
     // The rich voice-hub path must pass through the same deterministic
     // vocabulary/approval contract as the in-process fallback.

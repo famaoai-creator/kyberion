@@ -285,3 +285,15 @@ Presence Studio の demo frame request を再監査し、surface／agent／表�
 Concierge の文書取込 multipart 境界を再監査し、`tenant`／`format`／`dry_run` を `String(FormData)` で暗黙変換していたため、File・未知フィールド・重複値・未定義の真偽値が tenant lookup／ファイル staging 前に曖昧化する残存を検出した。strict な `parseIngestForm` を追加し、対応フィールド、単一値、文字列型、format enum、dry-run enum、File 型を正規化してから既存の tenant registry 検証と ingest ceremony へ渡すようにした。未指定 `dry_run` は従来どおり false とし、既存の preview／commit semantics は変更していない。
 
 検証: Concierge ingest input **1 file / 10 tests passed**、変更対象 Prettier、root typecheck、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 22
+
+Concierge の JSON mutation route 群を再監査し、root object だけを検査して未知 field を各 route の暗黙既定値化へ通していた残存を検出した。共通 `readRequestObject` に route ごとの許可キー検証を接続し、message、notification、config mission、approval、outcome、hygiene、memory queue、plugin の各副作用前に未知 field を 400 で拒否するようにした。既存の route-specific enum／tenant／viewer／approval 検証と body 未指定時の契約は変更していない。
+
+検証: Concierge request-input／ingest input／message input **4 files / 21 tests passed**、変更対象 Prettier、root typecheck、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 23
+
+Concierge の契約テストを現行 `ConversationMessageResponse.reply` 契約と照合し、旧 `replyText` を要求する stale assertion が package-local test を失敗させていたため修正した。併せて共通 JSON key guard に `__proto__`／`constructor`／`prototype` の明示的な拒否を追加し、許可キー検証を prototype-shaped key に対しても fail-closed にした。会話 payload の canonical field と既存の返信 semantics は変更していない。
+
+検証: Concierge contract **1 file / 23 tests passed**、request input等 **4 files / 21 tests passed**、変更対象 Prettier、root typecheck、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

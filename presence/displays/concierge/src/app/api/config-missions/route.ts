@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
     conciergeText(key, locale, params);
 
   try {
-    const parsedBody = await readRequestObject(req);
+    const parsedBody = await readRequestObject(req, 'request body', ['preset', 'tenant', 'inputs']);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;

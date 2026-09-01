@@ -70,7 +70,11 @@ export async function POST(req: NextRequest) {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
-    const parsedBody = await readRequestObject(req);
+    const parsedBody = await readRequestObject(req, 'request body', [
+      'surface',
+      'channel',
+      'target',
+    ]);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;

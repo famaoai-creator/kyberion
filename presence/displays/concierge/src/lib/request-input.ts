@@ -28,10 +28,24 @@ export function optionalRequestString(
   return object[field] as string;
 }
 
+export function requireKnownRequestKeys(
+  object: RequestInputObject,
+  allowedKeys: readonly string[],
+  field = 'request body'
+): void {
+  const allowed = new Set(allowedKeys);
+  const unknown = Object.keys(object).find(
+    (key) =>
+      key === '__proto__' || key === 'constructor' || key === 'prototype' || !allowed.has(key)
+  );
+  if (unknown) throw new RequestInputError(`${field}.${unknown} is not supported`);
+}
+
 /** Read a Concierge JSON body without turning malformed input into an empty request. */
 export async function readRequestObject(
   request: { json: () => Promise<unknown> },
-  field = 'request body'
+  field = 'request body',
+  allowedKeys?: readonly string[]
 ): Promise<RequestObjectResult> {
   let raw: unknown;
   try {
@@ -40,7 +54,9 @@ export async function readRequestObject(
     return { ok: false, error: `${field} must be valid JSON` };
   }
   try {
-    return { ok: true, body: requireRequestObject(raw, field) };
+    const body = requireRequestObject(raw, field);
+    if (allowedKeys) requireKnownRequestKeys(body, allowedKeys, field);
+    return { ok: true, body };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }
