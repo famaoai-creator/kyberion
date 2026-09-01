@@ -1,4 +1,4 @@
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -13,7 +13,6 @@ import {
   safeMkdir,
   safeReaddir,
   safeWriteFile,
-  loadJson,
 } from './secure-io.js';
 
 export type GovernedArtifactRole =
@@ -89,7 +88,7 @@ export function appendGovernedArtifactJsonl(
 export function readGovernedArtifactJson<T>(logicalPath: string): T | null {
   const resolved = resolveGovernedArtifactPath(logicalPath);
   if (!safeExistsSync(resolved)) return null;
-  return loadJson<T>(resolved);
+  return readJson<T>(resolved);
 }
 
 export function listGovernedArtifacts(logicalDir: string): string[] {

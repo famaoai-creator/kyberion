@@ -99,7 +99,7 @@ import {
   safeExistsSync,
   safeLstat,
   safeReadFile,
-  loadJson,
+  readJson as readFoundationJson,
   safeReaddir,
   saveDistillCandidateRecord,
   saveMissionSeedRecord,
@@ -883,7 +883,7 @@ export function readJson<T = unknown>(filePath: string): T | null {
   }
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
   try {
-    return loadJson<T>(safePath);
+    return readFoundationJson<T>(safePath);
   } catch {
     return null;
   }

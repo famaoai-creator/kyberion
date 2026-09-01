@@ -25,13 +25,13 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
-  loadJson,
   safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
@@ -325,7 +325,7 @@ async function runProbe(
       if (!safeExistsSync(file)) return { available: false, reason: `${probe.filename} missing` };
       if (!probe.require_field) return { available: true };
       try {
-        const data = loadJson<unknown>(file);
+        const data = readJson<unknown>(file);
         const value = probe.require_field.path
           .split('.')
           .reduce<any>((acc, key) => (acc != null ? acc[key] : undefined), data);
@@ -682,7 +682,7 @@ function readReceipt(manifestId: string, missionId?: string): SetupReceipt | nul
   const file = receiptPath(manifestId, missionId);
   if (!safeExistsSync(file)) return null;
   try {
-    return loadJson<SetupReceipt>(file);
+    return readJson<SetupReceipt>(file);
   } catch (err: any) {
     logger.warn(`[environment-capability] receipt parse failed: ${err?.message ?? err}`);
     return null;
