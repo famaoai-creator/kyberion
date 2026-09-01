@@ -3,6 +3,8 @@ import { execFileSync } from 'node:child_process';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { safeExistsSync } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { resolveLocale } from './locale.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -60,8 +62,10 @@ export class PythonVoiceBridge implements VoiceBridge {
       const raw = execFileSync(this.pythonBin, [this.voiceBridgePath, payload], {
         encoding: 'utf8',
       });
-      const result = JSON.parse(raw.trim());
-      if (result.status !== 'success' && result.status !== 'ok') return undefined;
+      const result = parseSafeJsonInput(raw.trim(), 'Python voice bridge response');
+      if (!isRecord(result) || (result.status !== 'success' && result.status !== 'ok')) {
+        return undefined;
+      }
       return outputPath;
     } catch {
       return undefined;
