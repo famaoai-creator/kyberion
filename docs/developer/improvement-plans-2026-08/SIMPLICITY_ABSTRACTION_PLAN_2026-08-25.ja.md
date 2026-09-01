@@ -10651,6 +10651,12 @@ Agent Runtime Supervisor daemonのIPC JSONL境界を再監査し、health respon
 
 検証: supervisor daemon **1 file / 10 tests passed**（Unix socket実行のため権限付き環境で確認）、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 153
+
+Mission Controllerのlegacy positional `relationships` JSONを再監査し、直接 `JSON.parse` していた旧CLI経路をshared safe object parserへ移行した。malformed／配列・primitive／nested dangerous keyはrelationshipsの正規化とproject／track補完前に拒否し、named option経路と同じ入力境界へ統一した。既存のpositional tier／tenant／mission metadataとrelationship overlay semanticsは維持した。
+
+検証: mission controller **1 file / 75 tests passed**、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

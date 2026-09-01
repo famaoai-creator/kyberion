@@ -21,6 +21,7 @@ import {
 } from './mission-project-ledger.js';
 import type { MissionRelationships } from './mission-types.js';
 import { currentProcessArgv } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
 
@@ -115,7 +116,7 @@ export function resolveMissionStartCreateInputFromArgv(
   const arg7 = positionalArgs[7];
   const namedStartCreateOptions = extractMissionStartCreateOptionsFromArgv(argv);
   const relationships = normalizeRelationships(
-    JSON.parse(arg7 || '{}'),
+    parseSafeJsonObjectInput(arg7, 'legacy mission relationships') || {},
     namedStartCreateOptions.relationships || {}
   );
   if (relationships?.project?.project_id && !relationships.track?.track_id) {

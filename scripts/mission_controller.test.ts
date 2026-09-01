@@ -553,6 +553,36 @@ describe('mission_controller argument parsing', () => {
         'secret',
       ])
     ).toThrow('mission tier must be one of');
+
+    expect(() =>
+      resolveMissionStartCreateInputFromArgv([
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-BAD-LEGACY-REL',
+        'public',
+        'tenant-a',
+        'operations',
+        'vision',
+        'operator',
+        '{"project":{"__proto__":{"polluted":true}}}',
+      ])
+    ).toThrow('legacy mission relationships contains a dangerous JSON key');
+
+    expect(() =>
+      resolveMissionStartCreateInputFromArgv([
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-BAD-LEGACY-REL-SHAPE',
+        'public',
+        'tenant-a',
+        'operations',
+        'vision',
+        'operator',
+        '[]',
+      ])
+    ).toThrow('legacy mission relationships must be a JSON object');
   });
 
   it('rejects unsupported ticket and work-item dispatch option values', () => {
