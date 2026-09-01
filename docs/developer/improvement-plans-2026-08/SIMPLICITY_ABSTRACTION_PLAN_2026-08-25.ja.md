@@ -10669,6 +10669,12 @@ Marketing video dry-runのcampaign brief／ffprobe外部JSON境界を再監査�
 
 検証: marketing video dry-run **1 file / 3 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 156
+
+Team／Authority role generatorの生成物比較用 `normalize` を再監査し、直接 `JSON.parse` していた比較経路をshared safe object parserへ移行した。malformed／配列・primitive／nested dangerous keyを生成物の同値比較に持ち込まず、generatorの既存render／declared output semanticsは維持した。
+
+検証: team／authority role generator **2 files / 4 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

@@ -22,6 +22,8 @@ describe('sync_team_roles', () => {
     expect(source).toContain('loadTeamRoleSnapshot()');
     expect(source).toContain('defineGenerator');
     expect(source).toContain('runSyncTeamRoles');
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('readJson<');
   });
 
