@@ -341,6 +341,66 @@ export interface AuditEventRow {
   mission_id?: string;
 }
 
+const AUDIT_EVENT_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function isAuditRecord(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.keys(value).every((key) => !AUDIT_EVENT_DANGEROUS_KEYS.has(key));
+}
+
+function auditStringField(
+  event: Record<string, unknown>,
+  primaryKey: string,
+  legacyKey?: string
+): string | undefined {
+  const primary = event[primaryKey];
+  const legacy = legacyKey ? event[legacyKey] : undefined;
+  if (primary !== undefined && typeof primary !== 'string') return undefined;
+  if (legacy !== undefined && typeof legacy !== 'string') return undefined;
+  if (primary !== undefined && legacy !== undefined && primary !== legacy) return undefined;
+  const value = primary ?? legacy;
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function parseAuditEvent(raw: string): AuditEventRow | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isAuditRecord(parsed)) return null;
+
+  const id = auditStringField(parsed, 'id');
+  const timestamp = auditStringField(parsed, 'timestamp');
+  const agentId = auditStringField(parsed, 'agentId', 'agent_id');
+  const action = auditStringField(parsed, 'action');
+  const operation = auditStringField(parsed, 'operation');
+  const result = auditStringField(parsed, 'result');
+  const reason = auditStringField(parsed, 'reason');
+  const tenantSlug = auditStringField(parsed, 'tenantSlug', 'tenant_slug');
+  const missionId = auditStringField(parsed, 'mission_id');
+  const metadata = parsed.metadata;
+  const metadataMissionId = isAuditRecord(metadata)
+    ? auditStringField(metadata, 'mission_id')
+    : undefined;
+
+  if (!id || !timestamp || !action || (parsed.metadata !== undefined && !isAuditRecord(metadata))) {
+    return null;
+  }
+  return {
+    id,
+    timestamp,
+    agentId: agentId || '',
+    action,
+    operation: operation || '',
+    result: result || '',
+    reason,
+    tenantSlug,
+    mission_id: missionId || metadataMissionId,
+  };
+}
+
 export function listRecentAuditEvents(limit = 100): AuditEventRow[] {
   const scope = getTenantScope();
   const auditDir = safeResourcePath(pathResolver.rootResolve('active/audit'));
@@ -360,29 +420,16 @@ export function listRecentAuditEvents(limit = 100): AuditEventRow[] {
     for (const line of txt.split('\n')) {
       const trimmed = line.trim();
       if (!trimmed) continue;
-      let event: any;
-      try {
-        event = JSON.parse(trimmed);
-      } catch {
-        continue;
-      }
-      const tenantSlug = event.tenantSlug || event.tenant_slug;
-      if (scope && tenantSlug && tenantSlug !== scope) continue;
-      // Tenantless events are visible to everyone (cross-tenant tooling).
-      rows.push({
-        id: event.id,
-        timestamp: event.timestamp,
-        agentId: event.agentId || event.agent_id || '',
-        action: event.action,
-        operation: event.operation || '',
-        result: event.result || '',
-        reason: event.reason,
-        tenantSlug,
-        mission_id: event.mission_id || event.metadata?.mission_id,
-      });
+      const event = parseAuditEvent(trimmed);
+      if (!event) continue;
+      // A tenant-scoped viewer must never receive an event without an explicit
+      // tenant; an unscoped viewer is limited to public/tenantless observations.
+      if (scope && (!event.tenantSlug || event.tenantSlug !== scope)) continue;
+      rows.push(event);
     }
   }
-  return rows.slice(-limit).reverse();
+  const boundedLimit = Number.isSafeInteger(limit) && limit > 0 ? limit : 100;
+  return rows.slice(-boundedLimit).reverse();
 }
 
 export interface HealthSummary {
