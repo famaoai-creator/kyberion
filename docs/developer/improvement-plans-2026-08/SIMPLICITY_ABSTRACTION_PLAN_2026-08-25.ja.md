@@ -10999,6 +10999,12 @@ SX-03 の private helper 残差を続けて整理し、egress audit report と O
 
 検証: egress report／OCR／voice-hub／foundation adoption **5 files / 37 tests passed**、root typecheck、catalog integrity、PR scope check、`git diff --check`。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 210
+
+SX-03 の private helper 残差をさらに整理し、native speech／screen display／virtual device／virtual input／desktop event の汎用 `isRecord` を `foundation/text` の canonical helperへ移行した。各 bridge 固有の provider shape、座標範囲、デバイス項目、入力イベントの fail-closed validation は維持し、record判定の重複だけを削除した。
+
+検証: inventory／desktop event／foundation adoption **6 files / 34 tests passed**。残る SX-03 の private `isRecord`／`clamp`／時刻 helper 全件移行、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

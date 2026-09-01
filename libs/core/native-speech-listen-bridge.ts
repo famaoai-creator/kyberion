@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const NATIVE_SPEECH_LISTEN_BRIDGE_ID = 'native-speech-listen-bridge' as const;
 
@@ -21,10 +22,6 @@ export interface NativeSpeechListenResult {
   isFinal?: boolean;
   locale: string;
   deviceId?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeNativeSpeechListenResult(

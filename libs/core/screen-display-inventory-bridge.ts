@@ -1,5 +1,6 @@
 import { safeExecResult } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const SCREEN_DISPLAY_INVENTORY_BRIDGE_ID = 'screen-display-inventory-bridge' as const;
 
@@ -74,10 +75,6 @@ function parseResolution(text: string): { width?: number; height?: number } {
   const width = Number(match[1]);
   const height = Number(match[2]);
   return Number.isFinite(width) && Number.isFinite(height) ? { width, height } : {};
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseSystemProfilerDisplayItems(
