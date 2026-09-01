@@ -12,7 +12,7 @@ import {
 import { resolveIntentTrackGate } from '@agent/core/intent-track-resolver';
 import { saveProjectTrackRecord } from '@agent/core/project-track-registry';
 import { writeIntentGoalHandoff } from '@agent/core/intent-handoff';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   collectMissionHygieneReport,
   formatMissionHygieneLine,
@@ -65,30 +65,36 @@ function parseIntegerArgument(raw: string | undefined, fallback: number, flag: s
 
 function parseJsonRecord(raw: string | undefined, flag: string): Record<string, unknown> {
   if (raw === undefined || raw.trim() === '') return {};
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
+    const parsed = parseSafeJsonInput(raw, flag);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`${flag} must contain a JSON object`);
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('dangerous JSON key')) throw error;
+    if (error instanceof Error && error.message.endsWith('must contain a JSON object')) {
+      throw error;
+    }
     throw new Error(`${flag} must contain valid JSON`);
   }
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`${flag} must contain a JSON object`);
-  }
-  return parsed as Record<string, unknown>;
 }
 
 function parseJsonArray(raw: string | undefined, flag: string): unknown[] {
   if (raw === undefined || raw.trim() === '') return [];
-  let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
-  } catch {
+    const parsed = parseSafeJsonInput(raw, flag);
+    if (!Array.isArray(parsed)) {
+      throw new Error(`${flag} must contain a JSON array`);
+    }
+    return parsed;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('dangerous JSON key')) throw error;
+    if (error instanceof Error && error.message.endsWith('must contain a JSON array')) {
+      throw error;
+    }
     throw new Error(`${flag} must contain valid JSON`);
   }
-  if (!Array.isArray(parsed)) {
-    throw new Error(`${flag} must contain a JSON array`);
-  }
-  return parsed;
 }
 
 type Awaitable<T> = T | Promise<T>;
@@ -374,7 +380,7 @@ function showTerminalOutboxHint(): void {
 function parseRoutingDecision(raw?: string): Record<string, unknown> | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = parseSafeJsonInput(raw, 'routing decision');
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? (parsed as Record<string, unknown>)
       : null;
