@@ -2,6 +2,7 @@ import {
   loadJson,
   appendJsonLine,
   getRegisteredEnv,
+  isRecord,
   parseSafeJsonInput,
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
@@ -113,10 +114,6 @@ const cloudflareOsControlPlane = new CloudflareOsControlPlane();
 
 function resolveServiceRepositoryPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 function isSafeServiceId(value: string): boolean {

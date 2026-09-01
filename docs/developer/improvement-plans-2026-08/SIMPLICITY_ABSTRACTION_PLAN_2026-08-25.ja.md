@@ -11340,6 +11340,17 @@ unknown platform structured error、Prettier、
 `git diff --check`。残る改善計画は Python bridge の全 subprocess 出力 shape、全surfaceの実ブラウザ／
 外部provider実機確認、SX-03〜SX-13 の未完了項目、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 252
+
+SX-03 の foundation helper adoption を再監査し、actuator **15 files** に同型の private
+`isRecord` が残っていたため、canonical `foundation/text` の `isRecord` へ移行した。object／
+array 判定の semantics は維持し、browser／ingest／iOS／media／meeting／orchestrator／process／
+service／system／voice の parser 境界が同じ helper を利用するようにした。
+
+検証: 対象 actuator test、root typecheck、foundation adoption、Prettier、`git diff --check`。
+残る改善計画は追加の private helper／全surfaceの実ブラウザ・外部provider実機確認、SX-04〜SX-14
+の未完了項目、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

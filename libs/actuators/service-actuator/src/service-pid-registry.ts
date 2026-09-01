@@ -1,8 +1,6 @@
-export type ServicePidRegistry = Record<string, number>;
+import { isRecord } from '@agent/core/foundation';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+export type ServicePidRegistry = Record<string, number>;
 
 function isServiceId(value: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value);

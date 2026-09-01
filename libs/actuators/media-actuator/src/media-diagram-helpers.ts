@@ -1,4 +1,5 @@
 import { resolveLatinFontFamily } from '@agent/core/design-fonts';
+import { isRecord } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, loadJson, safeExistsSync } from '@agent/core/secure-io';
 import * as path from 'node:path';
 
@@ -35,10 +36,6 @@ export interface DrawioIconMapResource extends Record<string, unknown> {
 
 export interface DrawioIconMap extends Record<string, unknown> {
   resources: Record<string, DrawioIconMapResource>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function nonEmptyString(value: unknown): value is string {
