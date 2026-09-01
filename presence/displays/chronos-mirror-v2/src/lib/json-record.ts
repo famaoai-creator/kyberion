@@ -1,4 +1,4 @@
-import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, parseSafeJsonObjectInput } from '@agent/core/foundation';
 
 export type JsonRecord = Record<string, unknown>;
 
@@ -11,6 +11,14 @@ export function parseJsonRecord(raw: string): JsonRecord | null {
     return parseSafeJsonObjectInput(raw, 'JSON record') ?? null;
   } catch {
     return null;
+  }
+}
+
+export function parseJsonValue(raw: string): unknown | undefined {
+  try {
+    return parseSafeJsonInput(raw, 'JSON value');
+  } catch {
+    return undefined;
   }
 }
 
