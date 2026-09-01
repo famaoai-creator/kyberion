@@ -4,6 +4,7 @@ import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-
 import { executeServicePreset } from './service-engine.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
   assertSafeRepositoryPath,
@@ -198,14 +199,14 @@ function emailRequestId(value: string): string {
 export function extractFirstJsonBlock(text: string): Record<string, unknown> | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
+  const firstJsonToken = trimmed.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return null;
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidates = fenced ? [fenced[1], trimmed] : [trimmed];
   for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
+      const parsed = parseSafeJsonObjectInput(candidate, 'email JSON block');
+      if (parsed) return parsed;
     } catch (err) {
       logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
     }
@@ -214,10 +215,7 @@ export function extractFirstJsonBlock(text: string): Record<string, unknown> | n
   const last = trimmed.lastIndexOf('}');
   if (first >= 0 && last > first) {
     try {
-      const parsed = JSON.parse(trimmed.slice(first, last + 1));
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>;
-      }
+      return parseSafeJsonObjectInput(trimmed.slice(first, last + 1), 'email JSON block') ?? null;
     } catch (err) {
       logger.warn(`suppressed error in extractFirstJsonBlock: ${err}`);
     }
@@ -715,7 +713,8 @@ export function readGwsAuthStatus(): GwsAuthStatus {
   const checkedAt = new Date().toISOString();
   try {
     const raw = safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }).trim();
-    const parsed = raw ? JSON.parse(raw) : {};
+    const parsed = raw ? parseSafeJsonObjectInput(raw, 'gws auth status') : {};
+    if (!parsed) throw new Error('gws auth status must be a JSON object');
     return {
       ok: true,
       available: true,
