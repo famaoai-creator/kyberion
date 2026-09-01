@@ -34,7 +34,7 @@ import * as path from 'node:path';
 import { z } from 'zod';
 import { getWorkItem } from '@agent/core/work-coordination';
 import { delegateWorkItemWithReasoningBackend } from '@agent/core/reasoning-backend-execution-adapter';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { MeetingFacilitatorPolicy } from '@agent/core/meeting-facilitator-policy';
 
 function writeJSON(rel: string, data: unknown): string {
@@ -142,7 +142,7 @@ function extractFirstJsonBlock(text: string): unknown {
   const trimmed = text.trim();
   // Extract JSON inside a code fence first.
   const fenced = trimmed.match(/```(?:json)?\s*\n([\s\S]*?)\n```/);
-  if (fenced) return JSON.parse(fenced[1]);
+  if (fenced) return parseSafeJsonInput(fenced[1], 'meeting model response');
   // Fallback: locate the first top-level {...} or [...].
   const start = trimmed.search(/[\[{]/);
   if (start === -1) throw new Error('no JSON block in delegateTask response');
@@ -153,7 +153,8 @@ function extractFirstJsonBlock(text: string): unknown {
     if (trimmed[i] === open) depth += 1;
     else if (trimmed[i] === close) {
       depth -= 1;
-      if (depth === 0) return JSON.parse(trimmed.slice(start, i + 1));
+      if (depth === 0)
+        return parseSafeJsonInput(trimmed.slice(start, i + 1), 'meeting model response');
     }
   }
   throw new Error('unbalanced JSON block in delegateTask response');
