@@ -11435,6 +11435,17 @@ resource-boundary テストも canonical reader 名を確認するように更�
 追加の secure-io reader caller／domain-specific helper、全surfaceの実ブラウザ・外部provider実機確認、
 SX-04〜SX-14 の未完了項目、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 260
+
+SX-03 の bounded value helper を再監査し、video visual／motion direction に残っていた単なる引数転送の
+private `clamp*` wrapper を削除して `foundation/text` の canonical `clamp` を直接利用するようにした。
+`clampDuration`／`clampFps`／`clampDimension` のようにドメイン上の範囲名を表す helper は残し、各映像の
+範囲、丸め順序、fallback semantics は変更していない。
+
+検証: video visual／motion direction **2 test files / 27 tests passed**、Prettier、ESLint、
+`git diff --check`。残る改善計画は追加の domain-specific clamp／時刻 helper、SX-04〜SX-14 の未完了項目、
+および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
