@@ -227,7 +227,7 @@ describe('plugin packs (QM-07)', () => {
       const current = String(safeReadFile(importLog, { encoding: 'utf8' }));
       safeWriteFile(
         importLog,
-        `${current}${JSON.stringify([])}\n${JSON.stringify({ ok: true })}\n`
+        `${current}${JSON.stringify([])}\n${JSON.stringify({ ok: true })}\n{"meta":{"__proto__":{}}}\n`
       );
 
       expect(listPackImportRecords(10, registryDir)).toHaveLength(1);
