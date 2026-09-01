@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 const ACTION_FIELDS: Record<string, readonly string[]> = {
   approval_decision: [
     'action',
@@ -73,10 +75,6 @@ export type ChronosIntelligenceAction = keyof typeof ACTION_FIELDS;
 
 export interface ChronosIntelligenceInput extends Record<string, unknown> {
   action: ChronosIntelligenceAction;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function requireString(body: Record<string, unknown>, field: string, options = {}): string {

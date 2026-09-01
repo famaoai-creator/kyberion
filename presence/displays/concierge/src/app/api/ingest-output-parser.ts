@@ -1,13 +1,9 @@
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 
 export interface IngestCliVerdict {
   dry_run?: boolean;
   would_commit?: boolean;
   target_path?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseIngestCliVerdict(stdout: string, marker: string): IngestCliVerdict | null {
