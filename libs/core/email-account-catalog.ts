@@ -41,9 +41,15 @@ export function isGmailAuthStatusReady(raw: string): boolean {
 }
 
 function gmailReady(): boolean {
-  return isGmailAuthStatusReady(
-    safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }) || '{}'
-  );
+  try {
+    return isGmailAuthStatusReady(
+      safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }) || '{}'
+    );
+  } catch {
+    // An optional provider CLI must not make the adapter registry unusable.
+    // The account remains needs_setup until a later readiness probe succeeds.
+    return false;
+  }
 }
 
 export interface EmailAccountDescriptor {

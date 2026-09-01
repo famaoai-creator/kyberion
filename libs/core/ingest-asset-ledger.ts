@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
  *
@@ -167,10 +168,6 @@ function assertAssetRecord(record: IngestAssetRecord): void {
         `deriveAssetId('${record.source_system}', '${record.source_id}') = '${expectedAssetId}'`
     );
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function requiredString(value: unknown): string | null {

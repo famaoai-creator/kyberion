@@ -5,6 +5,7 @@
   "required": ["version", "scenarios"],
   "properties": {
     "$schema": { "type": "string" },
+    "documentation_only": { "type": "boolean" },
     "version": { "type": "string", "minLength": 1 },
     "scenarios": {
       "type": "array",

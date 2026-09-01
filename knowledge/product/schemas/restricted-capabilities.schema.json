@@ -6,6 +6,7 @@
   "additionalProperties": false,
   "required": ["version", "last_updated", "restrictions"],
   "properties": {
+    "$schema": { "type": "string", "format": "uri-reference" },
     "version": { "type": ["string", "number"] },
     "last_updated": { "type": "string", "minLength": 1 },
     "restrictions": {
