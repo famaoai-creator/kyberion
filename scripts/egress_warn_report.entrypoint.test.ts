@@ -14,4 +14,14 @@ describe('egress warn report entrypoint', () => {
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('logger.info(');
   });
+
+  it('uses the foundation record predicate for audit record validation', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/egress_warn_report.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('import { isRecord, parseSafeJsonInput, readJsonLines }');
+    expect(source).not.toContain('function isRecord(');
+  });
 });
