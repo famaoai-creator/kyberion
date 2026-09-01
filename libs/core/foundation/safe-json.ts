@@ -1,5 +1,9 @@
 const JSON_DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+export interface SafeJsonParseOptions {
+  preserveParseError?: boolean;
+}
+
 function isSafeJsonValue(value: unknown): boolean {
   if (Array.isArray(value)) return value.every(isSafeJsonValue);
   if (value === null || typeof value !== 'object') return true;
@@ -8,11 +12,16 @@ function isSafeJsonValue(value: unknown): boolean {
   );
 }
 
-export function parseSafeJsonInput(raw: string, label: string): unknown {
+export function parseSafeJsonInput(
+  raw: string,
+  label: string,
+  options: SafeJsonParseOptions = {}
+): unknown {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
-  } catch {
+  } catch (error) {
+    if (options.preserveParseError) throw error;
     throw new Error(`${label} must be valid JSON`);
   }
   if (!isSafeJsonValue(parsed)) {

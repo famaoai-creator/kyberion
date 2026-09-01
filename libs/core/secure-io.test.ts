@@ -179,6 +179,14 @@ describe('secure-io core', () => {
       expect(loadJson<{ hello: string }>(testFile)).toEqual({ hello: 'world' });
     });
 
+    it('rejects dangerous JSON keys before exposing the parsed value', () => {
+      const testFile = path.join(tmpDir, 'dangerous.json');
+      fs.writeFileSync(testFile, '{"__proto__":{"polluted":true}}');
+
+      expect(() => loadJson(testFile)).toThrow('contains a dangerous JSON key');
+      expect(loadJsonIfPresent(testFile)).toBeNull();
+    });
+
     it('preserves root $schema metadata for catalog read-modify-write flows', () => {
       const testFile = path.join(tmpDir, 'catalog.json');
       fs.writeFileSync(
