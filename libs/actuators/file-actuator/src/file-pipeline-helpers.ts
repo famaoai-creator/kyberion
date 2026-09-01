@@ -1,4 +1,4 @@
-import { loadJson } from '@agent/core/foundation';
+import { loadJson, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -227,7 +227,7 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         async () => safeReadFile(resolveFilePath(String(filePath)), { encoding: 'utf8' }),
         buildRetryOptions()
       );
-      const parsed = JSON.parse(String(rawText));
+      const parsed = parseSafeJsonInput(String(rawText), 'file read_json input');
       return {
         ...ctx,
         [params.export_as || 'last_capture_data']: parsed,
@@ -270,7 +270,12 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
         async () => safeExec('rg', ['--json', String(pattern), targetPath], { encoding: 'utf8' }),
         buildRetryOptions()
       );
-      return { ...ctx, [params.export_as || 'search_results']: JSON.parse(rgOutput) };
+      const results = rgOutput
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => parseSafeJsonInput(line, 'file search result'));
+      return { ...ctx, [params.export_as || 'search_results']: results };
     }
     case 'tail': {
       const filePath = resolve(params.path);
@@ -306,7 +311,10 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
     case 'json_parse':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: JSON.parse(ctx[params.from || 'last_capture']),
+        [params.export_as || 'last_capture_data']: parseSafeJsonInput(
+          String(ctx[params.from || 'last_capture']),
+          'file json_parse input'
+        ),
       };
     case 'path_join':
       return {
@@ -432,7 +440,12 @@ const main = async () => {
   const inputContent = safeReadFile(resolveFilePath(String(argv.input)), {
     encoding: 'utf8',
   }) as string;
-  const result = await handleAction(JSON.parse(inputContent));
+  const result = await handleAction(
+    parseSafeJsonObjectValue(
+      parseSafeJsonInput(inputContent, 'file action input'),
+      'file action input'
+    ) as unknown as FileAction
+  );
   console.log(JSON.stringify(result, null, 2));
 };
 
