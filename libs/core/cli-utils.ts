@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
 import { createAjv } from './foundation/ajv.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { assertCapabilityAllowed } from './capability-restriction-policy.js';
 
 /**
@@ -103,7 +104,7 @@ async function runActuatorServeLoop(opts: {
       if (!line) continue;
       let request: ActuatorServeRequest;
       try {
-        const parsed: unknown = JSON.parse(line);
+        const parsed: unknown = parseSafeJsonInput(line, 'actuator serve request');
         request = normalizeActuatorServeRequest(parsed);
       } catch (err: unknown) {
         emit({ ok: false, error: `invalid JSON request: ${formatUnknownError(err)}` });
@@ -195,7 +196,7 @@ export async function runActuatorCli(opts: {
 
   let input: unknown;
   try {
-    input = JSON.parse(inputContent);
+    input = parseSafeJsonInput(inputContent, `${opts.name} input`);
   } catch (err: any) {
     console.error(`[${opts.name}] invalid JSON input: ${err?.message || err}`);
     throw new Error(`invalid JSON input: ${err?.message || err}`);

@@ -10469,6 +10469,12 @@ native bridge の外部応答を再監査し、Windows local assist、CoreAudio 
 
 検証: native bridge **6 files / 29 tests passed**、typecheck、module-boundaries、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-01 再レビュー修正 123
+
+core の CLI／IPC／provider response を再監査し、actuator serve request、governed command response、actuator serve client、STT response／capabilities、復号済み secret document、peer messaging response が直接 `JSON.parse` されていた残存を safe parser 前段へ移行した。malformed／primitive／配列／nested dangerous key は既存の CLI error／response warning／bridge fallback／secret reject／peer failure path へ閉じ、serve framing、command status、STT schema、暗号 envelope、peer authentication semantics は変更していない。
+
+検証: core CLI／IPC／provider response **7 files / 63 tests passed**（peer HTTP socket テストを含む）、typecheck、Prettier、`git diff --check` を実行済み。canonical full gate はこの記録追加後に再実行する。残る scripts **≤120**、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

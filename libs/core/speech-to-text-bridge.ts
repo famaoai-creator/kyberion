@@ -19,6 +19,7 @@
 import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -205,7 +206,7 @@ function projectStructuredOutput(record: Record<string, unknown>): Partial<Trans
 function parseStructuredOutput(stdout: string): Partial<TranscribeResult> {
   const parseRecord = (candidate: string): Record<string, unknown> | undefined => {
     try {
-      const parsed: unknown = JSON.parse(candidate);
+      const parsed: unknown = parseSafeJsonInput(candidate, 'speech-to-text response');
       return isJsonRecord(parsed) ? parsed : undefined;
     } catch {
       return undefined;
@@ -411,7 +412,10 @@ export function installShellSpeechToTextBridgeIfAvailable(
   let capabilities: SpeechToTextCapabilities | undefined;
   if (env.KYBERION_STT_CAPABILITIES?.trim()) {
     try {
-      const parsed: unknown = JSON.parse(env.KYBERION_STT_CAPABILITIES);
+      const parsed: unknown = parseSafeJsonInput(
+        env.KYBERION_STT_CAPABILITIES,
+        'speech-to-text capabilities'
+      );
       capabilities = parseSpeechToTextCapabilities(parsed);
       if (!capabilities) {
         logger.warn('[stt-bridge] ignored invalid KYBERION_STT_CAPABILITIES shape');

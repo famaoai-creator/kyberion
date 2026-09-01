@@ -9,6 +9,7 @@ import { defineCatalog, type GovernedCatalog } from './foundation/governed-catal
 import { readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
@@ -827,7 +828,7 @@ function parseRequestBody(
       settled = true;
       try {
         const raw = Buffer.concat(chunks).toString('utf8').trim();
-        resolve(raw ? JSON.parse(raw) : {});
+        resolve(raw ? parseSafeJsonInput(raw, 'peer response') : {});
       } catch (error) {
         reject(error);
       }
@@ -1103,7 +1104,9 @@ export async function sendPeerMessage<TPayload>(
   try {
     const response = await request;
     const text = await response.text();
-    const payload = parsePeerDispatchResponse(text ? JSON.parse(text) : {});
+    const payload = parsePeerDispatchResponse(
+      text ? parseSafeJsonInput(text, 'peer dispatch response') : {}
+    );
     if (response.ok) {
       recordOutbox(envelope.tenant_id, outboxPeerId, envelope, destinationUrl, 'sent', payload);
     } else {

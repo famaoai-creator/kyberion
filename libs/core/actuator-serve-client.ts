@@ -17,6 +17,7 @@ import { ACTUATOR_SERVE_RESULT_PREFIX } from './cli-utils.js';
 import { logger } from './core.js';
 import { rootResolve } from './path-resolver.js';
 import { buildSafeExecEnv } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export interface ActuatorServeClientOptions {
   /** Full argv of the serve-mode actuator, e.g. ['node', 'dist/.../index.js', '--serve']. */
@@ -185,7 +186,7 @@ export class ActuatorServeClient {
   private handleResponseLine(json: string): void {
     let parsed: ActuatorServeResponse;
     try {
-      const value: unknown = JSON.parse(json);
+      const value: unknown = parseSafeJsonInput(json, `${this.label || 'actuator'} response`);
       parsed = normalizeActuatorServeResponse(value);
     } catch (err) {
       logger.warn(
