@@ -14,6 +14,7 @@ import {
 } from './work-design.js';
 import { resolveWorkScopeSignalOptions } from './work-scope-decision.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import {
   resolveCapabilityBundleForIntent,
@@ -318,14 +319,14 @@ function extractJsonObject(text: string): string | null {
   return text.slice(start, end + 1);
 }
 
-function parseJsonObject(text: string): Record<string, unknown> | null {
-  const json = extractJsonObject(text.trim());
+export function parseIntentModelJsonObject(text: string): Record<string, unknown> | null {
+  const trimmed = text.trim();
+  const firstJsonToken = trimmed.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return null;
+  const json = extractJsonObject(trimmed);
   if (!json) return null;
   try {
-    const parsed: unknown = JSON.parse(json);
-    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
+    return parseSafeJsonObjectInput(json, 'intent model response') ?? null;
   } catch {
     return null;
   }
@@ -1158,7 +1159,7 @@ async function compileExecutionBriefWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildExecutionBriefPrompt(input));
-  const parsed = parseJsonObject(raw);
+  const parsed = parseIntentModelJsonObject(raw);
   return parsed ? normalizeExecutionBrief(parsed, toExecutionBriefSeed(input)) : null;
 }
 
@@ -1170,7 +1171,7 @@ async function compileIntentContractWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildIntentContractPrompt(input, executionBrief));
-  const parsed = parseJsonObject(raw);
+  const parsed = parseIntentModelJsonObject(raw);
   if (!parsed) return null;
   const result = validateIntentContract(parsed);
   if (!result.valid) return null;
@@ -1189,7 +1190,7 @@ async function compileWorkLoopWithLlm(
   const ask =
     options.askFn || ((prompt: string) => defaultAsk(prompt, { model_tier: options.model_tier }));
   const raw = await ask(buildWorkLoopPrompt(input, executionBrief, contract));
-  const parsed = parseJsonObject(raw);
+  const parsed = parseIntentModelJsonObject(raw);
   if (!parsed) return null;
   const result = validateWorkLoop(parsed);
   if (!result.valid) return null;
