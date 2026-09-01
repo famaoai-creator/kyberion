@@ -1,5 +1,6 @@
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
+import { clamp } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import {
   resolveDefaultScheduleSource,
@@ -163,16 +164,14 @@ export function buildContextualIntentFrame(sourceText: string): ContextualIntent
   if (action === 'read') assumptions.push('Do not mutate the calendar.');
   if (selected) assumptions.push(`Prefer ${selected} as the source binding.`);
 
-  const confidence = Math.min(
-    0.98,
-    Math.max(
-      0.42,
-      scoreActionConfidence(action) * 0.3 +
-        scoreObjectConfidence(object) * 0.25 +
-        scoreSubjectConfidence(subject) * 0.2 +
-        dateRangeConfidence * 0.15 +
-        selectedConfidence * 0.1
-    )
+  const confidence = clamp(
+    scoreActionConfidence(action) * 0.3 +
+      scoreObjectConfidence(object) * 0.25 +
+      scoreSubjectConfidence(subject) * 0.2 +
+      dateRangeConfidence * 0.15 +
+      selectedConfidence * 0.1,
+    0.42,
+    0.98
   );
 
   return {

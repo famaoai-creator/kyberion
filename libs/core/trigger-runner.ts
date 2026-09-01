@@ -11,6 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { clamp } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
@@ -430,9 +431,10 @@ export class TriggerRunner {
     );
     this.now = options.now || (() => new Date());
     this.claimLeaseMs = Math.max(1000, options.claimLeaseMs ?? DEFAULT_CLAIM_LEASE_MS);
-    this.maxStoreBytes = Math.max(
+    this.maxStoreBytes = clamp(
+      options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES,
       64 * 1024,
-      Math.min(options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES, MAX_STORE_BYTES)
+      MAX_STORE_BYTES
     );
     this.authorityResolver = options.authorityResolver || resolveGovernedAuthority;
     this.lockId = `trigger-store-${createHash('sha256')
