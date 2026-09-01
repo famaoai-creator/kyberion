@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { rootDir } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 export { registerLockIo } from './src/lock-utils.js';
@@ -65,10 +66,6 @@ export interface AuditEntry {
   chain_key_id?: string;
   previousHash: string;
   currentHash: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function persistedString(
