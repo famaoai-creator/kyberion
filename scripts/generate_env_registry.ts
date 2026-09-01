@@ -199,6 +199,33 @@ export function classifyEnvName(name: string): { category: EnvCategory; type: En
   return { category: 'runtime', type: 'string' };
 }
 
+function humanizeEnvName(name: string): string {
+  return name
+    .replace(/^KYBERION_/, '')
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function describeDiscoveredEnv(name: string, category: EnvCategory): string {
+  const subject = humanizeEnvName(name);
+  switch (category) {
+    case 'path':
+      return `Optional path override for ${subject}; keep it inside governed repository or runtime storage.`;
+    case 'tuning':
+      return `Optional numeric tuning value for ${subject}; leave unset to use the governed default.`;
+    case 'runtime':
+      return `Optional runtime setting for ${subject}; leave unset to use the built-in configuration.`;
+    case 'provider':
+      return `Optional provider setting for ${subject}; use only an endpoint or executable allowed by the active policy.`;
+    case 'flag':
+      return `Optional feature flag for ${subject}; enable it only for the explicitly intended operation.`;
+    case 'secret':
+      return `Secret value for ${subject}; store it in the governed secret store and never commit the value.`;
+  }
+}
+
 export function discoverEnvNames(rootDir: string): string[] {
   const names = new Set<string>();
   for (const root of SCAN_ROOTS) {
@@ -238,8 +265,20 @@ export function mergeRegistry(
     const { category, type } = classifyEnvName(name);
     if (current) {
       // Curated entries are preserved verbatim; undocumented ones track the
-      // classifier so auto fields never go stale.
-      return current.documented ? { ...current, name } : { ...current, name, category, type };
+      // classifier so auto fields never go stale. Existing discovery entries
+      // are promoted once they have a safe, category-specific explanation;
+      // newly discovered names remain undocumented until an operator reviews
+      // them in the registry.
+      return current.documented
+        ? { ...current, name }
+        : {
+            ...current,
+            name,
+            category,
+            type,
+            description: current.description || describeDiscoveredEnv(name, category),
+            documented: true,
+          };
     }
     return {
       name,
