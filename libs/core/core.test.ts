@@ -124,6 +124,7 @@ describe('core library bundle', () => {
     it('should parse JSON safely or throw', () => {
       expect((safeJsonParse('{"a":1}', 'test') as any).a).toBe(1);
       expect(() => safeJsonParse('invalid', 'test')).toThrow('Invalid test');
+      expect(() => safeJsonParse('{"__proto__":{"x":1}}', 'test')).toThrow('Invalid test');
     });
 
     it('should detect missing arguments', () => {

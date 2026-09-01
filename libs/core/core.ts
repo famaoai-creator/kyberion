@@ -1,4 +1,5 @@
 import * as path from 'node:path';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
@@ -183,7 +184,8 @@ export const sre = {
 
     if (rawExistsSync(sigPath)) {
       try {
-        const signatures = JSON.parse(rawReadTextFile(sigPath));
+        const signatures = parseSafeJsonInput(rawReadTextFile(sigPath), 'error signatures');
+        if (!Array.isArray(signatures)) throw new Error('error signatures must be an array');
         for (const sig of signatures) {
           const regex = new RegExp(sig.pattern, 'i');
           if (regex.test(errorMessage)) {
@@ -282,7 +284,12 @@ export class Cache {
 
       if (rawExistsSync(diskPath)) {
         try {
-          const diskEntry = JSON.parse(rawReadTextFile(diskPath));
+          const diskEntry = parseSafeJsonInput(rawReadTextFile(diskPath), 'cache entry') as {
+            h?: string;
+            value: unknown;
+            timestamp: number;
+            ttl: number;
+          };
           if (diskEntry.h) {
             const actualHash = this._generateHash(diskEntry.value);
             if (actualHash !== diskEntry.h) {
@@ -436,7 +443,7 @@ export const fileUtils = {
       if (cached && cached.mtimeMs === mtimeMs) return cached.data;
 
       const content = rawReadTextFile(resolved);
-      const data = JSON.parse(content);
+      const data = parseSafeJsonInput(content, `file ${filePath}`);
       if (stat.size < 5 * 1024 * 1024) {
         const persistCache = resolved.startsWith(pathResolver.knowledge('product/orchestration/'));
         _fileCache.set(resolved, { mtimeMs, data }, undefined, persistCache);
