@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import type { GovernedCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
 
@@ -297,7 +298,7 @@ export async function generateVideoVisualDirection(
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'video visual direction response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }
