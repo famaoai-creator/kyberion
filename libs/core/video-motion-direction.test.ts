@@ -216,4 +216,15 @@ describe('generateVideoMotionDirection', () => {
     });
     expect(direction.scenes).toHaveLength(3);
   });
+
+  it('degrades when a model reply contains a dangerous JSON key', async () => {
+    const direction = await generateVideoMotionDirection({
+      title: 'T',
+      story: 'S',
+      scenes: SCENES,
+      generate: async () => '{"scenes":[],"meta":{"__proto__":{}}}',
+    });
+    expect(direction.resolution?.degraded).toBe(true);
+    expect(direction.scenes).toHaveLength(3);
+  });
 });

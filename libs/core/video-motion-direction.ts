@@ -2,6 +2,7 @@ import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
@@ -537,7 +538,7 @@ export async function generateVideoMotionDirection(
     const jsonText = rawReply.slice(rawReply.indexOf('{'), rawReply.lastIndexOf('}') + 1);
     let parsed: any;
     try {
-      parsed = JSON.parse(jsonText);
+      parsed = parseSafeJsonInput(jsonText, 'video motion direction response');
     } catch {
       parsed = tryRepairJson(jsonText);
     }
