@@ -480,6 +480,21 @@ export const presenceStudioVoiceMinutesSchema = z
   })
   .strict();
 
+export const presenceStudioMinutesSessionStartSchema = z
+  .object({
+    missionId: z.string().trim().min(1, 'missionId is required').max(128),
+    title: z.string().trim().min(1).max(200).optional(),
+    language: z.string().trim().min(1).max(32).optional(),
+    device: z.string().trim().min(1).max(256).optional(),
+  })
+  .strict();
+
+export const presenceStudioVoiceStopSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+
 export const presenceStudioLocationSchema = z
   .object({
     latitude: z.number().finite().min(-90).max(90),
