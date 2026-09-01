@@ -1,6 +1,7 @@
 import * as yaml from 'js-yaml';
 import * as Papa from 'papaparse';
 import * as path from 'node:path';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
  * Data Utils Core Library.
@@ -19,7 +20,7 @@ export function detectFormat(filePath: string): DataFormat {
 
 export function parseData(content: string, format: DataFormat): any {
   try {
-    if (format === 'json') return JSON.parse(content);
+    if (format === 'json') return parseSafeJsonInput(content, 'data');
     if (format === 'yaml') return yaml.load(content);
     if (format === 'csv') {
       const results = Papa.parse(content, { header: true, skipEmptyLines: true });

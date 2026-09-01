@@ -37,6 +37,7 @@ import {
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -784,7 +785,7 @@ function enforceManifestSignature(manifest: EnvironmentManifest): void {
 }
 
 function parseEnvironmentManifest(raw: string, expectedId: string): EnvironmentManifest {
-  const value: unknown = JSON.parse(raw);
+  const value: unknown = parseSafeJsonInput(raw, 'environment manifest');
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('[environment-capability] manifest must be a JSON object');
   }
