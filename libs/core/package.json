@@ -139,6 +139,10 @@
       "types": "./dist/computer-surface.d.ts",
       "default": "./dist/computer-surface.js"
     },
+    "./dashboard-event-parser": {
+      "types": "./dist/dashboard-event-parser.d.ts",
+      "default": "./dist/dashboard-event-parser.js"
+    },
     "./artifact-store": {
       "types": "./dist/artifact-store.d.ts",
       "default": "./dist/artifact-store.js"
