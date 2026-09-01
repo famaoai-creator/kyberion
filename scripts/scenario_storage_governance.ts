@@ -15,6 +15,7 @@ import { createProcessLogger } from '@agent/core/process-logger';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 function hr(label: string) {
@@ -194,7 +195,11 @@ if (safeExistsSync(sharedLogsProcess('scenario-daemon.log'))) {
     `process log written: ${lines.length} entries at active/shared/logs/process/scenario-daemon.log`
   );
   for (const line of lines) {
-    const entry = JSON.parse(line);
+    const entry = parseSafeJsonInput(line, 'scenario process log entry') as {
+      level?: string;
+      msg?: string;
+      meta?: unknown;
+    };
     info(`  [${entry.level}] ${entry.msg}${entry.meta ? ' ' + JSON.stringify(entry.meta) : ''}`);
   }
 } else {
