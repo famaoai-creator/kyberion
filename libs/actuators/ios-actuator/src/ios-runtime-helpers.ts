@@ -12,7 +12,7 @@ import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry } from '@agent/core/async-utils';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -62,10 +62,6 @@ interface SimctlDevice {
   state: string;
   isAvailable?: boolean;
   runtime: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export async function executePipeline(

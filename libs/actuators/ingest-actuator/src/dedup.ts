@@ -21,7 +21,7 @@ import {
   safeMkdir,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -69,10 +69,6 @@ function assertTargetPath(targetPath: string | undefined): void {
     throw new Error('ingest:dedup — target_path must be repository-relative');
   }
   assertSafeRepositoryPath(pathResolver.rootResolve(targetPath), { allowMissingLeaf: true });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isSha256(value: unknown): value is string {

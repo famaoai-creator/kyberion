@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 export interface ActuatorRequestArchetype {
   id: string;
   trigger_keywords: string[];
@@ -11,10 +13,6 @@ export interface ActuatorRequestArchetype {
 export interface ActuatorRequestArchetypeCatalog {
   default_archetype: string;
   archetypes: ActuatorRequestArchetype[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isNonEmptyString(value: unknown): value is string {

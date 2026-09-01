@@ -1,6 +1,6 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { loadJson } from '@agent/core/foundation';
+import { isRecord, loadJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -19,10 +19,6 @@ export interface PasskeyProviderPreset {
 export interface PasskeyProviderCatalog {
   default_provider?: string;
   providers: Record<string, PasskeyProviderPreset>;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
 }
 
 function isSafeProviderKey(key: string): boolean {

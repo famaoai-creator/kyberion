@@ -1,10 +1,8 @@
+import { isRecord } from '@agent/core/foundation';
+
 export interface ChromeCdpVersionResponse {
   browser?: string;
   webSocketDebuggerUrl?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function nonEmptyString(value: unknown): string | undefined {

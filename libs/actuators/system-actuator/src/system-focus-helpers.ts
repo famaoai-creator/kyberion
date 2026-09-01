@@ -6,7 +6,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { activateApplication, detectFocusedInput } from '@agent/core/os-automation';
 
@@ -28,10 +28,6 @@ export interface FocusTargetRecord {
 }
 
 export type FocusTargetStore = Record<string, FocusTargetRecord>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-}
 
 function isSafeStoreKey(key: string): boolean {
   return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';

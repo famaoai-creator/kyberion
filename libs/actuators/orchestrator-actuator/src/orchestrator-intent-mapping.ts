@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 export interface IntentMappingEntry {
   name: string;
   trigger_phrases: string[];
@@ -6,10 +8,6 @@ export interface IntentMappingEntry {
 
 export interface IntentMapping {
   intents: IntentMappingEntry[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function nonEmptyString(value: unknown): value is string {
