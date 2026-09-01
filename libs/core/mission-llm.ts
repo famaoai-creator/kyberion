@@ -8,6 +8,7 @@ import * as customerResolver from './customer-resolver.js';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeExec } from './secure-io.js';
 import { runCodexCliQuery } from './codex-cli-query.js';
@@ -388,7 +389,9 @@ export function parseLlmResponse(raw: string, responseFormat?: string): any {
 
   let content: string;
   if (format === 'json_envelope') {
-    const envelope = JSON.parse(raw);
+    const envelope = parseSafeJsonInput(raw, 'mission LLM envelope') as {
+      result?: unknown;
+    };
     content =
       typeof envelope.result === 'string' ? envelope.result : JSON.stringify(envelope.result);
   } else {
@@ -396,17 +399,17 @@ export function parseLlmResponse(raw: string, responseFormat?: string): any {
   }
 
   try {
-    return JSON.parse(content);
+    return parseSafeJsonInput(content, 'mission LLM response');
   } catch (err) {
     logger.warn(`[mission-llm] suppressed error in parseLlmResponse: ${err}`);
   }
 
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (jsonMatch) {
-    return JSON.parse(jsonMatch[1].trim());
+    return parseSafeJsonInput(jsonMatch[1].trim(), 'mission LLM fenced response');
   }
 
-  return JSON.parse(content.trim());
+  return parseSafeJsonInput(content.trim(), 'mission LLM response');
 }
 
 function isQuotaError(err: any): boolean {

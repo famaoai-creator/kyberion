@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { recordEstimatedCliUsage } from './cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildProviderChildEnv,
   resolveActiveProviderPermissionArgs,
@@ -258,8 +259,12 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
     try {
-      const cliResult = JSON.parse(cleanStdout);
-      return (cliResult.response || stdout).trim();
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
+      const response = typeof cliResult.response === 'string' ? cliResult.response : undefined;
+      return (response || stdout).trim();
     } catch (_) {
       return stdout.trim();
     }
@@ -296,7 +301,7 @@ export class GeminiCliBackend implements ReasoningBackend {
 
     let cliResult: any;
     try {
-      cliResult = JSON.parse(cleanStdout);
+      cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response');
     } catch (err: any) {
       throw new Error(
         `[gemini-cli] failed to parse CLI JSON output: ${err.message}. Raw: ${cleanStdout.slice(0, 500)}`
@@ -316,7 +321,7 @@ export class GeminiCliBackend implements ReasoningBackend {
     const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
 
     try {
-      const structured = JSON.parse(cleanJson);
+      const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
       const parsed = params.schema.safeParse(structured);
       if (!parsed.success) {
         throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
@@ -348,15 +353,17 @@ export class GeminiCliBackend implements ReasoningBackend {
     }
     const cleanStdout = lines.slice(jsonStartIdx).join('\n');
     try {
-      const cliResult = JSON.parse(cleanStdout);
+      const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+        response?: unknown;
+        error?: unknown;
+      };
       if (cliResult.error) {
         throw new Error(`[gemini-cli] CLI returned error: ${JSON.stringify(cliResult.error)}`);
       }
-      const responseStr: string | undefined = cliResult.response;
-      if (responseStr === undefined || responseStr === null) {
+      if (typeof cliResult.response !== 'string') {
         throw new Error('[gemini-cli] CLI result missing "response" field');
       }
-      return responseStr.trim() || stdout.trim();
+      return cliResult.response.trim() || stdout.trim();
     } catch (err: any) {
       if (err.message.startsWith('[gemini-cli]')) throw err;
       return stdout.trim();
@@ -490,16 +497,18 @@ export async function runGeminiCliQuery<T>(params: {
     throw new Error(`[gemini-cli] could not find JSON in stdout: ${stdout}`);
   }
   const cleanStdout = lines.slice(jsonStartIdx).join('\n');
-  const cliResult = JSON.parse(cleanStdout);
-  const responseStr = cliResult.response;
-  if (!responseStr) {
+  const cliResult = parseSafeJsonInput(cleanStdout, 'Gemini CLI response') as {
+    response?: unknown;
+  };
+  if (typeof cliResult.response !== 'string' || !cliResult.response) {
     throw new Error(
       `[gemini-cli] CLI result missing 'response' field: ${JSON.stringify(cliResult)}`
     );
   }
+  const responseStr = cliResult.response;
   const jsonMatch = responseStr.match(/```json\n([\s\S]*?)\n```/) || responseStr.match(/{[\s\S]*}/);
   const cleanJson = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseStr;
-  const structured = JSON.parse(cleanJson);
+  const structured = parseSafeJsonInput(cleanJson, 'Gemini CLI structured response');
   const parsed = params.schema.safeParse(structured);
   if (!parsed.success) {
     throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);

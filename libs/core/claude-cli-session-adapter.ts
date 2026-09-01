@@ -30,6 +30,7 @@
 
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { childDelegationEnv } from './operation-policy-gate.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   buildProviderChildEnv,
   type ProviderPermissionProfileName,
@@ -467,7 +468,7 @@ export class ClaudeCliSessionAdapter {
   private consumeMessage(line: string): void {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(line);
+      parsed = parseSafeJsonInput(line, 'Claude CLI session response');
     } catch {
       // Non-protocol noise on stdout is not fatal on its own; a turn that
       // never reaches a `result` still fails closed on its own budget.
