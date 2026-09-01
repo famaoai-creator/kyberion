@@ -309,3 +309,9 @@ Concierge setup の JSON／multipart 境界を再監査し、action ごとの未
 Concierge の voice/listen-once proxy を再監査し、backend／device／locale の型検証はあるものの未知 JSON field を受理して voice-hub 呼び出しへ進める残存を検出した。共通 request key guard を接続し、許可された3 field 以外を外部接続前に 400 で拒否するようにした。既存のtrim、既定locale、voice-hub response parser、Tier-0 fallback semantics は変更していない。
 
 検証: Concierge listen-once **1 file / 6 tests passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 26
+
+Concierge の config-missions プリセット読込を再監査し、repository-local JSON を `JSON.parse` 後に domain parser へ渡していた残存を検出した。共有 `parseSafeJsonInput` を preset read 前へ接続し、malformed／primitive／配列／nested dangerous key を既存の unreadable preset skip へ閉じた。preset の一覧・入力 spec・draft creation semantics は変更していない。
+
+検証: Concierge config-missions resource boundary **1 file / 1 test passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

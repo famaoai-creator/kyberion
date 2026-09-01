@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
-import { loadJson } from '@agent/core/foundation';
+import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -76,7 +76,9 @@ function readPresets(): PresetSummary[] {
       });
       if (!safeExistsSync(presetPath) || !safeLstat(presetPath).isFile()) continue;
       const raw = safeReadFile(presetPath, { encoding: 'utf8' }) as string;
-      const parsed = parseConfigMissionPreset(JSON.parse(raw));
+      const parsed = parseConfigMissionPreset(
+        parseSafeJsonInput(raw, `config mission preset ${name}`)
+      );
       if (!parsed) continue;
       presets.push({
         ...parsed,
