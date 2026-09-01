@@ -34,6 +34,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { truncateNormalizedText } from './foundation/text.js';
 import { assertProjectTrustApproval } from './project-trust.js';
 import { isBuiltinPipelineResource } from './trust-requiring-resources.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { ValidationResult } from './types.js';
 
 export interface AdfRepairResult {
@@ -102,7 +103,7 @@ export async function validateAndRepairAdf(
   const content = safeReadFile(repairPath, { encoding: 'utf8' }) as string;
   let parsed: any;
   try {
-    parsed = JSON.parse(content);
+    parsed = parseSafeJsonInput(content, 'ADF input');
   } catch (err: any) {
     // 1. Try lightweight structural repair before escalating to the LLM subagent
     const lightweight = tryRepairJson(content);
@@ -416,7 +417,7 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     }
     let updatedParsed: any;
     try {
-      updatedParsed = JSON.parse(updatedContent);
+      updatedParsed = parseSafeJsonInput(updatedContent, 'ADF repair output');
     } catch {
       // Last-chance repair on what the sub-agent wrote
       const recovered = tryRepairJson(updatedContent);
