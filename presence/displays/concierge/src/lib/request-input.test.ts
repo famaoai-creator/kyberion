@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { readRequestObject, requireKnownRequestKeys, requireRequestObject } from './request-input';
+import {
+  readRequestObject,
+  requireKnownFormKeys,
+  requireKnownRequestKeys,
+  requireRequestObject,
+} from './request-input';
 
 describe('readRequestObject', () => {
   it.each([
@@ -40,5 +45,23 @@ describe('readRequestObject', () => {
     expect(() =>
       requireKnownRequestKeys({ decision: 'approved', constructor: 'bad' }, ['decision'], 'body')
     ).toThrow('body.constructor is not supported');
+  });
+
+  it('rejects unknown and duplicate multipart keys', () => {
+    const form = new FormData();
+    form.set('action', 'avatar');
+    form.set('file', new File(['avatar'], 'avatar.png'));
+    expect(() => requireKnownFormKeys(form, ['action', 'file'])).not.toThrow();
+
+    form.set('redirect', 'https://example.test');
+    expect(() => requireKnownFormKeys(form, ['action', 'file'])).toThrow(
+      'form body.redirect is not supported'
+    );
+
+    form.delete('redirect');
+    form.append('action', 'avatar');
+    expect(() => requireKnownFormKeys(form, ['action', 'file'])).toThrow(
+      'form body.action must appear once'
+    );
   });
 });

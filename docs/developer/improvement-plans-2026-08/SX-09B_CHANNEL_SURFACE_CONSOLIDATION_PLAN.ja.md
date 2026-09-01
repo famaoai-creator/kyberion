@@ -297,3 +297,9 @@ Concierge の JSON mutation route 群を再監査し、root object だけを検�
 Concierge の契約テストを現行 `ConversationMessageResponse.reply` 契約と照合し、旧 `replyText` を要求する stale assertion が package-local test を失敗させていたため修正した。併せて共通 JSON key guard に `__proto__`／`constructor`／`prototype` の明示的な拒否を追加し、許可キー検証を prototype-shaped key に対しても fail-closed にした。会話 payload の canonical field と既存の返信 semantics は変更していない。
 
 検証: Concierge contract **1 file / 23 tests passed**、request input等 **4 files / 21 tests passed**、変更対象 Prettier、root typecheck、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 24
+
+Concierge setup の JSON／multipart 境界を再監査し、action ごとの未知 root field、tenant／agent の未知 nested field、FormData の未知／重複 field が設定書き込み前に無視される残存を検出した。共通 JSON／FormData key guard を接続し、`save_management`／`apply_onboarding` と avatar／voice sample の許可 field だけを受理するようにした。既存の型検証、profile／tenant／agent の governed write、onboarding draft semantics は変更していない。
+
+検証: Concierge setup input／request input **2 files / 17 tests passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

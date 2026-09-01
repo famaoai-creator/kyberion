@@ -41,6 +41,20 @@ export function requireKnownRequestKeys(
   if (unknown) throw new RequestInputError(`${field}.${unknown} is not supported`);
 }
 
+export function requireKnownFormKeys(
+  form: FormData,
+  allowedKeys: readonly string[],
+  field = 'form body'
+): void {
+  const allowed = new Set(allowedKeys);
+  const seen = new Set<string>();
+  for (const key of form.keys()) {
+    if (!allowed.has(key)) throw new RequestInputError(`${field}.${key} is not supported`);
+    if (seen.has(key)) throw new RequestInputError(`${field}.${key} must appear once`);
+    seen.add(key);
+  }
+}
+
 /** Read a Concierge JSON body without turning malformed input into an empty request. */
 export async function readRequestObject(
   request: { json: () => Promise<unknown> },
