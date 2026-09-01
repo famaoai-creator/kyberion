@@ -16,7 +16,7 @@ function question(rl: readline.Interface, query: string): Promise<string> {
 
 function printUsage(): void {
   console.log(chalk.bold.cyan('\n📦 [KYBERION] Interactive Skill Installer\n'));
-  console.log('Usage: pnpm skill:install <bundle-id>');
+  console.log('Usage: pnpm kyberion skill install <bundle-id>');
 }
 
 async function installPackage(type: 'brew' | 'pip', name: string): Promise<boolean> {

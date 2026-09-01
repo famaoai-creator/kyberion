@@ -34,7 +34,7 @@ This is the procedure behind the `live-voice` intent and its default execution p
 ## CLI
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --session-id user-voice-live \
   --audio active/shared/tmp/live/user-turn-01.wav \
   --profile-id your-active-voice-profile \
@@ -59,7 +59,7 @@ pnpm meeting:consent grant --mission MSN-LIVE-VOICE-001
 ```
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --interactive \
   --session-id user-voice-live \
   --profile-id your-active-voice-profile \
@@ -112,7 +112,7 @@ the `mlx_audio_qwen3` learned-voice engine therefore uses WAV on macOS.
 The legacy fixed-duration recorder remains available as a fallback:
 
 ```bash
-pnpm voice:conversation:turn \
+pnpm kyberion voice conversation-turn \
   --interactive \
   --recorder fixed \
   --record-seconds 8 \

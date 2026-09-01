@@ -629,7 +629,7 @@
     },
     {
       "id": "script.audit.mirror-reconcile",
-      "script": "audit:mirror-reconcile",
+      "module": "scripts/audit_mirror_reconcile.ts",
       "command": "audit mirror-reconcile",
       "noun": "audit",
       "verb": "mirror-reconcile",
@@ -661,7 +661,7 @@
     },
     {
       "id": "script.service.harness",
-      "script": "service:harness",
+      "module": "scripts/service_harness.ts",
       "command": "service harness",
       "noun": "service",
       "verb": "harness",
@@ -669,7 +669,7 @@
     },
     {
       "id": "script.check.chronos-perf",
-      "script": "check:chronos-perf",
+      "module": "scripts/check_chronos_perf_baseline.ts",
       "command": "check chronos-perf",
       "noun": "check",
       "verb": "chronos-perf",
@@ -677,7 +677,7 @@
     },
     {
       "id": "script.service.recording",
-      "script": "service:recording",
+      "module": "scripts/service_recording.ts",
       "command": "service recording",
       "noun": "service",
       "verb": "recording",
@@ -725,7 +725,7 @@
     },
     {
       "id": "script.sync.component-inventory",
-      "script": "sync:component-inventory",
+      "module": "scripts/sync_component_inventory.ts",
       "command": "sync component-inventory",
       "noun": "sync",
       "verb": "component-inventory",
@@ -733,7 +733,7 @@
     },
     {
       "id": "script.sync.model-registry",
-      "script": "sync:model-registry",
+      "module": "scripts/sync_model_registry.ts",
       "command": "sync model-registry",
       "noun": "sync",
       "verb": "model-registry",
@@ -789,7 +789,7 @@
     },
     {
       "id": "script.knowledge.rank",
-      "script": "knowledge:rank",
+      "module": "scripts/context_ranker.ts",
       "command": "knowledge rank",
       "noun": "knowledge",
       "verb": "rank",
@@ -813,7 +813,7 @@
     },
     {
       "id": "script.knowledge.scope-health",
-      "script": "knowledge:scope-health",
+      "module": "scripts/watch_knowledge_scope_health.ts",
       "command": "knowledge scope-health",
       "noun": "knowledge",
       "verb": "scope-health",
@@ -845,7 +845,7 @@
     },
     {
       "id": "script.generate.capability-seams",
-      "script": "generate:capability-seams",
+      "module": "scripts/generate_capability_seams.ts",
       "command": "generate capability-seams",
       "noun": "generate",
       "verb": "capability-seams",
@@ -885,7 +885,7 @@
     },
     {
       "id": "script.pr.create",
-      "script": "pr:create",
+      "module": "scripts/publish_pull_request.ts",
       "command": "pr create",
       "noun": "pr",
       "verb": "create",
@@ -925,7 +925,7 @@
     },
     {
       "id": "script.task.smoke",
-      "script": "task:smoke",
+      "module": "scripts/task_smoke.ts",
       "command": "task smoke",
       "noun": "task",
       "verb": "smoke",
@@ -997,7 +997,7 @@
     },
     {
       "id": "script.smoke.intent",
-      "script": "smoke:intent",
+      "module": "scripts/intent_smoke.ts",
       "command": "smoke intent",
       "noun": "smoke",
       "verb": "intent",
@@ -1021,7 +1021,7 @@
     },
     {
       "id": "script.patch.dependency",
-      "script": "patch:dependency",
+      "module": "scripts/apply_dependency_patch.ts",
       "command": "patch dependency",
       "noun": "patch",
       "verb": "dependency",
@@ -1069,7 +1069,7 @@
     },
     {
       "id": "script.mesh.deliver",
-      "script": "mesh:deliver",
+      "module": "scripts/mesh_delivery_driver.ts",
       "command": "mesh deliver",
       "noun": "mesh",
       "verb": "deliver",
@@ -1077,7 +1077,7 @@
     },
     {
       "id": "script.campaign.suite",
-      "script": "campaign:suite",
+      "module": "scripts/campaign_suite.ts",
       "command": "campaign suite",
       "noun": "campaign",
       "verb": "suite",
@@ -1133,7 +1133,7 @@
     },
     {
       "id": "script.background-review.mission-e2e",
-      "script": "background-review:mission-e2e",
+      "module": "scripts/background_review_mission_e2e.ts",
       "command": "background-review mission-e2e",
       "noun": "background-review",
       "verb": "mission-e2e",
@@ -1181,7 +1181,7 @@
     },
     {
       "id": "script.gws.meet.create",
-      "script": "gws:meet:create",
+      "module": "scripts/google_workspace_meet.ts",
       "command": "gws meet-create",
       "noun": "gws",
       "verb": "meet-create",
@@ -1261,7 +1261,7 @@
     },
     {
       "id": "script.media.visual-proof.ds04",
-      "script": "media:visual-proof:ds04",
+      "module": "scripts/ds04_video_visual_proof.ts",
       "command": "media visual-proof-ds04",
       "noun": "media",
       "verb": "visual-proof-ds04",
@@ -1309,7 +1309,7 @@
     },
     {
       "id": "script.create.actuator",
-      "script": "create:actuator",
+      "module": "scripts/create_actuator.ts",
       "command": "create actuator",
       "noun": "create",
       "verb": "actuator",
@@ -1317,7 +1317,7 @@
     },
     {
       "id": "script.model.feedback",
-      "script": "model:feedback",
+      "module": "scripts/model_feedback.ts",
       "command": "model feedback",
       "noun": "model",
       "verb": "feedback",
@@ -1333,7 +1333,7 @@
     },
     {
       "id": "script.agent-runtime.daemon",
-      "script": "agent-runtime:daemon",
+      "module": "scripts/agent_runtime_supervisor_daemon.ts",
       "command": "agent-runtime daemon",
       "noun": "agent-runtime",
       "verb": "daemon",
@@ -1365,7 +1365,7 @@
     },
     {
       "id": "script.peer.collaboration",
-      "script": "peer:collaboration",
+      "module": "scripts/peer_collaboration.ts",
       "command": "peer collaboration",
       "noun": "peer",
       "verb": "collaboration",
@@ -1373,7 +1373,7 @@
     },
     {
       "id": "script.peer.send",
-      "script": "peer:send",
+      "module": "scripts/peer_messaging_send.ts",
       "command": "peer send",
       "noun": "peer",
       "verb": "send",
@@ -1405,7 +1405,7 @@
     },
     {
       "id": "script.mission.journal",
-      "script": "mission:journal",
+      "module": "scripts/mission_journal.ts",
       "command": "mission journal",
       "noun": "mission",
       "verb": "journal",
@@ -1493,7 +1493,7 @@
     },
     {
       "id": "script.chronos.install",
-      "script": "chronos:install",
+      "module": "scripts/install_chronos_launchd.ts",
       "command": "chronos install",
       "noun": "chronos",
       "verb": "install",
@@ -1501,7 +1501,8 @@
     },
     {
       "id": "script.chronos.uninstall",
-      "script": "chronos:uninstall",
+      "module": "scripts/install_chronos_launchd.ts",
+      "args": ["--uninstall"],
       "command": "chronos uninstall",
       "noun": "chronos",
       "verb": "uninstall",
@@ -1517,7 +1518,7 @@
     },
     {
       "id": "script.voice.conversation.turn",
-      "script": "voice:conversation:turn",
+      "module": "scripts/run_realtime_voice_conversation.ts",
       "command": "voice conversation-turn",
       "noun": "voice",
       "verb": "conversation-turn",
@@ -1525,7 +1526,7 @@
     },
     {
       "id": "script.voice.profile.promote",
-      "script": "voice:profile:promote",
+      "module": "scripts/promote_voice_profile.ts",
       "command": "voice profile-promote",
       "noun": "voice",
       "verb": "profile-promote",
@@ -1653,7 +1654,7 @@
     },
     {
       "id": "script.pipeline.super",
-      "script": "pipeline:super",
+      "module": "scripts/run_super_pipeline.ts",
       "command": "pipeline super",
       "noun": "pipeline",
       "verb": "super",
@@ -1685,7 +1686,8 @@
     },
     {
       "id": "script.release.install-smoke",
-      "script": "release:install-smoke",
+      "module": "scripts/source_archive.ts",
+      "args": ["--install-smoke"],
       "command": "release install-smoke",
       "noun": "release",
       "verb": "install-smoke",
@@ -1741,7 +1743,7 @@
     },
     {
       "id": "script.skill.install",
-      "script": "skill:install",
+      "module": "scripts/skill_installer.ts",
       "command": "skill install",
       "noun": "skill",
       "verb": "install",

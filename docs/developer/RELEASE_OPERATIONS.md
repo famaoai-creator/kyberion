@@ -44,7 +44,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
 
 PRs must use one of these types. CI rejects PR titles that do not match the pattern. Pushes to `main` reject commit subjects that do not match the pattern, except for the default GitHub merge commit subject (`Merge pull request #...`) when a human uses the merge button.
 
-Before opening a PR locally, run the title through `pnpm run check:pr-title -- --title "<proposed title>"`. The repo also exposes `pnpm run pr:create -- --title "<proposed title>"` as a guarded publish wrapper that fails fast if the title is not conventional.
+Before opening a PR locally, run the title through `pnpm run check:pr-title -- --title "<proposed title>"`. The repo also exposes `pnpm kyberion pr create --title "<proposed title>"` as a guarded publish wrapper that fails fast if the title is not conventional.
 
 ## Release cadence
 
@@ -67,7 +67,7 @@ pnpm run release:source-archive -- --ref HEAD \
   --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
 pnpm run release:source-archive -- --check \
   --output active/shared/exports/release/kyberion-vX.Y.Z.tar.gz
-pnpm run release:install-smoke -- --ref HEAD
+pnpm kyberion release install-smoke --ref HEAD
 ```
 
 ```bash

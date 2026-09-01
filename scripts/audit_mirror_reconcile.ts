@@ -36,7 +36,7 @@ export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
 export const AUDIT_MIRROR_EFFECT_BINDING = 'sa-01:audit-mirror-reconcile';
 export const DEFAULT_AUDIT_MIRROR_MISSION = 'MSN-SA-01-20260816A';
 const AUDIT_MIRROR_USAGE =
-  'Usage: pnpm audit:mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
+  'Usage: pnpm kyberion audit mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
 
 const AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 

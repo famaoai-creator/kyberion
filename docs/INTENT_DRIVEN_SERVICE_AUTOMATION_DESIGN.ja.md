@@ -98,11 +98,11 @@ tags: [service-preset, intent-loop, capability, pipeline, approval, multi-agent,
 実装済みの操作入口は次のとおりである。
 
 ```text
-pnpm service:recording -- capture --target-name <name> --calls <json|@path>
-pnpm service:recording -- compile --recording <path> --procedure-id <id> --intent-phrases '[...]'
-pnpm service:recording -- candidate --recording <path> --procedure-id <id> --intent-phrases '[...]' [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>]
-pnpm service:recording -- review --recording <path> --approve|--reject
-pnpm service:recording -- promote --recording <path> --procedure-id <id> --intent-phrases '[...]'
+pnpm kyberion service recording capture --target-name <name> --calls <json|@path>
+pnpm kyberion service recording compile --recording <path> --procedure-id <id> --intent-phrases '[...]'
+pnpm kyberion service recording candidate --recording <path> --procedure-id <id> --intent-phrases '[...]' [--mission-id <id>] [--tenant-slug <slug>] [--tier <personal|confidential>]
+pnpm kyberion service recording review --recording <path> --approve|--reject
+pnpm kyberion service recording promote --recording <path> --procedure-id <id> --intent-phrases '[...]'
 ```
 
 `compile` は `_draft: true` のADFを生成する。`candidate` は同じADFとGolden情報を `active/shared/runtime/distill-candidates/` にレビュー用として保存するが、catalogや実行pipelineは書き換えない。confidential candidateには `--tenant-slug` が必要で、public candidateはbrokered publication未実装のため拒否する。`promote` は承認済み録画だけを受け付ける。high-risk stepのADFには `core:await_decision` が前置されるため、ADFを直接実行する経路でも承認前に `service:preset` は実行されない。

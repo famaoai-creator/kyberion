@@ -20,7 +20,9 @@ export interface CliCommand {
 
 export interface CliScriptCommand {
   id: string;
-  script: string;
+  script?: string;
+  module?: string;
+  args?: string[];
   command: string;
   noun: string;
   verb: string;
@@ -48,6 +50,8 @@ export interface CliManifestCheckOptions {
   packageScripts?: ReadonlySet<string>;
 }
 
+export const MAX_PACKAGE_SCRIPTS = 120;
+
 function loadPackageScriptNames(): Set<string> {
   const packageJson = readJson<{ scripts?: Record<string, string> }>(
     pathResolver.rootResolve('package.json')
@@ -60,6 +64,11 @@ function checkScriptCommands(
   packageScripts: ReadonlySet<string>,
   failures: string[]
 ): void {
+  if (packageScripts.size > MAX_PACKAGE_SCRIPTS) {
+    failures.push(
+      `package scripts exceed the SX-05 ratchet: ${packageScripts.size} > ${MAX_PACKAGE_SCRIPTS}`
+    );
+  }
   if (manifest.script_commands === undefined) return;
   if (!Array.isArray(manifest.script_commands) || manifest.script_commands.length === 0) {
     failures.push('script_commands must be a non-empty script command registry');
@@ -73,10 +82,23 @@ function checkScriptCommands(
       failures.push(`script command id must be unique: ${command.id || '<missing>'}`);
     }
     ids.add(command.id);
-    if (!command.script || scripts.has(command.script)) {
-      failures.push(`script command must be unique: ${command.script || '<missing>'}`);
+    if ((!command.script && !command.module) || (command.script && command.module)) {
+      failures.push(
+        `script command must declare exactly one of script or module: ${command.id || '<missing>'}`
+      );
     }
-    scripts.add(command.script);
+    if (command.script && scripts.has(command.script)) {
+      failures.push(`script command must be unique: ${command.script}`);
+    }
+    if (command.script) {
+      scripts.add(command.script);
+    }
+    if (command.module && !safeExistsSync(pathResolver.rootResolve(command.module))) {
+      failures.push(`script command module does not exist: ${command.module}`);
+    }
+    if (command.args && !Array.isArray(command.args)) {
+      failures.push(`script command args must be an array: ${command.id || '<missing>'}`);
+    }
     if (!command.command || !command.noun || !command.verb) {
       failures.push(
         `script command ${command.id || '<missing>'} must declare command, noun, and verb`
@@ -85,7 +107,7 @@ function checkScriptCommands(
     if (!['user', 'operator', 'dev'].includes(command.audience)) {
       failures.push(`script command ${command.id || '<missing>'} has invalid audience`);
     }
-    if (!packageScripts.has(command.script)) {
+    if (command.script && !packageScripts.has(command.script)) {
       failures.push(`script command references missing package script: ${command.script}`);
     }
     const expectedCommand = `${command.noun} ${command.verb}`.trim();

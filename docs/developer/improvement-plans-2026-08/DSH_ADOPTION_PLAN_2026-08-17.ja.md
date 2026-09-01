@@ -753,7 +753,7 @@ First-Win lifecycle smoke の live identity、schedule pipeline、dry-run fixtur
 
 - DH-01: `pnpm vitest run libs/core/op-preflight.test.ts libs/core/op-preflight-defaults.test.ts` + `pnpm check -- --scope full --only op-preflight-coverage`
 - DH-02: `pnpm vitest run libs/core/seam.test.ts` + 各 seam の移行テスト、`grep -c "export function reset" libs/core/*.ts` の減少をラチェット
-- DH-03/07: `pnpm bindings --dump --json`、`pnpm run generate:capability-seams && pnpm check -- --scope full --only capability-seams`
+- DH-03/07: `pnpm bindings --dump --json`、`pnpm kyberion generate capability-seams && pnpm check -- --scope full --only capability-seams`
 - DH-06: `pnpm check -- --scope full --only module-invariants`
 - DH-08: `pnpm plugin:install` → deactivate → 全貢献消失の boundary test
 

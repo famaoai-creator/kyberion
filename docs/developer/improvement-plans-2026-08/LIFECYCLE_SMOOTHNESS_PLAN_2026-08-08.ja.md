@@ -135,7 +135,7 @@ Kyberion のライフサイクルは「オンボーディング(persona 登録�
 
 - 2026-08-08: 計画起草。検証エビデンスは §2 に記載。
 - 2026-08-08: **Phase 1 + LC-05 + LC-08 実装完了**(同日)。
-  - **LC-01 完了**: baseline-check に L10 レイヤ(`scheduler_alive` / `schedules_firing` / failed-schedule sweep)追加(`scripts/run_baseline_check.ts`)。stale heartbeat で critical ops-alert(日次デデュープ)。`pnpm chronos:install` / `chronos:uninstall`(launchd 生成セレモニー、既定 dry-run)。実機で LaunchAgent 導入済み(`com.kyberion.chronos`)。
+  - **LC-01 完了**: baseline-check に L10 レイヤ(`scheduler_alive` / `schedules_firing` / failed-schedule sweep)追加(`scripts/run_baseline_check.ts`)。stale heartbeat で critical ops-alert(日次デデュープ)。`pnpm kyberion chronos install` / `pnpm kyberion chronos uninstall`(launchd 生成セレモニー、既定 dry-run)。実機で LaunchAgent 導入済み(`com.kyberion.chronos`)。
   - **LC-02 完了**: `pnpm ops:alerts`(サマリ / `--redeliver` / `--ack`、履歴は append-only)。baseline-check と `services:setup` に通知チャネル未設定警告。`services:setup` の customer overlay 読み取りは LC-06 で sensitive-path mediation に接続。
   - **LC-03 完了**: `shell-claude-cli-backend.ts` に placeholder 署名検出+周知ディレクトリへのフォールバック解決(実機で `~/.local/bin/claude` を自動選択、警告消滅、failover chain に claude-cli 復帰)。`KYBERION_CLAUDE_CLI_BIN` / `pnpm approve-builds` の修復ガイダンスを reasoning:setup / INITIALIZATION.md に追記。
   - **LC-04 完了**: `onboard reset` 登録、phases/onboarding.md Stage 2 修正+customer overlay 出力先追記、backend カタログを `loadReasoningBackendPolicy().allowed_modes` を単一情報源として 4 ソース統一、`probeReasoningBackend` に grok 追加+重複プローブ除去+明示バックエンドの個別プローブ(`probeExplicitReasoningBackend`)。

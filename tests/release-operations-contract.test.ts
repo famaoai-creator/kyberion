@@ -17,7 +17,7 @@ describe('Release operations contract', () => {
     expect(workflow).toContain('pnpm run check -- --scope release');
     expect(workflow).toContain('pnpm run release:source-archive');
     expect(workflow).toContain('pnpm run release:source-archive -- --check');
-    expect(workflow).toContain('pnpm run release:install-smoke');
+    expect(workflow).toContain('pnpm kyberion release install-smoke');
     expect(workflow).not.toContain('pnpm run check:golden');
     expect(workflow).toContain(
       'pnpm run release:notes -- --ref "${{ github.ref_name }}" --output active/shared/tmp/release-notes.md'
@@ -34,9 +34,7 @@ describe('Release operations contract', () => {
     expect(packageJson).toContain(
       '"release:source-archive": "node --import ./scripts/ts-loader.mjs scripts/source_archive.ts"'
     );
-    expect(packageJson).toContain(
-      '"release:install-smoke": "node --import ./scripts/ts-loader.mjs scripts/source_archive.ts --install-smoke"'
-    );
+    expect(packageJson).not.toContain('"release:install-smoke"');
     // SX-05: the TypeScript entrypoint runner was unified on the ts-loader
     // import hook; these scripts no longer shell out through `pnpm exec tsx`.
     expect(packageJson).toContain(
@@ -51,7 +49,7 @@ describe('Release operations contract', () => {
       'pnpm run release:notes -- --ref "v${NEW_VERSION}" --output active/shared/tmp/release-notes.md'
     );
     expect(releaseOps).toContain('pnpm run release:source-archive');
-    expect(releaseOps).toContain('pnpm run release:install-smoke');
+    expect(releaseOps).toContain('pnpm kyberion release install-smoke');
     expect(releaseOps).toContain('Automated release workflow (`.github/workflows/release.yml`)');
     expect(releaseOps).toContain('Migration runner (`scripts/run_migrations.ts`)');
     expect(releaseOps).toContain('PR titles that do not match the pattern');
