@@ -61,4 +61,9 @@ describe('tailJsonl', () => {
       })
     ).toEqual([{ n: 3 }]);
   });
+
+  it('skips JSONL records containing dangerous keys', () => {
+    const filePath = writeFixture('dangerous-records.jsonl', '{"nested":{"constructor":{}}}\n');
+    expect(tailJsonl(filePath, 10, () => ({ accepted: true }))).toEqual([]);
+  });
 });
