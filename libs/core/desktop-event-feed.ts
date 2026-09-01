@@ -1,5 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeSpawn } from './secure-io.js';
 import type { DesktopObservationSnapshot } from './desktop-recording.js';
@@ -21,10 +22,6 @@ export interface DesktopEventFeed {
 }
 
 const ALLOWED_EVENTS = new Set(['click_at', 'right_click_at', 'press_key']);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100_000;

@@ -1,5 +1,6 @@
 import { safeExecResult } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const VIRTUAL_DEVICE_INVENTORY_BRIDGE_ID = 'virtual-device-inventory-bridge' as const;
 
@@ -87,10 +88,6 @@ function tryParseJson(text: string): unknown | null {
   } catch {
     return null;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseSystemProfilerItems(

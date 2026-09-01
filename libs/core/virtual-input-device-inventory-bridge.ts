@@ -1,5 +1,6 @@
 import { safeExecResult } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export const VIRTUAL_INPUT_DEVICE_INVENTORY_BRIDGE_ID =
   'virtual-input-device-inventory-bridge' as const;
@@ -77,10 +78,6 @@ function uniqueByName(records: VirtualInputDeviceRecord[]): VirtualInputDeviceRe
     seen.add(key);
     return true;
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function parseWindowsInputDeviceRows(payload: unknown): Array<Record<string, unknown>> {
