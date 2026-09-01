@@ -8,6 +8,7 @@ import { readJson } from './foundation/json.js';
 import { setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { getInjectionSignalPath } from './injection-signal.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 export { isInjectionSuspected } from './injection-signal.js';
 import {
   firstJsonObject,
@@ -46,6 +47,26 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((entry): entry is string => typeof entry === 'string')
     : [];
+}
+
+export function parseInjectionScannerVerdict(
+  raw: string
+): { injection_suspected: boolean; indicators: string[] } | null {
+  const trimmed = raw.trim();
+  const firstJsonToken = trimmed.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && trimmed[firstJsonToken] === '[') return null;
+  const jsonStr = firstJsonObject(trimmed);
+  if (!jsonStr) return null;
+  try {
+    const parsed = parseSafeJsonObjectInput(jsonStr, 'LLM injection scanner verdict');
+    if (!parsed || typeof parsed.injection_suspected !== 'boolean') return null;
+    return {
+      injection_suspected: parsed.injection_suspected,
+      indicators: stringArray(parsed.indicators),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface ScanResult {
@@ -338,28 +359,15 @@ Return ONLY a JSON object with the following schema:
 
       // QM-04 fail-closed verdict parsing: an unparseable or malformed verdict
       // escalates to suspicion instead of being silently ignored.
-      const jsonStr = firstJsonObject(response);
-      let parsed: unknown;
-      try {
-        parsed = jsonStr ? JSON.parse(jsonStr) : undefined;
-      } catch {
-        parsed = undefined;
-      }
-      if (typeof parsed !== 'object' || parsed === null) {
+      const verdict = parseInjectionScannerVerdict(response);
+      if (!verdict) {
         scan.injection_suspected = true;
         scan.indicators.push('invalid_llm_verdict');
-      } else {
-        const verdict = parsed as { injection_suspected?: unknown; indicators?: unknown };
-        if (typeof verdict.injection_suspected !== 'boolean') {
-          scan.injection_suspected = true;
-          scan.indicators.push('invalid_llm_verdict');
-        } else if (verdict.injection_suspected) {
-          scan.injection_suspected = true;
-          const extra = Array.isArray(verdict.indicators)
-            ? verdict.indicators.filter((i): i is string => typeof i === 'string')
-            : [];
-          scan.indicators.push(...(extra.length ? extra : ['llm_detected_injection']));
-        }
+      } else if (verdict.injection_suspected) {
+        scan.injection_suspected = true;
+        scan.indicators.push(
+          ...(verdict.indicators.length ? verdict.indicators : ['llm_detected_injection'])
+        );
       }
     } catch (err) {
       // QM-04 labelled fail-open: the screener being unavailable is a
