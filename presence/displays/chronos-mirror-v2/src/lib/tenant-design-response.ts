@@ -1,4 +1,4 @@
-import { isRecord } from './json-primitives';
+import { isRecord } from '@agent/core/foundation/primitives';
 
 export type TenantDesignResponse = {
   source: string;
