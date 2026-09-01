@@ -45,6 +45,20 @@ const ALLOWED_MEETING_HOSTS: Record<'meet' | 'zoom' | 'teams', readonly string[]
   teams: ['teams.microsoft.com', 'teams.live.com', 'microsoft.com'],
 };
 
+function normalizedMeetingHost(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password) return null;
+    return parsed.hostname.replace(/\.+$/u, '').toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function hostMatches(host: string, allowed: string): boolean {
+  return host === allowed || host.endsWith(`.${allowed}`);
+}
+
 export function redactMeetingUrl(url: string | undefined): string {
   if (!url) return 'missing-url';
   try {
@@ -57,12 +71,14 @@ export function redactMeetingUrl(url: string | undefined): string {
 export function resolveMeetingPlatformFromUrl(url: string): 'meet' | 'zoom' | 'teams' | null {
   try {
     const parsed = new URL(url);
-    const host = parsed.host.toLowerCase();
+    const host = normalizedMeetingHost(url);
+    if (!host) return null;
     const pathname = parsed.pathname.toLowerCase();
-    if (host.endsWith('meet.google.com')) return 'meet';
-    if (host.endsWith('zoom.us') || host.endsWith('zoom.com')) return 'zoom';
-    if (host.endsWith('teams.microsoft.com') || host.endsWith('teams.live.com')) return 'teams';
-    if (host.endsWith('microsoft.com') && pathname.includes('/microsoft-teams/join-a-meeting'))
+    if (hostMatches(host, 'meet.google.com')) return 'meet';
+    if (hostMatches(host, 'zoom.us') || hostMatches(host, 'zoom.com')) return 'zoom';
+    if (hostMatches(host, 'teams.microsoft.com') || hostMatches(host, 'teams.live.com'))
+      return 'teams';
+    if (hostMatches(host, 'microsoft.com') && pathname.includes('/microsoft-teams/join-a-meeting'))
       return 'teams';
   } catch {
     /* fall through */
@@ -92,12 +108,12 @@ export function validateMeetingTarget(
   if (platform === 'in_room') {
     return { ...target, platform, url: target.url || 'room://local' };
   }
-  const host = redactMeetingUrl(target.url).toLowerCase();
+  const host = normalizedMeetingHost(target.url);
   if (!host || host === 'invalid-url' || host === 'missing-url') {
     throw new Error(`[browser-driver] invalid meeting URL host: ${redactMeetingUrl(target.url)}`);
   }
   const allowlist = ALLOWED_MEETING_HOSTS[platform];
-  if (!allowlist.includes(host)) {
+  if (!allowlist.some((allowed) => hostMatches(host, allowed))) {
     throw new Error(
       `[browser-driver] meeting URL host '${host}' is not allow-listed for platform '${platform}'. Allowed hosts: ${allowlist.join(', ')}.`
     );
