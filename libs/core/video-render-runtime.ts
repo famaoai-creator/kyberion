@@ -1,8 +1,15 @@
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
-import type { VideoRenderJobStatus, VideoRenderProgressPacket, VideoRenderRuntimePolicy } from './video-composition-contract.js';
+import { clamp } from './foundation/text.js';
+import type {
+  VideoRenderJobStatus,
+  VideoRenderProgressPacket,
+  VideoRenderRuntimePolicy,
+} from './video-composition-contract.js';
 
 export interface VideoRenderJobApi {
-  report(update: Partial<Omit<VideoRenderProgressPacket, 'kind' | 'job_id' | 'updated_at'>>): VideoRenderProgressPacket;
+  report(
+    update: Partial<Omit<VideoRenderProgressPacket, 'kind' | 'job_id' | 'updated_at'>>
+  ): VideoRenderProgressPacket;
   isCancelled(): boolean;
 }
 
@@ -88,7 +95,12 @@ export class VideoRenderRuntime {
     if (!runningJob) return null;
     runningJob.cancelled = true;
     const packet = this.buildPacket(jobId, 'cancelled', {
-      progress: this.packets.get(jobId)?.progress || { current: 0, total: 1, percent: 0, unit: 'steps' },
+      progress: this.packets.get(jobId)?.progress || {
+        current: 0,
+        total: 1,
+        percent: 0,
+        unit: 'steps',
+      },
       message: reason ? `cancellation requested: ${reason}` : 'cancellation requested',
     });
     this.packets.set(jobId, packet);
@@ -146,9 +158,10 @@ export class VideoRenderRuntime {
     try {
       const result = await job.spec.run(api);
       if (!job.cancelled) {
-        const artifactRefs = result && typeof result === 'object' && 'artifactRefs' in result
-          ? result.artifactRefs
-          : undefined;
+        const artifactRefs =
+          result && typeof result === 'object' && 'artifactRefs' in result
+            ? result.artifactRefs
+            : undefined;
         const packet = this.buildPacket(jobId, 'completed', {
           progress: { current: 1, total: 1, percent: 100, unit: 'steps' },
           message: 'completed',
@@ -160,7 +173,12 @@ export class VideoRenderRuntime {
     } catch (error: any) {
       if (!job.cancelled) {
         const packet = this.buildPacket(jobId, 'failed', {
-          progress: this.packets.get(jobId)?.progress || { current: 0, total: 1, percent: 0, unit: 'steps' },
+          progress: this.packets.get(jobId)?.progress || {
+            current: 0,
+            total: 1,
+            percent: 0,
+            unit: 'steps',
+          },
           message: error?.message || 'video render job failed',
         });
         this.packets.set(jobId, packet);
@@ -173,16 +191,22 @@ export class VideoRenderRuntime {
     }
   }
 
-  private report(jobId: string, update: Partial<Omit<VideoRenderProgressPacket, 'kind' | 'job_id' | 'updated_at'>>): VideoRenderProgressPacket {
-    const current = this.packets.get(jobId) || this.buildPacket(jobId, 'queued', {
-      progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
-    });
+  private report(
+    jobId: string,
+    update: Partial<Omit<VideoRenderProgressPacket, 'kind' | 'job_id' | 'updated_at'>>
+  ): VideoRenderProgressPacket {
+    const current =
+      this.packets.get(jobId) ||
+      this.buildPacket(jobId, 'queued', {
+        progress: { current: 0, total: 1, percent: 0, unit: 'steps' },
+      });
     if (current.status === 'cancelled' && update.status !== 'cancelled') return current;
 
     const packet = this.buildPacket(jobId, update.status || current.status, {
       progress: update.progress || current.progress,
       message: update.message === undefined ? current.message : update.message,
-      artifact_refs: update.artifact_refs === undefined ? current.artifact_refs : update.artifact_refs,
+      artifact_refs:
+        update.artifact_refs === undefined ? current.artifact_refs : update.artifact_refs,
       queue: update.queue === undefined ? current.queue : update.queue,
     });
     this.packets.set(jobId, packet);
@@ -193,7 +217,8 @@ export class VideoRenderRuntime {
   private buildPacket(
     jobId: string,
     status: VideoRenderJobStatus,
-    data: Pick<VideoRenderProgressPacket, 'progress'> & Partial<Pick<VideoRenderProgressPacket, 'message' | 'artifact_refs' | 'queue'>>,
+    data: Pick<VideoRenderProgressPacket, 'progress'> &
+      Partial<Pick<VideoRenderProgressPacket, 'message' | 'artifact_refs' | 'queue'>>
   ): VideoRenderProgressPacket {
     return {
       kind: 'video_render_progress_packet',
@@ -251,9 +276,10 @@ export class VideoRenderRuntime {
     const lastPercent = this.lastNotifiedPercent.get(packet.job_id) || -100;
     const timeDelta = now - lastTime;
     const percentDelta = Math.abs(packet.progress.percent - lastPercent);
-    const shouldNotify = force
-      || timeDelta >= this.policy.progress.throttle_ms
-      || percentDelta >= this.policy.progress.min_percent_delta;
+    const shouldNotify =
+      force ||
+      timeDelta >= this.policy.progress.throttle_ms ||
+      percentDelta >= this.policy.progress.min_percent_delta;
     if (!shouldNotify) return;
     this.lastNotifiedAt.set(packet.job_id, now);
     this.lastNotifiedPercent.set(packet.job_id, packet.progress.percent);
@@ -261,6 +287,4 @@ export class VideoRenderRuntime {
   }
 }
 
-function clampPercent(percent: number): number {
-  return Math.max(0, Math.min(100, percent));
-}
+const clampPercent = (percent: number): number => clamp(percent, 0, 100);

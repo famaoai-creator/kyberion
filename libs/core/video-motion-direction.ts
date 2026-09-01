@@ -6,7 +6,7 @@ import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { tryRepairJson } from './json-repair.js';
 import type { VideoCompositionSceneRole } from './video-composition-contract.js';
 import { withReasoningPayloadScope, type ReasoningPayloadScope } from './reasoning-egress-scope.js';
-import { isRecord } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 
 /**
  * MP-02: motion vocabulary as governed tokens.
@@ -204,9 +204,8 @@ function coerceCatalog(parsed: any): VideoMotionCatalog | null {
   };
 }
 
-function clampMotionDirectionValue(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
+const clampMotionDirectionValue = (value: number, min: number, max: number): number =>
+  clamp(value, min, max);
 
 /** Read a pattern id from either a bare string or a normalized `{pattern_id}`. */
 function patternIdOf(value: unknown): string | undefined {
