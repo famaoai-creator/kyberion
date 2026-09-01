@@ -29,6 +29,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
+import { isRecord } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
@@ -241,10 +242,6 @@ function hashFile(source: string): string {
 
 function parseMigrationJsonObject(raw: string, label: string): Record<string, unknown> {
   return parseSafeJsonObjectValue(parseSafeJsonInput(raw, label), label);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function scopeFromRecord(record: unknown): ReturnType<typeof resolveScopeForRecord> {

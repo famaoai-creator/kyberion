@@ -43,6 +43,7 @@ import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-re
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import { logger } from '@agent/core/core';
+import { isRecord } from '@agent/core/foundation';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -258,9 +259,6 @@ const MCP_STRUCTURED_OUTPUT_SCHEMA = {
 
 type McpToolInputSchema = NonNullable<Parameters<McpServer['registerTool']>[1]['inputSchema']>;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
 /**
  * Keep legacy text content stable while exposing one machine-readable result
  * shape to MCP clients. Handlers historically returned either JSON text or

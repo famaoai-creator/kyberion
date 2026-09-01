@@ -7,7 +7,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
-import { readJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface ActuatorExampleRecord {
@@ -21,10 +21,6 @@ interface ActuatorExampleRecord {
 interface ActuatorExampleCatalog {
   actuator: string;
   examples: ActuatorExampleRecord[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function isActuatorExampleCatalog(value: unknown): value is ActuatorExampleCatalog {
