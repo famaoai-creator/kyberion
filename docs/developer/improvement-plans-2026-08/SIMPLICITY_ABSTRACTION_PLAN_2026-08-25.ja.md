@@ -10753,6 +10753,12 @@ Slack mission proposal actionとsurface actor allowlistのJSON境界を再監査
 
 検証: Slack proposal／surface access **4 files / 14 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 170
+
+Claude CLI auth statusの外部JSON応答を再監査し、直接 `JSON.parse` の結果を型アサーションだけで認証状態へ反映していた境界をshared safe object parserへ移行した。配列・malformed JSON・nested dangerous keyは構造化auth statusとして信頼せず、既存のhuman-readable／process exit fallbackへ閉じ込めた。正常な`loggedIn`判定とCLI互換fallbackは維持した。
+
+検証: Claude auth status **1 file / 4 tests passed**、root typecheck、Prettier、`git diff --check`。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
