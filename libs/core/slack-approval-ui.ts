@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
+import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import {
@@ -148,7 +149,14 @@ export function buildSlackApprovalBlocks(
 }
 
 export function parseSlackApprovalAction(value: string): SlackApprovalActionPayload {
-  return JSON.parse(value) as SlackApprovalActionPayload;
+  const parsed = parseSafeJsonObjectInput(value, 'Slack approval action');
+  if (!parsed || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+    throw new Error('Slack approval action requires requestId');
+  }
+  if (parsed.decision !== 'approved' && parsed.decision !== 'rejected') {
+    throw new Error('Slack approval action requires a valid decision');
+  }
+  return { requestId: parsed.requestId, decision: parsed.decision };
 }
 
 export function applySlackApprovalDecision(params: {
@@ -214,11 +222,12 @@ export function buildSlackApprovalAskWhyBlocks(requestId: string): any[] {
 }
 
 export function parseSlackAskWhyAction(value: string): SlackAskWhyActionPayload {
-  const parsed = JSON.parse(value) as Partial<SlackAskWhyActionPayload>;
-  const category = normalizeSurfaceApprovalAskWhyCategory(parsed.category);
-  if (!parsed.requestId || !category) {
-    return { requestId: String(parsed.requestId || ''), category: 'skip' };
+  const parsed = parseSafeJsonObjectInput(value, 'Slack approval reason action');
+  if (!parsed || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+    throw new Error('Slack approval reason action requires requestId');
   }
+  const category = normalizeSurfaceApprovalAskWhyCategory(parsed.category);
+  if (!category) throw new Error('Slack approval reason action requires a valid category');
   return { requestId: parsed.requestId, category };
 }
 
