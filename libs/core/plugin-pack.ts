@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -231,7 +231,9 @@ export function listPackImportRecords(limit = 50, override?: string): PackImport
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const record = normalizePackImportRecord(JSON.parse(trimmed));
+      const record = normalizePackImportRecord(
+        parseSafeJsonInput(trimmed, 'plugin pack import record')
+      );
       if (record) records.push(record);
       else logger.warn('[plugin-pack] skipping malformed import record line');
     } catch {
