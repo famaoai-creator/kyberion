@@ -10573,6 +10573,12 @@ File Actuator の `read_json`／`json_parse`／CLI action input／`rg --json` �
 
 検証: File Actuator／secure JSON **3 files / 65 tests passed**、File Actuator typecheck、root typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
+## 2026-09-02 CI 再レビュー修正 139
+
+PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
+
+検証: `check_i18n_hardcoding.ts --update-baseline` 後の通常 `check_i18n_hardcoding.ts`（**1857 files / 756 baseline-frozen violations / 0 exemptions**）を確認した。PR #711 の新SHA CI はpush後に再評価中である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
