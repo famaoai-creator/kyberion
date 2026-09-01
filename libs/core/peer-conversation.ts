@@ -1,5 +1,6 @@
 import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { isRecord } from './foundation/text.js';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -324,10 +325,6 @@ const PEER_CONVERSATION_MESSAGE_KINDS: readonly PeerConversationMessageKind[] = 
   'status',
 ];
 const PEER_CONVERSATION_DIRECTIONS: readonly PeerConversationDirection[] = ['inbound', 'outbound'];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

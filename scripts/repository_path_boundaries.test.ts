@@ -38,4 +38,10 @@ describe('repository-bound script inputs', () => {
   it('rejects intent smoke report directories outside the repository', () => {
     expect(() => resolveIntentSmokeOutputDir('/tmp/intent-smoke')).toThrow('[RESOURCE_PATH_SCOPE]');
   });
+
+  it('accepts intent smoke reports in the governed shared temp namespace', () => {
+    expect(resolveIntentSmokeOutputDir('active/shared/tmp/intent-smoke')).toBe(
+      pathResolver.rootResolve('active/shared/tmp/intent-smoke')
+    );
+  });
 });
