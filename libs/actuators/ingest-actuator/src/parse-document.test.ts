@@ -171,5 +171,11 @@ describe('ingest:parse_document golden normalization (DA-04 acceptance 1)', () =
     await expect(
       parseDocument({ content_text: '{"not":"an array"}', format: 'slack_thread' })
     ).rejects.toThrow(/JSON array/);
+    await expect(
+      parseDocument({
+        content_text: '[{"user":"alice","ts":"1","text":"ok","__proto__":{"x":true}}]',
+        format: 'slack_thread',
+      })
+    ).rejects.toThrow(/dangerous JSON key/);
   });
 });

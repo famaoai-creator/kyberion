@@ -10537,6 +10537,12 @@ SX-08 の surface contract 描画を再監査し、Computer Surface が authorit
 
 検証: surface contract coverage／Computer Surface **2 files / 5 tests passed**、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 134
+
+ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
+
+検証: ingest dedup／parse document **2 files / 19 tests passed**、ingest actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

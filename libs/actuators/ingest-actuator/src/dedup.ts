@@ -21,7 +21,7 @@ import {
   safeMkdir,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -104,7 +104,9 @@ function readRegistry(absPath: string): IngestRegistryRecord[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const record = parseIngestRegistryRecord(JSON.parse(trimmed) as unknown);
+      const record = parseIngestRegistryRecord(
+        parseSafeJsonInput(trimmed, 'ingest dedup registry entry')
+      );
       if (record) records.push(record);
     } catch {
       // Corrupt line: skip rather than block ingestion — the registry is
