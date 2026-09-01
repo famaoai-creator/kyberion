@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/governance-catalog.schema.json",
   "version": 1,
-  "generated_at": "2026-08-30T10:23:49.254Z",
+  "generated_at": "2026-09-01T16:44:57.414Z",
   "scan_roots": [
     "libs/core",
     "scripts",
@@ -155,6 +155,6 @@
     "presence/displays/concierge/src/app/api/approvals/[id]/route.ts": 1,
     "presence/displays/concierge/src/app/api/outcomes/[id]/route.ts": 3,
     "presence/displays/operator-surface/src/app/layout.tsx": 2,
-    "presence/displays/presence-studio/presence-studio-runtime-data.ts": 4
+    "presence/displays/presence-studio/presence-studio-runtime-data.ts": 3
   }
 }
