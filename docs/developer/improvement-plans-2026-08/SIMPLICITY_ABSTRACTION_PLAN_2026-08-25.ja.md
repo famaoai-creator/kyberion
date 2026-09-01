@@ -10537,6 +10537,12 @@ SX-08 の surface contract 描画を再監査し、Computer Surface が authorit
 
 検証: surface contract coverage／Computer Surface **2 files / 5 tests passed**、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 136
+
+Code Actuator の semgrep／skill index／JSON transform／impact analysis 境界を再監査し、外部 stdout・永続 catalog・pipeline context・model responseを直接 `JSON.parse` していた残存を修正した。共有 safe parser と object parser を前段へ接続し、malformed／primitive／配列／nested dangerous key は既存の scan error／空 catalog／transform error／analysis rejection へ閉じた。既存の code discovery、semgrep fallback、JSON update、impact report semantics は変更していない。
+
+検証: Code Actuator **2 files / 18 tests passed**、Code Actuator build、typecheck、Prettier、`git diff --check`。残る voice provider の実機依存と provider CLI の実 OS-level enforcement probe は、該当ハードウェア／OS実行環境が必要なため継続課題である。
+
 ## 2026-09-02 再レビュー修正 134
 
 ingest actuator の persisted registry と Slack thread JSON 入力を再監査し、`JSON.parse` 後の値を dedup／transcript normalization へ直接渡していた残存を修正した。foundation の `parseSafeJsonInput` を前段へ接続し、malformed／primitive／配列／nested dangerous key を既存の registry skip／入力エラーへ閉じた。content hash dedup、同一 source の supersede candidate、時系列 transcript semantics は変更していない。
