@@ -8,6 +8,23 @@
     "libs/core/channel-surface.ts",
     "libs/core/agent-runtime-supervisor.ts"
   ],
+  "direction_exceptions": [
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/audit-chain.ts",
+      "reason": "audit-chain must receive the secure persistence adapter during secure-io bootstrap"
+    },
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/sandbox-policy.ts",
+      "reason": "secure-io enforces the active provider sandbox before filesystem and network operations"
+    },
+    {
+      "source": "libs/core/secure-io.ts",
+      "target": "libs/core/tier-guard.ts",
+      "reason": "secure-io enforces tenant and tier permissions at every governed filesystem boundary"
+    }
+  ],
   "patterns": [
     { "layer": "foundation", "pattern": "libs/core/foundation/**" },
     { "layer": "foundation", "pattern": "libs/core/secure-io.ts" },

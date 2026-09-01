@@ -1497,7 +1497,7 @@
     {
       "path": "product/governance/governance-catalog-contracts.json",
       "tier": "public",
-      "size": 5573,
+      "size": 5633,
       "type": "json"
     },
     {
@@ -2043,7 +2043,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 4597,
+      "size": 5238,
       "type": "json"
     },
     {
