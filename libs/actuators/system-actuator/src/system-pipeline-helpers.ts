@@ -3,11 +3,11 @@ import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeWriteFile,
   safeExec,
   safeExistsSync,
 } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
@@ -384,7 +384,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
       })
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = loadJson<Record<string, unknown>>(contextPath);
+    const saved = readJson<Record<string, unknown>>(contextPath);
     ctx = { ...ctx, ...saved };
   }
 
