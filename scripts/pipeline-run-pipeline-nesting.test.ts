@@ -7,8 +7,12 @@ import { pathResolver } from '@agent/core/path-resolver';
 const { runValidatedSteps, executePipelineFile } = await import(
   new URL('./run_pipeline.js', import.meta.url).href
 );
-const { MAX_PIPELINE_NESTING_DEPTH, PIPELINE_ANCESTRY_CONTEXT_KEY, sanitizeNestedPipelineContext } =
-  await import(new URL('./pipeline-execution-part-control.js', import.meta.url).href);
+const {
+  MAX_PIPELINE_NESTING_DEPTH,
+  PIPELINE_ANCESTRY_CONTEXT_KEY,
+  parseFragmentJson,
+  sanitizeNestedPipelineContext,
+} = await import(new URL('./pipeline-execution-part-control.js', import.meta.url).href);
 
 const ROOT = pathResolver.rootDir();
 const abs = (relative: string) => path.resolve(ROOT, relative);
@@ -43,6 +47,13 @@ function childContextOf(runner: ReturnType<typeof stubNestedRunner>): Record<str
 }
 
 describe('core:run_pipeline nesting guard', () => {
+  it('rejects unsafe fragments before auto-repair or execution', () => {
+    expect(parseFragmentJson('{"ok":true}', 'safe-fragment')).toEqual({ ok: true });
+    expect(() => parseFragmentJson('{"__proto__":{"polluted":true}}', 'unsafe-fragment')).toThrow(
+      /invalid JSON/u
+    );
+  });
+
   it('rejects a pipeline that includes itself, naming the cycle', async () => {
     const nestedRunner = stubNestedRunner();
 

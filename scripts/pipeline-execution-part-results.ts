@@ -1,4 +1,8 @@
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  parseSafeJsonObjectInput,
+  setRegisteredEnv,
+} from '@agent/core/foundation';
 import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
 import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
 import { logger } from '@agent/core/core';
@@ -425,7 +429,8 @@ export async function main(args?: string[]) {
   let overrideContext: Record<string, unknown> = {};
   if (argv.context) {
     try {
-      overrideContext = JSON.parse(argv.context as string);
+      overrideContext =
+        parseSafeJsonObjectInput(argv.context as string, 'pipeline --context') || {};
     } catch (err: any) {
       logger.error(`❌ [PIPELINE] Invalid --context JSON: ${err.message}`);
       process.exitCode = 1;
