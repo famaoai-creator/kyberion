@@ -10603,6 +10603,12 @@ Service harness の `--inputs`／`--result` JSON option を再監査し、直接
 
 検証: service harness **1 file / 3 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 145
+
+Pipeline domain operations の外部 proposal JSON と issue list JSON を再監査し、直接 `JSON.parse` していた境界を foundation safe parserへ移行した。fenced／wrapped model output、context内のissue配列ともに malformed／primitive／nested dangerous key を pipeline operation 前に拒否し、既存の dry-run／mission start semantics は維持した。
+
+検証: pipeline domain JSON boundary **1 file / 6 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

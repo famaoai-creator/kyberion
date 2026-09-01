@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseInlineOnboardingInput } from './pipeline-domain-ops.js';
+import { parseInlineOnboardingInput, runInlineProposalBriefParse } from './pipeline-domain-ops.js';
 
 describe('pipeline domain JSON input boundaries', () => {
   it('accepts object onboarding input from JSON text and values', () => {
@@ -19,5 +19,15 @@ describe('pipeline domain JSON input boundaries', () => {
     expect(() =>
       parseInlineOnboardingInput('{"identity":{"__proto__":{"polluted":true}}}')
     ).toThrow('onboarding input contains a dangerous JSON key');
+  });
+
+  it('rejects dangerous external proposal JSON before pipeline effects', () => {
+    expect(() =>
+      runInlineProposalBriefParse(
+        { produces: 'proposal' } as never,
+        { input: '{"nested":{"prototype":{"polluted":true}}}' },
+        { tenant_slug: 'demo' }
+      )
+    ).toThrow('deck_brief_raw contains a dangerous JSON key');
   });
 });
