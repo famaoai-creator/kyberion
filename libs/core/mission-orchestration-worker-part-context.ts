@@ -1,4 +1,5 @@
 import { a2aBridge } from './a2a-bridge.js';
+import { clamp } from './foundation/text.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
@@ -989,7 +990,7 @@ export function buildTaskClarificationPacket(input: {
         required_input: need,
         impact: 'The work item remains blocked until the missing input is available.',
       })),
-      maxQuestions: Math.min(3, Math.max(1, needs.length)),
+      maxQuestions: clamp(needs.length, 1, 3),
     },
     `Clarification needed for task ${input.task.task_id}`,
     'The task result still has unresolved needs_input and cannot be marked complete yet.'
