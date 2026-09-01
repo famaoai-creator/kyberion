@@ -7,7 +7,7 @@ import {
   safeLstat,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { readJson, readJsonIfPresent } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson, readJsonIfPresent } from '@agent/core/foundation';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import {
   validatePipelineGuardrails,
@@ -109,10 +109,16 @@ function assertPipelineResourceTrust(inputPath: string, options: AdfInputOptions
 
 function parsePipelineFragment(raw: string, ref: string): any {
   try {
-    return JSON.parse(raw);
+    return parseSafeJsonInput(raw, `core:include fragment ${ref}`);
   } catch {
     const repaired = tryRepairJson(raw);
-    if (repaired !== null) return repaired;
+    if (repaired !== null) {
+      try {
+        return parseSafeJsonInput(JSON.stringify(repaired), `core:include fragment ${ref}`);
+      } catch {
+        // Fall through to the stable include error below.
+      }
+    }
     throw new Error(`core:include: fragment at ${ref} contains invalid JSON`);
   }
 }
