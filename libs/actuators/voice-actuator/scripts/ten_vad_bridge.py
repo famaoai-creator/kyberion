@@ -7,6 +7,7 @@ import argparse
 import base64
 import json
 import sys
+from json_boundary import JsonInputError, parse_json_object
 
 
 def emit(payload: dict) -> None:
@@ -47,8 +48,8 @@ def main() -> None:
         if not line.strip():
             continue
         try:
-            request = json.loads(line)
-        except json.JSONDecodeError:
+            request = parse_json_object(line, "TEN VAD input")
+        except JsonInputError:
             continue
         if request.get("reset"):
             destroy = getattr(vad, "destroy", None)
