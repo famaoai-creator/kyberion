@@ -12,7 +12,12 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { loadState } from '@agent/core/mission-state';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnvText,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  readJson,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_LIFECYCLE_STAGES = [
@@ -186,10 +191,10 @@ function parseJsonPayload(raw: string): Record<string, unknown> | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   try {
-    const parsed = JSON.parse(trimmed);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
+    return parseSafeJsonObjectValue(
+      parseSafeJsonInput(trimmed, 'first-win lifecycle JSON output'),
+      'first-win lifecycle JSON output'
+    );
   } catch {
     // Some governed CLIs write logger lines around machine-readable output.
     // Recover a complete top-level object without accepting arbitrary text.
@@ -216,10 +221,10 @@ function parseJsonPayload(raw: string): Record<string, unknown> | null {
         depth -= 1;
         if (depth === 0 && start >= 0) {
           try {
-            const parsed = JSON.parse(raw.slice(start, index + 1));
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              return parsed as Record<string, unknown>;
-            }
+            return parseSafeJsonObjectValue(
+              parseSafeJsonInput(raw.slice(start, index + 1), 'first-win lifecycle JSON output'),
+              'first-win lifecycle JSON output'
+            );
           } catch {
             start = -1;
           }
