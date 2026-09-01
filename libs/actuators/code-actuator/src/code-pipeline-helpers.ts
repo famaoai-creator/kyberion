@@ -1,4 +1,9 @@
-import { loadJson, getRegisteredEnv } from '@agent/core/foundation';
+import {
+  loadJson,
+  getRegisteredEnv,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -369,13 +374,13 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
             );
           }
           try {
-            return JSON.parse(stdout);
+            return parseSafeJsonInput(stdout, 'semgrep response');
           } catch {
             if (result.status === 0) {
               throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
             }
             try {
-              return JSON.parse(String(result.stderr || ''));
+              return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
             } catch {
               throw new Error(
                 `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
@@ -461,7 +466,7 @@ function discoverGovernedSkills(): any[] {
 
   try {
     const raw = safeReadFile(skillIndexPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as GlobalSkillIndex;
+    const parsed = parseSafeJsonInput(raw, 'global skill index') as GlobalSkillIndex;
     const entries = Array.isArray(parsed.s) ? parsed.s : [];
     return entries.map((entry) => ({
       name: entry.n,
@@ -489,7 +494,13 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
         ).replace(new RegExp(params.pattern, 'g'), resolve(params.template)),
       };
     case 'json_update':
-      const json = JSON.parse(ctx[params.from || 'last_capture']);
+      const json = parseSafeJsonObjectValue(
+        parseSafeJsonInput(
+          String(ctx[params.from || 'last_capture'] ?? ''),
+          'code json_update input'
+        ),
+        'code json_update input'
+      );
       params.updates.forEach((u: any) => {
         json[u.key] = resolve(u.value);
       });
@@ -600,7 +611,10 @@ export async function impactAnalysisOp(input: {
   if (start < 0 || end <= start) {
     throw new Error('[impact_analysis] backend did not return JSON');
   }
-  const parsed = JSON.parse(raw.slice(start, end + 1)) as Partial<ImpactAnalysisResult>;
+  const parsed = parseSafeJsonObjectValue(
+    parseSafeJsonInput(raw.slice(start, end + 1), 'impact analysis response'),
+    'impact analysis response'
+  ) as Partial<ImpactAnalysisResult>;
   const size =
     parsed.size === 'S' || parsed.size === 'M' || parsed.size === 'L' ? parsed.size : 'M';
   const result: ImpactAnalysisResult = {
