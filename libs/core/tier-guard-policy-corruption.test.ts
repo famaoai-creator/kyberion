@@ -67,4 +67,11 @@ describe('tier-guard policy corruption fail-closed (IP-08)', () => {
     const result = validateWritePermission(path.join(ROOT, 'knowledge/personal/notes.md'));
     expect(result.allowed).toBe(true);
   });
+
+  it('fails closed when the policy contains a dangerous JSON key', () => {
+    state.policyText = '{"read":{},"__proto__":{"allow":true}}';
+    const result = validateReadPermission(path.join(ROOT, 'knowledge/personal/notes.md'));
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('cannot be parsed');
+  });
 });
