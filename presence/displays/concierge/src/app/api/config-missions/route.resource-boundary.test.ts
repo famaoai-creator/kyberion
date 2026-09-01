@@ -15,6 +15,8 @@ describe('concierge config-missions route resource boundary', () => {
     );
 
     expect(source).toContain('assertSafeRepositoryPath');
+    expect(source).toContain('parseSafeJsonInput(raw, `config mission preset ${name}`)');
+    expect(source).not.toContain('JSON.parse(raw)');
     expect(source).toContain('safeLstat(presetPath).isFile()');
     expect(source).toContain('safeLstat(briefPath).isFile()');
     expect(source).not.toContain('safeReadFile(path.join(presetDir, name)');
