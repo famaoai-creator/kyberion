@@ -5,6 +5,13 @@ describe('module boundary ratchet', () => {
   it('does not allow cycles or forbidden direction edges to grow', () => {
     const report = checkModuleBoundaries();
     expect(report.violations).toEqual([]);
+    expect(report.directionViolations).toEqual([]);
+    expect(report.directionExceptions).toEqual([
+      'libs/core/secure-io.ts -> libs/core/audit-chain.ts',
+      'libs/core/secure-io.ts -> libs/core/sandbox-policy.ts',
+      'libs/core/secure-io.ts -> libs/core/tier-guard.ts',
+    ]);
+    expect(report.staleDirectionExceptions).toEqual([]);
   }, 60_000);
 
   it('does not treat import examples inside comments as runtime edges', () => {

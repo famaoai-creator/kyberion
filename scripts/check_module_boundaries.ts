@@ -11,6 +11,11 @@ type BoundaryConfig = {
   layers: Layer[];
   patterns: Array<{ layer: Layer; pattern: string }>;
   facade_patterns?: string[];
+  direction_exceptions?: Array<{
+    source: string;
+    target: string;
+    reason: string;
+  }>;
   default_layer: Layer;
 };
 type BoundaryBaseline = {
@@ -58,6 +63,17 @@ function classify(filePath: string, manifest: BoundaryConfig): Layer {
 function isFacade(filePath: string, manifest: BoundaryConfig): boolean {
   const repoPath = relative(filePath);
   return (manifest.facade_patterns || []).some((pattern) => matchesPattern(repoPath, pattern));
+}
+
+function directionExceptionFor(
+  source: string,
+  target: string,
+  manifest: BoundaryConfig
+): BoundaryConfig['direction_exceptions'][number] | undefined {
+  return manifest.direction_exceptions?.find(
+    (exception) =>
+      matchesPattern(source, exception.source) && matchesPattern(target, exception.target)
+  );
 }
 
 function sourceFiles(): string[] {
@@ -276,7 +292,10 @@ function findDirectionViolations(graph: Map<string, string[]>, manifest: Boundar
     const sourceLayer = classify(source, manifest);
     for (const target of targets) {
       const targetLayer = classify(target, manifest);
-      if ((rank.get(targetLayer) || 0) > (rank.get(sourceLayer) || 0)) {
+      if (
+        (rank.get(targetLayer) || 0) > (rank.get(sourceLayer) || 0) &&
+        !directionExceptionFor(relative(source), relative(target), manifest)
+      ) {
         violations.push(
           `${relative(source)} [${sourceLayer}] -> ${relative(target)} [${targetLayer}]`
         );
@@ -286,9 +305,42 @@ function findDirectionViolations(graph: Map<string, string[]>, manifest: Boundar
   return violations.sort();
 }
 
+function findDirectionExceptions(
+  graph: Map<string, string[]>,
+  manifest: BoundaryConfig
+): { active: string[]; stale: string[] } {
+  const configured = manifest.direction_exceptions || [];
+  const active = new Set<string>();
+  const rank = new Map(manifest.layers.map((layer, index) => [layer, index]));
+
+  for (const [source, targets] of graph) {
+    const sourceRelative = relative(source);
+    const sourceLayer = classify(source, manifest);
+    for (const target of targets) {
+      const targetRelative = relative(target);
+      const targetLayer = classify(target, manifest);
+      if ((rank.get(targetLayer) || 0) <= (rank.get(sourceLayer) || 0)) continue;
+      const exception = directionExceptionFor(sourceRelative, targetRelative, manifest);
+      if (exception) {
+        active.add(`${exception.source} -> ${exception.target}`);
+      }
+    }
+  }
+
+  return {
+    active: [...active].sort(),
+    stale: configured
+      .filter((exception) => !active.has(`${exception.source} -> ${exception.target}`))
+      .map((exception) => `${exception.source} -> ${exception.target}: ${exception.reason}`)
+      .sort(),
+  };
+}
+
 export function checkModuleBoundaries(): {
   cycles: string[][];
   directionViolations: string[];
+  directionExceptions: string[];
+  staleDirectionExceptions: string[];
   dynamicImportEdges: DynamicImportEdge[];
   maxRuntimeSccSize: number;
   baseline: BoundaryBaseline;
@@ -306,6 +358,7 @@ export function checkModuleBoundaries(): {
   const runtimeCycles = findCycles(runtimeGraph);
   const maxRuntimeSccSize = maxComponentSize(runtimeCycles);
   const directionViolations = findDirectionViolations(runtimeGraph, manifest);
+  const directionExceptions = findDirectionExceptions(runtimeGraph, manifest);
   const dynamicImportEdges = collectDynamicImportEdges(files);
   const baseline = safeExistsSync(BASELINE_PATH)
     ? readJson<BoundaryBaseline>(BASELINE_PATH)
@@ -337,9 +390,16 @@ export function checkModuleBoundaries(): {
       `direction violations increased from ${baseline.direction_violations} to ${directionViolations.length}`
     );
   }
+  if (directionExceptions.stale.length > 0) {
+    violations.push(
+      `configured direction exceptions are stale or no longer forbidden: ${directionExceptions.stale.join('; ')}`
+    );
+  }
   return {
     cycles,
     directionViolations,
+    directionExceptions: directionExceptions.active,
+    staleDirectionExceptions: directionExceptions.stale,
     dynamicImportEdges,
     maxRuntimeSccSize,
     baseline,
@@ -371,7 +431,7 @@ export const runCheckModuleBoundaries = defineScript({
         )
       );
       context.print(
-        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize})`
+        `[check:module-boundaries] baseline written (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, ${report.directionExceptions.length} documented exceptions, max runtime SCC ${report.maxRuntimeSccSize})`
       );
       return;
     }
@@ -382,7 +442,7 @@ export const runCheckModuleBoundaries = defineScript({
       );
     }
     context.print(
-      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
+      `[check:module-boundaries] OK (${report.cycles.length} cycles, ${report.directionViolations.length} direction violations, ${report.directionExceptions.length} documented exceptions, max runtime SCC ${report.maxRuntimeSccSize}, ${report.dynamicImportEdges.length} dynamic imports tracked)`
     );
     return report;
   },

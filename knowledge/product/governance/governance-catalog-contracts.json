@@ -113,7 +113,13 @@
       "unit",
       "version"
     ],
-    "module-layer-boundaries.json": ["default_layer", "layers", "patterns", "version"],
+    "module-layer-boundaries.json": [
+      "default_layer",
+      "direction_exceptions",
+      "layers",
+      "patterns",
+      "version"
+    ],
     "monitoring-rules.json": ["benchmarking", "name", "pulse", "quarantine", "slo", "version"],
     "orchestration-config.json": [
       "defaults",
