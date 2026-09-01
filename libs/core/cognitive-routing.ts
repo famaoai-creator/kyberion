@@ -3,6 +3,7 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 const SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/cognitive-routing-decision.schema.json'
@@ -328,8 +329,8 @@ export function loadCognitiveRoutingSchema(): unknown {
   }
   const raw = safeReadFile(SCHEMA_PATH, { encoding: 'utf8' }) as string;
   if (cachedSchemaRaw === raw && cachedSchemaPath === SCHEMA_PATH) {
-    return JSON.parse(raw);
+    return parseSafeJsonInput(raw, 'cognitive routing schema');
   }
   cachedSchemaRaw = raw;
-  return JSON.parse(raw);
+  return parseSafeJsonInput(raw, 'cognitive routing schema');
 }

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { safeExistsSync } from '../secure-io.js';
 import { safeLstat } from '../secure-io.js';
 import { readJson } from '../foundation/json.js';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { validatePipelineAdf } from '../pipeline-contract.js';
 import { pathResolver } from '../path-resolver.js';
 import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
@@ -202,13 +203,14 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
 
   // Resolve what we can
   try {
-    ps.resolvedParams = JSON.parse(
+    ps.resolvedParams = parseSafeJsonInput(
       paramStr.replace(/\{\{([^}]+)\}\}/g, (_, key) => {
         const parts = key.trim().split('.');
         let val: any = ctx;
         for (const p of parts) val = val?.[p];
         return val !== undefined ? String(val) : `{{${key}}}`;
-      })
+      }),
+      'pipeline preview resolved params'
     );
   } catch {
     ps.resolvedParams = step.params || {};
