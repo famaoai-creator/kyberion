@@ -102,6 +102,12 @@ describe('operator surface resource boundaries', () => {
             action: 'hidden',
             tenant_slug: { value: 'tenant-a' },
           }),
+          JSON.stringify({
+            id: `audit-dangerous-${suffix}`,
+            timestamp: new Date().toISOString(),
+            action: 'hidden',
+            metadata: { nested: { constructor: { polluted: true } } },
+          }),
         ].join('\n') + '\n'
       );
 
@@ -110,6 +116,7 @@ describe('operator surface resource boundaries', () => {
       expect(events.some((event) => event.id === `audit-other-${suffix}`)).toBe(false);
       expect(events.some((event) => event.id === `audit-global-${suffix}`)).toBe(false);
       expect(events.some((event) => event.id === `audit-malformed-${suffix}`)).toBe(false);
+      expect(events.some((event) => event.id === `audit-dangerous-${suffix}`)).toBe(false);
 
       vi.stubEnv('KYBERION_TENANT', '');
       const unscopedEvents = listRecentAuditEvents();
