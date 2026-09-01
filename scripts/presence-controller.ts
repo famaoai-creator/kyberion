@@ -9,7 +9,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { readJson, readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -62,7 +62,7 @@ export function parsePresenceStimulus(value: unknown): Stimulus | undefined {
 
 export function parsePresenceStimulusLine(line: string): Stimulus | undefined {
   try {
-    return parsePresenceStimulus(JSON.parse(line) as unknown);
+    return parsePresenceStimulus(parseSafeJsonInput(line, 'presence stimulus entry'));
   } catch {
     return undefined;
   }
