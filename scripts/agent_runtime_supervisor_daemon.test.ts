@@ -382,6 +382,18 @@ describe('agent_runtime_supervisor_daemon', () => {
     await expect(
       sendRequest(socketPath, { id: 'invalid-method', method: 'unknown' })
     ).resolves.toMatchObject({ ok: false, id: 'invalid' });
+    await expect(
+      sendRequest(
+        socketPath,
+        JSON.parse(
+          '{"id":"unsafe-request","method":"health","payload":{"nested":{"__proto__":{"polluted":true}}}}'
+        )
+      )
+    ).resolves.toMatchObject({
+      ok: false,
+      id: 'invalid',
+      error: expect.stringContaining('dangerous JSON key'),
+    });
   });
 
   it('creates a private Unix socket', async () => {
