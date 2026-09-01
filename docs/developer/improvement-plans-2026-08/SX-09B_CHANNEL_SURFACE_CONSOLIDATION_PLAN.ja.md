@@ -273,3 +273,9 @@ peer conversation／peer messaging の CLI JSON 入力を再監査し、`metadat
 Presence Studio の議事録開始／voice停止 request を再監査し、`missionId`、会議タイトル、言語、入力デバイス、停止理由が `String(...)` または個別の既定値化を経て、マイク起動・voice-hub転送へ到達し得る残存を修正した。既存の strict schema 群へ minutes session start／voice stop schema を追加し、未知フィールド、配列・オブジェクト、空文字を副作用前に 400 で拒否するようにした。正常系の trim と既定言語／停止理由、録音同意・外部 voice 配送 gate は維持している。
 
 検証: Presence Studio security／minutes input **1 file / 4 tests passed**、対象 typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 20
+
+Presence Studio の demo frame request を再監査し、surface／agent／表示状態／字幕／transcript の各値を個別に既定値化し、未知 field と不正な transcript item が A2UI frame 生成へ到達し得る残存を修正した。strict な demo frame schema を追加し、配列・オブジェクト・空文字・未知 field を frame 生成前に 400 で拒否するようにした。body 未指定時の既存デモ既定値と A2UI dispatch semantics は維持している。
+
+検証: Presence Studio request schema **1 file / 8 tests passed**、対象 typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PresenceStudioViewerError,
+  presenceStudioDemoFrameSchema,
   presenceStudioMinutesSessionStartSchema,
   presenceStudioVoiceStopSchema,
   requirePresenceStudioLocalAdmin,
@@ -93,5 +94,20 @@ describe('Presence Studio OS viewer scope', () => {
     expect(presenceStudioVoiceStopSchema.parse({ reason: ' manual ' })).toEqual({
       reason: 'manual',
     });
+    expect(presenceStudioVoiceStopSchema.parse(undefined)).toEqual({});
+
+    expect(
+      presenceStudioDemoFrameSchema.safeParse({
+        transcript: [{ speaker: 'AI', text: 'ok', extra: true }],
+      }).success
+    ).toBe(false);
+    expect(presenceStudioDemoFrameSchema.safeParse({ expression: ['joy'] }).success).toBe(false);
+    expect(
+      presenceStudioDemoFrameSchema.parse({
+        title: ' Demo ',
+        transcript: [{ speaker: ' AI ', text: ' Hello ' }],
+      })
+    ).toEqual({ title: 'Demo', transcript: [{ speaker: 'AI', text: 'Hello' }] });
+    expect(presenceStudioDemoFrameSchema.parse(undefined)).toEqual({});
   });
 });

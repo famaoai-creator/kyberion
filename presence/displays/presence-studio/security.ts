@@ -493,7 +493,31 @@ export const presenceStudioVoiceStopSchema = z
   .object({
     reason: z.string().trim().min(1).max(200).optional(),
   })
-  .strict();
+  .strict()
+  .default({});
+
+export const presenceStudioDemoFrameSchema = z
+  .object({
+    surfaceId: z.string().trim().min(1).max(128).optional(),
+    agentId: z.string().trim().min(1).max(128).optional(),
+    title: z.string().trim().min(1).max(200).optional(),
+    status: z.string().trim().min(1).max(64).optional(),
+    expression: z.string().trim().min(1).max(64).optional(),
+    subtitle: z.string().trim().max(4000).optional(),
+    transcript: z
+      .array(
+        z
+          .object({
+            speaker: z.string().trim().min(1).max(128),
+            text: z.string().trim().max(4000),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict()
+  .default({});
 
 export const presenceStudioLocationSchema = z
   .object({
