@@ -10861,6 +10861,12 @@ Slack automation modal metadataを再監査し、直接 `JSON.parse` の結果�
 
 検証: automation blueprint Slack **1 file / 3 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 188
+
+Audit forwarderの環境JSONヘッダを再監査し、直接 `JSON.parse` の結果を外部HTTP転送へ渡していた境界をshared safe object parserへ移行した。malformed／配列／nested dangerous keyは転送ヘッダとして採用せず、文字列値のみを許可し、既存の警告・forwarder fallback semanticsは維持した。
+
+検証: audit forwarder **1 file / 10 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
