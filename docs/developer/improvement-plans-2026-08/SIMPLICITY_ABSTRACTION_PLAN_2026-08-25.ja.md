@@ -11523,9 +11523,10 @@ guard、approved recording／intent の検証、deal review、onboarding binding
 前回の CI／本番 build 再確認で、Chronos intelligence API が利用する `@agent/core/dashboard-event-parser`
 の package export 欠落と、client bundle から `@agent/core/foundation` の Node.js 依存 barrel を辿る境界違反を
 検出した。core package に parser の explicit export を追加し、Chronos の client-side JSON response parser
-群は browser-safe な `json-primitives` へ、localStorage／client component が利用する JSON record reader は
-同等の dangerous-key 再帰検証を持つローカル実装へ分離した。server-only の secure-io／foundation が client
-bundle に混入しないため、package resolution と clean webpack build の双方で検証可能な構成にした。
+群と Concierge の voice／conversation contract は Node.js 依存のない canonical `foundation/primitives`
+へ移行し、localStorage／client component が利用する JSON record reader は同等の dangerous-key 再帰検証を
+持つ browser-safe 実装へ分離した。server-only の secure-io／foundation が client bundle に混入しないため、
+package resolution と Chronos／Concierge の clean build の双方で検証可能な構成にした。
 
 検証: Chronos production build、対象 **4 test files / 17 tests passed**、core build、root typecheck、foundation
 adoption、PR gate **33/33**、Prettier、ESLint、`git diff --check`。残る改善計画は追加の direct reader caller、

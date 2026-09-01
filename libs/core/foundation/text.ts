@@ -1,4 +1,5 @@
 import { getFoundationIo } from './io.js';
+export { isRecord } from './primitives.js';
 
 /** Read UTF-8 text through the registered secure foundation I/O boundary. */
 export function readTextFile(filePath: string): string {
@@ -7,10 +8,6 @@ export function readTextFile(filePath: string): string {
 
 export function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : value == null ? fallback : String(value);
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeText(value: unknown): string {

@@ -2,7 +2,7 @@ import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
 } from '@agent/core/intent-resolution-contract-parser';
-import { isRecord } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation/primitives';
 
 /**
  * Shared request/response contract for the concierge conversation core

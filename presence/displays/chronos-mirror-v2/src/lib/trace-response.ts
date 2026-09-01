@@ -1,4 +1,4 @@
-import { isRecord } from './json-primitives';
+import { isRecord } from '@agent/core/foundation/primitives';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 
 export type TraceStatus = 'ok' | 'error' | 'in_progress';

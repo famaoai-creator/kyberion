@@ -1,4 +1,4 @@
-import { isRecord } from './foundation/text.js';
+import { isRecord } from './foundation/primitives.js';
 
 export type IntentResolutionShape =
   'direct_answer' | 'task_session' | 'mission' | 'project_bootstrap';
