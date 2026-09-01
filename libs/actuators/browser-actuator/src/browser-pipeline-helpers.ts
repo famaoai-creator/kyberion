@@ -16,6 +16,7 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { getSecret } from '@agent/core/secret-guard';
+import { clamp } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -180,7 +181,7 @@ export async function executePipeline(
     action_trail: Array.isArray(initialCtx?.action_trail)
       ? initialCtx.action_trail
       : browserRuntimeHelpers.loadBrowserActionTrail(sessionId),
-    action_trail_max: Math.max(1, Math.min(2000, Number(options.action_trail_max || 200))),
+    action_trail_max: clamp(Number(options.action_trail_max || 200), 1, 2000),
     timestamp: new Date().toISOString(),
   };
 
@@ -508,7 +509,7 @@ async function opCapture(
     }
     case 'action_trail': {
       const source = browserRuntimeHelpers.readRecordedActions(ctx, params.from);
-      const trail = source.slice(-Math.max(1, Math.min(2000, Number(params.limit || 50))));
+      const trail = source.slice(-clamp(Number(params.limit || 50), 1, 2000));
       return browserRuntimeHelpers.recordBrowserAction(
         { ...ctx, last_capture: trail, [params.export_as || 'action_trail']: trail },
         { kind: 'capture', op: 'action_trail', tab_id: runtime.activeTabId }
@@ -1221,8 +1222,8 @@ async function opApply(
     }
     case 'scroll': {
       const delta = params.delta || {};
-      const x = Math.max(-5000, Math.min(5000, Number(params.x ?? delta.x ?? 0)));
-      const y = Math.max(-5000, Math.min(5000, Number(params.y ?? delta.y ?? 0)));
+      const x = clamp(Number(params.x ?? delta.x ?? 0), -5000, 5000);
+      const y = clamp(Number(params.y ?? delta.y ?? 0), -5000, 5000);
       await page.mouse.wheel(x, y);
       return browserRuntimeHelpers.recordBrowserAction(ctx, {
         kind: 'apply',
