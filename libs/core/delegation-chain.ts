@@ -56,6 +56,8 @@
  * by test (delegation-chain.test.ts) instead of by a runtime import.
  */
 
+import { parseSafeJsonInput } from './foundation/safe-json.js';
+
 // ---------------------------------------------------------------------------
 // Model
 // ---------------------------------------------------------------------------
@@ -299,7 +301,7 @@ export function parseDelegationChain(value: unknown): DelegationChain | null {
   let candidate: unknown = value;
   if (typeof candidate === 'string') {
     try {
-      candidate = JSON.parse(candidate);
+      candidate = parseSafeJsonInput(candidate, 'delegation chain');
     } catch {
       return null;
     }
