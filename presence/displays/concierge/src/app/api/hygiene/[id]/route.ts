@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   try {
     const { id } = await context.params;
-    const parsedBody = await readRequestObject(req);
+    const parsedBody = await readRequestObject(req, 'request body', ['decision', 'note']);
     if (!parsedBody.ok)
       return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     const { body } = parsedBody;
