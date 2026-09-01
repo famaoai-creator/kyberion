@@ -612,26 +612,28 @@
     {
       "name": "KYBERION_CODEX_APPROVAL",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["strict", "relaxed"],
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "strict",
+      "description": "Approval mode for the Codex app-server adapter; strict keeps the governed approval path and relaxed permits provider-side relaxed approvals.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_BIN",
       "category": "path",
       "type": "path",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Explicit executable path for the Codex CLI query backend; when unset, the backend resolves an acceptable Codex binary from the host.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_EXTRA_ARGS",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Whitespace-separated extra arguments appended to Codex CLI query invocations.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_CLI_MODEL",
@@ -646,24 +648,26 @@
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Timeout in milliseconds for a Codex CLI query; unset keeps the adapter default.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_INSTANCES",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Comma-separated Codex instance identifiers used by provider-health routing to track independent quotas and demotions.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_MODE",
       "category": "runtime",
-      "type": "string",
+      "type": "enum",
+      "enum": ["app-server", "exec", "legacy"],
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "app-server",
+      "description": "Codex transport mode; app-server uses the JSON-RPC adapter, while exec and legacy select the CLI adapter.",
+      "documented": true
     },
     {
       "name": "KYBERION_CODEX_MODEL",
@@ -1787,40 +1791,43 @@
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "mflux",
+      "description": "Package specification supplied to the local mflux runner; use this to select a pinned or locally available package build.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_QUANTIZE",
       "category": "runtime",
-      "type": "string",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "8",
+      "description": "Positive quantization level passed to the local mflux image-generation runner; defaults to 8.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_SEED",
       "category": "runtime",
       "type": "string",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Optional deterministic seed passed to the local mflux image-generation runner.",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_STEPS",
       "category": "runtime",
-      "type": "string",
+      "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "description": "Positive diffusion step count for local mflux generation; the default is mode-dependent (4 for schnell and 20 for dev).",
+      "documented": true
     },
     {
       "name": "KYBERION_MFLUX_TIMEOUT_MS",
       "category": "tuning",
       "type": "number",
       "required": false,
-      "description": "",
-      "documented": false
+      "default": "1800000",
+      "description": "Maximum local mflux generation time in milliseconds; defaults to 30 minutes.",
+      "documented": true
     },
     {
       "name": "KYBERION_MINIMAX_VIDEO_API_KEY",
