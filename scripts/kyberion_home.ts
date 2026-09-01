@@ -8,7 +8,7 @@
  * every other surface uses.
  */
 import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -914,6 +914,11 @@ async function handleProcedureInspect(procedureId: string, json: boolean): Promi
     console.log(ui('recorder:recorder_pipeline_blocked', { error: pipeline.errors.join('; ') }));
 }
 
+export function parseProcedureInputs(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  return parseSafeJsonObjectInput(raw, 'procedure inputs') || {};
+}
+
 async function handleProcedureRun(
   procedureId: string,
   argv: {
@@ -943,10 +948,7 @@ async function handleProcedureRun(
   let inputs: Record<string, unknown> = {};
   if (argv.inputs) {
     try {
-      const parsed = JSON.parse(argv.inputs);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-        throw new Error('JSON object required');
-      inputs = parsed as Record<string, unknown>;
+      inputs = parseProcedureInputs(argv.inputs);
     } catch (error) {
       console.error(
         ui('recorder:recorder_inputs_invalid', {
