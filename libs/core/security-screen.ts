@@ -168,7 +168,10 @@ const INVALID_VERDICT: ScreenDecision = {
  * treated as strict. A screener may never return "dangerous".
  */
 export function parseScreenVerdict(raw: string): ScreenDecision {
-  const json = firstJsonObject(String(raw ?? ''));
+  const text = String(raw ?? '').trim();
+  const firstJsonToken = text.search(/[\[{]/u);
+  if (firstJsonToken >= 0 && text[firstJsonToken] === '[') return INVALID_VERDICT;
+  const json = firstJsonObject(text);
   if (!json) return INVALID_VERDICT;
   try {
     const parsed = parseSafeJsonObjectInput(json, 'security screen verdict');

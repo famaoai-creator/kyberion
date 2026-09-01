@@ -10867,6 +10867,12 @@ Audit forwarderの環境JSONヘッダを再監査し、直接 `JSON.parse` の�
 
 検証: audit forwarder **1 file / 10 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 189
+
+LLM injection scannerとsecurity screenのverdict抽出を再監査し、root配列の内部objectを構造化判定として誤採用する抽出境界を修正した。safe object parserによるdangerous key拒否に加え、配列root・malformed・型不正をinvalid verdictへ収束させ、prompt injection検出とsecurity postureのfail-closed semanticsを維持した。
+
+検証: untrusted content／security screen **2 files / 47 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
