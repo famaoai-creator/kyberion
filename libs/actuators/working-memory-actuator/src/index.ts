@@ -10,7 +10,6 @@ import * as path from 'node:path';
 import { pathResolver, type VolatileScope, type VolatileCadence } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -18,6 +17,7 @@ import {
   safeWriteFile,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import {
@@ -155,7 +155,7 @@ function loadSidecar(mdPath: string): VolatileSidecar | null {
   const sp = sidecarPath(mdPath);
   if (!isExistingRegularFile(sp)) return null;
   try {
-    return loadJson<VolatileSidecar>(sp);
+    return readJson<VolatileSidecar>(sp);
   } catch {
     return null;
   }
@@ -685,7 +685,7 @@ function opList(params: Record<string, unknown>): unknown {
   });
   if (!isExistingRegularFile(indexPath)) return [];
   try {
-    const all = loadJson<
+    const all = readJson<
       Array<{
         mdPath: string;
         sidecar: VolatileSidecar;
@@ -732,7 +732,7 @@ function opRunGc(params: Record<string, unknown>): unknown {
         if (!isExistingRegularFile(fullPath)) continue;
         let sidecar: VolatileSidecar;
         try {
-          sidecar = loadJson<VolatileSidecar>(fullPath);
+          sidecar = readJson<VolatileSidecar>(fullPath);
         } catch {
           results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
           continue;
@@ -794,7 +794,7 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
       if (entry.endsWith('.volatile.json')) {
         if (!isExistingRegularFile(fullPath)) continue;
         try {
-          const sidecar = loadJson<VolatileSidecar>(fullPath);
+          const sidecar = readJson<VolatileSidecar>(fullPath);
           faces.push({ mdPath: fullPath.replace(/\.volatile\.json$/, '.md'), sidecar });
         } catch {
           /* skip */
