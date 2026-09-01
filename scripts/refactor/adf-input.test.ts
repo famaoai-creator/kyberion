@@ -195,6 +195,18 @@ describe('readValidatedPipelineAdf', () => {
     );
   });
 
+  it('keeps repaired include fragments behind the safe JSON boundary', async () => {
+    const source = String(
+      (await import('@agent/core/secure-io')).safeReadFile(
+        pathResolver.rootResolve('scripts/refactor/adf-input.ts'),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain('parseSafeJsonInput(JSON.stringify(repaired)');
+    expect(source).not.toContain('return JSON.parse(raw)');
+  });
+
   it('applies the pre-trust boundary to static pipeline fragments', async () => {
     safeMkdir(tmpRoot, { recursive: true });
     const cyclePath = fixturePath('include-from-untrusted-root.json');
