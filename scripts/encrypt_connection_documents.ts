@@ -16,14 +16,11 @@ import {
   decryptConnectionDocument,
   encryptConnectionDocument,
   isEncryptedConnectionEnvelope,
-  logger,
-  pathResolver,
   resolveSecretEncryptionMode,
-  safeExistsSync,
-  safeReaddir,
-  safeReadFile,
-  safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secret-encryption';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

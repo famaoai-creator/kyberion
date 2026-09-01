@@ -1,8 +1,10 @@
 import chalk from 'chalk';
 // chalk imported dynamically
-import { pathResolver, safeExistsSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
 const inboxPath = pathResolver.shared('portal/inbox.json');
 const outboxPath = pathResolver.shared('portal/outbox.json');
@@ -10,14 +12,43 @@ const outboxPath = pathResolver.shared('portal/outbox.json');
 interface PortalRequest {
   intent: string;
   status: 'pending' | 'thinking' | 'complete' | 'processed';
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+const PORTAL_STATUSES = new Set<PortalRequest['status']>([
+  'pending',
+  'thinking',
+  'complete',
+  'processed',
+]);
+
+function isPortalStatus(value: unknown): value is PortalRequest['status'] {
+  return typeof value === 'string' && PORTAL_STATUSES.has(value as PortalRequest['status']);
+}
+
+export function parsePortalRequest(raw: string): PortalRequest | null {
+  try {
+    const parsed = parseSafeJsonObjectInput(raw, 'portal request');
+    if (!parsed || typeof parsed.intent !== 'string' || !isPortalStatus(parsed.status)) {
+      return null;
+    }
+    const intent = parsed.intent.trim();
+    if (!intent) return null;
+    return { ...parsed, intent, status: parsed.status };
+  } catch {
+    return null;
+  }
 }
 
 async function processInbox(): Promise<void> {
   if (!safeExistsSync(inboxPath)) return;
 
   const raw = readTextFile(inboxPath);
-  const request: PortalRequest = JSON.parse(raw);
+  const request = parsePortalRequest(raw);
+  if (!request) {
+    console.warn('[portal] ignored malformed inbox request');
+    return;
+  }
   if (request.status !== 'pending') return;
 
   console.log(chalk.bold.cyan(`\n📩 Processing Portal Request: "${request.intent}"`));

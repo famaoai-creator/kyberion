@@ -1,32 +1,44 @@
 import express from 'express';
-import { extractSurfaceBearerToken, installProcessGuards } from '@agent/core';
-import { appendJsonLine, getRegisteredEnvText } from '@agent/core/foundation';
+import {
+  appendJsonLine,
+  getRegisteredEnvBool,
+  getRegisteredEnvText,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
+import { installProcessGuards } from '@agent/core/process-guards';
 import { createServer } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as path from 'node:path';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('terminal-bridge');
+import { ReflexTerminal } from '@agent/core/reflex-terminal';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import {
-  ReflexTerminal,
-  logger,
-  pathResolver,
-  runtimeSupervisor,
+  assertSafeRepositoryPath,
   safeReadFile,
   loadJson,
   safeWriteFile,
   safeMkdir,
   safeRmSync,
   safeExistsSync,
+  safeLstat,
   safeUnlinkSync,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import {
   buildSessionPaths,
   listPersistedSessionStates,
   mergeSessionSummaries,
   normalizeSessionName,
+  parseTerminalSessionCreateInput,
+  parseTerminalControlRequest,
+  parseTerminalSocketMessage,
+  isLikelyTerminalControlPayload,
   readPersistedSessionState,
 } from './session-utils.js';
+import { authorizeTerminalRequest } from './auth.js';
 
 /**
  * Terminal Hub v6.2 [STANDARDIZED]
@@ -43,7 +55,7 @@ const ROOT_DIR = pathResolver.rootDir();
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const TERMINAL_TOKEN =
   getRegisteredEnvText('KYBERION_TERMINAL_TOKEN') || getRegisteredEnvText('KYBERION_API_TOKEN');
-const ALLOW_REMOTE = getRegisteredEnvText('KYBERION_TERMINAL_ALLOW_REMOTE') === 'true';
+const TRUST_PROXY = getRegisteredEnvBool('KYBERION_TRUST_PROXY') === true;
 const DISCONNECT_TIMEOUT_MS = Number(
   getRegisteredEnvText('KYBERION_TERMINAL_DISCONNECT_TIMEOUT_MS') || 5 * 60 * 1000
 );
@@ -73,56 +85,8 @@ interface Session {
 
 const sessions = new Map<string, Session>();
 
-function getClientIp(req: any): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-  return req.socket?.remoteAddress || 'unknown';
-}
-
-function isLoopback(ip: string): boolean {
-  return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
-}
-
-function extractToken(req: any): string | null {
-  const authHeader = req.headers['authorization'];
-  const bearer = extractSurfaceBearerToken(authHeader);
-  if (bearer) return bearer;
-  try {
-    const url = new URL(req.url || '/', 'http://localhost');
-    return url.searchParams.get('token');
-  } catch (_) {
-    return null;
-  }
-}
-
-function authorizeRequest(req: any): { ok: boolean; status: number; reason: string } {
-  const ip = getClientIp(req);
-  const isLocal = isLoopback(ip);
-  if (isLocal) return { ok: true, status: 200, reason: 'local' };
-
-  if (!TERMINAL_TOKEN) {
-    if (ALLOW_REMOTE) return { ok: true, status: 200, reason: 'remote_allowed' };
-    return {
-      ok: false,
-      status: 403,
-      reason:
-        'Remote access disabled. Set KYBERION_TERMINAL_ALLOW_REMOTE=true or provide KYBERION_TERMINAL_TOKEN.',
-    };
-  }
-
-  const token = extractToken(req);
-  if (token === TERMINAL_TOKEN) return { ok: true, status: 200, reason: 'token' };
-  return {
-    ok: false,
-    status: 401,
-    reason: 'Unauthorized. Provide Authorization: Bearer <token> or ?token=',
-  };
-}
-
 app.use((req, res, next) => {
-  const auth = authorizeRequest(req);
+  const auth = authorizeTerminalRequest(req, TERMINAL_TOKEN, TRUST_PROXY);
   if (!auth.ok) {
     return res.status(auth.status).json({ error: auth.reason });
   }
@@ -294,8 +258,13 @@ async function setupSessionWatcher(session: Session) {
   session.watcher.on('add', (filePath: string) => {
     if (!filePath.endsWith('.json')) return;
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const request = JSON.parse(content);
+      const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) return;
+      const content = safeReadFile(safeFilePath, { encoding: 'utf8' }) as string;
+      const request = parseTerminalControlRequest(
+        parseSafeJsonInput(content, 'terminal control request')
+      );
+      if (!request) return;
       if (request.text) {
         typeLine(session, request.text);
       } else if (request.stimulus_id) {
@@ -304,8 +273,11 @@ async function setupSessionWatcher(session: Session) {
 
         let bootCommand = 'gemini -y';
         try {
-          const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
-          if (safeExistsSync(registryPath)) {
+          const registryPath = assertSafeRepositoryPath(
+            pathResolver.resolve('knowledge/orchestration/brain-profiles.json'),
+            { allowMissingLeaf: true }
+          );
+          if (safeExistsSync(registryPath) && safeLstat(registryPath).isFile()) {
             const registry = loadJson<{
               default_profile: string;
               profiles: Record<string, { cmd: string; args: string[] }>;
@@ -326,7 +298,7 @@ async function setupSessionWatcher(session: Session) {
           saveSessionState(session);
         }
       }
-      safeUnlinkSync(filePath);
+      safeUnlinkSync(safeFilePath);
     } catch (_) {
       /* best-effort cleanup */
     }
@@ -507,7 +479,7 @@ function getOrCreateSession(id: string, cols = 80, rows = 30, requestedName?: st
 }
 
 wss.on('connection', (ws, req) => {
-  const auth = authorizeRequest(req);
+  const auth = authorizeTerminalRequest(req, TERMINAL_TOKEN, TRUST_PROXY);
   if (!auth.ok) {
     ws.close(1008, auth.reason);
     return;
@@ -515,11 +487,26 @@ wss.on('connection', (ws, req) => {
   let activeSession: Session | null = null;
 
   ws.on('message', (msg) => {
+    const rawMessage = msg.toString();
+    let parsed: unknown;
     try {
-      const p = JSON.parse(msg.toString());
-      if (p.type === 'init') {
-        const id = p.sessionId || `s-${Date.now()}`;
-        activeSession = getOrCreateSession(id, p.cols, p.rows, p.name);
+      parsed = parseSafeJsonInput(rawMessage, 'terminal socket message');
+    } catch {
+      if (isLikelyTerminalControlPayload(rawMessage)) {
+        ws.send(JSON.stringify({ type: 'error', error: '[TERMINAL_INPUT_INVALID] invalid JSON' }));
+        return;
+      }
+      if (activeSession) {
+        if (!activeSession.rt) attachRuntime(activeSession);
+        activeSession.rt?.write(rawMessage);
+      }
+      return;
+    }
+    try {
+      const message = parseTerminalSocketMessage(parsed);
+      if (message.type === 'init') {
+        const id = message.sessionId || `s-${Date.now()}`;
+        activeSession = getOrCreateSession(id, message.cols, message.rows, message.name);
         if (activeSession.disconnectTimer) clearTimeout(activeSession.disconnectTimer);
         activeSession.disconnectTimer = undefined;
         activeSession.ws = ws;
@@ -527,20 +514,22 @@ wss.on('connection', (ws, req) => {
         saveSessionState(activeSession);
         ws.send(JSON.stringify({ type: 'session_ready', sessionId: id, name: activeSession.name }));
         ws.send(activeSession.backlog.join(''));
-      } else if (p.type === 'input' && activeSession) {
+      } else if (message.type === 'input' && activeSession) {
         if (!activeSession.rt) attachRuntime(activeSession);
-        activeSession.rt?.write(p.data);
+        activeSession.rt?.write(message.data);
         activeSession.lastActive = Date.now();
         saveSessionState(activeSession);
-      } else if (p.type === 'resize' && activeSession) {
-        if (!activeSession.rt) attachRuntime(activeSession, p.cols, p.rows);
-        activeSession.rt?.resize(p.cols, p.rows);
+      } else if (message.type === 'resize' && activeSession) {
+        if (!activeSession.rt) attachRuntime(activeSession, message.cols, message.rows);
+        activeSession.rt?.resize(message.cols, message.rows);
       }
-    } catch (_) {
-      if (activeSession) {
-        if (!activeSession.rt) attachRuntime(activeSession);
-        activeSession.rt?.write(msg.toString());
-      }
+    } catch (error: unknown) {
+      ws.send(
+        JSON.stringify({
+          type: 'error',
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
     }
   });
 
@@ -593,10 +582,14 @@ app.get('/runtime', (req, res) => {
 });
 
 app.post('/sessions', (req, res) => {
-  const requestedId = typeof req.body?.id === 'string' ? req.body.id.trim() : '';
-  const id = requestedId || `s-${Date.now()}`;
-  const requestedName = typeof req.body?.name === 'string' ? req.body.name : undefined;
-  const session = getOrCreateSession(id, 80, 30, requestedName);
+  let input;
+  try {
+    input = parseTerminalSessionCreateInput(req.body === undefined ? {} : req.body);
+  } catch (error: unknown) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+  const id = input.id || `s-${Date.now()}`;
+  const session = getOrCreateSession(id, 80, 30, input.name);
   saveSessionState(session);
   res.status(201).json({
     id: session.id,

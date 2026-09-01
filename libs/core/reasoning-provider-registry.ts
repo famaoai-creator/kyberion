@@ -13,8 +13,7 @@ import type { IntentExtractorCandidate } from './intent-extractor.js';
 import type { VoiceBridgeCandidate } from './voice-bridge.js';
 import type { BackendInputModality } from './backend-capability-profile.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertModuleInvariant } from './invariants.js';
 import { isRecord } from './foundation/text.js';
 
@@ -44,7 +43,14 @@ export interface ReasoningProviderRuntimeBundle {
 export type ReasoningProviderConformanceStatus = 'verified' | 'declared' | 'unavailable' | 'failed';
 
 export interface ReasoningProviderConformanceCheck {
-  name: 'prompt' | 'structured_output' | 'abort' | 'usage';
+  name:
+    | 'prompt'
+    | 'structured_output'
+    | 'abort'
+    | 'failover'
+    | 'egress_scope'
+    | 'usage'
+    | 'sandbox_enforcement';
   status: ReasoningProviderConformanceStatus;
   evidence: string;
 }
@@ -83,10 +89,13 @@ export type ReasoningProviderFactory = (
 
 interface RegistryFile {
   version?: string;
-  providers?: unknown;
+  providers: unknown[];
 }
 
 const REGISTRY_PATH = pathResolver.knowledge('product/governance/reasoning-provider-registry.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/reasoning-provider-registry.schema.json'
+);
 
 const KNOWN_MODES = new Set<ReasoningBackendMode>([
   'claude-cli',
@@ -122,9 +131,24 @@ const FALLBACK_CAPABILITIES: ReasoningProviderCapabilities = {
 
 const INPUT_MODALITIES = new Set<BackendInputModality>(['text', 'image', 'audio']);
 
+const reasoningProviderCatalog = defineCatalog<RegistryFile>({
+  id: 'reasoning-provider-registry',
+  path: REGISTRY_PATH,
+  schema: REGISTRY_SCHEMA_PATH,
+  fallback: { version: 'missing', providers: [] },
+});
+
 let cachedDescriptors: readonly ReasoningProviderDescriptor[] | null = null;
 const registeredFactories = new Map<ReasoningBackendMode, ReasoningProviderFactory>();
-const CONFORMANCE_CHECK_NAMES = ['prompt', 'structured_output', 'abort', 'usage'] as const;
+const CONFORMANCE_CHECK_NAMES = [
+  'prompt',
+  'structured_output',
+  'abort',
+  'failover',
+  'egress_scope',
+  'usage',
+  'sandbox_enforcement',
+] as const;
 const CONFORMANCE_STATUSES = ['verified', 'declared', 'unavailable', 'failed'] as const;
 
 function parseBoolean(value: unknown, fallback: boolean): boolean {
@@ -209,16 +233,27 @@ function assertConformanceEvidence(
       !CONFORMANCE_CHECK_NAMES.includes(check.name) ||
       !CONFORMANCE_STATUSES.includes(check.status) ||
       typeof check.evidence !== 'string' ||
+      !check.evidence.trim() ||
       seen.has(check.name)
     ) {
       throw new Error(`[REASONING_PROVIDER_CONFORMANCE_INVALID] ${mode}`);
     }
     seen.add(check.name);
   }
-  if (seen.size !== CONFORMANCE_CHECK_NAMES.length || !evidence.passed) {
+  if (
+    seen.size !== CONFORMANCE_CHECK_NAMES.length ||
+    !evidence.passed ||
+    evidence.checks.some((check) => check.status === 'failed')
+  ) {
     throw new Error(`[REASONING_PROVIDER_CONFORMANCE_FAILED] ${mode}`);
   }
-  const requiredLiveChecks = new Set(['prompt', 'structured_output', 'abort']);
+  const requiredLiveChecks = new Set([
+    'prompt',
+    'structured_output',
+    'abort',
+    'failover',
+    'egress_scope',
+  ]);
   const hasVerifiedLiveContract =
     evidence.live &&
     evidence.checks.every(
@@ -230,22 +265,7 @@ function assertConformanceEvidence(
 }
 
 function loadDescriptors(): readonly ReasoningProviderDescriptor[] {
-  if (!safeExistsSync(REGISTRY_PATH)) return [];
-  let parsed: RegistryFile;
-  try {
-    parsed = readJson<RegistryFile>(REGISTRY_PATH);
-  } catch (error) {
-    throw new Error(
-      `Invalid reasoning provider registry at ${REGISTRY_PATH}: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-  }
-  if (!Array.isArray(parsed.providers)) {
-    throw new Error(
-      `Invalid reasoning provider registry at ${REGISTRY_PATH}: providers must be an array`
-    );
-  }
+  const parsed = reasoningProviderCatalog.load();
   const descriptors = parsed.providers
     .map(parseDescriptor)
     .filter((entry): entry is ReasoningProviderDescriptor => entry !== null);
@@ -321,4 +341,5 @@ export function buildRegisteredReasoningProvider(
 export function resetReasoningProviderRegistryForTests(): void {
   registeredFactories.clear();
   cachedDescriptors = null;
+  reasoningProviderCatalog.reset();
 }

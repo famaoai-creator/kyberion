@@ -1,8 +1,8 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 /**
  * Model×role performance feedback used by future team staffing.
@@ -55,15 +55,15 @@ const MAX_REFERENCE_LENGTH = 160;
 const MAX_COMMENT_LENGTH = 2_000;
 
 export function modelRoleOutcomesPath(): string {
-  return pathResolver.shared(OUTCOMES_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(OUTCOMES_PATH), { allowMissingLeaf: true });
 }
 
 export function modelRoleFeedbackPath(): string {
-  return pathResolver.shared(FEEDBACK_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(FEEDBACK_PATH), { allowMissingLeaf: true });
 }
 
 export function modelPerformanceIndexPath(): string {
-  return pathResolver.shared(INDEX_PATH);
+  return assertSafeRepositoryPath(pathResolver.shared(INDEX_PATH), { allowMissingLeaf: true });
 }
 
 function keyFor(modelId: string, teamRole: string): string {
@@ -94,17 +94,7 @@ function scoreStatus(status: string): { success: number; review: number; blocked
 }
 
 function readJsonl<T>(filePath: string): T[] {
-  if (!safeExistsSync(filePath)) return [];
-  return String(safeReadFile(filePath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter((line) => line.trim())
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as T];
-      } catch {
-        return [];
-      }
-    });
+  return readJsonLines<T>(filePath, { onMalformed: 'skip' });
 }
 
 function appendJsonl(filePath: string, records: unknown[]): void {
@@ -236,6 +226,10 @@ export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerforma
 let cachedIndex: { loadedAt: number; byKey: Record<string, ModelRolePerformance> } | null = null;
 const INDEX_CACHE_TTL_MS = 30_000;
 
+export function resetModelPerformanceIndexCache(): void {
+  cachedIndex = null;
+}
+
 export function getModelRolePerformance(
   modelId: string,
   teamRole: string
@@ -256,10 +250,6 @@ export function getModelRolePerformance(
     cachedIndex = { loadedAt: now, byKey };
   }
   return cachedIndex.byKey[keyFor(modelId, teamRole)] || null;
-}
-
-export function resetModelPerformanceIndexCache(): void {
-  cachedIndex = null;
 }
 
 /**

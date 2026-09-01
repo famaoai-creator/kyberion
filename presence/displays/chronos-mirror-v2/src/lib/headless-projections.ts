@@ -1,12 +1,12 @@
+import { buildAgentCollaborationProjection } from '@agent/core/agent-collaboration-projection';
+import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
 import {
-  buildAgentCollaborationProjection,
-  collectOperatorHomeSummary,
   getWorkItem,
   listWorkItems,
   updateWorkItem,
-  type EventScopeKind,
   type WorkItemStatus,
-} from '@agent/core';
+} from '@agent/core/work-coordination';
+import type { EventScopeKind } from '@agent/core/event-scope';
 import type { OperatorHomeScopeFilter } from '@agent/core/operator-home-summary';
 import {
   buildWorkVisibilityProjection,
@@ -30,6 +30,8 @@ export const HEADLESS_WORK_ITEM_STATUSES: readonly WorkItemStatus[] = [
   'done',
   'archived',
 ];
+
+export type HeadlessWorkItemStatus = (typeof HEADLESS_WORK_ITEM_STATUSES)[number];
 
 export class HeadlessQueryError extends Error {
   readonly status = 400;

@@ -34,7 +34,7 @@ Chrome の現在タブで操作意図を記録し、Kyberion が review でき�
 
 Native Messaging host の導入は [native-host/README.md](./native-host/README.md) を参照してください。
 
-拡張機能の契約テストはリポジトリルートから `pnpm run test:browser-bridge` で実行できます。
+拡張機能の契約テストはリポジトリルートから `pnpm test -- --suite browser-bridge` で実行できます。
 
 ## ローカル読み込み
 

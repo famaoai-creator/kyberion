@@ -1,5 +1,35 @@
-import { logger, secretGuard } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { secretGuard } from '@agent/core/secret-guard';
 const BRIDGE_WEBHOOK_URL = 'http://127.0.0.1:3035/webhook';
+
+interface TelegramPollingUpdate {
+  update_id: number;
+  [key: string]: unknown;
+}
+
+interface TelegramPollingResponse {
+  ok?: boolean;
+  result?: unknown;
+}
+
+function parsePollingResponse(value: unknown): TelegramPollingResponse {
+  if (!value || typeof value !== 'object') return {};
+  const record = value as Record<string, unknown>;
+  return {
+    ok: typeof record.ok === 'boolean' ? record.ok : undefined,
+    result: record.result,
+  };
+}
+
+function parsePollingUpdates(value: unknown): TelegramPollingUpdate[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (item): item is TelegramPollingUpdate =>
+      Boolean(item) &&
+      typeof item === 'object' &&
+      typeof (item as Record<string, unknown>).update_id === 'number'
+  );
+}
 
 async function main() {
   const connection = secretGuard.loadConnectionDocument('telegram');
@@ -25,9 +55,9 @@ async function main() {
         throw new Error(`Telegram API returned ${response.status}`);
       }
 
-      const body = (await response.json()) as any;
-      if (body.ok && Array.isArray(body.result)) {
-        for (const update of body.result) {
+      const body = parsePollingResponse(await response.json());
+      if (body.ok) {
+        for (const update of parsePollingUpdates(body.result)) {
           offset = Math.max(offset, update.update_id + 1);
 
           logger.info(
@@ -47,8 +77,10 @@ async function main() {
           }
         }
       }
-    } catch (error: any) {
-      logger.error(`❌ [TelegramPolling] Error: ${error?.message || error}`);
+    } catch (error: unknown) {
+      logger.error(
+        `❌ [TelegramPolling] Error: ${error instanceof Error ? error.message : String(error)}`
+      );
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }

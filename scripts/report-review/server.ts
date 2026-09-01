@@ -19,11 +19,11 @@
 import http from 'node:http';
 import { randomBytes } from 'node:crypto';
 import { safeReadFile, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
-  assertProtocolServiceRegistered,
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycle,
-} from '@agent/core';
+} from '@agent/core/protocol-service-lifecycle';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';

@@ -1,10 +1,12 @@
-import { getOpInputContract, withCatalogInputContract } from '@agent/core';
+import { getOpInputContract } from '@agent/core/op-input-contracts';
+import { withCatalogInputContract } from '../../../core/actuator-sdk.js';
 
 // AR-02: self-described op catalog — the single source the registry and
 // discovery index are generated from. Keep in sync with the dispatch
 // switches in the pipeline helpers; check:op-registry fails on drift.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 type InputSchema = Record<string, unknown>;
 
@@ -331,7 +333,7 @@ export const BROWSER_ACTUATOR_CONTROL_OPS = [
   'while',
 ] as const;
 
-function withInputSchema(op: string, kind: OpSpecKind) {
+function withInputSchema(op: string, kind: PipelineStepType) {
   const contract = getOpInputContract('browser', op);
   const description = contract
     ? { op, kind, input_schema: contract.schema, examples: contract.examples }
@@ -348,7 +350,7 @@ function withInputSchema(op: string, kind: OpSpecKind) {
 
 const toSpec = withInputSchema;
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...BROWSER_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...BROWSER_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

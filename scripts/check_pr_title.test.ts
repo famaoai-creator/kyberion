@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { pathResolver, safeMkdir, safeWriteFile, safeRmSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { checkPullRequestTitle, checkTitle } from './check_pr_title.js';
 
 const TMP_DIR = pathResolver.sharedTmp('check-pr-title-tests');
@@ -24,9 +25,13 @@ describe('check_pr_title', () => {
   it('reads the title from a GitHub event file', () => {
     const eventPath = path.join(TMP_DIR, 'event.json');
     safeMkdir(TMP_DIR, { recursive: true });
-    safeWriteFile(eventPath, JSON.stringify({ pull_request: { title: 'fix(release): lint PR titles' } }), {
-      encoding: 'utf8',
-    });
+    safeWriteFile(
+      eventPath,
+      JSON.stringify({ pull_request: { title: 'fix(release): lint PR titles' } }),
+      {
+        encoding: 'utf8',
+      }
+    );
 
     const result = checkPullRequestTitle({ eventPath });
     expect(result.ok).toBe(true);

@@ -73,6 +73,28 @@ vi.mock('./error-classifier.js', () => ({
 }));
 
 describe('recovery-policy', () => {
+  it('creates an override-compatible builder for actuator helpers', async () => {
+    manifestMock.mockReturnValue({
+      actuator_id: 'test-actuator',
+      version: '1.0.0',
+      capabilities: [],
+      recovery_policy: {
+        retry: { initialDelayMs: 700 },
+      },
+    });
+    const { createGovernedRetryOptionsBuilder } = await import('./recovery-policy.js');
+    const buildRetryOptions = createGovernedRetryOptionsBuilder({
+      manifestPath: '/tmp/manifest-builder.json',
+      defaults: { maxRetries: 2, initialDelayMs: 500 },
+      fallbackCategories: ['timeout'],
+    });
+
+    const options = buildRetryOptions({ maxRetries: 1 });
+
+    expect(options.maxRetries).toBe(1);
+    expect(options.initialDelayMs).toBe(700);
+  });
+
   it('preserves defaults and applies manifest plus explicit overrides', async () => {
     manifestMock.mockReturnValue({
       actuator_id: 'test-actuator',

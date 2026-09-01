@@ -1,7 +1,6 @@
-import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
-import { compileSchema } from './foundation/ajv.js';
+import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export interface SurfaceProviderManifestCatalogEntry {
   id: string;
@@ -25,33 +24,16 @@ const CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/surface-provider-manifest-catalog.schema.json'
 );
 
-let validateFn: ValidateFunction | null = null;
 let cachedCatalog: SurfaceProviderManifestCatalog | null = null;
 let cachedCatalogPath: string | null = null;
 let cachedCatalogDirMtime: number | null = null;
 let cachedCatalogSnapshotMtime: number | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (validateFn) return validateFn;
-  validateFn = compileSchema(CATALOG_SCHEMA_PATH);
-  return validateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCatalog(value: unknown, label: string): SurfaceProviderManifestCatalog {
-  const validate = ensureValidator();
-  if (!validate(value)) {
-    throw new Error(
-      `Invalid surface provider manifest catalog at ${label}: ${errorsFrom(validate).join('; ')}`
-    );
-  }
-  return value as SurfaceProviderManifestCatalog;
-}
+const surfaceProviderManifestCatalog = defineCatalog<SurfaceProviderManifestCatalog>({
+  id: 'surface-provider-manifest-catalog',
+  path: CATALOG_PATH,
+  schema: CATALOG_SCHEMA_PATH,
+});
 
 function readMtime(filePath: string): number {
   try {
@@ -70,12 +52,11 @@ function loadCatalogDirectory(): SurfaceProviderManifestCatalog | null {
 
   const entries: SurfaceProviderManifestCatalogEntry[] = [];
   for (const file of files) {
-    const value = validateCatalog(
-      loadJson(
-        pathResolver.knowledge(`product/governance/surface-provider-manifest-catalogs/${file}`)
-      ),
-      `${CATALOG_DIR}/${file}`
-    );
+    const value = defineCatalog<SurfaceProviderManifestCatalog>({
+      id: `surface-provider-manifest-catalog.${file}`,
+      path: pathResolver.knowledge(`product/governance/surface-provider-manifest-catalogs/${file}`),
+      schema: CATALOG_SCHEMA_PATH,
+    }).load();
     if ((value.entries || []).length !== 1) {
       throw new Error(`Invalid surface provider catalog file ${file}: expected exactly one entry`);
     }
@@ -113,7 +94,7 @@ export function loadSurfaceProviderManifestCatalog(): SurfaceProviderManifestCat
 
   if (!safeExistsSync(CATALOG_PATH)) return null;
 
-  const parsed = validateCatalog(loadJson(CATALOG_PATH), CATALOG_PATH);
+  const parsed = surfaceProviderManifestCatalog.load();
   cachedCatalog = parsed;
   cachedCatalogPath = CATALOG_PATH;
   cachedCatalogDirMtime = dirMtime;
@@ -133,11 +114,4 @@ export function getSurfaceProviderManifestCatalogEntry(
   return (
     listSurfaceProviderManifestCatalogEntries().find((entry) => entry.id === normalized) || null
   );
-}
-
-export function resetSurfaceProviderManifestCatalogCache(): void {
-  cachedCatalog = null;
-  cachedCatalogPath = null;
-  cachedCatalogDirMtime = null;
-  cachedCatalogSnapshotMtime = null;
 }

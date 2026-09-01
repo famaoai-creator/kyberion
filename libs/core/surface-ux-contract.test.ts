@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { repairSurfaceUxContractText, validateSurfaceUxContract } from './surface-ux-contract.js';
+import {
+  checkAndRepairSurfaceUxContract,
+  repairSurfaceUxContractText,
+  validateSurfaceUxContract,
+} from './surface-ux-contract.js';
 
 describe('surface-ux-contract', () => {
   it('accepts user-facing summaries with request/plan/state/result signals', () => {
@@ -95,5 +99,26 @@ describe('surface-ux-contract', () => {
       approval_required: true,
     });
     expect(withGuidance.valid, withGuidance.violations.join('; ')).toBe(true);
+  });
+
+  it('shares deterministic repair behavior with surface entrypoints', () => {
+    const result = checkAndRepairSurfaceUxContract(
+      'Plan: ADF を使って workflow_id を実行します。Result: 完了後に返します。'
+    );
+
+    expect(result.repaired).toBe(true);
+    expect(result.text).not.toContain('ADF');
+    expect(result.text).not.toContain('workflow_id');
+    expect(result.verdict.valid).toBe(true);
+  });
+
+  it('does not claim a repair when approval guidance is still missing', () => {
+    const result = checkAndRepairSurfaceUxContract('State: waiting for approval.', {
+      approval_required: true,
+    });
+
+    expect(result.repaired).toBe(false);
+    expect(result.text).toBe('State: waiting for approval.');
+    expect(result.verdict.valid).toBe(false);
   });
 });

@@ -14,4 +14,9 @@ describe('media-style-policy', () => {
     expect(resolveSignalToneRank('success')).toBe(3);
     expect(resolveBorderKeySides('TL')).toEqual(['top', 'left']);
   });
+
+  it('uses neutral defaults for unknown policy entries', () => {
+    expect(resolveSignalToneRank('unknown-tone')).toBe(2);
+    expect(resolveBorderKeySides('Q')).toEqual([]);
+  });
 });

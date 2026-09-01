@@ -1,13 +1,14 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
+import { loadJson } from '@agent/core/foundation';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeReadFile,
   safeExec,
   safeExistsSync,
-  validatePipelineAdf,
-  pathResolver,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { validatePipelineAdf } from '@agent/core/pipeline-contract';
+import { pathResolver } from '@agent/core/path-resolver';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import type {
@@ -17,32 +18,52 @@ import type {
   ExecutionPlanSetJob,
   PipelineBundleJob,
 } from './orchestrator-helpers.js';
+import {
+  parseActuatorRequestArchetypeCatalog,
+  type ActuatorRequestArchetype,
+  type ActuatorRequestArchetypeCatalog,
+} from './orchestrator-archetype-catalog.js';
 
 const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
   'product/orchestration/actuator-request-archetypes.json'
 );
 
-export function loadActuatorRequestArchetypes(): any {
+export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog {
   if (!safeExistsSync(ACTUATOR_ARCHETYPES_PATH)) {
     throw new Error(`Archetype catalog not found: ${ACTUATOR_ARCHETYPES_PATH}`);
   }
-  return loadJson<unknown>(ACTUATOR_ARCHETYPES_PATH);
+  const parsed = parseActuatorRequestArchetypeCatalog(
+    loadJson<unknown>(assertSafeRepositoryPath(ACTUATOR_ARCHETYPES_PATH))
+  );
+  if (!parsed) {
+    throw new Error(`Archetype catalog has an invalid shape: ${ACTUATOR_ARCHETYPES_PATH}`);
+  }
+  return parsed;
 }
-export function detectRequestArchetype(requestText: string, catalog: any): any {
+
+function loadRepositoryJson<T>(filePath: string): T {
+  return loadJson<T>(assertSafeRepositoryPath(filePath));
+}
+export type DetectedRequestArchetype = ActuatorRequestArchetype & { score: number };
+
+export function detectRequestArchetype(
+  requestText: string,
+  catalog: ActuatorRequestArchetypeCatalog
+): DetectedRequestArchetype {
   const text = normalizeRequestTextForArchetypeDetection(requestText);
-  const archetypes = Array.isArray(catalog?.archetypes) ? catalog.archetypes : [];
-  const scored = archetypes.map((archetype: any) => {
-    const hits = (archetype.trigger_keywords || []).filter((keyword: string) =>
-      text.includes(String(keyword).toLowerCase())
+  const scored = catalog.archetypes.map((archetype) => {
+    const hits = archetype.trigger_keywords.filter((keyword) =>
+      text.includes(keyword.toLowerCase())
     ).length;
     return { ...archetype, score: hits };
   });
-  scored.sort((a: any, b: any) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   if (best && best.score > 0) return best;
   return (
-    scored.find((item: any) => item.id === catalog.default_archetype) || {
+    scored.find((item) => item.id === catalog.default_archetype) || {
       id: 'structured-delivery',
+      trigger_keywords: [],
       score: 0,
       summary_template:
         'Generic structured delivery request requiring normalization before execution.',
@@ -480,7 +501,9 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const templateFullPath = pathResolver.rootResolve(job.template_path);
+  const templateFullPath = assertSafeRepositoryPath(pathResolver.rootResolve(job.template_path), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(templateFullPath)) {
     return {
       ...job,
@@ -829,9 +852,10 @@ export function deriveStatusNextActions(
         id: 'fix-esm-integrity',
         priority: 'now',
         next_action_type: 'execute_now',
-        action: 'Run `pnpm run check:esm` and resolve import/runtime mismatches',
+        action:
+          'Run `pnpm run check -- --scope pr --only esm` and resolve import/runtime mismatches',
         reason: finding.detail || finding.message,
-        suggested_command: 'pnpm run check:esm',
+        suggested_command: 'pnpm run check -- --scope pr --only esm',
         suggested_followup_request: 'ESM integrity の失敗箇所を修正してください。',
       });
       continue;
@@ -841,9 +865,10 @@ export function deriveStatusNextActions(
         id: 'fix-catalog-integrity',
         priority: 'now',
         next_action_type: 'execute_now',
-        action: 'Run `pnpm run check:catalogs` and repair invalid orchestration catalogs',
+        action:
+          'Run `pnpm run check -- --scope full --only catalogs` and repair invalid orchestration catalogs',
         reason: finding.detail || finding.message,
-        suggested_command: 'pnpm run check:catalogs',
+        suggested_command: 'pnpm run check -- --scope full --only catalogs',
         suggested_followup_request: 'catalog integrity の失敗箇所を修正してください。',
       });
       continue;
@@ -929,7 +954,7 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   );
   const missions = missionFiles.map((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = loadJson(filePath) as Record<string, any>;
+    const state = loadRepositoryJson<Record<string, any>>(filePath);
     return {
       mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
       tier: String(state.tier || 'unknown'),
@@ -967,11 +992,13 @@ export function collectProjectStatusSnapshot(targetProjectId?: string) {
     for (const readmePath of readmes) {
       const projectRoot = path.dirname(readmePath);
       const ledgerPath = path.join(projectRoot, '04_control', 'mission-ledger.json');
-      const readme = safeReadFile(readmePath, { encoding: 'utf8' }) as string;
+      const readme = safeReadFile(assertSafeRepositoryPath(readmePath), {
+        encoding: 'utf8',
+      }) as string;
       const titleLine =
         readme.split('\n').find((line) => line.startsWith('# ')) || '# Unknown Project';
       const ledger = safeExistsSync(ledgerPath)
-        ? loadJson<{ project_id?: unknown; entries?: unknown }>(ledgerPath)
+        ? loadRepositoryJson<{ project_id?: unknown; entries?: unknown }>(ledgerPath)
         : { entries: [] };
       const entries = Array.isArray(ledger.entries) ? ledger.entries : [];
       projectEntries.push({

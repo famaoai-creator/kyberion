@@ -1,9 +1,10 @@
 import * as path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { maskComments } from './check_module_boundaries.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type MaxFileLinesConfig = {
   max_lines: number;
@@ -67,12 +68,15 @@ export const runCheckMaxFileLines = defineScript({
   run(context) {
     const report = checkMaxFileLines();
     if (report.violations.length > 0) {
-      context.print('[check:max-file-lines] violations detected:');
-      for (const violation of report.violations) context.print(`- ${violation}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)].join(
+          '\n'
+        )
+      );
     }
     context.print(`[check:max-file-lines] OK (max ${report.maxLines} lines)`);
+    return report;
   },
 });
 

@@ -171,17 +171,32 @@ export interface DeferredToolLoadingPlan<T extends DeferredToolDeclaration> {
 /**
  * Resolve a role-scoped tool surface without mutating the stable prefix.
  *
- * The caller provides the complete governed catalog and names only the tools
- * it wants to defer for this request. Unknown names and role-denied deferred
- * names fail closed instead of producing an announcement for an unavailable
- * capability. The returned arrays are new arrays and preserve catalog order.
+ * The caller provides the active governed catalog and may provide additional
+ * definitions that should remain deferred for this request. Unknown names and
+ * role-denied deferred names fail closed instead of producing an announcement
+ * for an unavailable capability. The returned arrays are new arrays and
+ * preserve the supplied order.
  */
 export function planDeferredToolLoading<T extends DeferredToolDeclaration>(
   tools: readonly T[],
-  options: { role?: string; deferredToolNames?: readonly string[] } = {}
+  options: {
+    role?: string;
+    deferredToolNames?: readonly string[];
+    deferredTools?: readonly T[];
+  } = {}
 ): DeferredToolLoadingPlan<T> {
   const byName = new Map<string, T>();
   for (const tool of tools) {
+    const name = String(tool.name || '').trim();
+    if (!name) throw new Error('[DEFERRED_TOOL_INVALID] tool name is required.');
+    if (byName.has(name)) {
+      throw new Error(`[DEFERRED_TOOL_DUPLICATE] tool "${name}" is declared more than once.`);
+    }
+    byName.set(name, tool);
+  }
+
+  const explicitDeferred = [...(options.deferredTools ?? [])];
+  for (const tool of explicitDeferred) {
     const name = String(tool.name || '').trim();
     if (!name) throw new Error('[DEFERRED_TOOL_INVALID] tool name is required.');
     if (byName.has(name)) {
@@ -202,13 +217,27 @@ export function planDeferredToolLoading<T extends DeferredToolDeclaration>(
       );
     }
   }
+  for (const tool of explicitDeferred) {
+    if (options.role && tool.allowed_roles?.length && !tool.allowed_roles.includes(options.role)) {
+      throw new Error(
+        `[DEFERRED_TOOL_ROLE_DENIED] role "${options.role}" cannot access tool "${tool.name}".`
+      );
+    }
+  }
 
   const visible = tools.filter(
     (tool) =>
       !options.role || !tool.allowed_roles?.length || tool.allowed_roles.includes(options.role)
   );
-  const deferred = visible.filter((tool) => deferredNames.has(tool.name));
-  const active = visible.filter((tool) => !deferredNames.has(tool.name));
+  const visibleExplicitDeferred = explicitDeferred.filter(
+    (tool) =>
+      !options.role || !tool.allowed_roles?.length || tool.allowed_roles.includes(options.role)
+  );
+  const deferred = [
+    ...visible.filter((tool) => deferredNames.has(String(tool.name).trim())),
+    ...visibleExplicitDeferred,
+  ];
+  const active = visible.filter((tool) => !deferredNames.has(String(tool.name).trim()));
   return {
     active: [...active],
     deferred: [...deferred],

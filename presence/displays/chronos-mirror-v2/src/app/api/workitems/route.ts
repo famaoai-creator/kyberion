@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  listWorkItems,
-  getWorkItem,
-  updateWorkItem,
-  type WorkItemStatus,
-} from '@agent/core/work-coordination';
+import { listWorkItems, getWorkItem, updateWorkItem } from '@agent/core/work-coordination';
 import {
   buildWorkVisibilityProjection,
   type WorkVisibilityScope,
@@ -20,18 +15,10 @@ import {
   ViewerContextError,
   withViewerExecutionContext,
 } from '../../../lib/viewer-context';
+import { readChronosJsonObject } from '../../../lib/request-input';
+import { CHRONOS_WORK_ITEM_STATUSES, parseWorkItemStatusInput } from './work-item-input';
 
 export const dynamic = 'force-dynamic';
-
-const KANBAN_STATUSES: WorkItemStatus[] = [
-  'backlog',
-  'ready',
-  'in_progress',
-  'blocked',
-  'review',
-  'done',
-  'archived',
-];
 
 export function GET(req: NextRequest) {
   const denied = guardRequest(req);
@@ -86,7 +73,7 @@ export function GET(req: NextRequest) {
     });
     return NextResponse.json({
       ok: true,
-      statuses: KANBAN_STATUSES,
+      statuses: CHRONOS_WORK_ITEM_STATUSES,
       scope: projection.scope,
       view: projection.view,
       items: projection.items,
@@ -108,15 +95,11 @@ export async function POST(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
   const viewer = resolvedViewer.context;
   try {
-    const body = await req.json();
-    const itemId = typeof body?.itemId === 'string' ? body.itemId : '';
-    const status = KANBAN_STATUSES.includes(body?.status) ? (body.status as WorkItemStatus) : null;
-    if (!itemId || !status) {
-      return NextResponse.json(
-        { ok: false, error: 'itemId と status が必要です' },
-        { status: 400 }
-      );
+    const parsedBody = await readChronosJsonObject(req, 'Chronos work items');
+    if (!parsedBody.ok) {
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
     }
+    const { itemId, status } = parseWorkItemStatusInput(parsedBody.body);
     const current = withViewerExecutionContext(viewer, () => getWorkItem(itemId));
     if (!current)
       return NextResponse.json({ ok: false, error: 'work item not found' }, { status: 404 });

@@ -211,6 +211,46 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.email.status",
+      "command": "email status",
+      "noun": "email",
+      "verb": "status",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.email.latest-draft",
+      "command": "email latest-draft",
+      "noun": "email",
+      "verb": "latest-draft",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.email.draft",
+      "command": "email draft",
+      "noun": "email",
+      "verb": "draft",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.email.deliver",
+      "command": "email deliver",
+      "noun": "email",
+      "verb": "deliver",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.email.archive-inbox",
+      "command": "email archive-inbox",
+      "noun": "email",
+      "verb": "archive-inbox",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
       "id": "operator-cli.calendar",
       "command": "calendar",
       "noun": "calendar",
@@ -219,10 +259,74 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.calendar.status",
+      "command": "calendar status",
+      "noun": "calendar",
+      "verb": "status",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.calendar.list-calendars",
+      "command": "calendar list-calendars",
+      "noun": "calendar",
+      "verb": "list-calendars",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.calendar.agenda",
+      "command": "calendar agenda",
+      "noun": "calendar",
+      "verb": "agenda",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.calendar.freebusy",
+      "command": "calendar freebusy",
+      "noun": "calendar",
+      "verb": "freebusy",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.calendar.create-event",
+      "command": "calendar create-event",
+      "noun": "calendar",
+      "verb": "create-event",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
       "id": "operator-cli.task",
       "command": "task",
       "noun": "task",
       "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.task.plan",
+      "command": "task plan",
+      "noun": "task",
+      "verb": "plan",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.task.start",
+      "command": "task start",
+      "noun": "task",
+      "verb": "start",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.task.scenario",
+      "command": "task scenario",
+      "noun": "task",
+      "verb": "scenario",
       "entry": "operator-cli",
       "audience": "operator"
     },
@@ -267,19 +371,83 @@
       "audience": "user"
     },
     {
+      "id": "operator-cli.schedule.list",
+      "command": "schedule list",
+      "noun": "schedule",
+      "verb": "list",
+      "entry": "operator-cli",
+      "audience": "user"
+    },
+    {
+      "id": "operator-cli.schedule.register",
+      "command": "schedule register",
+      "noun": "schedule",
+      "verb": "register",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.schedule.remove",
+      "command": "schedule remove",
+      "noun": "schedule",
+      "verb": "remove",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.project-trust",
+      "command": "project-trust",
+      "noun": "project-trust",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-cli.project-trust.request",
+      "command": "project-trust request",
+      "noun": "project-trust",
+      "verb": "request",
+      "entry": "operator-cli",
+      "audience": "operator"
+    },
+    {
+      "id": "pipeline-runner.default",
+      "command": "pipeline",
+      "noun": "pipeline",
+      "verb": "default",
+      "entry": "pipeline-runner",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-readiness.vital",
+      "command": "vital",
+      "noun": "vital",
+      "verb": "default",
+      "entry": "operator-readiness",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-setup.report",
+      "command": "setup report",
+      "noun": "setup",
+      "verb": "report",
+      "entry": "operator-setup",
+      "audience": "operator"
+    },
+    {
+      "id": "operator-voice.setup",
+      "command": "voice setup",
+      "noun": "voice",
+      "verb": "setup",
+      "entry": "operator-voice",
+      "audience": "operator"
+    },
+    {
       "id": "organization-model.default",
       "command": "organization",
       "noun": "organization",
       "verb": "default",
       "entry": "organization-model",
-      "audience": "operator"
-    },
-    {
-      "id": "organization-roles.default",
-      "command": "org",
-      "noun": "org",
-      "verb": "default",
-      "entry": "organization-roles",
       "audience": "operator"
     },
     {
@@ -328,29 +496,1288 @@
         "approve",
         "reject",
         "email",
+        "email status",
+        "email latest-draft",
+        "email draft",
+        "email deliver",
+        "email archive-inbox",
         "calendar",
+        "calendar status",
+        "calendar list-calendars",
+        "calendar agenda",
+        "calendar freebusy",
+        "calendar create-event",
         "task",
+        "task plan",
+        "task start",
+        "task scenario",
         "offboard",
         "run",
         "preview",
         "intent",
-        "schedule"
+        "schedule",
+        "schedule list",
+        "schedule register",
+        "schedule remove",
+        "project-trust",
+        "project-trust request"
       ]
     },
     {
       "id": "organization-model",
-      "module": "scripts/organization_operating_model.ts",
+      "module": "scripts/organization.ts",
       "commands": ["organization"]
-    },
-    {
-      "id": "organization-roles",
-      "module": "scripts/org.ts",
-      "commands": ["org"]
     },
     {
       "id": "project-controller",
       "module": "scripts/project_controller.ts",
       "commands": ["project"]
+    },
+    {
+      "id": "pipeline-runner",
+      "module": "scripts/run_pipeline.ts",
+      "commands": ["pipeline"]
+    },
+    {
+      "id": "operator-readiness",
+      "module": "scripts/vital_check.ts",
+      "commands": ["vital"]
+    },
+    {
+      "id": "operator-setup",
+      "module": "scripts/setup_report.ts",
+      "commands": ["setup report"]
+    },
+    {
+      "id": "operator-voice",
+      "module": "scripts/voice_setup.ts",
+      "commands": ["voice setup"]
+    }
+  ],
+  "script_commands": [
+    {
+      "id": "script.test",
+      "script": "test",
+      "command": "test default",
+      "noun": "test",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.test.unit",
+      "script": "test:unit",
+      "command": "test unit",
+      "noun": "test",
+      "verb": "unit",
+      "audience": "dev"
+    },
+    {
+      "id": "script.lint",
+      "script": "lint",
+      "command": "lint default",
+      "noun": "lint",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.format",
+      "script": "format",
+      "command": "format default",
+      "noun": "format",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.build",
+      "script": "build",
+      "command": "build default",
+      "noun": "build",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.build.packages",
+      "script": "build:packages",
+      "command": "build packages",
+      "noun": "build",
+      "verb": "packages",
+      "audience": "dev"
+    },
+    {
+      "id": "script.build.actuators",
+      "script": "build:actuators",
+      "command": "build actuators",
+      "noun": "build",
+      "verb": "actuators",
+      "audience": "dev"
+    },
+    {
+      "id": "script.build.repo",
+      "script": "build:repo",
+      "command": "build repo",
+      "noun": "build",
+      "verb": "repo",
+      "audience": "dev"
+    },
+    {
+      "id": "script.build.ui",
+      "script": "build:ui",
+      "command": "build ui",
+      "noun": "build",
+      "verb": "ui",
+      "audience": "dev"
+    },
+    {
+      "id": "script.audit.mirror-reconcile",
+      "script": "audit:mirror-reconcile",
+      "command": "audit mirror-reconcile",
+      "noun": "audit",
+      "verb": "mirror-reconcile",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generate.op-registry",
+      "script": "generate:op-registry",
+      "command": "generate op-registry",
+      "noun": "generate",
+      "verb": "op-registry",
+      "audience": "dev"
+    },
+    {
+      "id": "script.generate.vocabulary-types",
+      "script": "generate:vocabulary-types",
+      "command": "generate vocabulary-types",
+      "noun": "generate",
+      "verb": "vocabulary-types",
+      "audience": "dev"
+    },
+    {
+      "id": "script.generate.pseudo-locale",
+      "script": "generate:pseudo-locale",
+      "command": "generate pseudo-locale",
+      "noun": "generate",
+      "verb": "pseudo-locale",
+      "audience": "dev"
+    },
+    {
+      "id": "script.service.harness",
+      "script": "service:harness",
+      "command": "service harness",
+      "noun": "service",
+      "verb": "harness",
+      "audience": "operator"
+    },
+    {
+      "id": "script.check.chronos-perf",
+      "script": "check:chronos-perf",
+      "command": "check chronos-perf",
+      "noun": "check",
+      "verb": "chronos-perf",
+      "audience": "dev"
+    },
+    {
+      "id": "script.service.recording",
+      "script": "service:recording",
+      "command": "service recording",
+      "noun": "service",
+      "verb": "recording",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generate.env-registry",
+      "script": "generate:env-registry",
+      "command": "generate env-registry",
+      "noun": "generate",
+      "verb": "env-registry",
+      "audience": "dev"
+    },
+    {
+      "id": "script.config.report",
+      "script": "config:report",
+      "command": "config report",
+      "noun": "config",
+      "verb": "report",
+      "audience": "operator"
+    },
+    {
+      "id": "script.agents.generate",
+      "script": "agents:generate",
+      "command": "agents generate",
+      "noun": "agents",
+      "verb": "generate",
+      "audience": "operator"
+    },
+    {
+      "id": "script.check.apple-fm",
+      "script": "check:apple-fm",
+      "command": "check apple-fm",
+      "noun": "check",
+      "verb": "apple-fm",
+      "audience": "dev"
+    },
+    {
+      "id": "script.report.i18n-coverage",
+      "script": "report:i18n-coverage",
+      "command": "report i18n-coverage",
+      "noun": "report",
+      "verb": "i18n-coverage",
+      "audience": "dev"
+    },
+    {
+      "id": "script.sync.component-inventory",
+      "script": "sync:component-inventory",
+      "command": "sync component-inventory",
+      "noun": "sync",
+      "verb": "component-inventory",
+      "audience": "operator"
+    },
+    {
+      "id": "script.sync.model-registry",
+      "script": "sync:model-registry",
+      "command": "sync model-registry",
+      "noun": "sync",
+      "verb": "model-registry",
+      "audience": "operator"
+    },
+    {
+      "id": "script.tenant",
+      "script": "tenant",
+      "command": "tenant default",
+      "noun": "tenant",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.tenant.activation",
+      "script": "tenant:activation",
+      "command": "tenant activation",
+      "noun": "tenant",
+      "verb": "activation",
+      "audience": "operator"
+    },
+    {
+      "id": "script.migrate.physical-namespaces",
+      "script": "migrate:physical-namespaces",
+      "command": "migrate physical-namespaces",
+      "noun": "migrate",
+      "verb": "physical-namespaces",
+      "audience": "operator"
+    },
+    {
+      "id": "script.migrate.peer-tenant-runtime",
+      "script": "migrate:peer-tenant-runtime",
+      "command": "migrate peer-tenant-runtime",
+      "noun": "migrate",
+      "verb": "peer-tenant-runtime",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.runtime-recovery",
+      "script": "peer:runtime-recovery",
+      "command": "peer runtime-recovery",
+      "noun": "peer",
+      "verb": "runtime-recovery",
+      "audience": "operator"
+    },
+    {
+      "id": "script.organization",
+      "script": "organization",
+      "command": "organization default",
+      "noun": "organization",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge.rank",
+      "script": "knowledge:rank",
+      "command": "knowledge rank",
+      "noun": "knowledge",
+      "verb": "rank",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge",
+      "script": "knowledge",
+      "command": "knowledge default",
+      "noun": "knowledge",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge-feedback",
+      "script": "knowledge-feedback",
+      "command": "knowledge-feedback default",
+      "noun": "knowledge-feedback",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge.scope-health",
+      "script": "knowledge:scope-health",
+      "command": "knowledge scope-health",
+      "noun": "knowledge",
+      "verb": "scope-health",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge.scope-reconcile",
+      "script": "knowledge:scope-reconcile",
+      "command": "knowledge scope-reconcile",
+      "noun": "knowledge",
+      "verb": "scope-reconcile",
+      "audience": "operator"
+    },
+    {
+      "id": "script.scope",
+      "script": "scope",
+      "command": "scope default",
+      "noun": "scope",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.bindings",
+      "script": "bindings",
+      "command": "bindings default",
+      "noun": "bindings",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generate.capability-seams",
+      "script": "generate:capability-seams",
+      "command": "generate capability-seams",
+      "noun": "generate",
+      "verb": "capability-seams",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check",
+      "script": "check",
+      "command": "check default",
+      "noun": "check",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.first-win-docs",
+      "script": "check:first-win-docs",
+      "command": "check first-win-docs",
+      "noun": "check",
+      "verb": "first-win-docs",
+      "audience": "dev"
+    },
+    {
+      "id": "script.knowledge.sync",
+      "script": "knowledge:sync",
+      "command": "knowledge sync",
+      "noun": "knowledge",
+      "verb": "sync",
+      "audience": "operator"
+    },
+    {
+      "id": "script.check.wire-error-boundary",
+      "script": "check:wire-error-boundary",
+      "command": "check wire-error-boundary",
+      "noun": "check",
+      "verb": "wire-error-boundary",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.contract-semver",
+      "script": "check:contract-semver",
+      "command": "check contract-semver",
+      "noun": "check",
+      "verb": "contract-semver",
+      "audience": "dev"
+    },
+    {
+      "id": "script.check.pr-title",
+      "script": "check:pr-title",
+      "command": "check pr-title",
+      "noun": "check",
+      "verb": "pr-title",
+      "audience": "dev"
+    },
+    {
+      "id": "script.pr.create",
+      "script": "pr:create",
+      "command": "pr create",
+      "noun": "pr",
+      "verb": "create",
+      "audience": "operator"
+    },
+    {
+      "id": "script.check.commit-subject",
+      "script": "check:commit-subject",
+      "command": "check commit-subject",
+      "noun": "check",
+      "verb": "commit-subject",
+      "audience": "dev"
+    },
+    {
+      "id": "script.task.list",
+      "script": "task:list",
+      "command": "task list",
+      "noun": "task",
+      "verb": "list",
+      "audience": "operator"
+    },
+    {
+      "id": "script.task.init",
+      "script": "task:init",
+      "command": "task init",
+      "noun": "task",
+      "verb": "init",
+      "audience": "operator"
+    },
+    {
+      "id": "script.task.run",
+      "script": "task:run",
+      "command": "task run",
+      "noun": "task",
+      "verb": "run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.task.smoke",
+      "script": "task:smoke",
+      "command": "task smoke",
+      "noun": "task",
+      "verb": "smoke",
+      "audience": "operator"
+    },
+    {
+      "id": "script.intent",
+      "script": "intent",
+      "command": "intent default",
+      "noun": "intent",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.onboarding.context",
+      "script": "onboarding:context",
+      "command": "onboarding context",
+      "noun": "onboarding",
+      "verb": "context",
+      "audience": "operator"
+    },
+    {
+      "id": "script.minutes.record",
+      "script": "minutes:record",
+      "command": "minutes record",
+      "noun": "minutes",
+      "verb": "record",
+      "audience": "operator"
+    },
+    {
+      "id": "script.license.audit",
+      "script": "license:audit",
+      "command": "license audit",
+      "noun": "license",
+      "verb": "audit",
+      "audience": "dev"
+    },
+    {
+      "id": "script.voice.upgrade",
+      "script": "voice:upgrade",
+      "command": "voice upgrade",
+      "noun": "voice",
+      "verb": "upgrade",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generate.pii-rules",
+      "script": "generate:pii-rules",
+      "command": "generate pii-rules",
+      "noun": "generate",
+      "verb": "pii-rules",
+      "audience": "dev"
+    },
+    {
+      "id": "script.meeting.preflight",
+      "script": "meeting:preflight",
+      "command": "meeting preflight",
+      "noun": "meeting",
+      "verb": "preflight",
+      "audience": "operator"
+    },
+    {
+      "id": "script.dev.watch",
+      "script": "dev:watch",
+      "command": "dev watch",
+      "noun": "dev",
+      "verb": "watch",
+      "audience": "dev"
+    },
+    {
+      "id": "script.smoke.intent",
+      "script": "smoke:intent",
+      "command": "smoke intent",
+      "noun": "smoke",
+      "verb": "intent",
+      "audience": "dev"
+    },
+    {
+      "id": "script.watch.tenant-drift",
+      "script": "watch:tenant-drift",
+      "command": "watch tenant-drift",
+      "noun": "watch",
+      "verb": "tenant-drift",
+      "audience": "operator"
+    },
+    {
+      "id": "script.pipeline.promote",
+      "script": "pipeline:promote",
+      "command": "pipeline promote",
+      "noun": "pipeline",
+      "verb": "promote",
+      "audience": "operator"
+    },
+    {
+      "id": "script.patch.dependency",
+      "script": "patch:dependency",
+      "command": "patch dependency",
+      "noun": "patch",
+      "verb": "dependency",
+      "audience": "dev"
+    },
+    {
+      "id": "script.manifests.sign",
+      "script": "manifests:sign",
+      "command": "manifests sign",
+      "noun": "manifests",
+      "verb": "sign",
+      "audience": "operator"
+    },
+    {
+      "id": "script.secrets.encrypt",
+      "script": "secrets:encrypt",
+      "command": "secrets encrypt",
+      "noun": "secrets",
+      "verb": "encrypt",
+      "audience": "operator"
+    },
+    {
+      "id": "script.cost.report",
+      "script": "cost:report",
+      "command": "cost report",
+      "noun": "cost",
+      "verb": "report",
+      "audience": "operator"
+    },
+    {
+      "id": "script.egress.report",
+      "script": "egress:report",
+      "command": "egress report",
+      "noun": "egress",
+      "verb": "report",
+      "audience": "operator"
+    },
+    {
+      "id": "script.daemon.watchdog",
+      "script": "daemon:watchdog",
+      "command": "daemon watchdog",
+      "noun": "daemon",
+      "verb": "watchdog",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mesh.deliver",
+      "script": "mesh:deliver",
+      "command": "mesh deliver",
+      "noun": "mesh",
+      "verb": "deliver",
+      "audience": "operator"
+    },
+    {
+      "id": "script.campaign.suite",
+      "script": "campaign:suite",
+      "command": "campaign suite",
+      "noun": "campaign",
+      "verb": "suite",
+      "audience": "operator"
+    },
+    {
+      "id": "script.audit.verify",
+      "script": "audit:verify",
+      "command": "audit verify",
+      "noun": "audit",
+      "verb": "verify",
+      "audience": "operator"
+    },
+    {
+      "id": "script.ai-test",
+      "script": "ai-test",
+      "command": "ai-test default",
+      "noun": "ai-test",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generate.knowledge-index",
+      "script": "generate:knowledge-index",
+      "command": "generate knowledge-index",
+      "noun": "generate",
+      "verb": "knowledge-index",
+      "audience": "dev"
+    },
+    {
+      "id": "script.history.search",
+      "script": "history:search",
+      "command": "history search",
+      "noun": "history",
+      "verb": "search",
+      "audience": "operator"
+    },
+    {
+      "id": "script.plugin.install",
+      "script": "plugin:install",
+      "command": "plugin install",
+      "noun": "plugin",
+      "verb": "install",
+      "audience": "operator"
+    },
+    {
+      "id": "script.background-review",
+      "script": "background-review",
+      "command": "background-review default",
+      "noun": "background-review",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.background-review.mission-e2e",
+      "script": "background-review:mission-e2e",
+      "command": "background-review mission-e2e",
+      "noun": "background-review",
+      "verb": "mission-e2e",
+      "audience": "operator"
+    },
+    {
+      "id": "script.automation.blueprint",
+      "script": "automation:blueprint",
+      "command": "automation blueprint",
+      "noun": "automation",
+      "verb": "blueprint",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mesh-hub.inspect",
+      "script": "mesh-hub:inspect",
+      "command": "mesh-hub inspect",
+      "noun": "mesh-hub",
+      "verb": "inspect",
+      "audience": "operator"
+    },
+    {
+      "id": "script.export.validation-bundle",
+      "script": "export:validation-bundle",
+      "command": "export validation-bundle",
+      "noun": "export",
+      "verb": "validation-bundle",
+      "audience": "operator"
+    },
+    {
+      "id": "script.meeting.run",
+      "script": "meeting:run",
+      "command": "meeting run",
+      "noun": "meeting",
+      "verb": "run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.meeting.participate",
+      "script": "meeting:participate",
+      "command": "meeting participate",
+      "noun": "meeting",
+      "verb": "participate",
+      "audience": "operator"
+    },
+    {
+      "id": "script.gws.meet.create",
+      "script": "gws:meet:create",
+      "command": "gws meet-create",
+      "noun": "gws",
+      "verb": "meet-create",
+      "audience": "operator"
+    },
+    {
+      "id": "script.env.bootstrap",
+      "script": "env:bootstrap",
+      "command": "env bootstrap",
+      "noun": "env",
+      "verb": "bootstrap",
+      "audience": "operator"
+    },
+    {
+      "id": "script.meeting.consent",
+      "script": "meeting:consent",
+      "command": "meeting consent",
+      "noun": "meeting",
+      "verb": "consent",
+      "audience": "operator"
+    },
+    {
+      "id": "script.voice.route",
+      "script": "voice:route",
+      "command": "voice route",
+      "noun": "voice",
+      "verb": "route",
+      "audience": "operator"
+    },
+    {
+      "id": "script.typecheck",
+      "script": "typecheck",
+      "command": "typecheck default",
+      "noun": "typecheck",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.validate",
+      "script": "validate",
+      "command": "validate default",
+      "noun": "validate",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.doctor",
+      "script": "doctor",
+      "command": "doctor default",
+      "noun": "doctor",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.office",
+      "script": "office",
+      "command": "office default",
+      "noun": "office",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.tui",
+      "script": "tui",
+      "command": "tui default",
+      "noun": "tui",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.deps.check",
+      "script": "deps:check",
+      "command": "deps check",
+      "noun": "deps",
+      "verb": "check",
+      "audience": "dev"
+    },
+    {
+      "id": "script.media.visual-proof.ds04",
+      "script": "media:visual-proof:ds04",
+      "command": "media visual-proof-ds04",
+      "noun": "media",
+      "verb": "visual-proof-ds04",
+      "audience": "operator"
+    },
+    {
+      "id": "script.service.preflight",
+      "script": "service:preflight",
+      "command": "service preflight",
+      "noun": "service",
+      "verb": "preflight",
+      "audience": "operator"
+    },
+    {
+      "id": "script.kyberion",
+      "script": "kyberion",
+      "command": "kyberion default",
+      "noun": "kyberion",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.email.workflow",
+      "script": "email:workflow",
+      "command": "email workflow",
+      "noun": "email",
+      "verb": "workflow",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mission",
+      "script": "mission",
+      "command": "mission default",
+      "noun": "mission",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.project",
+      "script": "project",
+      "command": "project default",
+      "noun": "project",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.create.actuator",
+      "script": "create:actuator",
+      "command": "create actuator",
+      "noun": "create",
+      "verb": "actuator",
+      "audience": "operator"
+    },
+    {
+      "id": "script.model.feedback",
+      "script": "model:feedback",
+      "command": "model feedback",
+      "noun": "model",
+      "verb": "feedback",
+      "audience": "operator"
+    },
+    {
+      "id": "script.agent-runtime.supervisor",
+      "script": "agent-runtime:supervisor",
+      "command": "agent-runtime supervisor",
+      "noun": "agent-runtime",
+      "verb": "supervisor",
+      "audience": "operator"
+    },
+    {
+      "id": "script.agent-runtime.daemon",
+      "script": "agent-runtime:daemon",
+      "command": "agent-runtime daemon",
+      "noun": "agent-runtime",
+      "verb": "daemon",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.conversation-server",
+      "script": "peer:conversation-server",
+      "command": "peer conversation-server",
+      "noun": "peer",
+      "verb": "conversation-server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.register",
+      "script": "peer:register",
+      "command": "peer register",
+      "noun": "peer",
+      "verb": "register",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.conversation",
+      "script": "peer:conversation",
+      "command": "peer conversation",
+      "noun": "peer",
+      "verb": "conversation",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.collaboration",
+      "script": "peer:collaboration",
+      "command": "peer collaboration",
+      "noun": "peer",
+      "verb": "collaboration",
+      "audience": "operator"
+    },
+    {
+      "id": "script.peer.send",
+      "script": "peer:send",
+      "command": "peer send",
+      "noun": "peer",
+      "verb": "send",
+      "audience": "operator"
+    },
+    {
+      "id": "script.work",
+      "script": "work",
+      "command": "work default",
+      "noun": "work",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mission.orchestrator",
+      "script": "mission:orchestrator",
+      "command": "mission orchestrator",
+      "noun": "mission",
+      "verb": "orchestrator",
+      "audience": "operator"
+    },
+    {
+      "id": "script.onboard",
+      "script": "onboard",
+      "command": "onboard default",
+      "noun": "onboard",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mission.journal",
+      "script": "mission:journal",
+      "command": "mission journal",
+      "noun": "mission",
+      "verb": "journal",
+      "audience": "operator"
+    },
+    {
+      "id": "script.ingest",
+      "script": "ingest",
+      "command": "ingest default",
+      "noun": "ingest",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.dashboard",
+      "script": "dashboard",
+      "command": "dashboard default",
+      "noun": "dashboard",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.control",
+      "script": "control",
+      "command": "control default",
+      "noun": "control",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.surfaces",
+      "script": "surfaces",
+      "command": "surfaces default",
+      "noun": "surfaces",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.config-mission",
+      "script": "config-mission",
+      "command": "config-mission default",
+      "noun": "config-mission",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.services.setup",
+      "script": "services:setup",
+      "command": "services setup",
+      "noun": "services",
+      "verb": "setup",
+      "audience": "operator"
+    },
+    {
+      "id": "script.channels.list",
+      "script": "channels:list",
+      "command": "channels list",
+      "noun": "channels",
+      "verb": "list",
+      "audience": "operator"
+    },
+    {
+      "id": "script.setup.report",
+      "script": "setup:report",
+      "command": "setup report",
+      "noun": "setup",
+      "verb": "report",
+      "audience": "operator"
+    },
+    {
+      "id": "script.generation.schedule",
+      "script": "generation:schedule",
+      "command": "generation schedule",
+      "noun": "generation",
+      "verb": "schedule",
+      "audience": "operator"
+    },
+    {
+      "id": "script.chronos",
+      "script": "chronos",
+      "command": "chronos default",
+      "noun": "chronos",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.chronos.install",
+      "script": "chronos:install",
+      "command": "chronos install",
+      "noun": "chronos",
+      "verb": "install",
+      "audience": "operator"
+    },
+    {
+      "id": "script.chronos.uninstall",
+      "script": "chronos:uninstall",
+      "command": "chronos uninstall",
+      "noun": "chronos",
+      "verb": "uninstall",
+      "audience": "operator"
+    },
+    {
+      "id": "script.ops.alerts",
+      "script": "ops:alerts",
+      "command": "ops alerts",
+      "noun": "ops",
+      "verb": "alerts",
+      "audience": "operator"
+    },
+    {
+      "id": "script.voice.conversation.turn",
+      "script": "voice:conversation:turn",
+      "command": "voice conversation-turn",
+      "noun": "voice",
+      "verb": "conversation-turn",
+      "audience": "operator"
+    },
+    {
+      "id": "script.voice.profile.promote",
+      "script": "voice:profile:promote",
+      "command": "voice profile-promote",
+      "noun": "voice",
+      "verb": "profile-promote",
+      "audience": "operator"
+    },
+    {
+      "id": "script.agy.sdk.setup",
+      "script": "agy:sdk:setup",
+      "command": "agy sdk-setup",
+      "noun": "agy",
+      "verb": "sdk-setup",
+      "audience": "operator"
+    },
+    {
+      "id": "script.reasoning.setup",
+      "script": "reasoning:setup",
+      "command": "reasoning setup",
+      "noun": "reasoning",
+      "verb": "setup",
+      "audience": "operator"
+    },
+    {
+      "id": "script.reasoning.config",
+      "script": "reasoning:config",
+      "command": "reasoning config",
+      "noun": "reasoning",
+      "verb": "config",
+      "audience": "operator"
+    },
+    {
+      "id": "script.customer.create",
+      "script": "customer:create",
+      "command": "customer create",
+      "noun": "customer",
+      "verb": "create",
+      "audience": "operator"
+    },
+    {
+      "id": "script.customer.list",
+      "script": "customer:list",
+      "command": "customer list",
+      "noun": "customer",
+      "verb": "list",
+      "audience": "operator"
+    },
+    {
+      "id": "script.customer.migrate-from-personal",
+      "script": "customer:migrate-from-personal",
+      "command": "customer migrate-from-personal",
+      "noun": "customer",
+      "verb": "migrate-from-personal",
+      "audience": "operator"
+    },
+    {
+      "id": "script.customer.switch",
+      "script": "customer:switch",
+      "command": "customer switch",
+      "noun": "customer",
+      "verb": "switch",
+      "audience": "operator"
+    },
+    {
+      "id": "script.backup",
+      "script": "backup",
+      "command": "backup default",
+      "noun": "backup",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.telegram.bridge",
+      "script": "telegram:bridge",
+      "command": "telegram bridge",
+      "noun": "telegram",
+      "verb": "bridge",
+      "audience": "operator"
+    },
+    {
+      "id": "script.chronos.dev",
+      "script": "chronos:dev",
+      "command": "chronos dev",
+      "noun": "chronos",
+      "verb": "dev",
+      "audience": "operator"
+    },
+    {
+      "id": "script.capabilities",
+      "script": "capabilities",
+      "command": "capabilities default",
+      "noun": "capabilities",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.provider-capabilities.scan",
+      "script": "provider-capabilities:scan",
+      "command": "provider-capabilities scan",
+      "noun": "provider-capabilities",
+      "verb": "scan",
+      "audience": "operator"
+    },
+    {
+      "id": "script.examples",
+      "script": "examples",
+      "command": "examples default",
+      "noun": "examples",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.system.upgrade",
+      "script": "system:upgrade",
+      "command": "system upgrade",
+      "noun": "system",
+      "verb": "upgrade",
+      "audience": "operator"
+    },
+    {
+      "id": "script.pipeline",
+      "script": "pipeline",
+      "command": "pipeline default",
+      "noun": "pipeline",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.pipeline.super",
+      "script": "pipeline:super",
+      "command": "pipeline super",
+      "noun": "pipeline",
+      "verb": "super",
+      "audience": "operator"
+    },
+    {
+      "id": "script.intent.run",
+      "script": "intent:run",
+      "command": "intent run",
+      "noun": "intent",
+      "verb": "run",
+      "audience": "operator"
+    },
+    {
+      "id": "script.release.notes",
+      "script": "release:notes",
+      "command": "release notes",
+      "noun": "release",
+      "verb": "notes",
+      "audience": "operator"
+    },
+    {
+      "id": "script.release.source-archive",
+      "script": "release:source-archive",
+      "command": "release source-archive",
+      "noun": "release",
+      "verb": "source-archive",
+      "audience": "operator"
+    },
+    {
+      "id": "script.release.install-smoke",
+      "script": "release:install-smoke",
+      "command": "release install-smoke",
+      "noun": "release",
+      "verb": "install-smoke",
+      "audience": "operator"
+    },
+    {
+      "id": "script.migration",
+      "script": "migration",
+      "command": "migration default",
+      "noun": "migration",
+      "verb": "default",
+      "audience": "operator"
+    },
+    {
+      "id": "script.dev",
+      "script": "dev",
+      "command": "dev default",
+      "noun": "dev",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.ci",
+      "script": "ci",
+      "command": "ci default",
+      "noun": "ci",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.generate.types",
+      "script": "generate:types",
+      "command": "generate types",
+      "noun": "generate",
+      "verb": "types",
+      "audience": "dev"
+    },
+    {
+      "id": "script.project-os.init",
+      "script": "project-os:init",
+      "command": "project-os init",
+      "noun": "project-os",
+      "verb": "init",
+      "audience": "operator"
+    },
+    {
+      "id": "script.prepare",
+      "script": "prepare",
+      "command": "prepare default",
+      "noun": "prepare",
+      "verb": "default",
+      "audience": "dev"
+    },
+    {
+      "id": "script.skill.install",
+      "script": "skill:install",
+      "command": "skill install",
+      "noun": "skill",
+      "verb": "install",
+      "audience": "operator"
+    },
+    {
+      "id": "script.mcp.server",
+      "script": "mcp:server",
+      "command": "mcp server",
+      "noun": "mcp",
+      "verb": "server",
+      "audience": "operator"
+    },
+    {
+      "id": "script.knowledge.cowork-sync",
+      "script": "knowledge:cowork-sync",
+      "command": "knowledge cowork-sync",
+      "noun": "knowledge",
+      "verb": "cowork-sync",
+      "audience": "operator"
     }
   ]
 }

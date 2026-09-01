@@ -18,6 +18,17 @@ afterAll(() => {
 });
 
 describe('shell-command-policy', () => {
+  it('rejects a policy override outside the repository before it can replace deny rules', () => {
+    const original = process.env.KYBERION_SHELL_COMMAND_POLICY_PATH;
+    process.env.KYBERION_SHELL_COMMAND_POLICY_PATH = '/tmp/kyberion-shell-policy-external.json';
+    try {
+      expect(() => evaluateShellCommandPolicy('git status')).toThrow('[RESOURCE_PATH_SCOPE]');
+    } finally {
+      if (original === undefined) delete process.env.KYBERION_SHELL_COMMAND_POLICY_PATH;
+      else process.env.KYBERION_SHELL_COMMAND_POLICY_PATH = original;
+    }
+  });
+
   it('allows read-only inspection commands', () => {
     expect(evaluateShellCommandPolicy('git status').verdict).toBe('allow');
     expect(

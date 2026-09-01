@@ -36,6 +36,43 @@ function currentRoot(): string {
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
+    assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+      const root = path.resolve(currentRoot());
+      const resolved = path.resolve(filePath);
+      const relative = path.relative(root, resolved);
+      if (
+        !relative ||
+        relative === '..' ||
+        relative.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relative)
+      ) {
+        throw new Error(
+          `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+        );
+      }
+      let current = root;
+      for (const segment of relative.split(path.sep)) {
+        current = path.join(current, segment);
+        try {
+          if (actual.lstatSync(current).isSymbolicLink()) {
+            throw new Error(
+              `[RESOURCE_PATH_SYMLINK] resource path cannot traverse a symbolic link: ${filePath}`
+            );
+          }
+        } catch (error: unknown) {
+          const code =
+            error && typeof error === 'object' && 'code' in error
+              ? (error as { code?: string }).code
+              : undefined;
+          if (code === 'ENOENT') break;
+          throw error;
+        }
+      }
+      if (!options.allowMissingLeaf && !actual.existsSync(resolved)) {
+        throw new Error(`Resource path does not exist: ${resolved}`);
+      }
+      return resolved;
+    },
     safeReaddir: (dir: string) => actual.readdirSync(dir),
     safeStat: (p: string) => actual.statSync(p),
     safeLstat: (p: string) => actual.lstatSync(p),
@@ -357,6 +394,30 @@ describe('AL-04 tenant/project offboarding', () => {
     expect(offboardScope({ scopeType: 'tenant', scopeId: '../outside' })).toMatchObject({
       status: 'error',
     });
+  });
+
+  it('ignores a symlinked mission tree during scope discovery', () => {
+    const tierDir = abs('active/missions/public');
+    const externalMission = abs('active/shared/tmp/offboarding-external-mission');
+    const linkedMission = path.join(tierDir, 'MIS-SYMLINK-TENANT');
+    fs.mkdirSync(tierDir, { recursive: true });
+    fs.mkdirSync(externalMission, { recursive: true });
+    writeJson(path.join(externalMission, 'mission-state.json'), {
+      mission_id: 'MIS-SYMLINK-TENANT',
+      tenant_slug: 'tenant-alpha',
+    });
+    fs.symlinkSync(externalMission, linkedMission, 'dir');
+    try {
+      expect(
+        collectScopeTargets('tenant', 'tenant-alpha').some((target) =>
+          target.path.includes('MIS-SYMLINK-TENANT')
+        )
+      ).toBe(false);
+      expect(fs.existsSync(path.join(externalMission, 'mission-state.json'))).toBe(true);
+    } finally {
+      fs.unlinkSync(linkedMission);
+      fs.rmSync(externalMission, { recursive: true, force: true });
+    }
   });
 
   it('applies tenant and organization lineage to project workspaces and missions', () => {

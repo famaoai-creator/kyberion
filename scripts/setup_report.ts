@@ -1,5 +1,5 @@
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { buildNextAction, formatNextAction, logger } from '@agent/core';
+import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { setupSurfaces } from './surface_runtime.js';
 import { setupServices } from './services_setup.js';
 import { runReasoningSetup } from './reasoning_setup.js';
@@ -39,11 +39,12 @@ export async function runSetupReport(): Promise<SetupReport> {
 
 export async function runSetupReportWithPersona(options: {
   persona?: SetupPersona;
+  quiet?: boolean;
 }): Promise<SetupReport> {
-  const quiet = options.persona === 'first-time-user';
+  const quiet = options.quiet ?? options.persona === 'first-time-user';
   const surfaces = await setupSurfaces({ quiet });
   const services = await setupServices({ quiet });
-  const reasoning = await runReasoningSetup();
+  const reasoning = await runReasoningSetup({ quiet });
   const doctor = await collectDoctorReport({});
   const recommendedSurfaces = buildRecommendedSurfaces({ surfaces, doctor });
 
@@ -62,7 +63,7 @@ function buildFirstTimeUserNextActions(
         title: 'Reconcile surface readiness',
         reason: `${report.surfaces.summary.missing} surface auth gaps and ${report.surfaces.summary.disabled} disabled surfaces need attention.`,
         next_action_type: 'run_command',
-        suggested_command: 'pnpm surfaces:reconcile',
+        suggested_command: 'pnpm surfaces reconcile',
       })
     );
   }
@@ -156,8 +157,8 @@ function buildRecommendedSurfaces(
         chronosReadiness === 'ready'
           ? 'pnpm chronos:dev'
           : chronosReadiness === 'needs_setup'
-            ? 'pnpm surfaces:reconcile'
-            : 'pnpm surfaces:status',
+            ? 'pnpm surfaces reconcile'
+            : 'pnpm surfaces status',
     },
     {
       id: 'voice-first-win',
@@ -177,7 +178,7 @@ function buildRecommendedSurfaces(
           ? 'pnpm pipeline --input pipelines/voice-hello.json'
           : voiceReadiness === 'needs_setup'
             ? 'pnpm doctor --runtime browser'
-            : 'pnpm surfaces:status',
+            : 'pnpm surfaces status',
     },
     {
       id: 'messaging',
@@ -193,28 +194,17 @@ function buildRecommendedSurfaces(
             : 'Slack is disabled, so messaging work should stay in terminal or Chronos for now.',
       suggestedCommand:
         messagingReadiness === 'ready'
-          ? 'pnpm surfaces:start --surface slack-bridge'
+          ? 'pnpm surfaces start --surface slack-bridge'
           : messagingReadiness === 'needs_setup'
-            ? 'pnpm surfaces:setup'
-            : 'pnpm surfaces:status',
+            ? 'pnpm surfaces setup'
+            : 'pnpm surfaces status',
     },
   ];
 }
 
-async function main(args: string[] = []): Promise<void> {
-  const argv = await createStandardYargs(['node', 'setup_report', ...args])
-    .option('json', { type: 'boolean', default: false })
-    .option('persona', {
-      type: 'string',
-      choices: ['operator', 'first-time-user'] as const,
-      default: 'operator',
-    })
-    .parseSync();
-
-  const report = await runSetupReportWithPersona({ persona: argv.persona as SetupPersona });
-
-  console.log('');
-  console.log(
+function formatSetupReport(report: SetupReport, persona: SetupPersona): string {
+  const lines = [
+    '',
     formatSetupSummaryLine([
       ['surface issues', report.surfaces.summary.missing],
       ['service auth missing', report.services.summary.authMissing],
@@ -222,44 +212,59 @@ async function main(args: string[] = []): Promise<void> {
       ['reasoning must', report.reasoning.must],
       ['reasoning should', report.reasoning.should],
       ['doctor must', report.doctor.totalMissing],
-    ])
-  );
+    ]),
+  ];
 
-  if (argv.persona === 'first-time-user') {
-    console.log('Recommended surfaces:');
+  if (persona === 'first-time-user') {
+    lines.push('Recommended surfaces:');
     for (const surface of report.recommendedSurfaces) {
-      console.log(`- ${surface.title} [${surface.readiness}]`);
-      console.log(`  use when: ${surface.whenToUse}`);
-      console.log(`  surfaces: ${surface.surfaces.join(', ')}`);
-      console.log(`  why now: ${surface.reason}`);
-      console.log(`  try: ${surface.suggestedCommand}`);
+      lines.push(`- ${surface.title} [${surface.readiness}]`);
+      lines.push(`  use when: ${surface.whenToUse}`);
+      lines.push(`  surfaces: ${surface.surfaces.join(', ')}`);
+      lines.push(`  why now: ${surface.reason}`);
+      lines.push(`  try: ${surface.suggestedCommand}`);
     }
-    console.log('');
-    console.log('First-time user next actions:');
-    for (const action of report.nextActions) {
-      for (const line of formatNextAction(action)) {
-        console.log(line);
-      }
-    }
+    lines.push('', 'First-time user next actions:');
+    for (const action of report.nextActions) lines.push(...formatNextAction(action));
   } else if (report.doctor.summaries.length > 0) {
-    console.log('Doctor detail:');
+    lines.push('Doctor detail:');
     for (const summary of report.doctor.summaries) {
-      console.log(`  - ${summary.manifestId}`);
-      for (const line of summary.lines) {
-        console.log(`    ${line}`);
-      }
+      lines.push(`  - ${summary.manifestId}`);
+      lines.push(...summary.lines.map((line) => `    ${line}`));
     }
   }
 
-  if (argv.json) {
-    logger.info(JSON.stringify({ status: 'ok', report }, null, 2));
-  }
+  return lines.join('\n');
+}
+
+async function main(
+  args: string[] = [],
+  quiet = false
+): Promise<{ report: SetupReport; persona: SetupPersona }> {
+  const normalizedArgs = args.filter((arg) => arg !== '--');
+  const argv = await createStandardYargs(['node', 'setup_report', ...normalizedArgs])
+    .option('persona', {
+      type: 'string',
+      choices: ['operator', 'first-time-user'] as const,
+      default: 'operator',
+    })
+    .parseSync();
+
+  const report = await runSetupReportWithPersona({ persona: argv.persona as SetupPersona, quiet });
+  return { report, persona: argv.persona as SetupPersona };
 }
 
 export const runSetupReportCli = defineScript({
   name: 'setup:report',
-  flags: [],
-  run: (context) => main(context.argv),
+  run: async ({ argv, json, quiet, print }) => {
+    const result = await main(argv, quiet || json);
+    print(
+      json
+        ? { status: 'ok', report: result.report }
+        : formatSetupReport(result.report, result.persona)
+    );
+    return result.report;
+  },
 });
 
 if (

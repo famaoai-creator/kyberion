@@ -1,12 +1,14 @@
 import path from 'node:path';
+import { resolveOperatorDisplayName, resolveOperatorLocale } from '@agent/core/operator-identity';
+import { resolveActiveProfileRoot } from '@agent/core/profile-root';
+import { listAgentIdentities } from '@agent/core/agent-identity';
+import { loadOrganizationProfile } from '@agent/core/organization-profile';
 import {
-  resolveOperatorDisplayName,
-  resolveOperatorLocale,
-  resolveActiveProfileRoot,
-  listAgentIdentities,
-  loadOrganizationProfile,
-} from '@agent/core';
-import { loadJson, safeExistsSync } from '@agent/core/secure-io';
+  loadJson,
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
@@ -25,8 +27,9 @@ export function loadProfile(): ProfileData {
   let onboardingLines: string[] = [];
   try {
     const statePath = path.join(profileRoot, 'onboarding', 'onboarding-state.json');
-    if (safeExistsSync(statePath)) {
-      const state = loadJson<Record<string, unknown>>(statePath);
+    const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+    if (safeExistsSync(safeStatePath) && safeLstat(safeStatePath).isFile()) {
+      const state = loadJson<Record<string, unknown>>(safeStatePath);
       onboardingLines = Object.entries(state)
         .filter(([, value]) => typeof value !== 'object' || value === null)
         .slice(0, 10)

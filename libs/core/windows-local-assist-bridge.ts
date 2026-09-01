@@ -90,7 +90,7 @@ async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
   return { available: true, endpoint, model: configuredModel() };
 }
 
-export function resetWindowsLocalAssistAvailabilityCache(): void {
+export function _resetWindowsLocalAssistAvailabilityCacheForTests(): void {
   cached = null;
 }
 

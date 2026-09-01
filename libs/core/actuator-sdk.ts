@@ -1,15 +1,29 @@
 import { buildUnknownActuatorOpError, type PipelineStepType } from './actuator-op-registry.js';
-import * as addFormatsModule from 'ajv-formats';
 import { createAjv } from './foundation/ajv.js';
+import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
+import { runOpPreflight } from './op-preflight.js';
 import { resolvePipelineInputPlaceholders } from './pipeline-input-contract.js';
-
-type AddFormats = (ajv: ReturnType<typeof createAjv>) => unknown;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormats }).default ||
-  (addFormatsModule as unknown as AddFormats);
+import {
+  executeAdfSteps,
+  type AdfRunOptions,
+  type AdfRunResult,
+  type AdfStep,
+  type AdfStepHandlers,
+  type AdfStepHooks,
+} from './adf-engine.js';
+import {
+  requireSandboxEnforcement,
+  withSandboxPolicy,
+  type SandboxPolicy,
+} from './sandbox-policy.js';
+import {
+  assertExecutionBounds,
+  createExecutionBoundsState,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from './execution-bounds.js';
 
 const actuatorContractAjv = createAjv();
-addFormats(actuatorContractAjv);
 
 export type ActuatorResultStatus = 'succeeded' | 'failed' | 'denied';
 
@@ -26,6 +40,217 @@ export interface ActuatorOpDescription {
   op: string;
   kind: PipelineStepType;
   input_schema?: unknown;
+  examples?: Array<Record<string, unknown>>;
+  owner?: string;
+  idempotency?: string;
+  execution_kind?: string;
+  deprecated?: boolean;
+  canonical_op?: string;
+  forward_to?: {
+    actuator: string;
+    op: string;
+  };
+}
+
+export interface ActuatorPipelineStep<Params = Record<string, unknown>> {
+  type?: string;
+  op: string;
+  params?: Params;
+  /** Optional step-level approval metadata projected by a caller. */
+  approval_required?: boolean;
+}
+
+export interface RunActuatorPipelineOptions<
+  Params extends object,
+  Context extends Record<string, unknown>,
+> {
+  actuatorId: string;
+  steps: readonly ActuatorPipelineStep<Params>[];
+  context: Context;
+  /** Maximum number of steps admitted by this in-process pipeline. */
+  maxSteps?: number;
+  /** Wall-clock limit for this in-process pipeline. */
+  timeoutMs?: number;
+  /** Optional resolved sandbox policy for every domain handler invocation. */
+  sandboxPolicy?: SandboxPolicy;
+  /** Trusted caller-side presence signal for approval-gated steps. */
+  hasHuman?: boolean;
+  /** Trusted caller-side resolver for a bound approval decision. */
+  approvalGranted?: (
+    step: ActuatorPipelineStep<Params>,
+    params: Params,
+    context: Context
+  ) => boolean | Promise<boolean>;
+  /** Resolve pipeline placeholders before the operation preflight boundary. */
+  resolveParams?: (
+    params: Params,
+    context: Context,
+    step: ActuatorPipelineStep<Params>
+  ) => Params | Promise<Params>;
+  execute: (
+    op: string,
+    params: Params,
+    context: Context,
+    step: ActuatorPipelineStep<Params>
+  ) => Context | Promise<Context>;
+}
+
+/**
+ * Run a domain actuator's in-process step sequence through the shared
+ * preflight boundary. The handler remains domain-specific, but ordering and
+ * fail-closed admission are identical for every actuator that uses this
+ * helper.
+ */
+export async function runActuatorPipeline<
+  Params extends object,
+  Context extends Record<string, unknown>,
+>(options: RunActuatorPipelineOptions<Params, Context>): Promise<Context> {
+  if (options.sandboxPolicy) requireSandboxEnforcement(options.sandboxPolicy);
+  const run = async (): Promise<Context> => {
+    let context = options.context;
+    const bounds = createExecutionBoundsState();
+    for (const step of options.steps) {
+      bounds.stepCount += 1;
+      assertExecutionBounds(bounds, {
+        maxSteps: options.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS,
+        timeoutMs: options.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS,
+      });
+      const rawParams = (step.params ?? {}) as Params;
+      const resolvedParams = options.resolveParams
+        ? await options.resolveParams(rawParams, context, step)
+        : rawParams;
+      const resolvedParamsRecord = resolvedParams as Record<string, unknown>;
+      ensureDefaultOpPreflight();
+      const preflight = await runOpPreflight({
+        op: `${options.actuatorId}:${step.op}`,
+        params: resolvedParamsRecord,
+        context,
+        source: 'actuator',
+        requiresApproval:
+          step.approval_required === true ||
+          resolvedParamsRecord._approval_required === true ||
+          context._approval_required === true,
+        approvalGranted: options.approvalGranted
+          ? await options.approvalGranted(step, resolvedParams, context)
+          : false,
+        ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
+      });
+      if (preflight.decision !== 'allow') {
+        throw new Error(
+          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation ${options.actuatorId}:${step.op} was not admitted.`}`
+        );
+      }
+      context = await options.execute(step.op, preflight.input as Params, context, step);
+    }
+    return context;
+  };
+  return options.sandboxPolicy ? withSandboxPolicy(options.sandboxPolicy, run) : run();
+}
+
+export interface RunAdfActuatorPipelineOptions<Context extends Record<string, unknown>> {
+  actuatorId: string;
+  steps: readonly AdfStep[];
+  context: Context;
+  /** All engine controls remain available; the SDK owns the runner label. */
+  options?: Omit<AdfRunOptions, 'label'>;
+  /** Optional resolved sandbox policy for all nested actuator handlers. */
+  sandboxPolicy?: SandboxPolicy;
+  handlers: AdfStepHandlers<Context>;
+  hooks?: AdfStepHooks<Context>;
+}
+
+/**
+ * Shared entry for actuator runners whose domain logic is already expressed
+ * as ADF handlers. The SDK owns engine options and result accounting while
+ * the actuator retains only its domain handlers and context persistence.
+ */
+export async function runAdfActuatorPipeline<Context extends Record<string, unknown>>(
+  options: RunAdfActuatorPipelineOptions<Context>
+): Promise<AdfRunResult<Context>> {
+  return executeAdfSteps(
+    [...options.steps],
+    options.context,
+    {
+      maxSteps: options.options?.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS,
+      timeoutMs: options.options?.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS,
+      ...options.options,
+      ...(options.sandboxPolicy ? { sandboxPolicy: options.sandboxPolicy } : {}),
+      label: `[${options.actuatorId}]`,
+    },
+    options.handlers,
+    options.hooks
+  );
+}
+
+export interface ActuatorStepSequenceResult<Context extends Record<string, unknown>> {
+  status: 'succeeded' | 'failed';
+  results: Array<{ op: string; status: 'success' | 'failed'; error?: string }>;
+  context: Context;
+}
+
+export interface RunActuatorStepSequenceOptions<
+  Params extends object,
+  Context extends Record<string, unknown>,
+> extends Omit<RunActuatorPipelineOptions<Params, Context>, 'steps' | 'context'> {
+  steps: readonly ActuatorPipelineStep<Params>[];
+  context: Context;
+  /** Maximum number of domain steps admitted for this sequence. */
+  maxSteps?: number;
+  onStepStart?: (step: ActuatorPipelineStep<Params>) => void | Promise<void>;
+  onStepError?: (step: ActuatorPipelineStep<Params>, error: unknown) => void | Promise<void>;
+}
+
+/**
+ * Run a domain actuator's ordered sequence through the same per-step
+ * preflight boundary, stopping on the first failure and returning a stable
+ * result envelope. Domain handlers remain responsible for operation logic;
+ * sequence accounting is intentionally shared here.
+ */
+export async function runActuatorStepSequence<
+  Params extends object,
+  Context extends Record<string, unknown>,
+>(
+  options: RunActuatorStepSequenceOptions<Params, Context>
+): Promise<ActuatorStepSequenceResult<Context>> {
+  const { steps, maxSteps, onStepStart, onStepError, ...pipelineOptions } = options;
+  const limit = maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS;
+  if (steps.length > limit) {
+    throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${limit})`);
+  }
+
+  let context = options.context;
+  const bounds = createExecutionBoundsState();
+  const results: ActuatorStepSequenceResult<Context>['results'] = [];
+  for (const step of steps) {
+    bounds.stepCount += 1;
+    assertExecutionBounds(bounds, {
+      maxSteps: limit,
+      timeoutMs: pipelineOptions.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS,
+    });
+    await onStepStart?.(step);
+    try {
+      context = await runActuatorPipeline({
+        ...pipelineOptions,
+        steps: [step],
+        context,
+      });
+      results.push({ op: step.op, status: 'success' });
+    } catch (error) {
+      await onStepError?.(step, error);
+      results.push({
+        op: step.op,
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      break;
+    }
+  }
+
+  return {
+    status: results.some((result) => result.status === 'failed') ? 'failed' : 'succeeded',
+    results,
+    context,
+  };
 }
 
 /**

@@ -22,17 +22,15 @@ import http from 'node:http';
 import * as path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
-import { safeExistsSync } from '@agent/core/secure-io';
-import {
-  applySurfaceApprovalDecision,
-  findMissionPath,
-  listApprovalRequests,
-  normalizeRejectionReasonCategory,
-  type ApprovalRequestRecord,
-} from '@agent/core';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { applySurfaceApprovalDecision } from '@agent/core/surface-approval-ui';
+import { findMissionPath } from '@agent/core/path-resolver';
+import { listApprovalRequests, type ApprovalRequestRecord } from '@agent/core/approval-store';
+import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
 import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
 import { renderMissionBriefHtml, type MissionBrief } from './render-brief.js';
 
@@ -42,6 +40,10 @@ const MAX_BODY_BYTES = 256 * 1024;
 function argValue(flag: string, args: string[]): string | undefined {
   const index = args.indexOf(flag);
   return index >= 0 ? args[index + 1] : undefined;
+}
+
+export function parseDecisionRequestBody(raw: string): Record<string, unknown> {
+  return parseSafeJsonObjectInput(raw, 'decision request') ?? {};
 }
 
 async function main(args: string[] = []): Promise<void> {
@@ -57,14 +59,23 @@ async function main(args: string[] = []): Promise<void> {
   if (!missionDir) {
     throw new ScriptExitError(1, `mission directory for ${missionId} not found`);
   }
-  const briefPath = path.join(missionDir, 'evidence', 'mission-brief.json');
+  const briefPath = assertSafeRepositoryPath(
+    path.join(missionDir, 'evidence', 'mission-brief.json'),
+    { allowMissingLeaf: true }
+  );
   if (!safeExistsSync(briefPath)) {
     throw new ScriptExitError(1, `alignment brief not found: ${briefPath}`);
+  }
+  if (!safeLstat(briefPath).isFile()) {
+    throw new ScriptExitError(1, `alignment brief is not a regular file: ${briefPath}`);
   }
 
   const TOKEN = randomBytes(16).toString('hex');
 
   function readBrief(): MissionBrief {
+    if (!safeLstat(briefPath).isFile()) {
+      throw new Error(`alignment brief is not a regular file: ${briefPath}`);
+    }
     return readJson<MissionBrief>(briefPath);
   }
 
@@ -135,7 +146,15 @@ async function main(args: string[] = []): Promise<void> {
       return json(res, 403, { ok: false, error: 'bad origin' });
     }
 
-    const body = JSON.parse((await readBody(req)) || '{}');
+    let body: Record<string, unknown>;
+    try {
+      body = parseDecisionRequestBody((await readBody(req)) || '{}');
+    } catch (error) {
+      return json(res, 400, {
+        ok: false,
+        error: error instanceof Error ? error.message : 'decision request must be valid JSON',
+      });
+    }
     const decision =
       body?.decision === 'approved' || body?.decision === 'rejected' ? body.decision : null;
     const decidedBy = typeof body?.decidedBy === 'string' ? body.decidedBy.trim() : '';

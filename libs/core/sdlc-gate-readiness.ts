@@ -1,13 +1,15 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
 import { SPECIALIST_IDS } from './specialist-ids.js';
 import type { ArtifactRecord } from './artifact-record.js';
 import type { ProjectRecord } from './project-registry.js';
 import type { ProjectTrackRecord } from './project-track-registry.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
 
-interface SdlcGateCatalogRecord {
+interface SdlcGateProfile {
+  domain: string;
   gates: Array<{
     gate_id: string;
     phase: string;
@@ -16,6 +18,11 @@ interface SdlcGateCatalogRecord {
     required_artifacts?: string[];
     exit_criteria?: string[];
   }>;
+}
+
+interface GateProfileRegistryRecord {
+  version: string;
+  profiles: Record<string, SdlcGateProfile>;
 }
 
 export interface TrackGateReadinessGateSummary {
@@ -55,17 +62,28 @@ export interface TrackNextWorkProposal {
   work_loop: OrganizationWorkLoopSummary;
 }
 
-const GATE_CATALOG_PATH = pathResolver.knowledge('product/governance/sdlc-gate-catalog.json');
+const GATE_PROFILE_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/gate-profiles/gate-profile-registry.json'
+);
 
-let cachedCatalog: SdlcGateCatalogRecord | null = null;
+let cachedCatalog: SdlcGateProfile | null = null;
 
-function loadGateCatalog(): SdlcGateCatalogRecord {
+const gateProfileRegistryCatalog = defineCatalog<GateProfileRegistryRecord>({
+  id: 'gate-profile-registry',
+  path: GATE_PROFILE_REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/gate-profile.schema.json'),
+  fallback: {
+    version: 'fallback',
+    profiles: { sdlc: { domain: 'delivery', gates: [] } },
+  },
+});
+
+function loadGateCatalog(): SdlcGateProfile {
   if (cachedCatalog) return cachedCatalog;
-  if (!safeExistsSync(GATE_CATALOG_PATH)) {
-    cachedCatalog = { gates: [] };
-    return cachedCatalog;
-  }
-  cachedCatalog = loadJson<SdlcGateCatalogRecord>(GATE_CATALOG_PATH);
+  cachedCatalog = gateProfileRegistryCatalog.load().profiles.sdlc || {
+    domain: 'delivery',
+    gates: [],
+  };
   return cachedCatalog;
 }
 

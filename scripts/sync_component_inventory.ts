@@ -1,15 +1,8 @@
 import * as path from 'node:path';
-import {
-  pathResolver,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeReaddir,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
-import {} from '../libs/actuators/system-actuator/src/op-catalog.js';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface CapabilityManifest {
   actuator_id: string;
@@ -142,52 +135,58 @@ function collectComponentInventory() {
   return { current, legacy };
 }
 
-function writeJsonArtifacts(current: CurrentIndexRecord[], legacy: LegacyRecord[]) {
-  safeWriteFile(
-    CURRENT_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '2.0.0',
-        t: current.length,
-        actuators: current,
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  safeWriteFile(
-    LEGACY_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '1.0.0',
-        t: legacy.length,
-        components: legacy,
-      },
-      null,
-      2
-    ) + '\n'
-  );
-
-  safeWriteFile(
-    SKILL_INDEX_PATH,
-    JSON.stringify(
-      {
-        v: '3.0.0',
-        t: current.length,
-        s: current.map((entry) => ({
-          n: entry.n,
-          path: entry.path,
-          d: entry.d,
-          s: entry.s,
-          version: entry.version,
-          capability_count: entry.capability_count,
-        })),
-      },
-      null,
-      2
-    ) + '\n'
-  );
+function renderJsonArtifacts(
+  current: CurrentIndexRecord[],
+  legacy: LegacyRecord[]
+): GeneratedFile[] {
+  return [
+    {
+      path: CURRENT_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '2.0.0',
+            t: current.length,
+            actuators: current,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: LEGACY_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '1.0.0',
+            t: legacy.length,
+            components: legacy,
+          },
+          null,
+          2
+        ) + '\n',
+    },
+    {
+      path: SKILL_INDEX_PATH,
+      content:
+        JSON.stringify(
+          {
+            v: '3.0.0',
+            t: current.length,
+            s: current.map((entry) => ({
+              n: entry.n,
+              path: entry.path,
+              d: entry.d,
+              s: entry.s,
+              version: entry.version,
+              capability_count: entry.capability_count,
+            })),
+          },
+          null,
+          2
+        ) + '\n',
+    },
+  ];
 }
 
 interface DiscoveryOpsRecord {
@@ -394,38 +393,39 @@ function buildReport(current: CurrentIndexRecord[], legacy: LegacyRecord[]): str
   return `${lines.join('\n')}\n`;
 }
 
-function main() {
-  return withExecutionContext(
-    'component_inventory_sync',
-    () => {
-      const knowledgeDir = path.dirname(REPORT_PATH);
-      if (!safeExistsSync(knowledgeDir)) {
-        safeMkdir(knowledgeDir);
-      }
-
-      const { current, legacy } = collectComponentInventory();
-      writeJsonArtifacts(current, legacy);
-      safeWriteFile(REPORT_PATH, buildReport(current, legacy));
-      safeWriteFile(CAPABILITIES_GUIDE_PATH, buildCapabilitiesGuide(current));
-      console.log(
-        JSON.stringify(
-          {
-            status: 'ok',
-            current_count: current.length,
-            legacy_count: legacy.length,
-            current_index_path: path.relative(pathResolver.rootDir(), CURRENT_INDEX_PATH),
-            skill_index_path: path.relative(pathResolver.rootDir(), SKILL_INDEX_PATH),
-            legacy_index_path: path.relative(pathResolver.rootDir(), LEGACY_INDEX_PATH),
-            report_path: path.relative(pathResolver.rootDir(), REPORT_PATH),
-            capabilities_guide_path: path.relative(pathResolver.rootDir(), CAPABILITIES_GUIDE_PATH),
-          },
-          null,
-          2
-        )
-      );
-    },
-    'ecosystem_architect'
-  );
+function render(): GeneratedFile[] {
+  const { current, legacy } = collectComponentInventory();
+  return [
+    ...renderJsonArtifacts(current, legacy),
+    { path: REPORT_PATH, content: buildReport(current, legacy) },
+    { path: CAPABILITIES_GUIDE_PATH, content: buildCapabilitiesGuide(current) },
+  ];
 }
 
-main();
+function normalizeGeneratedContent(content: string): string {
+  const withoutGeneratedDate = content.replace(/^Last updated: .*$/mu, 'Last updated: <generated>');
+  try {
+    return JSON.stringify(JSON.parse(withoutGeneratedDate));
+  } catch {
+    return withoutGeneratedDate;
+  }
+}
+
+export const runSyncComponentInventory = defineGenerator({
+  id: 'component-inventory',
+  outputs: [
+    CURRENT_INDEX_PATH,
+    SKILL_INDEX_PATH,
+    LEGACY_INDEX_PATH,
+    REPORT_PATH,
+    CAPABILITIES_GUIDE_PATH,
+  ],
+  normalize: normalizeGeneratedContent,
+  render,
+});
+
+if (
+  isDirectScript(import.meta.url, 'sync_component_inventory.ts') ||
+  isDirectScript(import.meta.url, 'sync_component_inventory.js')
+)
+  void runSyncComponentInventory();

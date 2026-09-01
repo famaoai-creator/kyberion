@@ -26,6 +26,8 @@ const secureIo = vi.hoisted(() => ({
 
 vi.mock('./secure-io.js', () => secureIo);
 
+import { registerFoundationIo } from './foundation/io.js';
+
 describe('reconcile ops (LE-03)', () => {
   let tmpRoot: string;
 
@@ -34,6 +36,39 @@ describe('reconcile ops (LE-03)', () => {
     fs.mkdirSync(path.join(tmpRoot, 'active', 'shared', 'tmp'), { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     process.env.KYBERION_ROOT = tmpRoot;
+    registerFoundationIo({
+      loadJson: <T>(filePath: string): T => {
+        if (filePath.includes('unhandled-intent-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/unhandled-intent-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        if (filePath.includes('unclassified-error-registry.schema.json')) {
+          return JSON.parse(
+            fs.readFileSync(
+              path.resolve('knowledge/product/schemas/unclassified-error-registry.schema.json'),
+              'utf8'
+            )
+          ) as T;
+        }
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+      },
+      loadJsonIfPresent: <T>(filePath: string): T | null => {
+        try {
+          return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+        } catch {
+          return null;
+        }
+      },
+      appendFile: () => undefined,
+      exists: (filePath: string) => fs.existsSync(filePath),
+      readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+      stat: (filePath: string) => fs.statSync(filePath),
+      writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+    });
     vi.resetModules();
   });
 
@@ -161,5 +196,35 @@ describe('reconcile ops (LE-03)', () => {
       'utf8'
     );
     expect(summary).toContain('unreconciled=1');
+  });
+
+  it('ignores schema-invalid observation registries and keeps reconciliation safe', async () => {
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unclassified-error-registry.json'),
+      JSON.stringify({ version: '1.0.0', entries: [{ message_excerpt: '' }] })
+    );
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active', 'shared', 'tmp', 'unhandled-intent-registry.json'),
+      JSON.stringify({
+        version: '1.0.0',
+        entries: [{ miss_type: 'unrouted', utterance_samples: ['missing intent id'] }],
+      })
+    );
+
+    const { reconcileUnclassifiedErrors, reconcileUnhandledIntents } =
+      await import('./reconcile-ops.js');
+
+    expect(reconcileUnclassifiedErrors()).toEqual({
+      proposals_written: [],
+      skipped: [],
+      total_unreconciled: 0,
+    });
+    expect(reconcileUnhandledIntents()).toMatchObject({
+      proposals_written: [],
+      skipped: [],
+      total_unreconciled: 0,
+      top_unreconciled: null,
+      summary_line: '[UNHANDLED-INTENT] unreconciled=0 top=none',
+    });
   });
 });

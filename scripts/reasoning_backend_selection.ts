@@ -11,13 +11,11 @@
  */
 import {
   loadReasoningBackendPolicy,
-  normalizeReasoningBackendModePolicy,
-  pathResolver,
-  safeExistsSync,
-  safeReadFile,
-  safeWriteFile,
+  normalizeReasoningBackendMode as normalizeReasoningBackendModePolicy,
   type ReasoningBackendMode,
-} from '@agent/core';
+} from '@agent/core/reasoning-backend-policy';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 
 export const REASONING_BACKEND_ENV_KEY = 'KYBERION_REASONING_BACKEND';
 export const PERSONA_ENV_KEY = 'KYBERION_PERSONA';

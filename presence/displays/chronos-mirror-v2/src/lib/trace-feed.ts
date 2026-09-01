@@ -2,8 +2,18 @@ import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import { loadJson, safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+  safeReaddir,
+} from '@agent/core/secure-io';
+import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
+import { validateTraceReplay } from '@agent/core/trace-schema';
+import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { isJsonRecord, optionalStringField } from './json-record';
 
 export interface TraceFeedSummary {
   traceId: string;
@@ -13,6 +23,7 @@ export interface TraceFeedSummary {
   completedAt?: string;
   missionId?: string;
   tenantSlug?: string;
+  tier?: OsKnowledgeTier;
   organizationId?: string;
   projectId?: string;
   pipelineId?: string;
@@ -80,8 +91,32 @@ export interface TraceFeedOptions {
   query?: string;
   /** Source-side viewer tenant allowlist; unscoped legacy traces fail closed. */
   tenantSlugs?: string[] | 'all';
+  /** Source-side viewer tier allowlist; unclassified traces fail closed. */
+  tierAccess?: readonly OsKnowledgeTier[];
   organizationIds?: string[] | 'all';
   projectIds?: string[] | 'all';
+  /** Reject extension span names as well as structurally invalid traces. */
+  strictUnknownSpans?: boolean;
+}
+
+function listTraceFiles(dir: string): string[] {
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return [];
+
+  return safeReaddir(safeDir)
+    .filter((entry) => /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/i.test(entry))
+    .flatMap((entry) => {
+      try {
+        const filePath = assertSafeRepositoryPath(path.join(safeDir, entry), {
+          allowMissingLeaf: true,
+        });
+        return safeLstat(filePath).isFile() ? [filePath] : [];
+      } catch {
+        return [];
+      }
+    })
+    .sort()
+    .reverse();
 }
 
 interface PersistedTraceShape {
@@ -97,6 +132,9 @@ interface PersistedTraceShape {
     organizationId?: string;
     projectId?: string;
     customerId?: string;
+    tier?: unknown;
+    dataTier?: unknown;
+    sensitivityTier?: unknown;
   };
   _persistedAt?: string;
 }
@@ -118,6 +156,40 @@ interface TraceNode {
 function asTraceNode(value: unknown): TraceNode | null {
   if (!value || typeof value !== 'object') return null;
   return value as TraceNode;
+}
+
+export function normalizePersistedTrace(
+  value: unknown,
+  options: Pick<TraceFeedOptions, 'strictUnknownSpans'> = {}
+): PersistedTraceShape | null {
+  if (validateTraceReplay(value, { strictUnknownSpans: options.strictUnknownSpans }).length > 0) {
+    return null;
+  }
+  if (!isJsonRecord(value)) return null;
+
+  const metadata = isJsonRecord(value.metadata)
+    ? {
+        missionId: optionalStringField(value.metadata, 'missionId'),
+        actuator: optionalStringField(value.metadata, 'actuator'),
+        pipelineId: optionalStringField(value.metadata, 'pipelineId'),
+        startedAt: optionalStringField(value.metadata, 'startedAt'),
+        completedAt: optionalStringField(value.metadata, 'completedAt'),
+        tenantSlug: optionalStringField(value.metadata, 'tenantSlug'),
+        organizationId: optionalStringField(value.metadata, 'organizationId'),
+        projectId: optionalStringField(value.metadata, 'projectId'),
+        customerId: optionalStringField(value.metadata, 'customerId'),
+        tier: value.metadata.tier,
+        dataTier: value.metadata.dataTier,
+        sensitivityTier: value.metadata.sensitivityTier,
+      }
+    : undefined;
+
+  return {
+    traceId: optionalStringField(value, 'traceId'),
+    rootSpan: value.rootSpan,
+    ...(metadata ? { metadata } : {}),
+    _persistedAt: optionalStringField(value, '_persistedAt'),
+  };
 }
 
 export function resolveTraceFeedDirs(): string[] {
@@ -213,6 +285,9 @@ function matchesTraceFilters(summary: TraceFeedSummary, options: TraceFeedOption
   if (options.tenantSlugs !== undefined && options.tenantSlugs !== 'all') {
     if (!summary.tenantSlug || !options.tenantSlugs.includes(summary.tenantSlug)) return false;
   }
+  if (options.tierAccess !== undefined) {
+    if (!summary.tier || !options.tierAccess.includes(summary.tier)) return false;
+  }
   if (options.organizationIds !== undefined && options.organizationIds !== 'all') {
     if (!summary.organizationId || !options.organizationIds.includes(summary.organizationId))
       return false;
@@ -243,6 +318,10 @@ export function summarizePersistedTrace(
   const completedAt = record.metadata?.completedAt || rootSpan.endTime;
 
   const missionScope = resolveMissionScope(record.metadata?.missionId);
+  const tier =
+    normalizeTraceTier(
+      record.metadata?.tier || record.metadata?.dataTier || record.metadata?.sensitivityTier
+    ) || missionScope.tier;
   return {
     traceId: record.traceId,
     tracePath,
@@ -252,6 +331,7 @@ export function summarizePersistedTrace(
     missionId: record.metadata?.missionId,
     tenantSlug:
       record.metadata?.tenantSlug || record.metadata?.customerId || missionScope.tenantSlug,
+    ...(tier ? { tier } : {}),
     organizationId: record.metadata?.organizationId || missionScope.organizationId,
     projectId: record.metadata?.projectId || missionScope.projectId,
     pipelineId: record.metadata?.pipelineId,
@@ -267,6 +347,7 @@ export function summarizePersistedTrace(
 
 function resolveMissionScope(missionId?: string): {
   tenantSlug?: string;
+  tier?: OsKnowledgeTier;
   organizationId?: string;
   projectId?: string;
 } {
@@ -274,10 +355,11 @@ function resolveMissionScope(missionId?: string): {
   const missionPath = findMissionPath(missionId.toUpperCase());
   if (!missionPath) return {};
   const statePath = path.join(missionPath, 'mission-state.json');
-  if (!safeExistsSync(statePath)) return {};
   try {
+    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return {};
     const state = loadJson<{
       tenant_slug?: string;
+      tier?: unknown;
       organization_id?: string;
       relationships?: {
         organization?: { organization_id?: string };
@@ -286,12 +368,17 @@ function resolveMissionScope(missionId?: string): {
     }>(statePath);
     return {
       tenantSlug: state.tenant_slug,
+      ...(normalizeTraceTier(state.tier) ? { tier: normalizeTraceTier(state.tier) } : {}),
       organizationId: state.organization_id || state.relationships?.organization?.organization_id,
       projectId: state.relationships?.project?.project_id,
     };
   } catch {
     return {};
   }
+}
+
+function normalizeTraceTier(value: unknown): OsKnowledgeTier | undefined {
+  return value === 'personal' || value === 'confidential' || value === 'public' ? value : undefined;
 }
 
 export function detailPersistedTrace(
@@ -318,21 +405,14 @@ export function collectTraceFeed(options: TraceFeedOptions = {}): TraceFeedRecor
   const seen = new Set<string>();
 
   for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
-    if (!safeExistsSync(dir)) continue;
-
-    const files = safeReaddir(dir)
-      .filter((entry) => /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/i.test(entry))
-      .sort()
-      .reverse();
-
-    for (const fileName of files) {
-      const filePath = path.join(dir, fileName);
+    for (const filePath of listTraceFiles(dir)) {
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
-          const parsed = JSON.parse(trimmed) as PersistedTraceShape;
+          const parsed = normalizePersistedTrace(JSON.parse(trimmed), options);
+          if (!parsed) continue;
           const summary = summarizePersistedTrace(parsed, filePath);
           if (!summary) continue;
           if (!matchesTraceFilters(summary, options)) continue;
@@ -373,21 +453,14 @@ export function collectTraceDetail(
   if (!traceId) return null;
 
   for (const dir of options.dir ? [options.dir] : resolveTraceFeedDirs()) {
-    if (!safeExistsSync(dir)) continue;
-
-    const files = safeReaddir(dir)
-      .filter((entry) => /^traces-\d{4}-\d{2}-\d{2}\.jsonl$/i.test(entry))
-      .sort()
-      .reverse();
-
-    for (const fileName of files) {
-      const filePath = path.join(dir, fileName);
+    for (const filePath of listTraceFiles(dir)) {
       const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
       for (const line of raw.split('\n')) {
         const trimmed = line.trim();
         if (!trimmed) continue;
         try {
-          const parsed = JSON.parse(trimmed) as PersistedTraceShape;
+          const parsed = normalizePersistedTrace(JSON.parse(trimmed), options);
+          if (!parsed) continue;
           if (parsed.traceId !== traceId) continue;
           const detail = detailPersistedTrace(parsed, filePath);
           if (
@@ -395,6 +468,8 @@ export function collectTraceDetail(
             (options.tenantSlugs === undefined ||
               options.tenantSlugs === 'all' ||
               (detail.tenantSlug && options.tenantSlugs.includes(detail.tenantSlug))) &&
+            (options.tierAccess === undefined ||
+              (detail.tier && options.tierAccess.includes(detail.tier))) &&
             (options.organizationIds === undefined ||
               options.organizationIds === 'all' ||
               (detail.organizationId && options.organizationIds.includes(detail.organizationId))) &&

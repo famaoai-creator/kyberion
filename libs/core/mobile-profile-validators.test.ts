@@ -1,6 +1,6 @@
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
 import { describe, expect, it } from 'vitest';
 import {
   assertValidMobileAppProfile,
@@ -59,7 +59,8 @@ describe('mobile-profile-validators', () => {
         platform: 'android',
         title: 'Example Mobile Login + Passkey',
         path: 'knowledge/product/orchestration/mobile-app-profiles/example-mobile-login-passkey.json',
-        description: 'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
+        description:
+          'Example Android app profile covering launch, login form selectors, and passkey trigger selectors.',
         tags: ['android', 'login', 'passkey', 'example'],
       },
     ],
@@ -73,7 +74,10 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical mobile app profile schema example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/mobile-app-profile.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/mobile-app-profile.schema.json'
+    );
 
     expect(validate(validProfile)).toBe(true);
   });
@@ -94,18 +98,25 @@ describe('mobile-profile-validators', () => {
     expect(errors).toContain('app_id is required');
     expect(errors).toContain('package_name is required');
     expect(errors).toContain('selectors.login.email must include at least one selector field');
-    expect(() => assertValidMobileAppProfile(invalidProfile, 'test.profile')).toThrow('Invalid mobile app profile');
+    expect(() => assertValidMobileAppProfile(invalidProfile, 'test.profile')).toThrow(
+      'Invalid mobile app profile'
+    );
   });
 
   it('accepts a valid mobile app profile index when paths exist', () => {
     expect(validateMobileAppProfileIndex(validIndex, () => true)).toEqual([]);
-    expect(() => assertValidMobileAppProfileIndex(validIndex, 'test.index', () => true)).not.toThrow();
+    expect(() =>
+      assertValidMobileAppProfileIndex(validIndex, 'test.index', () => true)
+    ).not.toThrow();
   });
 
   it('accepts the canonical mobile app profile index example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/mobile-app-profile-index.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/mobile-app-profile-index.schema.json'
+    );
 
     expect(validate(validIndex)).toBe(true);
   });
@@ -132,7 +143,7 @@ describe('mobile-profile-validators', () => {
     expect(errors).toContain('profiles[0].tags must be an array of strings');
     expect(errors).toContain('profiles[0].path does not exist: missing.json');
     expect(() => assertValidMobileAppProfileIndex(invalidIndex, 'test.index', () => false)).toThrow(
-      'Invalid mobile app profile index',
+      'Invalid mobile app profile index'
     );
   });
 
@@ -158,7 +169,10 @@ describe('mobile-profile-validators', () => {
   it('accepts the canonical web app profile schema example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/web-app-profile.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/web-app-profile.schema.json'
+    );
 
     const canonicalProfile = {
       app_id: 'example-web-login-guarded',
@@ -198,7 +212,10 @@ describe('mobile-profile-validators', () => {
   it('accepts a valid webview session handoff contract', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/webview-session-handoff.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/webview-session-handoff.schema.json'
+    );
 
     const handoff = {
       kind: 'webview-session-handoff',
@@ -218,7 +235,10 @@ describe('mobile-profile-validators', () => {
   it('rejects an invalid webview session handoff contract', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/webview-session-handoff.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/webview-session-handoff.schema.json'
+    );
 
     const handoff = {
       kind: 'webview-session-handoff',
@@ -247,8 +267,12 @@ describe('mobile-profile-validators', () => {
     expect(errors).toContain('title is required');
     expect(errors).toContain('base_url is required');
     expect(errors).toContain('guarded_routes must be an array of strings');
-    expect(errors).toContain('debug_routes.session_export must be a non-empty string when provided');
-    expect(() => assertValidWebAppProfile(invalidProfile, 'test.web.profile')).toThrow('Invalid web app profile');
+    expect(errors).toContain(
+      'debug_routes.session_export must be a non-empty string when provided'
+    );
+    expect(() => assertValidWebAppProfile(invalidProfile, 'test.web.profile')).toThrow(
+      'Invalid web app profile'
+    );
   });
 
   it('accepts a valid web app profile index', () => {
@@ -259,33 +283,42 @@ describe('mobile-profile-validators', () => {
           platform: 'browser',
           title: 'Example Web Login + Guarded Routes',
           path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
-          description: 'Example Web app profile covering login, guarded routes, and debug session export.',
+          description:
+            'Example Web app profile covering login, guarded routes, and debug session export.',
           tags: ['browser', 'session-handoff'],
         },
       ],
     };
 
     expect(validateWebAppProfileIndex(validIndex, () => true)).toEqual([]);
-    expect(() => assertValidWebAppProfileIndex(validIndex, 'test.web.index', () => true)).not.toThrow();
+    expect(() =>
+      assertValidWebAppProfileIndex(validIndex, 'test.web.index', () => true)
+    ).not.toThrow();
   });
 
   it('accepts the canonical web app profile index example', () => {
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, 'knowledge/product/schemas/web-app-profile-index.schema.json');
+    const validate = compileSchemaFromPath(
+      ajv,
+      'knowledge/product/schemas/web-app-profile-index.schema.json'
+    );
 
-    expect(validate({
-      profiles: [
-        {
-          id: 'example-web-login-guarded',
-          platform: 'browser',
-          title: 'Example Web Login + Guarded Routes',
-          path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
-          description: 'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
-          tags: ['browser', 'session-handoff', 'login', 'guarded-routes', 'example'],
-        },
-      ],
-    })).toBe(true);
+    expect(
+      validate({
+        profiles: [
+          {
+            id: 'example-web-login-guarded',
+            platform: 'browser',
+            title: 'Example Web Login + Guarded Routes',
+            path: 'knowledge/product/orchestration/web-app-profiles/example-web-login-guarded.json',
+            description:
+              'Shared profile for a Web app with login, guarded routes, and a debug-only session export route.',
+            tags: ['browser', 'session-handoff', 'login', 'guarded-routes', 'example'],
+          },
+        ],
+      })
+    ).toBe(true);
   });
 
   it('rejects an invalid web app profile index', () => {
@@ -309,8 +342,8 @@ describe('mobile-profile-validators', () => {
     expect(errors).toContain('profiles[0].description is required');
     expect(errors).toContain('profiles[0].tags must be an array of strings');
     expect(errors).toContain('profiles[0].path does not exist: missing-web.json');
-    expect(() => assertValidWebAppProfileIndex(invalidIndex, 'test.web.index', () => false)).toThrow(
-      'Invalid web app profile index',
-    );
+    expect(() =>
+      assertValidWebAppProfileIndex(invalidIndex, 'test.web.index', () => false)
+    ).toThrow('Invalid web app profile index');
   });
 });

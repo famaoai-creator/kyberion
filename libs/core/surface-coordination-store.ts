@@ -2,17 +2,17 @@ import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   loadJson,
   safeMkdir,
   safeMoveSync,
   safeReaddir,
   safeRmSync,
-  safeStat,
+  safeLstat,
 } from './secure-io.js';
 import {
   appendGovernedArtifactJsonl,
@@ -174,16 +174,47 @@ function surfaceDeadTargetBase(surface: SurfaceAsyncChannel): string {
 }
 
 function collectJsonFiles(root: string, recursive: boolean): string[] {
-  if (!safeExistsSync(root)) return [];
-  return safeReaddir(root)
+  let safeRoot: string;
+  try {
+    safeRoot = assertSafeRepositoryPath(root, { allowMissingLeaf: true });
+    if (!safeExistsSync(safeRoot)) return [];
+    const rootStat = safeLstat(safeRoot);
+    if (!rootStat.isDirectory()) return [];
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes('[RESOURCE_PATH_SYMLINK]') ||
+        (error as NodeJS.ErrnoException).code === 'ENOENT')
+    ) {
+      return [];
+    }
+    throw error;
+  }
+  return safeReaddir(safeRoot)
     .sort()
     .flatMap((name) => {
       if (name === '.quarantine') return [];
       const child = path.join(root, name);
-      const stat = safeStat(child);
-      if (stat.isDirectory()) return recursive ? collectJsonFiles(child, true) : [];
-      return stat.isFile() && name.endsWith('.json') ? [child] : [];
+      try {
+        const safeChild = assertSafeRepositoryPath(child, { allowMissingLeaf: true });
+        const stat = safeLstat(safeChild);
+        if (stat.isDirectory()) return recursive ? collectJsonFiles(child, true) : [];
+        return stat.isFile() && name.endsWith('.json') ? [safeChild] : [];
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          (error.message.includes('[RESOURCE_PATH_SYMLINK]') ||
+            (error as NodeJS.ErrnoException).code === 'ENOENT')
+        ) {
+          return [];
+        }
+        throw error;
+      }
     });
+}
+
+function loadSurfaceRecordJson<T>(filePath: string): T {
+  return loadJson<T>(assertSafeRepositoryPath(filePath));
 }
 
 function hasPathSegments(filePath: string, parts: string[]): boolean {
@@ -506,7 +537,9 @@ export function getSurfaceAsyncRequest(
 ): SurfaceAsyncRequestRecord | null {
   const resolved = findRecordPath(asyncRequestBase(surface), requestId, { scope }, 'requests');
   if (!resolved) return null;
-  const request = readJson<SurfaceAsyncRequestRecord>(resolved);
+  const parsed = loadSurfaceRecordJson<unknown>(resolved);
+  if (!isSurfaceAsyncRequestRecord(parsed, surface)) return null;
+  const request = parsed;
   return recordMatchesScope(request, scopeFilter(scope)) ? request : null;
 }
 
@@ -542,7 +575,7 @@ export function listSurfaceAsyncRequests(
   return recordFiles(asyncRequestBase(surface), options, 'requests')
     .flatMap((filePath) => {
       try {
-        const parsed = loadJson<unknown>(filePath);
+        const parsed = loadSurfaceRecordJson<unknown>(filePath);
         if (!isSurfaceAsyncRequestRecord(parsed, surface)) {
           throw new Error('surface async-request schema violation');
         }
@@ -603,7 +636,7 @@ export function listSurfaceNotifications(
   return recordFiles(notificationBase(surface), options, 'notifications')
     .flatMap((filePath) => {
       try {
-        const parsed = loadJson<unknown>(filePath);
+        const parsed = loadSurfaceRecordJson<unknown>(filePath);
         if (!isSurfaceNotificationRecord(parsed, surface)) {
           throw new Error('surface notification schema violation');
         }
@@ -697,7 +730,7 @@ export function getSurfaceDeadTarget(
   );
   if (!safeExistsSync(resolved)) return null;
   try {
-    const parsed = loadJson<unknown>(resolved);
+    const parsed = loadSurfaceRecordJson<unknown>(resolved);
     if (!isSurfaceDeadTargetRecord(parsed, surface)) {
       throw new Error('surface dead-target schema violation');
     }
@@ -746,7 +779,8 @@ export function clearSurfaceDeadTarget(
   const resolved = pathResolver.resolve(
     surfaceDeadTargetLogicalPath(surface, channel, normalizedScope)
   );
-  if (safeExistsSync(resolved)) safeRmSync(resolved, { force: true });
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (safeExistsSync(safeResolved)) safeRmSync(safeResolved, { force: true });
 }
 
 export function listSurfaceDeadTargets(
@@ -759,7 +793,7 @@ export function listSurfaceDeadTargets(
       const dir = path.dirname(filePath);
       const name = path.basename(filePath);
       try {
-        const parsed = loadJson<unknown>(filePath);
+        const parsed = loadSurfaceRecordJson<unknown>(filePath);
         if (!isSurfaceDeadTargetRecord(parsed, surface)) {
           throw new Error('surface dead-target schema violation');
         }
@@ -781,7 +815,7 @@ export function listSurfaceOutboxMessages(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = loadJson<unknown>(filePath);
+      const parsed = loadSurfaceRecordJson<unknown>(filePath);
       if (!isSurfaceOutboxMessage(parsed, surface)) {
         throw new Error('surface outbox schema violation');
       }
@@ -807,7 +841,9 @@ export function clearSurfaceOutboxMessage(
     return;
   }
   const resolved = findRecordPath(surfaceOutboxBase(surface), messageId, { scope }, 'outbox');
-  if (resolved) safeRmSync(resolved, { force: true });
+  if (resolved) {
+    safeRmSync(assertSafeRepositoryPath(resolved, { allowMissingLeaf: true }), { force: true });
+  }
 }
 
 export function updateSurfaceOutboxMessage(
@@ -871,7 +907,7 @@ export function listSurfaceDeadLetters(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = loadJson<unknown>(filePath);
+      const parsed = loadSurfaceRecordJson<unknown>(filePath);
       if (!isSurfaceDeadLetterRecord(parsed, surface)) {
         throw new Error('surface dead-letter schema violation');
       }

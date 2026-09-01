@@ -89,6 +89,28 @@ export interface SurfaceViewerConfiguredCredential {
   role: ChronosAccessRole;
 }
 
+export interface SurfaceViewerScopeResolutionOptions {
+  /** Credential already extracted by the framework adapter. */
+  token?: string | null;
+  /** Whether the request was proven to originate from loopback. */
+  local?: boolean;
+  /** Server-owned tenant binding for unregistered remote credentials. */
+  serverTenant?: string | null;
+  registrations?: readonly ChronosTokenRegistration[] | null;
+  apiToken?: string;
+  localadminToken?: string;
+  configuredCredentials?: readonly SurfaceViewerConfiguredCredential[];
+  /** Role granted by a separately verified loopback compatibility path. */
+  loopbackRole?: ChronosAccessRole;
+  /** Allow the framework adapter's loopback compatibility path. */
+  allowLoopback?: boolean;
+  /** Bind loopback viewers to the server tenant instead of all tenants. */
+  loopbackUsesServerTenant?: boolean;
+  /** Surface-specific masking may remove personal, but never add, access. */
+  allowPersonalTier?: boolean;
+  principalIds?: Partial<Record<ChronosAccessRole, string>>;
+}
+
 /**
  * Resolve the shared credential boundary used by HTTP surfaces.
  *
@@ -150,6 +172,94 @@ export function resolveSurfaceViewerTierAccess(
     throw new SurfaceViewerScopeError(403, `viewer tier scope exceeds the ${role} role policy.`);
   }
   return normalized;
+}
+
+/**
+ * Materialize one server-derived viewer scope for every HTTP surface.
+ * Framework adapters own request parsing and loopback proof; this function
+ * owns credential precedence, registration scope, server-tenant binding,
+ * loopback fallback, principal identity, and role tier policy.
+ */
+export function resolveSurfaceViewerScope(
+  options: SurfaceViewerScopeResolutionOptions = {}
+): SurfaceViewerScope {
+  const token = options.token?.trim() || '';
+  const local = options.local === true;
+  const serverTenant = options.serverTenant?.trim() || undefined;
+  if (serverTenant && !isValidTenantSlug(serverTenant)) {
+    throw new SurfaceViewerScopeError(403, 'server tenant scope is invalid.');
+  }
+
+  const resolution = token
+    ? resolveSurfaceViewerToken(token, {
+        registrations: options.registrations,
+        apiToken: options.apiToken,
+        localadminToken: options.localadminToken,
+        configuredCredentials: options.configuredCredentials,
+      })
+    : null;
+
+  if (resolution) {
+    const registration = resolution.registration;
+    const tenantSlugs = registration
+      ? registration.tenant_slugs
+      : serverTenant
+        ? [serverTenant]
+        : local
+          ? 'all'
+          : undefined;
+    if (!tenantSlugs && !local) {
+      throw new SurfaceViewerScopeError(
+        403,
+        'Remote viewer access requires server-side tenant scope.'
+      );
+    }
+    return {
+      role: resolution.role,
+      tenantSlugs: tenantSlugs || 'all',
+      organizationIds: registration?.organization_ids ?? 'all',
+      projectIds: registration?.project_ids ?? 'all',
+      tierAccess: resolveSurfaceViewerScopeTierAccess(
+        resolution.role,
+        registration?.tier_access,
+        options.allowPersonalTier !== false
+      ),
+      source: 'token',
+      principalId: registration?.label || options.principalIds?.[resolution.role] || undefined,
+    };
+  }
+
+  if (token) throw new SurfaceViewerScopeError(401, 'Unknown viewer token.');
+
+  if (local && options.allowLoopback && options.loopbackRole) {
+    return {
+      role: options.loopbackRole,
+      tenantSlugs: options.loopbackUsesServerTenant && serverTenant ? [serverTenant] : 'all',
+      organizationIds: 'all',
+      projectIds: 'all',
+      tierAccess: resolveSurfaceViewerScopeTierAccess(
+        options.loopbackRole,
+        undefined,
+        options.allowPersonalTier !== false
+      ),
+      source: 'loopback',
+      principalId: options.principalIds?.[options.loopbackRole],
+    };
+  }
+
+  throw new SurfaceViewerScopeError(401, 'A viewer principal is required.');
+}
+
+function resolveSurfaceViewerScopeTierAccess(
+  role: ChronosAccessRole,
+  requested: readonly OsKnowledgeTier[] | undefined,
+  allowPersonalTier: boolean
+): OsKnowledgeTier[] {
+  if (!allowPersonalTier && requested?.includes('personal')) {
+    throw new SurfaceViewerScopeError(403, `viewer tier scope exceeds the ${role} role policy.`);
+  }
+  const resolved = resolveSurfaceViewerTierAccess(role, requested);
+  return allowPersonalTier ? resolved : resolved.filter((tier) => tier !== 'personal');
 }
 
 export function narrowSurfaceViewerTier(

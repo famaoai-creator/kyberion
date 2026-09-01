@@ -1,8 +1,15 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExecResult, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExecResult,
+  safeExistsSync,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { executeServicePreset } from './service-engine.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
@@ -24,11 +31,29 @@ import {
 
 function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;
-  return request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
+  const candidate = request.targetPath || pathResolver.resolve(`active/shared/tmp/${filename}`);
+  assertSafeRepositoryPath(pathResolver.resolve(candidate), { allowMissingLeaf: true });
+  return candidate;
 }
 
 function isAppleSiliconMac(): boolean {
   return process.platform === 'darwin' && process.arch === 'arm64';
+}
+
+function imageBytesFromResponse(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (!isRecord(value)) return undefined;
+  if (typeof value.imageBytes === 'string') return value.imageBytes;
+  if (Array.isArray(value.generatedImages)) {
+    const first = value.generatedImages[0];
+    if (isRecord(first) && isRecord(first.image) && typeof first.image.imageBytes === 'string') {
+      return first.image.imageBytes;
+    }
+  }
+  if (isRecord(value.result) && typeof value.result.imageBytes === 'string') {
+    return value.result.imageBytes;
+  }
+  return undefined;
 }
 
 function resolveLocalFluxDimensions(request: ImageGenerationRequest): {
@@ -171,17 +196,18 @@ export class ComfyUiImageGenerationProvider implements ImageGenerationProvider {
   async generate(request: ImageGenerationRequest): Promise<ImageGenerationResult> {
     const startedAt = Date.now();
     try {
+      const targetPath = request.targetPath ? getFallbackTargetPath(request) : undefined;
       // Delegate to existing ComfyUI service preset
       const res = await executeServicePreset('media-generation', 'generate_image', {
         prompt: request.prompt,
         aspect_ratio: request.aspectRatio,
-        target_path: request.targetPath,
+        target_path: targetPath,
         await_completion: request.awaitCompletion ?? true,
       });
 
       return {
         status: res?.prompt_id ? 'submitted' : 'succeeded',
-        path: res?.copied_to || res?.target_path || request.targetPath,
+        path: res?.copied_to || res?.target_path || targetPath,
         provider: this.id,
         promptId: res?.prompt_id,
         elapsedMs: Date.now() - startedAt,
@@ -224,12 +250,7 @@ export class GeminiServiceImageGenerationProvider implements ImageGenerationProv
         'secret-guard'
       );
 
-      const imageBytes =
-        typeof response === 'string'
-          ? response
-          : (response as any)?.imageBytes ||
-            (response as any)?.generatedImages?.[0]?.image?.imageBytes ||
-            (response as any)?.result?.imageBytes;
+      const imageBytes = imageBytesFromResponse(response);
 
       if (!imageBytes || typeof imageBytes !== 'string') {
         throw new Error('Gemini image service returned no image bytes');
@@ -316,8 +337,8 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`Gemini Imagen API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = (await res.json()) as any;
-    const base64Bytes = data.generatedImages?.[0]?.image?.imageBytes;
+    const data = (await res.json()) as unknown;
+    const base64Bytes = imageBytesFromResponse(data);
     if (!base64Bytes) {
       throw new Error('Gemini Imagen API returned no image bytes');
     }
@@ -367,8 +388,13 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`OpenAI DALL-E API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = (await res.json()) as any;
-    const base64Bytes = data.data?.[0]?.b64_json;
+    const data = (await res.json()) as unknown;
+    const base64Bytes =
+      isRecord(data) && Array.isArray(data.data) && isRecord(data.data[0])
+        ? typeof data.data[0].b64_json === 'string'
+          ? data.data[0].b64_json
+          : undefined
+        : undefined;
     if (!base64Bytes) {
       throw new Error('OpenAI DALL-E API returned no image bytes');
     }
@@ -508,7 +534,10 @@ function writeHostBridgeRequest(
   request: ImageGenerationRequest,
   targetPath: string
 ): void {
-  const requestFilePath = pathResolver.resolve(`active/shared/tmp/${config.requestFileName}`);
+  const requestFilePath = assertSafeRepositoryPath(
+    pathResolver.resolve(`active/shared/tmp/${config.requestFileName}`),
+    { allowMissingLeaf: true }
+  );
   const outputDir = path.dirname(requestFilePath);
   if (!safeExistsSync(outputDir)) {
     safeMkdir(outputDir, { recursive: true });

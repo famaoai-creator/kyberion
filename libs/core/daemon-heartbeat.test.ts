@@ -11,6 +11,12 @@ import { safeRmSync } from './secure-io.js';
 const HEARTBEAT_TEST_ROOT = pathResolver.sharedTmp('daemon-heartbeat-test');
 
 describe('daemon-heartbeat', () => {
+  it('rejects a heartbeat root outside the repository', () => {
+    expect(() =>
+      readDaemonHeartbeat('chronos-daemon', { rootDir: '../outside-heartbeats' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('records and reads a healthy daemon heartbeat', () => {
     safeRmSync(HEARTBEAT_TEST_ROOT, { recursive: true, force: true });
     recordDaemonHeartbeat(

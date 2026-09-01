@@ -4,20 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdmZip from 'adm-zip';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { rootDir, pathResolver } from '@agent/core/path-resolver';
 import {
-  compileSchemaFromPath,
-  rootDir,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
-  saveProjectRecord,
-  projectRecordPath,
-  saveServiceBindingRecord,
-  pptxUtils,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { saveProjectRecord, projectRecordPath } from '@agent/core/project-registry';
+import { saveServiceBindingRecord } from '@agent/core/service-binding-registry';
+import * as pptxUtils from '@agent/core/src/pptx-utils';
+import { withExecutionContext } from '@agent/core/authority';
 
 const ROOT = rootDir();
 
@@ -41,7 +40,7 @@ vi.mock('./media-ocr.js', () => ({
 
 import { handleAction } from './index.js';
 import type { MediaAction } from './media-pipeline-helpers.js';
-import type { PptxDesignProtocol, PptxElement } from '@agent/core';
+import type { PptxDesignProtocol, PptxElement } from '@agent/core/media-contracts';
 
 function decodeXmlEntities(value: string): string {
   return value
@@ -2878,6 +2877,18 @@ describe('media-actuator PDF page ops (pypdf bridge)', () => {
       steps: [{ type, op, params: { export_as: 'r', ...params } }],
     } as any);
 
+  it('rejects media write paths outside the repository', async () => {
+    const result = await runOp(
+      'write_file',
+      { path: '../../external-media-output.txt', content: 'must not write' },
+      'apply'
+    );
+    expect(result.status).toBe('failed');
+    expect(result.results.find((entry: any) => entry.error)?.error).toContain(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+  });
+
   it.runIf(pypdfAvailable)('pdf_extract_range keeps only the selected pages', async () => {
     const res = await runOp('pdf_extract_range', {
       path: rel('five.pdf'),
@@ -3083,6 +3094,22 @@ describe('media:deck_from_html', () => {
     } as MediaAction);
     expect(bad.status).toBe('failed');
     expect(bad.results[0].error).toContain('deck_from_html');
+  });
+
+  it('rejects file-backed HTML outside the repository root', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      steps: [
+        {
+          type: 'transform',
+          op: 'deck_from_html',
+          params: { path: '../../etc/passwd' },
+        },
+      ],
+    } as MediaAction);
+
+    expect(result.status).toBe('failed');
+    expect(result.results[0].error).toContain('[RESOURCE_PATH_SCOPE]');
   });
 
   it('rejects oversized inline HTML before parsing', async () => {

@@ -13,7 +13,7 @@ services:
       bash -lc "pnpm install --frozen-lockfile &&
       pnpm run validate &&
       pnpm build &&
-      node dist/scripts/cli.js list implemented"
+      node dist/scripts/kyberion.js list implemented"
 
   # OP-03 Task 3: deploy service — runs the built image (no source mount,
   # no install/build at runtime). macOS-only voice (MLX) is unavailable on
@@ -25,7 +25,7 @@ services:
       target: production
     environment:
       NODE_ENV: production
-    command: node dist/scripts/cli.js list implemented
+    command: node dist/scripts/kyberion.js list implemented
 
 volumes:
   node_modules_data:

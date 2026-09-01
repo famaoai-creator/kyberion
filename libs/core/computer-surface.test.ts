@@ -47,4 +47,15 @@ describe('computer-surface a2ui messages', () => {
       })
     ).toBe(false);
   });
+
+  it('rejects traversal-shaped computer session ids before persistence', () => {
+    expect(() =>
+      buildComputerSurfaceMessages({
+        sessionId: '../outside',
+        executor: 'terminal',
+        status: 'running',
+        latestAction: 'spawn',
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
 });

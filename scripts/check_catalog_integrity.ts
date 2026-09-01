@@ -1,17 +1,11 @@
-import * as addFormatsModule from 'ajv-formats';
 import * as path from 'node:path';
-import {
-  extractPlaceholderNames,
-  loadActuatorManifestCatalog,
-  pathResolver,
-  resolveVocabularyEntry,
-  safeExistsSync,
-  safeReadFile,
-  safeReaddir,
-  safeStat,
-} from '@agent/core';
-import { createAjv } from '@agent/core/foundation';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
+import { extractPlaceholderNames } from '@agent/core/message-format';
+import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import { resolveVocabularyEntry } from '@agent/core/vocabulary-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { compileSchema, readJson as readFoundationJson } from '@agent/core/foundation';
+import { getAllFiles } from '@agent/core/fs-utils';
 import { generateIndex } from './generate_knowledge_index.js';
 import {
   expectedKyberionThemeEntries,
@@ -20,11 +14,7 @@ import {
   renderKyberionDesignTokenBlock,
   renderKyberionTailwindColorsBlock,
 } from './design-token-utils.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
-
-const ajv = createAjv();
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-addFormats(ajv);
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type CatalogCheck = {
   id: string;
@@ -37,7 +27,17 @@ type GovernanceCatalogContracts = {
   catalogs: Record<string, string[]>;
 };
 
+type GovernanceCatalogMetadata = {
+  fileName: string;
+  documentationOnly: boolean;
+};
+
 const CHECKS: CatalogCheck[] = [
+  {
+    id: 'project-standards',
+    schemaPath: 'knowledge/product/schemas/project-standards.schema.json',
+    dataPath: 'knowledge/public/common/project_standards.json',
+  },
   {
     id: 'service-endpoints',
     schemaPath: 'knowledge/product/schemas/service-endpoints.schema.json',
@@ -98,6 +98,101 @@ const CHECKS: CatalogCheck[] = [
     schemaPath: 'knowledge/product/schemas/cli-commands.schema.json',
     dataPath: 'knowledge/product/governance/cli-commands.json',
   },
+  {
+    id: 'shell-command-policy',
+    schemaPath: 'knowledge/product/schemas/shell-command-policy.schema.json',
+    dataPath: 'knowledge/product/governance/shell-command-policy.json',
+  },
+  {
+    id: 'restricted-action-kinds-policy',
+    schemaPath: 'knowledge/product/schemas/restricted-action-kinds-policy.schema.json',
+    dataPath: 'knowledge/product/governance/restricted-action-kinds-policy.json',
+  },
+  {
+    id: 'voice-runtime-policy',
+    schemaPath: 'knowledge/product/schemas/voice-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/voice-runtime-policy.json',
+  },
+  {
+    id: 'video-render-runtime-policy',
+    schemaPath: 'knowledge/product/schemas/video-render-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/video-render-runtime-policy.json',
+  },
+  {
+    id: 'video-composition-template-registry',
+    schemaPath: 'knowledge/product/schemas/video-composition-template-registry.schema.json',
+    dataPath: 'knowledge/product/governance/video-composition-template-registry.json',
+  },
+  {
+    id: 'service-runtime-policy',
+    schemaPath: 'knowledge/product/schemas/service-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/service-runtime-policy.json',
+  },
+  {
+    id: 'autonomous-ops-policy',
+    schemaPath: 'knowledge/product/schemas/autonomous-ops-policy.schema.json',
+    dataPath: 'knowledge/product/governance/autonomous-ops-policy.json',
+  },
+  {
+    id: 'tool-actuator-routing-policy',
+    schemaPath: 'knowledge/product/schemas/tool-actuator-routing-policy.schema.json',
+    dataPath: 'knowledge/product/governance/tool-actuator-routing-policy.json',
+  },
+  {
+    id: 'media-backend-registry',
+    schemaPath: 'knowledge/product/schemas/media-backend-registry.schema.json',
+    dataPath: 'knowledge/product/governance/media-backend-registry.json',
+  },
+  {
+    id: 'provider-egress-policy',
+    schemaPath: 'knowledge/product/schemas/provider-egress-policy.schema.json',
+    dataPath: 'knowledge/product/governance/provider-egress-policy.json',
+  },
+  {
+    id: 'voice-engine-registry',
+    schemaPath: 'knowledge/product/schemas/voice-engine-registry.schema.json',
+    dataPath: 'knowledge/product/governance/voice-engine-registry.json',
+  },
+  {
+    id: 'presence-avatar-profiles',
+    schemaPath: 'knowledge/product/schemas/presence-avatar-profiles.schema.json',
+    dataPath: 'knowledge/product/presence/avatar-profiles.json',
+  },
+  {
+    id: 'voice-tts-config',
+    schemaPath: 'knowledge/product/schemas/voice-tts-config.schema.json',
+    dataPath: 'knowledge/product/presence/voice-hub-tts.json',
+  },
+  {
+    id: 'egress-policy',
+    schemaPath: 'knowledge/product/schemas/egress-policy.schema.json',
+    dataPath: 'knowledge/product/governance/egress-policy.json',
+  },
+  {
+    id: 'tool-runtime-policy',
+    schemaPath: 'knowledge/product/schemas/tool-runtime-policy.schema.json',
+    dataPath: 'knowledge/product/governance/tool-runtime-policy.json',
+  },
+  {
+    id: 'tool-runtime-registry',
+    schemaPath: 'knowledge/product/schemas/tool-runtime-registry.schema.json',
+    dataPath: 'knowledge/product/governance/tool-runtime-registry.json',
+  },
+  {
+    id: 'knowledge-feedback-policy',
+    schemaPath: 'knowledge/product/schemas/knowledge-feedback-policy.schema.json',
+    dataPath: 'knowledge/product/governance/knowledge-feedback-policy.json',
+  },
+  {
+    id: 'knowledge-curation-slo',
+    schemaPath: 'knowledge/product/schemas/knowledge-curation-slo.schema.json',
+    dataPath: 'knowledge/product/governance/knowledge-curation-slo.json',
+  },
+  {
+    id: 'knowledge-taxonomy',
+    schemaPath: 'knowledge/product/schemas/knowledge-taxonomy.schema.json',
+    dataPath: 'knowledge/product/governance/knowledge-taxonomy.json',
+  },
 ];
 
 function readJson<T>(relativePath: string): T {
@@ -106,23 +201,8 @@ function readJson<T>(relativePath: string): T {
 }
 
 function validateCatalog(check: CatalogCheck, violations: string[], warnings: string[]) {
-  const schema = readJson<Record<string, unknown>>(check.schemaPath);
-  if (check.id === 'organization-catalog') {
-    for (const dependency of [
-      'organization-domain.schema.json',
-      'organization-capability.schema.json',
-      'organization-service.schema.json',
-    ]) {
-      const dependencySchema = readJson<Record<string, unknown>>(
-        `knowledge/product/schemas/${dependency}`
-      );
-      if (!ajv.getSchema(String(dependencySchema.$id || dependency))) {
-        ajv.addSchema(dependencySchema);
-      }
-    }
-  }
+  const validate = compileSchema(pathResolver.rootResolve(check.schemaPath));
   const data = readJson<Record<string, unknown>>(check.dataPath);
-  const validate = ajv.compile(schema);
   const ok = validate(data);
   if (!ok) {
     for (const error of validate.errors || []) {
@@ -164,9 +244,8 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
         services?: Record<string, unknown>;
       };
       const snapshotServices = typed.services || {};
-      const payloadValidate = ajv.compile(schema);
-      if (!payloadValidate(payload)) {
-        for (const error of payloadValidate.errors || []) {
+      if (!validate(payload)) {
+        for (const error of validate.errors || []) {
           violations.push(
             `service-endpoints: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`
           );
@@ -266,9 +345,8 @@ function validateCatalog(check: CatalogCheck, violations: string[], warnings: st
         version?: string;
         specialists?: Record<string, unknown>;
       };
-      const payloadValidate = ajv.compile(schema);
-      if (!payloadValidate(payload)) {
-        for (const error of payloadValidate.errors || []) {
+      if (!validate(payload)) {
+        for (const error of validate.errors || []) {
           violations.push(
             `specialist-catalog: ${fileName}${error.instancePath || '/'} ${error.message || 'schema violation'}`
           );
@@ -695,6 +773,47 @@ function validateCapabilitiesGuideDrift(violations: string[]) {
  * documented compatibility artifact. Keeping this check directory-driven
  * prevents new policy JSON from silently bypassing schema validation.
  */
+export function findUnreferencedGovernanceCatalogs(input: {
+  catalogs: readonly GovernanceCatalogMetadata[];
+  sourceFiles: Readonly<Record<string, string>>;
+}): string[] {
+  const sourceText = Object.values(input.sourceFiles).join('\n');
+  const isReferenced = (fileName: string): boolean =>
+    sourceText.includes(`governance/${fileName}`) ||
+    sourceText.includes(`'${fileName}'`) ||
+    sourceText.includes(`"${fileName}"`) ||
+    sourceText.includes(`\`${fileName}\``);
+  return input.catalogs
+    .filter((catalog) => !catalog.documentationOnly && !isReferenced(catalog.fileName))
+    .map((catalog) => catalog.fileName)
+    .sort();
+}
+
+function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
+  const sourceFiles: Record<string, string> = {};
+  for (const rootName of ['libs', 'scripts', 'presence', 'satellites']) {
+    const root = pathResolver.rootResolve(rootName);
+    if (!safeExistsSync(root)) continue;
+    for (const file of getAllFiles(root)) {
+      if (
+        !/\.(?:ts|tsx|js|jsx|mjs|cjs)$/u.test(file) ||
+        file
+          .split(path.sep)
+          .some((segment) =>
+            new Set(['.next', 'build', 'coverage', 'dist', 'node_modules']).has(segment)
+          ) ||
+        file.endsWith('.test.ts') ||
+        file.endsWith('.test.tsx') ||
+        file.endsWith('.test.js')
+      )
+        continue;
+      const relative = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+      sourceFiles[relative] = String(safeReadFile(file, { encoding: 'utf8' }));
+    }
+  }
+  return sourceFiles;
+}
+
 function validateGovernanceCatalogMetadata(violations: string[]) {
   const relativeRoot = 'knowledge/product/governance';
   const root = pathResolver.rootResolve(relativeRoot);
@@ -703,7 +822,8 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
   );
   const contracts = readFoundationJson<GovernanceCatalogContracts>(contractsPath);
   const genericSchemaRef = '../schemas/governance-catalog.schema.json';
-  const genericCatalogs = new Set<string>();
+  const backedCatalogs = new Set<string>();
+  const catalogs: GovernanceCatalogMetadata[] = [];
   for (const fileName of safeReaddir(root)
     .filter((entry) => entry.endsWith('.json'))
     .sort()) {
@@ -719,6 +839,8 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
       continue;
     }
 
+    catalogs.push({ fileName, documentationOnly: payload.documentation_only === true });
+
     const schemaRef = payload.$schema;
     if (typeof schemaRef !== 'string' || schemaRef.trim() === '') {
       if (payload.documentation_only !== true) {
@@ -731,7 +853,7 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
 
     if (/^https?:\/\//u.test(schemaRef)) continue;
     if (schemaRef === genericSchemaRef) {
-      genericCatalogs.add(fileName);
+      backedCatalogs.add(fileName);
       const requiredKeys = contracts.catalogs[fileName];
       if (!requiredKeys) {
         violations.push(
@@ -751,14 +873,36 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     const schemaPath = pathResolver.rootResolve(path.join(relativeRoot, schemaRef));
     if (!safeExistsSync(schemaPath)) {
       violations.push(`governance-catalog: ${relativePath} references missing schema ${schemaRef}`);
+    } else {
+      // A dedicated schema is a stronger replacement for the generic envelope.
+      // Keep the legacy top-level contract check while the contract registry is
+      // gradually migrated to dedicated schemas.
+      backedCatalogs.add(fileName);
+      const requiredKeys = contracts.catalogs[fileName];
+      for (const key of requiredKeys || []) {
+        if (!(key in payload)) {
+          violations.push(
+            `governance-catalog: ${relativePath} is missing contracted top-level key ${key}`
+          );
+        }
+      }
     }
   }
   for (const fileName of Object.keys(contracts.catalogs)) {
-    if (!genericCatalogs.has(fileName)) {
+    if (!backedCatalogs.has(fileName)) {
       violations.push(
-        `governance-catalog: contract entry ${fileName} is not backed by the envelope schema`
+        `governance-catalog: contract entry ${fileName} is not backed by a declared schema`
       );
     }
+  }
+
+  for (const fileName of findUnreferencedGovernanceCatalogs({
+    catalogs,
+    sourceFiles: collectGovernanceRuntimeSourceFiles(),
+  })) {
+    violations.push(
+      `governance-catalog: ${relativeRoot}/${fileName} is not referenced by production source; declare documentation_only=true or add a runtime loader`
+    );
   }
 }
 
@@ -768,6 +912,7 @@ export const runCheckCatalogIntegrity = defineScript({
   run(context) {
     const result = runCatalogIntegrityCheck();
     context.print(result);
+    return result;
   },
 });
 
@@ -796,11 +941,10 @@ export function runCatalogIntegrityCheck(): { status: 'passed'; warnings: string
   }
 
   if (violations.length > 0) {
-    console.error('[check:catalogs] violations detected:');
-    for (const violation of violations.sort()) {
-      console.error(`- ${violation}`);
-    }
-    throw new Error(`${violations.length} catalog integrity violation(s)`);
+    throw new ScriptExitError(
+      1,
+      ['violations detected:', ...violations.sort().map((violation) => `- ${violation}`)].join('\n')
+    );
   }
 
   return { status: 'passed', warnings };

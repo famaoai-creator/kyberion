@@ -1,10 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   getServiceRuntimeRecord,
   getServiceRuntimeRegistry,
   listServiceRuntimeInventory,
   probeServiceRuntime,
-  resetServiceRuntimeRegistryCache,
+  _resetServiceRuntimeRegistryCacheForTests,
 } from './service-runtime-registry.js';
 
 const mocks = vi.hoisted(() => {
@@ -19,7 +21,7 @@ vi.mock('./network.js', () => ({
 describe('service-runtime-registry', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    resetServiceRuntimeRegistryCache();
+    _resetServiceRuntimeRegistryCacheForTests();
     mocks.secureFetch.mockResolvedValue({ ok: true });
   });
 
@@ -38,11 +40,13 @@ describe('service-runtime-registry', () => {
     const resolution = await probeServiceRuntime('comfyui', 'trial', 'darwin');
     expect(resolution.available).toBe(true);
     expect(resolution.probe_url).toBe('http://127.0.0.1:8188/system_stats');
-    expect(mocks.secureFetch).toHaveBeenCalledWith(expect.objectContaining({
-      method: 'GET',
-      url: 'http://127.0.0.1:8188/system_stats',
-      kyberion_allow_local_network: true,
-    }));
+    expect(mocks.secureFetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: 'http://127.0.0.1:8188/system_stats',
+        kyberion_allow_local_network: true,
+      })
+    );
   });
 
   it('lists service runtime inventory with lifecycle metadata', async () => {
@@ -55,5 +59,38 @@ describe('service-runtime-registry', () => {
       available: true,
       selected_action: 'probe',
     });
+  });
+
+  it('rejects a managed service subpath that escapes the governed runtime root', async () => {
+    const registryPath = pathResolver.sharedTmp(
+      `service-runtime-registry-escape-${process.pid}.json`
+    );
+    process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH = registryPath;
+    safeWriteFile(
+      registryPath,
+      JSON.stringify({
+        version: 'test',
+        default_service_id: 'escape-test',
+        services: [
+          {
+            service_id: 'escape-test',
+            display_name: 'Escape test',
+            kind: 'local_service',
+            status: 'active',
+            platforms: ['any'],
+            supported_modes: ['trial'],
+            trial_probe: { kind: 'http', method: 'GET', path: 'health' },
+            managed_service_subpath: '../outside',
+          },
+        ],
+      })
+    );
+    _resetServiceRuntimeRegistryCacheForTests();
+    await expect(probeServiceRuntime('escape-test', 'trial', 'darwin')).rejects.toThrow(
+      /escapes its root/
+    );
+    safeRmSync(registryPath, { force: true });
+    delete process.env.KYBERION_SERVICE_RUNTIME_REGISTRY_PATH;
+    _resetServiceRuntimeRegistryCacheForTests();
   });
 });

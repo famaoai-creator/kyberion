@@ -1,4 +1,5 @@
-import { appendJsonLine } from './foundation/json.js';
+import type { ValidateFunction } from 'ajv';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 /**
  * Action Item Store — persists meeting-derived action items to the
@@ -20,7 +21,9 @@ import { nowIso } from './foundation/time.js';
 
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
-import { safeReadFile, safeMkdir, safeExistsSync } from './secure-io.js';
+import { compileSchema } from './foundation/ajv.js';
+import { isRecord } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
 
 export type ActionItemStatus = 'pending' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
@@ -143,16 +146,28 @@ export interface ActionItemLifecycleSummary {
 }
 
 const ITEM_ID_RE = /^AI-[A-Z0-9-]{2,40}$/;
+const ACTION_ITEM_SCHEMA_PATH = pathResolver.knowledge('product/schemas/action-item.schema.json');
+let actionItemValidate: ValidateFunction<ActionItem> | null = null;
+
+function validateActionItemSchema(value: unknown): ActionItem {
+  actionItemValidate ||= compileSchema<ActionItem>(ACTION_ITEM_SCHEMA_PATH);
+  if (!actionItemValidate(value)) {
+    const errors = (actionItemValidate.errors || [])
+      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
+      .join('; ');
+    throw new Error(`[action-item-store] invalid persisted action item: ${errors}`);
+  }
+  return value as ActionItem;
+}
 
 function storePathFor(missionId: string): string {
   const evidenceDir = pathResolver.missionEvidenceDir(missionId);
-  if (!evidenceDir) {
-    // Fall back to a writable evidence dir layout the caller can create.
-    return pathResolver.rootResolve(
-      `active/missions/confidential/${missionId}/evidence/action-items.jsonl`
-    );
-  }
-  return path.join(evidenceDir, 'action-items.jsonl');
+  const candidate = evidenceDir
+    ? path.join(evidenceDir, 'action-items.jsonl')
+    : pathResolver.rootResolve(
+        `active/missions/confidential/${missionId}/evidence/action-items.jsonl`
+      );
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 /**
@@ -164,20 +179,16 @@ function storePathFor(missionId: string): string {
  * has to reason about `item.policy`. Writers always emit the new
  * shape, so the legacy form is read-only.
  */
-function migrateLegacyPolicy(raw: any): ActionItem {
-  const item = raw as ActionItem & {
-    partial_state?: boolean;
-    restricted?: boolean;
-    restriction_rule_id?: string;
-    manager_handle?: string;
-  };
+function migrateLegacyPolicy(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const item = raw;
   const legacyPresent =
     item.partial_state !== undefined ||
     item.restricted !== undefined ||
     item.restriction_rule_id !== undefined ||
     item.manager_handle !== undefined;
-  if (!legacyPresent && !item.policy) return item as ActionItem;
-  const policy: ActionItemPolicy = { ...(item.policy ?? {}) };
+  if (!legacyPresent && !item.policy) return item;
+  const policy = isRecord(item.policy) ? { ...item.policy } : {};
   if (item.partial_state !== undefined && policy.partial_state === undefined) {
     policy.partial_state = item.partial_state;
   }
@@ -190,11 +201,11 @@ function migrateLegacyPolicy(raw: any): ActionItem {
   if (item.manager_handle !== undefined && policy.manager_handle === undefined) {
     policy.manager_handle = item.manager_handle;
   }
-  const migrated: ActionItem = { ...(item as ActionItem) };
-  delete (migrated as any).partial_state;
-  delete (migrated as any).restricted;
-  delete (migrated as any).restriction_rule_id;
-  delete (migrated as any).manager_handle;
+  const migrated = { ...item };
+  delete migrated.partial_state;
+  delete migrated.restricted;
+  delete migrated.restriction_rule_id;
+  delete migrated.manager_handle;
   if (Object.keys(policy).length > 0) migrated.policy = policy;
   return migrated;
 }
@@ -202,18 +213,10 @@ function migrateLegacyPolicy(raw: any): ActionItem {
 function readAll(missionId: string): ActionItem[] {
   const file = storePathFor(missionId);
   if (!safeExistsSync(file)) return [];
-  const text = safeReadFile(file, { encoding: 'utf8' }) as string;
-  const events: ActionItem[] = [];
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      events.push(migrateLegacyPolicy(JSON.parse(trimmed)));
-    } catch {
-      /* skip malformed line */
-    }
-  }
-  return events;
+  return readJsonLines<ActionItem>(file, {
+    onMalformed: 'skip',
+    map: (value) => validateActionItemSchema(migrateLegacyPolicy(value)),
+  });
 }
 
 /**
@@ -229,6 +232,7 @@ function reduceLatest(items: ActionItem[]): Map<string, ActionItem> {
 
 function appendRecord(missionId: string, record: ActionItem): void {
   const file = storePathFor(missionId);
+  validateActionItemSchema(record);
   safeMkdir(path.dirname(file), { recursive: true });
   appendJsonLine(file, record);
 }

@@ -1,8 +1,8 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import { handleMediaAction, type MediaAction } from './media-pipeline-helpers.js';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 import { opCapture } from './media-action-capture.js';
 import { opTransform } from './media-action-transform.js';
 import { opApply } from './media-action-apply.js';
@@ -18,6 +18,7 @@ async function handleAction(input: MediaAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'media-actuator',
+    args: process.argv,
     handleAction,
   });
 };

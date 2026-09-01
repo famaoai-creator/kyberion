@@ -1,11 +1,10 @@
-import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from './secure-io.js';
@@ -35,40 +34,52 @@ export interface ProjectTrackRecord {
   metadata?: Record<string, unknown>;
 }
 
-const ajv = createAjv();
 const TRACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/project-track-record.schema.json'
 );
-let trackValidateFn: ValidateFunction | null = null;
-
-function ensureValidator(): ValidateFunction {
-  if (trackValidateFn) return trackValidateFn;
-  const raw = safeReadFile(TRACK_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  trackValidateFn = ajv.compile(JSON.parse(raw));
-  return trackValidateFn!;
-}
 
 function trackDir(rootDir = pathResolver.rootDir()): string {
   return path.resolve(rootDir, 'active/shared/runtime/project-tracks');
 }
 
 function trackPath(trackId: string, rootDir = pathResolver.rootDir()): string {
-  return `${trackDir(rootDir)}/${trackId}.json`;
+  const directory = trackDir(rootDir);
+  const candidate = path.resolve(directory, `${trackId}.json`);
+  const relative = path.relative(directory, candidate).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    throw new Error(`[RESOURCE_PATH_SCOPE] project track path escapes its directory: ${trackId}`);
+  }
+  return assertSafeRepositoryPath(candidate, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
 }
 
+const projectTrackRecordCatalog = defineCatalog<ProjectTrackRecord>({
+  id: 'project-track-record',
+  path: trackDir,
+  schema: TRACK_SCHEMA_PATH,
+});
+
 export function validateProjectTrackRecord(value: unknown): value is ProjectTrackRecord {
-  return Boolean(ensureValidator()(value));
+  try {
+    projectTrackRecordCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function saveProjectTrackRecord(
   record: ProjectTrackRecord,
   options: { rootDir?: string } = {}
 ): string {
-  if (!validateProjectTrackRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  try {
+    projectTrackRecordCatalog.validate(record);
+  } catch (error) {
+    throw new Error(
+      `Invalid project track record: ${error instanceof Error ? error.message : String(error)}`
     );
-    throw new Error(`Invalid project track record: ${errors.join('; ')}`);
   }
   const directory = trackDir(options.rootDir);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
@@ -83,9 +94,16 @@ export function loadProjectTrackRecord(
 ): ProjectTrackRecord | null {
   const filePath = trackPath(trackId, options.rootDir);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ProjectTrackRecord;
-  return validateProjectTrackRecord(parsed) ? parsed : null;
+  try {
+    return defineCatalog<ProjectTrackRecord>({
+      id: 'project-track-record',
+      path: filePath,
+      schema: TRACK_SCHEMA_PATH,
+    }).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
+    throw error;
+  }
 }
 
 export function listProjectTrackRecords(rootDir = pathResolver.rootDir()): ProjectTrackRecord[] {

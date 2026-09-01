@@ -161,6 +161,12 @@ describe('ingest:parse_document golden normalization (DA-04 acceptance 1)', () =
     );
   });
 
+  it('rejects a source path outside the repository before reading it', async () => {
+    await expect(
+      parseDocument({ source_path: '/tmp/external-ingest-source.txt', format: 'text' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects malformed slack_thread payloads', async () => {
     await expect(
       parseDocument({ content_text: '{"not":"an array"}', format: 'slack_thread' })

@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJson } from '../foundation/json.js';
+import { isRecord } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -10,8 +11,9 @@ import {
   safeWriteFile,
   safeMkdir,
   safeStat,
+  safeLstat,
   safeUnlinkSync,
-  loadJson,
+  assertSafeRepositoryPath,
 } from '../secure-io.js';
 import {
   getEmbeddingBackend,
@@ -130,39 +132,54 @@ function usageAggregatePath(scope?: ScopeContext): string {
   } else {
     base = shared('runtime/feedback-loop/knowledge-usage/usage.json');
   }
-  if (!scope?.tenant_slug) return base;
-  const scopeKind = scope.session_id
-    ? 'session'
-    : scope.task_id
-      ? 'task'
-      : scope.mission_id
-        ? 'mission'
-        : scope.project_id
-          ? 'project'
-          : scope.organization_id
-            ? 'organization'
-            : 'tenant';
-  const relative = base.replace(/^.*?(?=active\/shared\/runtime)/, '');
-  const feedbackRoot = 'active/shared/runtime/feedback-loop';
-  const scopedScope = { ...scope, scope_kind: scopeKind } as const;
-  const relativeBase = relative.replace(/^\/+/, '');
-  const scoped =
-    relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)
-      ? path.posix.join(
-          physicalScopedPath(feedbackRoot, scopedScope),
-          ...relativeBase.slice(feedbackRoot.length).replace(/^\/+/, '').split('/').filter(Boolean)
-        )
-      : physicalScopedPath(relativeBase, scopedScope);
-  let rootResolve: ((relativePath: string) => string) | undefined;
   try {
-    const candidate = resolver.rootResolve;
-    if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+    if (!scope?.tenant_slug) {
+      return assertSafeRepositoryPath(base, { allowMissingLeaf: true });
+    }
+    const scopeKind = scope.session_id
+      ? 'session'
+      : scope.task_id
+        ? 'task'
+        : scope.mission_id
+          ? 'mission'
+          : scope.project_id
+            ? 'project'
+            : scope.organization_id
+              ? 'organization'
+              : 'tenant';
+    const relative = base.replace(/^.*?(?=active\/shared\/runtime)/, '');
+    const feedbackRoot = 'active/shared/runtime/feedback-loop';
+    const scopedScope = { ...scope, scope_kind: scopeKind } as const;
+    const relativeBase = relative.replace(/^\/+/, '');
+    const scoped =
+      relativeBase === feedbackRoot || relativeBase.startsWith(`${feedbackRoot}/`)
+        ? path.posix.join(
+            physicalScopedPath(feedbackRoot, scopedScope),
+            ...relativeBase
+              .slice(feedbackRoot.length)
+              .replace(/^\/+/, '')
+              .split('/')
+              .filter(Boolean)
+          )
+        : physicalScopedPath(relativeBase, scopedScope);
+    let rootResolve: ((relativePath: string) => string) | undefined;
+    try {
+      const candidate = resolver.rootResolve;
+      if (typeof candidate === 'function') rootResolve = candidate.bind(resolver);
+    } catch {
+      rootResolve = undefined;
+    }
+    const resolved = rootResolve
+      ? rootResolve(scoped)
+      : nestedResolver?.rootDir?.()
+        ? path.join(nestedResolver.rootDir!(), scoped)
+        : scoped;
+    return assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
   } catch {
-    rootResolve = undefined;
+    // Usage feedback is optional. An invalid external override must not widen
+    // the read surface or make knowledge ranking unavailable.
+    return '';
   }
-  if (rootResolve) return rootResolve(scoped);
-  const rootDir = nestedResolver?.rootDir?.();
-  return rootDir ? path.join(rootDir, scoped) : scoped;
 }
 
 function loadUsageYieldValues(scope?: ScopeContext): Map<string, number> {
@@ -332,9 +349,17 @@ function computeTextHash(text: string): string {
 
 function cacheDir(): string {
   const override = getRegisteredEnvText('KYBERION_KI_CACHE_DIR')?.trim();
-  if (override) return override;
   const root = path.dirname(pathResolver.knowledge());
-  return path.join(root, 'active', 'shared', 'cache');
+  const fallback = path.join(root, 'active', 'shared', 'cache');
+  if (!override) return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
+  try {
+    const candidate = path.isAbsolute(override) ? override : pathResolver.rootResolve(override);
+    return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+  } catch {
+    // Cache is an optional optimization. Never write to an ungoverned
+    // override; use the canonical repository cache instead.
+    return assertSafeRepositoryPath(fallback, { allowMissingLeaf: true });
+  }
 }
 
 function cacheFilePath(scopeHash: string): string {
@@ -359,8 +384,13 @@ function usageFilePath(): string {
 function loadUsageMap(): Record<string, string> {
   try {
     if (!safeExistsSync(usageFilePath())) return {};
-    const parsed = loadJson<Record<string, string>>(usageFilePath());
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    const parsed = readJson<unknown>(usageFilePath());
+    if (!isRecord(parsed)) return {};
+    const usage: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'string') usage[key] = value;
+    }
+    return usage;
   } catch {
     /* corrupt usage map: rebuild from scratch */
     return {};
@@ -429,8 +459,7 @@ function loadDiskCache(scopeHash: string): Map<string, { textHash: string; vecto
   const filePath = cacheFilePath(scopeHash);
   if (!safeExistsSync(filePath)) return result;
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const cache: DiskCache = JSON.parse(raw);
+    const cache = readJson<DiskCache>(filePath);
     for (const entry of cache.entries) {
       result.set(entry.source, {
         textHash: entry.textHash,
@@ -831,6 +860,37 @@ function _scanCustomerOverlayTier(
 
 // ─── Low-level scanners ───────────────────────────────────────────────────────
 
+/**
+ * Validate a scanner candidate before reading it. `knowledgeBase` is a
+ * fixture-injectable knowledge root, so this checks against its containing
+ * project root rather than the process repository root. Every existing
+ * component is lstat'ed: lexical containment alone would allow a knowledge
+ * entry to escape through a symlink.
+ */
+function isSafeScannerPath(knowledgeBase: string, candidate: string): boolean {
+  const projectRoot = path.resolve(path.dirname(knowledgeBase));
+  const absolute = path.resolve(candidate);
+  const relative = path.relative(projectRoot, absolute).replaceAll('\\', '/');
+  if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
+    return false;
+  }
+
+  let current = projectRoot;
+  for (const segment of relative.split('/')) {
+    current = path.join(current, segment);
+    try {
+      if (safeLstat(current).isSymbolicLink()) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function scannerSource(knowledgeBase: string, filePath: string): string {
+  return path.relative(knowledgeBase, filePath).replaceAll('\\', '/');
+}
+
 function _loadJsonHints(
   dir: string,
   knowledgeBase: string,
@@ -838,6 +898,7 @@ function _loadJsonHints(
   customerId: string | undefined,
   hints: KnowledgeHint[]
 ): void {
+  if (!isSafeScannerPath(knowledgeBase, dir)) return;
   let files: string[];
   try {
     files = safeReaddir(dir);
@@ -848,11 +909,11 @@ function _loadJsonHints(
   for (const file of files) {
     if (!file.endsWith('.json')) continue;
     const filePath = path.join(dir, file);
+    if (!isSafeScannerPath(knowledgeBase, filePath)) continue;
     try {
-      const content = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(content);
+      const parsed = readJson<unknown>(filePath);
       const entries: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
-      const relSource = path.relative(knowledgeBase, filePath);
+      const relSource = scannerSource(knowledgeBase, filePath);
       for (const entry of entries) {
         if (
           entry !== null &&
@@ -892,6 +953,7 @@ function _scanMarkdownHints(
   options: { excludeDirectories?: ReadonlySet<string> } = {},
   atRoot = true
 ): void {
+  if (!isSafeScannerPath(knowledgeBase, dir)) return;
   let entries: string[];
   try {
     entries = safeReaddir(dir);
@@ -901,6 +963,7 @@ function _scanMarkdownHints(
 
   for (const entry of entries) {
     const fullPath = path.join(dir, entry);
+    if (!isSafeScannerPath(knowledgeBase, fullPath)) continue;
 
     if (entry === 'hints') continue; // Already handled as JSON
 
@@ -909,7 +972,7 @@ function _scanMarkdownHints(
         const content = safeReadFile(fullPath, { encoding: 'utf8' }) as string;
         const title = _extractMarkdownTitle(content, entry);
         if (title) {
-          const relSource = path.relative(knowledgeBase, fullPath);
+          const relSource = scannerSource(knowledgeBase, fullPath);
           const tags = _extractFrontmatterTags(content);
           const excerpt = _extractFirstParagraph(content);
           const rankingMetadata = _extractRankingMetadata(content, relSource);

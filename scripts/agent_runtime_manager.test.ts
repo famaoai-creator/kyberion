@@ -18,7 +18,12 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(() => ({ agentId: 'demo-agent-1234' })),
   getSnapshot: vi.fn(() => null),
   loadAgentManifests: vi.fn(() => [
-    { agentId: 'manifest-a', autoSpawn: true, trustRequired: false, systemPrompt: 'Manifest A\nmore text' },
+    {
+      agentId: 'manifest-a',
+      autoSpawn: true,
+      trustRequired: false,
+      systemPrompt: 'Manifest A\nmore text',
+    },
   ]),
   getAgentManifest: vi.fn(() => ({
     systemPrompt: 'Manifest A\nmore text',
@@ -37,19 +42,41 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('@agent/core', () => ({
+vi.mock('@agent/core/cli-utils', () => ({
   createStandardYargs: vi.fn(),
+}));
+
+vi.mock('@agent/core/agent-lifecycle', () => ({
   agentLifecycle: { spawn: mocks.spawn, shutdown: mocks.shutdown, getSnapshot: mocks.getSnapshot },
+}));
+
+vi.mock('@agent/core/agent-registry', () => ({
   agentRegistry: { list: mocks.list, get: mocks.get },
+}));
+
+vi.mock('@agent/core/agent-manifest', () => ({
   loadAgentManifests: mocks.loadAgentManifests,
   getAgentManifest: mocks.getAgentManifest,
+}));
+
+vi.mock('@agent/core/core', () => ({
   logger: mocks.logger,
-  pathResolver: { rootDir: vi.fn(() => '/tmp/kyberion') },
+}));
+
+vi.mock('@agent/core/audit-chain', () => ({
   auditChain: { record: mocks.record },
+}));
+
+vi.mock('@agent/core/error-classifier', () => ({
   classifyError: mocks.classifyError,
 }));
 
-import { inspectAgent, listManifests, listRunningAgents, spawnAgent } from './agent_runtime_manager.js';
+import {
+  inspectAgent,
+  listManifests,
+  listRunningAgents,
+  spawnAgent,
+} from './agent_runtime_manager.js';
 
 describe('agent_runtime_manager', () => {
   beforeEach(() => {
@@ -80,9 +107,11 @@ describe('agent_runtime_manager', () => {
         provider: 'claude',
         modelId: 'claude-3.5-sonnet',
         missionId: 'MSN-TEST',
-      }),
+      })
     );
-    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({ action: 'agent.manual_spawn' }));
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'agent.manual_spawn' })
+    );
     spy.mockRestore();
   });
 
@@ -90,17 +119,21 @@ describe('agent_runtime_manager', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     mocks.spawn.mockRejectedValueOnce(new Error('permission denied by runtime policy'));
 
-    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' })).rejects.toThrow('permission denied');
+    await expect(spawnAgent('manifest-a', { missionId: 'MSN-TEST' })).rejects.toThrow(
+      'permission denied'
+    );
 
     expect(mocks.classifyError).toHaveBeenCalledWith(expect.any(Error));
-    expect(mocks.record).toHaveBeenCalledWith(expect.objectContaining({
-      action: 'agent.manual_spawn',
-      operation: 'manifest-a',
-      result: 'failed',
-      metadata: expect.objectContaining({
-        classification: expect.objectContaining({ category: 'policy_violation' }),
-      }),
-    }));
+    expect(mocks.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'agent.manual_spawn',
+        operation: 'manifest-a',
+        result: 'failed',
+        metadata: expect.objectContaining({
+          classification: expect.objectContaining({ category: 'policy_violation' }),
+        }),
+      })
+    );
     expect(mocks.logger.error).toHaveBeenCalledWith(expect.stringContaining('policy_violation'));
     spy.mockRestore();
   });
@@ -108,7 +141,9 @@ describe('agent_runtime_manager', () => {
   it('inspects a registered but inactive agent', async () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     await inspectAgent('demo-agent-1234');
-    expect(spy).toHaveBeenCalledWith(expect.stringContaining('registered but not actively managed'));
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining('registered but not actively managed')
+    );
     spy.mockRestore();
   });
 });

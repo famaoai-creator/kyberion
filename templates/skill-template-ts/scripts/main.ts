@@ -3,7 +3,8 @@
  * Implementation based on @agent/core standards.
  */
 
-import { logger, runSkillAsync } from '@agent/core';
+import { logger } from '@agent/core/core';
+import { runSkillAsync } from '@agent/core/skill-wrapper';
 import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 
@@ -19,12 +20,12 @@ async function main() {
 
     return {
       status: 'success',
-      message: 'Skill executed successfully.'
+      message: 'Skill executed successfully.',
     } as const;
   });
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

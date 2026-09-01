@@ -546,7 +546,7 @@ tenant、organization、surface binding を一度に変更する onboarding で�
 4. `knowledge/product/governance/protocol-service-registry.json` に各 entry の `process_scope`、
    `request_scope_mode`、`health`、`owner`、`binding`、`approval`、`principal_resolution`、
    `write_authority`、`nhi_binding`、`approval_classes`、`data_residency`、`data_paths` を持たせる。
-5. `surfaces:reconcile`、peer listener、MCP server、review server、scheduler は registry の
+5. `surfaces reconcile`、peer listener、MCP server、review server、scheduler は registry の
    lifecycle adapter とし、registry が許可しない状態では起動せず、停止・再接続・restore は
    receipt を残す。protocol service registry に `lifecycle_actions` と `lifecycle_owner` を持たせ、
    supervisor とサービス本体が同じ状態を二重記録しないよう、1つの lifecycle owner を正本とする。
@@ -561,7 +561,7 @@ tenant、organization、surface binding を一度に変更する onboarding で�
 `active/shared/observability/protocol-services/{service}/tenants/{tenant}/` に保存するため、
 system の health と tenant の restore / reconnect を混在させない。service-owned の protocol
 surface はサービス本体が記録し、supervisor は同じ receipt を重複して書かない。残る作業は
-`surfaces:reconcile` の protocol-compatible surface 起動結果を同じ receipt stream に投影し、
+`surfaces reconcile` の protocol-compatible surface 起動結果を同じ receipt stream に投影し、
 再接続・restore の operator UI 表示へ接続することである。
 
 ## 参照した正本・実装

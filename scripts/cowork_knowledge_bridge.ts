@@ -11,10 +11,8 @@
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-function printUsage(): void {
-  console.log(
-    'Usage: pnpm knowledge:cowork-sync -- [--direction cowork-to-kyberion|kyberion-to-cowork|both] [--paths <paths...>] [--max-hints <n>]'
-  );
+function usage(): string {
+  return 'Usage: pnpm knowledge:cowork-sync -- [--direction cowork-to-kyberion|kyberion-to-cowork|both] [--paths <paths...>] [--max-hints <n>]';
 }
 
 function parseArgs(argv: string[]): {
@@ -53,8 +51,9 @@ export const runCoworkKnowledgeBridge = defineScript({
   run(context) {
     const { direction, paths, maxHints, help } = parseArgs(context.argv);
     if (help) {
-      printUsage();
-      return;
+      const result = { status: 'help', usage: usage() };
+      context.print(result);
+      return result;
     }
 
     const result = runCoworkKnowledgeSync({
@@ -63,22 +62,8 @@ export const runCoworkKnowledgeBridge = defineScript({
       maxHints,
     });
 
-    process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-
-    if (result.ingest) {
-      process.stderr.write(
-        `[cowork-sync] Ingest: ${result.ingest.enqueued} enqueued, ${result.ingest.skipped_duplicate} skipped (dup), ${result.ingest.skipped_tier_violation} skipped (tier)\n`
-      );
-    }
-    if (result.supply) {
-      process.stderr.write(
-        `[cowork-sync] Supply: ${result.supply.delivered} hints delivered, ${result.supply.skipped_unchanged} unchanged\n`
-      );
-    }
-    if (result.ingest?.errors.length || result.supply?.errors.length) {
-      const errs = [...(result.ingest?.errors ?? []), ...(result.supply?.errors ?? [])];
-      process.stderr.write(`[cowork-sync] Errors:\n${errs.map((e) => `  - ${e}`).join('\n')}\n`);
-    }
+    context.print(result);
+    return result;
   },
 });
 

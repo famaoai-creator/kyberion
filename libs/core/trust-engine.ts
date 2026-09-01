@@ -1,6 +1,6 @@
 import { logger } from './core.js';
-import { readJson } from './foundation/json.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { recordConfigFallback } from './config-fallback-registry.js';
@@ -31,7 +31,16 @@ export interface TrustRecord {
   history: { ts: number; score: number; event: string }[];
 }
 
-interface TrustPolicyFile {
+export interface PersistedTrustRecord {
+  current_score: number;
+  tier: TrustTier | number;
+  dimensions: TrustDimensions;
+  last_updated: string;
+}
+
+export type PersistedTrustLedger = Record<string, PersistedTrustRecord>;
+
+export interface TrustPolicyFile {
   scoring: {
     weights: Record<string, number>;
     dimension_max?: number;
@@ -40,45 +49,102 @@ interface TrustPolicyFile {
   decay: { rate_per_hour: number; floor: number };
   propagation: { factor: number; max_depth: number };
   regime_shift: { threshold: number };
-  anomaly_detection?: unknown;
+  anomaly_detection?: TrustPolicyAnomalyDetection;
+}
+
+export interface TrustPolicyAnomalyDetection {
+  rapid_fire: { max_actions: number; window_ms: number };
+  policy_violations: { max_violations: number; window_ms: number };
+  trust_degradation: { min_drop_percent: number; window_ms: number };
+}
+
+const DEFAULT_TRUST_POLICY: TrustPolicyFile = {
+  scoring: {
+    weights: {
+      policyCompliance: 0.25,
+      securityPosture: 0.25,
+      outputQuality: 0.2,
+      resourceEfficiency: 0.15,
+      collaborationHealth: 0.15,
+    },
+    dimension_max: 200,
+  },
+  tier_thresholds: [
+    { min_score: 900, tier: 'verified' },
+    { min_score: 700, tier: 'trusted' },
+    { min_score: 500, tier: 'standard' },
+    { min_score: 300, tier: 'probationary' },
+    { min_score: 0, tier: 'untrusted' },
+  ],
+  decay: { rate_per_hour: 2, floor: 100 },
+  propagation: { factor: 0.3, max_depth: 2 },
+  regime_shift: { threshold: 0.5 },
+  anomaly_detection: {
+    rapid_fire: { max_actions: 10, window_ms: 5000 },
+    policy_violations: { max_violations: 3, window_ms: 600000 },
+    trust_degradation: { min_drop_percent: 15, window_ms: 3600000 },
+  },
+};
+
+const trustPolicyCatalog = defineCatalog<TrustPolicyFile>({
+  id: 'trust-policy',
+  path: pathResolver.knowledge('product/governance/trust-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/trust-policy.schema.json'),
+  fallback: DEFAULT_TRUST_POLICY,
+  fallbackOnInvalid: true,
+  onFallback: (error, defaults) =>
+    recordConfigFallback({
+      knowledgePath: 'product/governance/trust-policy.json',
+      error,
+      defaults,
+    }),
+});
+
+const TRUST_LEDGER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-trust-scores.schema.json'
+);
+const trustLedgerCatalogs = new Map<string, GovernedCatalog<PersistedTrustLedger>>();
+
+function trustLedgerPath(rootDir: string): string {
+  return assertSafeRepositoryPath(
+    path.join(
+      path.resolve(rootDir),
+      'knowledge',
+      'personal',
+      'governance',
+      'agent-trust-scores.json'
+    ),
+    { allowMissingLeaf: true }
+  );
+}
+
+function getTrustLedgerCatalog(rootDir: string): GovernedCatalog<PersistedTrustLedger> {
+  const root = path.resolve(rootDir);
+  const existing = trustLedgerCatalogs.get(root);
+  if (existing) return existing;
+  const catalog = defineCatalog<PersistedTrustLedger>({
+    id: 'agent-trust-scores',
+    path: trustLedgerPath(root),
+    schema: TRUST_LEDGER_SCHEMA_PATH,
+  });
+  trustLedgerCatalogs.set(root, catalog);
+  return catalog;
+}
+
+export function loadPersistedTrustLedger(
+  rootDir = pathResolver.rootDir()
+): PersistedTrustLedger | null {
+  const ledgerPath = trustLedgerPath(rootDir);
+  if (!safeExistsSync(ledgerPath)) return null;
+  const catalog = getTrustLedgerCatalog(rootDir);
+  return catalog.load();
 }
 
 let _cachedTrustPolicy: TrustPolicyFile | null = null;
 
-function loadTrustPolicy(): TrustPolicyFile {
+export function loadTrustPolicy(): TrustPolicyFile {
   if (_cachedTrustPolicy) return _cachedTrustPolicy;
-  try {
-    const filePath = pathResolver.knowledge('product/governance/trust-policy.json');
-    _cachedTrustPolicy = readJson<TrustPolicyFile>(filePath);
-  } catch (err) {
-    const defaults: TrustPolicyFile = {
-      scoring: {
-        weights: {
-          policyCompliance: 0.25,
-          securityPosture: 0.25,
-          outputQuality: 0.2,
-          resourceEfficiency: 0.15,
-          collaborationHealth: 0.15,
-        },
-      },
-      tier_thresholds: [
-        { min_score: 900, tier: 'verified' },
-        { min_score: 700, tier: 'trusted' },
-        { min_score: 500, tier: 'standard' },
-        { min_score: 300, tier: 'probationary' },
-        { min_score: 0, tier: 'untrusted' },
-      ],
-      decay: { rate_per_hour: 2, floor: 100 },
-      propagation: { factor: 0.3, max_depth: 2 },
-      regime_shift: { threshold: 0.5 },
-    };
-    recordConfigFallback({
-      knowledgePath: 'product/governance/trust-policy.json',
-      error: err,
-      defaults,
-    });
-    _cachedTrustPolicy = defaults;
-  }
+  _cachedTrustPolicy = trustPolicyCatalog.load();
   return _cachedTrustPolicy;
 }
 
@@ -248,13 +314,7 @@ class TrustEngineImpl {
   /** Persist trust records to disk */
   persist(rootDir?: string): void {
     const root = rootDir || findProjectRoot();
-    const filePath = path.join(
-      root,
-      'knowledge',
-      'personal',
-      'governance',
-      'agent-trust-scores.json'
-    );
+    const filePath = trustLedgerPath(root);
     const data: Record<string, any> = {};
     for (const [id, record] of this.records) {
       data[id] = {
@@ -274,16 +334,9 @@ class TrustEngineImpl {
   /** Load persisted trust records */
   loadPersisted(rootDir?: string): void {
     const root = rootDir || findProjectRoot();
-    const filePath = path.join(
-      root,
-      'knowledge',
-      'personal',
-      'governance',
-      'agent-trust-scores.json'
-    );
-    if (!safeExistsSync(filePath)) return;
     try {
-      const data = loadJson<unknown>(filePath);
+      const data = loadPersistedTrustLedger(root);
+      if (!data) return;
       for (const [agentId, entry] of Object.entries(data as Record<string, any>)) {
         this.records.set(agentId, {
           agentId,

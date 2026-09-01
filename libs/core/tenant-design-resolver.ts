@@ -3,6 +3,7 @@ import { customerRoot } from './customer-resolver.js';
 import {
   loadJsonIfPresent as loadOptionalJson,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
   safeStat,
 } from './secure-io.js';
@@ -25,42 +26,142 @@ export interface TenantDesignResolution {
 }
 
 interface TenantEntry {
+  id?: string;
   override_path: string;
 }
 
-function readJsonIfPresent(filePath: string): Record<string, any> | null {
+function isSafeTenantSegment(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value !== '.' &&
+    value !== '..' &&
+    !value.includes('/') &&
+    !value.includes('\\')
+  );
+}
+
+function isSafeTenantDesignPath(
+  filePath: string,
+  rootDir: string,
+  requireFile = true,
+  allowedRootDir = rootDir
+): boolean {
+  const root = path.resolve(rootDir);
+  if (!safeExistsSync(root)) return false;
+  try {
+    if (safeLstat(root).isSymbolicLink()) return false;
+  } catch {
+    return false;
+  }
+  const absolute = path.resolve(filePath);
+  const boundary = path.resolve(allowedRootDir);
+  if (!safeExistsSync(boundary)) return false;
+  try {
+    if (safeLstat(boundary).isSymbolicLink()) return false;
+  } catch {
+    return false;
+  }
+  const relative = path.relative(boundary, absolute);
+  if (
+    !relative ||
+    relative === '..' ||
+    relative.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relative)
+  ) {
+    return false;
+  }
+
+  let current = boundary;
+  const segments = relative.split(path.sep);
+  for (const [index, segment] of segments.entries()) {
+    current = path.join(current, segment);
+    if (!safeExistsSync(current)) {
+      if (index === segments.length - 1 && !requireFile) return true;
+      return false;
+    }
+    try {
+      const stat = safeLstat(current);
+      if (
+        stat.isSymbolicLink() ||
+        (index === segments.length - 1 && (requireFile ? !stat.isFile() : stat.isDirectory()))
+      ) {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+function readJsonIfPresent(
+  filePath: string,
+  rootDir: string,
+  allowedRootDir = rootDir
+): Record<string, any> | null {
+  if (!isSafeTenantDesignPath(filePath, rootDir, true, allowedRootDir)) return null;
   return loadOptionalJson<Record<string, any>>(filePath);
+}
+
+function isConfidentialTenantDesignPath(
+  filePath: string,
+  rootDir: string,
+  tenantId: unknown
+): boolean {
+  if (!isSafeTenantSegment(tenantId)) return false;
+  const designRoot = path.join(rootDir, 'knowledge', 'confidential', tenantId, 'design');
+  return isSafeTenantDesignPath(filePath, rootDir, true, designRoot);
 }
 
 function collectTenantOverridePaths(rootDir: string, customerId?: string): string[] {
   const candidates = new Set<string>();
 
   if (customerId) {
-    const customerPath = customerRoot(path.join('design', 'tenant-override.json'), {
-      ...process.env,
-      KYBERION_CUSTOMER: customerId,
-    });
+    const customerPath = customerRoot(
+      path.join('design', 'tenant-override.json'),
+      {
+        ...process.env,
+        KYBERION_CUSTOMER: customerId,
+      },
+      rootDir
+    );
     if (customerPath && safeExistsSync(customerPath)) {
       return [path.resolve(customerPath)];
     }
   }
 
   const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
-  const registry = readJsonIfPresent(indexPath);
+  const registry = readJsonIfPresent(indexPath, rootDir);
   if (Array.isArray(registry?.tenants)) {
     for (const entry of registry.tenants as TenantEntry[]) {
       if (entry?.override_path) {
-        candidates.add(path.resolve(rootDir, entry.override_path));
+        const candidate = path.resolve(rootDir, entry.override_path);
+        if (
+          (!customerId || entry.id === customerId) &&
+          isConfidentialTenantDesignPath(candidate, rootDir, entry.id)
+        ) {
+          candidates.add(candidate);
+        }
       }
     }
   }
 
-  const confidentialDir = path.join(rootDir, 'knowledge/confidential');
+  const confidentialDir = path.join(rootDir, 'knowledge', 'confidential');
   if (safeExistsSync(confidentialDir)) {
-    for (const entry of safeReaddir(confidentialDir)) {
+    const tenantDirs = customerId
+      ? isSafeTenantSegment(customerId)
+        ? [customerId]
+        : []
+      : safeReaddir(confidentialDir);
+    for (const entry of tenantDirs) {
       try {
-        if (!safeStat(path.join(confidentialDir, entry)).isDirectory()) continue;
-        candidates.add(path.join(confidentialDir, entry, 'design', 'tenant-override.json'));
+        const tenantDir = path.join(confidentialDir, entry);
+        if (!safeStat(tenantDir).isDirectory()) continue;
+        const candidate = path.join(tenantDir, 'design', 'tenant-override.json');
+        if (isConfidentialTenantDesignPath(candidate, rootDir, entry)) {
+          candidates.add(candidate);
+        }
       } catch {
         // ignore unreadable entries
       }
@@ -163,14 +264,19 @@ function buildLogoPath(
     themePack?.assets?.logo_url ||
     null;
   if (typeof raw === 'string' && raw.trim()) {
-    return path.resolve(rootDir, raw.trim());
+    const candidate = path.resolve(rootDir, raw.trim());
+    return isSafeTenantDesignPath(candidate, rootDir, false, path.dirname(overridePath))
+      ? candidate
+      : null;
   }
   if (overridePath.includes('/design/tenant-override.json')) {
     const fallback = overridePath.replace(
       /\/design\/tenant-override\.json$/,
       '/design/assets/logo.png'
     );
-    return safeExistsSync(fallback) ? fallback : null;
+    return isSafeTenantDesignPath(fallback, rootDir, false, path.dirname(overridePath))
+      ? fallback
+      : null;
   }
   return null;
 }
@@ -191,17 +297,29 @@ export function resolveTenantDesign(input: ResolveTenantDesignInput): TenantDesi
   const overridePaths = collectTenantOverridePaths(rootDir, input.customerId);
 
   for (const candidate of overridePaths) {
-    const override = readJsonIfPresent(candidate);
+    const override = readJsonIfPresent(candidate, rootDir);
     if (!override) continue;
     if (!matchesOverride(override, input.brandName, input.designSystemId)) continue;
     const themePackPath = deriveThemePackPath(candidate, override);
-    const themePack = themePackPath
-      ? readJsonIfPresent(path.resolve(rootDir, themePackPath))
+    const themePackAbsolute = themePackPath ? path.resolve(rootDir, themePackPath) : null;
+    const themePack = themePackAbsolute
+      ? readJsonIfPresent(themePackAbsolute, rootDir, path.dirname(candidate))
+      : null;
+    const layoutCatalogCandidate = deriveLayoutCatalogPath(candidate, override, themePack);
+    const layoutCatalog = layoutCatalogCandidate
+      ? isSafeTenantDesignPath(
+          path.resolve(rootDir, layoutCatalogCandidate),
+          rootDir,
+          true,
+          path.dirname(candidate)
+        )
+        ? layoutCatalogCandidate
+        : null
       : null;
     return {
       source: 'tenant',
       tokens: buildTokens(override, themePack),
-      layoutCatalog: deriveLayoutCatalogPath(candidate, override, themePack),
+      layoutCatalog,
       logoPath: buildLogoPath(rootDir, candidate, override, themePack),
       tenantOverride: override,
       themePack,

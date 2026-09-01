@@ -1,18 +1,30 @@
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
-import { rootResolve } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver, rootResolve } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
+import { readJson, readJsonIfPresent } from '@agent/core/foundation';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import {
   validatePipelineGuardrails,
   type AdfScriptWrapperBaselineEntry,
 } from '@agent/core/adf-guardrails';
 import { tryRepairJson } from '@agent/core/json-repair';
-import { requiresProjectTrust } from '@agent/core/trust-requiring-resources';
+import { assertProjectTrustApproval } from '@agent/core/project-trust';
+import {
+  isBuiltinPipelineResource,
+  requiresProjectTrust,
+} from '@agent/core/trust-requiring-resources';
 
 export interface AdfInputOptions {
   /** Set false for pre-trust callers; project-local pipeline resources are not read. */
   trustResolved?: boolean;
+  /** Durable human approval for the exact project-local resource being loaded. */
+  projectTrustApprovalId?: string;
 }
 
 const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
@@ -20,11 +32,9 @@ const SCRIPT_WRAPPER_BASELINE_PATH = rootResolve(
 );
 
 function loadScriptWrapperBaseline(): AdfScriptWrapperBaselineEntry[] {
-  if (!safeExistsSync(SCRIPT_WRAPPER_BASELINE_PATH)) return [];
+  const parsed = readJsonIfPresent<{ violations?: unknown }>(SCRIPT_WRAPPER_BASELINE_PATH);
+  if (!parsed) return [];
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(SCRIPT_WRAPPER_BASELINE_PATH, { encoding: 'utf8' }))
-    ) as { violations?: unknown };
     return Array.isArray(parsed.violations)
       ? parsed.violations.filter(
           (entry): entry is AdfScriptWrapperBaselineEntry =>
@@ -41,12 +51,15 @@ function loadScriptWrapperBaseline(): AdfScriptWrapperBaselineEntry[] {
 }
 
 export function resolveAdfInputPath(inputPath: string): string {
-  return rootResolve(inputPath);
+  const resolved = assertSafeRepositoryPath(rootResolve(inputPath));
+  if (!safeLstat(resolved).isFile()) {
+    throw new Error(`[ADF_INPUT] input must be an existing regular file: ${inputPath}`);
+  }
+  return resolved;
 }
 
 export function readJsonInput<T = any>(inputPath: string): T {
-  const content = safeReadFile(resolveAdfInputPath(inputPath), { encoding: 'utf8' }) as string;
-  return JSON.parse(content) as T;
+  return readJson<T>(resolveAdfInputPath(inputPath));
 }
 
 function isWorkflowModulePath(inputPath: string): boolean {
@@ -73,20 +86,25 @@ function resolvePipelineFragmentPath(ref: string): string {
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
     throw new Error(`core:include: path must be within pipelines/: ${ref}`);
   }
-  return resolved;
+  return assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
 }
 
 function assertPipelineResourceTrust(inputPath: string, options: AdfInputOptions): void {
-  if (options.trustResolved !== false) return;
-  const absolute = resolveAdfInputPath(inputPath);
-  const relative = path.relative(rootResolve('.'), absolute).replaceAll('\\', '/');
-  const isProjectLocal =
-    relative !== '' && !relative.startsWith('../') && !path.isAbsolute(relative);
-  if (requiresProjectTrust(relative) || (isWorkflowModulePath(inputPath) && isProjectLocal)) {
-    throw new Error(
-      '[TRUST_REQUIRED] project-local pipeline/template cannot be loaded before trust resolution'
-    );
+  const absolute = assertSafeRepositoryPath(rootResolve(inputPath), { allowMissingLeaf: true });
+  const relative = path.relative(pathResolver.rootDir(), absolute).replaceAll('\\', '/');
+  // Repository-owned pipelines are the pre-trust executable surface used by
+  // baseline and other governed commands. Every other trust-sensitive input
+  // must carry an explicit decision; omission is not a compatibility grant.
+  if (isBuiltinPipelineResource(relative)) return;
+  if (options.projectTrustApprovalId) {
+    assertProjectTrustApproval(options.projectTrustApprovalId, inputPath);
+    return;
   }
+  if (options.trustResolved === true) return;
+  if (options.trustResolved === undefined && !requiresProjectTrust(relative)) return;
+  throw new Error(
+    '[TRUST_REQUIRED] project-local pipeline/template cannot be loaded before trust resolution'
+  );
 }
 
 function parsePipelineFragment(raw: string, ref: string): any {

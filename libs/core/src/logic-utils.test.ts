@@ -8,6 +8,7 @@ import {
   resolveRequiredStringParam,
 } from './logic-utils.js';
 import { pathResolver } from '../path-resolver.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync } from '../secure-io.js';
 
 describe('logic-utils', () => {
   const ctx = {
@@ -72,6 +73,25 @@ describe('logic-utils', () => {
     const resolved = resolveVars('{{@active:missions}}', ctx) as string;
     expect(path.isAbsolute(resolved)).toBe(true);
     expect(resolved.startsWith(pathResolver.rootDir())).toBe(true);
+  });
+
+  it('rejects path-token traversal and symlink components', () => {
+    expect(() => resolveVars('{{@active:../knowledge/private}}', ctx)).toThrow(
+      '[RESOURCE_PATH_SCOPE]'
+    );
+    const suffix = `logic-utils-path-token-${process.pid}`;
+    const target = pathResolver.sharedTmp(`${suffix}-target`);
+    const link = pathResolver.sharedTmp(`${suffix}-link`);
+    safeMkdir(target);
+    safeSymlinkSync(target, link, 'dir');
+    try {
+      expect(() => resolveVars(`{{@tmp:${suffix}-link/file}}`, ctx)).toThrow(
+        '[RESOURCE_PATH_SYMLINK]'
+      );
+    } finally {
+      safeRmSync(link, { recursive: true, force: true });
+      safeRmSync(target, { recursive: true, force: true });
+    }
   });
 
   it('resolves multi-var strings that start AND end with {{ }} correctly', () => {

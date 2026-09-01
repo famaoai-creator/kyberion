@@ -72,8 +72,8 @@ VOLATILE_KNOWLEDGE_PLAN の Phase 1〜5 は**コードとしてはほぼ完成�
 - 検証:
   - `pnpm exec vitest run scripts/run_pipeline.test.ts libs/core/storage-janitor.test.ts`
   - `pnpm run typecheck`
-  - `pnpm run check:script-integrity`
-  - `pnpm run check:pipeline-shell-independence`
+  - `pnpm run check -- --scope pr --only script-integrity`
+  - `pnpm run check -- --scope full --only pipeline-shell-independence`
   - `pnpm run build:repo`
   - `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":true}'`
   - `node dist/scripts/chronos_daemon.js` 起動確認で 5 schedule (`daily-routine`, `storage-janitor-daily`, `volatile-gc-daily`, `volatile-index-daily`, `weekly-review`) が登録された。

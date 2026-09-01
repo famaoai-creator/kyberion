@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import {
   describeServiceHarness,
   planServiceOperation,
@@ -10,7 +11,7 @@ import {
   type ServiceRecordingStep,
 } from './service-recording.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 
 export type ServiceRecordedParameterKind = 'fixed' | 'input' | 'template' | 'secret';
 
@@ -195,11 +196,15 @@ export class ServiceRecordingSession {
 
   persist(): string {
     const recording = this.toRecording();
-    const dir = pathResolver.shared('runtime/recordings');
+    const dir = assertSafeRepositoryPath(pathResolver.shared('runtime/recordings'), {
+      allowMissingLeaf: true,
+    });
     safeMkdir(dir, { recursive: true });
-    const path = pathResolver.shared(`runtime/recordings/${this.recording_id}.json`);
-    safeWriteFile(path, `${JSON.stringify(recording, null, 2)}\n`);
-    return pathResolver.toRepoRelative(path);
+    const recordingPath = assertSafeRepositoryPath(path.join(dir, `${this.recording_id}.json`), {
+      allowMissingLeaf: true,
+    });
+    safeWriteFile(recordingPath, `${JSON.stringify(recording, null, 2)}\n`);
+    return pathResolver.toRepoRelative(recordingPath);
   }
 }
 

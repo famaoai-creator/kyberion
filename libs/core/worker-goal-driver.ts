@@ -57,6 +57,14 @@
  */
 
 import { logger } from './core.js';
+import {
+  ManualDriveActionController,
+  registerAgentRuntimeManualDriver,
+  type AgentRuntimeManualDriver,
+  type ManualDriveApprovalGate,
+  type ManualDriveMode,
+} from './agent-runtime-manual-drive.js';
+import type { EventScopeInput } from './event-scope.js';
 import { buildContextRewindToolDefinition, RewindableWorkerContext } from './context-rewind.js';
 import {
   buildUntrustedDataInjectionProvider,
@@ -72,6 +80,7 @@ import { getReasoningBackend } from './reasoning-backend.js';
 import type {
   GenerateWithToolsResult,
   ReasoningBackend,
+  ReasoningCallOptions,
   ToolCall,
   ToolDefinition,
 } from './reasoning-backend.js';
@@ -267,11 +276,29 @@ export interface RunGoalDrivenLoopOptions {
   toolRole?: string;
   /** PI-17: additional tools announced in the message tail, not stable schema. */
   deferredToolNames?: string[];
+  /** PI-17: provider-native deferred definitions kept out of the active schema. */
+  deferredToolDefinitions?: ToolDefinition[];
   /** Execute a non-goal, non-rewind tool call and return its result. */
   executeTool?: (
     call: ToolCall,
     ctx: GoalTurnContext
   ) => Promise<GoalToolExecution> | GoalToolExecution;
+  /**
+   * PI-14: expose the live worker through a step boundary. In `step` mode
+   * the loop waits before each model turn and each external tool call until
+   * the registered operator driver executes that action. `auto` preserves
+   * the ordinary loop and does not publish a control target.
+   */
+  manualDrive?: {
+    mode?: ManualDriveMode;
+    agentId: string;
+    scope: EventScopeInput;
+    approvalGate?: ManualDriveApprovalGate;
+    /** Publish a safe durable control target for supervisor/Chronos callers. */
+    durableControl?: boolean;
+    durablePollIntervalMs?: number;
+    onReady?: (driver: AgentRuntimeManualDriver) => void;
+  };
   /** Backend override; defaults to the real getReasoningBackend(). */
   backend?: Pick<ReasoningBackend, 'generateWithTools'>;
   /** Event stream override; defaults to the process-wide worker event stream. */
@@ -329,6 +356,38 @@ export interface GoalDrivenLoopResult {
 
 const DEFAULT_MAX_TURNS = 100;
 const CONTEXT_REWIND_TOOL_NAME = 'context_rewind';
+
+function manualDriveAdmissionBlocked(value: unknown): value is {
+  status: 'awaiting_approval' | 'blocked' | 'failed' | 'idle';
+} {
+  if (!value || typeof value !== 'object') return false;
+  const status = (value as { status?: unknown }).status;
+  return ['awaiting_approval', 'blocked', 'failed', 'idle'].includes(String(status));
+}
+
+function buildToolLoadingOptions(
+  options: Pick<
+    RunGoalDrivenLoopOptions,
+    'toolRole' | 'deferredToolNames' | 'deferredToolDefinitions'
+  >
+): ReasoningCallOptions | undefined {
+  if (
+    !options.toolRole &&
+    !options.deferredToolNames?.length &&
+    !options.deferredToolDefinitions?.length
+  ) {
+    return undefined;
+  }
+  return {
+    ...(options.toolRole ? { role: options.toolRole } : {}),
+    ...(options.deferredToolNames?.length
+      ? { deferred_tool_names: [...options.deferredToolNames] }
+      : {}),
+    ...(options.deferredToolDefinitions?.length
+      ? { deferred_tool_definitions: [...options.deferredToolDefinitions] }
+      : {}),
+  };
+}
 
 /** The tool surface exposed to the MAIN worker goal loop (never to subagents). */
 export function buildMainWorkerGoalTools(
@@ -519,6 +578,10 @@ export async function runGoalDrivenLoop(
   );
 
   const unregister: Array<() => void> = [];
+  const manualDriveController =
+    options.manualDrive && options.manualDrive.mode !== 'auto'
+      ? new ManualDriveActionController({ approvalGate: options.manualDrive?.approvalGate })
+      : undefined;
   let govState: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
   let turnsRun = 0;
 
@@ -565,7 +628,11 @@ export async function runGoalDrivenLoop(
         .join('\n\n');
 
       options.onPromptVisible?.(gracePrompt, 'goal_grace_step');
-      const graceResult = await backend.generateWithTools(gracePrompt, tools);
+      const graceResult = await backend.generateWithTools(
+        gracePrompt,
+        tools,
+        buildToolLoadingOptions(options)
+      );
       for (const call of graceResult.toolCalls ?? []) {
         // Synthetic rejection: never executed, never applied (not even
         // goal_update) — the model was told tools would be rejected this turn.
@@ -602,6 +669,20 @@ export async function runGoalDrivenLoop(
   try {
     unregister.push(registerInjection(statusProvider));
     unregister.push(registerInjection(objectiveProvider));
+    if (manualDriveController && options.manualDrive) {
+      unregister.push(
+        registerAgentRuntimeManualDriver({
+          agentId: options.manualDrive.agentId,
+          driver: manualDriveController.driver,
+          scope: options.manualDrive.scope,
+          durableControl: options.manualDrive.durableControl,
+          ...(options.manualDrive.durablePollIntervalMs !== undefined
+            ? { durablePollIntervalMs: options.manualDrive.durablePollIntervalMs }
+            : {}),
+        })
+      );
+      options.manualDrive.onReady?.(manualDriveController.driver);
+    }
 
     while (goal.state === 'active' && goal.turnCount < maxTurns) {
       const turnNumber = goal.turnCount + 1;
@@ -668,8 +749,34 @@ export async function runGoalDrivenLoop(
 
       options.onPromptVisible?.(prompt, 'goal_turn');
 
+      if (manualDriveController) {
+        const admission = await manualDriveController.requestAction({
+          action_id: `${goal.goalId}:turn:${turnNumber}`,
+          kind: 'stream_assistant',
+          title: 'Run the next goal turn',
+          operation_id: `goal_turn:${turnNumber}`,
+          execute: async () => ({ admitted: true }),
+        });
+        if (manualDriveAdmissionBlocked(admission)) {
+          const reason = `manual drive ${admission.status} before goal turn ${turnNumber}`;
+          goal = pauseGoal(goal, reason, now);
+          stream.emit(
+            'turn_end',
+            { goal_id: goal.goalId, turn: turnNumber, applied: 'manual_drive_blocked' },
+            source
+          );
+          stream.emit(
+            'status_update',
+            { goal_event: 'paused', goal_id: goal.goalId, reason: goal.terminalReason ?? '' },
+            source
+          );
+          break;
+        }
+      }
+
       let signal: GoalUpdateSignal | null = null;
       let forceStopTool: string | undefined;
+      let manualDriveStopReason: string | undefined;
 
       // KD-02 mechanism 3 (wall-clock deadline): race the live turn against a
       // timer armed for the remaining budget. If the timer wins, the turn is
@@ -677,15 +784,7 @@ export async function runGoalDrivenLoop(
       // ever settles) is never awaited further or applied to the goal.
       const turnStartMs = wallClockScheduler.now();
       let result: GenerateWithToolsResult;
-      const toolLoadingOptions =
-        options.toolRole || options.deferredToolNames?.length
-          ? {
-              ...(options.toolRole ? { role: options.toolRole } : {}),
-              ...(options.deferredToolNames?.length
-                ? { deferred_tool_names: options.deferredToolNames }
-                : {}),
-            }
-          : undefined;
+      const toolLoadingOptions = buildToolLoadingOptions(options);
       let wallClockDeadlineHit = false;
       if (budgetLimits?.wallClockBudgetMs !== undefined) {
         const remainingMs =
@@ -766,7 +865,7 @@ export async function runGoalDrivenLoop(
         goal = accrueGoalBudgetUsage(goal, { tokens, turns: 1, wallClockMs: elapsedMs });
       }
 
-      for (const call of result.toolCalls ?? []) {
+      for (const [toolIndex, call] of (result.toolCalls ?? []).entries()) {
         const decision = advanceToolCallRepeatGovernor(
           govState,
           call.name,
@@ -799,9 +898,46 @@ export async function runGoalDrivenLoop(
           const added = addDiscoveredTools(tools, discovered, options.toolRole);
           toolSearchAnnouncement = renderToolSearchResults(added);
         } else if (options.executeTool) {
-          const exec = await options.executeTool(call, { goal, turnNumber, checkpointId });
-          if (exec.externalEffect) rewindContext.recordExternalEffect(exec.effectDescription);
+          const exec = manualDriveController
+            ? await manualDriveController.requestAction({
+                action_id: `${goal.goalId}:turn:${turnNumber}:tool:${toolIndex}:${call.name}`,
+                kind: 'execute_tool',
+                title: `Execute ${call.name}`,
+                operation_id: call.name,
+                requires_approval: true,
+                approval_payload: call.input,
+                execute: () =>
+                  options.executeTool!(call, {
+                    goal,
+                    turnNumber,
+                    checkpointId,
+                  }),
+              })
+            : await options.executeTool(call, { goal, turnNumber, checkpointId });
+          if (manualDriveAdmissionBlocked(exec)) {
+            manualDriveStopReason = `manual drive ${exec.status} before tool ${call.name}`;
+            break;
+          }
+          const toolExecution = exec as GoalToolExecution;
+          if (toolExecution.externalEffect) {
+            rewindContext.recordExternalEffect(toolExecution.effectDescription);
+          }
         }
+      }
+
+      if (manualDriveStopReason) {
+        goal = pauseGoal(goal, manualDriveStopReason, now);
+        stream.emit(
+          'turn_end',
+          { goal_id: goal.goalId, turn: turnNumber, applied: 'manual_drive_blocked' },
+          source
+        );
+        stream.emit(
+          'status_update',
+          { goal_event: 'paused', goal_id: goal.goalId, reason: goal.terminalReason ?? '' },
+          source
+        );
+        break;
       }
 
       if (forceStopTool) {
@@ -932,6 +1068,7 @@ export async function runGoalDrivenLoop(
       );
     }
   } finally {
+    manualDriveController?.cancel();
     for (const off of unregister) {
       try {
         off();

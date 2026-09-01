@@ -1,18 +1,16 @@
 #!/usr/bin/env node
 
 import * as path from 'node:path';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
-  createStandardYargs,
   markToolRuntimeInstalled,
-  pathResolver,
   probeToolRuntime,
   resolveManagedToolPythonBin,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-} from '@agent/core';
+} from '@agent/core/tool-runtime-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const TOOL_ID = 'agy_sdk';
 const MANAGED_PYTHON_VERSION =
@@ -137,36 +135,47 @@ function install(): SetupReport {
   return inspect();
 }
 
-function printReport(report: SetupReport, apply: boolean): void {
+export function formatAgySdkReport(report: SetupReport, apply: boolean): string[] {
   const icon =
     report.status === 'ready' ? 'OK' : report.status === 'needs_install' ? 'WARN' : 'SKIP';
-  console.log(`[${icon}] ${TOOL_ID}`);
-  console.log(`  managed_env: ${report.managedEnvPath}`);
-  console.log(`  detail: ${report.detail}`);
-  if (report.pythonBin) console.log(`  python: ${report.pythonBin}`);
+  const lines = [
+    `[${icon}] ${TOOL_ID}`,
+    `  managed_env: ${report.managedEnvPath}`,
+    `  detail: ${report.detail}`,
+  ];
+  if (report.pythonBin) lines.push(`  python: ${report.pythonBin}`);
   if (!apply && report.status === 'needs_install') {
-    console.log('Next step: `pnpm agy:sdk:setup --apply`');
+    lines.push('Next step: `pnpm agy:sdk:setup --apply`');
   }
+  return lines;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = []): Promise<{ report: SetupReport; apply: boolean }> {
+  const argv = await createStandardYargs(['node', 'agy_sdk_setup', ...args])
     .option('apply', { type: 'boolean', default: false })
     .parseSync();
   const current = inspect();
   const report = argv.apply && current.status === 'needs_install' ? install() : current;
-  printReport(report, Boolean(argv.apply));
-  if (report.status === 'needs_install') process.exitCode = argv.apply ? 1 : 0;
+  return { report, apply: Boolean(argv.apply) };
 }
+
+export { inspect as inspectAgySdkRuntime, install as installAgySdkRuntime };
+
+export const runAgySdkSetup = defineScript({
+  name: 'agy:sdk:setup',
+  flags: [],
+  run: async (context) => {
+    const { report, apply } = await main(context.argv);
+    context.print(formatAgySdkReport(report, apply).join('\n'));
+    if (apply && report.status === 'needs_install') {
+      throw new ScriptExitError(1, report.detail);
+    }
+    return report;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'agy_sdk_setup.ts') ||
   isDirectScript(import.meta.url, 'agy_sdk_setup.js')
-) {
-  main().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
-  });
-}
-
-export { inspect as inspectAgySdkRuntime, install as installAgySdkRuntime };
+)
+  void runAgySdkSetup();

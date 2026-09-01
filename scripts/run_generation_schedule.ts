@@ -1,18 +1,17 @@
 import * as path from 'node:path';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  safeExistsSync,
-  pathResolver,
   registerGenerationSchedule,
   runGenerationScheduleAction as runGovernedGenerationScheduleAction,
   GENERATION_SCHEDULER_AUTHORITY,
-  normalizeEventScope,
-  assertProtocolServiceRegistered,
-  recordProtocolServiceLifecycleBestEffort,
-  type EventScopeInput,
-} from '@agent/core';
+} from '@agent/core/generation-scheduler';
+import { normalizeEventScope, type EventScopeInput } from '@agent/core/event-scope';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
+import { recordProtocolServiceLifecycleBestEffort } from '@agent/core/protocol-service-lifecycle';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 /**
  * EV-01: this script used to carry a full second copy of the tick logic
@@ -51,9 +50,9 @@ export async function runGenerationScheduleAction(argv: {
       Object.assign(process.env, buildExecutionEnv(process.env, 'surface_runtime'));
       return withExecutionContext('surface_runtime', () => {
         const inputPath = String(argv.input);
-        const logicalPath = path.isAbsolute(inputPath)
-          ? inputPath
-          : pathResolver.rootResolve(inputPath);
+        const logicalPath = assertSafeRepositoryPath(
+          path.isAbsolute(inputPath) ? inputPath : pathResolver.resolve(inputPath)
+        );
         if (!safeExistsSync(logicalPath))
           throw new Error(`schedule file not found: ${logicalPath}`);
         const result = registerGenerationSchedule(logicalPath);
@@ -82,8 +81,8 @@ export async function runGenerationScheduleAction(argv: {
   }
 }
 
-async function main() {
-  const argv = await createStandardYargs()
+export async function main(args: string[] = [], print: (value: unknown) => void = () => undefined) {
+  const argv = await createStandardYargs(['node', 'run_generation_schedule', ...args])
     .option('action', { type: 'string', choices: ['register', 'list', 'tick'], demandOption: true })
     .option('input', { alias: 'i', type: 'string' })
     .option('schedule', { type: 'string' })
@@ -116,7 +115,7 @@ async function main() {
     ...(scope ? { scope } : {}),
   });
 
-  console.log(JSON.stringify(result, null, 2));
+  print(result);
 }
 
 if (
@@ -125,8 +124,8 @@ if (
 )
   void defineScript({
     name: 'generation-schedule',
-    flags: [],
-    run() {
-      return main();
+    flags: ['json', 'quiet'],
+    run({ argv, print }) {
+      return main(stripSharedScriptFlags(argv), print);
     },
   })();

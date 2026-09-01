@@ -1,6 +1,12 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJsonIfPresent as loadOptionalJson } from './secure-io.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { isValidTenantSlug } from './entity-scope.js';
+import {
+  assertSafeRepositoryPath,
+  loadJsonIfPresent as loadOptionalJson,
+  safeExistsSync,
+} from './secure-io.js';
 
 export interface FinancialPeriod {
   period_id: string;
@@ -37,8 +43,37 @@ function resolveBaseDir(rootDir?: string): string {
   return rootDir ? path.resolve(rootDir) : pathResolver.rootDir();
 }
 
+const FINANCIAL_MODEL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/financial-model.schema.json'
+);
+const financialModelCatalogs = new Map<string, GovernedCatalog<FinancialModel>>();
+
 function loadJsonIfPresent<T>(filePath: string): T | null {
   return loadOptionalJson<T>(filePath);
+}
+
+function loadFinancialModelCatalog(filePath: string, rootDir: string): FinancialModel | null {
+  const safeFilePath = assertSafeRepositoryPath(filePath, {
+    allowMissingLeaf: true,
+    rootDir,
+  });
+  if (!safeExistsSync(safeFilePath)) return null;
+  let catalog = financialModelCatalogs.get(safeFilePath);
+  if (!catalog) {
+    catalog = defineCatalog<FinancialModel>({
+      id: `financial-model:${safeFilePath}`,
+      path: safeFilePath,
+      schema: FINANCIAL_MODEL_SCHEMA_PATH,
+    });
+    financialModelCatalogs.set(safeFilePath, catalog);
+  }
+  try {
+    return catalog.load();
+  } catch {
+    // Keep candidate resolution fail-closed while allowing the next scoped
+    // source or the legacy customer adapter to remain usable.
+    return null;
+  }
 }
 
 function toNumber(value: unknown): number | null {
@@ -91,7 +126,24 @@ export function resolveFinancialModel(
   rootDir?: string
 ): FinancialModel {
   const baseDir = resolveBaseDir(rootDir);
-  const resolvedTenantSlug = tenantSlug?.trim() || null;
+  const requestedTenantSlug = tenantSlug?.trim() || null;
+  if (requestedTenantSlug && !isValidTenantSlug(requestedTenantSlug)) {
+    return {
+      company_id: 'default',
+      tenant_slug: null,
+      source_kind: 'derived',
+      source_path: path.join(
+        baseDir,
+        'knowledge',
+        'confidential',
+        'default',
+        'finance',
+        'financial-model.json'
+      ),
+      periods: [],
+    };
+  }
+  const resolvedTenantSlug = requestedTenantSlug;
   const companyId = resolvedTenantSlug || 'default';
   const candidates = resolvedTenantSlug
     ? [
@@ -105,11 +157,13 @@ export function resolveFinancialModel(
           'financial-model.json'
         ),
         path.join(baseDir, 'knowledge', 'confidential', resolvedTenantSlug, 'financial-model.json'),
-      ]
+      ].map((candidate) =>
+        assertSafeRepositoryPath(candidate, { allowMissingLeaf: true, rootDir: baseDir })
+      )
     : [];
 
   for (const candidate of candidates) {
-    const parsed = loadJsonIfPresent<FinancialModel>(candidate);
+    const parsed = loadFinancialModelCatalog(candidate, baseDir);
     if (!parsed || !Array.isArray(parsed.periods)) continue;
     return {
       ...parsed,
@@ -133,7 +187,10 @@ export function resolveFinancialModel(
 
   const legacy = resolvedTenantSlug
     ? loadLegacyCustomerFinancials(
-        path.join(baseDir, 'customer', resolvedTenantSlug, 'customer.json'),
+        assertSafeRepositoryPath(
+          path.join(baseDir, 'customer', resolvedTenantSlug, 'customer.json'),
+          { allowMissingLeaf: true, rootDir: baseDir }
+        ),
         resolvedTenantSlug
       )
     : null;

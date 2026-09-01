@@ -21,18 +21,16 @@
  */
 
 import * as path from 'node:path';
-import {
-  logger,
-  pathResolver,
-  safeExistsSync,
-  sendOpsAlert,
-  isValidTenantSlug,
-  type OpsAlertInput,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
+import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { auditChain } from '@agent/core';
+import { auditChain } from '@agent/core/audit-chain';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+
+export const TENANT_DRIFT_USAGE = 'Usage: pnpm watch:tenant-drift [--json] [--quiet] [--alert]';
 
 interface DriftFinding {
   path: string;
@@ -46,6 +44,7 @@ interface DriftReport {
   timestamp: string;
   scanned_paths: number;
   findings: DriftFinding[];
+  audit_error?: string;
 }
 
 function buildTenantDriftAlert(report: DriftReport): OpsAlertInput {
@@ -80,9 +79,11 @@ function detectExpectedTenantFromPath(relPath: string): string | null {
 function readMissionState(
   missionDirRel: string
 ): { tenant_slug?: string; mission_id?: string } | null {
-  const statePath = pathResolver.rootResolve(`${missionDirRel}/mission-state.json`);
-  if (!safeExistsSync(statePath)) return null;
   try {
+    const statePath = assertSafeRepositoryPath(
+      pathResolver.rootResolve(`${missionDirRel}/mission-state.json`)
+    );
+    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return null;
     return readJson(statePath);
   } catch {
     return null;
@@ -90,7 +91,12 @@ function readMissionState(
 }
 
 function* walkConfidentialMissionDirs(): Generator<{ relPath: string; expectedTenant: string }> {
-  const root = pathResolver.rootResolve('active/missions/confidential');
+  let root: string;
+  try {
+    root = assertSafeRepositoryPath(pathResolver.rootResolve('active/missions/confidential'));
+  } catch {
+    return;
+  }
   if (!safeExistsSync(root)) return;
   const all = getAllFiles(root);
   const seen = new Set<string>();
@@ -169,7 +175,7 @@ export function runTenantDriftWatch(options: TenantDriftWatchOptions = {}): {
     try {
       recordTenantDriftAudit(report);
     } catch (err) {
-      logger.warn(`[tenant-drift] failed to append audit entry: ${(err as Error).message ?? err}`);
+      report.audit_error = (err as Error).message ?? String(err);
     }
     if (options.alert) alertReceipt = sendOpsAlert(buildTenantDriftAlert(report));
   }
@@ -180,34 +186,41 @@ export function runTenantDriftWatch(options: TenantDriftWatchOptions = {}): {
   };
 }
 
-function main(args: string[] = []): number {
-  const json = args.includes('--json');
-  const quiet = args.includes('--quiet');
-  const alert = args.includes('--alert');
-  const result = runTenantDriftWatch({ alert });
-  const report = result.report;
-
-  if (json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else if (!quiet) {
-    logger.info(`[tenant-drift] scanned ${report.scanned_paths} confidential mission(s)`);
-    if (report.findings.length === 0) {
-      logger.success('[tenant-drift] no drift detected');
-    } else {
-      logger.warn(`[tenant-drift] ${report.findings.length} finding(s)`);
-      for (const f of report.findings) {
-        logger.warn(`  ${f.path}`);
-        logger.warn(`    → ${f.reason}`);
-      }
+export function formatTenantDriftReport(
+  report: DriftReport,
+  alertReceipt: ReturnType<typeof sendOpsAlert> | null = null
+): string {
+  const lines = [`[tenant-drift] scanned ${report.scanned_paths} confidential mission(s)`];
+  if (report.findings.length === 0) {
+    lines.push('[tenant-drift] no drift detected');
+  } else {
+    lines.push(`[tenant-drift] ${report.findings.length} finding(s)`);
+    for (const finding of report.findings) {
+      lines.push(`  ${finding.path}`, `    → ${finding.reason}`);
     }
   }
-
-  if (report.findings.length > 0 && alert && !quiet && result.alert) {
-    logger.warn(
-      `[tenant-drift] ops alert recorded at ${result.alert.recorded_path}; webhook=${result.alert.webhook_delivered ? 'delivered' : 'not-delivered'}`
+  if (report.audit_error) lines.push(`  audit error: ${report.audit_error}`);
+  if (alertReceipt) {
+    lines.push(
+      `[tenant-drift] ops alert recorded at ${alertReceipt.recorded_path}; webhook=${alertReceipt.webhook_delivered ? 'delivered' : 'not-delivered'}`
     );
   }
-  return result.status;
+  return lines.join('\n');
+}
+
+export function main(args: string[] = []): {
+  report?: DriftReport;
+  status: number;
+  alert: ReturnType<typeof sendOpsAlert> | null;
+  help?: string;
+} {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 0, alert: null, help: TENANT_DRIFT_USAGE };
+  }
+
+  const alert = args.includes('--alert');
+  const result = runTenantDriftWatch({ alert });
+  return result;
 }
 
 if (
@@ -216,10 +229,13 @@ if (
 ) {
   void defineScript({
     name: 'watch:tenant-drift',
-    flags: [],
-    run: ({ argv }) => {
-      const status = main(argv);
-      if (status !== 0) throw new ScriptExitError(status, 'tenant drift detected');
+    flags: ['json', 'quiet'],
+    run: ({ argv, json, quiet, print }) => {
+      const result = main(argv);
+      if (result.help) print(json ? result : result.help);
+      else if (result.report && !quiet)
+        print(json ? result.report : formatTenantDriftReport(result.report, result.alert));
+      if (result.status !== 0) throw new ScriptExitError(result.status, '', true, result);
     },
   })();
 }

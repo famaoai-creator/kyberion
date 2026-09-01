@@ -498,7 +498,7 @@ clone から 5 分以内に、ユーザが **声で話しかけ → Kyberion が
 | 1     | **Cloud voice (opt-in upgrade)**         | Anthropic Voice / OpenAI Realtime | 同上                                           | 数秒                | API key                        | 自然な対話、リアルタイム多言語、業務利用                          |
 | 2     | **Local voice (further opt-in)**         | Whisper (local)                   | Style-Bert-VITS2 (local)                       | 数十分（モデル DL） | python + GPU 推奨              | 完全オフライン、声カスタマイズ、長期常用                          |
 
-→ 初回は段 0 で確実に動かし、`pnpm voice:upgrade-cloud` / `pnpm voice:upgrade-local` でいつでも段 1 / 2 に切り替え。
+→ 初回は段 0 で確実に動かし、`pnpm voice:upgrade cloud` / `pnpm voice:upgrade local` でいつでも段 1 / 2 に切り替え。
 → いずれの段でも mission/actuator/Trace の本体は共通。voice の入出力経路だけが差し替わる。
 
 **段 0 の選定理由**:
@@ -535,7 +535,7 @@ A-5 のタスク完了条件に「30 秒以内の terminal cast + ブラウザ�
 - A-5.5: voice preflight（マイク権限、ブラウザ、TTS 経路）を `pipelines/vital-check.json` に統合
 - A-5.6: 失敗フォールバック（A.4）の実装
 - A-5.7: terminal cast / GIF / 動画の収録 + README 埋め込み
-- A-5.8: `pnpm voice:upgrade-cloud`（段 1）/ `pnpm voice:upgrade-local`（段 2）で切り替えるスクリプトと doc
+- A-5.8: `pnpm voice:upgrade cloud`（段 1）/ `pnpm voice:upgrade local`（段 2）で切り替えるスクリプトと doc
 
 #### A.7 段 1（クラウド voice）採用時の選択
 

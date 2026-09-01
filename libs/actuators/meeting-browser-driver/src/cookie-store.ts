@@ -12,17 +12,41 @@
  */
 
 import * as path from 'node:path';
-import { pathResolver, safeExistsSync, safeMkdir, loadJson, safeWriteFile } from '@agent/core';
+import { loadJson } from '@agent/core/foundation';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
 const COOKIE_DIR_REL = 'active/shared/state/browser-cookies';
 
+function assertAccountSlug(accountSlug: string): string {
+  if (
+    !accountSlug ||
+    accountSlug === '.' ||
+    accountSlug === '..' ||
+    accountSlug.includes('/') ||
+    accountSlug.includes('\\') ||
+    /\p{Cc}/u.test(accountSlug)
+  ) {
+    throw new Error('[browser-cookie-store] account slug must be a single safe path segment');
+  }
+  return accountSlug;
+}
+
 export function cookiePathFor(accountSlug: string): string {
-  return pathResolver.rootResolve(path.join(COOKIE_DIR_REL, `${accountSlug}.json`));
+  const safeAccountSlug = assertAccountSlug(accountSlug);
+  const candidate = pathResolver.rootResolve(path.join(COOKIE_DIR_REL, `${safeAccountSlug}.json`));
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }
 
 export function readCookies(accountSlug: string): unknown[] {
   const file = cookiePathFor(accountSlug);
-  if (!safeExistsSync(file)) return [];
+  if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
   try {
     const data = loadJson<unknown>(file);
     return Array.isArray(data) ? data : [];
@@ -33,6 +57,8 @@ export function readCookies(accountSlug: string): unknown[] {
 
 export function writeCookies(accountSlug: string, cookies: unknown[]): void {
   const file = cookiePathFor(accountSlug);
-  safeMkdir(path.dirname(file), { recursive: true });
+  safeMkdir(assertSafeRepositoryPath(path.dirname(file), { allowMissingLeaf: true }), {
+    recursive: true,
+  });
   safeWriteFile(file, JSON.stringify(cookies, null, 2));
 }

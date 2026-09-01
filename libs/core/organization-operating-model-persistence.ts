@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
 import { resolveIntentResolutionPacket } from './intent-resolution.js';
 import { t } from './t.js';
 import { pathResolver } from './path-resolver.js';
@@ -8,22 +7,17 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { auditChain } from './audit-chain.js';
 import { resolveTenant } from './tenant-registry.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
-  loadJson,
   safeMkdir,
   safeReaddir,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
-
-type AddFormatsPlugin = (instance: ReturnType<typeof createAjv>) => void;
-const addFormats =
-  (addFormatsModule as unknown as { default?: AddFormatsPlugin }).default ||
-  (addFormatsModule as unknown as AddFormatsPlugin);
-const ajv = createAjv();
-addFormats(ajv);
 
 import type {
   OrganizationTier,
@@ -103,12 +97,17 @@ const CAPABILITY_FILE_NAME = 'capability.json';
 const SERVICE_FILE_NAME = 'service.json';
 const SERVICE_STATE_FILE_NAME = 'service-state.json';
 const OPERATION_FILE_NAME = 'operation.json';
+const organizationOperatingModelCatalog = defineCatalog<OrganizationOperatingModelCatalog>({
+  id: 'organization-operating-model',
+  path: CATALOG_PATH,
+  schema: CATALOG_SCHEMA_PATH,
+});
 const validatorCache = new Map<string, ValidateFunction>();
 
 export function validatorFor(schemaPath: string): ValidateFunction {
   const cached = validatorCache.get(schemaPath);
   if (cached) return cached;
-  const validator = ajv.compile(loadJson<unknown>(schemaPath));
+  const validator = compileSchema(schemaPath);
   validatorCache.set(schemaPath, validator);
   return validator;
 }
@@ -173,9 +172,12 @@ export function statePath(
 ): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    STATE_FILE_NAME
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      STATE_FILE_NAME
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -187,9 +189,12 @@ export function purposePath(
 ): string {
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    PURPOSE_FILE_NAME
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      PURPOSE_FILE_NAME
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -215,11 +220,14 @@ export function recordPath(
   assertOrganizationId(recordId);
   assertOrganizationId(organizationId);
   assertTenantSlug(tenantSlug);
-  return path.join(
-    pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
-    kind,
-    recordId,
-    fileName
+  return assertSafeRepositoryPath(
+    path.join(
+      pathResolver.organizationStateDir(organizationId, tier, tenantSlug, rootDir),
+      kind,
+      recordId,
+      fileName
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -234,11 +242,12 @@ export function recordQueryTenant(tenantSlug?: string): string {
 }
 
 export function readJsonRecord<T>(filePath: string, label: string): T | null {
-  if (!safeExistsSync(filePath)) return null;
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) return null;
   try {
-    return loadJson<T>(filePath);
+    return readJson<T>(safeFilePath);
   } catch (error) {
-    throw new Error(`Unable to read ${label} at ${filePath}: ${String(error)}`);
+    throw new Error(`Unable to read ${label} at ${safeFilePath}: ${String(error)}`);
   }
 }
 
@@ -250,18 +259,15 @@ export function saveValidated<T>(
 ): string {
   const validator = validatorFor(schemaPath);
   if (!validator(record)) throw new Error(`Invalid ${label}: ${validationErrors(validator)}`);
-  const parent = path.dirname(filePath);
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const parent = path.dirname(safeFilePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-  safeWriteFile(filePath, JSON.stringify(record, null, 2), { encoding: 'utf8' });
-  return filePath;
+  safeWriteFile(safeFilePath, JSON.stringify(record, null, 2), { encoding: 'utf8' });
+  return safeFilePath;
 }
 
 export function loadOrganizationOperatingModelCatalog(): OrganizationOperatingModelCatalog {
-  const catalog = loadJson<unknown>(CATALOG_PATH);
-  const validator = validatorFor(CATALOG_SCHEMA_PATH);
-  if (!validator(catalog))
-    throw new Error(`Invalid organization operating model: ${validationErrors(validator)}`);
-  return catalog as OrganizationOperatingModelCatalog;
+  return organizationOperatingModelCatalog.load();
 }
 
 export function validateOrganizationPurpose(value: unknown): value is OrganizationPurposeRecord {
@@ -878,11 +884,11 @@ export function loadOrganizationServiceState(
 }
 
 export function organizationRecordFiles(rootDir: string, fileName: string): string[] {
-  if (!safeExistsSync(rootDir)) return [];
+  const safeRootDir = assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRootDir)) return [];
   const files: string[] = [];
-  for (const entry of safeReaddir(rootDir)) {
-    const fullPath = path.join(rootDir, entry);
-    if (!safeExistsSync(fullPath)) continue;
+  for (const entry of safeReaddir(safeRootDir)) {
+    const fullPath = assertSafeRepositoryPath(path.join(safeRootDir, entry));
     if (safeStat(fullPath).isDirectory())
       files.push(...organizationRecordFiles(fullPath, fileName));
     else if (entry === fileName) files.push(fullPath);

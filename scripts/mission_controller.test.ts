@@ -12,6 +12,7 @@ import {
   saveProjectTrackRecord,
 } from '@agent/core';
 import * as killSwitch from '@agent/core/kill-switch';
+import * as orchestratorSession from '@agent/core/orchestrator-session';
 import {
   assertCanGrantMissionAuthority,
   extractMissionControllerPositionalArgs,
@@ -22,9 +23,12 @@ import {
   handoffMission,
   main,
   resolveMissionStartCreateInputFromArgv,
+  resolveMissionTicketDispatchOptionsFromArgv,
+  resolveMissionWorkItemDispatchOptionsFromArgv,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
 import * as missionControllerRouter from './refactor/mission-controller-router.js';
+import type { MissionControllerRoutingContext } from './refactor/mission-controller-router.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -517,6 +521,52 @@ describe('mission_controller argument parsing', () => {
     expect(options.organizationId).toBe('demo-org');
   });
 
+  it('rejects malformed relationship JSON and unsupported positional tiers', () => {
+    expect(() =>
+      extractMissionStartCreateOptionsFromArgv([
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-BAD-REL',
+        '--relationships',
+        '[]',
+      ])
+    ).toThrow('--relationships-json must be a JSON object');
+
+    expect(() =>
+      extractMissionStartCreateOptionsFromArgv([
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-BAD-REL-KEY',
+        '--relationships',
+        '{"project":{"__proto__":{"polluted":true}}}',
+      ])
+    ).toThrow('--relationships-json contains a dangerous JSON key');
+
+    expect(() =>
+      resolveMissionStartCreateInputFromArgv([
+        'node',
+        'dist/scripts/mission_controller.js',
+        'start',
+        'MSN-BAD-TIER',
+        'secret',
+      ])
+    ).toThrow('mission tier must be one of');
+  });
+
+  it('rejects unsupported ticket and work-item dispatch option values', () => {
+    expect(() =>
+      resolveMissionTicketDispatchOptionsFromArgv(['--ticket-targets', 'workitem,unknown'])
+    ).toThrow('--ticket-targets contains unsupported value(s): unknown');
+    expect(() =>
+      resolveMissionWorkItemDispatchOptionsFromArgv(['--dispatch-mode', 'invalid'])
+    ).toThrow('--dispatch-mode must be one of');
+    expect(() =>
+      resolveMissionWorkItemDispatchOptionsFromArgv(['--dispatch-statuses', 'ready,unknown'])
+    ).toThrow('--dispatch-statuses contains unsupported value(s): unknown');
+  });
+
   it('includes the organization selection guide in the help text', () => {
     const help = buildHelpText();
 
@@ -539,7 +589,9 @@ describe('mission_controller argument parsing', () => {
     expect(help).toContain('organization-profiles --json --summary');
     expect(help).toContain('organization-profile --json --summary');
     expect(help).toContain('organization-catalogs --json --selected-only --summary');
-    expect(help).toContain('reconcile-work <ID> --manifest <PATH> [--dry-run]');
+    expect(help).toContain(
+      'reconcile-work <ID> --manifest <PATH> [--dry-run] [--approval-request-id <UUID>]'
+    );
     expect(help).toContain(
       'resume   [ID]                  Resume the last active mission and replay orchestration journal (or specify ID)'
     );
@@ -1358,7 +1410,7 @@ describe('handoffMission — SO-02 orchestrator-session release hook', () => {
     // itself is spied rather than seeding a real orchestrator session, per
     // the SO-02 brief's "mock/spy the release function" allowance.
     const releaseSpy = vi
-      .spyOn(core, 'releaseOrchestratorSessionForMissionBestEffort')
+      .spyOn(orchestratorSession, 'releaseOrchestratorSessionForMissionBestEffort')
       .mockImplementation(() => {});
 
     await handoffMission(missionId, 'ecosystem_architect', 'handoff test note');
@@ -1376,6 +1428,7 @@ describe('mission controller router — archive verb (AL-03)', () => {
     return {
       argv,
       action,
+      arg1: argv[argv.indexOf(action) + 1],
       hasRefresh: false,
       hasDryRun: argv.includes('--dry-run'),
       getOptionValue: (flag: string, args: string[]) => {
@@ -1385,6 +1438,8 @@ describe('mission controller router — archive verb (AL-03)', () => {
       parseCsvOption: (() => undefined) as any,
       purgeMissions: vi.fn(async () => undefined),
       archiveMissions: vi.fn(async () => undefined),
+      reconcileExistingWork: vi.fn(async () => undefined),
+      requestMissionWorkReconciliationApproval: vi.fn(async () => undefined),
       showHelp: vi.fn(),
     } as any;
   }
@@ -1424,6 +1479,51 @@ describe('mission controller router — archive verb (AL-03)', () => {
     );
     await missionControllerRouter.runMissionControllerAction(execute);
     expect(execute.purgeMissions).toHaveBeenCalledWith(false);
+  });
+
+  it('routes reconciliation approval requests separately from apply', async () => {
+    const request = makeRoutingContext(
+      [
+        'node',
+        'dist/scripts/mission_controller.js',
+        'reconcile-work',
+        'MSN-RECONCILE',
+        '--manifest',
+        'active/shared/tmp/reconciliation.json',
+        '--request-approval',
+        '--requested-by',
+        'operator',
+      ],
+      'reconcile-work'
+    );
+    await missionControllerRouter.runMissionControllerAction(request);
+    expect(request.requestMissionWorkReconciliationApproval).toHaveBeenCalledWith(
+      'MSN-RECONCILE',
+      'active/shared/tmp/reconciliation.json',
+      'operator'
+    );
+    expect(request.reconcileExistingWork).not.toHaveBeenCalled();
+
+    const apply = makeRoutingContext(
+      [
+        'node',
+        'dist/scripts/mission_controller.js',
+        'reconcile-work',
+        'MSN-RECONCILE',
+        '--manifest',
+        'active/shared/tmp/reconciliation.json',
+        '--approval-request-id',
+        'approval-123',
+      ],
+      'reconcile-work'
+    );
+    await missionControllerRouter.runMissionControllerAction(apply);
+    expect(apply.reconcileExistingWork).toHaveBeenCalledWith(
+      'MSN-RECONCILE',
+      'active/shared/tmp/reconciliation.json',
+      false,
+      'approval-123'
+    );
   });
 
   it("'archive' and '--mission' stay out of positional argument extraction (argv contract)", () => {
@@ -1482,4 +1582,102 @@ describe('mission controller router — mission ID and help guards', () => {
       );
     }
   );
+});
+
+describe('mission controller router — runtime input boundaries', () => {
+  function makeContext(action: string, positional: string[], options: string[] = []) {
+    const argv = ['node', 'dist/scripts/mission_controller.js', action, ...positional, ...options];
+    const optionValue = (flag: string, args: string[]) => {
+      const index = args.indexOf(flag);
+      return index >= 0 ? args[index + 1] : undefined;
+    };
+    return {
+      argv,
+      action,
+      arg1: positional[0],
+      arg2: positional[1],
+      arg3: positional[2],
+      hasRefresh: false,
+      hasDryRun: false,
+      getOptionValue: optionValue,
+      parseCsvOption: (flag: string, args: string[]) => {
+        const raw = optionValue(flag, args);
+        return raw ? raw.split(',') : undefined;
+      },
+      recordTask: vi.fn(async () => undefined),
+      recordEvidence: vi.fn(async () => undefined),
+      recordArtifactReview: vi.fn(async () => undefined),
+      listMemoryQueue: vi.fn(),
+      promoteMemoryCandidate: vi.fn(async () => undefined),
+      promotePendingMemoryCandidates: vi.fn(),
+      enqueueMission: vi.fn(async () => undefined),
+      showHelp: vi.fn(),
+    } as unknown as MissionControllerRoutingContext & {
+      recordTask: ReturnType<typeof vi.fn>;
+      recordEvidence: ReturnType<typeof vi.fn>;
+      recordArtifactReview: ReturnType<typeof vi.fn>;
+      listMemoryQueue: ReturnType<typeof vi.fn>;
+      promoteMemoryCandidate: ReturnType<typeof vi.fn>;
+      promotePendingMemoryCandidates: ReturnType<typeof vi.fn>;
+      enqueueMission: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  it('rejects malformed or non-object record-task details before dispatch', async () => {
+    const malformed = makeContext('record-task', ['MSN-BOUNDARY', 'task', '{broken']);
+    await expect(missionControllerRouter.runMissionControllerAction(malformed)).rejects.toThrow(
+      'record-task details must contain valid JSON'
+    );
+
+    const array = makeContext('record-task', ['MSN-BOUNDARY', 'task', '[]']);
+    await expect(missionControllerRouter.runMissionControllerAction(array)).rejects.toThrow(
+      'record-task details must contain a JSON object'
+    );
+    expect(array.recordTask).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid review and evidence metadata before dispatch', async () => {
+    const findings = makeContext(
+      'review-task',
+      ['MSN-BOUNDARY', 'review', 'agent'],
+      ['--findings', '{}']
+    );
+    await expect(missionControllerRouter.runMissionControllerAction(findings)).rejects.toThrow(
+      '--findings must contain a JSON array'
+    );
+
+    const evidence = makeContext(
+      'record-evidence',
+      ['MSN-BOUNDARY', 'task', 'note'],
+      ['--actor-type', 'robot']
+    );
+    await expect(missionControllerRouter.runMissionControllerAction(evidence)).rejects.toThrow(
+      '--actor-type must be one of: agent, human, service'
+    );
+    expect(evidence.recordEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid memory and queue enum values before dispatch', async () => {
+    const memory = makeContext('memory-queue', ['unknown']);
+    await expect(missionControllerRouter.runMissionControllerAction(memory)).rejects.toThrow(
+      'memory-queue status must be one of: queued, approved, rejected, promoted'
+    );
+
+    const promote = makeContext('memory-promote', ['candidate'], ['--execution-role', 'operator']);
+    await expect(missionControllerRouter.runMissionControllerAction(promote)).rejects.toThrow(
+      '--execution-role must be one of: mission_controller, chronos_gateway'
+    );
+
+    const enqueue = makeContext('enqueue', ['MSN-BOUNDARY', 'private']);
+    await expect(missionControllerRouter.runMissionControllerAction(enqueue)).rejects.toThrow(
+      'mission tier must be one of: personal, confidential, public'
+    );
+    expect(enqueue.enqueueMission).not.toHaveBeenCalled();
+
+    const malformedPriority = makeContext('enqueue', ['MSN-BOUNDARY', 'public', '12junk']);
+    await expect(
+      missionControllerRouter.runMissionControllerAction(malformedPriority)
+    ).rejects.toThrow('enqueue priority must be an integer');
+    expect(malformedPriority.enqueueMission).not.toHaveBeenCalled();
+  });
 });

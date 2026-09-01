@@ -1,20 +1,17 @@
-import {
-  createStandardYargs,
-  agentLifecycle,
-  agentRegistry,
-  loadAgentManifests,
-  getAgentManifest,
-  logger,
-  auditChain,
-  classifyError,
-} from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { agentLifecycle } from '@agent/core/agent-lifecycle';
+import { agentRegistry } from '@agent/core/agent-registry';
+import { getAgentManifest, loadAgentManifests } from '@agent/core/agent-manifest';
+import { logger } from '@agent/core/core';
+import { auditChain } from '@agent/core/audit-chain';
+import { classifyError } from '@agent/core/error-classifier';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type AgentAction = 'ps' | 'spawn' | 'shutdown' | 'list-manifests' | 'inspect';
 
-export const main = async () => {
-  const argv = await createStandardYargs()
+export const main = async (args: string[] = []) => {
+  const argv = await createStandardYargs(['node', 'agent_runtime_manager', ...args])
     .option('action', {
       type: 'string',
       choices: ['ps', 'spawn', 'shutdown', 'list-manifests', 'inspect'] as const,
@@ -226,11 +223,21 @@ export async function inspectAgent(agentId: string) {
   console.log('');
 }
 
+export const runAgentRuntimeManager = defineScript({
+  name: 'agent-runtime:manage',
+  flags: [],
+  run: async ({ argv }) => {
+    try {
+      await main(argv);
+    } catch (error) {
+      logger.error(error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    }
+  },
+});
+
 if (
   isDirectScript(import.meta.url, 'agent_runtime_manager.ts') ||
   isDirectScript(import.meta.url, 'agent_runtime_manager.js')
 )
-  void main().catch((err: any) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runAgentRuntimeManager();

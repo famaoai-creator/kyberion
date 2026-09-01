@@ -18,25 +18,28 @@
  */
 
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { currentScope } from '@agent/core/scope-context';
 import {
-  logger,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeReaddir,
   safeReadFile,
   safeExistsSync,
+  safeLstat,
   safeStat,
+} from '@agent/core/secure-io';
+import {
   scopeAffinityScore,
   docAuthorityScore,
   recencyDecayScore,
-  currentScope,
-  resolveKnowledgeScopeSet,
-  assertKnowledgePathInScope,
   knowledgeScopeProximityScore,
-  loadKnowledgeUsageAggregate,
   loadKnowledgeRankingWeights,
-} from '@agent/core';
+} from '@agent/core/ranking-signals';
+import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/core/knowledge-scope';
+import { loadKnowledgeUsageAggregate } from '@agent/core/src/knowledge-feedback-loop';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import type { ScopeContext } from '@agent/core';
+import type { ScopeContext } from '@agent/core/scope-context';
 import { readJson } from '@agent/core/foundation';
 
 // ---------------------------------------------------------------------------
@@ -128,6 +131,28 @@ function normalizeStringArray(value: unknown): string[] {
       : [];
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+export function normalizeRankingWeights(
+  value: unknown,
+  defaults: RankingWeights
+): Partial<RankingWeights> {
+  if (!isJsonRecord(value)) return {};
+  const algorithms = isJsonRecord(value.algorithms) ? value.algorithms : {};
+  const ranking = isJsonRecord(algorithms.ranking) ? algorithms.ranking : {};
+  const weights = isJsonRecord(ranking.weights) ? ranking.weights : {};
+  const normalized: Partial<RankingWeights> = {};
+  for (const key of Object.keys(defaults) as Array<keyof RankingWeights>) {
+    const candidate = weights[key];
+    if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+      normalized[key] = candidate;
+    }
+  }
+  return normalized;
+}
+
 let cachedTaxonomy: TaxonomyManifest | null = null;
 
 function loadTaxonomy(): TaxonomyManifest {
@@ -139,7 +164,9 @@ function loadTaxonomy(): TaxonomyManifest {
   }
 
   try {
-    cachedTaxonomy = readJson<TaxonomyManifest>(taxonomyPath);
+    const safeTaxonomyPath = assertSafeRepositoryPath(taxonomyPath);
+    if (!safeLstat(safeTaxonomyPath).isFile()) throw new Error('taxonomy is not a regular file');
+    cachedTaxonomy = readJson<TaxonomyManifest>(safeTaxonomyPath);
   } catch (_) {
     cachedTaxonomy = {};
   }
@@ -422,10 +449,13 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   };
   if (!safeExistsSync(configPath)) return { ...defaults, ...loadKnowledgeRankingWeights(scope) };
   try {
-    const config = readJson<any>(configPath);
+    const safeConfigPath = assertSafeRepositoryPath(configPath);
+    if (!safeLstat(safeConfigPath).isFile())
+      throw new Error('analysis config is not a regular file');
+    const config = readJson<unknown>(safeConfigPath);
     return {
       ...defaults,
-      ...config.algorithms?.ranking?.weights,
+      ...normalizeRankingWeights(config, defaults),
       ...loadKnowledgeRankingWeights(scope),
     };
   } catch (_) {

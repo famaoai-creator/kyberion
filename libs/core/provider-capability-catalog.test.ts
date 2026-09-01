@@ -9,6 +9,31 @@ const mocks = vi.hoisted(() => ({
   safeUnlinkSync: vi.fn(),
   rootResolve: vi.fn((relPath: string) => `/repo/${relPath}`),
   shared: vi.fn((relPath: string) => `/repo/active/shared/${relPath}`),
+  schemaPath: '/repo/knowledge/product/schemas/provider-capabilities.schema.json',
+  schema: {
+    type: 'object',
+    required: ['providers'],
+    properties: {
+      version: { type: 'string' },
+      provenance: { type: 'object' },
+      providers: {
+        type: 'object',
+        additionalProperties: {
+          type: 'object',
+          required: ['models', 'capabilities', 'modelCapabilities'],
+          properties: {
+            models: { type: 'array', items: { type: 'string' } },
+            capabilities: { type: 'array', items: { type: 'string' } },
+            modelCapabilities: {
+              type: 'object',
+              additionalProperties: { type: 'array', items: { type: 'string' } },
+            },
+            provenance: { type: 'object' },
+          },
+        },
+      },
+    },
+  },
 }));
 
 vi.mock('node:child_process', () => ({ spawnSync: mocks.spawnSync }));
@@ -19,6 +44,31 @@ vi.mock('./secure-io.js', () => ({
   safeExistsSync: mocks.safeExistsSync,
   safeMkdir: mocks.safeMkdir,
   safeUnlinkSync: mocks.safeUnlinkSync,
+}));
+
+vi.mock('./foundation/json.js', () => ({
+  readJson: (filePath: string) =>
+    JSON.parse(
+      filePath === mocks.schemaPath
+        ? JSON.stringify(mocks.schema)
+        : String(mocks.safeReadFile(filePath))
+    ),
+}));
+
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: (filePath: string) => JSON.parse(String(mocks.safeReadFile(filePath))),
+    loadJsonIfPresent: () => null,
+    appendFile: () => undefined,
+    exists: (filePath: string) => mocks.safeExistsSync(filePath),
+    readFile: (filePath: string) => String(mocks.safeReadFile(filePath)),
+    stat: (filePath: string) => ({
+      mtimeMs: 0,
+      size: String(mocks.safeReadFile(filePath)).length,
+    }),
+    writeFile: () => undefined,
+  }),
+  registerFoundationIo: vi.fn(),
 }));
 
 vi.mock('./path-resolver.js', () => ({
@@ -37,7 +87,9 @@ function claudeInstalled() {
       return { status: 0, stdout: 'claude 1.0.0', stderr: '' };
     return { status: 1, stdout: '', stderr: '' };
   });
-  mocks.safeExistsSync.mockReturnValue(false);
+  mocks.safeExistsSync.mockImplementation(
+    (filePath: string) => filePath === CATALOG_PATH || filePath === FALLBACK_CATALOG_PATH
+  );
   mocks.safeWriteFile.mockReturnValue(undefined);
   mocks.safeMkdir.mockReturnValue(undefined);
   mocks.safeUnlinkSync.mockReturnValue(undefined);

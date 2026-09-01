@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { consumeTenantBudget } from '@agent/core/tenant-rate-limiter';
 import {
-  consumeTenantBudget,
   extractSurfaceBearerToken,
+  resolveSurfaceViewerToken,
+} from '@agent/core/surface-mutation-guard';
+import {
   findChronosTokenRegistration,
   matchesChronosToken,
   readChronosTokenRegistrations,
-  resolveSurfaceViewerToken,
   type ChronosAccessRole,
   type ChronosTokenRegistration,
-} from '@agent/core';
+} from '@agent/core/chronos-access-registry';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 
 /**
@@ -26,8 +28,11 @@ const ALLOW_LOCALHOST_AUTOADMIN =
     defaultValue: true,
   }) === true;
 
-export type { ChronosAccessRole, ChronosTokenRegistration } from '@agent/core';
-export { matchesChronosToken } from '@agent/core';
+export type {
+  ChronosAccessRole,
+  ChronosTokenRegistration,
+} from '@agent/core/chronos-access-registry';
+export { matchesChronosToken } from '@agent/core/chronos-access-registry';
 
 function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
   try {

@@ -1,7 +1,13 @@
 import { appendJsonLine } from './foundation/json.js';
 import * as nodePath from 'node:path';
 import { sharedLogsProcess } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeStat, safeMoveSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeStat,
+  safeMoveSync,
+} from './secure-io.js';
 
 export type ProcessLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -50,7 +56,9 @@ export class ProcessLogger {
   }
 
   private logFilePath(): string {
-    return sharedLogsProcess(`${this.name}.log`);
+    return assertSafeRepositoryPath(sharedLogsProcess(`${this.name}.log`), {
+      allowMissingLeaf: true,
+    });
   }
 
   private writeToFile(entry: ProcessLogEntry): void {

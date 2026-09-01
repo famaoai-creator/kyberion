@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { pathResolver, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const SOURCE_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
 /**
@@ -54,7 +55,9 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
 
   for (const filePath of files) {
     const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
-    jsonLoaderViolations += [...source.matchAll(/JSON\.parse\(\s*safeReadFile\(/gu)].length;
+    jsonLoaderViolations += [
+      ...source.matchAll(/JSON\.parse\s*\(\s*(?:String\s*\(\s*)?safeReadFile\s*\(/gu),
+    ].length;
     if (
       !filePath.endsWith(`${path.sep}foundation${path.sep}json.ts`) &&
       path.basename(filePath) !== 'check_foundation_adoption.ts'
@@ -114,11 +117,13 @@ export const runCheckFoundationAdoption = defineScript({
   run(context) {
     const failures = checkFoundationAdoption();
     if (failures.length > 0) {
-      console.error('[check:foundation-adoption] FAILED');
-      for (const failure of failures) console.error(`- ${failure}`);
-      throw new Error(`${failures.length} foundation adoption violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...failures.map((failure) => `- ${failure}`)].join('\n')
+      );
     }
     context.print('[check:foundation-adoption] OK');
+    return { failures };
   },
 });
 

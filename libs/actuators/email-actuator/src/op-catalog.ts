@@ -6,7 +6,8 @@
 // is strictly additive — determineActuatorStepType previously threw
 // unknown-op for all of them.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const EMAIL_SCHEMA = {
   type: 'object',
@@ -37,7 +38,7 @@ export const EMAIL_ACTUATOR_TRANSFORM_OPS = [] as const;
 
 export const EMAIL_ACTUATOR_APPLY_OPS = ['create_draft', 'send', 'send_from_file'] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   return {
     op,
     kind,
@@ -49,7 +50,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...EMAIL_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...EMAIL_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

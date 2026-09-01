@@ -86,8 +86,3 @@ export function getWorkCoordinationImportCatalogEntryByCommand(
     listWorkCoordinationImportCatalogEntries().find((entry) => entry.command === normalized) || null
   );
 }
-
-export function resetWorkCoordinationImportCatalogCache(): void {
-  publicCatalog.reset();
-  personalCatalog.reset();
-}

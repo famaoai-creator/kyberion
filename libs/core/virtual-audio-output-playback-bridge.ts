@@ -1,5 +1,12 @@
 import * as path from 'node:path';
-import { buildSafeExecEnv, safeExec, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  buildSafeExecEnv,
+  safeExec,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { AudioDeviceLeaseManager, type AudioDeviceLease } from './audio-device-lease.js';
 import { pathResolver } from './path-resolver.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
@@ -277,8 +284,10 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     }
 
     const playbackPath = request?.source_path
-      ? pathResolver.rootResolve(request.source_path)
-      : pathResolver.sharedTmp(tonePathFor(selectedOutputs[0]));
+      ? assertSafeRepositoryPath(pathResolver.rootResolve(request.source_path))
+      : assertSafeRepositoryPath(pathResolver.sharedTmp(tonePathFor(selectedOutputs[0])), {
+          allowMissingLeaf: true,
+        });
     if (!request?.source_path) {
       writeSineToneWav(playbackPath, {
         frequencyHz: this.opts.tone_frequency_hz ?? DEFAULT_TONE_FREQUENCY_HZ,
@@ -291,7 +300,9 @@ export class VirtualAudioOutputPlaybackBridgeImpl implements VirtualAudioOutputP
     const leaseManager = new AudioDeviceLeaseManager();
     const swiftBin = this.opts.swift_bin ?? DEFAULT_SWIFT_BIN;
     const powershellBin = this.opts.powershell_bin ?? DEFAULT_POWERSHELL_BIN;
-    const script = pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift');
+    const script = assertSafeRepositoryPath(
+      pathResolver.rootResolve('libs/core/virtual-audio-output-playback.swift')
+    );
 
     for (const outputName of selectedOutputs) {
       const candidate = inventory.inventory.audio_outputs.find(

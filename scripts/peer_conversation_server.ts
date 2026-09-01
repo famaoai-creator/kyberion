@@ -1,20 +1,33 @@
-import { createStandardYargs, logger } from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { createPeerMessagingServer } from '@agent/core/peer-messaging';
+import { createMeshHubPeerMessagingAdapter } from '@agent/core/mesh-hub-peer-messaging-adapter';
+import { createPeerConversationResponder } from '@agent/core/peer-conversation';
 import {
   advertiseMeshCapabilities,
-  assertProtocolServiceRegistered,
-  createMeshHubPeerMessagingAdapter,
-  createPeerConversationResponder,
-  createPeerMessagingServer,
-  recordProtocolServiceLifecycle,
   recordMeshHeartbeat,
   registerMeshPeer,
-  type MeshRequest,
-} from '@agent/core';
+} from '@agent/core/mesh-peer-directory';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
+import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
+import type { MeshRequest } from '@agent/core/mesh-hub-contract';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-async function main(): Promise<void> {
+function normalizePeerServerArguments(args: string[]): string[] {
+  return stripSharedScriptFlags(args);
+}
+
+async function main(
+  args: string[] = [],
+  options: { dryRun?: boolean; check?: boolean } = {}
+): Promise<unknown> {
   assertProtocolServiceRegistered('peer-messaging');
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs([
+    'node',
+    'peer_conversation_server',
+    ...normalizePeerServerArguments(args),
+  ])
     .option('peer-id', {
       type: 'string',
       demandOption: true,
@@ -75,6 +88,16 @@ async function main(): Promise<void> {
   const tenantId = String(argv['tenant-id'] || '').trim();
   if (!tenantId) {
     throw new Error('Missing tenant id. Set KYBERION_TENANT_ID or pass --tenant-id.');
+  }
+  if (options.dryRun === true || options.check === true) {
+    return {
+      dry_run: true,
+      operation: 'peer-conversation-server.listen',
+      peer_id: peerId,
+      tenant_id: tenantId,
+      host,
+      port,
+    };
   }
   const meshNamespace = String(argv['mesh-namespace'] || '').trim() || undefined;
   const meshAdapter = createMeshHubPeerMessagingAdapter({
@@ -139,46 +162,68 @@ async function main(): Promise<void> {
     });
   };
 
-  if (tenantId) {
-    const endpointHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-    const allowedRequestKinds = [
-      'review.request',
-      'workitem.claim',
-      'workitem.handoff',
-      'workitem.status_update',
-      'capability.query',
-      'notification.publish',
-    ] as const;
-    registerMeshPeer({
-      peer_id: peerId,
-      tenant_id: tenantId,
-      endpoint_ref: `http://${endpointHost}:${port}`,
-      key_ref: String(argv['key-ref']),
-      allowed_request_kinds: [...allowedRequestKinds],
-      authority_role: 'infrastructure_sentinel',
-    });
-    advertiseMeshCapabilities({
-      peer_id: peerId,
-      tenant_id: tenantId,
-      capability_id: 'peer.collaboration',
-      version: '1.0.0',
-      roles: ['collaboration-peer'],
-      request_kinds: [...allowedRequestKinds],
-    });
-    heartbeat();
-    heartbeatTimer = setInterval(() => heartbeat(), Number(argv['heartbeat-ms']));
-  }
-
   await server.listen(port, host);
-  recordProtocolServiceLifecycle({
-    serviceId: 'peer-messaging',
-    action: 'start',
-    status: 'started',
-    scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
-    principal: { kind: 'service', id: peerId },
-    requestedBy: peerId,
-    metadata: { host, port, mesh_namespace: meshNamespace || null },
-  });
+  let lifecycleStarted = false;
+  try {
+    recordProtocolServiceLifecycle({
+      serviceId: 'peer-messaging',
+      action: 'start',
+      status: 'started',
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+      principal: { kind: 'service', id: peerId },
+      requestedBy: peerId,
+      metadata: { host, port, mesh_namespace: meshNamespace || null },
+    });
+    lifecycleStarted = true;
+
+    if (tenantId) {
+      const endpointHost = host === '0.0.0.0' ? '127.0.0.1' : host;
+      const allowedRequestKinds = [
+        'review.request',
+        'workitem.claim',
+        'workitem.handoff',
+        'workitem.status_update',
+        'capability.query',
+        'notification.publish',
+      ] as const;
+      registerMeshPeer({
+        peer_id: peerId,
+        tenant_id: tenantId,
+        endpoint_ref: `http://${endpointHost}:${port}`,
+        key_ref: String(argv['key-ref']),
+        allowed_request_kinds: [...allowedRequestKinds],
+        authority_role: 'infrastructure_sentinel',
+      });
+      advertiseMeshCapabilities({
+        peer_id: peerId,
+        tenant_id: tenantId,
+        capability_id: 'peer.collaboration',
+        version: '1.0.0',
+        roles: ['collaboration-peer'],
+        request_kinds: [...allowedRequestKinds],
+      });
+      heartbeat();
+      heartbeatTimer = setInterval(() => heartbeat(), Number(argv['heartbeat-ms']));
+    }
+  } catch (error) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    if (lifecycleStarted) {
+      try {
+        recordProtocolServiceLifecycle({
+          serviceId: 'peer-messaging',
+          action: 'stop',
+          status: 'stopped',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenantId },
+          principal: { kind: 'service', id: peerId },
+          requestedBy: peerId,
+        });
+      } catch {
+        // Preserve the startup failure; the server is still closed below.
+      }
+    }
+    await server.close();
+    throw error;
+  }
   logger.success(`[peer-conversation-server] peer ${peerId} listening on http://${host}:${port}`);
 
   const shutdown = async () => {
@@ -195,14 +240,23 @@ async function main(): Promise<void> {
       });
     } finally {
       await server.close();
-      process.exitCode = 0;
     }
   };
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 }
 
-main().catch((error: any) => {
-  logger.error(error?.message || String(error));
-  process.exitCode = 1;
+export const runPeerConversationServer = defineScript({
+  name: 'peer:conversation-server',
+  run: async ({ argv, dryRun, check, print }) => {
+    const result = await main(argv, { dryRun, check });
+    if (result) print(result);
+    return result;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'peer_conversation_server.ts') ||
+  isDirectScript(import.meta.url, 'peer_conversation_server.js')
+)
+  void runPeerConversationServer();

@@ -54,7 +54,3 @@ export function loadMissionDistillMarkdownPolicyCatalog(): MissionDistillMarkdow
 export function resolveMissionDistillMarkdownPolicy(): MissionDistillMarkdownPolicyCatalog {
   return loadMissionDistillMarkdownPolicyCatalog();
 }
-
-export function resetMissionDistillMarkdownPolicyCatalogCache(): void {
-  catalog.reset();
-}

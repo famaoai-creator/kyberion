@@ -19,6 +19,16 @@ import { resolveOpAccessClaims, type OpInputDomain } from './op-input-contracts.
 import type { ResourceClaim } from './tool-call-scheduler.js';
 import { runOpPreflight } from './op-preflight.js';
 import { ensureDefaultOpPreflight } from './op-preflight-defaults.js';
+import {
+  requireSandboxEnforcement,
+  withSandboxPolicy,
+  type SandboxPolicy,
+} from './sandbox-policy.js';
+import {
+  assertExecutionBounds,
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from './execution-bounds.js';
 
 export type AdfStepType = 'capture' | 'transform' | 'apply' | 'control';
 
@@ -28,6 +38,8 @@ export interface AdfStep {
   params: any;
   /** Optional budget projected from the governed actuator operation definition. */
   timeout_ms?: number;
+  /** Optional step-level approval metadata projected by the pipeline contract. */
+  budget?: { approval_required?: boolean; approval_ref?: string };
   /** Explicit shared-resource claims used by the graph frontier scheduler. */
   resource_claims?: Array<string | ResourceClaim>;
 }
@@ -59,6 +71,10 @@ export interface AdfEngineContext {
 export interface AdfRunOptions {
   maxSteps?: number;
   timeoutMs?: number;
+  /** Trusted caller-side presence signal for approval-gated steps. */
+  hasHuman?: boolean;
+  /** Trusted caller-side resolver for a bound approval decision. */
+  approvalGranted?: (step: AdfStep, context: AdfEngineContext) => boolean | Promise<boolean>;
   /** Log prefix for step progress lines (default '[ADF]'). */
   label?: string;
   /** Override the template resolver (default: shared resolveVars). */
@@ -80,6 +96,8 @@ export interface AdfRunOptions {
   ) => Promise<{ blocked: boolean; reasons?: string[] } | void>;
   /** Maximum number of independent graph nodes to execute concurrently. */
   maxConcurrency?: number;
+  /** Resolved sandbox policy applied to every handler and nested ADF step. */
+  sandboxPolicy?: SandboxPolicy;
   /** Completed node ids restored from a durable pipeline run journal. */
   resumeCompletedNodeIds?: ReadonlySet<string>;
   /** Optional observer for durable DAG/run-graph artifacts. */
@@ -177,19 +195,22 @@ export async function executeAdfSteps<Ctx extends AdfEngineContext = AdfEngineCo
   handlers: AdfStepHandlers<Ctx>,
   hooks?: AdfStepHooks<Ctx>
 ): Promise<AdfRunResult<Ctx>> {
-  return await executeAdfStepsInternal(
-    steps,
-    initialCtx,
-    options,
-    handlers,
-    {
-      stepCount: 0,
-      startTime: Date.now(),
-      repeatGovernor: createToolCallRepeatGovernorState(),
-      loopDepth: 0,
-    },
-    hooks
-  );
+  if (options.sandboxPolicy) requireSandboxEnforcement(options.sandboxPolicy);
+  const run = (): Promise<AdfRunResult<Ctx>> =>
+    executeAdfStepsInternal(
+      steps,
+      initialCtx,
+      options,
+      handlers,
+      {
+        stepCount: 0,
+        startTime: Date.now(),
+        repeatGovernor: createToolCallRepeatGovernorState(),
+        loopDepth: 0,
+      },
+      hooks
+    );
+  return options.sandboxPolicy ? withSandboxPolicy(options.sandboxPolicy, run) : run();
 }
 
 async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineContext>(
@@ -200,8 +221,8 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
   state: AdfEngineState,
   hooks?: AdfStepHooks<Ctx>
 ): Promise<AdfRunResult<Ctx>> {
-  const maxSteps = options.maxSteps ?? 1000;
-  const timeoutMs = options.timeoutMs ?? 60_000;
+  const maxSteps = options.maxSteps ?? DEFAULT_MAX_PIPELINE_STEPS;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_PIPELINE_TIMEOUT_MS;
   const label = options.label || '[ADF]';
   let ctx = { ...initialCtx } as Ctx;
   const results: PipelineStepResult[] = [];
@@ -309,12 +330,7 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
 
   for (const step of steps) {
     state.stepCount += 1;
-    if (state.stepCount > maxSteps) {
-      throw new Error(`[SAFETY_LIMIT] Exceeded maximum pipeline steps (${maxSteps})`);
-    }
-    if (Date.now() - state.startTime > timeoutMs) {
-      throw new Error(`[SAFETY_LIMIT] Pipeline execution timed out (${timeoutMs}ms)`);
-    }
+    assertExecutionBounds(state, { maxSteps, timeoutMs });
 
     let executionParams = step.params;
     if (step.type !== 'control') {
@@ -364,11 +380,18 @@ async function executeAdfStepsInternal<Ctx extends AdfEngineContext = AdfEngineC
       // reaches the handler; block/ask decisions are terminal and cannot be
       // recovered through a step's on_error fallback.
       ensureDefaultOpPreflight();
+      const resolvedParams = (resolve(step.params) || {}) as Record<string, unknown>;
       const preflight = await runOpPreflight({
         op: step.op,
-        params: (resolve(step.params) || {}) as Record<string, unknown>,
+        params: resolvedParams,
         context: ctx,
         source: 'actuator',
+        requiresApproval:
+          step.budget?.approval_required === true ||
+          resolvedParams._approval_required === true ||
+          ctx._approval_required === true,
+        approvalGranted: options.approvalGranted ? await options.approvalGranted(step, ctx) : false,
+        ...(options.hasHuman !== undefined ? { hasHuman: options.hasHuman } : {}),
       });
       if (preflight.decision !== 'allow') {
         const error = new Error(

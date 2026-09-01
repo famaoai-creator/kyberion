@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeWriteFile } from '@agent/core';
-import { getVoiceRuntimePolicy, resetVoiceRuntimePolicyCache } from './voice-runtime-policy.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import {
+  getVoiceRuntimePolicy,
+  _resetVoiceRuntimePolicyCacheForTests,
+} from './voice-runtime-policy.js';
 
 describe('voice runtime policy', () => {
   const tmpDir = pathResolver.sharedTmp('voice-runtime-policy-tests');
@@ -8,7 +12,7 @@ describe('voice runtime policy', () => {
 
   afterEach(() => {
     delete process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH;
-    resetVoiceRuntimePolicyCache();
+    _resetVoiceRuntimePolicyCacheForTests();
   });
 
   it('loads override policy files', () => {
@@ -37,7 +41,7 @@ describe('voice runtime policy', () => {
           default_personal_voice_mode: 'require_personal_voice',
           enforce_clone_engine_for_personal_tier: true,
         },
-      }),
+      })
     );
     process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH = overridePath;
 
@@ -46,5 +50,11 @@ describe('voice runtime policy', () => {
     expect(policy.chunking.default_max_chunk_chars).toBe(640);
     expect(policy.delivery.default_format).toBe('mp3');
     expect(policy.routing.default_personal_voice_mode).toBe('require_personal_voice');
+  });
+
+  it('falls back instead of consuming a policy outside the repository', () => {
+    process.env.KYBERION_VOICE_RUNTIME_POLICY_PATH = '/tmp/kyberion-voice-policy-external.json';
+
+    expect(getVoiceRuntimePolicy().version).toBe('fallback');
   });
 });

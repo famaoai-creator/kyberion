@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { normalizeEventScope, type EventScope, type EventScopeKind } from '@agent/core';
+import { normalizeEventScope, type EventScope, type EventScopeKind } from '@agent/core/event-scope';
 
 export interface ReportReviewContext {
   review_session_id: string;

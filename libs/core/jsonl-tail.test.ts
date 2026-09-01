@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { sharedTmp } from './path-resolver.js';
+import { pathResolver, sharedTmp } from './path-resolver.js';
 import {
   createJsonlTail,
   detectRotation,
@@ -96,6 +96,36 @@ describe('jsonl-tail', () => {
     expect(batch.malformed).toBe(1);
   });
 
+  it('dangerous key を含む行は malformed として配送しない', () => {
+    fs.writeFileSync(file, '{"n":1}\n{"nested":{"constructor":{}}}\n{"n":2}\n');
+
+    const batch = createJsonlTail<{ n: number }>(file).read();
+
+    expect(batch.records).toEqual([{ n: 1 }, { n: 2 }]);
+    expect(batch.malformed).toBe(1);
+  });
+
+  it('parser hook は JSON の値を配送前に検証・投影する', () => {
+    fs.writeFileSync(file, '{"n":1}\n[]\n{"n":"bad"}\n');
+    const tail = createJsonlTail<{ n: number }>(file, {
+      parse: (value) => {
+        if (
+          value === null ||
+          typeof value !== 'object' ||
+          Array.isArray(value) ||
+          typeof (value as { n?: unknown }).n !== 'number'
+        ) {
+          throw new Error('invalid record');
+        }
+        return value as { n: number };
+      },
+    });
+
+    const batch = tail.read();
+    expect(batch.records).toEqual([{ n: 1 }]);
+    expect(batch.malformed).toBe(2);
+  });
+
   it('マルチバイト文字を含む行でもオフセットがずれない', () => {
     // Byte length differs from character length; a char-based offset would
     // desynchronise here and corrupt every subsequent read.
@@ -123,6 +153,11 @@ describe('jsonl-tail', () => {
 
     append({ n: 1 });
     expect(tail.read().records).toEqual([{ n: 1 }]);
+  });
+
+  it('リポジトリ外のファイルを tail しない', () => {
+    const outside = path.join(pathResolver.rootDir(), '..', 'jsonl-tail-outside.jsonl');
+    expect(() => createJsonlTail(outside)).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   describe('detectRotation', () => {

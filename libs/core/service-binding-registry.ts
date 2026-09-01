@@ -1,13 +1,6 @@
-import type { ValidateFunction } from 'ajv';
-import { createAjv } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeReaddir,
-  safeWriteFile,
-} from './secure-io.js';
+import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from './secure-io.js';
 
 export interface ServiceBindingRecord {
   binding_id: string;
@@ -24,34 +17,37 @@ export interface ServiceBindingRecord {
   metadata?: Record<string, unknown>;
 }
 
-const ajv = createAjv();
 const BINDING_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/service-binding-record.schema.json'
 );
 const BINDING_DIR = pathResolver.shared('runtime/service-bindings');
-let bindingValidateFn: ValidateFunction | null = null;
 
-function ensureValidator(): ValidateFunction {
-  if (bindingValidateFn) return bindingValidateFn;
-  const raw = safeReadFile(BINDING_SCHEMA_PATH, { encoding: 'utf8' }) as string;
-  bindingValidateFn = ajv.compile(JSON.parse(raw));
-  return bindingValidateFn!;
-}
+const serviceBindingRecordCatalog = defineCatalog<ServiceBindingRecord>({
+  id: 'service-binding-record',
+  path: BINDING_DIR,
+  schema: BINDING_SCHEMA_PATH,
+});
 
 function bindingPath(bindingId: string): string {
   return `${BINDING_DIR}/${bindingId}.json`;
 }
 
 export function validateServiceBindingRecord(value: unknown): value is ServiceBindingRecord {
-  return Boolean(ensureValidator()(value));
+  try {
+    serviceBindingRecordCatalog.validate(value);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function saveServiceBindingRecord(record: ServiceBindingRecord): string {
-  if (!validateServiceBindingRecord(record)) {
-    const errors = (ensureValidator().errors || []).map(
-      (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
+  try {
+    serviceBindingRecordCatalog.validate(record);
+  } catch (error) {
+    throw new Error(
+      `Invalid service binding record: ${error instanceof Error ? error.message : String(error)}`
     );
-    throw new Error(`Invalid service binding record: ${errors.join('; ')}`);
   }
   if (!safeExistsSync(BINDING_DIR)) safeMkdir(BINDING_DIR, { recursive: true });
   const filePath = bindingPath(record.binding_id);
@@ -62,9 +58,16 @@ export function saveServiceBindingRecord(record: ServiceBindingRecord): string {
 export function loadServiceBindingRecord(bindingId: string): ServiceBindingRecord | null {
   const filePath = bindingPath(bindingId);
   if (!safeExistsSync(filePath)) return null;
-  const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-  const parsed = JSON.parse(raw) as ServiceBindingRecord;
-  return validateServiceBindingRecord(parsed) ? parsed : null;
+  try {
+    return defineCatalog<ServiceBindingRecord>({
+      id: 'service-binding-record',
+      path: filePath,
+      schema: BINDING_SCHEMA_PATH,
+    }).load();
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
+    throw error;
+  }
 }
 
 export function listServiceBindingRecords(): ServiceBindingRecord[] {

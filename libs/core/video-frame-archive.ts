@@ -1,7 +1,9 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  assertSafeRepositoryPath,
   safeExec,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeReaddir,
@@ -67,6 +69,9 @@ export async function writeVideoFramesToMp4(
   framesStream: AsyncIterable<VideoFrame>,
   options: VideoFrameArchiveOptions = {}
 ): Promise<VideoFrameArchiveResult> {
+  const safeOutputPath = assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), {
+    allowMissingLeaf: true,
+  });
   const frames = await collectFrames(framesStream);
   if (frames.length === 0) {
     throw new Error('[video-frame-archive] no frames provided for mp4 encoding');
@@ -83,19 +88,26 @@ export async function writeVideoFramesToMp4(
 
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
   const fps = normalizeFps(frames, options.fps);
-  const tempDir = resolveArchiveTempDir('encode');
+  const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('encode'), {
+    allowMissingLeaf: true,
+  });
   const ext = frameFileExtension(firstFormat);
   safeMkdir(tempDir, { recursive: true });
-  safeMkdir(path.dirname(outputPath), { recursive: true });
+  safeMkdir(path.dirname(safeOutputPath), { recursive: true });
 
   try {
     for (let index = 0; index < frames.length; index += 1) {
       const frame = frames[index];
-      const framePath = path.join(tempDir, `frame-${String(index + 1).padStart(6, '0')}.${ext}`);
+      const framePath = assertSafeRepositoryPath(
+        path.join(tempDir, `frame-${String(index + 1).padStart(6, '0')}.${ext}`),
+        { allowMissingLeaf: true }
+      );
       safeWriteFile(framePath, Buffer.from(frame.payload));
     }
 
-    const inputPattern = path.join(tempDir, `frame-%06d.${ext}`);
+    const inputPattern = assertSafeRepositoryPath(path.join(tempDir, `frame-%06d.${ext}`), {
+      allowMissingLeaf: true,
+    });
     safeExec(
       ffmpegBin,
       [
@@ -110,13 +122,13 @@ export async function writeVideoFramesToMp4(
         'yuv420p',
         '-movflags',
         '+faststart',
-        outputPath,
+        safeOutputPath,
       ],
       { env: process.env, timeoutMs: 120_000 }
     );
 
     return {
-      output_path: outputPath,
+      output_path: safeOutputPath,
       frame_count: frames.length,
       fps,
       format: firstFormat,
@@ -132,14 +144,19 @@ export async function* readVideoFramesFromMp4(
   inputPath: string,
   options: VideoFrameArchiveOptions = {}
 ): AsyncIterable<VideoFrame> {
+  const safeInputPath = assertSafeRepositoryPath(pathResolver.rootResolve(inputPath), {
+    allowMissingLeaf: true,
+  });
   const ffmpegBin = options.ffmpeg_bin ?? DEFAULT_FFMPEG_BIN;
-  const tempDir = resolveArchiveTempDir('decode');
+  const tempDir = assertSafeRepositoryPath(resolveArchiveTempDir('decode'), {
+    allowMissingLeaf: true,
+  });
   const fps = Math.max(1, Math.min(120, Math.round(options.fps || 30)));
   safeMkdir(tempDir, { recursive: true });
 
   try {
     const outputPattern = path.join(tempDir, 'frame-%06d.jpg');
-    safeExec(ffmpegBin, ['-y', '-i', inputPath, '-vf', `fps=${fps}`, outputPattern], {
+    safeExec(ffmpegBin, ['-y', '-i', safeInputPath, '-vf', `fps=${fps}`, outputPattern], {
       env: process.env,
       timeoutMs: 120_000,
     });
@@ -149,7 +166,13 @@ export async function* readVideoFramesFromMp4(
       .sort();
     for (let index = 0; index < files.length; index += 1) {
       const file = files[index];
-      const filePath = path.join(tempDir, file);
+      let filePath: string;
+      try {
+        filePath = assertSafeRepositoryPath(path.join(tempDir, file));
+        if (!safeLstat(filePath).isFile()) continue;
+      } catch {
+        continue;
+      }
       const payload = safeReadFile(filePath, { encoding: null });
       const payloadBytes = Buffer.isBuffer(payload)
         ? new Uint8Array(payload)

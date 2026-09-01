@@ -1,8 +1,9 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJsonIfPresent } from './foundation/json.js';
 
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getVoiceProfileRecord } from './voice-profile-registry.js';
 import {
   getVoiceEngineRegistry,
@@ -74,16 +75,17 @@ const DEFAULT_PREFERENCES: VoiceSelectionPreferences = {
 };
 
 function selectionPath(): string {
-  return path.join(resolveActiveProfileRoot(), 'onboarding', 'voice-selection.json');
+  return assertSafeRepositoryPath(
+    path.join(resolveActiveProfileRoot(), 'onboarding', 'voice-selection.json'),
+    { allowMissingLeaf: true }
+  );
 }
 
 function readPreferences(): VoiceSelectionPreferences | null {
   const filePath = selectionPath();
-  if (!safeExistsSync(filePath)) return null;
+  const parsed = readJsonIfPresent<Partial<VoiceSelectionPreferences>>(filePath);
+  if (!parsed) return null;
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(filePath, { encoding: 'utf8' }))
-    ) as Partial<VoiceSelectionPreferences>;
     const backend = parseVoiceSttBackend(parsed.stt_backend);
     if (typeof parsed.tts_engine_id !== 'string' || !parsed.tts_engine_id.trim()) return null;
     return {
@@ -297,8 +299,4 @@ export function saveVoiceSelectionPreferences(input: {
     )
   );
   return getVoiceSelectionSnapshot();
-}
-
-export function resetVoiceSelectionPreferencesCache(): void {
-  // Preferences are intentionally read on each request so UI changes take effect without a restart.
 }

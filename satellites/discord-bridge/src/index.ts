@@ -1,42 +1,105 @@
 import * as path from 'node:path';
-import { installProcessGuards } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
-import { pathToFileURL } from 'node:url';
-
-import { Client, GatewayIntentBits, Events, Message } from 'discord.js';
-
-// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
-installProcessGuards('discord-bridge');
+import { installProcessGuards } from '@agent/core/process-guards';
+import { appendJsonLine, readJsonLines } from '@agent/core/foundation';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { t } from '@agent/core/t';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { startBridgeTypingLoop } from '@agent/core/bridge-typing';
+import * as pathResolver from '@agent/core/path-resolver';
+import { safeMkdir } from '@agent/core/secure-io';
 import {
-  resolveOperatorLocale,
-  createStandardYargs,
-  logger,
-  startBridgeTypingLoop,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  runSurfaceMessageConversation,
-  runChannelTurn,
   formatChannelThreadContext,
+  runChannelTurn,
   type ChannelAdapter,
+} from '@agent/core/channel-adapter';
+import {
   buildBridgeEmptyReplyText,
   chunkSurfaceMessage,
   postBridgeError,
-  createSurfaceOutboxDrainGuard,
-  drainSurfaceOutbox,
+  sendSurfaceTextWithFallback,
+} from '@agent/core/bridge-error-reply';
+import { createSurfaceOutboxDrainGuard, drainSurfaceOutbox } from '@agent/core/surface-delivery';
+import {
   resolveMissionProposalReply,
   stashMissionProposalForConfirmation,
-  evaluateSurfaceActorAccess,
-  sendSurfaceTextWithFallback,
+} from '@agent/core/surface-mission-proposals';
+import {
   buildSurfaceApprovalActions,
   buildSurfaceApprovalText,
   createSurfaceApprovalRequest,
   resolveSurfaceApprovalReply,
-} from '@agent/core';
+  runSurfaceMessageConversation,
+} from '@agent/core/channel-surface';
+import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
+import { pathToFileURL } from 'node:url';
 
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  Client,
+  GatewayIntentBits,
+  Events,
+  Message,
+} from 'discord.js';
+
+// IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
+installProcessGuards('discord-bridge');
 const DISCORD_SURFACE_AGENT_ID = 'discord-surface-agent';
 const DISCORD_THREAD_HISTORY_ROOT = 'active/shared/runtime/discord-bridge/thread-history';
+
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+interface DiscordInteractionLike {
+  isButton(): boolean;
+  user: { id: string };
+  channelId: string | null;
+  customId?: string;
+  reply?: (options: { content: string; ephemeral?: boolean }) => Promise<unknown> | unknown;
+}
+
+function hasSendTyping(value: unknown): value is { sendTyping(): Promise<void> } {
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    typeof (value as { sendTyping?: unknown }).sendTyping === 'function'
+  );
+}
+
+function isSendableChannel(value: unknown): value is { send(content: string): Promise<unknown> } {
+  return Boolean(
+    value && typeof value === 'object' && typeof (value as { send?: unknown }).send === 'function'
+  );
+}
+
+interface DiscordHistoryMessageLike {
+  id?: string;
+  content?: string;
+  createdTimestamp?: number;
+  createdAt?: Date;
+  author?: { bot?: boolean; tag?: string; username?: string; id?: string };
+}
+
+interface DiscordHistoryChannelLike {
+  messages: {
+    fetch(options: { limit: number; before: string }): Promise<{
+      values(): Iterable<DiscordHistoryMessageLike>;
+    }>;
+  };
+}
+
+function hasMessageHistory(value: unknown): value is DiscordHistoryChannelLike {
+  if (!value || typeof value !== 'object') return false;
+  const messages = (value as { messages?: unknown }).messages;
+  return Boolean(
+    messages &&
+    typeof messages === 'object' &&
+    typeof (messages as { fetch?: unknown }).fetch === 'function'
+  );
+}
 
 async function replyDiscordText(message: Message, text: string): Promise<void> {
   for (const chunk of chunkSurfaceMessage(text, 'discord')) {
@@ -54,15 +117,29 @@ async function replyDiscordApproval(
   record: Awaited<ReturnType<typeof createSurfaceApprovalRequest>>
 ): Promise<void> {
   const buttons = buildSurfaceApprovalActions(record).map((action) => ({
-    type: 2,
-    style: action.decision === 'approved' ? 3 : 4,
-    label: action.decision === 'approved' ? '承認' : '却下',
-    custom_id: action.callbackData,
+    style: action.decision === 'approved' ? ButtonStyle.Success : ButtonStyle.Danger,
+    label: t(
+      action.decision === 'approved'
+        ? 'bridge:approval_approve_button'
+        : 'bridge:approval_reject_button',
+      undefined,
+      resolveOperatorLocale()
+    ),
+    customId: action.callbackData,
   }));
   await message.reply({
     content: text,
-    components: [{ type: 1, components: buttons }],
-  } as any);
+    components: [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        buttons.map((button) =>
+          new ButtonBuilder()
+            .setStyle(button.style)
+            .setLabel(button.label)
+            .setCustomId(button.customId)
+        )
+      ),
+    ],
+  });
 }
 
 export interface DiscordThreadHistoryEntry {
@@ -73,6 +150,31 @@ export interface DiscordThreadHistoryEntry {
   threadTs: string;
   channelId: string;
   receivedAt: string;
+}
+
+export function parseDiscordThreadHistoryEntry(value: unknown): DiscordThreadHistoryEntry | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const role = record.role === 'user' || record.role === 'assistant' ? record.role : undefined;
+  const stringField = (field: string): string | undefined =>
+    typeof record[field] === 'string' ? record[field] : undefined;
+  const authorLabel = stringField('authorLabel');
+  const text = stringField('text');
+  const messageId = stringField('messageId');
+  const threadTs = stringField('threadTs');
+  const channelId = stringField('channelId');
+  const receivedAt = stringField('receivedAt');
+  if (!role || !authorLabel || !text || !messageId || !threadTs || !channelId || !receivedAt)
+    return null;
+  return {
+    role,
+    authorLabel,
+    text,
+    messageId,
+    threadTs,
+    channelId,
+    receivedAt,
+  };
 }
 
 function sanitizePathSegment(value: string): string {
@@ -87,21 +189,14 @@ function resolveDiscordThreadHistoryPath(threadTs: string): string {
 
 function readDiscordThreadHistory(threadTs: string): DiscordThreadHistoryEntry[] {
   const resolved = resolveDiscordThreadHistoryPath(threadTs);
-  if (!safeExistsSync(resolved)) return [];
-  const raw = String(safeReadFile(resolved, { encoding: 'utf8' }) || '').trim();
-  if (!raw) return [];
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      try {
-        return JSON.parse(line) as DiscordThreadHistoryEntry;
-      } catch {
-        return null;
-      }
-    })
-    .filter((entry): entry is DiscordThreadHistoryEntry => Boolean(entry));
+  return readJsonLines<DiscordThreadHistoryEntry>(resolved, {
+    onMalformed: 'skip',
+    map: (value) => {
+      const entry = parseDiscordThreadHistoryEntry(value);
+      if (!entry) throw new Error('invalid Discord thread history entry');
+      return entry;
+    },
+  });
 }
 
 function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
@@ -109,8 +204,8 @@ function appendDiscordThreadHistory(entry: DiscordThreadHistoryEntry): void {
     const resolved = resolveDiscordThreadHistoryPath(entry.threadTs);
     safeMkdir(path.dirname(resolved), { recursive: true });
     appendJsonLine(resolved, entry);
-  } catch (error: any) {
-    logger.warn(`⚠️ [DiscordBridge] Failed to persist thread history: ${error?.message || error}`);
+  } catch (error: unknown) {
+    logger.warn(`⚠️ [DiscordBridge] Failed to persist thread history: ${errorDetail(error)}`);
   }
 }
 
@@ -125,32 +220,28 @@ async function collectDiscordThreadContext(
   priorHistoryEntries: DiscordThreadHistoryEntry[]
 ): Promise<string | undefined> {
   const historyEntries: DiscordThreadHistoryEntry[] = [];
-  const channel = message.channel as any;
+  const channel = message.channel;
 
-  if (channel?.messages?.fetch) {
+  if (hasMessageHistory(channel)) {
     try {
       const fetched = await channel.messages.fetch({ limit: 8, before: message.id });
-      for (const entry of (Array.from(fetched.values()) as any[]).sort(
-        (a, b) => Number(a?.createdTimestamp || 0) - Number(b?.createdTimestamp || 0)
+      for (const entry of Array.from(fetched.values()).sort(
+        (a, b) => Number(a.createdTimestamp || 0) - Number(b.createdTimestamp || 0)
       )) {
-        const content = String(entry?.content || '').trim();
+        const content = String(entry.content || '').trim();
         if (!content) continue;
         historyEntries.push({
-          role: entry?.author?.bot ? 'assistant' : 'user',
-          authorLabel: String(
-            entry?.author?.tag || entry?.author?.username || entry?.author?.id || 'unknown'
-          ),
+          role: entry.author?.bot ? 'assistant' : 'user',
+          authorLabel: entry.author?.tag || entry.author?.username || entry.author?.id || 'unknown',
           text: content,
-          messageId: String(entry?.id || ''),
+          messageId: entry.id || '',
           threadTs: message.channelId,
           channelId: message.channelId,
-          receivedAt: entry?.createdAt
-            ? new Date(entry.createdAt).toISOString()
-            : new Date().toISOString(),
+          receivedAt: entry.createdAt?.toISOString() || new Date().toISOString(),
         });
       }
-    } catch (error: any) {
-      logger.warn(`⚠️ [DiscordBridge] Failed to fetch channel history: ${error?.message || error}`);
+    } catch (error: unknown) {
+      logger.warn(`⚠️ [DiscordBridge] Failed to fetch channel history: ${errorDetail(error)}`);
     }
   }
 
@@ -222,7 +313,7 @@ export async function handleDiscordMessage(message: Message) {
     typing: () =>
       startBridgeTypingLoop(
         'discord-bridge',
-        () => (message.channel as { sendTyping?: () => Promise<void> }).sendTyping?.(),
+        () => (hasSendTyping(message.channel) ? message.channel.sendTyping() : Promise.resolve()),
         8000
       ),
     shouldSend: ({ result }) =>
@@ -275,6 +366,7 @@ export async function handleDiscordMessage(message: Message) {
               sourceText: message.content,
               routingDecision: result.routingDecision,
               fallbackSummary: result.text,
+              intentResolution: result.intentResolution,
             });
             await replyDiscordText(message, prompt);
             appendDiscordThreadHistory({
@@ -302,7 +394,7 @@ export async function handleDiscordMessage(message: Message) {
               });
               await replyDiscordApproval(
                 message,
-                buildSurfaceApprovalText('discord', record),
+                buildSurfaceApprovalText('discord', record, result.intentResolution),
                 record
               );
             }
@@ -320,8 +412,8 @@ export async function handleDiscordMessage(message: Message) {
         },
       }
     );
-  } catch (err: any) {
-    logger.error(`❌ [DiscordBridge] Conversation failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`❌ [DiscordBridge] Conversation failed: ${errorDetail(err)}`);
     // UX-01: surface a vocabulary-based error to the user (rate-limited per channel).
     await postBridgeError({
       conversationKey: `discord:${message.channelId}`,
@@ -333,15 +425,15 @@ export async function handleDiscordMessage(message: Message) {
   }
 }
 
-export async function handleDiscordInteraction(interaction: any): Promise<void> {
-  if (!interaction?.isButton?.()) return;
-  const actorId = String(interaction.user?.id || '');
+export async function handleDiscordInteraction(interaction: DiscordInteractionLike): Promise<void> {
+  if (!interaction.isButton() || !interaction.reply) return;
+  const actorId = interaction.user.id;
   const access = evaluateSurfaceActorAccess('discord', actorId);
   if (!access.allowed) {
     await interaction.reply({ content: 'この操作は許可されていません。', ephemeral: true });
     return;
   }
-  const channel = String(interaction.channelId || '');
+  const channel = interaction.channelId || '';
   const approvalReply = resolveSurfaceApprovalReply({
     surface: 'discord',
     channel,
@@ -360,8 +452,8 @@ async function drainDiscordOutbox(client: Client): Promise<void> {
   await drainSurfaceOutbox(
     'discord',
     async (message) => {
-      const channel = await (client as any).channels.fetch(message.channel);
-      if (!channel || typeof channel.send !== 'function') {
+      const channel = await client.channels.fetch(message.channel);
+      if (!isSendableChannel(channel)) {
         throw Object.assign(new Error('channel_not_found'), { status: 404 });
       }
       await channel.send(message.text);
@@ -373,7 +465,7 @@ async function drainDiscordOutbox(client: Client): Promise<void> {
 const runDiscordOutbox = createSurfaceOutboxDrainGuard('discord');
 
 async function main() {
-  const argv = await createStandardYargs()
+  const argv = await createStandardYargs(process.argv)
     .option('token', { type: 'string', description: 'Discord Bot Token' })
     .parseSync();
 
@@ -402,8 +494,8 @@ async function main() {
 
   try {
     await client.login(token);
-  } catch (err: any) {
-    logger.error(`❌ [DiscordBridge] Login failed: ${err.message}`);
+  } catch (err: unknown) {
+    logger.error(`❌ [DiscordBridge] Login failed: ${errorDetail(err)}`);
     process.exit(1);
   }
 

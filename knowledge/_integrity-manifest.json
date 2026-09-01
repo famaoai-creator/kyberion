@@ -15,7 +15,7 @@
     {
       "path": "product/agents/chronos-mirror.agent.md",
       "tier": "public",
-      "size": 6866,
+      "size": 7736,
       "type": "md"
     },
     {
@@ -405,7 +405,7 @@
     {
       "path": "product/architecture/intent-loop-wiring-status.md",
       "tier": "public",
-      "size": 21451,
+      "size": 21449,
       "type": "md"
     },
     {
@@ -459,13 +459,13 @@
     {
       "path": "product/architecture/kyberion-intent-catalog.md",
       "tier": "public",
-      "size": 40217,
+      "size": 40390,
       "type": "md"
     },
     {
       "path": "product/architecture/kyberion-mesh-hub-implementation-instructions-5.4-mini.md",
       "tier": "public",
-      "size": 23672,
+      "size": 23718,
       "type": "md"
     },
     {
@@ -519,7 +519,7 @@
     {
       "path": "product/architecture/meeting-facilitator-use-case.md",
       "tier": "public",
-      "size": 14744,
+      "size": 14756,
       "type": "md"
     },
     {
@@ -549,7 +549,7 @@
     {
       "path": "product/architecture/mission-orchestration-control-plane.md",
       "tier": "public",
-      "size": 6590,
+      "size": 6686,
       "type": "md"
     },
     {
@@ -567,7 +567,7 @@
     {
       "path": "product/architecture/mission-task-classification-roadmap-5.4-mini.md",
       "tier": "public",
-      "size": 36355,
+      "size": 36392,
       "type": "md"
     },
     {
@@ -585,7 +585,7 @@
     {
       "path": "product/architecture/multi-tenant-operations.md",
       "tier": "public",
-      "size": 21191,
+      "size": 21214,
       "type": "md"
     },
     {
@@ -645,7 +645,7 @@
     {
       "path": "product/architecture/presence-layer.md",
       "tier": "public",
-      "size": 7185,
+      "size": 7359,
       "type": "md"
     },
     {
@@ -675,7 +675,7 @@
     {
       "path": "product/architecture/provider-cli-capability-report.md",
       "tier": "public",
-      "size": 6169,
+      "size": 16455,
       "type": "md"
     },
     {
@@ -801,7 +801,7 @@
     {
       "path": "product/architecture/token-management-rfc-implementation-tasks-5.4-mini.md",
       "tier": "public",
-      "size": 16131,
+      "size": 16200,
       "type": "md"
     },
     {
@@ -915,7 +915,7 @@
     {
       "path": "product/capability-assets/security-scanner/agentic-rule-hierarchy.json",
       "tier": "public",
-      "size": 2929,
+      "size": 2999,
       "type": "json"
     },
     {
@@ -981,7 +981,7 @@
     {
       "path": "product/config-missions/new-service-integration.json",
       "tier": "public",
-      "size": 1723,
+      "size": 1738,
       "type": "json"
     },
     {
@@ -1047,7 +1047,7 @@
     {
       "path": "product/governance/active-services.json",
       "tier": "public",
-      "size": 351,
+      "size": 381,
       "type": "json"
     },
     {
@@ -1065,7 +1065,7 @@
     {
       "path": "product/governance/actuator-op-registry.json",
       "tier": "public",
-      "size": 19634,
+      "size": 21339,
       "type": "json"
     },
     {
@@ -1269,13 +1269,13 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21233,
+      "size": 20801,
       "type": "json"
     },
     {
       "path": "product/governance/cli-commands.json",
       "tier": "public",
-      "size": 8059,
+      "size": 43816,
       "type": "json"
     },
     {
@@ -1299,7 +1299,7 @@
     {
       "path": "product/governance/contextual-intent-learning-seed.json",
       "tier": "public",
-      "size": 2667,
+      "size": 2697,
       "type": "json"
     },
     {
@@ -1359,13 +1359,13 @@
     {
       "path": "product/governance/dynamic-policies.json",
       "tier": "public",
-      "size": 407,
+      "size": 414,
       "type": "json"
     },
     {
       "path": "product/governance/ecosystem-blueprint.json",
       "tier": "public",
-      "size": 1060,
+      "size": 1090,
       "type": "json"
     },
     {
@@ -1383,7 +1383,7 @@
     {
       "path": "product/governance/env-registry.json",
       "tier": "public",
-      "size": 85471,
+      "size": 99293,
       "type": "json"
     },
     {
@@ -1431,13 +1431,13 @@
     {
       "path": "product/governance/environment-manifests/schema-integrity.json",
       "tier": "public",
-      "size": 2848,
+      "size": 2890,
       "type": "json"
     },
     {
       "path": "product/governance/error-classifier-rules.json",
       "tier": "public",
-      "size": 17888,
+      "size": 17929,
       "type": "json"
     },
     {
@@ -1473,7 +1473,7 @@
     {
       "path": "product/governance/gateway-capability-registry.json",
       "tier": "public",
-      "size": 114,
+      "size": 144,
       "type": "json"
     },
     {
@@ -1521,13 +1521,13 @@
     {
       "path": "product/governance/health-thresholds.json",
       "tier": "public",
-      "size": 460,
+      "size": 459,
       "type": "json"
     },
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7366,
+      "size": 7239,
       "type": "json"
     },
     {
@@ -1539,13 +1539,13 @@
     {
       "path": "product/governance/ingest-quota-policy.json",
       "tier": "public",
-      "size": 691,
+      "size": 692,
       "type": "json"
     },
     {
       "path": "product/governance/ingestion-rules.json",
       "tier": "public",
-      "size": 198,
+      "size": 228,
       "type": "json"
     },
     {
@@ -1557,7 +1557,7 @@
     {
       "path": "product/governance/integrity-policy.json",
       "tier": "public",
-      "size": 493,
+      "size": 523,
       "type": "json"
     },
     {
@@ -1575,7 +1575,7 @@
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31821,
+      "size": 31851,
       "type": "json"
     },
     {
@@ -1623,7 +1623,7 @@
     {
       "path": "product/governance/judgment-rules.json",
       "tier": "public",
-      "size": 2046,
+      "size": 2076,
       "type": "json"
     },
     {
@@ -1659,7 +1659,7 @@
     {
       "path": "product/governance/knowledge-sync-rules.json",
       "tier": "public",
-      "size": 4770,
+      "size": 4772,
       "type": "json"
     },
     {
@@ -1671,7 +1671,7 @@
     {
       "path": "product/governance/knowledge-weights.json",
       "tier": "public",
-      "size": 311,
+      "size": 310,
       "type": "json"
     },
     {
@@ -1695,7 +1695,7 @@
     {
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
-      "size": 323,
+      "size": 353,
       "type": "json"
     },
     {
@@ -1809,7 +1809,7 @@
     {
       "path": "product/governance/mesh-hub-policy.json",
       "tier": "public",
-      "size": 1424,
+      "size": 1421,
       "type": "json"
     },
     {
@@ -1893,13 +1893,13 @@
     {
       "path": "product/governance/model-cost-registry.fallback.json",
       "tier": "public",
-      "size": 1386,
+      "size": 1387,
       "type": "json"
     },
     {
       "path": "product/governance/model-cost-registry.json",
       "tier": "public",
-      "size": 2008,
+      "size": 2009,
       "type": "json"
     },
     {
@@ -2043,13 +2043,13 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 3577,
+      "size": 4597,
       "type": "json"
     },
     {
       "path": "product/governance/monitoring-rules.json",
       "tier": "public",
-      "size": 774,
+      "size": 804,
       "type": "json"
     },
     {
@@ -2073,7 +2073,7 @@
     {
       "path": "product/governance/onboarding-flow.md",
       "tier": "public",
-      "size": 11841,
+      "size": 11872,
       "type": "md"
     },
     {
@@ -2097,13 +2097,13 @@
     {
       "path": "product/governance/operator-learning-scenario-pack.json",
       "tier": "public",
-      "size": 18943,
+      "size": 18973,
       "type": "json"
     },
     {
       "path": "product/governance/orchestration-config.json",
       "tier": "public",
-      "size": 1835,
+      "size": 1865,
       "type": "json"
     },
     {
@@ -2175,13 +2175,13 @@
     {
       "path": "product/governance/package-governance.json",
       "tier": "public",
-      "size": 292,
+      "size": 322,
       "type": "json"
     },
     {
       "path": "product/governance/package-policy.json",
       "tier": "public",
-      "size": 279,
+      "size": 309,
       "type": "json"
     },
     {
@@ -2211,7 +2211,7 @@
     {
       "path": "product/governance/phases/onboarding.md",
       "tier": "public",
-      "size": 5737,
+      "size": 5768,
       "type": "md"
     },
     {
@@ -2325,7 +2325,7 @@
     {
       "path": "product/governance/pre-pr-ci-readiness-checklist.ja.md",
       "tier": "public",
-      "size": 11452,
+      "size": 11787,
       "type": "md"
     },
     {
@@ -2391,7 +2391,7 @@
     {
       "path": "product/governance/qa-rules.json",
       "tier": "public",
-      "size": 603,
+      "size": 633,
       "type": "json"
     },
     {
@@ -2427,7 +2427,7 @@
     {
       "path": "product/governance/reporting-config.json",
       "tier": "public",
-      "size": 251,
+      "size": 281,
       "type": "json"
     },
     {
@@ -2439,13 +2439,13 @@
     {
       "path": "product/governance/restricted-capabilities.json",
       "tier": "public",
-      "size": 321,
+      "size": 326,
       "type": "json"
     },
     {
       "path": "product/governance/restricted-skills.json",
       "tier": "public",
-      "size": 406,
+      "size": 405,
       "type": "json"
     },
     {
@@ -2475,13 +2475,19 @@
     {
       "path": "product/governance/sdlc-gate-catalog.json",
       "tier": "public",
-      "size": 4646,
+      "size": 4676,
       "type": "json"
     },
     {
       "path": "product/governance/security-policy.json",
       "tier": "public",
-      "size": 21306,
+      "size": 21304,
+      "type": "json"
+    },
+    {
+      "path": "product/governance/security-posture.json",
+      "tier": "public",
+      "size": 102,
       "type": "json"
     },
     {
@@ -2523,7 +2529,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 14013,
+      "size": 14043,
       "type": "json"
     },
     {
@@ -2535,7 +2541,7 @@
     {
       "path": "product/governance/skill-index-aggregation.json",
       "tier": "public",
-      "size": 238,
+      "size": 268,
       "type": "json"
     },
     {
@@ -2547,13 +2553,13 @@
     {
       "path": "product/governance/skill-metadata-sync.json",
       "tier": "public",
-      "size": 501,
+      "size": 531,
       "type": "json"
     },
     {
       "path": "product/governance/skill-validation.json",
       "tier": "public",
-      "size": 377,
+      "size": 407,
       "type": "json"
     },
     {
@@ -2583,13 +2589,13 @@
     {
       "path": "product/governance/standard-policy.json",
       "tier": "public",
-      "size": 2050,
+      "size": 2080,
       "type": "json"
     },
     {
       "path": "product/governance/storage-retention-catalog.json",
       "tier": "public",
-      "size": 21061,
+      "size": 21066,
       "type": "json"
     },
     {
@@ -2823,7 +2829,7 @@
     {
       "path": "product/governance/track-creation-policy.json",
       "tier": "public",
-      "size": 10024,
+      "size": 10027,
       "type": "json"
     },
     {
@@ -2841,7 +2847,7 @@
     {
       "path": "product/governance/ts-base-stabilization-sop.md",
       "tier": "public",
-      "size": 3115,
+      "size": 3141,
       "type": "md"
     },
     {
@@ -3285,7 +3291,7 @@
     {
       "path": "product/orchestration/actuator-op-discovery.json",
       "tier": "public",
-      "size": 1337212,
+      "size": 1380718,
       "type": "json"
     },
     {
@@ -3633,7 +3639,7 @@
     {
       "path": "product/orchestration/global_actuator_index.json",
       "tier": "public",
-      "size": 19104,
+      "size": 19136,
       "type": "json"
     },
     {
@@ -3663,7 +3669,7 @@
     {
       "path": "product/orchestration/intent-scenario-catalog.md",
       "tier": "public",
-      "size": 22937,
+      "size": 23379,
       "type": "md"
     },
     {
@@ -3801,7 +3807,7 @@
     {
       "path": "product/orchestration/mobile-app-profiles/README.md",
       "tier": "public",
-      "size": 890,
+      "size": 868,
       "type": "md"
     },
     {
@@ -4041,7 +4047,7 @@
     {
       "path": "product/orchestration/peer-network.md",
       "tier": "public",
-      "size": 6667,
+      "size": 6672,
       "type": "md"
     },
     {
@@ -4917,7 +4923,7 @@
     {
       "path": "product/orchestration/user-facing-vocabulary.json",
       "tier": "public",
-      "size": 466038,
+      "size": 471830,
       "type": "json"
     },
     {
@@ -5091,7 +5097,7 @@
     {
       "path": "product/pipeline-templates/clone-my-voice.json",
       "tier": "public",
-      "size": 13408,
+      "size": 13577,
       "type": "json"
     },
     {
@@ -5835,7 +5841,7 @@
     {
       "path": "product/roles/ecosystem_architect/PROCEDURE.md",
       "tier": "public",
-      "size": 1800,
+      "size": 1821,
       "type": "md"
     },
     {
@@ -6147,7 +6153,7 @@
     {
       "path": "product/schemas/README-intent-resolution-packet.md",
       "tier": "public",
-      "size": 778,
+      "size": 988,
       "type": "md"
     },
     {
@@ -6291,7 +6297,7 @@
     {
       "path": "product/schemas/action-item.schema.json",
       "tier": "public",
-      "size": 7319,
+      "size": 7443,
       "type": "json"
     },
     {
@@ -6309,7 +6315,7 @@
     {
       "path": "product/schemas/actuator-manifest.schema.json",
       "tier": "public",
-      "size": 4123,
+      "size": 4164,
       "type": "json"
     },
     {
@@ -6334,6 +6340,12 @@
       "path": "product/schemas/actuator-resolution-plan.schema.json",
       "tier": "public",
       "size": 1037,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/adf-execution-policy.schema.json",
+      "tier": "public",
+      "size": 876,
       "type": "json"
     },
     {
@@ -6367,9 +6379,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-trust-scores.schema.json",
+      "tier": "public",
+      "size": 1577,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agentic-source-review-plan.schema.json",
       "tier": "public",
       "size": 7308,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/agentic-source-review-rules.schema.json",
+      "tier": "public",
+      "size": 1568,
       "type": "json"
     },
     {
@@ -6382,6 +6406,12 @@
       "path": "product/schemas/aggregation-job.schema.json",
       "tier": "public",
       "size": 547,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/analysis-execution-contracts.schema.json",
+      "tier": "public",
+      "size": 1332,
       "type": "json"
     },
     {
@@ -6484,6 +6514,12 @@
       "path": "product/schemas/authority-role.schema.json",
       "tier": "public",
       "size": 622,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/autonomous-ops-policy.schema.json",
+      "tier": "public",
+      "size": 3260,
       "type": "json"
     },
     {
@@ -6663,7 +6699,7 @@
     {
       "path": "product/schemas/cli-commands.schema.json",
       "tier": "public",
-      "size": 1622,
+      "size": 2296,
       "type": "json"
     },
     {
@@ -6745,6 +6781,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cowork-sync-policy.schema.json",
+      "tier": "public",
+      "size": 5412,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cross-device-handoff.schema.json",
       "tier": "public",
       "size": 5466,
@@ -6753,7 +6795,7 @@
     {
       "path": "product/schemas/customer-channel-binding.schema.json",
       "tier": "public",
-      "size": 1097,
+      "size": 1211,
       "type": "json"
     },
     {
@@ -6859,9 +6901,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/dynamic-permission-policy.schema.json",
+      "tier": "public",
+      "size": 1545,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
       "size": 814,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/env-registry.schema.json",
+      "tier": "public",
+      "size": 1470,
       "type": "json"
     },
     {
@@ -6883,6 +6937,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/execution-boundary-profiles.schema.json",
+      "tier": "public",
+      "size": 1456,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/execution-feedback.schema.json",
       "tier": "public",
       "size": 1478,
@@ -6901,6 +6961,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/external-service-registry.schema.json",
+      "tier": "public",
+      "size": 1273,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/file-pipeline.schema.json",
       "tier": "public",
       "size": 2446,
@@ -6909,7 +6975,7 @@
     {
       "path": "product/schemas/financial-model.schema.json",
       "tier": "public",
-      "size": 1219,
+      "size": 1903,
       "type": "json"
     },
     {
@@ -6964,6 +7030,12 @@
       "path": "product/schemas/generation-schedule.schema.json",
       "tier": "public",
       "size": 3589,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/global-actuator-index.schema.json",
+      "tier": "public",
+      "size": 1212,
       "type": "json"
     },
     {
@@ -7039,6 +7111,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/health-thresholds.schema.json",
+      "tier": "public",
+      "size": 954,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/heuristic-entry.schema.json",
       "tier": "public",
       "size": 1765,
@@ -7078,6 +7156,12 @@
       "path": "product/schemas/inbound-inquiry.schema.json",
       "tier": "public",
       "size": 989,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/ingest-quota-policy.schema.json",
+      "tier": "public",
+      "size": 917,
       "type": "json"
     },
     {
@@ -7141,6 +7225,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/intent-outcome-patterns.schema.json",
+      "tier": "public",
+      "size": 1506,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/intent-policy.schema.json",
       "tier": "public",
       "size": 3104,
@@ -7149,7 +7239,7 @@
     {
       "path": "product/schemas/intent-resolution-packet.schema.json",
       "tier": "public",
-      "size": 3130,
+      "size": 6561,
       "type": "json"
     },
     {
@@ -7167,7 +7257,7 @@
     {
       "path": "product/schemas/intent-routing-map.schema.json",
       "tier": "public",
-      "size": 1315,
+      "size": 1873,
       "type": "json"
     },
     {
@@ -7207,6 +7297,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-feedback-policy.schema.json",
+      "tier": "public",
+      "size": 883,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-package.schema.json",
       "tier": "public",
       "size": 2752,
@@ -7225,9 +7321,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-sync-rules.schema.json",
+      "tier": "public",
+      "size": 963,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-taxonomy.schema.json",
       "tier": "public",
       "size": 1889,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/knowledge-weights.schema.json",
+      "tier": "public",
+      "size": 1040,
       "type": "json"
     },
     {
@@ -7237,9 +7345,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/lifecycle-hooks.schema.json",
+      "tier": "public",
+      "size": 887,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/maintenance-task.schema.json",
       "tier": "public",
       "size": 908,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-risk-policy.schema.json",
+      "tier": "public",
+      "size": 1556,
       "type": "json"
     },
     {
@@ -7267,9 +7387,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mcp-tool-catalog.schema.json",
+      "tier": "public",
+      "size": 1608,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/media-aws-icon-rules.schema.json",
       "tier": "public",
       "size": 989,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/media-backend-registry.schema.json",
+      "tier": "public",
+      "size": 2839,
       "type": "json"
     },
     {
@@ -7423,6 +7555,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mesh-hub-policy.schema.json",
+      "tier": "public",
+      "size": 1334,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mesh-peer-presence.schema.json",
       "tier": "public",
       "size": 1628,
@@ -7515,7 +7653,7 @@
     {
       "path": "product/schemas/mission-management.schema.json",
       "tier": "public",
-      "size": 667,
+      "size": 2297,
       "type": "json"
     },
     {
@@ -7527,13 +7665,19 @@
     {
       "path": "product/schemas/mission-orchestration-event.schema.json",
       "tier": "public",
-      "size": 2485,
+      "size": 2530,
       "type": "json"
     },
     {
       "path": "product/schemas/mission-orchestration-scenario-pack.schema.json",
       "tier": "public",
       "size": 1456,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/mission-orchestration-scenario-runs.schema.json",
+      "tier": "public",
+      "size": 1238,
       "type": "json"
     },
     {
@@ -7593,7 +7737,7 @@
     {
       "path": "product/schemas/mission-template.schema.json",
       "tier": "public",
-      "size": 709,
+      "size": 1892,
       "type": "json"
     },
     {
@@ -7651,9 +7795,27 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/model-cost-registry.schema.json",
+      "tier": "public",
+      "size": 2128,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/model-profile.schema.json",
       "tier": "public",
       "size": 2048,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-registry-directory-entry.schema.json",
+      "tier": "public",
+      "size": 307,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/model-registry-directory-index.schema.json",
+      "tier": "public",
+      "size": 554,
       "type": "json"
     },
     {
@@ -7756,6 +7918,12 @@
       "path": "product/schemas/notification-preferences.schema.json",
       "tier": "public",
       "size": 1416,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/observation-to-op-map.schema.json",
+      "tier": "public",
+      "size": 1078,
       "type": "json"
     },
     {
@@ -8071,6 +8239,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/pipeline-schedule-registry.schema.json",
+      "tier": "public",
+      "size": 2964,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/planning-packet.schema.json",
       "tier": "public",
       "size": 1617,
@@ -8110,6 +8284,12 @@
       "path": "product/schemas/presence-action.schema.json",
       "tier": "public",
       "size": 291,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/presence-avatar-profiles.schema.json",
+      "tier": "public",
+      "size": 1212,
       "type": "json"
     },
     {
@@ -8197,6 +8377,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/project-operating-system-artifact-map.schema.json",
+      "tier": "public",
+      "size": 1827,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/project-operational-state.schema.json",
       "tier": "public",
       "size": 2620,
@@ -8206,6 +8392,12 @@
       "path": "product/schemas/project-record.schema.json",
       "tier": "public",
       "size": 3214,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/project-standards.schema.json",
+      "tier": "public",
+      "size": 644,
       "type": "json"
     },
     {
@@ -8233,9 +8425,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/protocol-service-registry.schema.json",
+      "tier": "public",
+      "size": 2440,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/provider-capabilities.schema.json",
+      "tier": "public",
+      "size": 1414,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/provider-capability-registry.schema.json",
       "tier": "public",
-      "size": 1471,
+      "size": 2196,
       "type": "json"
     },
     {
@@ -8263,6 +8467,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/provider-health-state.schema.json",
+      "tier": "public",
+      "size": 781,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/qa-contract.schema.json",
       "tier": "public",
       "size": 750,
@@ -8284,6 +8494,12 @@
       "path": "product/schemas/reasoning-level-policy.schema.json",
       "tier": "public",
       "size": 4170,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/reasoning-provider-registry.schema.json",
+      "tier": "public",
+      "size": 442,
       "type": "json"
     },
     {
@@ -8319,7 +8535,7 @@
     {
       "path": "product/schemas/requirements-draft.schema.json",
       "tier": "public",
-      "size": 6574,
+      "size": 6617,
       "type": "json"
     },
     {
@@ -8335,6 +8551,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/restricted-capabilities.schema.json",
+      "tier": "public",
+      "size": 899,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/restricted-skills.schema.json",
+      "tier": "public",
+      "size": 1616,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/review-gate-result.schema.json",
       "tier": "public",
       "size": 757,
@@ -8344,6 +8572,12 @@
       "path": "product/schemas/role-capability-map.schema.json",
       "tier": "public",
       "size": 1260,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/runtime-design-profiles.schema.json",
+      "tier": "public",
+      "size": 1754,
       "type": "json"
     },
     {
@@ -8371,9 +8605,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/security-posture.schema.json",
+      "tier": "public",
+      "size": 412,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/security-scope.schema.json",
       "tier": "public",
       "size": 1491,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/semantic-degradation-log.schema.json",
+      "tier": "public",
+      "size": 574,
       "type": "json"
     },
     {
@@ -8449,6 +8695,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/service-provider-catalog.schema.json",
+      "tier": "public",
+      "size": 1021,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/service-recording.schema.json",
       "tier": "public",
       "size": 4301,
@@ -8470,6 +8722,12 @@
       "path": "product/schemas/shell-command-policy.schema.json",
       "tier": "public",
       "size": 1219,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/skill-index.schema.json",
+      "tier": "public",
+      "size": 988,
       "type": "json"
     },
     {
@@ -8617,6 +8875,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-roles.schema.json",
+      "tier": "public",
+      "size": 1656,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/system-pipeline.schema.json",
       "tier": "public",
       "size": 11011,
@@ -8749,6 +9013,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-rate-limit-policy.schema.json",
+      "tier": "public",
+      "size": 1631,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/tenant-rate-limit-state.schema.json",
+      "tier": "public",
+      "size": 635,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/terminal-action.schema.json",
       "tier": "public",
       "size": 293,
@@ -8791,6 +9067,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/track-creation-policy.schema.json",
+      "tier": "public",
+      "size": 2235,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/track-policy-override.schema.json",
       "tier": "public",
       "size": 1790,
@@ -8818,6 +9100,18 @@
       "path": "product/schemas/ui-flow-adf.schema.json",
       "tier": "public",
       "size": 1602,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/unclassified-error-registry.schema.json",
+      "tier": "public",
+      "size": 1130,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/unhandled-intent-registry.schema.json",
+      "tier": "public",
+      "size": 1580,
       "type": "json"
     },
     {
@@ -8857,6 +9151,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/video-motion-patterns.schema.json",
+      "tier": "public",
+      "size": 3563,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/video-render-progress-packet.schema.json",
       "tier": "public",
       "size": 1741,
@@ -8875,9 +9175,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/video-visual-patterns.schema.json",
+      "tier": "public",
+      "size": 2305,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/vision-action.schema.json",
       "tier": "public",
       "size": 1489,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/visual-review-rubric.schema.json",
+      "tier": "public",
+      "size": 1447,
       "type": "json"
     },
     {
@@ -8899,9 +9211,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/voice-profile-registration-receipt.schema.json",
+      "tier": "public",
+      "size": 2016,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/voice-profile-registration.schema.json",
       "tier": "public",
       "size": 1598,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/voice-profile-registry-overlay.schema.json",
+      "tier": "public",
+      "size": 1497,
       "type": "json"
     },
     {
@@ -8956,6 +9280,12 @@
       "path": "product/schemas/voice-task-profile-catalog.schema.json",
       "tier": "public",
       "size": 2865,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/voice-tts-config.schema.json",
+      "tier": "public",
+      "size": 714,
       "type": "json"
     },
     {
@@ -9087,7 +9417,7 @@
     {
       "path": "product/schemas/working-memory-action.schema.json",
       "tier": "public",
-      "size": 1946,
+      "size": 2056,
       "type": "json"
     },
     {
@@ -9213,13 +9543,13 @@
     {
       "path": "public/common/operations/attendance-approval-sop.md",
       "tier": "public",
-      "size": 2831,
+      "size": 2844,
       "type": "md"
     },
     {
       "path": "public/common/operations/ringi-approval-sop.md",
       "tier": "public",
-      "size": 2901,
+      "size": 2914,
       "type": "md"
     },
     {
@@ -9231,7 +9561,7 @@
     {
       "path": "public/common/pmo/release-audit-sop.md",
       "tier": "public",
-      "size": 3963,
+      "size": 4173,
       "type": "md"
     },
     {
@@ -9669,7 +9999,7 @@
     {
       "path": "public/design-patterns/media-templates/video-motion-patterns.json",
       "tier": "public",
-      "size": 7529,
+      "size": 7604,
       "type": "json"
     },
     {
@@ -9681,7 +10011,7 @@
     {
       "path": "public/design-patterns/media-templates/visual-review-rubric.json",
       "tier": "public",
-      "size": 2877,
+      "size": 2951,
       "type": "json"
     },
     {
@@ -10341,7 +10671,7 @@
     {
       "path": "public/procedures/business/email-triage-and-reply-draft.md",
       "tier": "public",
-      "size": 3056,
+      "size": 3076,
       "type": "md"
     },
     {
@@ -10473,7 +10803,7 @@
     {
       "path": "public/procedures/media/blackhole-tts-loopback.md",
       "tier": "public",
-      "size": 3390,
+      "size": 3384,
       "type": "md"
     },
     {
@@ -10593,7 +10923,7 @@
     {
       "path": "public/procedures/media/realtime-voice-conversation.md",
       "tier": "public",
-      "size": 8342,
+      "size": 8351,
       "type": "md"
     },
     {
@@ -10611,7 +10941,7 @@
     {
       "path": "public/procedures/media/select-voice-backends.md",
       "tier": "public",
-      "size": 8275,
+      "size": 8372,
       "type": "md"
     },
     {
@@ -10635,7 +10965,7 @@
     {
       "path": "public/procedures/media/voice-cloning-overview.md",
       "tier": "public",
-      "size": 1716,
+      "size": 1737,
       "type": "md"
     },
     {
@@ -11157,7 +11487,7 @@
     {
       "path": "public/tech-stack/mcp-integration-guide.md",
       "tier": "public",
-      "size": 3343,
+      "size": 3339,
       "type": "md"
     },
     {
@@ -11169,7 +11499,7 @@
     {
       "path": "public/tech-stack/runtime-interop.md",
       "tier": "public",
-      "size": 3493,
+      "size": 3812,
       "type": "md"
     },
     {

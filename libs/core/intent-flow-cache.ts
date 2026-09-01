@@ -2,7 +2,8 @@ import type { ValidateFunction } from 'ajv';
 import { createHash } from 'node:crypto';
 
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { compileSchema } from './foundation/ajv.js';
 import { nowIso } from './foundation/time.js';
 import { normalizeText } from './foundation/text.js';
@@ -34,6 +35,12 @@ const CACHE_SCHEMA_VERSION = '1.0.0';
 const INTENT_CONTRACT_SCHEMA_VERSION = 'https://kyberion.local/schemas/intent-contract.schema.json';
 const REDACTED_PROMPT_VALUE = '<redacted>';
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
+
+const intentFlowCacheCatalog = defineCatalog<IntentFlowCacheStore>({
+  id: 'intent-flow-cache',
+  path: CACHE_PATH,
+  schema: CACHE_SCHEMA_PATH,
+});
 
 type CacheStatus = 'disabled' | 'miss' | 'hit' | 'invalid' | 'write';
 type ConfidenceBand = 'low' | 'medium' | 'high';
@@ -99,18 +106,11 @@ export interface IntentFlowCacheWriteResult {
   cacheKeyHash?: string;
 }
 
-let cacheValidateFn: ValidateFunction | null = null;
 let intentContractValidateFn: ValidateFunction | null = null;
 let workLoopValidateFn: ValidateFunction | null = null;
 let executionBriefValidateFn: ValidateFunction | null = null;
 let cachedStore: IntentFlowCacheStore | null = null;
 let cachedStorePath: string | null = null;
-
-function ensureCacheValidator(): ValidateFunction {
-  if (cacheValidateFn) return cacheValidateFn;
-  cacheValidateFn = compileSchema(CACHE_SCHEMA_PATH);
-  return cacheValidateFn;
-}
 
 function ensureIntentContractValidator(): ValidateFunction {
   if (intentContractValidateFn) return intentContractValidateFn;
@@ -128,20 +128,6 @@ function ensureExecutionBriefValidator(): ValidateFunction {
   if (executionBriefValidateFn) return executionBriefValidateFn;
   executionBriefValidateFn = compileSchema(EXECUTION_BRIEF_SCHEMA_PATH);
   return executionBriefValidateFn;
-}
-
-function errorsFrom(validate: ValidateFunction): string[] {
-  return (validate.errors || []).map((error) =>
-    `${error.instancePath || '/'} ${error.message || 'schema violation'}`.trim()
-  );
-}
-
-function validateCacheStore(value: unknown, label = CACHE_PATH): IntentFlowCacheStore {
-  const validate = ensureCacheValidator();
-  if (!validate(value)) {
-    throw new Error(`Invalid intent-flow cache at ${label}: ${errorsFrom(validate).join('; ')}`);
-  }
-  return value as IntentFlowCacheStore;
 }
 
 function validateStoredExecutionBrief(
@@ -342,8 +328,7 @@ export function buildIntentFlowCacheEligibility(input: {
 
 function loadCacheStoreFromDisk(): IntentFlowCacheStore | null {
   if (!safeExistsSync(CACHE_PATH)) return null;
-  const raw = safeReadFile(CACHE_PATH, { encoding: 'utf8' }) as string;
-  return validateCacheStore(JSON.parse(raw), CACHE_PATH);
+  return intentFlowCacheCatalog.load();
 }
 
 function loadCacheStore(): IntentFlowCacheStore {
@@ -568,6 +553,7 @@ export function loadIntentFlowCacheSnapshot(): IntentFlowCacheStore {
 export function refreshIntentFlowCacheSnapshot(): IntentFlowCacheStore {
   cachedStore = null;
   cachedStorePath = null;
+  intentFlowCacheCatalog.reset();
   return loadCacheStore();
 }
 

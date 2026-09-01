@@ -13,8 +13,9 @@ import {
   listAutomationBlueprintCatalog,
   loadAutomationBlueprint,
   resolveAutomationBlueprint,
-} from '@agent/core';
+} from '@agent/core/automation-blueprint';
 import { defineScript, isDirectScript } from './lib/harness.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
 function flag(argv: string[], name: string): string {
   const index = argv.indexOf(name);
@@ -31,9 +32,15 @@ function blueprintFor(ref: string) {
   return loadAutomationBlueprint(ref).blueprint;
 }
 
+export function parseAutomationBlueprintValues(value: unknown): Record<string, unknown> {
+  return parseSafeJsonObjectValue(value, '--values-json');
+}
+
 function render(ref: string, valuesJson: string) {
   const blueprint = blueprintFor(ref);
-  const values = valuesJson ? (JSON.parse(valuesJson) as Record<string, unknown>) : undefined;
+  const values = valuesJson
+    ? parseAutomationBlueprintValues(parseSafeJsonInput(valuesJson, '--values-json'))
+    : undefined;
   return {
     blueprint,
     question_seed: buildAutomationQuestionSeed(blueprint),

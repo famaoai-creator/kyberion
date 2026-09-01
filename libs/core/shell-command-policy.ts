@@ -14,6 +14,7 @@ import {
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import type { ApprovalActionDescriptor } from './approval-store.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export type ShellCommandVerdict = 'allow' | 'deny' | 'require_approval';
 
@@ -62,12 +63,11 @@ export function shellCommandApprovalDescriptor(
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/shell-command-policy.json');
 
-export function resetShellCommandPolicyCache(): void {
-  policyCatalog.reset();
-}
-
 function getPolicyPath(): string {
-  return getRegisteredEnvText('KYBERION_SHELL_COMMAND_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  const configured = getRegisteredEnvText('KYBERION_SHELL_COMMAND_POLICY_PATH')?.trim();
+  return assertSafeRepositoryPath(configured || DEFAULT_POLICY_PATH, {
+    allowMissingLeaf: true,
+  });
 }
 
 const policyCatalog = defineCatalog<ShellCommandPolicyFile>({

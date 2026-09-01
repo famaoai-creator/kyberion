@@ -19,12 +19,12 @@
 
 import {
   grantVoiceConsent as grantVoiceConsentRecord,
-  logger,
   readVoiceConsent,
   revokeVoiceConsent as revokeVoiceConsentRecord,
-} from '@agent/core';
+} from '@agent/core/voice-consent';
+import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 function grant(
   missionId: string,
@@ -65,8 +65,8 @@ function status(missionId: string): void {
   logger.info(JSON.stringify(existing, null, 2));
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+async function main(args: string[] = []): Promise<void> {
+  const argv = await createStandardYargs(['node', 'voice_consent', ...args])
     .command('grant', 'Grant voice consent for the mission', () => undefined)
     .command('revoke', 'Revoke voice consent for the mission', () => undefined)
     .command('status', 'Print current consent state for the mission', () => undefined)
@@ -104,14 +104,16 @@ async function main(): Promise<void> {
   }
 }
 
+export { grant as grantVoiceConsent, revoke as revokeVoiceConsent, status as voiceConsentStatus };
+
+export const runVoiceConsent = defineScript({
+  name: 'meeting:consent',
+  flags: [],
+  run: ({ argv }) => main(argv),
+});
+
 if (
   isDirectScript(import.meta.url, 'voice_consent.ts') ||
   isDirectScript(import.meta.url, 'voice_consent.js')
-) {
-  main().catch((err) => {
-    logger.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
-}
-
-export { grant as grantVoiceConsent, revoke as revokeVoiceConsent, status as voiceConsentStatus };
+)
+  void runVoiceConsent();

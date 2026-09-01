@@ -444,14 +444,24 @@ describe('reasoning-backend', () => {
           allowed_roles: ['operator'],
         },
       ],
-      { role: 'agent', deferred_tool_names: ['search'] }
+      {
+        role: 'agent',
+        deferred_tool_names: ['search'],
+        deferred_tool_definitions: [
+          {
+            name: 'summarize',
+            description: 'Summarize a result.',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+      }
     );
 
     expect(dispatchedTools.map((tool) => tool.name)).toEqual(['read_file']);
     expect(dispatchedPrompt).toContain('Choose the right capability.');
     expect(dispatchedPrompt).toContain('search');
     expect(dispatchedPrompt).not.toContain('deploy');
-    expect(deferredDefinitions.map((tool) => tool.name)).toEqual(['search']);
+    expect(deferredDefinitions.map((tool) => tool.name)).toEqual(['search', 'summarize']);
   });
 
   it('delegates structured output with retry-on-mismatch', async () => {

@@ -389,7 +389,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
   private readonly enableNativeDeferredTools: boolean;
 
   constructor(options: AnthropicReasoningBackendOptions = {}) {
-    this.client = options.client ?? new Anthropic();
+    // Keep provider-level retries disabled. Retry/failover is owned by the
+    // shared reasoning boundary; allowing the SDK default (currently 2)
+    // would multiply attempts and hide quota/latency from that policy.
+    this.client = options.client ?? new Anthropic({ maxRetries: 0 });
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.effort = options.effort;

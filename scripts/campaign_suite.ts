@@ -11,20 +11,29 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   buildCampaignPlan,
-  logger,
-  pathResolver,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeReadFile,
-  safeWriteFile,
-  sharedTmp,
   type CampaignBrief,
   type CampaignManifest,
   type CampaignPlanEntry,
-} from '@agent/core';
+} from '@agent/core/campaign-suite';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { pathResolver, sharedTmp } from '@agent/core/path-resolver';
+import { readJson } from '@agent/core/foundation';
+import {
+  assertSafeRepositoryPath,
+  safeExecResult,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+
+function resolveCampaignPath(value: unknown, label: string, allowMissingLeaf = false): string {
+  const requested = String(value ?? '').trim();
+  if (!requested) throw new Error(`${label} is required`);
+  return assertSafeRepositoryPath(pathResolver.resolve(requested), { allowMissingLeaf });
+}
 
 function executeEntry(entry: CampaignPlanEntry): { ok: boolean; detail?: string } {
   const inputPath = sharedTmp(
@@ -52,7 +61,7 @@ function executeEntry(entry: CampaignPlanEntry): { ok: boolean; detail?: string 
   if (failedMatch) {
     return { ok: false, detail: failedMatch[1] };
   }
-  const outputDirAbs = pathResolver.rootResolve(entry.output_dir);
+  const outputDirAbs = resolveCampaignPath(entry.output_dir, 'campaign output directory');
   const produced = safeExistsSync(outputDirAbs) ? safeReaddir(outputDirAbs) : [];
   if (produced.length === 0) {
     return { ok: false, detail: 'no artifacts produced in output_dir' };
@@ -65,24 +74,30 @@ export function runCampaignSuite(options: {
   outputRoot?: string;
   dryRun?: boolean;
 }): CampaignManifest {
-  const briefRaw = safeReadFile(pathResolver.rootResolve(options.briefPath), {
-    encoding: 'utf8',
-  }) as string;
-  const brief = JSON.parse(briefRaw) as CampaignBrief;
+  const briefPath = resolveCampaignPath(options.briefPath, 'brief path');
+  if (!safeLstat(briefPath).isFile()) {
+    throw new Error(`brief path must be a regular file: ${options.briefPath}`);
+  }
+  const brief = readJson<CampaignBrief>(briefPath);
   if (brief.kind !== 'campaign-brief' || !Array.isArray(brief.deliverables)) {
     throw new Error(
       `Invalid campaign brief at ${options.briefPath}: expected kind=campaign-brief with deliverables[]`
     );
   }
 
-  const outputRoot =
+  const outputRootPath =
     options.outputRoot ||
     `active/shared/exports/campaigns/${brief.title.replace(/[^a-zA-Z0-9-_]+/g, '-').slice(0, 48)}`;
+  const outputRoot = pathResolver.toRepoRelative(
+    resolveCampaignPath(outputRootPath, 'output root', true)
+  );
   const plan = buildCampaignPlan(brief, { outputRoot });
 
   const manifest: CampaignManifest = { ...plan.manifest, deliverables: [] };
   for (const entry of plan.entries) {
-    safeMkdir(pathResolver.rootResolve(entry.output_dir), { recursive: true });
+    safeMkdir(resolveCampaignPath(entry.output_dir, 'campaign output directory', true), {
+      recursive: true,
+    });
     if (options.dryRun) {
       manifest.deliverables.push({
         kind: entry.kind,
@@ -104,7 +119,11 @@ export function runCampaignSuite(options: {
     );
   }
 
-  const manifestPath = pathResolver.rootResolve(path.join(outputRoot, 'campaign-manifest.json'));
+  const manifestPath = resolveCampaignPath(
+    path.join(outputRoot, 'campaign-manifest.json'),
+    'campaign manifest path',
+    true
+  );
   safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
   logger.info(`[campaign-suite] manifest: ${manifestPath} (design=${manifest.primary_hex})`);
   return manifest;

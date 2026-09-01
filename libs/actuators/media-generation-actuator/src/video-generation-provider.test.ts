@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({
   secureFetch: vi.fn(),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+vi.mock('@agent/core/network', async () => {
+  const actual = await vi.importActual<typeof import('@agent/core/network')>('@agent/core/network');
   return { ...actual, secureFetch: mocks.secureFetch };
 });
 
@@ -15,7 +15,7 @@ import {
   normalizeVideoGenerationRequest,
   resolveVideoGenerationBackend,
 } from './video-generation-provider.js';
-import { getMediaBackendRecord } from '@agent/core';
+import { getMediaBackendRecord } from '@agent/core/media-backend-registry';
 
 describe('video generation provider abstraction', () => {
   beforeEach(() => {

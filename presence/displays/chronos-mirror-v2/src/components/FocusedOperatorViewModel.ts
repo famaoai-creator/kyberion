@@ -1,4 +1,5 @@
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
+import { optionalStringField, parseJsonRecord } from '../lib/json-record';
 import type { MissionAssetCategory } from '../lib/mission-progress';
 import type { AttentionItem } from '../lib/operator-console';
 
@@ -14,6 +15,7 @@ export type FocusedViewId =
   | 'trace-viewer';
 
 export interface Payload {
+  revision: number;
   activeMissions: Array<{
     missionId: string;
     tier: string;
@@ -153,6 +155,7 @@ export interface Payload {
 }
 
 const EMPTY_PAYLOAD: Payload = {
+  revision: 0,
   activeMissions: [],
   missionProgress: [],
   secretApprovals: [],
@@ -181,6 +184,7 @@ export function normalizePayload(input: Partial<Payload> | null | undefined): Pa
   return {
     ...EMPTY_PAYLOAD,
     ...input,
+    revision: typeof input?.revision === 'number' ? input.revision : EMPTY_PAYLOAD.revision,
     activeMissions: Array.isArray(input?.activeMissions)
       ? input.activeMissions
       : EMPTY_PAYLOAD.activeMissions,
@@ -284,8 +288,8 @@ export function loadFocusedOperatorSelectedSessionId(): string | null {
   try {
     const raw = window.localStorage.getItem(FOCUSED_OPERATOR_PREFS_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<{ selectedSessionId: string | null }>;
-    return typeof parsed.selectedSessionId === 'string' ? parsed.selectedSessionId : null;
+    const parsed = parseJsonRecord(raw);
+    return parsed ? optionalStringField(parsed, 'selectedSessionId') || null : null;
   } catch {
     return null;
   }

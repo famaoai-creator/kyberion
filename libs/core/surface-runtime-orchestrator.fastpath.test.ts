@@ -202,6 +202,11 @@ describe('surface-runtime-orchestrator fast-path', () => {
           execution_shape: 'task_session',
         },
       },
+      control: {
+        interruptible: true,
+        requires_approval: false,
+        awaiting_user_input: Boolean(params.requirements?.missing?.length),
+      },
     }));
     mocks.saveTaskSession.mockReturnValue(undefined);
     mocks.executeCapturePhotoTaskSession.mockResolvedValue({
@@ -998,6 +1003,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         requirements: { missing: ['requestId'] },
         payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
         goal: 'resolve approval request',
+        control: { interruptible: true, requires_approval: false, awaiting_user_input: true },
       })
       .mockReturnValueOnce({
         session_id: 'TSK-ACTIVE-1',
@@ -1005,6 +1011,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         requirements: { missing: ['requestId'] },
         payload: { intent_id: 'resolve-approval', channel: 'slack', decision: 'approve' },
         goal: 'resolve approval request',
+        control: { interruptible: true, requires_approval: false, awaiting_user_input: true },
       });
     mocks.getActiveTaskSession.mockReturnValue(null); // Prevent subsequent loop match
 
@@ -1020,6 +1027,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       },
       status: 'planning',
       goal: 'resolve approval request',
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     });
 
     mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'approved' }));
@@ -1064,6 +1072,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
       payload: input.payload,
       goal: input.goal,
       work_loop: { resolution: { execution_shape: 'task_session' } },
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     }));
     mocks.updateTaskSession.mockImplementation((sessionId: string, update: any) => ({
       session_id: sessionId,
@@ -1075,6 +1084,7 @@ describe('surface-runtime-orchestrator fast-path', () => {
         success_condition: 'Voice input is enabled.',
       },
       status: update.status,
+      control: { interruptible: true, requires_approval: false, awaiting_user_input: false },
     }));
     mocks.safeExec.mockReturnValue(JSON.stringify({ ok: true, status: 'voice_input_enabled' }));
 

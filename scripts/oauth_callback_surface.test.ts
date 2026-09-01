@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { runOAuthCallbackSurface } from './oauth_callback_surface.js';
 
 const HOST = '127.0.0.1';
 const PORT = 18787;
@@ -20,6 +21,17 @@ async function waitForSurface() {
 }
 
 describe('oauth callback surface', () => {
+  it('does not bind a listener in dry-run mode', async () => {
+    process.exitCode = undefined;
+    await expect(
+      runOAuthCallbackSurface(['--dry-run', '--json', '--quiet'])
+    ).resolves.toMatchObject({
+      dry_run: true,
+      operation: 'oauth-callback-surface.listen',
+    });
+    expect(process.exitCode).toBeUndefined();
+  });
+
   beforeAll(async () => {
     surface = spawn(
       process.execPath,

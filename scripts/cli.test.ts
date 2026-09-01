@@ -16,6 +16,7 @@ import {
   stripNpmSeparatorArg,
   routeLegacyIntentToAsk,
 } from './cli.js';
+import { handleTaskCommand } from './cli-workflow-handlers.js';
 
 describe('Kyberion CLI helpers', () => {
   it('routes legacy intent resolution to the canonical ask explanation path', async () => {
@@ -24,7 +25,31 @@ describe('Kyberion CLI helpers', () => {
     await routeLegacyIntentToAsk('prepare the weekly report');
 
     expect(errorSpy).toHaveBeenCalledWith(
-      '[DEPRECATED] `pnpm cli intent` is now routed to `pnpm kyberion ask --explain`; use the latter directly.'
+      '[DEPRECATED] `pnpm kyberion intent` is now routed to `pnpm kyberion ask --explain`; use the latter directly.'
+    );
+    expect(legacyIntentAsk).toHaveBeenCalledWith(['ask', 'prepare the weekly report', '--explain']);
+    legacyIntentAsk.mockClear();
+  });
+
+  it('preserves legacy --clarify when routing to the canonical ask entrypoint', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await routeLegacyIntentToAsk('what is missing', 'clarify');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[DEPRECATED] `pnpm kyberion intent` is now routed to `pnpm kyberion ask --clarify`; use the latter directly.'
+    );
+    expect(legacyIntentAsk).toHaveBeenCalledWith(['ask', 'what is missing', '--clarify']);
+    legacyIntentAsk.mockClear();
+  });
+
+  it('routes legacy --run through the same canonical ask entrypoint', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await main(['intent', 'prepare the weekly report', '--run']);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[DEPRECATED] `pnpm kyberion intent` is now routed to `pnpm kyberion ask --explain`; use the latter directly.'
     );
     expect(legacyIntentAsk).toHaveBeenCalledWith(['ask', 'prepare the weekly report', '--explain']);
     legacyIntentAsk.mockClear();
@@ -99,6 +124,7 @@ describe('Kyberion CLI helpers', () => {
     expect(shouldBootstrapRuntime(['list'])).toBe(false);
     expect(shouldBootstrapRuntime(['list', '--check'])).toBe(true);
     expect(shouldBootstrapRuntime(['task', 'plan', 'hello'])).toBe(true);
+    expect(shouldBootstrapRuntime(['task', 'scenario', 'list'])).toBe(false);
   });
 
   afterEach(() => {
@@ -178,10 +204,10 @@ describe('Kyberion CLI helpers', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
-    expect(output).toContain('npm run cli -- email status');
-    expect(output).toContain('npm run cli -- email draft');
+    expect(output).toContain('pnpm kyberion email status');
+    expect(output).toContain('pnpm kyberion email draft');
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
-    expect(output).toContain('npm run cli -- calendar status');
+    expect(output).toContain('pnpm kyberion calendar status');
     expect(output).toContain('intent [--clarify] "<utterance>"');
     expect(output).toContain('task <plan|start> "<request>"');
   });
@@ -192,7 +218,7 @@ describe('Kyberion CLI helpers', () => {
     await main(['help', '--locale', 'ja']);
 
     const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('使い方: npm run cli -- <コマンド> [引数]');
+    expect(output).toContain('使い方: pnpm kyberion <コマンド> [引数]');
     expect(output).toContain('── アクチュエータ管理 ──');
     expect(output).toContain('Gmail 認証の準備状態を確認');
   });
@@ -204,7 +230,7 @@ describe('Kyberion CLI helpers', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('email <status|draft|latest-draft|deliver|archive-inbox>');
-    expect(output).toContain('npm run cli -- email archive-inbox --apply');
+    expect(output).toContain('pnpm kyberion email archive-inbox --apply');
   });
 
   it('includes the calendar workflow command in help output', async () => {
@@ -214,7 +240,23 @@ describe('Kyberion CLI helpers', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('calendar <status|list-calendars|agenda|freebusy|create-event>');
-    expect(output).toContain('npm run cli -- calendar create-event --summary "Planning"');
+    expect(output).toContain('pnpm kyberion calendar create-event --summary "Planning"');
+  });
+
+  it('keeps calendar JSON output machine-readable', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await main(['calendar', 'status', '--json']);
+
+    const output = logSpy.mock.calls.flat().join('\n');
+    expect(JSON.parse(output)).toHaveProperty('checked_at');
+    expect(output).not.toContain('KYBERION CONSOLE');
+  });
+
+  it('rejects unsupported calendar providers', async () => {
+    await expect(main(['calendar', 'status', '--provider', 'unknown'])).rejects.toThrow(
+      'Unsupported calendar provider: unknown'
+    );
   });
 
   it('previews a governed cross-tool task without external effects', async () => {
@@ -235,8 +277,19 @@ describe('Kyberion CLI helpers', () => {
     await main(['task', 'help', '--locale', 'ja']);
 
     const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('使い方: npm run cli -- task <plan|start>');
+    expect(output).toContain('使い方: pnpm kyberion task <plan|start>');
     expect(output).toContain('外部効果は引き続き停止');
+  });
+
+  it('routes TaskScenario workflows through the unified task namespace', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await handleTaskCommand('scenario', ['list', '--json'], 'en');
+
+    const output = logSpy.mock.calls.flat().join('');
+    const parsed = JSON.parse(output) as { status: string; scenarios: Array<{ id: string }> };
+    expect(parsed.status).toBe('ok');
+    expect(parsed.scenarios.map((scenario) => scenario.id)).toContain('daily-email-triage');
   });
 
   it('parses an offboard dry run by default and needs no approval', () => {
@@ -309,7 +362,7 @@ describe('Kyberion CLI helpers', () => {
 
     const output = logSpy.mock.calls.flat().join('\n');
     expect(output).toContain('offboard <tenant|project> <id>');
-    expect(output).toContain('npm run cli -- offboard tenant acme');
+    expect(output).toContain('pnpm kyberion offboard tenant acme');
   });
 
   it('shows offboard command help in Japanese (UX-03)', async () => {
@@ -318,7 +371,7 @@ describe('Kyberion CLI helpers', () => {
     await main(['offboard', 'help', '--locale', 'ja']);
 
     const output = logSpy.mock.calls.flat().join('\n');
-    expect(output).toContain('使い方: npm run cli -- offboard <tenant|project> <id>');
+    expect(output).toContain('使い方: pnpm kyberion offboard <tenant|project> <id>');
     expect(output).toContain('--approved-by と --purpose が必須');
     expect(output).toContain('復元可能');
   });
@@ -408,10 +461,10 @@ describe('next action outcome classification', () => {
         id: 'clarify',
         action: 'Ask for missing input',
         next_action_type: 'clarify',
-        suggested_command: 'node dist/scripts/cli.js packet',
+        suggested_command: 'pnpm kyberion packet',
       },
       'command',
-      'node dist/scripts/cli.js packet',
+      'pnpm kyberion packet',
       true,
       'Missing packet path.',
       'ERROR Missing packet path.'

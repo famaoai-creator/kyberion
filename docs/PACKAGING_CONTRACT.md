@@ -8,15 +8,15 @@ This document defines the package-boundary rules that keep builds stable across 
 
 Every clause declares an honest status — `ENFORCED` (a named verifier proves it in CI), `VALIDATED-ONLY` (checked at build/validate time, no runtime enforcement claimed), or `RESERVED` (a compatibility slot; no implementation is claimed) — following the qm deployment-directory contract pattern (QM-08). A clause without a passing verifier must not be labelled ENFORCED.
 
-| Clause                     | What it guarantees                                                                                                                                                                      | Status         | Verifier                                              |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ----------------------------------------------------- |
-| `esm-discipline`           | ESM-first runtime: `type: "module"`, `.js`-suffixed relative imports, no shadow `.js` artifacts                                                                                         | **ENFORCED**   | `pnpm run check:esm`                                  |
-| `package-boundaries`       | Runtime imports by package name only; `exports` is the public API; no `src/`/`dist/` bypass                                                                                             | **ENFORCED**   | `tests/package-boundary-contract.test.ts`             |
-| `image.tier-isolation`     | `.dockerignore` excludes every data-tier path (`knowledge/personal/`, `knowledge/confidential/`, `customer/`, `work/`, `.env*`, keys) so confidential data is never baked into an image | **ENFORCED**   | `pnpm run check:packaging-contract`                   |
-| `config.no-secret-values`  | `docs/developer/env.example` documents names and descriptions, never values; no credential-shaped strings anywhere in it                                                                | **ENFORCED**   | `pnpm run check:packaging-contract`                   |
-| `image.build-reproducible` | The production image builds from prebuilt `dist/` with `pnpm prune --prod` (no runtime build)                                                                                           | VALIDATED-ONLY | `Dockerfile` multi-stage layout; no runtime assertion |
-| `container.egress-control` | Network egress restrictions inside a container                                                                                                                                          | RESERVED       | — (no enforcement claimed; SA-04 scope)               |
-| `published-distribution`   | Official registry image / npx installer                                                                                                                                                 | RESERVED       | — (deferred by OP-03 as a management decision)        |
+| Clause                     | What it guarantees                                                                                                                                                                      | Status         | Verifier                                                 |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | -------------------------------------------------------- |
+| `esm-discipline`           | ESM-first runtime: `type: "module"`, `.js`-suffixed relative imports, no shadow `.js` artifacts                                                                                         | **ENFORCED**   | `pnpm run check -- --scope pr --only esm`                |
+| `package-boundaries`       | Runtime imports by package name only; `exports` is the public API; no `src/`/`dist/` bypass                                                                                             | **ENFORCED**   | `tests/package-boundary-contract.test.ts`                |
+| `image.tier-isolation`     | `.dockerignore` excludes every data-tier path (`knowledge/personal/`, `knowledge/confidential/`, `customer/`, `work/`, `.env*`, keys) so confidential data is never baked into an image | **ENFORCED**   | `pnpm run check -- --scope pr --only packaging-contract` |
+| `config.no-secret-values`  | `docs/developer/env.example` documents names and descriptions, never values; no credential-shaped strings anywhere in it                                                                | **ENFORCED**   | `pnpm run check -- --scope pr --only packaging-contract` |
+| `image.build-reproducible` | The production image builds from prebuilt `dist/` with `pnpm prune --prod` (no runtime build)                                                                                           | VALIDATED-ONLY | `Dockerfile` multi-stage layout; no runtime assertion    |
+| `container.egress-control` | Network egress restrictions inside a container                                                                                                                                          | RESERVED       | — (no enforcement claimed; SA-04 scope)                  |
+| `published-distribution`   | Official registry image / npx installer                                                                                                                                                 | RESERVED       | — (deferred by OP-03 as a management decision)           |
 
 ## ESM Discipline
 
@@ -30,7 +30,7 @@ Kyberion's runtime contract is ESM-first.
 The enforcement command is:
 
 ```bash
-pnpm run check:esm
+pnpm run check -- --scope pr --only esm
 ```
 
 This check is part of `pnpm run validate` and CI.

@@ -5,16 +5,23 @@ import * as http from 'node:http';
 import { logger } from './core.js';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readJsonLines } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
+import {
+  normalizeEventScope,
+  parseEventScopeInput,
+  type EventScope,
+  type EventScopeInput,
+} from './event-scope.js';
 import { toWireError } from './wire-error.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeWriteFile,
   validateUrl,
@@ -135,6 +142,7 @@ export interface PeerMessagingCatalogOptions {
 }
 
 const DEFAULT_CATALOG_PATH = pathResolver.knowledge('product/orchestration/peer-network.json');
+const PEER_NETWORK_SCHEMA_PATH = pathResolver.knowledge('product/schemas/peer-network.schema.json');
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/peer-messaging';
 const DEFAULT_OBSERVABILITY_ROOT = 'active/shared/observability/peer-messaging';
 const DEFAULT_INBOX_ROLE: GovernedArtifactRole = 'surface_runtime';
@@ -143,6 +151,19 @@ const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
 const REQUEST_SIGNATURE_HEADER = 'x-kyberion-peer-signature';
 const PEER_ID_PATTERN = /^[a-z][a-z0-9-]{1,63}$/;
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::', '::1']);
+const peerNetworkCatalogs = new Map<string, GovernedCatalog<PeerNetworkCatalog>>();
+
+function peerNetworkCatalogFor(catalogPath: string): GovernedCatalog<PeerNetworkCatalog> {
+  const existing = peerNetworkCatalogs.get(catalogPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<PeerNetworkCatalog>({
+    id: `peer-network:${catalogPath}`,
+    path: catalogPath,
+    schema: PEER_NETWORK_SCHEMA_PATH,
+  });
+  peerNetworkCatalogs.set(catalogPath, catalog);
+  return catalog;
+}
 
 function randomId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -172,6 +193,147 @@ function normalizeEnvelope<TPayload>(
     ...(envelope.principal ? { principal: envelope.principal } : {}),
     ...(envelope.approval_ref ? { approval_ref: envelope.approval_ref } : {}),
   };
+}
+
+const PEER_MESSAGE_TYPES: readonly PeerMessageType[] = [
+  'request',
+  'reply',
+  'notification',
+  'handoff',
+  'capability_query',
+  'capability_response',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isTimestamp(value: unknown): value is string {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value));
+}
+
+/** Parse a peer envelope before signature verification or responder dispatch. */
+export function parsePeerMessageEnvelope<TPayload = unknown>(
+  value: unknown
+): PeerMessageEnvelope<TPayload> {
+  if (!isRecord(value)) throw new Error('invalid_peer_envelope_shape');
+  if (value.version !== '1') throw new Error('invalid_peer_envelope_version');
+  if (!isNonEmptyString(value.tenant_id)) throw new Error('invalid_peer_envelope_tenant_id');
+  normalizeTenantId(value.tenant_id);
+  for (const field of [
+    'message_id',
+    'conversation_id',
+    'sender_peer_id',
+    'recipient_peer_id',
+    'subject',
+    'created_at',
+  ]) {
+    if (!isNonEmptyString(value[field])) throw new Error(`invalid_peer_envelope_${field}`);
+  }
+  const senderPeerId = value.sender_peer_id;
+  const recipientPeerId = value.recipient_peer_id;
+  if (!isNonEmptyString(senderPeerId) || !isNonEmptyString(recipientPeerId)) {
+    throw new Error('invalid_peer_envelope_peer_id');
+  }
+  normalizePeerId(senderPeerId);
+  normalizePeerId(recipientPeerId);
+  if (!PEER_MESSAGE_TYPES.includes(value.type as PeerMessageType)) {
+    throw new Error('invalid_peer_envelope_type');
+  }
+  if (!isTimestamp(value.created_at)) throw new Error('invalid_peer_envelope_created_at');
+  if (!Object.prototype.hasOwnProperty.call(value, 'payload')) {
+    throw new Error('invalid_peer_envelope_payload');
+  }
+
+  let scope: EventScope;
+  try {
+    scope = normalizeEventScope(parseEventScopeInput(value.scope));
+  } catch {
+    throw new Error('invalid_peer_envelope_scope');
+  }
+  if (scope.tenant_slug !== value.tenant_id) {
+    throw new Error('peer_message_scope_tenant_mismatch');
+  }
+
+  for (const field of ['reply_to_message_id', 'correlation_id', 'approval_ref'] as const) {
+    if (value[field] !== undefined && !isNonEmptyString(value[field])) {
+      throw new Error(`invalid_peer_envelope_${field}`);
+    }
+  }
+  if (
+    value.ttl_ms !== undefined &&
+    (!Number.isSafeInteger(value.ttl_ms) || (value.ttl_ms as number) < 0)
+  ) {
+    throw new Error('invalid_peer_envelope_ttl_ms');
+  }
+  if (value.expires_at !== undefined && !isTimestamp(value.expires_at)) {
+    throw new Error('invalid_peer_envelope_expires_at');
+  }
+  if (value.transport !== undefined && value.transport !== 'http') {
+    throw new Error('invalid_peer_envelope_transport');
+  }
+  if (value.signature !== undefined && !/^[a-f0-9]{64}$/iu.test(value.signature as string)) {
+    throw new Error('invalid_peer_envelope_signature');
+  }
+  if (value.principal !== undefined) {
+    if (
+      !isRecord(value.principal) ||
+      value.principal.kind !== 'nhi' ||
+      !isNonEmptyString(value.principal.id)
+    ) {
+      throw new Error('invalid_peer_envelope_principal');
+    }
+  }
+  return value as unknown as PeerMessageEnvelope<TPayload>;
+}
+
+function parsePeerInboxRecord(
+  value: unknown,
+  tenantId: string,
+  peerId: string
+): Record<string, unknown> {
+  if (!isRecord(value) || !isTimestamp(value.received_at)) {
+    throw new Error('invalid_peer_inbox_record');
+  }
+  const envelope = parsePeerMessageEnvelope(value.envelope);
+  if (envelope.tenant_id !== tenantId || envelope.recipient_peer_id !== peerId) {
+    throw new Error('peer_inbox_scope_mismatch');
+  }
+  return value;
+}
+
+function parsePeerOutboxRecord(
+  value: unknown,
+  tenantId: string,
+  peerId: string
+): Record<string, unknown> {
+  if (
+    !isRecord(value) ||
+    !isTimestamp(value.sent_at) ||
+    !isNonEmptyString(value.destination_url) ||
+    (value.status !== 'sent' && value.status !== 'failed')
+  ) {
+    throw new Error('invalid_peer_outbox_record');
+  }
+  const envelope = parsePeerMessageEnvelope(value.envelope);
+  if (envelope.tenant_id !== tenantId || envelope.sender_peer_id !== peerId) {
+    throw new Error('peer_outbox_scope_mismatch');
+  }
+  if (value.error !== undefined && !isNonEmptyString(value.error)) {
+    throw new Error('invalid_peer_outbox_error');
+  }
+  return value;
+}
+
+function parsePeerEventRecord(value: unknown, peerId: string): Record<string, unknown> {
+  if (!isRecord(value) || !isTimestamp(value.ts) || value.peer_id !== peerId) {
+    throw new Error('invalid_peer_event_record');
+  }
+  return value;
 }
 
 function signaturePayload<TPayload>(
@@ -238,8 +400,8 @@ export function buildPeerMessageEnvelope<TPayload>(
     message_id: randomId('PM'),
     conversation_id: input.conversationId || randomId('PC'),
     type: input.type,
-    sender_peer_id: input.senderPeerId,
-    recipient_peer_id: input.recipientPeerId,
+    sender_peer_id: normalizePeerId(input.senderPeerId),
+    recipient_peer_id: normalizePeerId(input.recipientPeerId),
     subject: input.subject,
     payload: input.payload,
     created_at: nowIso(),
@@ -264,23 +426,20 @@ export function loadPeerNetworkCatalog(
   const catalogPath = resolvePeerNetworkCatalogPath(options);
   try {
     if (!safeExistsSync(catalogPath)) return null;
-    const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw) as PeerNetworkCatalog;
-    if (parsed && parsed.version === '1' && Array.isArray(parsed.peers)) {
-      if (parsed.tenant_id && !isValidTenantSlug(parsed.tenant_id)) {
-        throw new Error(`peer_catalog_invalid_tenant:${parsed.tenant_id}`);
-      }
-      if (options.tenantId && parsed.tenant_id !== options.tenantId) {
-        throw new Error(`peer_catalog_tenant_mismatch:${options.tenantId}`);
-      }
-      if (
-        parsed.catalog_visibility === 'public_metadata' &&
-        parsed.peers.some((peer) => Boolean(peer.shared_secret))
-      ) {
-        throw new Error('public_peer_catalog_contains_shared_secret');
-      }
-      return parsed;
+    const parsed = peerNetworkCatalogFor(catalogPath).load();
+    if (parsed.tenant_id && !isValidTenantSlug(parsed.tenant_id)) {
+      throw new Error(`peer_catalog_invalid_tenant:${parsed.tenant_id}`);
     }
+    if (options.tenantId && parsed.tenant_id !== options.tenantId) {
+      throw new Error(`peer_catalog_tenant_mismatch:${options.tenantId}`);
+    }
+    if (
+      parsed.catalog_visibility === 'public_metadata' &&
+      parsed.peers.some((peer) => Boolean(peer.shared_secret))
+    ) {
+      throw new Error('public_peer_catalog_contains_shared_secret');
+    }
+    return parsed;
   } catch (error: any) {
     logger.warn(
       `[peer-messaging] failed to load catalog ${catalogPath}: ${error?.message || error}`
@@ -297,19 +456,33 @@ function normalizeTenantId(tenantId: string): string {
   return normalized;
 }
 
+function normalizePeerId(peerId: string): string {
+  const normalized = String(peerId || '').trim();
+  if (!PEER_ID_PATTERN.test(normalized)) {
+    throw new Error(`invalid_peer_network_peer_id:${normalized || 'missing'}`);
+  }
+  return normalized;
+}
+
+function safePeerStoragePath(logicalPath: string): string {
+  return assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
+    allowMissingLeaf: true,
+  });
+}
+
 export function peerNetworkCatalogPath(tenantId: string): string {
-  return pathResolver.knowledge(
-    `confidential/${normalizeTenantId(tenantId)}/connections/peer-network.json`
+  return safePeerStoragePath(
+    `knowledge/confidential/${normalizeTenantId(tenantId)}/connections/peer-network.json`
   );
 }
 
 export function resolvePeerNetworkCatalogPath(options: PeerMessagingCatalogOptions = {}): string {
-  if (options.catalogPath) return options.catalogPath;
+  if (options.catalogPath) return safePeerStoragePath(options.catalogPath);
   if (getRegisteredEnvText('KYBERION_PEER_NETWORK_CATALOG')?.trim()) {
-    return getRegisteredEnvText('KYBERION_PEER_NETWORK_CATALOG')!.trim();
+    return safePeerStoragePath(getRegisteredEnvText('KYBERION_PEER_NETWORK_CATALOG')!.trim());
   }
   const tenantId = options.tenantId?.trim() || getRegisteredEnvText('KYBERION_TENANT_ID')?.trim();
-  return tenantId ? peerNetworkCatalogPath(tenantId) : DEFAULT_CATALOG_PATH;
+  return tenantId ? peerNetworkCatalogPath(tenantId) : safePeerStoragePath(DEFAULT_CATALOG_PATH);
 }
 
 export interface RegisterPeerNetworkPeerInput {
@@ -351,10 +524,7 @@ export function registerPeerNetworkPeer(
   input: RegisterPeerNetworkPeerInput
 ): RegisterPeerNetworkPeerResult {
   const tenantId = normalizeTenantId(input.tenantId);
-  const peerId = String(input.peerId || '').trim();
-  if (!PEER_ID_PATTERN.test(peerId)) {
-    throw new Error(`invalid_peer_network_peer_id:${peerId || 'missing'}`);
-  }
+  const peerId = normalizePeerId(input.peerId);
   const sharedSecret = String(input.sharedSecret || '');
   if (sharedSecret.length < 8) {
     throw new Error(`peer_network_shared_secret_too_short:${peerId}`);
@@ -363,7 +533,7 @@ export function registerPeerNetworkPeer(
 
   const catalogPath = input.catalogPath || peerNetworkCatalogPath(tenantId);
   if (input.catalogPath) {
-    const resolvedCatalogPath = pathResolver.resolve(input.catalogPath);
+    const resolvedCatalogPath = safePeerStoragePath(input.catalogPath);
     const confidentialRoot = pathResolver.resolve(`knowledge/confidential/${tenantId}`);
     const sharedTmpRoot = pathResolver.resolve('active/shared/tmp');
     if (
@@ -380,11 +550,7 @@ export function registerPeerNetworkPeer(
     peers: [],
   };
   if (safeExistsSync(catalogPath)) {
-    const raw = safeReadFile(catalogPath, { encoding: 'utf8' }) as string;
-    const existing = JSON.parse(raw) as PeerNetworkCatalog;
-    if (existing.version !== '1' || !Array.isArray(existing.peers)) {
-      throw new Error(`invalid_peer_network_catalog:${catalogPath}`);
-    }
+    const existing = peerNetworkCatalogFor(catalogPath).load();
     if (existing.tenant_id && existing.tenant_id !== tenantId) {
       throw new Error(`peer_catalog_tenant_mismatch:${tenantId}`);
     }
@@ -412,9 +578,10 @@ export function registerPeerNetworkPeer(
     ...catalog,
     peers: [...peers, peer].sort((left, right) => left.peer_id.localeCompare(right.peer_id)),
   };
+  const validatedCatalog = peerNetworkCatalogFor(catalogPath).validate(catalog, catalogPath);
   safeMkdir(path.dirname(catalogPath), { recursive: true });
-  safeWriteFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`);
-  return { catalogPath, catalog, peer };
+  safeWriteFile(catalogPath, `${JSON.stringify(validatedCatalog, null, 2)}\n`);
+  return { catalogPath, catalog: validatedCatalog, peer };
 }
 
 export function resolvePeerRecord(
@@ -452,11 +619,25 @@ export function resolvePeerDispatchTarget(
 }
 
 function runtimeLogicalPath(tenantId: string, peerId: string, segment: string): string {
-  return `${DEFAULT_RUNTIME_ROOT}/tenants/${tenantId}/peers/${peerId}/${segment}`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  if (!/^[a-z][a-z0-9-]{0,63}\.jsonl?$/.test(segment) && segment !== 'state.json') {
+    throw new Error(`invalid_peer_runtime_segment:${segment}`);
+  }
+  const logicalPath = `${DEFAULT_RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/${segment}`;
+  safePeerStoragePath(logicalPath);
+  return logicalPath;
 }
 
 function observabilityLogicalPath(tenantId: string, peerId: string, segment: string): string {
-  return `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}/${segment}`;
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  if (!/^[a-z][a-z0-9-]{0,63}\.jsonl?$/.test(segment) && segment !== 'state.json') {
+    throw new Error(`invalid_peer_observability_segment:${segment}`);
+  }
+  const logicalPath = `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/${segment}`;
+  safePeerStoragePath(logicalPath);
+  return logicalPath;
 }
 
 function appendRuntimeJsonl(
@@ -483,23 +664,20 @@ function appendObservabilityJsonl(
   );
 }
 
-function readJsonlRecords<T>(logicalPath: string): T[] {
+function readJsonlRecords<T>(logicalPath: string, map: (value: unknown) => T): T[] {
   const resolved = pathResolver.resolve(logicalPath);
-  if (!safeExistsSync(resolved)) return [];
-  const raw = String(safeReadFile(resolved, { encoding: 'utf8' }) || '');
-  return raw
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  return readJsonLines<T>(resolved, { map, onMalformed: 'skip' });
 }
 
 export function listPeerInboxRecords(
   tenantId: string,
   peerId: string
 ): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(
-    runtimeLogicalPath(tenantId, peerId, 'inbox.jsonl')
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return readJsonlRecords(
+    runtimeLogicalPath(normalizedTenantId, normalizedPeerId, 'inbox.jsonl'),
+    (value) => parsePeerInboxRecord(value, normalizedTenantId, normalizedPeerId)
   );
 }
 
@@ -507,24 +685,33 @@ export function listPeerOutboxRecords(
   tenantId: string,
   peerId: string
 ): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(
-    runtimeLogicalPath(tenantId, peerId, 'outbox.jsonl')
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  return readJsonlRecords(
+    runtimeLogicalPath(normalizedTenantId, normalizedPeerId, 'outbox.jsonl'),
+    (value) => parsePeerOutboxRecord(value, normalizedTenantId, normalizedPeerId)
   );
 }
 
 export function listPeerEvents(tenantId: string, peerId: string): Array<Record<string, unknown>> {
-  return readJsonlRecords<Record<string, unknown>>(
-    observabilityLogicalPath(tenantId, peerId, 'events.jsonl')
+  const normalizedPeerId = normalizePeerId(peerId);
+  return readJsonlRecords(
+    observabilityLogicalPath(tenantId, normalizedPeerId, 'events.jsonl'),
+    (value) => parsePeerEventRecord(value, normalizedPeerId)
   );
 }
 
 export function clearPeerRuntime(tenantId: string, peerId: string): void {
-  const runtimeDir = pathResolver.resolve(
-    `${DEFAULT_RUNTIME_ROOT}/tenants/${tenantId}/peers/${peerId}`
+  const normalizedTenantId = normalizeTenantId(tenantId);
+  const normalizedPeerId = normalizePeerId(peerId);
+  const runtimeStatePath = safePeerStoragePath(
+    `${DEFAULT_RUNTIME_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/state.json`
   );
-  const observabilityDir = pathResolver.resolve(
-    `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${tenantId}/peers/${peerId}`
+  const observabilityEventsPath = safePeerStoragePath(
+    `${DEFAULT_OBSERVABILITY_ROOT}/tenants/${normalizedTenantId}/peers/${normalizedPeerId}/events.jsonl`
   );
+  const runtimeDir = path.dirname(runtimeStatePath);
+  const observabilityDir = path.dirname(observabilityEventsPath);
   withExecutionContext('infrastructure_sentinel', () => {
     if (safeExistsSync(runtimeDir)) safeRmSync(runtimeDir, { recursive: true, force: true });
     if (safeExistsSync(observabilityDir))
@@ -667,18 +854,31 @@ export class PeerMessagingServer {
 
   constructor(private readonly options: PeerMessagingServerOptions) {
     normalizeTenantId(options.tenantId);
+    normalizePeerId(options.peerId);
   }
 
   public async processEnvelope(
     envelope: PeerMessageEnvelope
   ): Promise<{ status: number; body: unknown }> {
-    const normalized = normalizeEnvelope(envelope);
+    let parsedEnvelope: PeerMessageEnvelope;
+    try {
+      parsedEnvelope = parsePeerMessageEnvelope(envelope);
+    } catch {
+      return { status: 400, body: { ok: false, error: 'invalid_envelope' } };
+    }
+    const normalized = normalizeEnvelope(parsedEnvelope);
     const sharedSecret = this.options.sharedSecret;
     if (!normalized || typeof normalized !== 'object') {
       return { status: 400, body: { ok: false, error: 'invalid_envelope' } };
     }
     if (!normalized.tenant_id || !isValidTenantSlug(normalized.tenant_id)) {
       return { status: 400, body: { ok: false, error: 'invalid_tenant_id' } };
+    }
+    if (!PEER_ID_PATTERN.test(normalized.sender_peer_id)) {
+      return { status: 400, body: { ok: false, error: 'invalid_sender_peer_id' } };
+    }
+    if (!PEER_ID_PATTERN.test(normalized.recipient_peer_id)) {
+      return { status: 400, body: { ok: false, error: 'invalid_recipient_peer_id' } };
     }
     let scope: EventScope;
     try {
@@ -859,10 +1059,33 @@ export class PeerMessagingServer {
   }
 }
 
+function parsePeerDispatchResponse(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) throw new Error('invalid_peer_response');
+  if (value.ok !== undefined && typeof value.ok !== 'boolean') {
+    throw new Error('invalid_peer_response_ok');
+  }
+  if (value.accepted !== undefined && typeof value.accepted !== 'boolean') {
+    throw new Error('invalid_peer_response_accepted');
+  }
+  if (value.processing_mode !== undefined && value.processing_mode !== 'synchronous_on_receive') {
+    throw new Error('invalid_peer_response_processing_mode');
+  }
+  if (value.processed_at !== undefined && !isTimestamp(value.processed_at)) {
+    throw new Error('invalid_peer_response_processed_at');
+  }
+  if (value.error !== undefined && !isNonEmptyString(value.error)) {
+    throw new Error('invalid_peer_response_error');
+  }
+  return value;
+}
+
 export async function sendPeerMessage<TPayload>(
   envelope: PeerMessageEnvelope<TPayload>,
   options: PeerMessageDispatchOptions
 ): Promise<PeerMessageDispatchReceipt> {
+  normalizeTenantId(envelope.tenant_id);
+  normalizePeerId(envelope.sender_peer_id);
+  normalizePeerId(envelope.recipient_peer_id);
   const destinationUrl = validateUrl(options.destinationUrl, {
     allowLocalNetwork: options.allowLocalNetwork !== false,
   });
@@ -880,7 +1103,7 @@ export async function sendPeerMessage<TPayload>(
   try {
     const response = await request;
     const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
+    const payload = parsePeerDispatchResponse(text ? JSON.parse(text) : {});
     if (response.ok) {
       recordOutbox(envelope.tenant_id, outboxPeerId, envelope, destinationUrl, 'sent', payload);
     } else {

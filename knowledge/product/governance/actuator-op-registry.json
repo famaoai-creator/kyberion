@@ -277,6 +277,49 @@
       "transform": [],
       "apply": ["exec", "plugin"]
     },
+    "core": {
+      "capture": [
+        "run_first_win_lifecycle",
+        "run_health_degradation_watch",
+        "run_tenant_drift_watch",
+        "run_ui_ux_governance",
+        "run_vitest"
+      ],
+      "transform": ["calculate_productivity_score", "parse_proposal_brief", "transform"],
+      "apply": [
+        "apply_onboarding",
+        "capture_avatar_photo",
+        "generate_avatar",
+        "grant_voice_consent",
+        "programmatic_tool_call",
+        "ptc",
+        "register_avatar",
+        "run_ai_audit",
+        "run_auto_checkpoint",
+        "run_backup_create",
+        "run_backup_restore_drill",
+        "run_campaign_suite",
+        "run_catalog_integrity",
+        "run_compliance_scan",
+        "run_dependency_vulnerability_scan",
+        "run_doc_examples_check",
+        "run_i18n_hardcoding",
+        "run_marketing_video_dry_run",
+        "run_mesh_delivery",
+        "run_mission_create",
+        "run_mission_start_from_issues",
+        "run_oauth_setup",
+        "run_pipeline",
+        "run_promote_procedure",
+        "run_registry_manager",
+        "run_soak_endurance",
+        "run_soak_restart_e2e",
+        "run_software_quality_report",
+        "run_translation_coverage",
+        "validate_productivity_dry_run",
+        "wait"
+      ]
+    },
     "deployment": {
       "capture": [],
       "transform": [],
@@ -742,6 +785,24 @@
         "write_file"
       ],
       "control": ["if", "while"]
+    },
+    "working-memory": {
+      "capture": ["consolidation-status", "list", "read"],
+      "transform": [],
+      "apply": [
+        "add-action-item",
+        "build-index",
+        "complete-action-item",
+        "daily-open",
+        "nominate-promotion",
+        "note",
+        "run-gc",
+        "set-now",
+        "todo-add",
+        "todo-done",
+        "todo-rollover",
+        "weekly-open"
+      ]
     }
   }
 }

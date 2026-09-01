@@ -1,21 +1,17 @@
 import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
-import addFormatsModule from 'ajv-formats';
 import { logger } from './core.js';
-import { createAjv as createFoundationAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
-import { compileSchemaFromPath } from './schema-loader.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
   loadStandardIntentCatalog,
   resolveIntentResolutionPacket,
   type IntentResolutionPacket,
   type StandardIntentDefinition,
 } from './intent-resolution.js';
-
-const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 export type OperatorKnowledgeTier = 'personal' | 'confidential' | 'public';
 export type OperatorRouteShape =
@@ -260,12 +256,6 @@ let operatorRequestLogValidateFn: ValidateFunction | null = null;
 let operatorLearningDispatchRegistryCachePath: string | null = null;
 let operatorLearningDispatchRegistryCache: OperatorLearningDispatchRegistry | null = null;
 
-function createAjv() {
-  const ajv = createFoundationAjv();
-  addFormats(ajv);
-  return ajv;
-}
-
 function formatSchemaErrors(validate: ValidateFunction): string[] {
   return (validate.errors || []).map(
     (error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`
@@ -274,8 +264,7 @@ function formatSchemaErrors(validate: ValidateFunction): string[] {
 
 function ensureOperatorProfileValidator(): ValidateFunction {
   if (operatorProfileValidateFn) return operatorProfileValidateFn;
-  operatorProfileValidateFn = compileSchemaFromPath(
-    createAjv(),
+  operatorProfileValidateFn = compileSchema(
     pathResolver.knowledge('product/schemas/operator-profile.schema.json')
   );
   return operatorProfileValidateFn;
@@ -283,8 +272,7 @@ function ensureOperatorProfileValidator(): ValidateFunction {
 
 function ensureOperatorRequestLogValidator(): ValidateFunction {
   if (operatorRequestLogValidateFn) return operatorRequestLogValidateFn;
-  operatorRequestLogValidateFn = compileSchemaFromPath(
-    createAjv(),
+  operatorRequestLogValidateFn = compileSchema(
     pathResolver.knowledge('product/schemas/operator-request-log.schema.json')
   );
   return operatorRequestLogValidateFn;
@@ -495,24 +483,25 @@ const dispatchRegistryCatalogs = new Map<
 function getDispatchRegistryCatalog(
   registryPath: string
 ): GovernedCatalog<OperatorLearningDispatchRegistry> {
-  const existing = dispatchRegistryCatalogs.get(registryPath);
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath);
+  const existing = dispatchRegistryCatalogs.get(safeRegistryPath);
   if (existing) return existing;
   const catalog = defineCatalog<OperatorLearningDispatchRegistry>({
     id: 'operator-learning-dispatch-registry',
-    path: registryPath,
+    path: safeRegistryPath,
     schema: pathResolver.knowledge(
       'product/schemas/operator-learning-dispatch-registry.schema.json'
     ),
   });
-  dispatchRegistryCatalogs.set(registryPath, catalog);
+  dispatchRegistryCatalogs.set(safeRegistryPath, catalog);
   return catalog;
 }
 
 function getOperatorLearningDispatchRegistryPath(): string {
-  return (
+  const configured =
     getRegisteredEnvText('KYBERION_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
-    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH
-  );
+    DEFAULT_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
@@ -521,7 +510,8 @@ function getPersonalOperatorLearningDispatchRegistryPath(): string | null {
   const configured =
     getRegisteredEnvText('KYBERION_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH')?.trim() ||
     DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
-  return safeExistsSync(configured) ? configured : null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
@@ -531,11 +521,12 @@ function getConfidentialOperatorLearningDispatchRegistryPath(): string | null {
     getRegisteredEnvText(
       'KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH'
     )?.trim() || DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH;
-  return safeExistsSync(configured) ? configured : null;
+  const safePath = assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+  return safeExistsSync(safePath) ? safePath : null;
 }
 
 function loadDispatchRegistryFromPath(registryPath: string): OperatorLearningDispatchRegistry {
-  return getDispatchRegistryCatalog(registryPath).load();
+  return getDispatchRegistryCatalog(assertSafeRepositoryPath(registryPath)).load();
 }
 
 function mergeDispatchRegistries(
@@ -552,7 +543,7 @@ function mergeDispatchRegistries(
   };
 }
 
-export function resetOperatorLearningDispatchRegistryCache(): void {
+export function _resetOperatorLearningDispatchRegistryCacheForTests(): void {
   operatorLearningDispatchRegistryCachePath = null;
   operatorLearningDispatchRegistryCache = null;
 }
@@ -571,14 +562,15 @@ export function getOperatorLearningDispatchRegistry(): OperatorLearningDispatchR
     return operatorLearningDispatchRegistryCache;
   }
 
-  if (!safeExistsSync(registryPath)) {
+  const safeRegistryPath = assertSafeRepositoryPath(registryPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeRegistryPath)) {
     operatorLearningDispatchRegistryCachePath = cacheKey;
     operatorLearningDispatchRegistryCache = FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY;
     return operatorLearningDispatchRegistryCache;
   }
 
   try {
-    let parsed = loadDispatchRegistryFromPath(registryPath);
+    let parsed = loadDispatchRegistryFromPath(safeRegistryPath);
     if (confidentialOverlayPath) {
       parsed = mergeDispatchRegistries(
         parsed,
@@ -1130,6 +1122,7 @@ export function promoteOperatorLearningProposal(input: {
       targetTier,
       approvedAt,
     });
+  const safeTargetPath = assertSafeRepositoryPath(targetPath, { allowMissingLeaf: true });
 
   const record: OperatorLearningPromotionRecord = {
     kind: 'operator-learning-promotion-record',
@@ -1139,7 +1132,7 @@ export function promoteOperatorLearningProposal(input: {
     approved_by: approvedBy,
     approved_at: approvedAt,
     target_tier: targetTier,
-    target_path: targetPath,
+    target_path: safeTargetPath,
     summary: input.proposal.summary,
     evidence_request_ids: input.proposal.evidence_request_ids,
     promotion_decision: input.proposal.promotion_decision,
@@ -1147,7 +1140,7 @@ export function promoteOperatorLearningProposal(input: {
   };
 
   if (!input.dryRun) {
-    safeWriteFile(targetPath, `${JSON.stringify(record, null, 2)}\n`);
+    safeWriteFile(safeTargetPath, `${JSON.stringify(record, null, 2)}\n`);
   }
 
   return record;

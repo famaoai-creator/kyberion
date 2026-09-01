@@ -22,7 +22,7 @@
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { redactSensitiveObject } from './network.js';
-import type { AuditEntry } from './audit-chain.js';
+import { registerAuditForwarderPublisher, type AuditEntry } from './audit-chain.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface AuditForwarder {
@@ -60,6 +60,15 @@ export const stubAuditForwarder: AuditForwarder = {
     // no-op
   },
 };
+
+// Keep the audit chain independent from this optional network-facing module.
+// The callback is installed only when the forwarder module is loaded, which
+// is the same optional-loading boundary used by the bootstrap path.
+registerAuditForwarderPublisher((entry) => {
+  const forwarder = getAuditForwarder();
+  if (forwarder.name === 'stub') return;
+  return forwarder.publish(entry);
+});
 
 export class ChainAuditForwarder implements AuditForwarder {
   readonly name: string;

@@ -1,8 +1,12 @@
 import * as path from 'node:path';
-import { loadAgentManifests, resolveAgentSelectionHints, type AgentManifest } from './agent-manifest.js';
+import {
+  loadAgentManifests,
+  resolveAgentSelectionHints,
+  type AgentManifest,
+} from './agent-manifest.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 
 export interface SurfaceAgentCatalogEntry {
   agentId: string;
@@ -29,7 +33,7 @@ interface AgentProfileIndexEntry {
 function titleCaseAgentId(agentId: string): string {
   return agentId
     .split('-')
-    .map((part) => part ? part[0].toUpperCase() + part.slice(1) : part)
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
     .join(' ');
 }
 
@@ -46,7 +50,10 @@ function collectBulletsFromSection(body: string, headings: string[]): string[] {
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (/^#{1,6}\s+/.test(line)) {
-      const heading = line.replace(/^#{1,6}\s+/, '').trim().toLowerCase();
+      const heading = line
+        .replace(/^#{1,6}\s+/, '')
+        .trim()
+        .toLowerCase();
       capture = normalizedHeadings.has(heading);
       continue;
     }
@@ -96,7 +103,16 @@ function isSurfaceAgent(manifest: AgentManifest, profile?: AgentProfileIndexEntr
 }
 
 function loadAgentBody(agentId: string): string {
-  const filePath = path.join(pathResolver.knowledge('product/agents'), `${agentId}.agent.md`);
+  if (!/^[a-z][a-z0-9-]*$/u.test(agentId)) return '';
+  let filePath: string;
+  try {
+    filePath = assertSafeRepositoryPath(
+      path.join(pathResolver.knowledge('product/agents'), `${agentId}.agent.md`),
+      { allowMissingLeaf: true }
+    );
+  } catch {
+    return '';
+  }
   if (!safeExistsSync(filePath)) return '';
   const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
   return parseFrontmatterBody(raw);
@@ -136,7 +152,11 @@ export function listSurfaceAgentCatalog(): SurfaceAgentCatalogEntry[] {
         deniedActuators: manifest.deniedActuators || [],
         summary: extractSummary(body),
         responsibilities: collectBulletsFromSection(body, ['Responsibilities', 'Role', 'Behavior']),
-        nonResponsibilities: collectBulletsFromSection(body, ['Non-responsibilities', 'Rules', 'Response Rules']),
+        nonResponsibilities: collectBulletsFromSection(body, [
+          'Non-responsibilities',
+          'Rules',
+          'Response Rules',
+        ]),
         delegationTargets: extractDelegationTargets(body),
       };
     })

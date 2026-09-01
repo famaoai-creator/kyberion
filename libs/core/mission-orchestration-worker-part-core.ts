@@ -1,4 +1,5 @@
 import { AgentBusyError } from './a2a-bridge.js';
+import * as path from 'node:path';
 import { notifyOperator } from './operator-notifications.js';
 import { type DelegationChain } from './delegation-chain.js';
 import { missionCoordinationBus } from './mission-coordination-bus.js';
@@ -267,6 +268,7 @@ export async function dispatchPlannedMissionTaskCore(
       missionId: input.missionId,
       filePath: clarificationPacketPath,
       targetPath: `evidence/task-clarification-${input.task.task_id}.json`,
+      missionPathHint: path.dirname(path.dirname(clarificationPacketPath)),
       provisioned: provisionMissionEntry({
         mission_id: input.missionId,
         task_id: input.task.task_id,

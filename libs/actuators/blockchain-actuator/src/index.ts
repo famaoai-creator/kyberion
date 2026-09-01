@@ -1,19 +1,15 @@
-import {
-  logger,
-  safeReadFile,
-  safeMkdir,
-  safeExistsSync,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { safeReadFile, safeMkdir, safeExistsSync } from '@agent/core/secure-io';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { runActuatorCli } from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+import { runActuatorCli } from '@agent/core/cli-utils';
+import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -44,14 +40,11 @@ interface BlockchainAction {
   };
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: BLOCKCHAIN_MANIFEST_PATH,
-    defaults: DEFAULT_BLOCKCHAIN_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: BLOCKCHAIN_MANIFEST_PATH,
+  defaults: DEFAULT_BLOCKCHAIN_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 async function handleAction(input: BlockchainAction) {
   ensureDefaultOpPreflight();
@@ -85,7 +78,7 @@ function readMockChainEntries(): any[] {
       .trim()
       .split('\n')
       .filter(Boolean)
-      .map((line) => JSON.parse(line));
+      .map((line) => parseSafeJsonInput(line, 'mock blockchain entry'));
   } catch {
     return [];
   }
@@ -170,6 +163,7 @@ function _writeToMockChain(tx: any) {
 const main = async () => {
   await runActuatorCli({
     name: 'blockchain-actuator',
+    args: process.argv,
     handleAction,
   });
 };

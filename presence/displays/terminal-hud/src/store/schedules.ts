@@ -1,10 +1,10 @@
 import {
   listScheduledPipelines,
   isScheduledPipelineDue,
-  listGenerationSchedules,
-  pathResolver,
   type ScheduledPipeline,
-} from '@agent/core';
+} from '@agent/core/pipeline-scheduler';
+import { listGenerationSchedules } from '@agent/core/generation-scheduler';
+import { pathResolver } from '@agent/core/path-resolver';
 import { statusColor, theme } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';

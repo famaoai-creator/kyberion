@@ -1,15 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  pathResolver,
-  safeMkdir,
-  safeReadFile,
-  safeRmSync,
-  safeWriteFile,
-  sha256,
-  type MarketingCompletionEvidence,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { sha256, type MarketingCompletionEvidence } from '@agent/core/marketing-workload';
 import { validateMarketingMissionCompletionGate } from './mission-governance.js';
 
 const roots: string[] = [];

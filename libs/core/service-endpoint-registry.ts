@@ -1,9 +1,9 @@
 import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('service-endpoint-registry');
@@ -44,6 +44,9 @@ const FALLBACK_SERVICE_ENDPOINTS: ServiceEndpointsCatalog = {
   default_pattern: 'https://api.{service_id}.com/v1',
   services: {},
 };
+const SERVICE_ENDPOINTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-endpoints.schema.json'
+);
 
 let cachedServiceEndpointsPath: string | null = null;
 let cachedServiceEndpointsDir: string | null = null;
@@ -62,9 +65,32 @@ function getServiceEndpointsDir(): string {
   );
 }
 
+const serviceEndpointsCatalog = defineCatalog<ServiceEndpointsCatalog>({
+  id: 'service-endpoints',
+  path: () =>
+    assertSafeRepositoryPath(pathResolver.rootResolve(getServiceEndpointsPath()), {
+      allowMissingLeaf: true,
+    }),
+  schema: SERVICE_ENDPOINTS_SCHEMA_PATH,
+  fallback: FALLBACK_SERVICE_ENDPOINTS,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    if (!String(error).includes('missing')) {
+      logger.warn(`failed to load service endpoints catalog: ${String(error)}`);
+    }
+  },
+});
+
 function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpointsCatalog {
   try {
-    return readJson<ServiceEndpointsCatalog>(pathResolver.rootResolve(catalogPath));
+    return defineCatalog<ServiceEndpointsCatalog>({
+      id: 'service-endpoints-entry',
+      path: () =>
+        assertSafeRepositoryPath(pathResolver.rootResolve(catalogPath), {
+          allowMissingLeaf: true,
+        }),
+      schema: SERVICE_ENDPOINTS_SCHEMA_PATH,
+    }).load();
   } catch (error: any) {
     throw new Error(
       `Failed to load service endpoints catalog at ${catalogPath}: ${error?.message || error}`
@@ -73,7 +99,9 @@ function loadServiceEndpointsCatalogFromPath(catalogPath: string): ServiceEndpoi
 }
 
 function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCatalog {
-  const dir = pathResolver.rootResolve(catalogDir);
+  const dir = assertSafeRepositoryPath(pathResolver.rootResolve(catalogDir), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) {
     throw new Error(`Service endpoints directory not found: ${dir}`);
   }
@@ -90,7 +118,7 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
   let defaultPattern = '';
 
   for (const file of files) {
-    const filePath = pathResolver.rootResolve(path.join(dir, file));
+    const filePath = assertSafeRepositoryPath(path.join(dir, file));
     if (!safeStat(filePath).isFile()) continue;
 
     const parsed = loadServiceEndpointsCatalogFromPath(filePath);
@@ -148,9 +176,12 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
 
   if (
     catalogPath === DEFAULT_SERVICE_ENDPOINTS_PATH &&
-    safeExistsSync(pathResolver.rootResolve(catalogDir))
+    safeExistsSync(
+      assertSafeRepositoryPath(pathResolver.rootResolve(catalogDir), { allowMissingLeaf: true })
+    )
   ) {
-    const dirEntries = safeReaddir(pathResolver.rootResolve(catalogDir));
+    const resolvedCatalogDir = assertSafeRepositoryPath(pathResolver.rootResolve(catalogDir));
+    const dirEntries = safeReaddir(resolvedCatalogDir);
     const hasJsonFiles = dirEntries.some((entry) => entry.endsWith('.json'));
     if (hasJsonFiles) {
       try {
@@ -166,27 +197,11 @@ export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
     }
   }
 
-  const resolvedCatalogPath = pathResolver.rootResolve(catalogPath);
-  if (!safeExistsSync(resolvedCatalogPath)) {
-    cachedServiceEndpointsPath = catalogPath;
-    cachedServiceEndpointsDir = catalogDir;
-    cachedServiceEndpoints = FALLBACK_SERVICE_ENDPOINTS;
-    return cachedServiceEndpoints;
-  }
-
-  try {
-    const parsed = loadServiceEndpointsCatalogFromPath(catalogPath);
-    cachedServiceEndpointsPath = catalogPath;
-    cachedServiceEndpointsDir = catalogDir;
-    cachedServiceEndpoints = parsed;
-    return parsed;
-  } catch (error: any) {
-    logger.warn(`failed to load catalog at ${catalogPath}: ${error.message}`);
-    cachedServiceEndpointsPath = catalogPath;
-    cachedServiceEndpointsDir = catalogDir;
-    cachedServiceEndpoints = FALLBACK_SERVICE_ENDPOINTS;
-    return cachedServiceEndpoints;
-  }
+  const parsed = serviceEndpointsCatalog.load();
+  cachedServiceEndpointsPath = catalogPath;
+  cachedServiceEndpointsDir = catalogDir;
+  cachedServiceEndpoints = parsed;
+  return parsed;
 }
 
 export function getServiceEndpointRecord(serviceId: string): ServiceEndpointRecord | null {

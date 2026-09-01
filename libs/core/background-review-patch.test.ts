@@ -1,9 +1,16 @@
 import { createHash } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import {
   createDistillCandidateRecord,
   loadDistillCandidateRecord,
@@ -23,6 +30,7 @@ const createdSkillDirs: string[] = [];
 const createdMemoryRefs: string[] = [];
 const createdBackupRefs: string[] = [];
 const createdApprovalRefs: string[] = [];
+const createdExternalTargets: string[] = [];
 
 function targetRef(suffix: string): string {
   const ref = `pipelines/background-review-patch-test-${process.pid}-${suffix}.json`;
@@ -141,6 +149,9 @@ afterEach(() => {
     for (const ref of createdPipelineRefs.splice(0)) {
       safeRmSync(pathResolver.rootResolve(ref), { force: true });
     }
+    for (const target of createdExternalTargets.splice(0)) {
+      safeRmSync(target, { force: true });
+    }
     for (const dir of createdSkillDirs.splice(0)) {
       safeRmSync(dir, { recursive: true, force: true });
     }
@@ -232,6 +243,40 @@ describe('background-review-patch', () => {
     ).toThrow(/pre-image hash mismatch/);
     expect(safeReadFile(pathResolver.rootResolve(ref), { encoding: 'utf8' })).toBe(before);
     expect(loadDistillCandidateRecord(candidate.candidate_id)?.status).toBe('proposed');
+  });
+
+  it('rejects a pipeline target that traverses a symbolic link', () => {
+    const ref = targetRef('symlink');
+    const absolute = pathResolver.rootResolve(ref);
+    const target = pathResolver.shared(
+      `tmp/background-review-target-${process.pid}-${Date.now()}.json`
+    );
+    createdExternalTargets.push(target);
+    withExecutionContext('ecosystem_architect', () => {
+      safeWriteFile(
+        target,
+        JSON.stringify({ action: 'pipeline', name: 'symlink-target', version: '1.0.0', steps: [] })
+      );
+      safeSymlinkSync(target, absolute);
+    });
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-SYMLINK`,
+      targetRef: ref,
+      patch: { operation: 'append_step', step: { op: 'system:log', params: { message: 'x' } } },
+    });
+
+    try {
+      expect(() =>
+        applyBackgroundReviewPipelinePatch({
+          candidateId: candidate.candidate_id,
+          expectedSha256: '0'.repeat(64),
+          approvedBy: 'operator-test',
+          approvalRef: 'approval-test-symlink',
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      unlinkSync(absolute);
+    }
   });
 
   it('rejects a patch that fails pipeline guardrails', () => {

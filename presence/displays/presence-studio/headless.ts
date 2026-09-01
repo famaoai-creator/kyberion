@@ -2,14 +2,14 @@ import {
   availableHeadlessOperationIds,
   createHeadlessEnvelope,
   filterHeadlessManifestForViewer,
-  listApprovalRequests,
-  listArtifactRecords,
-  listProjectRecords,
-  type A2UIMessage,
   type HeadlessApiManifest,
   type HeadlessOperationDescriptor,
   type HeadlessResourceDescriptor,
-} from '@agent/core';
+} from '@agent/core/headless-surface-contract';
+import { listApprovalRequests } from '@agent/core/approval-store';
+import { listArtifactRecords } from '@agent/core/artifact-record';
+import { listProjectRecords } from '@agent/core/project-registry';
+import type { A2UIMessage } from '@agent/core/a2ui';
 import {
   narrowPresenceStudioTenant,
   presenceStudioHeadlessScope,

@@ -26,6 +26,7 @@ import { rootResolve } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { registerVadBackend, type VadFactoryOptions } from './vad-registry.js';
+import { parseVadBridgeLine } from './vad-bridge-protocol.js';
 import {
   computeChunkDurationMs,
   EnergyVad,
@@ -152,13 +153,10 @@ export class SileroVad implements VoiceActivityDetector {
           const line = stdoutBuffer.slice(0, nl).trim();
           stdoutBuffer = stdoutBuffer.slice(nl + 1);
           if (!line) continue;
-          try {
-            const parsed = JSON.parse(line) as { prob?: number; error?: string };
-            if (typeof parsed.prob === 'number') this.lastProb = parsed.prob;
-            else if (parsed.error) this.fail(`bridge error: ${parsed.error}`);
-          } catch {
-            /* ignore non-JSON noise */
-          }
+          const parsed = parseVadBridgeLine(line);
+          if (!parsed) continue;
+          if (parsed.error !== undefined) this.fail(`bridge error: ${parsed.error}`);
+          else if (parsed.prob !== undefined) this.lastProb = parsed.prob;
         }
       });
       let stderrTail = '';

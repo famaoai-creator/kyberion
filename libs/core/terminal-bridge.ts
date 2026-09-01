@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   loadJson,
@@ -19,6 +20,24 @@ const logger = createLogger('terminal-bridge');
 
 const RUNTIME_BASE = pathResolver.shared('runtime/terminal');
 
+function pathSegment(value: string, label: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
+    throw new Error(`[terminal-bridge] invalid ${label}`);
+  }
+  return normalized;
+}
+
+function runtimePath(sessionId: string, ...parts: string[]): string {
+  const session = pathSegment(sessionId, 'session id');
+  const candidate = path.join(
+    RUNTIME_BASE,
+    session,
+    ...parts.map((part) => pathSegment(part, 'path segment'))
+  );
+  return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
+}
+
 function listReflexTerminalSessions() {
   if (!safeExistsSync(RUNTIME_BASE)) return [];
   const sessions: Array<{
@@ -29,7 +48,12 @@ function listReflexTerminalSessions() {
     pid?: number;
   }> = [];
   for (const id of safeReaddir(RUNTIME_BASE)) {
-    const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
+    let stateFile: string;
+    try {
+      stateFile = runtimePath(id, 'state.json');
+    } catch {
+      continue;
+    }
     if (!safeExistsSync(stateFile)) continue;
     try {
       const state = loadJson<{ pid: number; status?: string }>(stateFile);
@@ -55,7 +79,12 @@ const STRATEGIES: Record<string, any> = {
 
       const sessions = safeReaddir(RUNTIME_BASE);
       for (const id of sessions) {
-        const stateFile = path.join(RUNTIME_BASE, id, 'state.json');
+        let stateFile: string;
+        try {
+          stateFile = runtimePath(id, 'state.json');
+        } catch {
+          continue;
+        }
         if (safeExistsSync(stateFile)) {
           try {
             const state = loadJson<{ pid: number; status?: string }>(stateFile);
@@ -71,7 +100,13 @@ const STRATEGIES: Record<string, any> = {
     },
     inject: async (winId: string, sessionId: string, text: string) => {
       const sid = sessionId || 'default';
-      const sessionInDir = path.join(RUNTIME_BASE, sid, 'in');
+      let sessionInDir: string;
+      try {
+        sessionInDir = runtimePath(sid, 'in');
+      } catch (err: any) {
+        logger.error(`file injection failed for ${sid}: ${err.message}`);
+        return false;
+      }
 
       try {
         if (!safeExistsSync(sessionInDir)) {
@@ -79,7 +114,9 @@ const STRATEGIES: Record<string, any> = {
         }
 
         const requestId = `req-${Date.now()}`;
-        const requestPath = path.join(sessionInDir, `${requestId}.json`);
+        const requestPath = assertSafeRepositoryPath(path.join(sessionInDir, `${requestId}.json`), {
+          allowMissingLeaf: true,
+        });
 
         safeWriteFile(
           requestPath,
@@ -216,7 +253,12 @@ export const terminalBridge = {
   },
   readLatestOutput: (winId: string, sessionId: string, terminalType = 'iTerm2'): string => {
     if (terminalType === 'ReflexTerminal') {
-      const latestPath = path.join(RUNTIME_BASE, sessionId, 'out', 'latest_response.json');
+      let latestPath: string;
+      try {
+        latestPath = runtimePath(sessionId, 'out', 'latest_response.json');
+      } catch {
+        return '';
+      }
       if (safeExistsSync(latestPath)) {
         try {
           const content = loadJson<{ data?: { message?: string } }>(latestPath);

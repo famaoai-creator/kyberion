@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agentic-source-review-rules.schema.json",
+  "title": "Agentic Source Review Rule Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "agentic-source-review-rules" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "category": {
+            "type": "string",
+            "enum": ["domain", "language", "framework", "vulnerability"]
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "purpose": { "type": "string", "minLength": 1 },
+          "stages": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "match": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "always": { "type": "boolean" },
+              "domain": { "type": "string", "minLength": 1 },
+              "language": { "type": "string", "minLength": 1 },
+              "dependency": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "required": ["id", "category", "title", "purpose", "stages"]
+      }
+    }
+  },
+  "required": ["kind", "version", "rules"]
+}

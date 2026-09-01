@@ -7,7 +7,8 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import AjvModule from 'ajv';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { IngestCardIncompleteError, normalizeCard } from './normalize-card.js';
 import type { IngestIr } from './parse-document.js';
 

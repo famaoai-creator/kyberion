@@ -55,7 +55,7 @@ SDK 側は `Options.agents?: Record<string, AgentDefinition>` を持ち、メッ
 `libs/core/claude-native-subagent.ts` が唯一の射影点:
 
 - `--agents` JSON を **実行時に** KD-05 レジストリから生成(コミット済み生成物ではないのでドリフト不能)。prompt は `systemPromptPrefix` + working principles + secure-io 制約 + 共有ディレクトリ規約。
-- 後者2つは `libs/core/subagent-prompt-framing.ts` に SSoT 化し、`scripts/generate_subagent_definitions.ts`(`.claude/agents/*.md` 生成儀式)も同じ定数を参照するよう変更した。`pnpm check:subagent-definitions` はドリフト0のまま。
+- 後者2つは `libs/core/subagent-prompt-framing.ts` に SSoT 化し、`scripts/generate_subagent_definitions.ts`(`.claude/agents/*.md` 生成儀式)も同じ定数を参照するよう変更した。`pnpm agents:generate -- --check` はドリフト0のまま。
 - 権限は XP-02 の `PROVIDER_PERMISSION_MATRIX` を解析して射影する(独自マトリクスを作らない)。親セッションは `--tools Task` のみ = 自分で作業できない。tier の実ツールはサブエージェント定義側が持ち、**KD-05 ∩ 権限マトリクス allowlist**(least agency)に絞る。planner は `--permission-mode plan` + tools 無し。未知フラグは fail-closed。
 - `ShellClaudeCliBackend` に `getNativeSubagentAdopter()`(id `claude-cli`)/ `requiresNativeSubagent()` / `dispatchNativeSubagent()` を追加。委譲は `harnessQueue` で直列化。metadata が無ければ `[SUBAGENT_UNAVAILABLE]`。
 

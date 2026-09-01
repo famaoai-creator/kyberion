@@ -7,5 +7,5 @@
     "email": "tbd@example.com"
   },
   "engagement_started_at": "YYYY-MM-DD",
-  "notes": "IT運用・マネージドサービス(MSP)の業態テンプレートから生成。company:bootstrap 後に実情報へ更新すること。"
+  "notes": "IT運用・マネージドサービス(MSP)の業態テンプレートから生成。onboard company bootstrap 後に実情報へ更新すること。"
 }

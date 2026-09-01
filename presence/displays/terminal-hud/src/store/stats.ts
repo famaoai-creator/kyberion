@@ -1,5 +1,8 @@
 import path from 'node:path';
-import { metrics, traceLogDir, pathResolver } from '@agent/core';
+import { metrics } from '@agent/core/metrics';
+import { pathResolver } from '@agent/core/path-resolver';
+import { traceLogDir } from '@agent/core/src/trace';
+import { validateTraceReplay } from '@agent/core/trace-schema';
 import { tailJsonl } from './tail.js';
 import { theme, statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
@@ -25,6 +28,16 @@ export interface StatsData {
   regressions: string[];
   usageByKind: Array<{ kind: string; count: number }>;
   traces: TraceLine[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function parseTraceRecord(value: unknown): Record<string, unknown> | null {
+  return validateTraceReplay(value, { strictUnknownSpans: true }).length === 0 && isRecord(value)
+    ? value
+    : null;
 }
 
 function todaysTraceFile(): string {
@@ -65,12 +78,18 @@ export function loadStats(): StatsData {
   } catch {
     // no resource usage history yet
   }
-  const traces = tailJsonl<any>(todaysTraceFile(), 10).map((trace) => ({
-    name: String(trace?.rootSpan?.name ?? '-'),
-    status: String(trace?.rootSpan?.status ?? '-'),
-    startedAt: String(trace?.metadata?.startedAt ?? ''),
-    context: String(trace?.metadata?.pipelineId ?? trace?.metadata?.actuator ?? ''),
-  }));
+  const traces = tailJsonl<Record<string, unknown>>(todaysTraceFile(), 10, parseTraceRecord).map(
+    (trace) => {
+      const rootSpan = isRecord(trace.rootSpan) ? trace.rootSpan : {};
+      const metadata = isRecord(trace.metadata) ? trace.metadata : {};
+      return {
+        name: String(rootSpan.name ?? '-'),
+        status: String(rootSpan.status ?? '-'),
+        startedAt: String(metadata.startedAt ?? ''),
+        context: String(metadata.pipelineId ?? metadata.actuator ?? ''),
+      };
+    }
+  );
   return {
     components,
     regressions,

@@ -1,26 +1,34 @@
+import { loadJson } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
 import {
-  loadJson,
-  logger,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  pathResolver,
-  resolveVars,
-  evaluateCondition,
-  getPathValue,
-  retry,
-  buildGovernedRetryOptions,
-  classifyError,
-  executeAdfSteps,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
+  assertSafeRepositoryPath,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVars, evaluateCondition, getPathValue } from '@agent/core/src/logic-utils';
+import { retry } from '@agent/core/async-utils';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { classifyError } from '@agent/core/error-classifier';
+import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
+import {
+  DEFAULT_MAX_PIPELINE_STEPS,
+  DEFAULT_PIPELINE_TIMEOUT_MS,
+} from '@agent/core/execution-bounds';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import {
   rebuildPublicHistorySearchIndexFromLocalSources,
   searchHistory,
+} from '@agent/core/history-search-index';
+import {
   loadSkillResourceDescriptor,
   readSkillResourceForModel,
-} from '@agent/core';
-import type { ScopeContext, TierLevel } from '@agent/core';
+} from '@agent/core/skill-resource-loader';
+import type { ScopeContext } from '@agent/core/scope-context';
+import type { TierLevel } from '@agent/core/types';
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as yaml from 'js-yaml';
@@ -40,6 +48,7 @@ import {
 import type { WisdomContext } from './contracts/wisdom-context.js';
 import { makeWisdomReceipt, type WisdomReceipt } from './contracts/wisdom-result.js';
 import { validateWisdomRequest } from './contracts/wisdom-request.js';
+import { parseWisdomJsonObject, parseWisdomReconcileStrategy } from './wisdom-persisted-json.js';
 
 const WISDOM_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/wisdom-actuator/manifest.json'
@@ -87,13 +96,11 @@ function assertWisdomReconcileSteps(steps: PipelineStep[]): void {
   }
 }
 
-function buildRetryOptions() {
-  return buildGovernedRetryOptions({
-    manifestPath: WISDOM_MANIFEST_PATH,
-    defaults: DEFAULT_WISDOM_RETRY,
-    fallbackCategories: ['resource_unavailable', 'timeout'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: WISDOM_MANIFEST_PATH,
+  defaults: DEFAULT_WISDOM_RETRY,
+  fallbackCategories: ['resource_unavailable', 'timeout'],
+});
 
 export async function runWithOperationRetry<T>(op: string, task: () => Promise<T>): Promise<T> {
   const idempotency = getWisdomOperationSpec(op)?.idempotency;
@@ -240,17 +247,20 @@ export async function handleAction(input: WisdomAction) {
 }
 
 // AR-01 Task 2: hand-rolled loop replaced by the canonical engine
-// (executeAdfSteps). Nested control failures now propagate instead of being
+// (runAdfActuatorPipeline). Nested control failures now propagate instead of being
 // silently absorbed (AR-06 no-silent-failure).
 export async function executePipeline(
   steps: PipelineStep[],
   initialCtx: WisdomContext = {},
   options: WisdomAction['options'] = {}
 ) {
-  const MAX_STEPS = options.max_steps || 1000;
-  const TIMEOUT = options.timeout_ms || 60000;
+  const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
+  const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
   const contextPath =
     typeof initialCtx.context_path === 'string' ? initialCtx.context_path : undefined;
+  const contextFilePath = contextPath
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(contextPath), { allowMissingLeaf: true })
+    : undefined;
 
   let ctx: WisdomContext = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
   const receipts: WisdomReceipt[] = [];
@@ -274,20 +284,24 @@ export async function executePipeline(
     }
   );
 
-  if (contextPath && safeExistsSync(pathResolver.rootResolve(contextPath))) {
-    const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(pathResolver.rootResolve(contextPath)),
-      buildRetryOptions()
-    );
+  if (contextFilePath && safeExistsSync(contextFilePath)) {
+    const saved = await retry(async () => {
+      const parsed = parseWisdomJsonObject(loadJson<unknown>(contextFilePath));
+      if (!parsed) {
+        throw new Error(`[WISDOM_CONTEXT_SHAPE_INVALID] expected an object: ${contextFilePath}`);
+      }
+      return parsed;
+    }, buildRetryOptions());
     ctx = { ...ctx, ...saved };
   }
 
   const result = await operationRetryState.run(new Map<string, number>(), async () => {
-    return await executeAdfSteps(
-      steps as Parameters<typeof executeAdfSteps>[0],
-      ctx,
-      { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
-      {
+    return await runAdfActuatorPipeline({
+      actuatorId: 'wisdom',
+      steps,
+      context: ctx,
+      options: { maxSteps: MAX_STEPS, timeoutMs: TIMEOUT },
+      handlers: {
         capture: async (op, params, currentCtx) => {
           const before = operationRetryState.getStore()?.get(op) || 0;
           try {
@@ -322,14 +336,14 @@ export async function executePipeline(
           }
         },
         control: opControl,
-      }
-    );
+      },
+    });
   });
   ctx = result.context;
 
-  if (contextPath) {
+  if (contextFilePath) {
     await retry(async () => {
-      safeWriteFile(pathResolver.rootResolve(contextPath), JSON.stringify(ctx, null, 2));
+      safeWriteFile(contextFilePath, JSON.stringify(ctx, null, 2));
       return undefined;
     }, buildRetryOptions());
   }
@@ -413,7 +427,8 @@ async function opCapture(
       return { ...ctx, [params.export_as || 'history_search_results']: report };
     }
     case 'knowledge_search': {
-      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } = await import('@agent/core');
+      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
+        await import('@agent/core/src/knowledge-index');
       const securityScope =
         ctx.security_scope && typeof ctx.security_scope === 'object'
           ? (ctx.security_scope as Record<string, unknown>)
@@ -527,7 +542,9 @@ async function opCapture(
       };
       const missionPath =
         pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, tier);
-      const descriptor = loadSkillResourceDescriptor(String(resolveVars(rawPath, ctx)));
+      const descriptor = loadSkillResourceDescriptor(String(resolveVars(rawPath, ctx)), undefined, {
+        trustResolved: ctx.trust_resolved === true,
+      });
       const repoRelative = path.relative(pathResolver.rootResolve(''), descriptor.path);
       const isInsideRepo = repoRelative !== '..' && !repoRelative.startsWith(`..${path.sep}`);
       const normalizedResourcePath = repoRelative.replaceAll(path.sep, '/');
@@ -546,6 +563,7 @@ async function opCapture(
         ...(typeof securityScope?.task_id === 'string' ? { taskId: securityScope.task_id } : {}),
         ...(typeof ctx.context_pack_id === 'string' ? { contextPackId: ctx.context_pack_id } : {}),
         scope,
+        trustResolved: ctx.trust_resolved === true,
       });
       const exportAs = String(params.export_as || 'knowledge_read');
       const visibleReceipt = {
@@ -566,7 +584,8 @@ async function opCapture(
       };
     }
     case 'query': {
-      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } = await import('@agent/core');
+      const { buildScopedIndex, queryKnowledgeHybrid, DEFAULT_SCOPE } =
+        await import('@agent/core/src/knowledge-index');
       const scope = ctx._knowledge_scope ?? DEFAULT_SCOPE;
       const scopeKey = JSON.stringify(scope);
       if (!ctx._knowledgeIndex || ctx._knowledgeIndexScopeKey !== scopeKey) {
@@ -620,8 +639,12 @@ async function opTransform(
       const content = String(ctx[params.from || 'last_capture'] || '');
       const fmMatch = content.match(/^---\n([\s\S]*?)\n---/m);
       if (!fmMatch) return ctx;
-      const fm = yaml.load(fmMatch[1]) as any;
-      fm[params.field] = resolveVars(params.value, ctx);
+      const fm = parseWisdomJsonObject(yaml.load(fmMatch[1]));
+      const field = typeof params.field === 'string' ? params.field.trim() : '';
+      if (!fm || !field || ['__proto__', 'constructor', 'prototype'].includes(field)) {
+        throw new Error('[WISDOM_YAML_SHAPE_INVALID] frontmatter must be a safe object');
+      }
+      fm[field] = resolveVars(params.value, ctx);
       const newFm = yaml.dump(fm, { lineWidth: -1 }).trim();
       return {
         ...ctx,
@@ -668,9 +691,15 @@ async function opApply(
         const missionPath = (pathResolver as any).findMissionPath(missionId);
         if (!missionPath) throw new Error(`Mission ${missionId} not found.`);
 
-        const sourcePath = pathResolver.knowledge(kPath);
+        const safeMissionPath = assertSafeRepositoryPath(missionPath);
+        const sourcePath = assertSafeRepositoryPath(pathResolver.knowledge(kPath), {
+          allowMissingLeaf: true,
+        });
         const fileName = path.basename(sourcePath);
-        const targetPath = path.join(missionPath, `evidence/injected_${fileName}`);
+        const targetPath = assertSafeRepositoryPath(
+          path.join(safeMissionPath, `evidence/injected_${fileName}`),
+          { allowMissingLeaf: true }
+        );
 
         if (safeExistsSync(sourcePath)) {
           const data = safeReadFile(sourcePath, { encoding: 'utf8' }) as string;
@@ -686,7 +715,10 @@ async function opApply(
       break;
     case 'knowledge_export':
       await runWithOperationRetry('knowledge_export', async () => {
-        const sourceFile = pathResolver.knowledge(resolveVars(params.path, ctx));
+        const sourceFile = assertSafeRepositoryPath(
+          pathResolver.knowledge(resolveVars(params.path, ctx)),
+          { allowMissingLeaf: true }
+        );
         if (!safeExistsSync(sourceFile))
           throw new Error(`Knowledge source not found: ${sourceFile}`);
 
@@ -768,12 +800,15 @@ async function opApply(
           rawData,
         });
 
-        const outPath = pathResolver.rootResolve(
-          resolveVars(
-            params.output_path ||
-              pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`),
-            ctx
-          )
+        const outPath = assertSafeRepositoryPath(
+          pathResolver.rootResolve(
+            resolveVars(
+              params.output_path ||
+                pathResolver.sharedExports(`wisdom/${kkp.metadata.package_id}.kkp`),
+              ctx
+            )
+          ),
+          { allowMissingLeaf: true }
         );
         safeWriteFile(outPath, JSON.stringify(kkp, null, 2));
         logger.success(`📦 [Wisdom] Knowledge exported to ${outPath}`);
@@ -783,7 +818,10 @@ async function opApply(
     case 'knowledge_import':
       await runWithOperationRetry('knowledge_import', async () => {
         const packageSource = params.package_path || params.source_path;
-        const pkgPath = pathResolver.rootResolve(resolveVars(packageSource, ctx));
+        const pkgPath = assertSafeRepositoryPath(
+          pathResolver.rootResolve(resolveVars(packageSource, ctx)),
+          { allowMissingLeaf: true }
+        );
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const targetTier = normalizeKnowledgeTier(params.tier);
@@ -834,10 +872,16 @@ async function opApply(
             '[KNOWLEDGE_PROMOTION_APPROVAL_REQUIRED] promotion approval is required for public import'
           );
         }
-        const importDir = pathResolver.knowledge(`${targetTier}/external/${originAgentId}`);
+        const importDir = assertSafeRepositoryPath(
+          pathResolver.knowledge(`${targetTier}/external/${originAgentId}`),
+          { allowMissingLeaf: true }
+        );
         if (!safeExistsSync(importDir)) safeMkdir(importDir, { recursive: true });
 
-        const targetFile = path.join(importDir, path.basename(pkg.content.path));
+        const targetFile = assertSafeRepositoryPath(
+          path.join(importDir, path.basename(pkg.content.path)),
+          { allowMissingLeaf: true }
+        );
         safeWriteFile(targetFile, rawData);
 
         logger.success(`📥 [Wisdom] Imported knowledge from ${originAgentId} to ${targetFile}`);
@@ -850,20 +894,19 @@ async function opApply(
 }
 
 export async function performReconcile(input: WisdomAction) {
-  const strategyPath = pathResolver.knowledge(
-    input.strategy_path || 'governance/wisdom-reconcile-strategy.json'
+  const strategyPath = assertSafeRepositoryPath(
+    pathResolver.knowledge(input.strategy_path || 'governance/wisdom-reconcile-strategy.json'),
+    { allowMissingLeaf: true }
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = (await retry(
+  const rawConfig: unknown = await retry(
     async () => loadJson<unknown>(strategyPath),
     buildRetryOptions()
-  )) as {
-    strategies: Array<{
-      for_each?: { op: string; params: Record<string, unknown> };
-      pipeline: PipelineStep[];
-      params?: WisdomContext;
-    }>;
-  };
+  );
+  const config = parseWisdomReconcileStrategy(rawConfig);
+  if (!config) {
+    throw new Error(`[WISDOM_RECONCILE_STRATEGY_INVALID] ${strategyPath}`);
+  }
   for (const strategy of config.strategies) {
     if (strategy.for_each) {
       if (!RECONCILE_ALLOWED_OPS.has(strategy.for_each.op)) {

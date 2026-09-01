@@ -1,14 +1,12 @@
 /** PI-12: require an explicit opt-in for pnpm-lock.yaml changes. */
 import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { safeExec } from '../libs/core/secure-io.js';
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { safeExec } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
-const baseRef = process.env.GITHUB_BASE_REF?.trim();
-const safeBase = baseRef && /^[A-Za-z0-9._/-]+$/u.test(baseRef) ? baseRef : undefined;
-const changed = new Set<string>();
-
-function collect(args: string[]): void {
+function collectChangedFiles(args: string[], changed: Set<string>): void {
   try {
     for (const file of safeExec('git', args)
       .split(/\r?\n/u)
@@ -20,37 +18,86 @@ function collect(args: string[]): void {
   }
 }
 
-collect(['diff', '--name-only', '--', 'pnpm-lock.yaml']);
-if (safeBase) collect(['diff', '--name-only', `${safeBase}...HEAD`, '--', 'pnpm-lock.yaml']);
+export interface LockfileCommitGateResult {
+  changedFiles: string[];
+  evidenceRef?: string;
+  hasReviewEvidence: boolean;
+  permitted: boolean;
+}
 
-const evidenceRef = process.env.PI_LOCKFILE_REVIEW_EVIDENCE?.trim();
-const evidencePath = evidenceRef
-  ? path.isAbsolute(evidenceRef)
-    ? evidenceRef
-    : pathResolver.rootResolve(evidenceRef)
-  : undefined;
-const lockfileHash = createHash('sha256')
-  .update(safeReadFile(pathResolver.rootResolve('pnpm-lock.yaml')))
-  .digest('hex');
-const evidenceText =
-  evidencePath && safeExistsSync(evidencePath)
-    ? String(safeReadFile(evidencePath, { encoding: 'utf8' }))
-    : '';
-const evidenceHash = /pnpm-lock\.yaml`?\s+sha256:\s*([a-f0-9]{64})/iu.exec(evidenceText)?.[1];
-const hasReviewEvidence = Boolean(
-  evidencePath && evidenceText.trim() && evidenceHash === lockfileHash
-);
+export function isLockfileChangePermitted(input: {
+  lockfileChanged: boolean;
+  allowOverride: boolean;
+  hasReviewEvidence: boolean;
+}): boolean {
+  return !input.lockfileChanged || (input.allowOverride && input.hasReviewEvidence);
+}
+
+export function checkLockfileCommitGate(): LockfileCommitGateResult {
+  const baseRef = process.env.GITHUB_BASE_REF?.trim();
+  const safeBase = baseRef && /^[A-Za-z0-9._/-]+$/u.test(baseRef) ? baseRef : undefined;
+  const changed = new Set<string>();
+
+  collectChangedFiles(['diff', '--name-only', '--', 'pnpm-lock.yaml'], changed);
+  if (safeBase) {
+    collectChangedFiles(
+      ['diff', '--name-only', `${safeBase}...HEAD`, '--', 'pnpm-lock.yaml'],
+      changed
+    );
+  }
+
+  const evidenceRef = process.env.PI_LOCKFILE_REVIEW_EVIDENCE?.trim() || undefined;
+  const evidencePath = evidenceRef
+    ? path.isAbsolute(evidenceRef)
+      ? evidenceRef
+      : pathResolver.rootResolve(evidenceRef)
+    : undefined;
+  const lockfileHash = createHash('sha256')
+    .update(safeReadFile(pathResolver.rootResolve('pnpm-lock.yaml')))
+    .digest('hex');
+  const evidenceText =
+    evidencePath && safeExistsSync(evidencePath)
+      ? String(safeReadFile(evidencePath, { encoding: 'utf8' }))
+      : '';
+  const evidenceHash = /pnpm-lock\.yaml`?\s+sha256:\s*([a-f0-9]{64})/iu.exec(evidenceText)?.[1];
+  const hasReviewEvidence = Boolean(
+    evidencePath && evidenceText.trim() && evidenceHash === lockfileHash
+  );
+  const lockfileChanged = changed.has('pnpm-lock.yaml');
+  const permitted = isLockfileChangePermitted({
+    lockfileChanged,
+    allowOverride: process.env.PI_ALLOW_LOCKFILE_CHANGE === '1',
+    hasReviewEvidence,
+  });
+
+  return {
+    changedFiles: [...changed].sort(),
+    evidenceRef,
+    hasReviewEvidence,
+    permitted,
+  };
+}
+
+export const runCheckLockfileCommitGate = defineScript({
+  name: 'check:lockfile-commit-gate',
+  flags: [],
+  run(context) {
+    const result = checkLockfileCommitGate();
+    if (!result.permitted) {
+      context.print(
+        '[check:lockfile-commit-gate] FAILED: pnpm-lock.yaml changed; set PI_ALLOW_LOCKFILE_CHANGE=1 and PI_LOCKFILE_REVIEW_EVIDENCE to a non-empty reviewed file.'
+      );
+      throw new ScriptExitError(1);
+    }
+    context.print(
+      `[check:lockfile-commit-gate] OK${result.changedFiles.includes('pnpm-lock.yaml') ? ` (review evidence: ${result.evidenceRef})` : ''}`
+    );
+    return result;
+  },
+});
 
 if (
-  changed.has('pnpm-lock.yaml') &&
-  (process.env.PI_ALLOW_LOCKFILE_CHANGE !== '1' || !hasReviewEvidence)
-) {
-  console.error(
-    '[check:lockfile-commit-gate] FAILED: pnpm-lock.yaml changed; set PI_ALLOW_LOCKFILE_CHANGE=1 and PI_LOCKFILE_REVIEW_EVIDENCE to a non-empty reviewed file.'
-  );
-  process.exitCode = 1;
-} else {
-  console.log(
-    `[check:lockfile-commit-gate] OK${changed.has('pnpm-lock.yaml') ? ` (review evidence: ${evidenceRef})` : ''}`
-  );
-}
+  isDirectScript(import.meta.url, 'check_lockfile_commit_gate.ts') ||
+  isDirectScript(import.meta.url, 'check_lockfile_commit_gate.js')
+)
+  void runCheckLockfileCommitGate();

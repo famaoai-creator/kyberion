@@ -1,17 +1,12 @@
 #!/usr/bin/env node
 
 import * as path from 'node:path';
-import {
-  createStandardYargs,
-  markToolRuntimeInstalled,
-  pathResolver,
-  probeToolRuntime,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-} from '@agent/core';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool-runtime-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const VOICE_TOOL_IDS = [
   'mlx_audio',
@@ -27,7 +22,7 @@ const MANAGED_PYTHON_VERSION =
 
 type VoiceToolId = (typeof VOICE_TOOL_IDS)[number];
 
-type VoiceSetupRow = {
+export type VoiceSetupRow = {
   toolId: VoiceToolId;
   managedEnvPath: string;
   installed: boolean;
@@ -227,26 +222,26 @@ function inspectVoiceRuntime(toolId: VoiceToolId): VoiceSetupRow {
   };
 }
 
-function printReport(rows: VoiceSetupRow[], apply: boolean): void {
-  console.log('Voice runtime setup');
-  console.log('');
+export function formatVoiceSetupReport(rows: VoiceSetupRow[], apply: boolean): string[] {
+  const lines = ['Voice runtime setup', ''];
   for (const row of rows) {
     const icon = row.status === 'ready' ? 'OK' : row.status === 'needs_install' ? 'WARN' : 'SKIP';
-    console.log(`[${icon}] ${row.toolId}`);
-    console.log(`  managed_env: ${row.managedEnvPath}`);
-    console.log(`  detail: ${row.detail}`);
+    lines.push(`[${icon}] ${row.toolId}`);
+    lines.push(`  managed_env: ${row.managedEnvPath}`);
+    lines.push(`  detail: ${row.detail}`);
     if (row.pythonBin) {
-      console.log(`  python: ${row.pythonBin}`);
+      lines.push(`  python: ${row.pythonBin}`);
     }
   }
-  console.log('');
+  lines.push('');
   if (!apply && rows.some((row) => row.status === 'needs_install')) {
-    console.log('Next step: `pnpm voice:setup --apply`');
+    lines.push('Next step: `pnpm kyberion voice setup --apply`');
   }
-  console.log('Verify: `pnpm voice:health`');
-  console.log(
+  lines.push('Verify: `pnpm pipeline voice-health-check`');
+  lines.push(
     'Meeting/browser adjuncts: `pnpm env:bootstrap --manifest meeting-participation-runtime --apply`'
   );
+  return lines;
 }
 
 export async function runVoiceSetup(options: { apply: boolean }): Promise<VoiceSetupRow[]> {
@@ -262,24 +257,40 @@ export async function runVoiceSetup(options: { apply: boolean }): Promise<VoiceS
   return rows;
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(
+  args: string[] = []
+): Promise<{ rows: VoiceSetupRow[]; apply: boolean }> {
+  const argv = await createStandardYargs(['node', 'voice_setup', ...args])
     .option('apply', { type: 'boolean', default: false })
     .parseSync();
 
   const rows = await runVoiceSetup({ apply: Boolean(argv.apply) });
-  printReport(rows, Boolean(argv.apply));
-  if (rows.some((row) => row.status === 'needs_install')) {
-    process.exitCode = argv.apply ? 1 : 0;
-  }
+  return { rows, apply: Boolean(argv.apply) };
 }
+
+export const runVoiceSetupScript = defineScript({
+  name: 'voice setup',
+  flags: ['json', 'quiet'],
+  run: async (context) => {
+    const { rows, apply } = await main(context.argv);
+    if (context.json) {
+      context.print({
+        status: rows.some((row) => row.status === 'needs_install') ? 'needs_install' : 'ready',
+        apply,
+        rows,
+      });
+    } else {
+      context.print(formatVoiceSetupReport(rows, apply).join('\n'));
+    }
+    if (apply && rows.some((row) => row.status === 'needs_install')) {
+      throw new ScriptExitError(1, 'voice runtime setup is incomplete');
+    }
+    return rows;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'voice_setup.ts') ||
   isDirectScript(import.meta.url, 'voice_setup.js')
-) {
-  main().catch((error: any) => {
-    console.error(error?.message ?? String(error));
-    process.exitCode = 1;
-  });
-}
+)
+  void runVoiceSetupScript();

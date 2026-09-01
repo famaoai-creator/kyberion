@@ -10,19 +10,31 @@
  * 使い方:
  *   node_modules/.bin/tsx scripts/mission-alignment-gate/read-decision.ts <reviewed.html> <mission-brief.json>
  */
-import { safeReadFile, safeExistsSync } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  safeReadFile,
+  safeExistsSync,
+  safeLstat,
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+
+export function resolveDecisionResourcePath(inputPath: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(inputPath, { allowMissingLeaf });
+}
 
 export function main(argv: string[] = []): void {
   const htmlPath = argv[0];
   const jsonPath = argv[1];
   if (!htmlPath || !jsonPath)
     throw new ScriptExitError(1, 'usage: read-decision <reviewed.html> <mission-brief.json>');
-  if (!safeExistsSync(htmlPath)) throw new ScriptExitError(1, `html not found: ${htmlPath}`);
+  const safeHtmlPath = resolveDecisionResourcePath(htmlPath, true);
+  if (!safeExistsSync(safeHtmlPath)) throw new ScriptExitError(1, `html not found: ${htmlPath}`);
+  if (!safeLstat(safeHtmlPath).isFile())
+    throw new ScriptExitError(1, `html is not a regular file: ${htmlPath}`);
 
-  const html = safeReadFile(htmlPath, { encoding: 'utf8' }) as string;
+  const html = safeReadFile(safeHtmlPath, { encoding: 'utf8' }) as string;
   // mg-gate 要素の開始タグに限定して属性を読む（CSSセレクタ data-decision="approved" への誤マッチ防止）
   const gateTag = (html.match(/<div\s+id="mg-gate"[^>]*>/) || [''])[0];
   const decision = (gateTag.match(/data-decision="([^"]*)"/) || [])[1] || 'pending';
@@ -34,7 +46,11 @@ export function main(argv: string[] = []): void {
   while ((mm = reNote.exec(html)))
     comments.push(mm[1].replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'));
 
-  const b = safeExistsSync(jsonPath) ? readJson<Record<string, unknown>>(jsonPath) : {};
+  const safeJsonPath = resolveDecisionResourcePath(jsonPath, true);
+  const b =
+    safeExistsSync(safeJsonPath) && safeLstat(safeJsonPath).isFile()
+      ? readJson<Record<string, unknown>>(safeJsonPath)
+      : {};
 
   console.log(
     JSON.stringify(

@@ -4,20 +4,20 @@
  * Implements the closed-loop between Phase 4 (Execution) and Phase 5 (Review/Distillation).
  */
 import { logger } from '../core.js';
-import { safeWriteFile, safeReadFile, safeExistsSync, safeMkdir } from '../secure-io.js';
+import { readJson } from '../foundation/json.js';
+import { safeWriteFile, safeExistsSync, safeMkdir } from '../secure-io.js';
 import * as path from 'path';
 import { pathResolver } from '../path-resolver.js';
 
 // Import types
 import type { Trace, TraceSpan } from './trace.js';
 import type { KnowledgeHint } from './knowledge-index.js';
-import { loadScheduleRegistry } from './pipeline-scheduler.js';
+import { loadScheduleRegistry, saveScheduleRegistry } from './pipeline-scheduler.js';
 import type { PipelineScheduleRegistry, PipelineSchedulerOptions } from './pipeline-scheduler.js';
 import { sendOpsAlert } from '../ops-alert.js';
 import type { OpsAlertInput, OpsAlertOptions, OpsAlertReceipt } from '../ops-alert.js';
 
 const FEEDBACK_HINTS_DIR = pathResolver.shared('runtime/feedback-loop/hints');
-const PIPELINE_SCHEDULE_REGISTRY_PATH = pathResolver.shared('runtime/pipeline-schedules.json');
 
 function sanitizeSpanName(name: string): string {
   return name.replace(/[^\w:-]+/g, ' ').trim();
@@ -88,8 +88,7 @@ export function persistHints(hints: KnowledgeHint[], category: string = 'auto-le
 
   if (safeExistsSync(filePath)) {
     try {
-      const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      existing = JSON.parse(raw);
+      existing = readJson<KnowledgeHint[]>(filePath);
     } catch {
       /* start fresh */
     }
@@ -117,8 +116,7 @@ export function readHintsByCategory(category: string): KnowledgeHint[] {
   const filePath = path.join(FEEDBACK_HINTS_DIR, `${sanitizeCategory(category)}.json`);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    const parsed = JSON.parse(raw);
+    const parsed = readJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -130,19 +128,16 @@ export function readHintsByCategory(category: string): KnowledgeHint[] {
  */
 export function checkScheduleHealth(
   scheduleId: string,
-  maxConsecutiveFailures: number = 3
+  maxConsecutiveFailures: number = 3,
+  registryOptions: PipelineSchedulerOptions = {}
 ): {
   healthy: boolean;
   action?: 'disabled' | 'warning';
   message?: string;
 } {
-  const registryPath = PIPELINE_SCHEDULE_REGISTRY_PATH;
-  if (!safeExistsSync(registryPath)) return { healthy: true };
-
   try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const registry = JSON.parse(raw);
-    const schedule = (registry.schedules || []).find((s: any) => s.id === scheduleId);
+    const registry = loadScheduleRegistry(registryOptions);
+    const schedule = registry.schedules.find((s) => s.id === scheduleId);
 
     if (!schedule) return { healthy: true };
 
@@ -153,7 +148,7 @@ export function checkScheduleHealth(
       schedule.enabled = false;
       schedule.disabledReason = `Auto-disabled after ${failCount} consecutive failures`;
       schedule.disabledAt = new Date().toISOString();
-      safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
+      saveScheduleRegistry(registry, registryOptions);
       logger.warn(`[FEEDBACK] Schedule "${scheduleId}" auto-disabled after ${failCount} failures`);
       return {
         healthy: false,
@@ -264,15 +259,12 @@ export function sweepFailedSchedules(
 export function recordPipelineResult(
   scheduleId: string,
   status: 'succeeded' | 'failed',
-  trace?: Trace
+  trace?: Trace,
+  registryOptions: PipelineSchedulerOptions = {}
 ): void {
-  const registryPath = PIPELINE_SCHEDULE_REGISTRY_PATH;
-  if (!safeExistsSync(registryPath)) return;
-
   try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const registry = JSON.parse(raw);
-    const schedule = (registry.schedules || []).find((s: any) => s.id === scheduleId);
+    const registry = loadScheduleRegistry(registryOptions);
+    const schedule = registry.schedules.find((s) => s.id === scheduleId);
 
     if (!schedule) return;
 
@@ -285,7 +277,7 @@ export function recordPipelineResult(
       schedule.consecutiveFailures = 0;
     }
 
-    safeWriteFile(registryPath, JSON.stringify(registry, null, 2));
+    saveScheduleRegistry(registry, registryOptions);
 
     // Auto-extract and persist hints from trace
     if (trace) {
@@ -296,7 +288,7 @@ export function recordPipelineResult(
     }
 
     // Check health after recording
-    checkScheduleHealth(scheduleId);
+    checkScheduleHealth(scheduleId, 3, registryOptions);
   } catch (e: any) {
     logger.error(`[FEEDBACK] Failed to record result: ${e.message}`);
   }
@@ -309,11 +301,12 @@ export function recordPipelineResult(
 export function runFeedbackLoop(
   scheduleId: string | undefined,
   status: 'succeeded' | 'failed',
-  trace?: Trace
+  trace?: Trace,
+  registryOptions: PipelineSchedulerOptions = {}
 ): void {
   // 1. Record result in schedule registry
   if (scheduleId) {
-    recordPipelineResult(scheduleId, status, trace);
+    recordPipelineResult(scheduleId, status, trace, registryOptions);
   }
 
   // 2. Extract and persist hints from trace (even for non-scheduled pipelines)

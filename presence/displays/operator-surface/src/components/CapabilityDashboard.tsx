@@ -1,5 +1,6 @@
 import React from 'react';
-import { formatDateTime, resolveOperatorLocale, resolveTimeZone } from '@agent/core';
+import { formatDateTime, resolveTimeZone } from '@agent/core/format';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
 
 interface Dependency {
   id: string;

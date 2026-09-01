@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { attemptAutonomousRepair } from './autonomous-repair.js';
 import { sendOpsAlert } from './ops-alert.js';
-import { getReasoningBackend } from './reasoning-backend.js';
 
 vi.mock('./core.js', () => ({
   logger: {
@@ -16,27 +15,20 @@ vi.mock('./ops-alert.js', () => ({
   sendOpsAlert: vi.fn(),
 }));
 
-const delegateTask = vi.fn();
-vi.mock('./reasoning-backend.js', () => ({
-  getReasoningBackend: vi.fn(() => ({ delegateTask })),
+const { validateAndRepairAdfMock } = vi.hoisted(() => ({
+  validateAndRepairAdfMock: vi.fn(),
 }));
-
-// LC-01: in-memory ADF files for the deterministic repair cascade.
-const adfFiles = vi.hoisted(() => new Map<string, string>());
-vi.mock('./secure-io.js', () => ({
-  safeExistsSync: (filePath: string) => adfFiles.has(filePath),
-  safeReadFile: (filePath: string) => adfFiles.get(filePath) ?? '',
-  safeWriteFile: (filePath: string, data: string | Buffer) => {
-    adfFiles.set(filePath, String(data));
-  },
+vi.mock('./adf-repair-agent.js', () => ({
+  validateAndRepairAdf: validateAndRepairAdfMock,
 }));
 
 describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
   beforeEach(() => {
     vi.mocked(sendOpsAlert).mockClear();
-    vi.mocked(getReasoningBackend).mockClear();
-    delegateTask.mockReset().mockResolvedValue('fixed the params');
-    adfFiles.clear();
+    validateAndRepairAdfMock.mockReset().mockResolvedValue({
+      repaired: true,
+      report: 'fixed the params',
+    });
   });
 
   it('fails closed and escalates for sensitive categories (AO-03 §4)', async () => {
@@ -46,7 +38,7 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
     });
 
     expect(repaired).toBe(false);
-    expect(delegateTask).not.toHaveBeenCalled();
+    expect(validateAndRepairAdfMock).not.toHaveBeenCalled();
     expect(sendOpsAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         severity: 'critical',
@@ -55,7 +47,7 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
     );
   });
 
-  it('delegates safe repairs and reports success', async () => {
+  it('delegates file-backed repairs to the canonical ADF repair agent', async () => {
     const repaired = await attemptAutonomousRepair({
       step: { op: 'file:write_file', params: { path: 'x' } },
       failure: { category: 'validation_error', repairAction: 'fix the path param' },
@@ -64,16 +56,45 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
 
     expect(repaired).toBe(true);
     expect(sendOpsAlert).not.toHaveBeenCalled();
-    expect(delegateTask).toHaveBeenCalledTimes(1);
-    const [instruction] = delegateTask.mock.calls[0];
-    expect(instruction).toContain('pipelines/sample.json');
-    expect(instruction).toContain('fix the path param');
+    expect(validateAndRepairAdfMock).toHaveBeenCalledWith(
+      'pipelines/sample.json',
+      'pipeline-adf',
+      expect.objectContaining({
+        step: { op: 'file:write_file', params: { path: 'x' } },
+        failure: expect.objectContaining({
+          category: 'validation_error',
+          repairAction: 'fix the path param',
+        }),
+      })
+    );
+  });
+
+  it('forwards trust and approval decisions to project-local ADF repair', async () => {
+    await attemptAutonomousRepair({
+      step: { op: 'file:write_file' },
+      failure: { category: 'validation_error' },
+      pipelinePath: 'pipelines/project-local.json',
+      trustResolved: true,
+      projectTrustApprovalId: 'approval-project-local',
+      policy: { effort: 'high', budget: { max_tokens: 500 } },
+    });
+
+    expect(validateAndRepairAdfMock).toHaveBeenCalledWith(
+      'pipelines/project-local.json',
+      'pipeline-adf',
+      expect.objectContaining({
+        trustResolved: true,
+        projectTrustApprovalId: 'approval-project-local',
+        delegationOptions: { effort: 'high', budget: { max_tokens: 500 } },
+      })
+    );
   });
 
   it('returns false when post-repair validation still fails', async () => {
     const repaired = await attemptAutonomousRepair({
       step: { op: 'file:write_file' },
       failure: { category: 'validation_error' },
+      pipelinePath: 'pipelines/invalid.json',
       validate: async () => {
         throw new Error('ADF still invalid');
       },
@@ -82,65 +103,37 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
     expect(repaired).toBe(false);
   });
 
-  it('repairs mechanically broken JSON without any LLM call (LC-01)', async () => {
-    adfFiles.set('pipelines/broken.json', '{"id": "demo", "steps": [{"op": "file:read"},],}');
-    const validate = vi.fn().mockResolvedValue(undefined);
-
+  it('fails closed for in-memory repairs without a durable ADF path', async () => {
     const repaired = await attemptAutonomousRepair({
       step: { op: 'file:read' },
       failure: { category: 'validation_error', detail: 'invalid JSON' },
-      pipelinePath: 'pipelines/broken.json',
-      validate,
     });
 
-    expect(repaired).toBe(true);
-    expect(delegateTask).not.toHaveBeenCalled();
-    expect(validate).toHaveBeenCalledTimes(1);
-    expect(() => JSON.parse(adfFiles.get('pipelines/broken.json')!)).not.toThrow();
+    expect(repaired).toBe(false);
+    expect(validateAndRepairAdfMock).not.toHaveBeenCalled();
   });
 
-  it('skips deterministic repair for parseable JSON and escalates to the LLM (LC-01)', async () => {
-    adfFiles.set('pipelines/semantic.json', '{"id": "demo", "steps": [{"op": "unknown:op"}]}');
-    // A real repair subagent has file-editing tools; simulate it actually
-    // fixing the op as a side effect of the delegated task.
-    delegateTask.mockImplementation(async () => {
-      adfFiles.set('pipelines/semantic.json', '{"id": "demo", "steps": [{"op": "system:log"}]}');
-      return 'fixed the unknown op';
+  it('returns false when the canonical ADF repair cannot validate the result', async () => {
+    validateAndRepairAdfMock.mockResolvedValue({
+      repaired: false,
+      errors: ['steps[0].op: unknown operation'],
     });
-
     const repaired = await attemptAutonomousRepair({
       step: { op: 'unknown:op' },
       failure: { category: 'validation_error', detail: 'unknown op' },
       pipelinePath: 'pipelines/semantic.json',
     });
 
-    expect(repaired).toBe(true);
-    expect(delegateTask).toHaveBeenCalledTimes(1);
-  });
-
-  it('returns false when the subagent reports success but leaves the file unchanged', async () => {
-    // Regression test: a subagent that (correctly) declines to touch a
-    // security-gated file still returns a report; re-validating an untouched
-    // file trivially passes, so "the file still parses" must not be treated
-    // as "the subagent repaired it" (found via live loop simulation — a
-    // subagent explicitly halted with "CHANGES APPLIED: None" on a
-    // tier-isolation violation, yet the caller logged a successful repair).
-    adfFiles.set('pipelines/untouched.json', '{"id": "demo", "steps": [{"op": "unknown:op"}]}');
-
-    const repaired = await attemptAutonomousRepair({
-      step: { op: 'unknown:op' },
-      failure: { category: 'validation_error', detail: 'unknown op' },
-      pipelinePath: 'pipelines/untouched.json',
-    });
-
     expect(repaired).toBe(false);
+    expect(validateAndRepairAdfMock).toHaveBeenCalledOnce();
   });
 
-  it('returns false when the repair subagent itself fails', async () => {
-    delegateTask.mockRejectedValue(new Error('backend down'));
+  it('returns false when the canonical repair agent itself fails', async () => {
+    validateAndRepairAdfMock.mockRejectedValue(new Error('backend down'));
     const repaired = await attemptAutonomousRepair({
       step: { op: 'file:write_file' },
       failure: { category: 'validation_error' },
+      pipelinePath: 'pipelines/sample.json',
     });
 
     expect(repaired).toBe(false);

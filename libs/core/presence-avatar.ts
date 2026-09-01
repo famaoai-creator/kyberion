@@ -1,7 +1,7 @@
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 
 export interface PresenceAvatarProfile {
@@ -18,6 +18,9 @@ interface PresenceAvatarProfileRegistry {
 }
 
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge('product/presence/avatar-profiles.json');
+const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/presence-avatar-profiles.schema.json'
+);
 
 const DEFAULT_PROFILE: PresenceAvatarProfile = {
   agentId: 'default-surface-agent',
@@ -28,6 +31,12 @@ const DEFAULT_PROFILE: PresenceAvatarProfile = {
   },
 };
 
+const FALLBACK_REGISTRY: PresenceAvatarProfileRegistry = {
+  defaultAgentId: DEFAULT_PROFILE.agentId,
+  aliases: {},
+  profiles: [DEFAULT_PROFILE],
+};
+
 let cachedRegistryPath: string | null = null;
 let cachedProfiles: Record<string, PresenceAvatarProfile> | null = null;
 let cachedAliases: Record<string, string> | null = null;
@@ -35,8 +44,28 @@ let cachedDefaultAgentId: string | null = null;
 
 function getRegistryPath(): string {
   const overridePath = getRegisteredEnvText('KYBERION_PRESENCE_AVATAR_PROFILES_PATH')?.trim();
-  return overridePath || DEFAULT_REGISTRY_PATH;
+  return assertSafeRepositoryPath(overridePath || DEFAULT_REGISTRY_PATH, {
+    allowMissingLeaf: true,
+  });
 }
+
+const registryCatalog = defineCatalog<PresenceAvatarProfileRegistry>({
+  id: 'presence-avatar-profiles',
+  path: getRegistryPath,
+  schema: REGISTRY_SCHEMA_PATH,
+  fallback: FALLBACK_REGISTRY,
+  fallbackOnInvalid: true,
+  onFallback(error) {
+    const registryPath = getRegistryPath();
+    if (safeExistsSync(registryPath)) {
+      logger.warn(
+        `[PRESENCE_AVATAR] Failed to load registry at ${registryPath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  },
+});
 
 function buildFallbackRegistry(): {
   defaultAgentId: string;
@@ -57,7 +86,17 @@ function loadRegistry(): {
   aliases: Record<string, string>;
   profiles: Record<string, PresenceAvatarProfile>;
 } {
-  const registryPath = getRegistryPath();
+  let registryPath: string;
+  try {
+    registryPath = getRegistryPath();
+  } catch (error) {
+    logger.warn(
+      `[PRESENCE_AVATAR] Unsafe registry path; using fallback: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return buildFallbackRegistry();
+  }
   if (
     cachedProfiles &&
     cachedAliases &&
@@ -71,60 +110,34 @@ function loadRegistry(): {
     };
   }
 
-  const fallback = buildFallbackRegistry();
-  if (!safeExistsSync(registryPath)) {
-    cachedRegistryPath = registryPath;
-    cachedProfiles = fallback.profiles;
-    cachedAliases = fallback.aliases;
-    cachedDefaultAgentId = fallback.defaultAgentId;
-    return fallback;
-  }
-
-  try {
-    const raw = safeReadFile(registryPath, { encoding: 'utf8' }) as string;
-    const parsed = safeJsonParse<PresenceAvatarProfileRegistry>(
-      raw,
-      'presence avatar profile registry'
-    );
-    const profiles = Object.fromEntries(
-      (parsed.profiles || [])
-        .filter(
-          (profile) => profile && typeof profile.agentId === 'string' && profile.agentId.length > 0
-        )
-        .map((profile) => [profile.agentId, profile])
-    );
-    const firstProfileAgentId = Object.keys(profiles)[0];
-    const defaultAgentId =
-      typeof parsed.defaultAgentId === 'string' && parsed.defaultAgentId in profiles
-        ? parsed.defaultAgentId
-        : firstProfileAgentId || fallback.defaultAgentId;
-    const aliases = {
-      ...fallback.aliases,
-      ...(parsed.aliases || {}),
-    };
-    cachedRegistryPath = registryPath;
-    cachedProfiles = {
-      ...fallback.profiles,
-      ...profiles,
-    };
-    cachedAliases = aliases;
-    cachedDefaultAgentId = defaultAgentId;
-    return {
-      defaultAgentId,
-      aliases,
-      profiles: cachedProfiles,
-    };
-  } catch (error: any) {
-    logger.warn(`[PRESENCE_AVATAR] Failed to load registry at ${registryPath}: ${error.message}`);
-    cachedRegistryPath = registryPath;
-    cachedProfiles = fallback.profiles;
-    cachedAliases = fallback.aliases;
-    cachedDefaultAgentId = fallback.defaultAgentId;
-    return fallback;
-  }
+  const parsed = registryCatalog.load();
+  const profiles = Object.fromEntries(
+    (parsed.profiles || []).map((profile) => [profile.agentId, profile])
+  );
+  const firstProfileAgentId = Object.keys(profiles)[0];
+  const defaultAgentId =
+    typeof parsed.defaultAgentId === 'string' && parsed.defaultAgentId in profiles
+      ? parsed.defaultAgentId
+      : firstProfileAgentId || FALLBACK_REGISTRY.defaultAgentId!;
+  const aliases = {
+    ...FALLBACK_REGISTRY.aliases,
+    ...(parsed.aliases || {}),
+  };
+  cachedRegistryPath = registryPath;
+  cachedProfiles = {
+    ...buildFallbackRegistry().profiles,
+    ...profiles,
+  };
+  cachedAliases = aliases;
+  cachedDefaultAgentId = defaultAgentId;
+  return {
+    defaultAgentId,
+    aliases,
+    profiles: cachedProfiles,
+  };
 }
 
-export function resetPresenceAvatarRegistryCache(): void {
+export function _resetPresenceAvatarRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedProfiles = null;
   cachedAliases = null;

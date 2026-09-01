@@ -1,16 +1,14 @@
-import {
-  logger,
-  safeExecResult,
-  secureFetch,
-  type StepHook,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { safeExecResult } from '@agent/core/secure-io';
+import { secureFetch } from '@agent/core/network';
+import type { StepHook } from '@agent/core/pipeline-contract';
 
 type HookDecision = 'continue' | 'skip' | 'abort';
 type DispatchFunc = (
   op: string,
   params: any,
   ctx: Record<string, unknown>,
-  type?: string,
+  type?: string
 ) => Promise<{ handled: boolean; ctx: Record<string, unknown> }>;
 type DispatchLoader = (domain: string) => Promise<DispatchFunc>;
 
@@ -18,7 +16,7 @@ export async function runStepHooks(
   hooks: StepHook[],
   ctx: Record<string, unknown>,
   phase: 'before' | 'after',
-  loadActuatorDispatch: DispatchLoader,
+  loadActuatorDispatch: DispatchLoader
 ): Promise<HookDecision> {
   for (const hook of hooks) {
     const rejected = await runOneHook(hook, ctx, phase, loadActuatorDispatch);
@@ -31,7 +29,9 @@ export async function runStepHooks(
       continue;
     }
     if (phase === 'after' && decision === 'skip') {
-      logger.warn(`[pipeline:hook] ${label} rejected with on_reject=skip after step; treating as continue`);
+      logger.warn(
+        `[pipeline:hook] ${label} rejected with on_reject=skip after step; treating as continue`
+      );
       continue;
     }
     return decision;
@@ -44,7 +44,7 @@ async function runOneHook(
   hook: StepHook,
   ctx: Record<string, unknown>,
   phase: 'before' | 'after',
-  loadActuatorDispatch: DispatchLoader,
+  loadActuatorDispatch: DispatchLoader
 ): Promise<boolean> {
   const label = hook.label ?? `${phase}:${hook.type}`;
   try {
@@ -61,7 +61,9 @@ async function runOneHook(
   } catch (err: any) {
     const hookTarget = (hook as any).url || (hook as any).cmd || (hook as any).op || '';
     const targetSuffix = hookTarget ? ` → ${hookTarget}` : '';
-    logger.warn(`[pipeline:hook] ${label} failed (${phase} ${hook.type}${targetSuffix}): ${err.message || err}`);
+    logger.warn(
+      `[pipeline:hook] ${label} failed (${phase} ${hook.type}${targetSuffix}): ${err.message || err}`
+    );
     return true;
   }
 }
@@ -69,7 +71,7 @@ async function runOneHook(
 async function runActuatorHook(
   hook: StepHook,
   ctx: Record<string, unknown>,
-  loadActuatorDispatch: DispatchLoader,
+  loadActuatorDispatch: DispatchLoader
 ): Promise<boolean> {
   if (!hook.op) throw new Error('actuator hook requires op');
   const [domain, action] = hook.op.split(':', 2);
@@ -81,9 +83,11 @@ async function runActuatorHook(
   if (!result.handled) throw new Error(`actuator hook was not handled: ${hook.op}`);
   const resultCtx = result.ctx ?? {};
 
-  return resultCtx.decision === 'rejected'
-    || resultCtx.decision === 'abort'
-    || resultCtx.approved === false;
+  return (
+    resultCtx.decision === 'rejected' ||
+    resultCtx.decision === 'abort' ||
+    resultCtx.approved === false
+  );
 }
 
 async function runHttpHook(hook: StepHook, ctx: Record<string, unknown>): Promise<boolean> {
@@ -95,9 +99,11 @@ async function runHttpHook(hook: StepHook, ctx: Record<string, unknown>): Promis
     headers: resolveParamsRecursive(hook.headers, ctx),
   });
 
-  return response?.decision === 'abort'
-    || response?.decision === 'rejected'
-    || response?.approved === false;
+  return (
+    response?.decision === 'abort' ||
+    response?.decision === 'rejected' ||
+    response?.approved === false
+  );
 }
 
 function runCommandHook(hook: StepHook, ctx: Record<string, unknown>): boolean {
@@ -113,7 +119,7 @@ function resolveParamsRecursive(value: any, ctx: Record<string, unknown>): any {
   if (Array.isArray(value)) return value.map((item) => resolveParamsRecursive(item, ctx));
   if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entry]) => [key, resolveParamsRecursive(entry, ctx)]),
+      Object.entries(value).map(([key, entry]) => [key, resolveParamsRecursive(entry, ctx)])
     );
   }
   return resolveVars(value, ctx);

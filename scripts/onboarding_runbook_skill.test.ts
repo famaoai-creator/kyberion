@@ -21,7 +21,7 @@ describe('onboarding runbook skill (QM-08)', () => {
     expect(result.skillPath).toBe(onboardingRunbookSkillPath(root));
     expect(safeExistsSync(result.skillPath)).toBe(true);
     const skill = String(safeReadFile(result.skillPath, { encoding: 'utf8' }));
-    expect(skill).toContain('pnpm vital --format=json');
+    expect(skill).toContain('pnpm pipeline vital-check --format=json');
     expect(skill).toContain('Human approval remains required');
     expect(skill).not.toMatch(/(?:api[_-]?key|token|password)\s*[:=]\s*\S+/iu);
     expect(

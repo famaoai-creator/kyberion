@@ -1,11 +1,8 @@
-import {
-  createStandardYargs,
-  logger,
-  registerPeerNetworkPeer,
-  type PeerNetworkExposure,
-  withExecutionContext,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { createStandardYargs } from '@agent/core/cli-utils';
+import { logger } from '@agent/core/core';
+import { registerPeerNetworkPeer, type PeerNetworkExposure } from '@agent/core/peer-messaging';
+import { withExecutionContext } from '@agent/core/authority';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 function csv(value: unknown): string[] {
   if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean);
@@ -16,8 +13,11 @@ function csv(value: unknown): string[] {
     .filter(Boolean);
 }
 
-async function main(): Promise<void> {
-  const argv = createStandardYargs()
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
+  const argv = createStandardYargs(['node', 'peer_network_register', ...args])
     .option('tenant-id', {
       type: 'string',
       demandOption: true,
@@ -70,30 +70,24 @@ async function main(): Promise<void> {
   );
 
   logger.success(`[peer-register] registered ${result.peer.peer_id} in ${result.catalogPath}`);
-  console.log(
-    JSON.stringify(
-      {
-        catalog_path: result.catalogPath,
-        tenant_id: result.catalog.tenant_id,
-        peer: {
-          peer_id: result.peer.peer_id,
-          base_url: result.peer.base_url,
-          exposure: result.peer.exposure,
-          allow_local_network: result.peer.allow_local_network,
-          capabilities: result.peer.capabilities || [],
-        },
-      },
-      null,
-      2
-    )
-  );
+  print({
+    catalog_path: result.catalogPath,
+    tenant_id: result.catalog.tenant_id,
+    peer: {
+      peer_id: result.peer.peer_id,
+      base_url: result.peer.base_url,
+      exposure: result.peer.exposure,
+      allow_local_network: result.peer.allow_local_network,
+      capabilities: result.peer.capabilities || [],
+    },
+  });
 }
 
 export const runPeerNetworkRegister = defineScript({
   name: 'peer:network-register',
-  flags: [],
-  run() {
-    return main();
+  flags: ['json', 'quiet'],
+  run({ argv, print }) {
+    return main(stripSharedScriptFlags(argv), print);
   },
 });
 

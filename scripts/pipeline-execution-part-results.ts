@@ -1,33 +1,35 @@
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { attemptAutonomousRepair } from '@agent/core/autonomous-repair';
+import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
+import { logger } from '@agent/core/core';
+import { findMissionPath, missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { runFeedbackLoop } from '@agent/core/src/feedback-loop';
+import { getSemanticDecideDegradations } from '@agent/core/semantic-decide';
+import { appendSemanticDegradationRun } from '@agent/core/semantic-degradation-log';
 import {
-  validateAndRepairAdf,
-  TraceContext,
-  finalizeAndPersist,
-  logger,
-  findMissionPath,
-  missionEvidenceDir,
-  pathResolver,
-  installReasoningBackends,
-  runFeedbackLoop,
-  getSemanticDecideDegradations,
-  appendSemanticDegradationRun,
-  recordAdhocPipelineRun,
   PROMOTION_CANDIDATE_MIN_RUNS,
-  killSwitch,
-  resolveIdentityContext,
-  runAdfLifecycle,
-  getDefaultWorkerEventStream,
-  getDefaultLifecycleHookEngine,
+  recordAdhocPipelineRun,
+} from '@agent/core/promotion-candidates';
+import { killSwitch } from '@agent/core/kill-switch';
+import { resolveIdentityContext } from '@agent/core/authority';
+import { runAdfLifecycle } from '@agent/core/adf-lifecycle';
+import { getDefaultWorkerEventStream } from '@agent/core/worker-event-stream';
+import {
   fireLifecycleHooks,
-  withReasoningPayloadScope,
+  getDefaultLifecycleHookEngine,
+} from '@agent/core/lifecycle-hook-engine';
+import { withReasoningPayloadScope } from '@agent/core/reasoning-egress-scope';
+import {
   createPipelineRunJournal,
-  openPipelineRunJournal,
   loadPipelineRunJournal,
   newPipelineRunId,
+  openPipelineRunJournal,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
-  assessPipelineDryRun,
-} from '@agent/core';
+} from '@agent/core/pipeline-run-journal';
+import { assessPipelineDryRun } from '@agent/core/pipeline-dry-run';
+import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
 
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
 import { resetRouterSync } from '@agent/core/blackhole-routing-guard';
@@ -39,7 +41,7 @@ import {
 } from './pipeline-result-reporting.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { exitProcess, isDirectScript } from './lib/harness.js';
+import { currentProcessArgv, exitProcess } from './lib/harness.js';
 import { readValidatedWorkflowAdf } from './refactor/adf-input.js';
 import { runSteps } from './pipeline-execution-part-execution.js';
 
@@ -82,18 +84,27 @@ export async function runValidatedSteps(
           opts.pipelinePath && !opts._adfRepairAttempted
             ? async (draft, failure) => {
                 opts._adfRepairAttempted = true;
-                const repair = await validateAndRepairAdf(opts.pipelinePath!, 'pipeline-adf', {
+                const repaired = await attemptAutonomousRepair({
                   failure: {
                     category:
                       failure instanceof TypedFlowValidationError ? 'typed_flow' : 'preflight',
                     detail: failure instanceof Error ? failure.message : String(failure),
                     repairAction: 'repair the typed pipeline flow and re-run preflight',
                   },
+                  step: { op: 'core:validate_flow' },
+                  pipelinePath: opts.pipelinePath,
+                  trustResolved: opts.trustResolved,
+                  projectTrustApprovalId: opts.projectTrustApprovalId,
                 });
-                if (!repair.repaired) {
+                if (!repaired) {
                   throw new TypedFlowValidationError(validateFlow(draft, initialCtx));
                 }
-                return (await readValidatedWorkflowAdf(opts.pipelinePath!)).steps;
+                return (
+                  await readValidatedWorkflowAdf(opts.pipelinePath!, {
+                    trustResolved: opts.trustResolved,
+                    projectTrustApprovalId: opts.projectTrustApprovalId,
+                  })
+                ).steps;
               }
             : undefined,
         commit: (prepared) => prepared,
@@ -125,6 +136,10 @@ export interface ExecutePipelineFileOptions {
   trace?: TraceContext;
   quiet?: boolean;
   hasHuman?: boolean;
+  /** Explicit project-trust decision for pipeline/template loading. */
+  trustResolved?: boolean;
+  /** Durable human approval for the exact project-local resource being loaded. */
+  projectTrustApprovalId?: string;
 }
 
 /**
@@ -139,11 +154,16 @@ export async function executePipelineFile(
   inputPath: string,
   options: ExecutePipelineFileOptions = {}
 ) {
-  const pipeline = await readValidatedWorkflowAdf(inputPath);
+  const pipeline = await readValidatedWorkflowAdf(inputPath, {
+    trustResolved: options.trustResolved,
+    projectTrustApprovalId: options.projectTrustApprovalId,
+  });
   const pipelineId = String(
     pipeline.pipeline_id || pipeline.id || nodePath.basename(inputPath, nodePath.extname(inputPath))
   );
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
+  const effectiveTrustResolved =
+    options.trustResolved === true || Boolean(options.projectTrustApprovalId);
   const missionId =
     String(options.context?.mission_id || baseContext.mission_id || process.env.MISSION_ID || '') ||
     undefined;
@@ -153,6 +173,10 @@ export async function executePipelineFile(
     node_options: process.env.NODE_OPTIONS || '',
     run_utc_now: new Date().toISOString(),
     __pipeline_options: pipeline.options || {},
+    trust_resolved: effectiveTrustResolved,
+    ...(options.projectTrustApprovalId
+      ? { project_trust_approval_id: options.projectTrustApprovalId }
+      : {}),
   };
   if (missionId) {
     const missionPath = findMissionPath(missionId);
@@ -220,7 +244,14 @@ export async function executePipelineFile(
       pipelinePath: inputPath,
       quiet: options.quiet,
       hasHuman: options.hasHuman,
-      runPipelineFile: executePipelineFile,
+      trustResolved: effectiveTrustResolved,
+      projectTrustApprovalId: options.projectTrustApprovalId,
+      runPipelineFile: (nestedPath, nestedOptions = {}) =>
+        executePipelineFile(nestedPath, {
+          ...nestedOptions,
+          trustResolved: effectiveTrustResolved,
+          projectTrustApprovalId: options.projectTrustApprovalId,
+        }),
     });
   const missionTier = String(autoContext.mission_tier || '');
   const payloadTier: 'public' | 'confidential' | 'personal' =
@@ -260,7 +291,7 @@ export async function executePipelineFile(
   return { ...result, trace, persistedPath: persisted.path };
 }
 
-export async function main() {
+export async function main(args?: string[]) {
   // Propagate resolved identity to process.env so spawned subprocesses inherit them.
   const identity = resolveIdentityContext();
   if (identity.role && !process.env.MISSION_ROLE) {
@@ -270,7 +301,8 @@ export async function main() {
     setRegisteredEnv('KYBERION_PERSONA', identity.persona);
   }
 
-  const argv = await createStandardYargs()
+  const effectiveArgs = args ?? currentProcessArgv().slice(2);
+  const argv = await createStandardYargs(['node', 'run_pipeline', ...effectiveArgs])
     .option('input', { alias: 'i', type: 'string', required: false })
     .option('dry-run', {
       type: 'boolean',
@@ -296,6 +328,15 @@ export async function main() {
       default: false,
       describe: 'Suppress step-by-step progress output',
     })
+    .option('trust-project', {
+      type: 'boolean',
+      default: false,
+      describe: 'Deprecated compatibility flag; project-local resources require an approval id',
+    })
+    .option('project-trust-approval', {
+      type: 'string',
+      describe: 'Approved project-trust request id for this exact pipeline resource',
+    })
     .parseSync();
 
   let resumeState: PipelineRunJournalState | undefined;
@@ -304,10 +345,22 @@ export async function main() {
     if (!argv.input) argv.input = resumeState.started?.input_path;
   }
   if (!argv.input) throw new Error('Either --input or --resume is required.');
+  const projectTrustApprovalId = argv['project-trust-approval']
+    ? String(argv['project-trust-approval']).trim() || undefined
+    : undefined;
+  // Repository-owned pipelines are the built-in executable surface used by
+  // baseline and other governed commands. Project-local resources remain
+  // pre-trust unless their exact human approval request is supplied.
+  const inputIsBuiltin = isBuiltinPipelineResource(pathResolver.toRepoRelative(String(argv.input)));
+  const trustResolved = inputIsBuiltin && !projectTrustApprovalId;
+  const effectiveTrustResolved = trustResolved || Boolean(projectTrustApprovalId);
 
   if (argv['dry-run']) {
     try {
-      const pipeline = await readValidatedWorkflowAdf(argv.input as string);
+      const pipeline = await readValidatedWorkflowAdf(argv.input as string, {
+        trustResolved: effectiveTrustResolved,
+        projectTrustApprovalId,
+      });
       const report = assessPipelineDryRun(pipeline as Parameters<typeof assessPipelineDryRun>[0]);
       if (argv.json) {
         process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
@@ -321,6 +374,7 @@ export async function main() {
       process.exitCode = report.verdict === 'blocked' ? 1 : 0;
       return;
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       const report = {
         version: '1.0' as const,
         pipeline_id: String(argv.input),
@@ -330,10 +384,14 @@ export async function main() {
           {
             id: 'contract-validation',
             status: 'blocked' as const,
-            message: error instanceof Error ? error.message : String(error),
+            message,
           },
         ],
-        next_actions: ['Fix the pipeline ADF/guardrail validation errors and rerun the dry-run.'],
+        next_actions: message.includes('[TRUST_REQUIRED]')
+          ? [
+              `Request and approve project trust, then rerun with --project-trust-approval: pnpm kyberion project-trust request ${String(argv.input)}`,
+            ]
+          : ['Fix the pipeline ADF/guardrail validation errors and rerun the dry-run.'],
       };
       if (argv.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
       else process.stderr.write(`[pipeline-dry-run] blocked: ${report.checks[0].message}\n`);
@@ -358,7 +416,10 @@ export async function main() {
   process.once('SIGINT', () => cleanupAndExit(130));
   process.once('SIGTERM', () => cleanupAndExit(143));
 
-  const pipeline = await readValidatedWorkflowAdf(argv.input as string);
+  const pipeline = await readValidatedWorkflowAdf(argv.input as string, {
+    trustResolved: effectiveTrustResolved,
+    projectTrustApprovalId,
+  });
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
   let overrideContext: Record<string, unknown> = {};
@@ -530,7 +591,15 @@ export async function main() {
         runJournal: activeRunJournal,
         resumeState,
         runId,
-        runPipelineFile: executePipelineFile,
+        trustResolved: effectiveTrustResolved,
+        projectTrustApprovalId,
+        runPipelineFile: (nestedPath, nestedOptions = {}) =>
+          executePipelineFile(nestedPath, {
+            ...nestedOptions,
+            // Nested runs cannot widen the parent's trust decision.
+            trustResolved: effectiveTrustResolved,
+            projectTrustApprovalId,
+          }),
       });
     const result =
       payloadTier === 'public'
@@ -545,7 +614,12 @@ export async function main() {
           );
     const failed = result.results.find((entry) => entry.status === 'failed');
     const failure = failed ? formatPipelineFailure(failed.error || 'unknown error') : undefined;
-    const recovered = failure ? tryPermissionFallback(pipeline, failure, trace) : false;
+    const recovered = failure
+      ? tryPermissionFallback(pipeline, failure, trace, {
+          trustResolved: effectiveTrustResolved,
+          projectTrustApprovalId,
+        })
+      : false;
     const pipelineStatus = result.status === 'succeeded' || recovered ? 'succeeded' : 'failed';
     // PI-08: settled is deliberately after fallback/repair work. It is a
     // receipt point, not another execution gate, so a blocking hook is
@@ -649,6 +723,32 @@ export async function main() {
         on_timeout: err.suspension.on_timeout,
         ...(err.suspension.timeout_at ? { timeout_at: err.suspension.timeout_at } : {}),
       });
+      if (agentStartAdmitted && !settledLifecycleHookEmitted) {
+        settledLifecycleHookEmitted = true;
+        const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
+          matcher_value: pipelineId,
+          pipeline_id: pipelineId,
+          status: 'suspended',
+          recovered: false,
+          approval_request_id: err.suspension.approval_request_id,
+        });
+        if (settled.blocked) {
+          logger.warn(
+            `[PI-08] task_settled observer blocked after pipeline suspension: ${settled.reasons.join('; ')}`
+          );
+        }
+      }
+      const sessionEnd = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'session_end', {
+        matcher_value: pipelineId,
+        pipeline_id: pipelineId,
+        status: 'suspended',
+        approval_request_id: err.suspension.approval_request_id,
+      });
+      if (sessionEnd.blocked) {
+        logger.warn(
+          `[PI-08] session_end observer blocked after pipeline suspension: ${sessionEnd.reasons.join('; ')}`
+        );
+      }
       if (runJournal) runJournal.append('run_suspended', { ...err.suspension });
       getDefaultWorkerEventStream().emit(
         'turn_end',
@@ -671,7 +771,10 @@ export async function main() {
       return;
     }
     const failure = formatPipelineFailure(err);
-    const recovered = tryPermissionFallback(pipeline, failure, trace);
+    const recovered = tryPermissionFallback(pipeline, failure, trace, {
+      trustResolved: effectiveTrustResolved,
+      projectTrustApprovalId,
+    });
     if (agentStartAdmitted && !settledLifecycleHookEmitted) {
       settledLifecycleHookEmitted = true;
       const settled = await fireLifecycleHooks(getDefaultLifecycleHookEngine(), 'task_settled', {
@@ -728,15 +831,4 @@ export async function main() {
     process.exitCode = 1;
     return;
   }
-}
-
-export const isDirectRun =
-  isDirectScript(import.meta.url, 'run_pipeline.ts') ||
-  isDirectScript(import.meta.url, 'run_pipeline.js');
-
-if (isDirectRun) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
 }

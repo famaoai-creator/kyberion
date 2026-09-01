@@ -1,7 +1,8 @@
 import path from 'node:path';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
-import { compileSchemaFromPath, safeReadFile } from '@agent/core';
+import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { safeReadFile } from '@agent/core/secure-io';
 import { describe, expect, it } from 'vitest';
 
 const AjvCtor = (AjvModule as any).default ?? AjvModule;
@@ -12,11 +13,20 @@ describe('points-portal-clickout-usecase schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json')
+    );
     const example = JSON.parse(
-      safeReadFile(path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'), {
-        encoding: 'utf8',
-      }) as string,
+      safeReadFile(
+        path.resolve(
+          root,
+          'knowledge/product/schemas/points-portal-clickout-usecase.moppy-rakuten-travel.example.json'
+        ),
+        {
+          encoding: 'utf8',
+        }
+      ) as string
     );
 
     expect(validate(example)).toBe(true);
@@ -26,7 +36,10 @@ describe('points-portal-clickout-usecase schema', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });
     addFormats(ajv);
-    const validate = compileSchemaFromPath(ajv, path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json'));
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(root, 'knowledge/product/schemas/points-portal-clickout-usecase.schema.json')
+    );
 
     const invalid = {
       kind: 'points-portal-clickout-usecase',

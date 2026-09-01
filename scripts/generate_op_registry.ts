@@ -1,7 +1,10 @@
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { loadActuatorManifestCatalog } from '@agent/core';
-import { pathResolver, safeExistsSync } from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
+import type { ActuatorOpDescription } from '@agent/core/actuator-sdk';
+import { loadActuatorOpRegistry, type PipelineStepType } from '@agent/core/actuator-op-registry';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { getOpInputContract } from '@agent/core/op-input-contracts';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 import { describeOps as describeSystemOps } from '../libs/actuators/system-actuator/src/op-catalog.js';
@@ -34,19 +37,12 @@ import { describeOps as describeMediaGenerationOps } from '../libs/actuators/med
 import { describeOps as describeMediaOps } from '../libs/actuators/media-actuator/src/op-catalog.js';
 import { describeOps as describeVideoCompositionOps } from '../libs/actuators/video-composition-actuator/src/op-catalog.js';
 import { describeOps as describeDeploymentOps } from '../libs/actuators/deployment-actuator/src/op-catalog.js';
+import { describeOps as describeWorkingMemoryOps } from '../libs/actuators/working-memory-actuator/src/op-catalog.js';
 
 // AR-02: actuators that self-describe their op surface. The registry and
-// discovery index are generated from these; check:op-registry fails on
+// discovery index are generated from these; `generate:op-registry -- --check` fails on
 // drift between the committed files and this source of truth.
-const DESCRIBE_OPS_SOURCES: Record<
-  string,
-  () => Array<{
-    op: string;
-    kind: PipelineOpKind;
-    input_schema?: Record<string, unknown>;
-    examples?: Array<Record<string, unknown>>;
-  }>
-> = {
+const DESCRIBE_OPS_SOURCES: Record<string, () => ActuatorOpDescription[]> = {
   'system-actuator': describeSystemOps,
   'file-actuator': describeFileOps,
   'network-actuator': describeNetworkOps,
@@ -77,9 +73,8 @@ const DESCRIBE_OPS_SOURCES: Record<
   'media-actuator': describeMediaOps,
   'video-composition-actuator': describeVideoCompositionOps,
   'deployment-actuator': describeDeploymentOps,
+  'working-memory-actuator': describeWorkingMemoryOps,
 };
-
-type PipelineOpKind = 'capture' | 'transform' | 'apply' | 'control';
 
 interface ManifestPipelineOp {
   op?: string;
@@ -90,7 +85,7 @@ interface MediaManifestFile {
   actuator_id?: string;
   description?: string;
   version?: string;
-  pipeline_ops?: Partial<Record<Exclude<PipelineOpKind, 'control'>, ManifestPipelineOp[]>>;
+  pipeline_ops?: Partial<Record<Exclude<PipelineStepType, 'control'>, ManifestPipelineOp[]>>;
 }
 
 interface DomainOpRegistry {
@@ -115,12 +110,7 @@ interface OpDiscoveryRecord {
   n: string;
   path: string;
   source: 'describeOps' | 'manifest' | 'registry';
-  ops: Array<{
-    op: string;
-    kind: PipelineOpKind;
-    input_schema?: Record<string, unknown>;
-    examples?: Array<Record<string, unknown>>;
-  }>;
+  ops: ActuatorOpDescription[];
 }
 
 interface OpDiscoveryReport {
@@ -130,10 +120,10 @@ interface OpDiscoveryReport {
 
 function enrichDescribedOp(item: {
   op: string;
-  kind: PipelineOpKind;
-  input_schema?: Record<string, unknown>;
+  kind: PipelineStepType;
+  input_schema?: unknown;
   examples?: Array<Record<string, unknown>>;
-}) {
+}): ActuatorOpDescription {
   return { ...item };
 }
 
@@ -154,7 +144,7 @@ function normalizeDomainRegistry(registry: DomainOpRegistry | undefined): Domain
   };
 }
 
-function annotateOp(domain: string, op: string, kind: PipelineOpKind) {
+function annotateOp(domain: string, op: string, kind: PipelineStepType) {
   const contract = getOpInputContract(domain as 'browser' | 'file' | 'system', op);
   return contract
     ? {
@@ -170,7 +160,11 @@ function loadMediaManifest(): MediaManifestFile | null {
   if (!safeExistsSync(MEDIA_MANIFEST_PATH)) {
     return null;
   }
-  return readJson<MediaManifestFile>(MEDIA_MANIFEST_PATH);
+  return defineCatalog<MediaManifestFile>({
+    id: 'media-actuator-manifest',
+    path: MEDIA_MANIFEST_PATH,
+    schema: pathResolver.knowledge('product/schemas/actuator-manifest.schema.json'),
+  }).load();
 }
 
 function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOpRegistry {
@@ -183,7 +177,7 @@ function buildMediaOpsFromManifest(manifest: MediaManifestFile | null): DomainOp
 }
 
 function buildCurrentRegistryBase(): ActuatorOpRegistryFile {
-  const registry = readJson<ActuatorOpRegistryFile>(REGISTRY_PATH);
+  const registry = loadActuatorOpRegistry();
   return {
     $schema: '../schemas/actuator-op-registry.schema.json',
     version: registry.version || '1.0.0',

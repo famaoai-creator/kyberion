@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { AgySdkAdapter } from './agy-sdk-adapter.js';
+import { AgySdkAdapter, normalizeAgySdkBridgeMessage } from './agy-sdk-adapter.js';
 
 function fakeBridge(responseFor: (request: Record<string, unknown>) => Record<string, unknown>) {
   const child = new EventEmitter() as any;
@@ -33,6 +33,26 @@ describe('AgySdkAdapter', () => {
 
   afterEach(async () => {
     await adapter?.shutdown();
+  });
+
+  it('normalizes ready and request bridge messages', () => {
+    expect(normalizeAgySdkBridgeMessage({ event: 'ready', pid: 4321, sdk: 'test' })).toEqual({
+      event: 'ready',
+      pid: 4321,
+      sdk: 'test',
+    });
+    expect(
+      normalizeAgySdkBridgeMessage({ id: 'agy-sdk-1', ok: true, text: 'done', metadata: {} })
+    ).toEqual({ id: 'agy-sdk-1', ok: true, text: 'done', metadata: {} });
+  });
+
+  it('rejects malformed bridge message shapes', () => {
+    expect(normalizeAgySdkBridgeMessage(null)).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({})).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ event: 'ready', pid: 0 })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', ok: 'true' })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', metadata: [] })).toBeNull();
+    expect(normalizeAgySdkBridgeMessage({ id: 'x', text: 7 })).toBeNull();
   });
 
   it('boots the provider bridge and returns observed native-subagent metadata', async () => {

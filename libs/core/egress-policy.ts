@@ -1,11 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadServiceEndpointsCatalog } from './service-endpoint-registry.js';
 import type { ProvenanceTaint } from './cloudflare-os-control-plane.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { getActiveSandboxPolicy } from './sandbox-policy.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 export type EgressPolicyMode = 'warn' | 'enforce';
 
@@ -41,6 +42,9 @@ export interface EgressPolicyDecision {
 
 const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/egress-policy.json');
 const SECURITY_POLICY_PATH = pathResolver.knowledge('product/governance/security-policy.json');
+const SECURITY_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/security-policy.schema.json'
+);
 
 let cachedPolicyPath: string | null = null;
 let cachedPolicy: EgressPolicyFile | null = null;
@@ -49,7 +53,7 @@ const egressContextStorage = new AsyncLocalStorage<EgressPayloadContext>();
 
 const policyCatalog = defineCatalog<EgressPolicyFile>({
   id: 'egress-policy',
-  path: () => getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
+  path: () => getEgressPolicyPath(),
   schema: pathResolver.knowledge('product/schemas/egress-policy.schema.json'),
   fallback: {
     version: 'missing-policy',
@@ -60,11 +64,34 @@ const policyCatalog = defineCatalog<EgressPolicyFile>({
   },
 });
 
-export function resetEgressPolicyCache(): void {
+function getEgressPolicyPath(): string {
+  const configured =
+    getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
+}
+
+const securityPolicyCatalog = defineCatalog<{
+  network_guardrails?: { allowed_domains?: string[] };
+}>({
+  id: 'security-policy-egress-view',
+  path: SECURITY_POLICY_PATH,
+  schema: SECURITY_POLICY_SCHEMA_PATH,
+});
+
+export function _resetEgressPolicyCacheForTests(): void {
   cachedPolicyPath = null;
   cachedPolicy = null;
   cachedAllowedDomains = null;
   policyCatalog.reset();
+  securityPolicyCatalog.reset();
+}
+
+/**
+ * Backward-compatible cache reset for callers that used the public helper
+ * before the test-only naming was introduced.
+ */
+export function resetEgressPolicyCache(): void {
+  _resetEgressPolicyCacheForTests();
 }
 
 // ---------------------------------------------------------------------------
@@ -179,8 +206,22 @@ export function evaluateAudienceEgress(
 }
 
 export function loadEgressPolicy(): EgressPolicyFile {
-  const policyPath =
-    getRegisteredEnvText('KYBERION_EGRESS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
+  let policyPath: string;
+  try {
+    policyPath = getEgressPolicyPath();
+  } catch {
+    const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
+    const fallback: EgressPolicyFile = {
+      version: 'unsafe-path-fallback',
+      mode: modeOverride === 'enforce' ? 'enforce' : 'warn',
+      manual_allowed_domains: [],
+      blocked_domains: [],
+      tenant_allowed_domains: {},
+    };
+    cachedPolicyPath = null;
+    cachedPolicy = fallback;
+    return fallback;
+  }
   if (cachedPolicy && cachedPolicyPath === policyPath) return cachedPolicy;
   const parsed = policyCatalog.load();
   const modeOverride = getRegisteredEnvText('KYBERION_EGRESS_POLICY')?.trim();
@@ -220,9 +261,7 @@ export function loadAllowedEgressDomains(): string[] {
   };
 
   try {
-    const securityPolicy = readJson<{
-      network_guardrails?: { allowed_domains?: string[] };
-    }>(SECURITY_POLICY_PATH);
+    const securityPolicy = securityPolicyCatalog.load();
     for (const domain of securityPolicy.network_guardrails?.allowed_domains ?? []) {
       addDomain(domain);
     }
@@ -308,6 +347,17 @@ export function evaluateEgressPolicy(
       hostname: '',
       reason: 'Missing or invalid URL for egress policy.',
       mode: policy.mode || 'warn',
+    };
+  }
+
+  const sandbox = getActiveSandboxPolicy();
+  if (sandbox && !sandbox.networkAccess) {
+    return {
+      verdict: 'deny',
+      hostname,
+      reason: `[SANDBOX_NETWORK_DENIED] ${sandbox.provider ?? 'unknown'} sandbox denies network access.`,
+      mode: policy.mode || 'warn',
+      tier: context?.tier,
     };
   }
 

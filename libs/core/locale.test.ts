@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import * as core from './core.js';
 import {
@@ -167,5 +173,13 @@ describe('resolveLocale precedence chain', () => {
   it('behavior change: identity-absent + LANG=C resolves to en (not the old hardcoded ja)', () => {
     process.env.LANG = 'C';
     expect(resolveLocale({ identityPath: missingIdentityPath() })).toBe('en');
+  });
+
+  it('ignores an identity file reached through a symlink', () => {
+    const targetPath = writeIdentityFixture('identity-outside.json', { language: 'ja' });
+    const linkedPath = fixturePath('identity-linked.json');
+    safeSymlinkSync(targetPath, linkedPath);
+    process.env.LANG = 'C';
+    expect(resolveLocale({ identityPath: linkedPath })).toBe('en');
   });
 });

@@ -1,5 +1,19 @@
-import { describe, expect, it } from 'vitest';
-import { formatTraceReport } from './intent_trace.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
+import { collectTraceFiles, formatTraceReport } from './intent_trace.js';
+
+const traceLoaderTestDir = pathResolver.sharedTmp(`intent-trace-loader-${process.pid}`);
+
+afterEach(() => {
+  safeRmSync(traceLoaderTestDir, { recursive: true, force: true });
+});
 
 function makeEvidence(tier: 'confidential' | 'public') {
   return {
@@ -148,5 +162,62 @@ describe('formatTraceReport', () => {
     expect(report).toContain('path: /tmp/missions/MSN-123');
     expect(report).toContain('goal: Ship the trace view');
     expect(report).toContain('success: Expose a readable correlation timeline');
+  });
+});
+
+describe('intent trace entrypoint', () => {
+  it('keeps report output behind the shared script harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/intent_trace.ts'), { encoding: 'utf8' })
+    );
+
+    expect(source).toContain('runIntentTrace = defineScript');
+    expect(source).toContain('print(formatTraceReport(');
+    expect(source).not.toContain('console.log(');
+  });
+
+  it('does not read symlinked trace records during discovery', () => {
+    const target = `${traceLoaderTestDir}/target.jsonl`;
+    const link = `${traceLoaderTestDir}/linked.jsonl`;
+    safeMkdir(traceLoaderTestDir, { recursive: true });
+    safeWriteFile(
+      target,
+      `${JSON.stringify({
+        traceId: 'trace-linked',
+        rootSpan: { name: 'mission', status: 'ok', events: [], children: [] },
+      })}\n`
+    );
+    safeSymlinkSync(target, link);
+
+    expect(collectTraceFiles(traceLoaderTestDir)).toEqual([]);
+  });
+
+  it('skips malformed trace records before projection', () => {
+    const traceFile = `${traceLoaderTestDir}/records.jsonl`;
+    safeMkdir(traceLoaderTestDir, { recursive: true });
+    safeWriteFile(
+      traceFile,
+      [
+        '[]',
+        JSON.stringify({ traceId: 'missing-root-span' }),
+        JSON.stringify({
+          traceId: 'valid-trace',
+          rootSpan: {
+            spanId: 'span-1',
+            name: 'mission',
+            startTime: '2026-07-05T00:00:00.000Z',
+            status: 'ok',
+            events: [],
+            artifacts: [],
+            knowledgeRefs: [],
+            children: [],
+          },
+        }),
+      ].join('\n')
+    );
+
+    expect(collectTraceFiles(traceLoaderTestDir)).toEqual([
+      expect.objectContaining({ traceId: 'valid-trace' }),
+    ]);
   });
 });

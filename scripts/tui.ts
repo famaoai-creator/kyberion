@@ -36,7 +36,7 @@ export async function main(args: string[] = []): Promise<void> {
     return;
   }
 
-  const options = await createStandardYargs()
+  const options = await createStandardYargs(['node', 'tui', ...args])
     .option('once', { type: 'boolean', default: false, describe: 'Render one snapshot and exit' })
     .option('panel', { type: 'string', describe: 'Focus a single panel in --once mode' })
     .strict()

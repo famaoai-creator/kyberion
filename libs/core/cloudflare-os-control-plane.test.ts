@@ -7,6 +7,7 @@ import {
   assertAuthConfigMutationSource,
   AUTH_CONFIG_BOUNDARY_INVENTORY,
   isConstantTimeEqual,
+  normalizeGovernedCodeEnvelope,
 } from './cloudflare-os-control-plane.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile, safeUnlinkSync, safeWriteFile } from './secure-io.js';
@@ -67,6 +68,15 @@ const gadgetReadOperation = {
 };
 
 describe('Cloudflare OS adoption control plane', () => {
+  it('accepts only an object envelope with an explicit value field', () => {
+    expect(normalizeGovernedCodeEnvelope([])).toBeUndefined();
+    expect(normalizeGovernedCodeEnvelope({})).toBeUndefined();
+    expect(normalizeGovernedCodeEnvelope({ value: null, value_undefined: true })).toEqual({
+      value: undefined,
+    });
+    expect(normalizeGovernedCodeEnvelope({ value: 3 })).toEqual({ value: 3 });
+  });
+
   it('OS-01 submits, approves, applies exactly once and requires attribution', async () => {
     const plane = createPlane();
     let applications = 0;
@@ -534,6 +544,12 @@ describe('Cloudflare OS adoption control plane', () => {
     } finally {
       safeUnlinkSync(statePath);
     }
+  });
+
+  it('rejects a persisted state path outside the repository root', () => {
+    expect(
+      () => new CloudflareOsControlPlane({ statePath: '../outside-control-plane.json' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('persists and restores gadget contracts with tenant and observation boundaries', async () => {

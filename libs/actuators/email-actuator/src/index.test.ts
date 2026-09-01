@@ -3,30 +3,42 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   safeExistsSync: vi.fn(),
+  safeLstat: vi.fn(() => ({ isFile: () => true })),
   createDraft: vi.fn(),
   sendEmail: vi.fn(),
   resolveVars: vi.fn((value: unknown) => value),
   retry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
-vi.mock('@agent/core', async () => {
-  const actual = (await vi.importActual('@agent/core')) as any;
-  return {
-    ...actual,
-    safeReadFile: mocks.safeReadFile,
-    safeExistsSync: mocks.safeExistsSync,
-    createDraft: mocks.createDraft,
-    sendEmail: mocks.sendEmail,
-    resolveVars: mocks.resolveVars,
-    retry: mocks.retry,
-  };
-});
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  safeReadFile: mocks.safeReadFile,
+  safeExistsSync: mocks.safeExistsSync,
+  safeLstat: mocks.safeLstat,
+}));
+
+vi.mock('@agent/core/email-bridge', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/email-bridge')>()),
+  createDraft: mocks.createDraft,
+  sendEmail: mocks.sendEmail,
+}));
+
+vi.mock('@agent/core/src/logic-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/src/logic-utils')>()),
+  resolveVars: mocks.resolveVars,
+}));
+
+vi.mock('@agent/core/async-utils', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/async-utils')>()),
+  retry: mocks.retry,
+}));
 
 describe('email-actuator', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
     mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeLstat.mockReturnValue({ isFile: () => true });
   });
 
   it('creates a draft from direct parameters', async () => {
@@ -72,6 +84,37 @@ describe('email-actuator', () => {
       body: 'Hello from file',
     });
     expect(result).toEqual(expect.objectContaining({ status: 'succeeded' }));
+  });
+
+  it('rejects a body_file outside the repository', async () => {
+    const { handleAction } = await import('./index.js');
+
+    await expect(
+      handleAction({
+        action: 'send_from_file',
+        params: {
+          to: 'bob@example.com',
+          subject: 'External file',
+          body_file: '/tmp/external-email-body.txt',
+        },
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a body_file that is not a regular file', async () => {
+    mocks.safeLstat.mockReturnValue({ isFile: () => false });
+    const { handleAction } = await import('./index.js');
+
+    await expect(
+      handleAction({
+        action: 'send_from_file',
+        params: {
+          to: 'bob@example.com',
+          subject: 'Directory body',
+          body_file: 'docs/message.txt',
+        },
+      })
+    ).rejects.toThrow('body_file must be a regular file');
   });
 
   it('rejects unknown operations', async () => {

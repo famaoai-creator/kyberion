@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/model-cost-registry.schema.json",
+  "title": "Model Cost Registry",
+  "description": "Per-1k-token model pricing, aliases, optional cache rates, and input-token pricing tiers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "currency", "unit", "models", "default"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "currency": { "type": "string", "minLength": 1 },
+    "unit": { "type": "string", "minLength": 1 },
+    "note": { "type": "string" },
+    "models": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/costEntry" }
+    },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "default": { "$ref": "#/$defs/costEntry" }
+  },
+  "$defs": {
+    "rateProperties": {
+      "type": "number",
+      "minimum": 0
+    },
+    "costEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prompt", "completion"],
+      "properties": {
+        "prompt": { "$ref": "#/$defs/rateProperties" },
+        "completion": { "$ref": "#/$defs/rateProperties" },
+        "cache_read": { "$ref": "#/$defs/rateProperties" },
+        "cache_write": { "$ref": "#/$defs/rateProperties" },
+        "cache_write_1h": { "$ref": "#/$defs/rateProperties" },
+        "tiers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/costTier" }
+        }
+      }
+    },
+    "costTier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input_tokens_above", "prompt", "completion"],
+      "properties": {
+        "input_tokens_above": { "type": "number", "minimum": 0 },
+        "prompt": { "$ref": "#/$defs/rateProperties" },
+        "completion": { "$ref": "#/$defs/rateProperties" },
+        "cache_read": { "$ref": "#/$defs/rateProperties" },
+        "cache_write": { "$ref": "#/$defs/rateProperties" },
+        "cache_write_1h": { "$ref": "#/$defs/rateProperties" }
+      }
+    }
+  }
+}

@@ -7,7 +7,14 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { safeExistsSync, safeMkdir, safeReadFile, safeReaddir } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+} from './secure-io.js';
 import { findMissionPath, rootDir, shared } from './path-resolver.js';
 import {
   appendValidatedJournalEvent,
@@ -161,11 +168,12 @@ function appendPipelineJournalEvent(
   event: PipelineRunEventType,
   payload: Record<string, unknown>
 ): PipelineRunJournalEvent {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   return appendValidatedJournalEvent({
     kernel: pipelineJournalKernel,
     opName: `pipeline.${event}`,
     payload,
-    journalPath: filePath,
+    journalPath: safeFilePath,
     seq: sequence,
     buildEnvelope: ({ seq, ts, payload: validated }) => ({
       version: PIPELINE_RUN_JOURNAL_VERSION,
@@ -186,7 +194,10 @@ function journalDir(missionId?: string): string {
 }
 
 export function pipelineRunJournalPath(runId: string, missionId?: string): string {
-  return path.join(journalDir(missionId), `${normalizedSegment(runId)}.jsonl`);
+  return assertSafeRepositoryPath(
+    path.join(journalDir(missionId), `${normalizedSegment(runId)}.jsonl`),
+    { allowMissingLeaf: true }
+  );
 }
 
 function candidateJournalPaths(runId: string): string[] {
@@ -196,7 +207,18 @@ function candidateJournalPaths(runId: string): string[] {
     const base = path.join(rootDir(), 'active', 'missions', tier);
     if (!safeExistsSync(base)) continue;
     for (const missionId of safeReaddir(base)) {
-      const candidate = path.join(base, missionId, 'coordination', 'pipeline-runs', `${id}.jsonl`);
+      let candidate: string;
+      try {
+        candidate = assertSafeRepositoryPath(
+          path.join(base, missionId, 'coordination', 'pipeline-runs', `${id}.jsonl`),
+          { allowMissingLeaf: true }
+        );
+      } catch {
+        // A stale or hostile mission entry must not widen discovery to an
+        // external target, but it also must not hide valid journals in the
+        // remaining governed mission directories.
+        continue;
+      }
       if (safeExistsSync(candidate)) candidates.push(candidate);
     }
   }
@@ -275,8 +297,10 @@ function migrateEvent(raw: unknown): PipelineRunJournalEvent {
 }
 
 export function readPipelineRunJournal(filePath: string): PipelineRunJournalState {
-  if (!safeExistsSync(filePath)) throw new Error(`[PIPELINE_JOURNAL] not found: ${filePath}`);
-  const lines = String(safeReadFile(filePath, { encoding: 'utf8' }))
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath))
+    throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
+  const lines = String(safeReadFile(safeFilePath, { encoding: 'utf8' }))
     .split('\n')
     .filter((line) => line.trim().length > 0);
   const events: PipelineRunJournalEvent[] = [];
@@ -284,7 +308,7 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   for (const line of lines) {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(line);
+      parsed = parseSafeJsonInput(line, 'pipeline journal event');
     } catch {
       throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
     }
@@ -323,7 +347,7 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   }) as PipelineJournalProjection;
   const state: PipelineRunJournalState = {
     run_id: runId,
-    path: filePath,
+    path: safeFilePath,
     events,
     completed_nodes: new Map(Object.entries(projection.completed_nodes)),
   };

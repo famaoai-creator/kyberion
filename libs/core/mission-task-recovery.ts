@@ -1,6 +1,8 @@
+import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
   claimWorkItem,
   expireWorkItemLeases,
@@ -8,6 +10,7 @@ import {
   listActiveWorkLeases,
   listWorkItemAttempts,
 } from './work-coordination.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 export interface MissionRequestedTaskRecoveryRecord {
   task_id: string;
@@ -31,14 +34,18 @@ export interface MissionRequestedTaskRecoverySummary {
 }
 
 function nextTasksPath(missionId: string): string {
-  return `${pathResolver.missionDir(missionId, 'public')}/NEXT_TASKS.json`;
+  const missionPath =
+    pathResolver.findMissionPath(missionId) || pathResolver.missionDir(missionId, 'public');
+  return assertSafeRepositoryPath(nodePath.join(missionPath, 'NEXT_TASKS.json'), {
+    allowMissingLeaf: true,
+  });
 }
 
 function readNextTasks(missionId: string): Array<Record<string, unknown>> {
   const filePath = nextTasksPath(missionId);
   if (!safeExistsSync(filePath)) return [];
   try {
-    const parsed = loadJson<unknown>(filePath);
+    const parsed = readJson<unknown>(filePath);
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -46,7 +53,11 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
 }
 
 function writeNextTasks(missionId: string, tasks: Array<Record<string, unknown>>): void {
-  safeWriteFile(nextTasksPath(missionId), JSON.stringify(tasks, null, 2));
+  const filePath = nextTasksPath(missionId);
+  writeDispatchArtifact(filePath, tasks, {
+    missionId,
+    missionPath: nodePath.dirname(filePath),
+  });
 }
 
 function isTerminalWorkItemStatus(status: unknown): boolean {

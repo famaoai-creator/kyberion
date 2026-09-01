@@ -16,6 +16,7 @@ import {
   safeReaddir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from './secure-io.js';
 import { findRelevantDistilledKnowledge } from './distill-knowledge-injector.js';
@@ -113,6 +114,25 @@ describe('validateAndRepairAdf', () => {
     if (originalKnowledgeDeliveryDir === undefined)
       delete process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR;
     else process.env.KYBERION_KNOWLEDGE_DELIVERY_DIR = originalKnowledgeDeliveryDir;
+  });
+
+  it('rejects an ADF repair target outside the repository root', async () => {
+    await expect(
+      validateAndRepairAdf('../../outside-adf.json', 'capability-input')
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects an ADF repair target reached through a symbolic link', async () => {
+    const targetPath = writeFixture(
+      'symlink-target.json',
+      JSON.stringify({ capability: 'demo', action: 'run' })
+    );
+    const linkPath = fixturePath('symlink-adf.json');
+    safeSymlinkSync(targetPath, linkPath);
+
+    await expect(validateAndRepairAdf(linkPath, 'capability-input')).rejects.toThrow(
+      '[RESOURCE_PATH_SYMLINK]'
+    );
   });
 
   it('routes work-item ADF repair through the coordinated native path', async () => {
@@ -363,7 +383,7 @@ describe('validateAndRepairAdf', () => {
       )
     );
 
-    const result = await validateAndRepairAdf(filePath, 'pipeline-adf');
+    const result = await validateAndRepairAdf(filePath, 'pipeline-adf', { trustResolved: true });
 
     expect(result.repaired).toBe(false);
     expect(result.report).toContain('ADF guardrails failed');
@@ -383,6 +403,7 @@ describe('validateAndRepairAdf', () => {
     );
 
     const result = await validateAndRepairAdf(filePath, 'pipeline-adf', {
+      trustResolved: true,
       step: { op: 'demo:step', id: 'failed-step', params: { value: 'before' } },
       failure: {
         category: 'runtime_error',
@@ -396,6 +417,17 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({
       steps: [{ op: 'demo:step', params: {} }],
     });
+  });
+
+  it('blocks project-local pipeline repair without a trust decision', async () => {
+    const filePath = writeFixture(
+      'untrusted-pipeline.json',
+      JSON.stringify({ steps: [{ op: 'demo:step', params: {} }] })
+    );
+
+    await expect(validateAndRepairAdf(filePath, 'pipeline-adf')).rejects.toThrow(
+      '[TRUST_REQUIRED]'
+    );
   });
 
   describe('KP-02: delegateTask knowledge context', () => {

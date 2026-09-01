@@ -2,7 +2,8 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { secretGuard } from './secret-guard.js';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, validateUrl } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { validateUrl } from './secure-io.js';
 import {
   evaluateEgressPolicy,
   resolveEgressPayloadContext,
@@ -18,22 +19,21 @@ import { getRegisteredEnvText } from './foundation/env.js';
  * v2.2 - POLICY-DRIVEN GUARDRAILS (ADF ENABLED)
  */
 
+const securityPolicyCatalog = defineCatalog<{
+  network_guardrails?: { max_request_size_kb?: number };
+}>({
+  id: 'security-policy-network-guardrails',
+  path: pathResolver.knowledge('product/governance/security-policy.json'),
+  schema: pathResolver.knowledge('product/schemas/security-policy.schema.json'),
+  fallback: {},
+  fallbackOnInvalid: true,
+});
+
 function loadNetworkGuardrails(): { maxRequestSizeKb: number } {
-  try {
-    const policyPath = pathResolver.knowledge('product/governance/security-policy.json');
-    if (safeExistsSync(policyPath)) {
-      const policy = loadJson<{ network_guardrails?: { max_request_size_kb?: unknown } }>(
-        policyPath
-      );
-      const maxRequestSizeKb = Number(policy?.network_guardrails?.max_request_size_kb);
-      if (!Number.isNaN(maxRequestSizeKb) && maxRequestSizeKb > 0) {
-        return { maxRequestSizeKb };
-      }
-    }
-  } catch (_) {
-    /* policy unreadable: fall back to default guardrails */
-  }
-  return { maxRequestSizeKb: 2048 };
+  const maxRequestSizeKb = securityPolicyCatalog.load().network_guardrails?.max_request_size_kb;
+  return typeof maxRequestSizeKb === 'number' && maxRequestSizeKb > 0
+    ? { maxRequestSizeKb }
+    : { maxRequestSizeKb: 2048 };
 }
 
 const SENSITIVE_KEY_PATTERN =

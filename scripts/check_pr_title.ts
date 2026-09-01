@@ -9,8 +9,9 @@
 
 import * as path from 'node:path';
 import { readJson } from '@agent/core/foundation';
-import { safeExec, pathResolver } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CheckResult {
   ok: boolean;
@@ -105,7 +106,9 @@ export const runCheckPullRequestTitle = defineScript({
       title: optionValue(context.argv, '--title'),
       eventPath: optionValue(context.argv, '--event-path') || process.env.GITHUB_EVENT_PATH,
     });
-    if (!result.ok) throw new Error(`${result.source}: ${result.value} (${result.reason})`);
+    if (!result.ok) {
+      throw new ScriptExitError(1, `${result.source}: ${result.value} (${result.reason})`);
+    }
     context.print(context.json ? result : `✅ ${result.source}: ${result.value}`);
   },
 });

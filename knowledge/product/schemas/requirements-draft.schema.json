@@ -203,6 +203,7 @@
           "type": "string",
           "enum": ["open", "answered", "deferred"]
         },
+        "blocking": { "type": "boolean" },
         "source_refs": {
           "type": "array",
           "items": { "$ref": "#/$defs/sourceRef" }

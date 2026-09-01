@@ -26,7 +26,7 @@ AI の出力は候補と要約に限定し、ADF、selector、lease、approval �
   generated rule だけを再注入する。content script の二重宣言は行わない。
 - AI の入力と出力の両方を generated PII rule で処理し、repair 候補の index は候補配列の範囲内
   だけを採用する。
-- 拡張契約テストを `pnpm run test:browser-bridge` から実行できる入口を追加した。
+- 拡張契約テストを `pnpm test -- --suite browser-bridge` から実行できる入口を追加した。
 
 ## レビュー結果
 

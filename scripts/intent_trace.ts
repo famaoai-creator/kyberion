@@ -1,21 +1,25 @@
 import * as path from 'node:path';
 import {
   loadIntentContractMemorySnapshot,
-  listTaskSessions,
-  currentScope,
-  pathResolver,
-  renderStatus,
+  selectContractCandidates,
+} from '@agent/core/intent-contract-learning';
+import { listTaskSessions, type TaskSession } from '@agent/core/task-session';
+import { currentScope } from '@agent/core/scope-context';
+import { pathResolver } from '@agent/core/path-resolver';
+import { renderStatus } from '@agent/core/ux-vocabulary';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
-  selectContractCandidates,
-  traceLogDir,
-  type IntentContractMemoryEntry,
-  type TaskSession,
-  loadMissionOrchestrationJournal,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { traceLogDir } from '@agent/core/src/trace';
+import { validateTraceReplay } from '@agent/core/trace-schema';
+import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
+import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
 type JsonRecord = Record<string, unknown> & { [key: string]: unknown };
@@ -110,22 +114,92 @@ function normalizeId(value: unknown): string | null {
 }
 
 function listJsonlFiles(dir: string): string[] {
-  if (!safeExistsSync(dir)) return [];
+  const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) return [];
   return safeReaddir(dir)
-    .filter((entry) => entry.endsWith('.jsonl'))
+    .map((entry) => path.join(safeDir, entry))
+    .filter((entry) => {
+      try {
+        return entry.endsWith('.jsonl') && safeLstat(entry).isFile();
+      } catch {
+        return false;
+      }
+    })
+    .map((entry) => path.basename(entry))
     .sort((left, right) => left.localeCompare(right));
 }
 
-function readJsonlRecords<T>(filePath: string): T[] {
-  if (!safeExistsSync(filePath)) return [];
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+function isJsonRecord(value: unknown): value is JsonRecord {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeJsonRecord(value: unknown): JsonRecord | null {
+  return isJsonRecord(value) ? value : null;
+}
+
+function normalizeStringArray(value: unknown): string[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) return undefined;
+  return value;
+}
+
+function normalizeSnapshotRecord(value: unknown): SnapshotRecord | null {
+  if (!isJsonRecord(value)) return null;
+  if (
+    typeof value.snapshot_id !== 'string' ||
+    typeof value.mission_id !== 'string' ||
+    typeof value.stage !== 'string' ||
+    typeof value.created_at !== 'string' ||
+    typeof value.source !== 'string' ||
+    !isJsonRecord(value.intent) ||
+    typeof value.intent.goal !== 'string'
+  ) {
+    return null;
+  }
+  const constraints = normalizeStringArray(value.intent.constraints);
+  const deliverables = normalizeStringArray(value.intent.deliverables);
+  const excluded = normalizeStringArray(value.intent.excluded);
+  const stakeholders = normalizeStringArray(value.intent.stakeholders);
+  return {
+    snapshot_id: value.snapshot_id,
+    mission_id: value.mission_id,
+    stage: value.stage,
+    created_at: value.created_at,
+    source: value.source,
+    intent: {
+      goal: value.intent.goal,
+      ...(constraints ? { constraints } : {}),
+      ...(deliverables ? { deliverables } : {}),
+      ...(excluded ? { excluded } : {}),
+      ...(stakeholders ? { stakeholders } : {}),
+    },
+    ...(typeof value.trace_ref === 'string' ? { trace_ref: value.trace_ref } : {}),
+  };
+}
+
+function normalizeTraceRecord(value: unknown): TraceRecord | null {
+  if (!isJsonRecord(value) || typeof value.traceId !== 'string' || !value.traceId.trim()) {
+    return null;
+  }
+  const metadata = value.metadata;
+  if (metadata !== undefined && !isJsonRecord(metadata)) return null;
+  const candidate = { ...value, ...(metadata ? { metadata } : {}) };
+  if (validateTraceReplay(candidate, { strictUnknownSpans: true }).length > 0) return null;
+  return candidate as TraceRecord;
+}
+
+function readJsonlRecords<T>(filePath: string, normalize: (value: unknown) => T | null): T[] {
+  const safeFile = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFile) || !safeLstat(safeFile).isFile()) return [];
+  const raw = String(safeReadFile(safeFile, { encoding: 'utf8' }) || '');
   return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())
     .filter(Boolean)
     .flatMap((line) => {
       try {
-        return [JSON.parse(line) as T];
+        const record = normalize(JSON.parse(line));
+        return record ? [record] : [];
       } catch {
         return [];
       }
@@ -158,12 +232,12 @@ function collectIntentIdsFromRecord(record: JsonRecord | undefined): string[] {
   visitValue(record.correlation_id);
 
   const nested = record.attributes;
-  if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
-    visitValue((nested as JsonRecord).intentId);
-    visitValue((nested as JsonRecord).intent_id);
-    visitValue((nested as JsonRecord).selected_intent_id);
-    visitValue((nested as JsonRecord).correlationId);
-    visitValue((nested as JsonRecord).correlation_id);
+  if (isJsonRecord(nested)) {
+    visitValue(nested.intentId);
+    visitValue(nested.intent_id);
+    visitValue(nested.selected_intent_id);
+    visitValue(nested.correlationId);
+    visitValue(nested.correlation_id);
   }
 
   return [...candidates];
@@ -209,7 +283,7 @@ function collectTraceFiles(dir: string): TraceRecord[] {
   const traceFiles = listJsonlFiles(dir);
   const traces: TraceRecord[] = [];
   for (const fileName of traceFiles) {
-    traces.push(...readJsonlRecords<TraceRecord>(path.join(dir, fileName)));
+    traces.push(...readJsonlRecords(path.join(dir, fileName), normalizeTraceRecord));
   }
   return traces;
 }
@@ -233,10 +307,10 @@ function collectAuditEntries(
   const entries: TraceAuditEntry[] = [];
   for (const auditDir of auditDirs) {
     for (const fileName of listJsonlFiles(auditDir)) {
-      const fileEntries = readJsonlRecords<JsonRecord>(path.join(auditDir, fileName));
+      const fileEntries = readJsonlRecords(path.join(auditDir, fileName), normalizeJsonRecord);
       for (const entry of fileEntries) {
         if (entry.action !== 'approval_gate') continue;
-        const metadata = entry.metadata as JsonRecord | undefined;
+        const metadata = isJsonRecord(entry.metadata) ? entry.metadata : undefined;
         const entryCorrelationId = normalizeId(metadata?.correlationId);
         const entryIntentId = normalizeId(metadata?.intentId);
         if (entryCorrelationId !== correlationId && entryIntentId !== correlationId) continue;
@@ -267,13 +341,15 @@ function collectMissionEvidence(
       const state = loadState(missionId);
       const evidenceDir = path.join(missionPath, 'evidence');
       const snapshotFile = path.join(evidenceDir, 'intent-snapshots.jsonl');
-      const snapshots = readJsonlRecords<SnapshotRecord>(snapshotFile).filter((snapshot) => {
-        return (
-          snapshot.mission_id.toLowerCase() === missionId.toLowerCase() ||
-          snapshot.trace_ref === correlationId ||
-          snapshot.snapshot_id === correlationId
-        );
-      });
+      const snapshots = readJsonlRecords(snapshotFile, normalizeSnapshotRecord).filter(
+        (snapshot) => {
+          return (
+            snapshot.mission_id.toLowerCase() === missionId.toLowerCase() ||
+            snapshot.trace_ref === correlationId ||
+            snapshot.snapshot_id === correlationId
+          );
+        }
+      );
 
       const traceIds = new Set<string>();
       if (
@@ -528,8 +604,11 @@ function countTraceErrors(span: NonNullable<TraceRecord['rootSpan']> | undefined
   return current + (span.children || []).reduce((sum, child) => sum + countTraceErrors(child), 0);
 }
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export async function main(
+  args: string[] = [],
+  print: (value: unknown) => void = () => undefined
+): Promise<void> {
+  const argv = await createStandardYargs(['node', 'intent_trace', ...stripSharedScriptFlags(args)])
     .option('locale', {
       type: 'string',
       description: 'Locale for user-facing status text',
@@ -547,20 +626,20 @@ async function main(): Promise<void> {
   const evidence = collectIntentTraceEvidence(correlationId, {
     locale: normalizeIntentTraceText(argv.locale) || 'en',
   });
-  console.log(formatTraceReport(evidence, normalizeIntentTraceText(argv.locale) || 'en'));
+  print(formatTraceReport(evidence, normalizeIntentTraceText(argv.locale) || 'en'));
 }
+
+export const runIntentTrace = defineScript({
+  name: 'intent:trace',
+  flags: ['quiet'],
+  run: ({ argv, print }) => main(argv, print),
+});
 
 if (
   isDirectScript(import.meta.url, 'intent_trace.ts') ||
   isDirectScript(import.meta.url, 'intent_trace.js')
 ) {
-  void defineScript({
-    name: 'intent:trace',
-    flags: [],
-    run() {
-      return main();
-    },
-  })();
+  void runIntentTrace();
 }
 
 export {
@@ -569,4 +648,5 @@ export {
   collectTraceIntentIds,
   collectTaskSessionIntentIds,
   collectMissionEvidence,
+  collectTraceFiles,
 };

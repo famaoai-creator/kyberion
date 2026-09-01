@@ -5,7 +5,7 @@ import {
   listActiveWorkLeases,
   listWorkItems,
   type WorkItemStatus,
-} from '@agent/core';
+} from '@agent/core/work-coordination';
 import { auditAction, toActionResult, HUD_PEER_ID, type ActionResult } from './dispatch.js';
 
 const STATUS_CYCLE: WorkItemStatus[] = ['backlog', 'ready', 'in_progress', 'review', 'done'];

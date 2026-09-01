@@ -3,6 +3,7 @@ import { readJson } from './foundation/json.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeMkdir,
@@ -49,6 +50,16 @@ export interface RasterResult {
   backend?: 'soffice+pdftoppm' | 'playwright';
 }
 
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function firstNonEmptyString(...values: unknown[]): string | undefined {
+  return values
+    .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
+    ?.trim();
+}
+
 function commandExists(command: string): boolean {
   try {
     // `command -v` is the portable probe; a non-zero exit throws.
@@ -85,7 +96,7 @@ export function detectRasterCapabilities(options: { refresh?: boolean } = {}): R
   return cachedCapabilities;
 }
 
-export function resetRasterCapabilitiesCache(): void {
+export function _resetRasterCapabilitiesCacheForTests(): void {
   cachedCapabilities = null;
 }
 
@@ -109,9 +120,12 @@ export function rasterInstallHint(missing: string[]): string {
  * pass a mission-local directory; the shared root is only for public work.
  */
 function resolveWorkDir(label: string, workDirOverride?: string): string {
-  const base = workDirOverride
-    ? pathResolver.rootResolve(workDirOverride)
-    : pathResolver.sharedTmp(path.join('visual-review', label));
+  const base = assertSafeRepositoryPath(
+    workDirOverride
+      ? pathResolver.rootResolve(workDirOverride)
+      : pathResolver.sharedTmp(path.join('visual-review', label)),
+    { allowMissingLeaf: true }
+  );
   safeMkdir(base, { recursive: true });
   const staleBefore = Date.now() - 24 * 60 * 60 * 1000;
   for (const entry of safeReaddir(base)) {
@@ -148,7 +162,7 @@ export function assertVisualReviewPathScope(input: {
   missionId?: string;
 }): { artifactPath: string; workDir?: string } {
   const root = pathResolver.rootDir();
-  const artifactPath = path.resolve(input.artifactPath);
+  const artifactPath = path.resolve(pathResolver.rootResolve(input.artifactPath));
   const artifactRelative = path.relative(root, artifactPath).replace(/\\/g, '/');
   if (
     !artifactRelative ||
@@ -159,6 +173,7 @@ export function assertVisualReviewPathScope(input: {
       `[VISUAL_REVIEW_PATH_DENIED] artifact must stay under the project root: ${artifactPath}`
     );
   }
+  const safeArtifactPath = assertSafeRepositoryPath(artifactPath, { allowMissingLeaf: true });
   const encodedTier = tierFromPath(artifactRelative);
   if (encodedTier && encodedTier !== input.tier) {
     throw new Error(
@@ -193,10 +208,14 @@ export function assertVisualReviewPathScope(input: {
         const statePath = path.join(missionPath, 'mission-state.json');
         if (safeExistsSync(statePath)) {
           try {
-            const state = readJson<Record<string, any>>(statePath);
-            const recordedTenant = String(
-              state?.context?.tenant_slug || state?.tenant_slug || state?.tenant_id || ''
-            ).trim();
+            const state = readJson<unknown>(statePath);
+            const stateRecord = isJsonRecord(state) ? state : {};
+            const context = isJsonRecord(stateRecord.context) ? stateRecord.context : {};
+            const recordedTenant = firstNonEmptyString(
+              context.tenant_slug,
+              stateRecord.tenant_slug,
+              stateRecord.tenant_id
+            );
             if (recordedTenant && recordedTenant !== input.tenantSlug) {
               throw new Error(
                 '[VISUAL_REVIEW_TENANT_MISMATCH] mission ' +
@@ -218,7 +237,7 @@ export function assertVisualReviewPathScope(input: {
         `[VISUAL_REVIEW_WORKDIR_REQUIRED] ${input.tier} material requires a mission/project-local work directory`
       );
     }
-    return { artifactPath };
+    return { artifactPath: safeArtifactPath };
   }
   const workDir = path.resolve(pathResolver.rootResolve(input.workDir));
   const workRelative = path.relative(root, workDir).replace(/\\/g, '/');
@@ -227,13 +246,14 @@ export function assertVisualReviewPathScope(input: {
       `[VISUAL_REVIEW_PATH_DENIED] work directory must stay under the project root: ${workDir}`
     );
   }
+  const safeWorkDir = assertSafeRepositoryPath(workDir, { allowMissingLeaf: true });
   const workTier = tierFromPath(workRelative);
   if (input.tier !== 'public' && workTier !== input.tier) {
     throw new Error(
       `[VISUAL_REVIEW_WORKDIR_TIER_MISMATCH] work directory must remain in ${input.tier} tier`
     );
   }
-  return { artifactPath, workDir };
+  return { artifactPath: safeArtifactPath, workDir: safeWorkDir };
 }
 
 export interface RasterizeDocumentInput {

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
+import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { resolveTenant } from '@agent/core/tenant-registry';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
-  GENERATION_QUOTA_COUNTER_REPO_SUBPATH,
-  isValidTenantSlug,
-  resolveTenant,
   safeExecResult,
   safeExistsSync,
   safeMkdir,
@@ -15,12 +15,15 @@ import {
   safeStat,
   safeSymlinkSync,
   safeWriteFile,
-  assertProtocolServiceRegistered,
+} from '@agent/core/secure-io';
+import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
+import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
-} from '@agent/core';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/protocol-service-lifecycle';
+import { getRegisteredEnvText, isRecord, readJson } from '@agent/core/foundation';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import { logger } from '@agent/core/core';
 
 export type BackupScope = 'all' | 'mission' | 'tenant';
 type BackupCommand = 'create' | 'restore' | 'list' | 'prune' | 'drill';
@@ -724,6 +727,62 @@ interface RestoredBackupManifest {
   }>;
 }
 
+export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    throw new Error(
+      `Backup manifest is not valid JSON: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+  if (!isRecord(parsed)) throw new Error('Backup manifest root must be a JSON object.');
+  if (parsed.format !== 'kyberion-backup-v1') {
+    throw new Error('Unsupported or missing backup manifest format.');
+  }
+  if (parsed.scope !== 'all' && parsed.scope !== 'mission' && parsed.scope !== 'tenant') {
+    throw new Error('Backup manifest has an invalid scope.');
+  }
+  if (!Array.isArray(parsed.entries) || parsed.entries.some((entry) => typeof entry !== 'string')) {
+    throw new Error('Backup manifest entries are missing or invalid.');
+  }
+  if (parsed.tenant !== undefined && parsed.tenant !== null && typeof parsed.tenant !== 'string') {
+    throw new Error('Backup manifest tenant is invalid.');
+  }
+  let missionGitRepos: RestoredBackupManifest['mission_git_repos'];
+  if (parsed.mission_git_repos !== undefined) {
+    if (!Array.isArray(parsed.mission_git_repos)) {
+      throw new Error('Backup manifest mission git metadata is invalid.');
+    }
+    missionGitRepos = [];
+    for (const entry of parsed.mission_git_repos) {
+      if (!isRecord(entry) || typeof entry.repo_relative_path !== 'string') {
+        throw new Error('Backup manifest mission repository path is invalid.');
+      }
+      if (
+        entry.bundle_path !== undefined &&
+        entry.bundle_path !== null &&
+        typeof entry.bundle_path !== 'string'
+      ) {
+        throw new Error('Backup manifest mission bundle path is invalid.');
+      }
+      missionGitRepos.push({
+        repo_relative_path: entry.repo_relative_path,
+        ...(entry.bundle_path !== undefined
+          ? { bundle_path: entry.bundle_path as string | null }
+          : {}),
+      });
+    }
+  }
+  return {
+    format: parsed.format,
+    scope: parsed.scope,
+    ...(parsed.tenant !== undefined ? { tenant: parsed.tenant as string | null } : {}),
+    entries: parsed.entries,
+    ...(missionGitRepos ? { mission_git_repos: missionGitRepos } : {}),
+  };
+}
+
 const TENANT_PHYSICAL_BACKUP_ROOTS = [
   'active/shared/coordination/channels',
   'active/shared/runtime/presence',
@@ -789,25 +848,8 @@ function readArchiveManifest(
       `backup manifest read failed: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
     );
   }
-  let manifest: RestoredBackupManifest;
-  try {
-    manifest = JSON.parse(result.stdout) as RestoredBackupManifest;
-  } catch (error) {
-    throw new Error(`Backup manifest is not valid JSON: ${(error as Error).message}`);
-  }
-  if (manifest.format !== 'kyberion-backup-v1') {
-    throw new Error('Unsupported or missing backup manifest format.');
-  }
-  if (!['all', 'mission', 'tenant'].includes(String(manifest.scope))) {
-    throw new Error('Backup manifest has an invalid scope.');
-  }
-  if (
-    !Array.isArray(manifest.entries) ||
-    manifest.entries.some((entry) => typeof entry !== 'string')
-  ) {
-    throw new Error('Backup manifest entries are missing or invalid.');
-  }
-  for (const entry of manifest.entries as string[]) normalizeArchiveMember(entry);
+  const manifest = parseRestoredBackupManifest(result.stdout);
+  for (const entry of manifest.entries) normalizeArchiveMember(entry);
   return { manifest, member };
 }
 
@@ -1206,15 +1248,13 @@ export function summarizeBackupStatus(
   };
 }
 
-export function main(argv: string[]): void {
+export function main(argv: string[], print: (value: unknown) => void = () => undefined): void {
   assertProtocolServiceRegistered('backup-restore');
   const options = parseBackupArgs(argv);
   if (options.command === 'create') {
     const result = createBackup(options);
-    for (const warning of result.warnings) console.warn(`[backup] warning: ${warning}`);
-    console.log(
-      JSON.stringify({ ok: true, archive: result.archive, entries: result.plan.entries }, null, 2)
-    );
+    for (const warning of result.warnings) logger.warn(`[backup] warning: ${warning}`);
+    print({ ok: true, archive: result.archive, entries: result.plan.entries });
     return;
   }
   if (options.command === 'restore') {
@@ -1240,7 +1280,7 @@ export function main(argv: string[]): void {
         target: portableProtocolServicePathRef(result.target),
       },
     });
-    if (!lifecycleReceipt) console.warn('[backup] restore lifecycle receipt unavailable');
+    if (!lifecycleReceipt) logger.warn('[backup] restore lifecycle receipt unavailable');
     if (result.quarantinePaths.length > 0) {
       const quarantineReceipt = recordProtocolServiceLifecycleBestEffort({
         serviceId: 'backup-restore',
@@ -1252,20 +1292,14 @@ export function main(argv: string[]): void {
         requestedBy: getRegisteredEnvText('KYBERION_PERSONA') || 'backup-operator',
         metadata: { quarantine_count: result.quarantinePaths.length },
       });
-      if (!quarantineReceipt) console.warn('[backup] quarantine lifecycle receipt unavailable');
+      if (!quarantineReceipt) logger.warn('[backup] quarantine lifecycle receipt unavailable');
     }
-    console.log(
-      JSON.stringify(
-        {
-          ok: true,
-          archive: result.archive,
-          target: result.target,
-          quarantine_paths: result.quarantinePaths,
-        },
-        null,
-        2
-      )
-    );
+    print({
+      ok: true,
+      archive: result.archive,
+      target: result.target,
+      quarantine_paths: result.quarantinePaths,
+    });
     return;
   }
   if (options.command === 'prune') {
@@ -1273,21 +1307,21 @@ export function main(argv: string[]): void {
       retainDaily: options.retainDaily,
       retainWeekly: options.retainWeekly,
     });
-    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+    print({ ok: true, ...result });
     return;
   }
   if (options.command === 'drill') {
     const result = runRestoreDrill(options);
-    console.log(JSON.stringify({ ok: true, ...result }, null, 2));
+    print({ ok: true, ...result });
     return;
   }
   const backups = listBackups(options.backupDir);
-  console.log(JSON.stringify({ ok: true, backups }, null, 2));
+  print({ ok: true, backups });
 }
 
 if (isDirectScript(import.meta.url, 'backup.ts') || isDirectScript(import.meta.url, 'backup.js'))
   void defineScript({
     name: 'backup',
-    flags: [],
-    run: ({ argv }) => main(argv),
+    flags: ['json', 'quiet'],
+    run: ({ argv, print }) => main(stripSharedScriptFlags(argv), print),
   })();

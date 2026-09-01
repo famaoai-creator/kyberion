@@ -1,5 +1,9 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { TRACE_SPAN_DEFINITIONS } from '@agent/core/trace-schema';
+import {
+  TRACE_EXTENSION_SPAN_NAMES,
+  TRACE_EXTENSION_SPAN_PREFIXES,
+  TRACE_SPAN_DEFINITIONS,
+} from '@agent/core/trace-schema';
 import { defineGenerator, isDirectScript } from './lib/harness.js';
 
 const outputPath = pathResolver.rootResolve('docs/developer/TRACE_SCHEMA.md');
@@ -43,6 +47,15 @@ function render(): string {
     }
     lines.push('');
   }
+  lines.push(
+    '## Extension replay vocabulary',
+    '',
+    'Strict replay consumers accept these explicitly governed extension names and dynamic namespaces.',
+    '',
+    `- Exact names: ${TRACE_EXTENSION_SPAN_NAMES.map((name) => `\`${name}\``).join(', ')}`,
+    `- Dynamic namespaces: ${TRACE_EXTENSION_SPAN_PREFIXES.map((prefix) => `\`${prefix}\``).join(', ')}`,
+    ''
+  );
   return `${lines.join('\n').replace(/\n+$/u, '')}\n`;
 }
 

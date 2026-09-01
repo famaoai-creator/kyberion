@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from './path-resolver.js';
+import { safeReadFile } from './secure-io.js';
 import {
   isOAuthSessionExpired,
   isSafeOAuthState,
@@ -41,5 +43,17 @@ describe('oauth session hygiene', () => {
         now
       )
     ).toBe(true);
+  });
+
+  it('revalidates the latest-session file selected from the service directory', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/oauth-session-store.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain(
+      'const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));'
+    );
+    expect(source).toContain('if (!safeLstat(filePath).isFile()) return null;');
   });
 });

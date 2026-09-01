@@ -1,4 +1,6 @@
-import { installReasoningBackends, getReasoningBackend, logger } from '@agent/core';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
+import { logger } from '@agent/core/core';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function test() {

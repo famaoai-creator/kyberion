@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   OpenAiCompatibleBackend,
   buildNemotronBackendFromEnv,
@@ -177,6 +179,34 @@ describe('openai-compatible-backend', () => {
     const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
     expect(firstBody.messages[1].content).not.toContain('top-secret-token');
     expect(firstBody.messages[1].content).not.toContain('sk-test-1234567890abcdef');
+  });
+
+  it('rejects model file tools that traverse a symbolic link', async () => {
+    const tempDir = fs.mkdtempSync(path.join(process.cwd(), 'active/shared/tmp/openai-tool-'));
+    const targetDir = path.join(tempDir, 'target');
+    const linkDir = path.join(tempDir, 'linked');
+    fs.mkdirSync(targetDir);
+    fs.symlinkSync(targetDir, linkDir, 'dir');
+    try {
+      const backend = new OpenAiCompatibleBackend({
+        baseURL: 'http://127.0.0.1:11434/v1',
+        apiKey: 'not-needed',
+        model: 'llama3',
+        toolsEnabled: true,
+        allowedTools: ['read_file'],
+      });
+      const result = await (
+        backend as unknown as {
+          handleToolCall(name: string, args: string): Promise<string>;
+        }
+      ).handleToolCall(
+        'read_file',
+        JSON.stringify({ path: path.relative(process.cwd(), path.join(linkDir, 'secret.txt')) })
+      );
+      expect(result).toContain('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   it('returns caller-provided governed tool calls without executing them', async () => {

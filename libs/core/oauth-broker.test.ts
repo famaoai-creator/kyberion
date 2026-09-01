@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   safeFsyncFile: vi.fn(),
   resolveServiceBinding: vi.fn(),
   loadServiceEndpointsCatalog: vi.fn(),
+  getServicePresetRecord: vi.fn(),
   executeServicePreset: vi.fn(),
   loadConnectionDocument: vi.fn(),
   storeConnectionDocument: vi.fn(),
@@ -66,6 +67,10 @@ vi.mock('./service-binding.js', () => ({
   loadServiceEndpointsCatalog: mocks.loadServiceEndpointsCatalog,
 }));
 
+vi.mock('./service-preset-registry.js', () => ({
+  getServicePresetRecord: mocks.getServicePresetRecord,
+}));
+
 vi.mock('./service-engine.js', () => ({
   executeServicePreset: mocks.executeServicePreset,
 }));
@@ -99,9 +104,22 @@ describe('oauth-broker', () => {
         canva: { preset_path: 'knowledge/product/orchestration/service-presets/canva.json' },
       },
     });
+    mocks.getServicePresetRecord.mockReturnValue({
+      service_id: 'canva',
+      operations: {},
+      oauth: {
+        authorize_url: 'https://www.canva.com/api/oauth/authorize',
+        token_operation: 'exchange_oauth_code',
+        refresh_operation: 'refresh_oauth_token',
+        pkce: true,
+        scopes: ['design:meta:read', 'asset:write'],
+      },
+    });
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -167,6 +185,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -283,6 +303,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -401,6 +423,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -440,6 +464,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',
@@ -482,6 +508,8 @@ describe('oauth-broker', () => {
     mocks.safeReadFile.mockImplementation((filePath: string) => {
       if (filePath.includes('service-presets/canva.json')) {
         return JSON.stringify({
+          service_id: 'canva',
+          operations: {},
           oauth: {
             authorize_url: 'https://www.canva.com/api/oauth/authorize',
             token_operation: 'exchange_oauth_code',

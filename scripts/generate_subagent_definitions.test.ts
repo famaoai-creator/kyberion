@@ -35,6 +35,16 @@ function agyAgentPath(role: string): string {
 }
 
 describe('generate_subagent_definitions', () => {
+  it('uses the governed team-role loader', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/generate_subagent_definitions.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain('loadTeamRoleIndex()');
+    expect(source).not.toContain('readJson<');
+  });
+
   it('maps team roles to KD-05 profiles deterministically', () => {
     expect(resolveProfile('implementer')).toBe('implementer');
     expect(resolveProfile('reviewer')).toBe('explorer');

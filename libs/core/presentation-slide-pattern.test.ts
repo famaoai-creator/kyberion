@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import AjvModule from 'ajv';
 import {
   loadSlidePatternPack,
-  resetSlidePatternPackCache,
+  _resetSlidePatternPackCacheForTests,
   selectSlidePattern,
   buildSlidePatternDiagnostics,
   validateSlidePatternContent,
@@ -15,7 +15,7 @@ const Ajv = (AjvModule as any).default ?? AjvModule;
 
 describe('presentation slide pattern pack', () => {
   afterEach(() => {
-    resetSlidePatternPackCache();
+    _resetSlidePatternPackCacheForTests();
   });
 
   it('validates the governed catalog and canonical example', () => {
@@ -139,7 +139,13 @@ describe('presentation slide pattern pack', () => {
           category: 'comparison',
           layout_key: 'two-column-story',
           body_zone: 'two-column-callout',
-          constraints: [{ kind: 'paired_item_counts_match', slots: ['problem_items', 'solution_items'], message: 'Problems and solutions must align by item number.' }],
+          constraints: [
+            {
+              kind: 'paired_item_counts_match',
+              slots: ['problem_items', 'solution_items'],
+              message: 'Problems and solutions must align by item number.',
+            },
+          ],
           element_slots: [
             { slot_id: 'problem_items', role: 'Problems', required: true, min_items: 2 },
             { slot_id: 'solution_items', role: 'Solutions', required: true, min_items: 2 },
@@ -159,7 +165,9 @@ describe('presentation slide pattern pack', () => {
           layout_key: 'timeline-roadmap',
           body_zone: 'timeline',
           constraints: [],
-          element_slots: [{ slot_id: 'milestones', role: 'Milestones', required: true, min_items: 3 }],
+          element_slots: [
+            { slot_id: 'milestones', role: 'Milestones', required: true, min_items: 3 },
+          ],
         },
         body: ['Discovery', 'Pilot', 'Rollout'],
         objective: 'Show the roadmap',
@@ -171,7 +179,7 @@ describe('presentation slide pattern pack', () => {
         expect.objectContaining({ code: 'generic-layouts' }),
         expect.objectContaining({ code: 'headline-too-long', slide_id: 'why-change' }),
         expect.objectContaining({ code: 'mixed-story-families' }),
-      ]),
+      ])
     );
   });
 });

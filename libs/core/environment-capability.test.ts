@@ -10,8 +10,13 @@ import {
   registerEnvironmentCapabilityProbe,
   resolveCapabilityInstall,
   resetEnvironmentCapabilityProbeRegistry,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
   verifyManifestSignature,
   verifyReady,
+  withExecutionContextAsync,
   type EnvironmentManifest,
 } from './index.js';
 
@@ -140,6 +145,50 @@ describe('probeManifest', () => {
     expect(fs.existsSync(marker)).toBe(false);
     expect(process.env.UNTRUSTED_MODULE_RAN).toBeUndefined();
   });
+
+  it('rejects mission-evidence traversal and symlink filenames before reading JSON', async () => {
+    const missionId = 'MSN-ENV-PROBE-PATH-001';
+    const missionDir = path.join(ROOT, 'active/missions/confidential', missionId);
+    const evidenceDir = path.join(missionDir, 'evidence');
+    const outside = path.join(ROOT, 'active/shared/tmp/environment-capability-probe-outside.json');
+    const symlink = path.join(evidenceDir, 'linked.json');
+    await withExecutionContextAsync('mission_controller', async () => {
+      safeMkdir(evidenceDir, { recursive: true });
+      safeWriteFile(path.join(missionDir, 'mission-state.json'), JSON.stringify({ missionId }));
+      safeWriteFile(outside, JSON.stringify({ ready: true }));
+      safeSymlinkSync(outside, symlink);
+      try {
+        const manifest: EnvironmentManifest = {
+          manifest_id: 'unit-test-mission-evidence-paths',
+          version: 'test',
+          capabilities: [
+            {
+              capability_id: 'cap.traversal',
+              kind: 'mission-evidence',
+              description: 'reject traversal',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: '../shared.json' },
+            },
+            {
+              capability_id: 'cap.symlink',
+              kind: 'mission-evidence',
+              description: 'reject symlink',
+              required_for: ['test'],
+              probe: { kind: 'mission-evidence', filename: 'linked.json' },
+            },
+          ],
+        };
+        const statuses = await probeManifest(manifest, { mission_id: missionId });
+        expect(statuses[0]).toMatchObject({ satisfied: false });
+        expect(statuses[0]?.reason).toContain('single repository-local file name');
+        expect(statuses[1]).toMatchObject({ satisfied: false });
+        expect(statuses[1]?.reason).toContain('path rejected');
+      } finally {
+        safeRmSync(missionDir, { recursive: true, force: true });
+        safeRmSync(outside, { force: true });
+      }
+    });
+  });
 });
 
 describe('platform-specific environment installers', () => {
@@ -253,6 +302,17 @@ describe('verifyReady', () => {
     };
     const report = verifyReady(manifest, { mission_id: FIX_MISSION });
     expect(report.ready).toBe(false);
+  });
+
+  it('rejects a manifest id that could escape the receipt directory', () => {
+    const manifest = {
+      manifest_id: '../outside',
+      version: 'test',
+      capabilities: [],
+    } as unknown as EnvironmentManifest;
+    expect(() => verifyReady(manifest, { mission_id: FIX_MISSION })).toThrow(
+      'invalid manifest id for receipt path'
+    );
   });
 
   it('reports ready=true after a successful bootstrap', async () => {

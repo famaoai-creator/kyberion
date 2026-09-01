@@ -1,7 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
-import { safeJsonParse } from './validators.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
 export type AutonomousOpsDecision = 'auto' | 'notify' | 'approve';
@@ -100,71 +100,49 @@ const FALLBACK_POLICY: AutonomousOpsPolicy = {
   },
 };
 
-let cachedPolicyPath: string | null = null;
-let cachedPolicy: AutonomousOpsPolicy | null = null;
 let cachedPolicySourceHealthy = false;
-let cachedPolicyMtimeMs: number | null = null;
 
 function getPolicyPath(): string {
-  return getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH;
-}
-
-function loadPolicyFromPath(policyPath: string): AutonomousOpsPolicy {
-  const raw = safeReadFile(policyPath, { encoding: 'utf8' }) as string;
-  return safeJsonParse<AutonomousOpsPolicy>(raw, 'autonomous ops policy');
+  return assertSafeRepositoryPath(
+    getRegisteredEnvText('KYBERION_AUTONOMOUS_OPS_POLICY_PATH')?.trim() || DEFAULT_POLICY_PATH,
+    { allowMissingLeaf: true }
+  );
 }
 
 function cloneFallbackPolicy(): AutonomousOpsPolicy {
   return JSON.parse(JSON.stringify(FALLBACK_POLICY)) as AutonomousOpsPolicy;
 }
 
-export function resetAutonomousOpsPolicyCache(): void {
-  cachedPolicyPath = null;
-  cachedPolicy = null;
+const autonomousOpsPolicyCatalog = defineCatalog<AutonomousOpsPolicy>({
+  id: 'autonomous-ops-policy',
+  path: getPolicyPath,
+  schema: pathResolver.knowledge('product/schemas/autonomous-ops-policy.schema.json'),
+});
+
+export function _resetAutonomousOpsPolicyCacheForTests(): void {
   cachedPolicySourceHealthy = false;
-  cachedPolicyMtimeMs = null;
+  autonomousOpsPolicyCatalog.reset();
 }
 
 export function getAutonomousOpsPolicy(): AutonomousOpsPolicy {
-  const policyPath = getPolicyPath();
-  let currentPolicyMtimeMs: number | null = null;
-  if (safeExistsSync(policyPath)) {
-    try {
-      currentPolicyMtimeMs = safeStat(policyPath).mtimeMs;
-    } catch {
-      currentPolicyMtimeMs = null;
-    }
-  }
-
-  if (
-    cachedPolicyPath === policyPath &&
-    cachedPolicy &&
-    cachedPolicyMtimeMs === currentPolicyMtimeMs
-  ) {
-    return cachedPolicy;
-  }
-
-  if (currentPolicyMtimeMs === null) {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = cloneFallbackPolicy();
-    cachedPolicySourceHealthy = false;
-    cachedPolicyMtimeMs = null;
-    return cachedPolicy;
-  }
-
+  let policyPath: string;
   try {
-    const parsed = loadPolicyFromPath(policyPath);
-    cachedPolicyPath = policyPath;
-    cachedPolicy = parsed;
-    cachedPolicySourceHealthy = true;
-    cachedPolicyMtimeMs = currentPolicyMtimeMs;
-    return parsed;
+    policyPath = getPolicyPath();
   } catch {
-    cachedPolicyPath = policyPath;
-    cachedPolicy = cloneFallbackPolicy();
     cachedPolicySourceHealthy = false;
-    cachedPolicyMtimeMs = currentPolicyMtimeMs;
-    return cachedPolicy;
+    return cloneFallbackPolicy();
+  }
+  if (!safeExistsSync(policyPath)) {
+    cachedPolicySourceHealthy = false;
+    return cloneFallbackPolicy();
+  }
+  try {
+    const policy = autonomousOpsPolicyCatalog.load();
+    cachedPolicySourceHealthy = true;
+    return policy;
+  } catch {
+    cachedPolicySourceHealthy = false;
+    return cloneFallbackPolicy();
   }
 }
 

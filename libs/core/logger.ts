@@ -2,11 +2,25 @@
  * Structured Logger - provides leveled, structured logging for skills.
  */
 
-export const LOG_LEVELS: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3, silent: 4 };
+export const LOG_LEVELS: Record<string, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+  silent: 4,
+};
 
 export interface LoggerOptions {
   level?: string;
   json?: boolean;
+}
+
+function isQuietProcess(): boolean {
+  return (
+    process.env.LOG_LEVEL === 'silent' ||
+    process.argv.includes('--quiet') ||
+    process.argv.includes('--json')
+  );
 }
 
 export function createLogger(name: string, options: LoggerOptions = {}) {
@@ -26,6 +40,7 @@ export function createLogger(name: string, options: LoggerOptions = {}) {
   }
 
   function _log(lvl: string, msg: string, data: any) {
+    if (isQuietProcess() && lvl !== 'error') return;
     if (LOG_LEVELS[lvl] < level) return;
     const line = _format(lvl, msg, data);
     process.stderr.write(line + '\n');

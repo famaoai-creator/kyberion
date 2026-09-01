@@ -1,19 +1,23 @@
 #!/usr/bin/env node
+import { currentScope } from '@agent/core/scope-context';
+import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { isValidTenantSlug } from '@agent/core/foundation/scope';
+import { knowledgeWritePathFor } from '@agent/core/knowledge-scope';
 import {
-  currentScope,
-  getRegisteredEnv,
   applyKnowledgeRankingWeightProposal,
-  isValidTenantSlug,
-  knowledgeWritePathFor,
-  type KnowledgeRankingWeightProposal,
   proposeKnowledgeRankingWeightRecalculation,
-  pathResolver,
-  recordHumanKnowledgeFeedback,
-  resolveTenant,
+  type KnowledgeRankingWeightProposal,
+} from '@agent/core/knowledge-weight-recalculation';
+import { pathResolver } from '@agent/core/path-resolver';
+import { recordHumanKnowledgeFeedback } from '@agent/core/src/knowledge-feedback-loop';
+import { resolveTenant } from '@agent/core/tenant-registry';
+import {
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeWriteFile,
-  withExecutionContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -54,9 +58,14 @@ export const main = defineScript({
           '[KNOWLEDGE_WEIGHT_INVALID] Usage: pnpm knowledge weights apply --proposal <path> --approval-ref <ref> --approved-by <principal> [--dry-run]'
         );
       }
-      const proposalPath = pathResolver.rootResolve(proposalPathArg);
+      const proposalPath = assertSafeRepositoryPath(pathResolver.rootResolve(proposalPathArg));
       if (!safeExistsSync(proposalPath)) {
         throw new Error(`[KNOWLEDGE_WEIGHT_INVALID] proposal not found: ${proposalPathArg}`);
+      }
+      if (!safeLstat(proposalPath).isFile()) {
+        throw new Error(
+          `[KNOWLEDGE_WEIGHT_INVALID] proposal must be a regular file: ${proposalPathArg}`
+        );
       }
       const proposal = readJson<KnowledgeRankingWeightProposal>(proposalPath);
       if (!proposal?.scope?.tenant_slug || !isValidTenantSlug(proposal.scope.tenant_slug)) {
@@ -127,7 +136,9 @@ export const main = defineScript({
       body,
       '',
     ].join('\n');
-    const target = pathResolver.knowledge(relativePath);
+    const target = assertSafeRepositoryPath(pathResolver.knowledge(relativePath), {
+      allowMissingLeaf: true,
+    });
     if (!args.includes('--apply') || context.dryRun) {
       context.print({ status: 'dry_run', relative_path: relativePath, content });
       return;

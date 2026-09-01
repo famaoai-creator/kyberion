@@ -27,6 +27,18 @@ vi.mock('@agent/core/foundation', async () => {
   };
 });
 
+vi.mock('@agent/core/secure-io', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/secure-io')>('@agent/core/secure-io');
+  return {
+    ...actual,
+    safeExistsSync: mocks.safeExistsSync,
+    safeReaddir: mocks.safeReaddir,
+    safeReadFile: mocks.safeReadFile,
+    safeWriteFile: mocks.safeWriteFile,
+  };
+});
+
 describe('sync_specialist_catalog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -76,7 +88,8 @@ describe('sync_specialist_catalog', () => {
   });
 
   it('writes a snapshot merged from the canonical directory', async () => {
-    await import('./sync_specialist_catalog.js');
+    const module = await import('./sync_specialist_catalog.js');
+    await module.runSyncSpecialistCatalog();
 
     expect(mocks.safeWriteFile).toHaveBeenCalledTimes(1);
     const [snapshotPath, content] = mocks.safeWriteFile.mock.calls[0];

@@ -179,6 +179,25 @@ describe('organization-profile', () => {
     expect(loadOrganizationProfile(alternateRoot)).toBeNull();
   });
 
+  it('does not accept a schema-invalid customer overlay', () => {
+    process.env.KYBERION_CUSTOMER = 'test-org';
+    safeMkdir(alternateOverlayRoot, { recursive: true });
+    safeWriteFile(
+      alternateOverlayPath,
+      JSON.stringify({
+        version: '1.0.0',
+        organization_id: 'test-org',
+        name: 'Invalid Test Org',
+        mission_defaults: {},
+        team_defaults: {},
+        llm: {},
+        unexpected: true,
+      })
+    );
+
+    expect(loadOrganizationProfile(alternateRoot)).toBeNull();
+  });
+
   it('lists the public organization team template catalogs', () => {
     const catalogs = listOrganizationMissionTeamTemplateCatalogSummaries();
 

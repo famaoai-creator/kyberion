@@ -1,14 +1,18 @@
 import {
   ingestAudioIntoDealRequirements,
-  listCustomerChannelBindings,
-  listDeals,
-  listDistillCandidateRecords,
-  materializeExecutionFeedbackCandidate,
   readDealRequirementsCapture,
-  recordExecutionFeedback,
+} from '@agent/core/customer-conversation-modes';
+import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
+import { listDeals } from '@agent/core/deal-store';
+import {
+  listDistillCandidateRecords,
   updateDistillCandidateRecord,
-} from '@agent/core';
-import type { VocabularyKey } from '@agent/core';
+} from '@agent/core/distill-candidate-registry';
+import {
+  materializeExecutionFeedbackCandidate,
+  recordExecutionFeedback,
+} from '@agent/core/execution-feedback';
+import type { VocabularyKey } from '@agent/core/t';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
 

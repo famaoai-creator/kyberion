@@ -1,11 +1,7 @@
 import * as path from 'node:path';
-import {
-  pathResolver,
-  resolvePilotStrategyPolicy,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePilotStrategyPolicy } from '@agent/core/pilot-strategy-policy';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 async function main() {

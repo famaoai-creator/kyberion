@@ -5,7 +5,13 @@ import {
   openOrCreateMissionGraphRunJournal,
 } from './mission-graph-run-journal.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 describe('mission-graph-run-journal', () => {
   beforeEach(() => {
@@ -91,5 +97,87 @@ describe('mission-graph-run-journal', () => {
     expect(() =>
       withExecutionContext('mission_controller', () => loadMissionGraphRunJournal(missionId, runId))
     ).toThrow(/non-contiguous/);
+  });
+
+  it('re-reads the sequence under the fence when two handles append after a restart', () => {
+    const missionId = 'MSN-GRAPH-JOURNAL-3';
+    const runId = 'ME-STALE-HANDLES-1';
+    const coordinationPath = `${pathResolver.missionDir(missionId, 'public')}/coordination`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(coordinationPath, { recursive: true, force: true });
+    });
+
+    const first = withExecutionContext('mission_controller', () =>
+      openOrCreateMissionGraphRunJournal({ missionId, runId, taskIds: ['task-a'] })
+    );
+    const second = withExecutionContext('mission_controller', () =>
+      openOrCreateMissionGraphRunJournal({ missionId, runId, taskIds: ['task-a'] })
+    );
+
+    withExecutionContext('mission_controller', () => {
+      first.append('node_state', { task_id: 'task-a', state: 'rework' });
+      second.append('graph_finished', { status: 'completed' });
+    });
+
+    const state = withExecutionContext('mission_controller', () =>
+      loadMissionGraphRunJournal(missionId, runId)
+    );
+    expect(state.events.map((event) => event.sequence)).toEqual([1, 2, 3]);
+    expect(state.finished?.status).toBe('completed');
+  });
+
+  it('rejects a symlinked coordination directory before journal access', () => {
+    const missionId = 'MSN-GRAPH-JOURNAL-SYMLINK';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const coordinationPath = `${missionPath}/coordination`;
+    const externalPath = pathResolver.sharedTmp('graph-journal-external');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionPath, { recursive: true });
+      safeMkdir(externalPath, { recursive: true });
+      safeRmSync(coordinationPath, { recursive: true, force: true });
+      safeSymlinkSync(externalPath, coordinationPath, 'dir');
+    });
+    try {
+      expect(() =>
+        withExecutionContext('mission_controller', () =>
+          openOrCreateMissionGraphRunJournal({
+            missionId,
+            runId: 'ME-SYMLINK-1',
+            taskIds: ['task-a'],
+          })
+        )
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(coordinationPath, { recursive: true, force: true });
+        safeRmSync(missionPath, { recursive: true, force: true });
+        safeRmSync(externalPath, { recursive: true, force: true });
+      });
+    }
+  });
+
+  it('uses an existing confidential mission root for graph recovery journals', () => {
+    const missionId = 'MSN-GRAPH-JOURNAL-CONFIDENTIAL';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      safeMkdir(missionPath, { recursive: true });
+    });
+
+    try {
+      const journal = withExecutionContext('mission_controller', () =>
+        openOrCreateMissionGraphRunJournal({
+          missionId,
+          runId: 'ME-CONFIDENTIAL-1',
+          taskIds: ['task-a'],
+        })
+      );
+      expect(journal.path).toContain('/active/missions/confidential/');
+      expect(journal.path).toContain('/coordination/graph-run-ME-CONFIDENTIAL-1.jsonl');
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        safeRmSync(missionPath, { recursive: true, force: true });
+      });
+    }
   });
 });

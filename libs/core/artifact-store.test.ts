@@ -203,6 +203,29 @@ describe('writeScopedArtifact (AL-02)', () => {
     ).toThrow(/invalid artifact name segment/);
   });
 
+  it('rejects a scoped artifact root that traverses a symlink', () => {
+    const missionDir = path.join(tmpRoot, 'active/missions/M-AL02-SYMLINK');
+    const artifactsDir = path.join(missionDir, 'artifacts');
+    const targetDir = path.join(tmpRoot, 'artifact-external-target');
+    fs.mkdirSync(missionDir, { recursive: true });
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.symlinkSync(targetDir, artifactsDir, 'dir');
+
+    try {
+      expect(() =>
+        store.writeScopedArtifact({
+          scope: { mission: 'M-AL02-SYMLINK' },
+          artifact_class: 'report',
+          name: 'summary.json',
+          content: { should_not_land: true },
+        })
+      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      fs.rmSync(artifactsDir, { recursive: true, force: true });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+  });
+
   it('isScopedArtifactPath accepts only the scoped artifact roots', () => {
     expect(store.isScopedArtifactPath('active/missions/M-1/artifacts/report/a.json')).toBe(true);
     expect(store.isScopedArtifactPath('active/projects/confidential/t/p/artifacts/cache/a')).toBe(
@@ -221,5 +244,41 @@ describe('writeScopedArtifact (AL-02)', () => {
     const entries = store.readScopedArtifactIndex({ mission: 'M-AL02-A' });
     expect(entries.length).toBeGreaterThanOrEqual(2);
     expect(entries.map((e) => e.artifact_class)).toContain('report');
+  });
+
+  it('readScopedArtifactIndex fails closed on malformed JSONL', () => {
+    const result = store.writeScopedArtifact({
+      scope: { mission: 'M-AL02-C' },
+      artifact_class: 'report',
+      name: 'valid.json',
+      content: { ok: true },
+    });
+    fs.appendFileSync(result.index_path, '{not-json}\n');
+
+    expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-C' })).toThrow();
+  });
+
+  it('readScopedArtifactIndex rejects shape-invalid JSONL rows', () => {
+    const result = store.writeScopedArtifact({
+      scope: { mission: 'M-AL02-D' },
+      artifact_class: 'report',
+      name: 'valid.json',
+      content: { ok: true },
+    });
+    fs.appendFileSync(
+      result.index_path,
+      `${JSON.stringify({
+        name: 'invalid.json',
+        artifact_class: 'cache',
+        path: 'active/missions/M-AL02-D/artifacts/cache/invalid.json',
+        scope: { mission: 'M-AL02-D' },
+        scope_kind: 'mission',
+        written_at: 'not-a-date',
+      })}\n`
+    );
+
+    expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-D' })).toThrow(
+      'written_at is invalid'
+    );
   });
 });

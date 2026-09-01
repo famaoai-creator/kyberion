@@ -1,6 +1,7 @@
-import * as path from 'node:path';
 import type { ScreenCaptureBridge, ScreenCaptureStreamRequest } from './screen-capture-bridge.js';
 import { createScreenCaptureBridge } from './screen-capture-bridge.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
 import {
   writeVideoFramesToMp4,
   type VideoFrameArchiveOptions,
@@ -69,11 +70,15 @@ export class ScreenRecordingBridgeImpl implements ScreenRecordingBridge {
       frame_interval_ms: input.frame_interval_ms,
     };
     const redactedFrames = this.redactFrames(this.captureBridge.captureStream(captureInput));
-    return writeVideoFramesToMp4(path.resolve(outputPath), redactedFrames, {
-      fps: input.fps ?? this.opts.fps,
-      cleanup: input.cleanup,
-      ffmpeg_bin: input.ffmpeg_bin,
-    });
+    return writeVideoFramesToMp4(
+      assertSafeRepositoryPath(pathResolver.rootResolve(outputPath), { allowMissingLeaf: true }),
+      redactedFrames,
+      {
+        fps: input.fps ?? this.opts.fps,
+        cleanup: input.cleanup,
+        ffmpeg_bin: input.ffmpeg_bin,
+      }
+    );
   }
 
   private async *redactFrames(stream: AsyncIterable<VideoFrame>): AsyncIterable<VideoFrame> {

@@ -48,7 +48,7 @@ status: archived
 | -------- | ----------------------------------------------------------------------------------- |
 | 正本     | `knowledge/public/design-patterns/brand-tokens/kyberion.json`                       |
 | 生成     | `node --import ./scripts/ts-loader.mjs scripts/generate_design_tokens.ts`           |
-| PR gate  | `pnpm check:ui-ux` と `pnpm check:catalogs`                                         |
+| PR gate  | `pnpm check:ui-ux` と `pnpm run check -- --scope full --only catalogs`              |
 | 定期監査 | `ui-ux-governance-weekly`                                                           |
 | owner    | `design-system-steward`                                                             |
 | SLO      | main 上の raw operator color / missing semantic token / status bypass を 0 件に保つ |

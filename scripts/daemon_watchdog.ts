@@ -3,18 +3,20 @@ import {
   listDaemonHeartbeatStatuses,
   readDaemonHeartbeat,
   type DaemonHeartbeatStatus,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core';
-import { createStandardYargs } from '@agent/core';
+} from '@agent/core/daemon-heartbeat';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { sendOpsAlert, type OpsAlertReceipt } from '@agent/core/ops-alert';
+import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   createTriggerRunner,
   runWakeTrigger,
-  evaluateAutonomousOpsAction,
-  withExecutionContextAsync,
-  type AutonomousOpsGateResult,
   type TriggerReceipt,
-} from '@agent/core';
+} from '@agent/core/trigger-runner';
+import {
+  evaluateAutonomousOpsAction,
+  type AutonomousOpsGateResult,
+} from '@agent/core/autonomous-ops-gate';
+import { withExecutionContextAsync } from '@agent/core/authority';
 
 /**
  * EV-05: every long-lived daemon that fires work must be listed here.
@@ -264,7 +266,7 @@ export function formatDaemonWatchdogReport(report: DaemonWatchdogReport): string
   return lines;
 }
 
-async function main(args: string[] = []): Promise<number> {
+async function main(args: string[] = []) {
   const argv = await createStandardYargs(['node', 'daemon_watchdog', ...args])
     .option('json', { type: 'boolean', default: false })
     .option('daemon', {
@@ -284,12 +286,7 @@ async function main(args: string[] = []): Promise<number> {
     rootDir: argv.rootDir,
     staleAfterMs: argv.staleAfterMs,
   });
-  if (argv.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    for (const line of formatDaemonWatchdogReport(report)) console.log(line);
-  }
-  return report.ok ? 0 : 1;
+  return report;
 }
 
 if (
@@ -298,10 +295,12 @@ if (
 ) {
   void defineScript({
     name: 'daemon:watchdog',
-    flags: [],
+    flags: ['json'],
     async run(context) {
-      const status = await main(context.argv);
-      if (status !== 0) throw new Error(`daemon:watchdog failed with exit code ${status}`);
+      const report = await main(context.argv);
+      context.print(context.json ? report : formatDaemonWatchdogReport(report).join('\n'));
+      if (!report.ok) throw new ScriptExitError(1, '', true);
+      return report;
     },
   })();
 }

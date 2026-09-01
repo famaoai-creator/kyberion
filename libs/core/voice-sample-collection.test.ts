@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as fs from 'node:fs';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import { collectVoiceSamples } from './voice-sample-collection.js';
-import { resetVoiceSampleIngestionPolicyCache } from './voice-sample-ingestion-policy.js';
+import { _resetVoiceSampleIngestionPolicyCacheForTests } from './voice-sample-ingestion-policy.js';
 
 describe('voice-sample-collection', () => {
   const tmpDir = pathResolver.sharedTmp('voice-sample-collection-tests');
@@ -14,7 +15,7 @@ describe('voice-sample-collection', () => {
     safeRmSync(tmpDir, { recursive: true, force: true });
     safeRmSync(pathResolver.sharedTmp('voice-sample-collection'), { recursive: true, force: true });
     delete process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH;
-    resetVoiceSampleIngestionPolicyCache();
+    _resetVoiceSampleIngestionPolicyCacheForTests();
   });
 
   it('collects source files into governed staging and emits a manifest', () => {
@@ -36,7 +37,7 @@ describe('voice-sample-collection', () => {
           require_language_coverage: false,
           strict_personal_voice_registration: true,
         },
-      }),
+      })
     );
     process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = policyPath;
     safeWriteFile(sample1, Buffer.from('12345678901234567890'));
@@ -61,9 +62,17 @@ describe('voice-sample-collection', () => {
 
     expect(result.status).toBe('succeeded');
     expect(result.staged_samples).toHaveLength(2);
-    expect(result.registration_candidate.samples[0]?.path).toContain('voice-sample-collection/collect-1');
-    expect(safeReadFile(`${result.registration_candidate.samples[0]?.path}.transcript.txt`, { encoding: 'utf8' })).toBe('こんにちは。');
-    const manifest = JSON.parse(safeReadFile(result.collection_manifest_path, { encoding: 'utf8' }) as string) as {
+    expect(result.registration_candidate.samples[0]?.path).toContain(
+      'voice-sample-collection/collect-1'
+    );
+    expect(
+      safeReadFile(`${result.registration_candidate.samples[0]?.path}.transcript.txt`, {
+        encoding: 'utf8',
+      })
+    ).toBe('こんにちは。');
+    const manifest = JSON.parse(
+      safeReadFile(result.collection_manifest_path, { encoding: 'utf8' }) as string
+    ) as {
       kind?: string;
       samples?: Array<{ staged_path?: string }>;
     };
@@ -90,7 +99,7 @@ describe('voice-sample-collection', () => {
           require_language_coverage: false,
           strict_personal_voice_registration: true,
         },
-      }),
+      })
     );
     process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = policyPath;
     safeWriteFile(sample1, Buffer.from('12345678901234567890'));
@@ -103,7 +112,55 @@ describe('voice-sample-collection', () => {
           { sample_id: 's1', path: sample1, language: 'ja' },
           { sample_id: 's2', path: sample1, language: 'ja' },
         ],
-      }),
+      })
     ).toThrow(/duplicate sample path/u);
+  });
+
+  it('rejects sample sources that traverse a symbolic link', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(
+      policyPath,
+      JSON.stringify({
+        version: 'test',
+        sample_limits: {
+          min_samples: 1,
+          max_samples: 10,
+          min_sample_bytes: 10,
+          max_sample_bytes: 1_000_000,
+          allowed_extensions: ['wav'],
+        },
+        profile_rules: {
+          allowed_tiers: ['personal', 'confidential'],
+          require_unique_sample_paths: true,
+          require_language_coverage: false,
+          strict_personal_voice_registration: true,
+        },
+      })
+    );
+    process.env.KYBERION_VOICE_SAMPLE_INGESTION_POLICY_PATH = policyPath;
+    safeWriteFile(sample1, Buffer.from('12345678901234567890'));
+    const linkedSample = `${tmpDir}/linked-sample.wav`;
+    fs.symlinkSync(sample1, linkedSample);
+
+    expect(() =>
+      collectVoiceSamples({
+        action: 'collect_voice_samples',
+        request_id: 'collect-link',
+        samples: [{ sample_id: 's1', path: linkedSample, language: 'ja' }],
+      })
+    ).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('rejects path separators in collection identifiers', () => {
+    safeMkdir(tmpDir, { recursive: true });
+    safeWriteFile(sample1, Buffer.from('12345678901234567890'));
+
+    expect(() =>
+      collectVoiceSamples({
+        action: 'collect_voice_samples',
+        request_id: '../escape',
+        samples: [{ sample_id: 's1', path: sample1, language: 'ja' }],
+      })
+    ).toThrow(/request_id must be a single safe path segment/u);
   });
 });

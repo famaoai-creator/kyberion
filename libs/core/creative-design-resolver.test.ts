@@ -15,7 +15,35 @@ vi.mock('./path-resolver.js', () => ({
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const assertSafeRepositoryPath = (
+    filePath: string,
+    options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
+  ): string => {
+    const resolved = path.resolve(filePath);
+    const root = path.resolve(options.rootDir ?? rootDir);
+    const relative = path.relative(root, resolved);
+    if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error('[RESOURCE_PATH_SCOPE]');
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      try {
+        if (actual.lstatSync(current).isSymbolicLink()) {
+          throw new Error('[RESOURCE_PATH_SYMLINK]');
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') break;
+        throw error;
+      }
+    }
+    if (!options.allowMissingLeaf && !actual.existsSync(resolved)) {
+      throw new Error('[RESOURCE_PATH_MISSING]');
+    }
+    return resolved;
+  };
   return {
+    assertSafeRepositoryPath,
     safeExistsSync: (p: string) => actual.existsSync(p),
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
@@ -161,6 +189,21 @@ describe('creative-design-resolver', () => {
     expect(() => resolveCreativeDesign({ surface: 'pptx', tenantSlug: '../../etc' })).toThrow(
       /tenant slug/i
     );
+  });
+
+  it('ignores a symlinked tenant design override', () => {
+    fs.mkdirSync(path.join(rootDir, 'knowledge/confidential/client-a/design'), {
+      recursive: true,
+    });
+    write('outside-theme.json', { brand_name: 'Outside brand' });
+    fs.symlinkSync(
+      path.join(rootDir, 'outside-theme.json'),
+      path.join(rootDir, 'knowledge/confidential/client-a/design/tenant-override.json')
+    );
+
+    const resolved = resolveCreativeDesign({ surface: 'web', tenantSlug: 'client-a' });
+
+    expect(resolved.source).toBe('brand-default');
   });
 
   it('drops unsafe tenant token values before projecting CSS', () => {

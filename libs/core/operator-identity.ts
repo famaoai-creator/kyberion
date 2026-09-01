@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { readJson } from './foundation/json.js';
-import { safeExistsSync } from './secure-io.js';
+import { isRecord } from './foundation/text.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { resolveLocale, type SupportedLocale } from './locale.js';
 
 /**
@@ -14,10 +15,14 @@ import { resolveLocale, type SupportedLocale } from './locale.js';
  */
 export function resolveOperatorDisplayName(fallback = 'sovereign-user'): string {
   try {
-    const identityPath = path.join(resolveActiveProfileRoot(), 'my-identity.json');
+    const identityPath = assertSafeRepositoryPath(
+      path.join(resolveActiveProfileRoot(), 'my-identity.json'),
+      { allowMissingLeaf: true }
+    );
     if (!safeExistsSync(identityPath)) return fallback;
-    const parsed = readJson<Record<string, unknown>>(identityPath);
-    const name = String(parsed?.name || '').trim();
+    const parsed = readJson<unknown>(identityPath);
+    if (!isRecord(parsed)) return fallback;
+    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
     return name || fallback;
   } catch {
     return fallback;

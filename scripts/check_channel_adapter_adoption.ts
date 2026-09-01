@@ -1,5 +1,6 @@
-import { pathResolver, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const BRIDGES = [
   'satellites/slack-bridge/src/index.ts',
@@ -10,6 +11,12 @@ const BRIDGES = [
 
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/gu, '');
+}
+
+export function hasSharedThreadFormatterImport(source: string): boolean {
+  return /import\s*\{[\s\S]*\bformatChannelThreadContext\b[\s\S]*\}\s*from\s*['"]@agent\/core\/channel-adapter['"]/u.test(
+    source
+  );
 }
 
 export function checkChannelAdapterAdoption(): string[] {
@@ -28,10 +35,7 @@ export function checkChannelAdapterAdoption(): string[] {
     if (!/shouldSend\s*:/u.test(source)) {
       failures.push(`${relative}: missing explicit proposal/approval delivery gate`);
     }
-    if (
-      (relative.includes('discord') || relative.includes('telegram')) &&
-      !/\bformatChannelThreadContext\b/u.test(source)
-    ) {
+    if (!hasSharedThreadFormatterImport(source)) {
       failures.push(`${relative}: missing shared formatChannelThreadContext import`);
     }
     const deliveryEvidence =
@@ -49,12 +53,16 @@ export const runCheckChannelAdapterAdoption = defineScript({
   run(context) {
     const failures = checkChannelAdapterAdoption();
     if (failures.length) {
-      console.error('[check:channel-adapter-adoption] FAILED');
-      for (const failure of failures) console.error(`- ${failure}`);
-      process.exitCode = 1;
-      return;
+      throw new ScriptExitError(
+        1,
+        [
+          'channel adapter adoption check failed',
+          ...failures.map((failure) => `- ${failure}`),
+        ].join('\n')
+      );
     }
     context.print(`[check:channel-adapter-adoption] OK (${BRIDGES.length} bridges)`);
+    return { bridges: BRIDGES.length, failures };
   },
 });
 

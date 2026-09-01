@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import { listChannelDirectoryEntries } from '@agent/core/channel-directory';
 import {
-  isSurfaceAsyncChannel,
-  listChannelDirectoryEntries,
   loadNotificationPreferences,
   saveNotificationPreferences,
-  secureIo,
-  withExecutionContext,
   type NotificationChannelTarget,
   type NotificationPreferences,
-} from '@agent/core';
+} from '@agent/core/operator-notifications';
+import * as secureIo from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { readRequestObject } from '../../../lib/request-input';
+import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +44,9 @@ function listNotifiableChannels() {
   }));
 }
 
-export function GET() {
+export function GET(req: NextRequest) {
+  const resolved = resolveConciergeViewer(req);
+  if (resolved.response) return resolved.response;
   try {
     const preferences = withPreferences((prefs) => prefs);
     return NextResponse.json({
@@ -66,8 +70,11 @@ export async function POST(req: NextRequest) {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
-    const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-    const surface = String(body?.surface || '').trim();
+    const parsedBody = await readRequestObject(req);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
+    const surface = typeof body?.surface === 'string' ? body.surface.trim() : '';
 
     if (surface === 'none') {
       const saved = withPreferences((prefs) => {
@@ -91,7 +98,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const target = String(body?.channel ?? body?.target ?? '').trim();
+    const rawTarget = body?.channel ?? body?.target;
+    const target = typeof rawTarget === 'string' ? rawTarget.trim() : '';
     if (!target || target.length > 120 || /\s/.test(target)) {
       return NextResponse.json({ ok: false, error: t('api.notification_target') }, { status: 400 });
     }

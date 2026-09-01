@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
 import { buildRuntimeTopology } from '../../../../lib/runtime-topology';
+import { collectBrowserSessions } from '../../../../lib/intelligence-observations';
 import {
-  collectBrowserSessions,
   collectControlActionDetails,
   collectControlActions,
   collectOwnerSummaries,
+  collectPendingSecretApprovals,
   collectRecentEvents,
-} from '../../../../lib/intelligence-observations';
+} from '../intelligence-control-data';
 import {
   getChronosAccessRoleOrThrow,
   guardRequest,
@@ -18,20 +19,26 @@ import {
   strictViewerScopeTenantSlugs,
   viewerErrorResponse,
 } from '../../../../lib/viewer-context';
-import { resolveApprovalTenant } from '../../../../lib/su-surface-data';
 import {
   listAgentRuntimeLeaseSummaries,
   listAgentRuntimeSnapshots,
 } from '@agent/core/agent-runtime-supervisor';
-import { listApprovalRequests } from '@agent/core/approval-store';
 import {
   loadSurfaceManifest,
   loadSurfaceState,
   normalizeSurfaceDefinition,
 } from '@agent/core/surface-runtime';
-import { deriveProviderPressure } from '@agent/core';
+import { deriveProviderPressure } from '@agent/core/ce-adoption';
+import * as intelligenceData from '../intelligence-observation-data';
 
 export const runtime = 'nodejs';
+
+let intelligenceStreamRevision = 0;
+
+function nextIntelligenceStreamRevision(): number {
+  intelligenceStreamRevision = Math.max(intelligenceStreamRevision + 1, Date.now());
+  return intelligenceStreamRevision;
+}
 
 function sseChunk(data: unknown): string {
   return `data: ${JSON.stringify(data)}\n\n`;
@@ -46,7 +53,7 @@ function safeCollect<T>(label: string, fallback: T, collect: () => T): T {
   }
 }
 
-async function collectManagedRuntimeTopology() {
+async function collectManagedRuntimeTopology(tierAccess?: readonly string[]) {
   const runtimeSupervisorClient = await import('@agent/core/agent-runtime-supervisor-client');
   const runtimeSnapshots = listAgentRuntimeSnapshots();
   const runtimeLeases = listAgentRuntimeLeaseSummaries();
@@ -63,6 +70,7 @@ async function collectManagedRuntimeTopology() {
     metadata?: Record<string, unknown>;
     providerPressure?: ReturnType<typeof deriveProviderPressure>;
   }> = [];
+  let visibleAgentIds: Set<string> | undefined;
 
   try {
     const daemonRuntimes = await runtimeSupervisorClient.listAgentRuntimesViaDaemon();
@@ -142,6 +150,29 @@ async function collectManagedRuntimeTopology() {
     });
   }
 
+  if (tierAccess) {
+    visibleAgentIds = new Set(
+      runtimeLeases
+        .filter((lease) => {
+          const missionId =
+            lease.owner_type === 'mission'
+              ? lease.owner_id
+              : typeof lease.metadata?.mission_id === 'string'
+                ? lease.metadata.mission_id
+                : undefined;
+          return missionId
+            ? intelligenceData.missionVisibleToScope(missionId, 'all', tierAccess)
+            : tierAccess.includes('confidential');
+        })
+        .map((lease) => lease.agent_id)
+    );
+    managedRuntimes = managedRuntimes.filter((runtime) => visibleAgentIds!.has(runtime.agentId));
+  }
+
+  const scopedRuntimeSnapshots = visibleAgentIds
+    ? runtimeSnapshots.filter((entry) => visibleAgentIds!.has(entry.agent.agentId))
+    : runtimeSnapshots;
+
   return {
     managedRuntimes,
     surfaces: loadSurfaceManifest()
@@ -167,10 +198,10 @@ async function collectManagedRuntimeTopology() {
         };
       }),
     runtimeSummary: {
-      total: runtimeSnapshots.length,
-      ready: runtimeSnapshots.filter((entry) => entry.agent.status === 'ready').length,
-      busy: runtimeSnapshots.filter((entry) => entry.agent.status === 'busy').length,
-      error: runtimeSnapshots.filter((entry) => entry.agent.status === 'error').length,
+      total: scopedRuntimeSnapshots.length,
+      ready: scopedRuntimeSnapshots.filter((entry) => entry.agent.status === 'ready').length,
+      busy: scopedRuntimeSnapshots.filter((entry) => entry.agent.status === 'busy').length,
+      error: scopedRuntimeSnapshots.filter((entry) => entry.agent.status === 'error').length,
     },
   };
 }
@@ -189,9 +220,11 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return viewerErrorResponse(error, 403);
   }
+  const tierAccess = resolvedViewer.context.tierAccess ?? ['public', 'confidential'];
 
   const accessRole = getChronosAccessRoleOrThrow(req);
   process.env.MISSION_ROLE = roleToMissionRole(accessRole);
+  const broadOperationalAccess = tenantSlugs === 'all' && tierAccess.includes('confidential');
 
   const encoder = new TextEncoder();
   let previousPayload = '';
@@ -211,11 +244,17 @@ export async function GET(req: NextRequest) {
     start(controller) {
       const push = async () => {
         if (closed) return;
-        const agentMessages = safeCollect('collectAgentMessages', [], collectAgentMessages);
-        const a2aHandoffs = safeCollect('collectA2AHandoffs', [], collectA2AHandoffs);
+        const agentMessages = safeCollect('collectAgentMessages', [], collectAgentMessages).filter(
+          (message) =>
+            intelligenceData.missionVisibleToScope(message.missionId, tenantSlugs, tierAccess)
+        );
+        const a2aHandoffs = safeCollect('collectA2AHandoffs', [], collectA2AHandoffs).filter(
+          (handoff) =>
+            intelligenceData.missionVisibleToScope(handoff.missionId, tenantSlugs, tierAccess)
+        );
         const runtimeTopology = await (async () => {
           try {
-            return await collectManagedRuntimeTopology();
+            return await collectManagedRuntimeTopology(tierAccess);
           } catch (err) {
             console.warn('[chronos-mirror-v2] collectManagedRuntimeTopology failed', err);
             return {
@@ -229,43 +268,20 @@ export async function GET(req: NextRequest) {
         if (closed) return;
         const scopedView = tenantSlugs !== 'all';
         const payload = {
+          revision: nextIntelligenceStreamRevision(),
           ts: new Date().toISOString(),
           accessRole,
           ...(scopedView
             ? {}
             : {
-                recentEvents: safeCollect('collectRecentEvents', [], collectRecentEvents),
+                recentEvents: safeCollect('collectRecentEvents', [], () =>
+                  collectRecentEvents(tenantSlugs, tierAccess)
+                ),
                 agentMessages,
                 a2aHandoffs,
               }),
-          secretApprovals: safeCollect('listApprovalRequests', [], () =>
-            listApprovalRequests({ kind: 'secret_mutation', status: 'pending' })
-              .filter(
-                (request) =>
-                  tenantSlugs === 'all' ||
-                  Boolean(
-                    resolveApprovalTenant(request) &&
-                    tenantSlugs.includes(resolveApprovalTenant(request)!)
-                  )
-              )
-              .slice(0, 20)
-              .map((request) => ({
-                id: request.id,
-                title: request.title,
-                summary: request.summary,
-                storageChannel: request.storageChannel,
-                requestedAt: request.requestedAt,
-                requestedBy: request.requestedBy,
-                serviceId: request.target?.serviceId || 'unknown',
-                secretKey: request.target?.secretKey || 'unknown',
-                mutation: request.target?.mutation || 'set',
-                riskLevel: request.risk?.level || 'medium',
-                requiresStrongAuth: request.risk?.requiresStrongAuth === true,
-                pendingRoles:
-                  request.workflow?.approvals
-                    .filter((approval) => approval.status === 'pending')
-                    .map((approval) => approval.role) || [],
-              }))
+          secretApprovals: safeCollect('collectPendingSecretApprovals', [], () =>
+            collectPendingSecretApprovals(tenantSlugs, tierAccess)
           ),
           ...(scopedView
             ? {
@@ -282,14 +298,18 @@ export async function GET(req: NextRequest) {
                 }),
               }
             : {
-                controlActions: safeCollect('collectControlActions', [], collectControlActions),
-                controlActionDetails: safeCollect(
-                  'collectControlActionDetails',
-                  {},
-                  collectControlActionDetails
+                controlActions: safeCollect('collectControlActions', [], () =>
+                  collectControlActions(tenantSlugs, tierAccess)
                 ),
-                ownerSummaries: safeCollect('collectOwnerSummaries', [], collectOwnerSummaries),
-                browserSessions: safeCollect('collectBrowserSessions', [], collectBrowserSessions),
+                controlActionDetails: safeCollect('collectControlActionDetails', {}, () =>
+                  collectControlActionDetails(tenantSlugs, tierAccess)
+                ),
+                ownerSummaries: safeCollect('collectOwnerSummaries', [], () =>
+                  collectOwnerSummaries(tenantSlugs, tierAccess)
+                ),
+                browserSessions: broadOperationalAccess
+                  ? safeCollect('collectBrowserSessions', [], collectBrowserSessions)
+                  : [],
                 runtime: runtimeSummary,
                 runtimeTopology: buildRuntimeTopology({
                   surfaces,

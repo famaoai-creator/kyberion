@@ -19,7 +19,8 @@
  */
 
 import { createHash } from 'node:crypto';
-import { safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
+import { parseSafeJsonInput } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile, safeStat } from './secure-io.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('jsonl-tail');
@@ -39,6 +40,8 @@ export interface JsonlTailCursor {
 export interface JsonlTailOptions {
   maxSizeMB?: number;
   fingerprintBytes?: number;
+  /** Project parsed JSON into a trusted record shape before delivery. */
+  parse?: (value: unknown) => unknown;
   /** Called for each line that does not parse. Default: count only. */
   onMalformed?: (line: string, error: unknown) => void;
 }
@@ -120,13 +123,15 @@ export class JsonlTail<T = unknown> {
   private readonly filePath: string;
   private readonly maxSizeMB: number;
   private readonly fingerprintBytes: number;
+  private readonly parse: ((value: unknown) => T) | undefined;
   private readonly onMalformed: ((line: string, error: unknown) => void) | undefined;
   private position: JsonlTailCursor;
 
   constructor(filePath: string, options: JsonlTailOptions = {}) {
-    this.filePath = filePath;
+    this.filePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     this.maxSizeMB = options.maxSizeMB ?? DEFAULT_MAX_SIZE_MB;
     this.fingerprintBytes = options.fingerprintBytes ?? DEFAULT_FINGERPRINT_BYTES;
+    this.parse = options.parse as ((value: unknown) => T) | undefined;
     this.onMalformed = options.onMalformed;
     this.position = { ...EMPTY_JSONL_CURSOR };
   }
@@ -199,7 +204,8 @@ export class JsonlTail<T = unknown> {
     let malformed = 0;
     for (const line of lines) {
       try {
-        records.push(JSON.parse(line) as T);
+        const parsed = parseSafeJsonInput(line, 'jsonl tail record');
+        records.push(this.parse ? this.parse(parsed) : (parsed as T));
       } catch (err) {
         malformed++;
         // A torn or hand-edited line must not stop the rest of the batch.

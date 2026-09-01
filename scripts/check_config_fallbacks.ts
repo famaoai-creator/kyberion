@@ -1,5 +1,5 @@
 import { listFallbacks } from '@agent/core/config-fallback-registry';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function findConfigFallbackViolations(): string[] {
   return listFallbacks()
@@ -16,8 +16,13 @@ export const runCheckConfigFallbacks = defineScript({
   run(context) {
     const violations = findConfigFallbackViolations();
     if (violations.length > 0) {
-      for (const violation of violations) context.print(`- ${violation}`);
-      throw new Error(`${violations.length} config fallback registry violation(s)`);
+      throw new ScriptExitError(
+        1,
+        [
+          `${violations.length} config fallback registry violation(s)`,
+          ...violations.map((violation) => `- ${violation}`),
+        ].join('\n')
+      );
     }
     context.print('[check:config-fallbacks] OK (no recorded fallback occurrences)');
   },

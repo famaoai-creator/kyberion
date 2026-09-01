@@ -1,6 +1,7 @@
-import { pathResolver, safeExistsSync, safeReadFile } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type DiscoveryEntry = {
   n?: string;
@@ -37,17 +38,14 @@ function resolveBaselinePath(): string {
   return pathResolver.rootResolve(baseline);
 }
 
-const BASELINE_PATH = resolveBaselinePath();
-
 function readDiscovery(): DiscoveryFile {
-  return JSON.parse(
-    String(safeReadFile(DISCOVERY_PATH, { encoding: 'utf8' }) || '{}')
-  ) as DiscoveryFile;
+  return readJson<DiscoveryFile>(DISCOVERY_PATH);
 }
 
 export function findOpInputContractViolations(discovery: DiscoveryFile): string[] {
   const violations: string[] = [];
   let inferredLegacyCount = 0;
+  const baselinePath = resolveBaselinePath();
 
   for (const actuator of discovery.actuators || []) {
     for (const entry of actuator.ops || []) {
@@ -75,8 +73,8 @@ export function findOpInputContractViolations(discovery: DiscoveryFile): string[
       `[check:op-input-contract-coverage] ${inferredLegacyCount} inferred-legacy contract(s) remain`
     );
   }
-  if (safeExistsSync(BASELINE_PATH)) {
-    const baseline = readJson<ContractCoverageBaseline>(BASELINE_PATH);
+  if (safeExistsSync(baselinePath)) {
+    const baseline = readJson<ContractCoverageBaseline>(baselinePath);
     if (inferredLegacyCount > baseline.inferred_legacy) {
       violations.push(
         `inferred-legacy contracts increased from ${baseline.inferred_legacy} to ${inferredLegacyCount}`
@@ -97,14 +95,14 @@ export const runCheckOpInputContractCoverage = defineScript({
   run(context) {
     const violations = findMissingOpInputContractCoverage();
     if (violations.length > 0) {
-      console.error('[check:op-input-contract-coverage] FAILED');
-      for (const violation of violations) {
-        console.error(`- ${violation}`);
-      }
-      throw new Error(`${violations.length} op input contract coverage violation(s)`);
+      throw new ScriptExitError(
+        1,
+        ['FAILED', ...violations.map((violation) => `- ${violation}`)].join('\n')
+      );
     }
 
     context.print('[check:op-input-contract-coverage] OK');
+    return { violations };
   },
 });
 

@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { defineScript, isDirectScript } from './lib/harness.js';
-import {
-  inspectServiceAuth,
-  loadServiceEndpointsCatalog,
-  logger,
-  probeServiceRuntime,
-  safeExecResult,
-  getServiceRuntimeRecord,
-} from '@agent/core';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { probeServiceRuntime, getServiceRuntimeRecord } from '@agent/core/service-runtime-registry';
+import { loadServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import { inspectServiceAuth } from '@agent/core/service-validator';
+import { safeExecResult } from '@agent/core/secure-io';
+import { isRecord } from '@agent/core/foundation/text';
 
 type ServicePreflightStatus = 'ready' | 'needs_attention' | 'unavailable';
 
@@ -58,15 +55,20 @@ function resolveRuntimeProbeServiceId(serviceId: string): string | null {
   return getServiceRuntimeRecord(serviceId)?.service_id || null;
 }
 
-function parseJsonProbeOutput(output: string): { ok: boolean; payload?: any; reason: string } {
+export function parseJsonProbeOutput(output: string): {
+  ok: boolean;
+  payload?: Record<string, unknown>;
+  reason: string;
+} {
   const trimmed = output.trim();
   if (!trimmed) {
     return { ok: false, reason: 'empty_output' };
   }
   const lastLine = trimmed.split(/\r?\n/).filter(Boolean).pop() || trimmed;
   try {
-    const payload = JSON.parse(lastLine);
-    const status = String(payload?.status || '').toLowerCase();
+    const payload = JSON.parse(lastLine) as unknown;
+    if (!isRecord(payload)) return { ok: false, reason: 'invalid_json_output' };
+    const status = typeof payload.status === 'string' ? payload.status.toLowerCase() : '';
     return {
       ok: status === 'ok' || status === 'success',
       payload,
@@ -169,32 +171,28 @@ export async function runServicePreflight(options: {
   };
 }
 
-async function main(args: string[] = []): Promise<number> {
-  const argv = await createStandardYargs(['node', 'service_preflight', ...args])
+function formatHumanReport(report: Awaited<ReturnType<typeof runServicePreflight>>): string {
+  return [
+    ...report.reports.flatMap((item) => [
+      `[service-preflight] ${item.serviceId}: ${item.status}`,
+      `  auth=${item.authReady ? 'yes' : 'no'} direct=${item.directProbeReady === null ? 'n/a' : item.directProbeReady ? 'yes' : 'no'} runtime=${item.runtimeReady ? 'yes' : 'no'}`,
+      `  reason=${item.reason}`,
+    ]),
+    '',
+  ].join('\n');
+}
+
+async function main(args: string[] = []): Promise<Awaited<ReturnType<typeof runServicePreflight>>> {
+  const normalizedArgs = args[0] === '--' ? args.slice(1) : args;
+  const argv = await createStandardYargs(['node', 'service_preflight', ...normalizedArgs])
     .option('service', { type: 'string', describe: 'Service id to preflight' })
     .option('all', { type: 'boolean', default: false })
-    .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const report = await runServicePreflight({
+  return runServicePreflight({
     serviceId: argv.service ? String(argv.service) : undefined,
     all: Boolean(argv.all),
   });
-
-  if (!argv.json) {
-    for (const item of report.reports) {
-      console.log(`[service-preflight] ${item.serviceId}: ${item.status}`);
-      console.log(
-        `  auth=${item.authReady ? 'yes' : 'no'} direct=${item.directProbeReady === null ? 'n/a' : item.directProbeReady ? 'yes' : 'no'} runtime=${item.runtimeReady ? 'yes' : 'no'}`
-      );
-      console.log(`  reason=${item.reason}`);
-    }
-    console.log('');
-  } else {
-    logger.info(JSON.stringify({ status: 'ok', report }, null, 2));
-  }
-
-  return report.ready ? 0 : 1;
 }
 
 if (
@@ -203,9 +201,12 @@ if (
 )
   void defineScript({
     name: 'service:preflight',
-    flags: [],
     async run(context) {
-      const status = await main(context.argv);
-      if (status !== 0) throw new Error(`service:preflight failed with exit code ${status}`);
+      const report = await main(context.argv);
+      context.print(context.json ? { status: 'ok', report } : formatHumanReport(report));
+      if (!report.ready) {
+        throw new ScriptExitError(1, '', true, report);
+      }
+      return report;
     },
   })();

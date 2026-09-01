@@ -1,11 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdin } from 'ink';
 import type { SupportedLocale } from '@agent/core/locale';
-import {
-  currentScope,
-  listDaemonHeartbeatStatuses,
-  resolveIntentResolutionContract,
-} from '@agent/core';
+import { currentScope } from '@agent/core/scope-context';
+import { listDaemonHeartbeatStatuses } from '@agent/core/daemon-heartbeat';
+import { resolveIntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import { I18nContext, defaultLocale, makeI18n, toggleLocale } from './i18n.js';
 import { nextPanel, panelForDigit, type PanelId } from './keymap.js';
 import { TabBar } from './components/tab-bar.js';

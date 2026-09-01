@@ -24,8 +24,8 @@
  */
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
-import { createAjv, readJson as readFoundationJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeWriteFile, safeMkdir } from '@agent/core/secure-io';
+import { defineCatalog, readJson as readFoundationJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -92,11 +92,21 @@ interface RegistrationRequest {
 }
 
 function abs(rel: string): string {
-  return path.join(pathResolver.rootDir(), rel);
+  return assertSafeRepositoryPath(path.join(pathResolver.rootDir(), rel), {
+    allowMissingLeaf: true,
+  });
 }
 
 function readJson(rel: string): Json {
   return readFoundationJson<Json>(abs(rel));
+}
+
+function loadRegistrationRequest(filePath: string): RegistrationRequest {
+  return defineCatalog<RegistrationRequest>({
+    id: 'workflow-registration-request',
+    path: assertSafeRepositoryPath(filePath),
+    schema: abs(SCHEMA_REL),
+  }).load();
 }
 
 function writeJson(rel: string, obj: unknown): void {
@@ -112,19 +122,6 @@ function parseArgs(argv: string[]): { mode: 'propose' | 'apply'; request: string
     else if (a === '--propose') out.mode = 'propose';
   }
   return out;
-}
-
-function validateRequest(req: unknown): void {
-  const schema = readFoundationJson<unknown>(abs(SCHEMA_REL));
-  const ajv = createAjv();
-  const validate = ajv.compile(schema);
-  const ok = validate(req);
-  if (!ok) {
-    const errors = (validate as unknown as { errors?: unknown }).errors;
-    throw new Error(
-      `Registration request failed schema validation:\n${JSON.stringify(errors, null, 2)}`
-    );
-  }
 }
 
 function gateCheck(
@@ -399,8 +396,7 @@ function main(argv: string[]): void {
   }
 
   const requestPath = path.isAbsolute(args.request) ? args.request : abs(args.request);
-  const req = readFoundationJson<RegistrationRequest>(requestPath);
-  validateRequest(req);
+  const req = loadRegistrationRequest(requestPath);
 
   if (args.mode === 'apply') {
     const touched = applyToGovernedCatalogs(req);

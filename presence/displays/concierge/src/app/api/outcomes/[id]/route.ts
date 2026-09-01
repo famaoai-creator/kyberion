@@ -3,8 +3,9 @@ import {
   acceptInboxEntryWithHumanReceipt,
   markInboxEntry,
   type DeliverableInboxStatus,
-} from '@agent/core';
+} from '@agent/core/deliverable-inbox';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
+import { readRequestObject } from '../../../../lib/request-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,16 +16,21 @@ const ALLOWED_STATUSES: DeliverableInboxStatus[] = [
   'changes_requested',
 ];
 
+function isAllowedStatus(value: unknown): value is DeliverableInboxStatus {
+  return typeof value === 'string' && ALLOWED_STATUSES.includes(value as DeliverableInboxStatus);
+}
+
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
 
   try {
     const { id } = await context.params;
-    const body = await req.json().catch(() => ({}));
-    const status = ALLOWED_STATUSES.includes(body?.status)
-      ? (body.status as DeliverableInboxStatus)
-      : null;
+    const parsedBody = await readRequestObject(req);
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    const { body } = parsedBody;
+    const status = isAllowedStatus(body?.status) ? body.status : null;
     if (!id || !status) {
       return NextResponse.json(
         { ok: false, error: `id と status (${ALLOWED_STATUSES.join('|')}) が必要です` },

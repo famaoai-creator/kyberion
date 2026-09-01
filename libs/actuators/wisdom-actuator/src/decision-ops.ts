@@ -1,30 +1,33 @@
+import { logger } from '@agent/core/core';
+import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
-  logger,
-  sendOpsAlert,
-  safeReadFile,
+  assertSafeRepositoryPath,
   safeWriteFile,
   safeMkdir,
   safeExistsSync,
-  pathResolver,
-  resolveVars,
-  getReasoningBackend,
-  getVoiceBridge,
-  consumeTenantBudget,
-  TenantRateLimitExceededError,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveVars } from '@agent/core/src/logic-utils';
+import { getReasoningBackend } from '@agent/core/reasoning-backend';
+import { getVoiceBridge } from '@agent/core/voice-bridge';
+import { consumeTenantBudget, TenantRateLimitExceededError } from '@agent/core/tenant-rate-limiter';
+import {
   findRelevantDistilledKnowledge,
   formatDistilledKnowledgeSummary,
-  listDistillCandidateRecords,
+} from '@agent/core/distill-knowledge-injector';
+import { listDistillCandidateRecords } from '@agent/core/distill-candidate-registry';
+import {
   resolveReasoningParticipant,
   renderReasoningParticipantContext,
-  validateContextOutputTier,
-  type GovernedContextFragment,
   type ReasoningParticipant,
-  curateBackgroundReviewProposals,
-  generateKnowledgeCurationReport,
-  runKnowledgeValidationSweep,
-  deriveExecutionGraph,
-  executeGraph,
-} from '@agent/core';
+} from '@agent/core/reasoning-participant';
+import { validateContextOutputTier } from '@agent/core/context-security-scope';
+import type { GovernedContextFragment } from '@agent/core/context-security-scope';
+import type { ReasoningCallOptions, ToolDefinition } from '@agent/core/reasoning-backend-contracts';
+import { curateBackgroundReviewProposals } from '@agent/core/background-review-curator';
+import { generateKnowledgeCurationReport } from '@agent/core/src/knowledge-curation-report';
+import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
+import { deriveExecutionGraph, executeGraph } from '@agent/core/graph-scheduler';
 import * as path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
 import { assignWisdomContextValue, mergeWisdomContext } from './contracts/wisdom-context.js';
@@ -48,6 +51,7 @@ import {
   resolveHypothesisConflict,
 } from './decision-pure-ops.js';
 import type { CaptureIntuitionInput } from './decision-pure-ops.js';
+import { readWisdomJsonObject } from './wisdom-persisted-json.js';
 export {
   adjustProposalAppend,
   captureIntuition,
@@ -96,17 +100,16 @@ export {
 
 type Ctx = Record<string, any>;
 
-function readResolvedPath(rel: string): string {
-  const abs = pathResolver.rootResolve(rel);
-  return safeReadFile(abs, { encoding: 'utf8' }) as string;
+function resolveDecisionPath(ref: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
 }
 
-function readJSON<T = any>(rel: string): T {
-  return JSON.parse(readResolvedPath(rel)) as T;
+function readJSON<T = Record<string, unknown>>(rel: string): T {
+  return readWisdomJsonObject(rel) as T;
 }
 
 function writeJSON(rel: string, data: any): string {
-  const abs = pathResolver.rootResolve(rel);
+  const abs = resolveDecisionPath(rel, true);
   const dir = path.dirname(abs);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
   safeWriteFile(abs, JSON.stringify(data, null, 2));
@@ -496,8 +499,12 @@ export async function simulateAll(input: {
 }> {
   const backend = getReasoningBackend();
   const baseMaxSteps = Math.max(1, input.max_steps_per_branch ?? 10);
+  const manifestPath = input.manifest_path
+    ? resolveDecisionPath(input.manifest_path, true)
+    : undefined;
+  resolveDecisionPath(input.output_dir, true);
   const manifest =
-    input.manifest_path && safeExistsSync(pathResolver.rootResolve(input.manifest_path))
+    manifestPath && safeExistsSync(manifestPath)
       ? readJSON<any>(input.manifest_path)
       : { branches: [] };
   const outDir = input.output_dir.replace(/\/$/, '');
@@ -593,7 +600,7 @@ export async function simulateAllEnsemble(input: {
   }
   const outDir = input.output_dir.replace(/\/$/, '');
   const runsDir = `${outDir}/ensemble-runs`;
-  safeMkdir(pathResolver.rootResolve(runsDir), { recursive: true });
+  safeMkdir(resolveDecisionPath(runsDir, true), { recursive: true });
 
   const executeEnsemble = async (runsCount: number) => {
     const graph = {
@@ -613,7 +620,7 @@ export async function simulateAllEnsemble(input: {
       async (node) => {
         const runIndex = node.value;
         const runOutDir = `${runsDir}/run-${runIndex}`;
-        safeMkdir(pathResolver.rootResolve(runOutDir), { recursive: true });
+        safeMkdir(resolveDecisionPath(runOutDir, true), { recursive: true });
         const result = await simulateAll({
           ...(input.manifest_path ? { manifest_path: input.manifest_path } : {}),
           goal: input.goal,
@@ -1393,7 +1400,19 @@ export async function dispatchWisdomOperation(
     case 'propose_tool_calls': {
       const prompt = resolveVars(String(params.prompt ?? params.instruction ?? ''), ctx);
       const tools = Array.isArray(params.tools) ? params.tools : [];
-      const result = await proposeToolCalls({ prompt, tools });
+      const reasoningOptions =
+        params.options && typeof params.options === 'object' && !Array.isArray(params.options)
+          ? (params.options as ReasoningCallOptions)
+          : undefined;
+      const deferredTools = Array.isArray(params.deferred_tools)
+        ? (params.deferred_tools as ToolDefinition[])
+        : undefined;
+      const result = await proposeToolCalls({
+        prompt,
+        tools,
+        deferredTools,
+        options: reasoningOptions,
+      });
       return {
         handled: true,
         ctx:
@@ -1411,7 +1430,21 @@ export async function dispatchWisdomOperation(
       const goal = resolveVars(String(params.goal ?? params.instruction ?? ''), ctx);
       const maxSteps = Number(params.max_steps ?? 5);
       const tools = Array.isArray(params.tools) ? params.tools : [];
-      const reactResult = await runReasoningLoop({ goal, maxSteps, tools });
+      const reasoningOptions =
+        params.options && typeof params.options === 'object' && !Array.isArray(params.options)
+          ? (params.options as ReasoningCallOptions)
+          : undefined;
+      const deferredTools = Array.isArray(params.deferred_tools)
+        ? (params.deferred_tools as ToolDefinition[])
+        : undefined;
+      const reactResult = await runReasoningLoop({
+        goal,
+        maxSteps,
+        tools,
+        deferredTools,
+        options: reasoningOptions,
+        toolRole: reasoningOptions?.role,
+      });
       return { handled: true, ctx: assign(reactResult) };
     }
 

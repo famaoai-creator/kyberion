@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { probeMicCapture } from '@agent/core';
+import { probeMicCapture } from '@agent/core/mic-capture';
 import {
   beginVoiceCapture,
   transcribeWavBuffer,

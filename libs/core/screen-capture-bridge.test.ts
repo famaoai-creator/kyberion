@@ -31,6 +31,14 @@ describe('createScreenCaptureBridge', () => {
     expect(buf.subarray(1, 4).toString('utf8')).toBe('PNG');
   });
 
+  it('rejects a screenshot output outside the repository', async () => {
+    const bridge = createScreenCaptureBridge({ preferred_backend: 'stub' });
+
+    await expect(
+      bridge.captureScreenshot({ save_path: '/tmp/outside-screen.png' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('streams repeated screen frames in stub mode', async () => {
     const bridge = createScreenCaptureBridge({ preferred_backend: 'stub' });
     const frames = [];
@@ -39,11 +47,13 @@ describe('createScreenCaptureBridge', () => {
     }
 
     expect(frames).toHaveLength(2);
-    expect(frames[0]).toEqual(expect.objectContaining({
-      format: expect.objectContaining({
-        mime_type: 'image/png',
-      }),
-    }));
+    expect(frames[0]).toEqual(
+      expect.objectContaining({
+        format: expect.objectContaining({
+          mime_type: 'image/png',
+        }),
+      })
+    );
     expect(frames[0].payload.byteLength).toBeGreaterThan(0);
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { pathResolver, safeExistsSync, safeReadFile, safeRmSync } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { runSoakRestartE2E } from './soak_restart_e2e.js';
 
 describe('soak_restart_e2e', () => {
@@ -17,4 +18,10 @@ describe('soak_restart_e2e', () => {
       JSON.parse(safeReadFile(report.resume.state_path, { encoding: 'utf8' }) as string)
     ).toMatchObject({ resumed: true, restored_from: 'bootstrap' });
   }, 20000);
+
+  it('rejects a root outside the repository before cleanup', async () => {
+    await expect(runSoakRestartE2E('/tmp/kyberion-soak-outside')).rejects.toThrow(
+      /RESOURCE_PATH_SCOPE/u
+    );
+  });
 });

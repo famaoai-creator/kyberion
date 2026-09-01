@@ -1,15 +1,17 @@
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { MetricsCollector } from '@agent/core/metrics';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  logger,
-  MetricsCollector,
-  pathResolver,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeStat,
   safeReadFile,
   safeWriteFile,
-} from '@agent/core';
-import { appendJsonLine } from '@agent/core/foundation';
+} from '@agent/core/secure-io';
+import { appendJsonLine, readJsonIfPresent } from '@agent/core/foundation';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -119,6 +121,38 @@ const DEFAULT_METRICS_DIR = pathResolver.sharedTmp('soak-endurance');
 const DEFAULT_METRICS_FILE = 'latency-history.jsonl';
 const DEFAULT_LIVE_EVIDENCE_DIR = pathResolver.shared('runtime/health/soak');
 
+function assertSoakResourcePath(filePath: string, label: string, allowMissingLeaf = true): string {
+  try {
+    return assertSafeRepositoryPath(filePath, { allowMissingLeaf });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`[soak-endurance] invalid ${label}: ${reason}`);
+  }
+}
+
+function assertSoakMetricsFile(metricsFile: string): string {
+  if (
+    !metricsFile ||
+    metricsFile === '.' ||
+    metricsFile === '..' ||
+    metricsFile.includes('/') ||
+    metricsFile.includes('\\') ||
+    metricsFile.includes('\0')
+  ) {
+    throw new Error('[soak-endurance] metricsFile must be a single safe filename');
+  }
+  return metricsFile;
+}
+
+function isSafeRegularFile(filePath: string): boolean {
+  try {
+    const safePath = assertSoakResourcePath(filePath, 'evidence artifact');
+    return safeExistsSync(safePath) && safeLstat(safePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -140,11 +174,12 @@ function sampleFileSizes(samplePaths: string[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const samplePath of samplePaths) {
     try {
-      if (!safeExistsSync(samplePath)) {
+      const safeSamplePath = assertSoakResourcePath(samplePath, 'sample path');
+      if (!safeExistsSync(safeSamplePath) || !safeLstat(safeSamplePath).isFile()) {
         result[samplePath] = 0;
         continue;
       }
-      result[samplePath] = safeStat(samplePath).size;
+      result[samplePath] = safeStat(safeSamplePath).size;
     } catch {
       result[samplePath] = 0;
     }
@@ -266,8 +301,16 @@ export function detectResourceRegressions(samples: SoakSample[]): SoakRegression
 }
 
 function appendLatencyHistory(metricsDir: string, metricsFile: string, durationMs: number): void {
-  safeMkdir(metricsDir, { recursive: true });
-  appendJsonLine(path.join(metricsDir, metricsFile), {
+  const safeMetricsDir = assertSoakResourcePath(metricsDir, 'metrics directory');
+  const safeMetricsPath = assertSoakResourcePath(
+    path.join(safeMetricsDir, assertSoakMetricsFile(metricsFile)),
+    'metrics file'
+  );
+  assertSoakResourcePath(path.dirname(safeMetricsPath), 'metrics parent directory');
+  safeMkdir(safeMetricsDir, { recursive: true });
+  assertSoakResourcePath(safeMetricsDir, 'metrics directory');
+  assertSoakResourcePath(safeMetricsPath, 'metrics file');
+  appendJsonLine(safeMetricsPath, {
     skill: 'ao-04-soak-cycle',
     duration_ms: durationMs,
     timestamp: new Date().toISOString(),
@@ -303,10 +346,10 @@ export function validateSoakEvidence(report: SoakReport): SoakEvidenceValidation
   if (report.evidence.window_mode === 'compressed' && report.cycles < 4) {
     issues.push('at least 4 cycles are required for a meaningful trend');
   }
-  if (!report.evidence.run_log_path || !safeExistsSync(report.evidence.run_log_path)) {
+  if (!report.evidence.run_log_path || !isSafeRegularFile(report.evidence.run_log_path)) {
     issues.push('30-day run log artifact is missing');
   }
-  if (!report.evidence.summary_path || !safeExistsSync(report.evidence.summary_path)) {
+  if (!report.evidence.summary_path || !isSafeRegularFile(report.evidence.summary_path)) {
     issues.push('30-day run summary artifact is missing');
   }
   if (regressionCount > 0) {
@@ -318,7 +361,16 @@ export function validateSoakEvidence(report: SoakReport): SoakEvidenceValidation
     mature,
     issues,
     regression_count: regressionCount,
-    evidence_files: [report.evidence.run_log_path, report.evidence.summary_path].filter(Boolean),
+    evidence_files: [report.evidence.run_log_path, report.evidence.summary_path].flatMap(
+      (filePath) => {
+        if (!filePath) return [];
+        try {
+          return [assertSoakResourcePath(filePath, 'evidence artifact')];
+        } catch {
+          return [];
+        }
+      }
+    ),
   };
 }
 
@@ -337,18 +389,29 @@ function createEvidenceBundlePaths(
 } {
   const stamp = report.timestamp.replace(/[:.]/g, '-');
   const dir = evidenceRoot
-    ? path.join(evidenceRoot, 'evidence', `${stamp}-${process.pid}`)
+    ? path.join(
+        assertSoakResourcePath(evidenceRoot, 'evidence directory'),
+        'evidence',
+        `${stamp}-${process.pid}`
+      )
     : pathResolver.sharedTmp(path.join('soak-evidence', `${stamp}-${process.pid}`));
+  const safeDir = assertSoakResourcePath(dir, 'evidence bundle directory');
   return {
-    dir,
-    logPath: path.join(dir, '30day-run-log.jsonl'),
-    summaryPath: path.join(dir, '30day-run-summary.md'),
+    dir: safeDir,
+    logPath: assertSoakResourcePath(path.join(safeDir, '30day-run-log.jsonl'), 'run log'),
+    summaryPath: assertSoakResourcePath(path.join(safeDir, '30day-run-summary.md'), 'summary'),
   };
 }
 
 function appendEvidenceBundle(report: SoakReport, evidenceRoot?: string): void {
   const { dir, logPath, summaryPath } = createEvidenceBundlePaths(report, evidenceRoot);
+  assertSoakResourcePath(path.dirname(dir), 'evidence parent directory');
+  assertSoakResourcePath(logPath, 'run log');
+  assertSoakResourcePath(summaryPath, 'summary');
   safeMkdir(dir, { recursive: true });
+  assertSoakResourcePath(dir, 'evidence bundle directory');
+  assertSoakResourcePath(logPath, 'run log');
+  assertSoakResourcePath(summaryPath, 'summary');
   for (const sample of report.samples) {
     appendJsonLine(logPath, {
       run_timestamp: report.timestamp,
@@ -372,17 +435,12 @@ function appendEvidenceBundle(report: SoakReport, evidenceRoot?: string): void {
 }
 
 function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): void {
-  const manifestPath = path.join(evidenceRoot, 'manifest.json');
-  let previous: SoakEvidenceManifest | null = null;
-  if (safeExistsSync(manifestPath)) {
-    try {
-      previous = JSON.parse(
-        String(safeReadFile(manifestPath, { encoding: 'utf8' }) || '')
-      ) as SoakEvidenceManifest;
-    } catch {
-      previous = null;
-    }
-  }
+  const safeEvidenceRoot = assertSoakResourcePath(evidenceRoot, 'evidence directory');
+  const manifestPath = assertSoakResourcePath(
+    path.join(safeEvidenceRoot, 'manifest.json'),
+    'evidence manifest'
+  );
+  const previous = readJsonIfPresent<SoakEvidenceManifest>(manifestPath);
   const validation = validateSoakEvidence(report);
   const firstAt = previous?.started_at ?? report.timestamp;
   const lastAt = report.timestamp;
@@ -400,23 +458,31 @@ function updateLiveEvidenceManifest(report: SoakReport, evidenceRoot: string): v
       issues: validation.issues,
     },
   };
-  safeMkdir(evidenceRoot, { recursive: true });
+  assertSoakResourcePath(path.dirname(manifestPath), 'evidence parent directory');
+  safeMkdir(safeEvidenceRoot, { recursive: true });
+  assertSoakResourcePath(safeEvidenceRoot, 'evidence directory');
+  assertSoakResourcePath(manifestPath, 'evidence manifest');
   safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2));
   report.evidence.manifest_path = manifestPath;
   report.evidence.window_days_equivalent = manifest.window_days_equivalent;
-  safeWriteFile(report.evidence.summary_path, renderEvidenceSummary(report));
+  safeWriteFile(
+    assertSoakResourcePath(report.evidence.summary_path, 'summary'),
+    renderEvidenceSummary(report)
+  );
 }
 
 function applyEvidenceRollover(filePath: string, retentionCount: number): void {
   if (!Number.isFinite(retentionCount) || retentionCount <= 0) return;
-  if (!safeExistsSync(filePath)) return;
-  const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+  const safeFilePath = assertSoakResourcePath(filePath, 'run log');
+  if (!safeExistsSync(safeFilePath) || !safeLstat(safeFilePath).isFile()) return;
+  const raw = String(safeReadFile(safeFilePath, { encoding: 'utf8' }) || '');
   const lines = raw
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
   if (lines.length <= retentionCount) return;
-  safeWriteFile(filePath, lines.slice(-retentionCount).join('\n') + '\n');
+  assertSoakResourcePath(safeFilePath, 'run log');
+  safeWriteFile(safeFilePath, lines.slice(-retentionCount).join('\n') + '\n');
 }
 
 async function runDefaultMaintenancePulse(): Promise<{
@@ -450,23 +516,32 @@ export async function runSoakEnduranceHarness(
 ): Promise<SoakReport> {
   const mode = options.mode ?? 'compressed';
   const evidenceRoot =
-    mode === 'live' ? (options.evidenceDir ?? DEFAULT_LIVE_EVIDENCE_DIR) : undefined;
+    mode === 'live'
+      ? assertSoakResourcePath(
+          options.evidenceDir ?? DEFAULT_LIVE_EVIDENCE_DIR,
+          'evidence directory'
+        )
+      : undefined;
   const cycles = Math.max(1, Math.floor(options.cycles ?? 12));
   const delayMs = Math.max(0, Math.floor(options.delayMs ?? 0));
   const samplePaths = Array.from(
     new Set([...(options.samplePaths ?? []), ...DEFAULT_SAMPLE_PATHS])
-  );
-  const reportPath =
+  ).map((samplePath) => assertSoakResourcePath(samplePath, 'sample path'));
+  const reportPath = assertSoakResourcePath(
     options.reportPath ??
-    (mode === 'live'
-      ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'latest-report.json')
-      : DEFAULT_REPORT_PATH);
-  const metricsDir =
+      (mode === 'live'
+        ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'latest-report.json')
+        : DEFAULT_REPORT_PATH),
+    'report path'
+  );
+  const metricsDir = assertSoakResourcePath(
     options.metricsDir ??
-    (mode === 'live'
-      ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'metrics')
-      : DEFAULT_METRICS_DIR);
-  const metricsFile = options.metricsFile ?? DEFAULT_METRICS_FILE;
+      (mode === 'live'
+        ? path.join(evidenceRoot ?? DEFAULT_LIVE_EVIDENCE_DIR, 'metrics')
+        : DEFAULT_METRICS_DIR),
+    'metrics directory'
+  );
+  const metricsFile = assertSoakMetricsFile(options.metricsFile ?? DEFAULT_METRICS_FILE);
   const evidenceRetentionCount = Math.max(1, Math.floor(options.evidenceRetentionCount ?? 30));
   const samples: SoakSample[] = [];
   let autoCheckpointRuns = 0;
@@ -516,7 +591,14 @@ export async function runSoakEnduranceHarness(
     },
   };
 
-  safeMkdir(path.dirname(reportPath), { recursive: true });
+  const safeReportParent = assertSoakResourcePath(
+    path.dirname(reportPath),
+    'report parent directory'
+  );
+  assertSoakResourcePath(reportPath, 'report path');
+  safeMkdir(safeReportParent, { recursive: true });
+  assertSoakResourcePath(safeReportParent, 'report parent directory');
+  assertSoakResourcePath(reportPath, 'report path');
   safeWriteFile(reportPath, JSON.stringify(report, null, 2));
   appendEvidenceBundle(report, evidenceRoot);
   applyEvidenceRollover(report.evidence.run_log_path, evidenceRetentionCount);

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { safeMkdir, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getServicePresetRecord, type ServicePresetRecord } from './service-preset-registry.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
 import { pathResolver } from './path-resolver.js';
@@ -455,7 +455,9 @@ export function persistServiceExecutionReceipt(
 ): ServiceExecutionReceipt {
   safeMkdir(RECEIPT_DIR, { recursive: true });
   const safeId = receipt.receipt_id.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const receiptPath = path.join(RECEIPT_DIR, `${safeId}.json`);
+  const receiptPath = assertSafeRepositoryPath(path.join(RECEIPT_DIR, `${safeId}.json`), {
+    allowMissingLeaf: true,
+  });
   safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
   return { ...receipt, receipt_path: receiptPath };
 }

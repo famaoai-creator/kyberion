@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest } from '../../../lib/api-guard';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { loadJson, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import {
+  assertSafeRepositoryPath,
+  loadJson,
+  safeExistsSync,
+  safeLstat,
+  safeReadFile,
+} from '@agent/core/secure-io';
 import {
   resolveViewerContextForRequest,
   withViewerExecutionContext,
@@ -25,9 +31,11 @@ interface AgentIdentity {
 }
 
 function readJson<T>(fileName: string): T | null {
-  const full = customerResolver.resolveOverlay(fileName);
-  if (!safeExistsSync(full)) return null;
   try {
+    const full = assertSafeRepositoryPath(customerResolver.resolveOverlay(fileName), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(full) || !safeLstat(full).isFile()) return null;
     return loadJson<T>(full);
   } catch {
     return null;
@@ -35,9 +43,11 @@ function readJson<T>(fileName: string): T | null {
 }
 
 function readText(fileName: string): string | null {
-  const full = customerResolver.resolveOverlay(fileName);
-  if (!safeExistsSync(full)) return null;
   try {
+    const full = assertSafeRepositoryPath(customerResolver.resolveOverlay(fileName), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(full) || !safeLstat(full).isFile()) return null;
     return safeReadFile(full, { encoding: 'utf8' }) as string;
   } catch {
     return null;

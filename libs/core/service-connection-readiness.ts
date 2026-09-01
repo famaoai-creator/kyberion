@@ -1,12 +1,13 @@
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 
 export type ServiceConnectionReadinessRule = {
   required_keys_any?: string[];
 };
 
 export type ServiceConnectionReadinessConfig = {
-  version?: string;
+  version: string;
   tenant_guard?: { require_zero_drift?: boolean };
   required_services?: Record<string, ServiceConnectionReadinessRule>;
 };
@@ -15,23 +16,23 @@ const READINESS_CONFIG_PATH = pathResolver.knowledge(
   'product/governance/service-connection-readiness.json'
 );
 
-let cachedConfig: ServiceConnectionReadinessConfig | null | undefined;
+const readinessCatalog = defineCatalog<ServiceConnectionReadinessConfig>({
+  id: 'service-connection-readiness',
+  path: READINESS_CONFIG_PATH,
+  schema: pathResolver.knowledge('product/schemas/service-connection-readiness.schema.json'),
+});
 
 export function loadServiceConnectionReadinessConfig(): ServiceConnectionReadinessConfig | null {
-  if (cachedConfig !== undefined) return cachedConfig;
-  if (!safeExistsSync(READINESS_CONFIG_PATH)) {
-    cachedConfig = null;
-    return cachedConfig;
-  }
+  // This config is optional by design. Preserve the existing null contract for
+  // an unconfigured host while validating any present catalog strictly.
+  if (!safeExistsSync(READINESS_CONFIG_PATH)) return null;
   try {
-    const parsed = JSON.parse(
-      String(safeReadFile(READINESS_CONFIG_PATH, { encoding: 'utf8' }) ?? '')
-    ) as ServiceConnectionReadinessConfig;
-    cachedConfig = parsed && typeof parsed === 'object' ? parsed : null;
+    return readinessCatalog.load();
   } catch {
-    cachedConfig = null;
+    // Invalid JSON/schema has the same safe outcome as an absent readiness
+    // catalog: no service is declared ready by configuration.
+    return null;
   }
-  return cachedConfig;
 }
 
 export function requiredServiceConnectionKeys(serviceId: string): string[] {

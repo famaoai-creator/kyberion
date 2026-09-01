@@ -1,10 +1,9 @@
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalog } from '@agent/core/foundation';
-import {
-  buildContextualIntentFrame,
-  compileUserIntentFlow,
-  resolveIntentResolutionPacket,
-} from '@agent/core';
+import { buildContextualIntentFrame } from '@agent/core/contextual-intent-frame';
+import { compileUserIntentFlow } from '@agent/core/intent-contract';
+import { resolveIntentResolutionPacket } from '@agent/core/intent-resolution';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type CorpusItem = {
   id: string;
@@ -57,7 +56,21 @@ function compareExpectedFrame(
   return failures;
 }
 
-async function main(): Promise<void> {
+type EvaluationReport = {
+  corpus: string;
+  total: number;
+  frame_accuracy: number;
+  route_accuracy: number;
+  ask_vs_act_accuracy: number;
+  failures: string[];
+};
+
+type EvaluationResult = {
+  report: EvaluationReport;
+  mismatchCount: number;
+};
+
+export async function main(): Promise<EvaluationResult> {
   const corpusPath = pathResolver.knowledge(
     'product/governance/japanese-contextual-intent-corpus.json'
   );
@@ -72,9 +85,10 @@ async function main(): Promise<void> {
       schema: schemaPath,
     }).load();
   } catch (error) {
-    console.error(`[eval:japanese-contextual-intent] invalid corpus schema: ${String(error)}`);
-    process.exitCode = 1;
-    return;
+    throw new ScriptExitError(
+      1,
+      `[eval:japanese-contextual-intent] invalid corpus schema: ${String(error)}`
+    );
   }
 
   const failures: string[] = [];
@@ -132,18 +146,28 @@ async function main(): Promise<void> {
     failures: failures.slice(0, 20),
   };
 
-  console.log(JSON.stringify(report, null, 2));
-
-  if (failures.length > 0) {
-    console.error(`[eval:japanese-contextual-intent] completed with ${failures.length} mismatches`);
-    return;
-  }
-
-  console.log('[eval:japanese-contextual-intent] OK');
+  return { report, mismatchCount: failures.length };
 }
 
-main().catch((error) => {
-  console.error('[eval:japanese-contextual-intent] UNCAUGHT ERROR');
-  console.error(error);
-  process.exitCode = 1;
+export const runJapaneseContextualIntentEval = defineScript({
+  name: 'eval:japanese-contextual-intent',
+  flags: [],
+  run: async (context) => {
+    const { report, mismatchCount } = await main();
+    context.print(report);
+    if (mismatchCount > 0) {
+      throw new ScriptExitError(
+        1,
+        `[eval:japanese-contextual-intent] completed with ${mismatchCount} mismatches`
+      );
+    }
+    context.print('[eval:japanese-contextual-intent] OK');
+    return report;
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'eval_japanese_contextual_intent.ts') ||
+  isDirectScript(import.meta.url, 'eval_japanese_contextual_intent.js')
+)
+  void runJapaneseContextualIntentEval();

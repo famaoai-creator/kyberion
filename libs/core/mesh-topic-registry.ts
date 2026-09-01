@@ -1,10 +1,11 @@
 import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from './secure-io.js';
+import { safeExistsSync, safeRmSync } from './secure-io.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { listEligibleMeshPeers } from './mesh-peer-directory.js';
 import type {
@@ -133,13 +134,7 @@ function randomId(prefix: string): string {
 }
 
 function readJsonl<T>(logicalPath: string): T[] {
-  if (!safeExistsSync(logicalPath)) return [];
-  const raw = String(safeReadFile(logicalPath, { encoding: 'utf8' }) || '');
-  return raw
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as T);
+  return readJsonLines<T>(logicalPath);
 }
 
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {

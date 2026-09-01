@@ -7,7 +7,8 @@
 // change; every other op previously made determineActuatorStepType throw, so
 // those entries are strictly additive.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const TERMINAL_SCHEMA = {
   type: 'object',
@@ -73,7 +74,7 @@ export const TERMINAL_ACTUATOR_APPLY_OPS = [
   'shell_command',
 ] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const required: Record<string, string[]> = {
     poll: ['sessionId'],
     llm_decide: ['observation'],
@@ -92,7 +93,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...TERMINAL_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...TERMINAL_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

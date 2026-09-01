@@ -1,4 +1,4 @@
-import { pathResolver } from '../path-resolver.js';
+import { resolveRepositoryPathToken } from '../path-token-resolver.js';
 
 /**
  * Logic Utilities for ADF and Pipeline Processing.
@@ -13,26 +13,7 @@ import { pathResolver } from '../path-resolver.js';
  * `to_relative`/`normalize` before storing).
  */
 function resolvePathToken(token: string): string | undefined {
-  const trimmed = token.slice(1).trim(); // drop leading '@'
-  const sepIdx = trimmed.indexOf(':');
-  const domain = (sepIdx >= 0 ? trimmed.slice(0, sepIdx) : trimmed).trim();
-  const subPath = sepIdx >= 0 ? trimmed.slice(sepIdx + 1).trim() : '';
-  switch (domain) {
-    case 'root':
-      return subPath ? pathResolver.rootResolve(subPath) : pathResolver.rootDir();
-    case 'knowledge':
-      return pathResolver.knowledge(subPath);
-    case 'active':
-      return pathResolver.active(subPath);
-    case 'shared':
-      return pathResolver.shared(subPath);
-    case 'tmp':
-      return pathResolver.shared(subPath ? `tmp/${subPath}` : 'tmp');
-    case 'vault':
-      return pathResolver.vault(subPath);
-    default:
-      return undefined;
-  }
+  return resolveRepositoryPathToken(token);
 }
 
 /**
@@ -92,6 +73,24 @@ export function resolveVars(val: any, ctx: any): any {
     }
     return defaultValue !== undefined ? defaultValue : '';
   });
+}
+
+/** Resolve pipeline context templates recursively while preserving whole-value types. */
+export function resolvePipelineContextValues(
+  value: unknown,
+  context: Record<string, unknown>
+): unknown {
+  if (typeof value === 'string') return resolveVars(value, context);
+  if (Array.isArray(value)) {
+    return value.map((entry) => resolvePipelineContextValues(entry, context));
+  }
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      resolvePipelineContextValues(entry, context),
+    ])
+  );
 }
 
 export function resolveRequiredStringParam(

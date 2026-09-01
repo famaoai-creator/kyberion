@@ -1,14 +1,15 @@
 import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { formatDateTime, resolveTimeZone } from '@agent/core/format';
+import { resolveMissionJournalPolicy } from '@agent/core/mission-journal-policy';
+import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  formatDateTime,
-  logger,
-  pathResolver,
-  resolveMissionJournalPolicy,
-  resolveOperatorLocale,
-  resolveTimeZone,
+  assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReaddir,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import chalk from 'chalk';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -33,31 +34,136 @@ interface Mission {
   };
 }
 
-function scanMissions(tenantSlug?: string) {
-  const searchDirs = [
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function stringField(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function stringArrayField(value: unknown): string[] | undefined {
+  if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string')) return undefined;
+  return value.map((entry) => entry.trim()).filter(Boolean);
+}
+
+function normalizeMission(value: unknown): Mission | null {
+  if (!isJsonRecord(value)) return null;
+  const missionId = stringField(value, 'mission_id');
+  const status = stringField(value, 'status');
+  const tier = stringField(value, 'tier');
+  if (
+    !missionId ||
+    !status ||
+    (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') ||
+    !Array.isArray(value.history)
+  ) {
+    return null;
+  }
+
+  const history = value.history.flatMap((entry): MissionHistoryEntry[] => {
+    if (!isJsonRecord(entry)) return [];
+    const ts = stringField(entry, 'ts');
+    const event = stringField(entry, 'event');
+    const note = stringField(entry, 'note');
+    return ts && event && note ? [{ ts, event, note }] : [];
+  });
+  const scope = isJsonRecord(value.scope) ? value.scope : undefined;
+  const relationships = isJsonRecord(value.relationships) ? value.relationships : undefined;
+  const prerequisites = relationships ? stringArrayField(relationships.prerequisites) : undefined;
+  const successors = relationships ? stringArrayField(relationships.successors) : undefined;
+  const blockers = relationships ? stringArrayField(relationships.blockers) : undefined;
+
+  return {
+    mission_id: missionId,
+    status,
+    tier,
+    ...(stringField(value, 'tenant_slug')
+      ? { tenant_slug: stringField(value, 'tenant_slug') }
+      : {}),
+    ...(scope && stringField(scope, 'tenant_slug')
+      ? { scope: { tenant_slug: stringField(scope, 'tenant_slug') } }
+      : {}),
+    history,
+    ...(relationships && (prerequisites || successors || blockers)
+      ? {
+          relationships: {
+            ...(prerequisites ? { prerequisites } : {}),
+            ...(successors ? { successors } : {}),
+            ...(blockers ? { blockers } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+export function loadTrustScores(
+  ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json')
+): Record<string, number> {
+  try {
+    const safePath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return {};
+    const raw = readJson<unknown>(safePath);
+    if (!isJsonRecord(raw)) return {};
+    const ledger = isJsonRecord(raw.agents) ? raw.agents : raw;
+    return Object.fromEntries(
+      Object.entries(ledger).flatMap(([agentId, value]) => {
+        if (!isJsonRecord(value)) return [];
+        const score = value.current_score;
+        return typeof score === 'number' && Number.isFinite(score) && score >= 0 && score <= 1000
+          ? [[agentId, score]]
+          : [];
+      })
+    );
+  } catch {
+    return {};
+  }
+}
+
+export function scanMissions(
+  tenantSlug?: string,
+  searchDirs: string[] = [
     pathResolver.active('missions/public'),
     pathResolver.active('missions/confidential'),
     pathResolver.knowledge('personal/missions'),
     pathResolver.active('archive/missions'),
-  ];
-
+  ]
+) {
   const missions: Mission[] = [];
 
   for (const dir of searchDirs) {
-    if (!safeExistsSync(dir)) continue;
-    const items = safeReaddir(dir);
+    let safeDir: string;
+    try {
+      safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+      if (!safeExistsSync(safeDir) || !safeLstat(safeDir).isDirectory()) continue;
+    } catch {
+      continue;
+    }
+    let items: string[];
+    try {
+      items = safeReaddir(safeDir);
+    } catch {
+      continue;
+    }
     for (const item of items) {
-      const statePath = path.join(dir, item, 'mission-state.json');
-      if (safeExistsSync(statePath)) {
-        try {
-          const mission = readJson<Mission>(statePath);
-          if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
-            continue;
-          }
-          missions.push(mission);
-        } catch (err) {
-          logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
+      try {
+        const missionDir = assertSafeRepositoryPath(path.join(safeDir, item), {
+          allowMissingLeaf: true,
+        });
+        if (!safeLstat(missionDir).isDirectory()) continue;
+        const statePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'), {
+          allowMissingLeaf: true,
+        });
+        if (!safeExistsSync(statePath)) continue;
+        const mission = normalizeMission(readJson<unknown>(statePath));
+        if (!mission) continue;
+        if (tenantSlug && (mission.tenant_slug || mission.scope?.tenant_slug) !== tenantSlug) {
+          continue;
         }
+        missions.push(mission);
+      } catch (err) {
+        logger.warn(`[mission_journal] suppressed error in scanMissions: ${err}`);
       }
     }
   }
@@ -118,10 +224,10 @@ function renderJournal(tenantSlug?: string) {
   });
 
   // Summary
-  const stats = missions.reduce((acc, m) => {
-    acc[m.status] = (acc[m.status] || 0) + 1;
-    return acc;
-  }, {} as any);
+  const stats: Record<string, number> = {};
+  for (const mission of missions) {
+    stats[mission.status] = (stats[mission.status] || 0) + 1;
+  }
 
   console.log(chalk.bold(`📈 ${policy.summary_title}:`));
   Object.keys(stats).forEach((s) => {
@@ -131,13 +237,11 @@ function renderJournal(tenantSlug?: string) {
 
   // Trust Scores Summary
   const ledgerPath = pathResolver.knowledge('personal/governance/agent-trust-scores.json');
-  if (safeExistsSync(ledgerPath)) {
-    const raw = readJson<any>(ledgerPath);
-    const ledger = raw?.agents ?? raw ?? {};
+  const ledger = loadTrustScores(ledgerPath);
+  if (Object.keys(ledger).length > 0) {
     console.log(chalk.bold(`🤝 ${policy.trust_scores_title}:`));
     Object.keys(ledger).forEach((a) => {
-      const score = ledger[a].current_score;
-      const normalized = score / 100;
+      const normalized = ledger[a] / 100;
       const color = normalized >= 7.0 ? chalk.green : normalized >= 5.0 ? chalk.yellow : chalk.red;
       console.log(`  - ${a}: ${color(normalized.toFixed(1))}/10.0`);
     });

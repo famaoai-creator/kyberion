@@ -1,7 +1,8 @@
 import * as path from 'node:path';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
-  loadJson,
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
@@ -38,13 +39,18 @@ function normalizeSegment(value: string): string {
 }
 
 export function getPendingIntentPath(correlationId: string): string {
-  return pathResolver.sharedTmp(
-    path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`)
+  return assertSafeRepositoryPath(
+    pathResolver.sharedTmp(
+      path.join(PENDING_INTENT_SUBDIR, `${normalizeSegment(correlationId)}.json`)
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
 function ensurePendingIntentDir(): void {
-  const dir = pathResolver.sharedTmp(PENDING_INTENT_SUBDIR);
+  const dir = assertSafeRepositoryPath(pathResolver.sharedTmp(PENDING_INTENT_SUBDIR), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
 }
 
@@ -111,7 +117,7 @@ export function loadPendingIntent(correlationId: string): PendingIntentRecord | 
   if (!safeExistsSync(filePath)) return null;
   let parsed: PendingIntentRecord | null = null;
   try {
-    parsed = normalizePendingIntent(loadJson<unknown>(filePath));
+    parsed = normalizePendingIntent(readJson<unknown>(filePath));
   } catch {
     clearPendingIntent(correlationId);
     return null;
@@ -134,7 +140,9 @@ export function clearPendingIntent(correlationId: string): void {
 }
 
 export function listPendingIntents(): PendingIntentRecord[] {
-  const dir = pathResolver.sharedTmp(PENDING_INTENT_SUBDIR);
+  const dir = assertSafeRepositoryPath(pathResolver.sharedTmp(PENDING_INTENT_SUBDIR), {
+    allowMissingLeaf: true,
+  });
   if (!safeExistsSync(dir)) return [];
   return safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))

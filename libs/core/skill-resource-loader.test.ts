@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 import {
   loadSkillResourceDescriptor,
   readSkillResourceForModel,
@@ -187,9 +187,57 @@ describe('PI-09 skill progressive disclosure', () => {
     );
   });
 
+  it('rejects a SKILL.md directory before attempting to read it', () => {
+    const dir = pathResolver.rootResolve(`${root}/directory-resource`);
+    safeMkdir(pathResolver.rootResolve(`${root}/directory-resource/SKILL.md`), { recursive: true });
+    expect(() => loadSkillResourceDescriptor(dir)).toThrow(
+      '[SKILL_RESOURCE_INVALID] skill resource must be a regular file'
+    );
+  });
+
   it('does not inspect project-local skills before trust resolution', () => {
     expect(() =>
       loadSkillResourceDescriptor('skills/project-local', undefined, { trustResolved: false })
     ).toThrow('[TRUST_REQUIRED]');
+  });
+
+  it('fails closed when project trust is omitted', () => {
+    expect(() => loadSkillResourceDescriptor('skills/project-local')).toThrow('[TRUST_REQUIRED]');
+  });
+
+  it('rejects repository escape and symbolic-link traversal before loading', () => {
+    expect(() => loadSkillResourceDescriptor('../package')).toThrow('[SKILL_RESOURCE_SCOPE]');
+
+    const outside = pathResolver.rootResolve(`${root}/outside`);
+    const link = pathResolver.rootResolve(`${root}/linked`);
+    safeMkdir(outside, { recursive: true });
+    safeWriteFile(
+      pathResolver.rootResolve(`${root}/outside/SKILL.md`),
+      ['---', 'name: linked', 'description: linked', '---', '', 'Body'].join('\n')
+    );
+    safeSymlinkSync(outside, link);
+    expect(() => loadSkillResourceDescriptor(`${root}/linked`)).toThrow('[SKILL_RESOURCE_SCOPE]');
+  });
+
+  it('rechecks trust when a caller supplies a descriptor directly', () => {
+    const descriptor = {
+      name: 'project-local',
+      description: 'Project-local skill',
+      path: pathResolver.rootResolve('skills/project-local/SKILL.md'),
+      frontmatter: {
+        name: 'project-local',
+        description: 'Project-local skill',
+        disable_model_invocation: false,
+        allowed_tools: [],
+      },
+      provenance: {
+        source: 'test',
+        scope: 'repository' as const,
+        origin: 'builtin' as const,
+        base_dir: pathResolver.rootResolve('skills/project-local'),
+        trust: 'trusted' as const,
+      },
+    };
+    expect(() => readSkillResourceBody(descriptor)).toThrow('[TRUST_REQUIRED]');
   });
 });

@@ -5,7 +5,7 @@ import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import { safeExec } from './secure-io.js';
-import { loadState, saveState } from './mission-state.js';
+import { loadState, loadStateForRepair, saveState } from './mission-state.js';
 import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.js';
 import { deriveMissionBranchName, getCurrentBranch, getGitHash } from './mission-git.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -206,7 +206,7 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
     return;
   }
   const upperId = id.toUpperCase();
-  const state = loadState(upperId);
+  const state = loadStateForRepair(upperId);
   if (!state) {
     logger.error(`Mission ${upperId} not found.`);
     return;

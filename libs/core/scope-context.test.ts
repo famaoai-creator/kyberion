@@ -153,6 +153,12 @@ describe('scope-context', () => {
     }
   });
 
+  it('rejects a scope.env path outside the repository root', () => {
+    expect(() =>
+      writeScopeEnv({ tier: 'public' }, { KYBERION_SCOPE_ENV_PATH: '../../outside-scope.env' })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('memoizes and resets the process scope', () => {
     resetCurrentScope();
     const original = {

@@ -4,6 +4,7 @@ import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { collectDeliverableInbox } from '../../../lib/deliverable-inbox';
 import {
   resolveViewerContextForRequest,
+  strictViewerTier,
   strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
   strictViewerScopeTenantSlugs,
@@ -22,6 +23,7 @@ export async function GET(req: NextRequest) {
   let tenantSlugs: string[] | 'all';
   let organizationIds: string[] | 'all';
   let projectIds: string[] | 'all';
+  let tier: 'personal' | 'confidential' | 'public' | '';
   try {
     tenantSlugs = strictViewerScopeTenantSlugs(
       resolvedViewer.context,
@@ -35,6 +37,13 @@ export async function GET(req: NextRequest) {
       resolvedViewer.context,
       req.nextUrl.searchParams.get('project_id') || undefined
     );
+    const requestedTier = req.nextUrl.searchParams.get('tier') || '';
+    tier = requestedTier
+      ? strictViewerTier(
+          resolvedViewer.context,
+          requestedTier as 'personal' | 'confidential' | 'public'
+        )
+      : '';
   } catch (error) {
     return viewerErrorResponse(error);
   }
@@ -44,8 +53,8 @@ export async function GET(req: NextRequest) {
       query: req.nextUrl.searchParams.get('query') || '',
       missionId: req.nextUrl.searchParams.get('missionId') || '',
       kind: req.nextUrl.searchParams.get('kind') || '',
-      tier: (req.nextUrl.searchParams.get('tier') || '') as
-        '' | 'personal' | 'confidential' | 'public',
+      tier,
+      tierAccess: resolvedViewer.context.tierAccess ?? ['public', 'confidential'],
       limit: Number.isFinite(limit) ? limit : 50,
       tenantSlugs,
       organizationIds,

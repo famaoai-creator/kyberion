@@ -9,6 +9,8 @@ import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
 } from '../../../../../../lib/viewer-context';
+import { readChronosJsonObject } from '../../../../../../lib/request-input';
+import { parseHeadlessWorkItemStatusInput } from './status-input';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,11 +23,13 @@ export async function POST(req: NextRequest) {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
-    const body = await req.json();
+    const parsedBody = await readChronosJsonObject(req, 'Chronos headless work items');
+    if (!parsedBody.ok) return NextResponse.json({ error: parsedBody.error }, { status: 400 });
+    const input = parseHeadlessWorkItemStatusInput(parsedBody.body);
     authorizeHeadlessOperation(resolvedViewer.context, 'chronos.work_items.update_status');
     const item = updateHeadlessWorkItemStatus(resolvedViewer.context, {
-      itemId: body?.item_id,
-      status: body?.status,
+      itemId: input.item_id,
+      status: input.status,
     });
     return NextResponse.json(
       headlessEnvelope(

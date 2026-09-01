@@ -14,6 +14,33 @@ const secureIo = vi.hoisted(() => ({
     fs.writeFileSync(filePath, data);
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  assertSafeRepositoryPath: (
+    filePath: string,
+    options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
+  ) => {
+    const resolved = path.resolve(filePath);
+    const root = path.resolve(options.rootDir || process.env.KYBERION_ROOT || process.cwd());
+    const relative = path.relative(root, resolved);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error('[RESOURCE_PATH_SCOPE]');
+    }
+    let current = root;
+    for (const segment of relative.split(path.sep)) {
+      current = path.join(current, segment);
+      if (fs.existsSync(current) && fs.lstatSync(current).isSymbolicLink()) {
+        throw new Error('[RESOURCE_PATH_SYMLINK]');
+      }
+    }
+    if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+      throw new Error('[RESOURCE_PATH_MISSING]');
+    }
+    return resolved;
+  },
   loadJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
@@ -29,6 +56,31 @@ const secureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./foundation/json.js', () => ({
+  readJson: secureIo.loadJson,
+  readJsonLines: <T>(
+    filePath: string,
+    options: {
+      onMalformed?: 'skip';
+      map?: (value: unknown, lineNumber: number) => T;
+    } = {}
+  ): T[] => {
+    if (!fs.existsSync(filePath)) return [];
+    return fs
+      .readFileSync(filePath, 'utf8')
+      .split(/\r?\n/)
+      .flatMap((line, index) => {
+        if (!line.trim()) return [];
+        try {
+          const value = JSON.parse(line) as unknown;
+          return [options.map ? options.map(value, index + 1) : (value as T)];
+        } catch (error) {
+          if (options.onMalformed === 'skip') return [];
+          throw error;
+        }
+      });
+  },
+}));
 
 describe('operator home summary', () => {
   let tmpRoot: string;
@@ -71,6 +123,17 @@ describe('operator home summary', () => {
         2
       )
     );
+    const externalMission = path.join(tmpRoot, 'external-mission');
+    fs.mkdirSync(externalMission, { recursive: true });
+    fs.writeFileSync(
+      path.join(externalMission, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: 'MSN-LINKED',
+        status: 'active',
+        tier: 'public',
+      })
+    );
+    fs.symlinkSync(externalMission, path.join(tmpRoot, 'active/missions/public/MSN-LINKED'));
     addInboxEntry({
       missionId: 'MSN-1',
       title: 'Deliverable ready',

@@ -1,8 +1,8 @@
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
 import { shared } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
-  safeReadFile,
   safeWriteFile,
   safeExistsSync,
   safeMkdir,
@@ -78,8 +78,7 @@ function isExpired(entry: VaultEntry): boolean {
 function readEntryFile<T>(filePath: string): VaultEntry<T> | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    return JSON.parse(raw) as VaultEntry<T>;
+    return readJson<VaultEntry<T>>(filePath);
   } catch {
     return null;
   }

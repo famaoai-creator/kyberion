@@ -1,15 +1,13 @@
-import {
-  logger,
-  recordInteraction,
-  resolveServiceBinding,
-  validatePresenceTimeline,
-  pathResolver,
-  buildGovernedRetryOptions,
-  retry,
-  secureFetch,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-} from '@agent/core';
+import { logger } from '@agent/core/core';
+import { recordInteraction } from '@agent/core/relationship-graph-store';
+import { resolveServiceBinding } from '@agent/core/service-binding';
+import { validatePresenceTimeline } from '@agent/core/presence-surface';
+import * as pathResolver from '@agent/core/path-resolver';
+import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
+import { retry } from '@agent/core/async-utils';
+import { secureFetch } from '@agent/core/network';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { WebClient } from '@slack/web-api';
 
@@ -62,14 +60,11 @@ interface PresenceAction {
   };
 }
 
-function buildRetryOptions(override?: Record<string, any>) {
-  return buildGovernedRetryOptions({
-    manifestPath: PRESENCE_MANIFEST_PATH,
-    defaults: DEFAULT_PRESENCE_RETRY,
-    override: override,
-    fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
-  });
-}
+const buildRetryOptions = createGovernedRetryOptionsBuilder({
+  manifestPath: PRESENCE_MANIFEST_PATH,
+  defaults: DEFAULT_PRESENCE_RETRY,
+  fallbackCategories: ['network', 'rate_limit', 'timeout', 'resource_unavailable'],
+});
 
 export async function handleAction(input: PresenceAction) {
   const { action } = input;

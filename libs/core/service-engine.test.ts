@@ -77,6 +77,20 @@ vi.mock('./service-binding.js', async () => {
   };
 });
 
+vi.mock('./service-preset-registry.js', () => ({
+  getServicePresetRecord: (serviceId: string, presetPathHint?: string) => {
+    const raw = mocks.safeReadFile(presetPathHint || `${serviceId}.json`, {
+      encoding: 'utf8',
+    });
+    if (raw === undefined || raw === '') return null;
+    const parsed = JSON.parse(String(raw)) as Record<string, unknown>;
+    return {
+      service_id: serviceId,
+      ...parsed,
+    };
+  },
+}));
+
 vi.mock('./secure-io.js', async () => {
   const actual = (await vi.importActual('./secure-io.js')) as any;
   return {
@@ -93,6 +107,7 @@ vi.mock('./secure-io.js', async () => {
       const raw = mocks.safeReadFile(filePath, { encoding: 'utf8' });
       return JSON.parse(String(raw)) as T;
     },
+    assertSafeRepositoryPath: (filePath: string): string => filePath,
   };
 });
 

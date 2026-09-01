@@ -64,6 +64,7 @@ describe('policy loading (spend-policy.json override pattern)', () => {
 
   it('loads governed limits and per-tenant overrides keyed by tenant slug', () => {
     writePolicy({
+      version: '1.0.0',
       max_files_per_day: 10,
       max_bytes_per_day: 1000,
       warn_ratio: 0.5,
@@ -198,6 +199,12 @@ describe('checkIngestQuota — warn→block staging', () => {
     );
     expect(() => recordIngestUsage('UPPER', 1, 1, { rootDir: fixtureRoot })).toThrow(
       /invalid tenant slug/
+    );
+  });
+
+  it('rejects a quota root outside the repository', () => {
+    expect(() => ingestQuotaCounterPath('acme-corp', { rootDir: '/tmp' })).toThrow(
+      /outside the repository/
     );
   });
 });

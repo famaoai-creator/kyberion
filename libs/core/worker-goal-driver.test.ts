@@ -24,6 +24,10 @@ vi.mock('./kill-switch.js', () => ({
 
 import { RewindableWorkerContext } from './context-rewind.js';
 import {
+  getAgentRuntimeManualDriverRegistration,
+  type AgentRuntimeManualDriver,
+} from './agent-runtime-manual-drive.js';
+import {
   resetDefaultDynamicInjectionRegistry,
   ScopedDynamicInjectionRegistry,
 } from './dynamic-injection.js';
@@ -116,8 +120,140 @@ describe('runGoalDrivenLoop — acceptance #1: create → 3 turns → complete �
     expect(turnBegins).toEqual([1, 2, 3, 4]);
   });
 
+  it('exposes a scoped manual driver and waits before the model turn', async () => {
+    const backend = scriptedBackend([goalUpdate({ status: 'complete', reason: 'approved' })]);
+    let driver: AgentRuntimeManualDriver | undefined;
+    const run = runGoalDrivenLoop({
+      objective: 'manual objective',
+      goalId: 'manual-g1',
+      backend,
+      manualDrive: {
+        agentId: 'manual-agent-g1',
+        scope: { scope_kind: 'system', tier: 'public' },
+        onReady: (value) => {
+          driver = value;
+        },
+      },
+    });
+
+    await vi.waitFor(() => expect(driver).toBeDefined());
+    const action = await driver!.peekAction();
+    expect(action).toMatchObject({
+      action_id: 'manual-g1:turn:1',
+      kind: 'stream_assistant',
+      status: 'ready',
+    });
+    expect(backend.prompts).toEqual([]);
+    await expect(driver!.executeAction(action!.action_id)).resolves.toMatchObject({
+      status: 'executed',
+    });
+    await expect(run).resolves.toMatchObject({ finalState: 'complete', turnsRun: 1 });
+    expect(getAgentRuntimeManualDriverRegistration('manual-agent-g1')).toBeUndefined();
+  });
+
+  it('gates a real external tool call behind the manual execute_tool action', async () => {
+    const backend = scriptedBackend([
+      { toolCalls: [{ name: 'write_note', input: { path: 'note.txt', body: 'private' } }] },
+      goalUpdate({ status: 'complete', reason: 'tool approved' }),
+    ]);
+    const executed: string[] = [];
+    const phases: string[] = [];
+    let driver: AgentRuntimeManualDriver | undefined;
+    const run = runGoalDrivenLoop({
+      objective: 'manual tool objective',
+      goalId: 'manual-g2',
+      backend,
+      executeTool: () => {
+        executed.push('write_note');
+        return { resultText: 'ok', externalEffect: true };
+      },
+      manualDrive: {
+        agentId: 'manual-agent-g2',
+        scope: { scope_kind: 'system', tier: 'public' },
+        approvalGate: ({ phase }) => {
+          phases.push(phase);
+          return { status: 'approved', request_id: 'approval-g2' };
+        },
+        onReady: (value) => {
+          driver = value;
+        },
+      },
+    });
+
+    await vi.waitFor(() => expect(driver).toBeDefined());
+    const turn = await driver!.peekAction();
+    await driver!.executeAction(turn!.action_id);
+    await vi.waitFor(async () =>
+      expect(await driver!.peekAction()).toMatchObject({
+        kind: 'execute_tool',
+        status: 'ready',
+      })
+    );
+    const tool = await driver!.peekAction();
+    expect(executed).toEqual([]);
+    expect(tool).not.toHaveProperty('approval_payload');
+    await driver!.executeAction(tool!.action_id);
+    expect(executed).toEqual(['write_note']);
+
+    await vi.waitFor(async () => expect(await driver!.peekAction()).not.toBeNull());
+    const nextTurn = await driver!.peekAction();
+    await driver!.executeAction(nextTurn!.action_id);
+    await expect(run).resolves.toMatchObject({ finalState: 'complete', turnsRun: 2 });
+    expect(phases.at(-1)).toBe('execute');
+    expect(phases.slice(0, -1).every((phase) => phase === 'peek')).toBe(true);
+  });
+
+  it('pauses instead of hanging when manual tool approval is pending', async () => {
+    const backend = scriptedBackend([
+      { toolCalls: [{ name: 'write_note', input: { body: 'needs approval' } }] },
+    ]);
+    const executed: string[] = [];
+    let driver: AgentRuntimeManualDriver | undefined;
+    const run = runGoalDrivenLoop({
+      objective: 'pause for manual approval',
+      goalId: 'manual-g3',
+      backend,
+      executeTool: () => {
+        executed.push('write_note');
+        return { resultText: 'unexpected', externalEffect: true };
+      },
+      manualDrive: {
+        agentId: 'manual-agent-g3',
+        scope: { scope_kind: 'system', tier: 'public' },
+        approvalGate: () => ({ status: 'pending', request_id: 'approval-g3' }),
+        onReady: (value) => {
+          driver = value;
+        },
+      },
+    });
+
+    await vi.waitFor(() => expect(driver).toBeDefined());
+    const turn = await driver!.peekAction();
+    await driver!.executeAction(turn!.action_id);
+    await vi.waitFor(async () =>
+      expect(await driver!.peekAction()).toMatchObject({
+        kind: 'execute_tool',
+        status: 'awaiting_approval',
+      })
+    );
+    const tool = await driver!.peekAction();
+    await expect(driver!.executeAction(tool!.action_id)).resolves.toMatchObject({
+      status: 'awaiting_approval',
+    });
+    await expect(run).resolves.toMatchObject({
+      finalState: 'paused',
+      turnsRun: 1,
+    });
+    expect(executed).toEqual([]);
+  });
+
   it('forwards PI-17 role and deferred tool settings at the goal boundary', async () => {
     const seenOptions: ReasoningCallOptions[] = [];
+    const deferredDefinition = {
+      name: 'search',
+      description: 'Search the governed catalog.',
+      inputSchema: { type: 'object' },
+    };
     const backend: ToolBackend = {
       prompts: [],
       async generateWithTools(_prompt, _tools, options) {
@@ -132,9 +268,16 @@ describe('runGoalDrivenLoop — acceptance #1: create → 3 turns → complete �
       backend,
       toolRole: 'agent',
       deferredToolNames: ['search'],
+      deferredToolDefinitions: [deferredDefinition],
     });
 
-    expect(seenOptions).toEqual([{ role: 'agent', deferred_tool_names: ['search'] }]);
+    expect(seenOptions).toEqual([
+      {
+        role: 'agent',
+        deferred_tool_names: ['search'],
+        deferred_tool_definitions: [deferredDefinition],
+      },
+    ]);
   });
 
   it('discovers and additively exposes governed tools through tool_search', async () => {
@@ -565,6 +708,39 @@ function fakeWallClockScheduler(): {
 }
 
 describe('runGoalDrivenLoop — KD-02 acceptance #1: token budget grace step then blocked', () => {
+  it('forwards deferred tool settings to the budget grace turn', async () => {
+    const seenOptions: ReasoningCallOptions[] = [];
+    const backend: ToolBackend = {
+      prompts: [],
+      async generateWithTools(_prompt, _tools, options) {
+        if (options) seenOptions.push(options);
+        return seenOptions.length === 1
+          ? { toolCalls: [{ name: 'search', input: {} }] }
+          : { text: 'budget report', toolCalls: [{ name: 'search', input: {} }] };
+      },
+    };
+    const deferredDefinition = {
+      name: 'search',
+      description: 'Search the governed catalog.',
+      inputSchema: { type: 'object' },
+    };
+
+    const result = await runGoalDrivenLoop({
+      objective: 'preserve the tool surface during grace',
+      goalId: 'g-budget-grace-options',
+      backend,
+      toolRole: 'agent',
+      deferredToolNames: ['search'],
+      deferredToolDefinitions: [deferredDefinition],
+      budget: { tokenBudget: 100 },
+      estimateTurnTokens: () => 100,
+    });
+
+    expect(result.finalState).toBe('blocked');
+    expect(seenOptions).toHaveLength(2);
+    expect(seenOptions[1]).toEqual(seenOptions[0]);
+  });
+
   it('runs exactly one grace turn with every tool call synthetically rejected, then blocks with a budget reason', async () => {
     const backend = scriptedBackend([
       // Turn 1: still working with tools, no goal_update signal => continue.

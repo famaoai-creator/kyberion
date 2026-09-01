@@ -1,14 +1,10 @@
 /* eslint-disable no-restricted-imports -- long-lived OAuth callback server; IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import * as readline from 'node:readline';
-import {
-  beginInteractiveServiceOAuth,
-  logger,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core';
+import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 

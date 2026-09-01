@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+
 import {
   claimWorkItem,
   clearWorkCoordinationStore,
@@ -34,6 +37,23 @@ afterEach(() => {
 });
 
 describe('work coordination', () => {
+  it('rejects a namespace that can escape the coordination root', () => {
+    expect(() => setWorkCoordinationNamespace('../outside')).toThrow(/invalid work coordination/);
+  });
+
+  it('rejects a symlinked coordination store leaf', () => {
+    const runtimeDir = pathResolver.rootResolve(
+      'active/shared/runtime/work-coordination/work-coordination-core-test'
+    );
+    const target = `${runtimeDir}/items-target.jsonl`;
+    const link = `${runtimeDir}/items.jsonl`;
+    safeMkdir(runtimeDir, { recursive: true });
+    safeWriteFile(target, '');
+    safeSymlinkSync(target, link);
+
+    expect(() => listWorkItems()).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
   it('keeps the canonical context chain when an external item is updated', () => {
     const first = importExternalWorkItem({
       source: 'github',

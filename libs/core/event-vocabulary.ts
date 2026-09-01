@@ -72,6 +72,7 @@ export const MISSION_ORCHESTRATION_COLLABORATION_KIND: Record<
   mission_distillation_requested: 'review',
   mission_completion_requested: 'completion',
   mission_control_requested: 'dispatch',
+  mission_worker_recovery_requested: 'retry',
   surface_control_requested: 'dispatch',
 };
 

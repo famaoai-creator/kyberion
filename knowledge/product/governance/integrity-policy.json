@@ -1,5 +1,6 @@
 {
   "$schema": "../schemas/governance-catalog.schema.json",
+  "documentation_only": true,
   "name": "Standard Integrity Policy",
   "version": "1.0.0",
   "checks": [

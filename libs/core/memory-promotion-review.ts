@@ -7,7 +7,7 @@ import {
   type MemoryCandidate,
 } from './memory-promotion-queue.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 export type MemoryPromotionReviewStatus =
   'ready_to_approve' | 'ready_to_promote' | 'hold' | 'promoted' | 'rejected';
@@ -108,7 +108,15 @@ function reviewEvidence(candidate: MemoryCandidate): MemoryPromotionEvidenceRevi
   return candidate.evidence_refs.map((rawRef) => {
     const ref = String(rawRef || '').trim();
     if (isLogicalEvidenceRef(ref)) return { ref, kind: 'logical', status: 'logical' };
-    const resolvedPath = path.isAbsolute(ref) ? ref : pathResolver.rootResolve(ref);
+    let resolvedPath: string;
+    try {
+      resolvedPath = assertSafeRepositoryPath(
+        path.isAbsolute(ref) ? ref : pathResolver.rootResolve(ref),
+        { allowMissingLeaf: true }
+      );
+    } catch {
+      return { ref, kind: 'path', status: 'missing', resolved_path: ref };
+    }
     return {
       ref,
       kind: 'path',

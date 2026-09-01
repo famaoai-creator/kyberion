@@ -7,8 +7,9 @@
  */
 
 import { logger } from '../core.js';
+import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
-import { loadJson, safeExec, safeExistsSync } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExec, safeExistsSync } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
@@ -188,11 +189,12 @@ export async function checkActuatorCapabilities(
   manifestPath: string
 ): Promise<ActuatorStatus> {
   // Read manifest
-  const manifest = loadJson<{
+  const safeManifestPath = assertSafeRepositoryPath(manifestPath);
+  const manifest = readJson<{
     capabilities?: ManifestCapability[];
     actuator_id?: string;
     version?: string;
-  }>(manifestPath);
+  }>(safeManifestPath);
   const manifestCapabilities = ((manifest.capabilities || []) as ManifestCapability[]).map(
     evaluateManifestCapability
   );
@@ -236,8 +238,10 @@ export async function checkAllActuatorCapabilities(
   actuatorsDir?: string
 ): Promise<ActuatorStatus[]> {
   const dir = actuatorsDir
-    ? pathResolver.rootResolve(actuatorsDir)
-    : pathResolver.rootResolve('libs/actuators');
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(actuatorsDir), {
+        allowMissingLeaf: true,
+      })
+    : assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
   const results: ActuatorStatus[] = [];
 
   const catalog = loadActuatorManifestCatalog(dir);
@@ -245,7 +249,7 @@ export async function checkAllActuatorCapabilities(
     try {
       const status = await checkActuatorCapabilities(
         entry.n,
-        pathResolver.rootResolve(entry.manifest_path)
+        assertSafeRepositoryPath(pathResolver.rootResolve(entry.manifest_path))
       );
       results.push(status);
     } catch (e: any) {

@@ -9,7 +9,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   EXCEPTIONS_RELATIVE_PATH,
@@ -114,6 +114,20 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(exitCode).toBe(0);
     expect(output).not.toContain('ghost-co');
     expect(output).toContain('[check:tenant-registry] OK');
+  });
+
+  it('does not follow a symlinked customer stance directory', () => {
+    seedProfile('acme-corp');
+    const customerBase = path.join(fixtureRoot, 'customer');
+    const outside = path.join(fixtureRoot, 'outside-customer');
+    fs.mkdirSync(path.join(outside, 'tenants'), { recursive: true });
+    fs.writeFileSync(path.join(outside, 'tenants', 'ghost-co.json'), '{}');
+    fs.mkdirSync(customerBase, { recursive: true });
+    fs.symlinkSync(outside, path.join(customerBase, 'linked-customer'), 'dir');
+
+    const systems = collectTenantSystems(options());
+
+    expect(systems.customerTenantProfiles).toEqual([]);
   });
 
   it('flags a customer tenant profile facet with no tenant profile as drift', () => {

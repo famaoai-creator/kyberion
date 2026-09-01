@@ -12,6 +12,20 @@ import {
 describe('classifyEnvName', () => {
   it('classifies secrets, paths, flags, tuning, and providers', () => {
     expect(classifyEnvName('KYBERION_API_TOKEN').category).toBe('secret');
+    expect(classifyEnvName('KYBERION_BACKUP_PASSPHRASE')).toEqual({
+      category: 'secret',
+      type: 'string',
+    });
+    expect(classifyEnvName('KYBERION_SMTP_PASS')).toEqual({
+      category: 'secret',
+      type: 'string',
+    });
+    expect(classifyEnvName('KYBERION_A2A_SIGNATURE').category).toBe('runtime');
+    expect(classifyEnvName('KYBERION_GATE_OVERRIDE_SIGNATURE').category).toBe('runtime');
+    expect(classifyEnvName('KYBERION_AGENT_RING')).toEqual({
+      category: 'tuning',
+      type: 'number',
+    });
     expect(classifyEnvName('KYBERION_CLAUDE_CLI_BIN').category).toBe('path');
     expect(classifyEnvName('KYBERION_ALLOW_FILE_SECRETS')).toEqual({
       category: 'flag',
@@ -146,17 +160,81 @@ describe('validateEnvRegistryQuality', () => {
   it('rejects secret defaults and non-opaque secret types without requiring secrets', () => {
     expect(
       validateEnvRegistryQuality(
-        base({ category: 'secret', description: 'credential', default: 'placeholder' })
+        base({
+          category: 'secret',
+          description: 'credential',
+          documented: true,
+          default: 'placeholder',
+        })
       )
     ).toEqual(['KYBERION_TEST: secrets may not define a registry default']);
     expect(
       validateEnvRegistryQuality(
-        base({ category: 'secret', type: 'number', description: 'credential' })
+        base({ category: 'secret', type: 'number', description: 'credential', documented: true })
       )
     ).toEqual(['KYBERION_TEST: secrets must use the opaque string type']);
   });
 
+  it('requires secret variables to be operator-documented', () => {
+    expect(validateEnvRegistryQuality(base({ category: 'secret' }))).toEqual([
+      'KYBERION_TEST: secret entries must be documented',
+    ]);
+  });
+
+  it('requires feature flags to be operator-documented', () => {
+    expect(validateEnvRegistryQuality(base({ category: 'flag' }))).toEqual([
+      'KYBERION_TEST: flag entries must be documented',
+    ]);
+  });
+
   it('accepts optional undocumented discovery entries', () => {
     expect(validateEnvRegistryQuality(base({}))).toEqual([]);
+  });
+
+  it('rejects malformed, duplicate, and non-canonical entries without throwing', () => {
+    const registry = {
+      version: '1.0.0',
+      description: 'test',
+      entries: [
+        { documented: false },
+        {
+          name: 'KYBERION_DUPLICATE',
+          category: 'runtime',
+          type: 'string',
+          required: false,
+          description: '',
+          documented: false,
+        },
+        {
+          name: 'KYBERION_DUPLICATE',
+          category: 'runtime',
+          type: 'string',
+          required: false,
+          description: '',
+          documented: false,
+        },
+        {
+          name: 'KYBERION_DYNAMIC_',
+          category: 'unknown',
+          type: 'enum',
+          required: false,
+          description: '',
+          documented: false,
+          enum: ['same', 'same'],
+        },
+      ],
+    } as unknown as EnvRegistryFile;
+
+    expect(validateEnvRegistryQuality(registry)).toEqual([
+      'entries[0]: name must match KYBERION_[A-Z0-9_]+ and not end with an underscore',
+      'entries[0]: category must be one of secret, path, flag, tuning, provider, runtime',
+      'entries[0]: type must be one of string, boolean, number, enum, path',
+      'entries[0]: required must be boolean',
+      'entries[0]: description must be a string',
+      'KYBERION_DUPLICATE: duplicate registry entry',
+      'KYBERION_DYNAMIC_: name must match KYBERION_[A-Z0-9_]+ and not end with an underscore',
+      'KYBERION_DYNAMIC_: category must be one of secret, path, flag, tuning, provider, runtime',
+      'KYBERION_DYNAMIC_: enum values must be unique',
+    ]);
   });
 });

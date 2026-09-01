@@ -12,19 +12,19 @@
 // not a regex fragment" signal.
 import * as path from 'node:path';
 import ts from 'typescript';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeStat,
   safeReaddir,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const ROOT = pathResolver.rootDir();
 const DEFAULT_BASELINE_PATH = pathResolver.rootResolve(
@@ -336,31 +336,23 @@ export function checkI18nHardcoding(
   };
 }
 
-function printHumanReport(report: I18nHardcodingReport): void {
+function formatHumanReport(report: I18nHardcodingReport): string {
   if (report.updated_baseline) {
-    console.log(
-      `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`
-    );
-    return;
+    return `[check:i18n] baseline updated: ${report.baseline_path} (${report.total_violations} violation(s) across ${report.checked_files} files scanned, ${report.exemption_count} exemption(s))`;
   }
 
   if (report.status === 'pass') {
-    console.log(
-      `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`
-    );
-    return;
+    return `[check:i18n] OK (${report.checked_files} files scanned, ${report.total_violations} baseline-frozen violation(s), ${report.exemption_count} exemption(s))`;
   }
 
-  console.error('[check:i18n] violations detected:');
-  for (const violation of report.violations) {
-    console.error(`- ${violation}`);
-  }
+  const lines = ['violations detected:', ...report.violations.map((violation) => `- ${violation}`)];
   if (report.stale_entries.length > 0) {
-    console.error('[check:i18n] baseline is stale, run --update-baseline:');
-    for (const entry of report.stale_entries) {
-      console.error(`- ${entry}`);
-    }
+    lines.push(
+      '[check:i18n] baseline is stale, run --update-baseline:',
+      ...report.stale_entries.map((entry) => `- ${entry}`)
+    );
   }
+  return lines.join('\n');
 }
 
 export const runCheckI18nHardcoding = defineScript({
@@ -374,12 +366,15 @@ export const runCheckI18nHardcoding = defineScript({
     if (asJson) {
       context.print(report);
     } else {
-      printHumanReport(report);
+      const output = formatHumanReport(report);
+      if (report.status === 'fail') throw new ScriptExitError(1, output);
+      context.print(output);
     }
 
     if (report.status === 'fail') {
-      process.exitCode = 1;
+      throw new ScriptExitError(1);
     }
+    return report;
   },
 });
 

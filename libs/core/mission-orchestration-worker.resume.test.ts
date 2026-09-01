@@ -124,4 +124,81 @@ describe('mission-orchestration-worker resume replay', () => {
       )
     ).toContain(controlEvent.event_id);
   });
+
+  it('passes an explicit resume contract to the dedicated goal-worker recovery handler', async () => {
+    const { handleMissionWorkerRecoveryRequested } =
+      await import('./mission-orchestration-lifecycle-handlers.js');
+    const dispatchMissionNextTasks = vi.fn(async () => [
+      { task_id: 'TASK-PAUSED', team_role: 'implementer', agent_id: 'agent-1' },
+    ]);
+
+    await handleMissionWorkerRecoveryRequested(
+      {
+        event_id: 'ME-RECOVERY-1',
+        event_type: 'mission_worker_recovery_requested',
+        mission_id: 'MSN-RECOVERY-HANDLER',
+        requested_by: 'mission_controller',
+        payload: { operation: 'resume_goal_driven' },
+      },
+      { dispatchMissionNextTasks } as never
+    );
+
+    expect(dispatchMissionNextTasks).toHaveBeenCalledWith('MSN-RECOVERY-HANDLER', 'ME-RECOVERY-1', {
+      resumeGoalDriven: true,
+    });
+  });
+
+  it('resolves worker evidence paths from an existing confidential mission root', async () => {
+    const missionId = 'MSN-RECOVERY-CONFIDENTIAL';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    const { safeMkdir, safeRmSync } = await import('./secure-io.js');
+    safeRmSync(missionPath, { recursive: true, force: true });
+    safeMkdir(missionPath, { recursive: true });
+
+    try {
+      const { taskResultFilePath, taskClarificationFilePath } =
+        await import('./mission-orchestration-worker-part-context.js');
+      expect(taskResultFilePath(missionId, 'TASK-1')).toBe(
+        `${missionPath}/evidence/task-result-TASK-1.json`
+      );
+      expect(taskClarificationFilePath(missionId, 'TASK-1')).toBe(
+        `${missionPath}/evidence/task-clarification-TASK-1.json`
+      );
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps worker prompt and goal journal paths on the existing confidential root', async () => {
+    const missionId = 'MSN-RECOVERY-CONFIDENTIAL-SCOPE';
+    const missionPath = pathResolver.missionDir(missionId, 'confidential');
+    const { safeMkdir, safeRmSync } = await import('./secure-io.js');
+    safeRmSync(missionPath, { recursive: true, force: true });
+    safeMkdir(missionPath, { recursive: true });
+
+    try {
+      const { buildTaskExecutionPrompt } =
+        await import('./mission-orchestration-worker-part-context.js');
+      const { goalJournalPath } = await import('./mission-orchestration-worker-part-dispatch.js');
+      const prompt = buildTaskExecutionPrompt({
+        missionId,
+        task: { task_id: 'TASK-1' } as never,
+        teamRole: 'implementer',
+        agentId: 'agent-1',
+        missionContextPack: '',
+        missionGoalLines: [],
+        upstreamResultLines: [],
+        teamSnapshotLines: [],
+        reviewFindingsLines: [],
+        artifactReviewLines: [],
+      });
+
+      expect(prompt).toContain(`Artifact root: ${missionPath}`);
+      expect(goalJournalPath(missionId, 'TASK-1')).toBe(
+        `${missionPath}/coordination/goal-journal-TASK-1.jsonl`
+      );
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+    }
+  });
 });

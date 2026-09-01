@@ -20,6 +20,17 @@ export interface SurfaceUxContractResult {
   violations: string[];
 }
 
+export interface SurfaceUxContractCheckOptions {
+  approval_required?: boolean;
+  allow_conversational_reply?: boolean;
+}
+
+export interface SurfaceUxContractCheckResult {
+  text: string;
+  verdict: SurfaceUxContractResult;
+  repaired: boolean;
+}
+
 const SIGNAL_PATTERNS: Array<{
   signal: SurfaceUxContractResult['signals'][number];
   patterns: RegExp[];
@@ -62,7 +73,7 @@ const INTERNAL_LEAKAGE_PATTERNS = [
 ];
 
 const APPROVAL_CONSEQUENCE_PATTERNS = [
-  /承認がない場合|承認されない場合|if not approved|without approval|blocked|停止/i,
+  /承認がない場合|承認されない場合|承認待ちです|まだ実行していません|if not approved|without approval|blocked|停止/i,
 ];
 const APPROVAL_ACTION_PATTERNS = [/承認してください|approve|unblock|next action|次のアクション/i];
 
@@ -159,4 +170,26 @@ export function repairSurfaceUxContractText(input: string): string {
   const hasJapanese = /[ぁ-んァ-ン一-龯]/.test(text);
   const rules = hasJapanese ? JA_REPAIR_RULES : EN_REPAIR_RULES;
   return replaceOutsideCodeFences(text, rules);
+}
+
+/**
+ * Validate a user-facing reply and apply only deterministic, vocabulary-level
+ * repairs when they make the reply pass the same contract. Callers that need
+ * escalation can use the returned verdict to decide that separately; this
+ * helper deliberately never re-asks a model or changes response semantics.
+ */
+export function checkAndRepairSurfaceUxContract(
+  input: string,
+  options: SurfaceUxContractCheckOptions = {}
+): SurfaceUxContractCheckResult {
+  const text = String(input || '');
+  const verdict = validateSurfaceUxContract({ text, ...options });
+  if (verdict.valid) return { text, verdict, repaired: false };
+
+  const repairedText = repairSurfaceUxContractText(text);
+  if (repairedText === text) return { text, verdict, repaired: false };
+
+  const repairedVerdict = validateSurfaceUxContract({ text: repairedText, ...options });
+  if (!repairedVerdict.valid) return { text, verdict, repaired: false };
+  return { text: repairedText, verdict: repairedVerdict, repaired: true };
 }

@@ -6,9 +6,10 @@
  * to `main` so merge commit subjects remain conventional too.
  */
 
-import { safeExec, pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExec } from '@agent/core/secure-io';
 import { checkTitle } from './check_pr_title.js';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const MERGE_PULL_REQUEST_SUBJECT_RE = /^Merge pull request #\d+ from [^\s]+\/[^\s]+$/;
 
@@ -31,7 +32,9 @@ export const runCheckCommitSubject = defineScript({
   name: 'check:commit-subject',
   run(context) {
     const result = checkCommitSubject(readHeadSubject());
-    if (!result.ok) throw new Error(`${result.source}: ${result.value} (${result.reason})`);
+    if (!result.ok) {
+      throw new ScriptExitError(1, `${result.source}: ${result.value} (${result.reason})`);
+    }
     context.print(context.json ? result : `✅ ${result.source}: ${result.value}`);
   },
 });

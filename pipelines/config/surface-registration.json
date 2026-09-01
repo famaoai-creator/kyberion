@@ -2,7 +2,7 @@
   "action": "pipeline",
   "name": "Config: Surface Registration",
   "version": "1.0.0",
-  "description": "Registers a new runtime surface in the surface governance manifest. Run `pnpm surfaces:reconcile` after applying.",
+  "description": "Registers a new runtime surface in the surface governance manifest. Run `pnpm surfaces reconcile` after applying.",
   "steps": [
     {
       "id": "preflight_inputs",
@@ -40,7 +40,7 @@
       "role": "sink",
       "op": "system:log",
       "params": {
-        "message": "✅ Surface '{{input.surface_id}}' registered. Run `pnpm surfaces:reconcile` to start it."
+        "message": "✅ Surface '{{input.surface_id}}' registered. Run `pnpm surfaces reconcile` to start it."
       }
     }
   ]

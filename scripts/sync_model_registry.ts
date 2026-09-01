@@ -5,19 +5,16 @@ import {
   modelRegistrySnapshotFromDirectory,
   readModelRegistryDirectory,
   type ModelRegistryDirectoryIndex,
-  type GovernedModelRegistryEntry,
-  type GovernedModelRegistrySnapshot,
-  pathResolver,
-  safeExistsSync,
-  safeMkdir,
-  safeReaddir,
-  safeReadFile,
-  safeWriteFile,
-  validateModelRegistrySnapshot,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/model-registry-directory';
+import { loadModelRegistry } from '@agent/core/reasoning-model-routing';
+import type {
+  GovernedModelRegistryEntry,
+  GovernedModelRegistrySnapshot,
+} from '@agent/core/model-registry-contract';
+import { validateModelRegistrySnapshot } from '@agent/core/model-registry-contract';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 const DIRECTORY = pathResolver.rootResolve('knowledge/product/governance/model-registry');
 const INDEX_PATH = path.join(DIRECTORY, 'index.json');
@@ -31,18 +28,14 @@ function readDirectorySnapshot(): ModelRegistrySnapshot {
   return validateModelRegistrySnapshot(modelRegistrySnapshotFromDirectory(directory), DIRECTORY);
 }
 
-export function bootstrapModelRegistryDirectory(): void {
-  const snapshot = validateModelRegistrySnapshot(
-    readJson<ModelRegistrySnapshot>(SNAPSHOT_PATH),
-    SNAPSHOT_PATH
-  );
-  safeMkdir(DIRECTORY, { recursive: true });
-
-  const existingItems = safeReaddir(DIRECTORY).filter(
-    (entry) => entry.endsWith('.json') && entry !== 'index.json'
-  );
-  if (existingItems.length) {
-    throw new Error(`Refusing to bootstrap a non-empty model registry directory: ${DIRECTORY}`);
+async function renderBootstrap(snapshot: ModelRegistrySnapshot): Promise<GeneratedFile[]> {
+  if (safeExistsSync(DIRECTORY)) {
+    const existingItems = safeReaddir(DIRECTORY).filter(
+      (entry) => entry.endsWith('.json') && entry !== 'index.json'
+    );
+    if (existingItems.length) {
+      throw new Error(`Refusing to bootstrap a non-empty model registry directory: ${DIRECTORY}`);
+    }
   }
 
   const index: ModelRegistryDirectoryIndex = {
@@ -50,51 +43,54 @@ export function bootstrapModelRegistryDirectory(): void {
     default_model_id: snapshot.default_model_id,
     model_order: snapshot.models.map((model) => model.model_id),
   };
-  safeWriteFile(INDEX_PATH, `${JSON.stringify(index, null, 2)}\n`);
-  for (const model of snapshot.models) {
-    safeWriteFile(
-      path.join(DIRECTORY, modelRegistryFileName(model.model_id)),
-      `${JSON.stringify(model, null, 2)}\n`
-    );
-  }
+  return [
+    { path: INDEX_PATH, content: `${JSON.stringify(index, null, 2)}\n` },
+    ...snapshot.models.map((model) => ({
+      path: path.join(DIRECTORY, modelRegistryFileName(model.model_id)),
+      content: `${JSON.stringify(model, null, 2)}\n`,
+    })),
+  ];
 }
 
-export async function syncModelRegistrySnapshot(checkOnly = false): Promise<boolean> {
-  const snapshot = withExecutionContext('ecosystem_architect', () => readDirectorySnapshot());
+async function renderSnapshot(snapshot: ModelRegistrySnapshot): Promise<GeneratedFile> {
   const config = (await resolvePrettierConfig(SNAPSHOT_PATH)) ?? {};
-  const expected = await prettierFormat(JSON.stringify(snapshot, null, 2), {
-    ...config,
-    parser: 'json',
-  });
-  return withExecutionContext('ecosystem_architect', () => {
-    if (checkOnly) {
-      if (!safeExistsSync(SNAPSHOT_PATH)) return false;
-      return String(safeReadFile(SNAPSHOT_PATH, { encoding: 'utf8' }) || '') === expected;
+  const expected = await prettierFormat(
+    JSON.stringify(
+      {
+        $schema: '../schemas/model-registry.schema.json',
+        ...snapshot,
+      },
+      null,
+      2
+    ),
+    {
+      ...config,
+      parser: 'json',
     }
-    safeWriteFile(SNAPSHOT_PATH, expected);
-    return true;
-  });
+  );
+  return { path: SNAPSHOT_PATH, content: expected };
 }
 
-export const runSyncModelRegistry = defineScript({
-  name: 'sync:model-registry',
-  async run(context) {
-    if (context.positional.includes('--bootstrap')) {
-      withExecutionContext('ecosystem_architect', () => {
-        bootstrapModelRegistryDirectory();
-        context.print(`[sync:model-registry] bootstrapped ${DIRECTORY}`);
-      });
-      return;
-    }
-    const checkOnly = context.check;
-    const ok = await syncModelRegistrySnapshot(checkOnly);
-    if (!ok && checkOnly) {
-      throw new Error('snapshot is out of date; run pnpm sync:model-registry');
-    }
-    context.print(
-      `[sync:model-registry] ${checkOnly ? 'snapshot is aligned' : `wrote ${SNAPSHOT_PATH}`}`
-    );
-  },
+async function render(context: { positional: string[] }): Promise<GeneratedFile[]> {
+  if (context.positional.includes('--bootstrap')) {
+    return renderBootstrap(loadModelRegistry());
+  }
+  return [await renderSnapshot(readDirectorySnapshot())];
+}
+
+const outputPaths = [
+  SNAPSHOT_PATH,
+  INDEX_PATH,
+  ...loadModelRegistry().models.map((model) =>
+    path.join(DIRECTORY, modelRegistryFileName(model.model_id))
+  ),
+];
+
+export const runSyncModelRegistry = defineGenerator({
+  id: 'model-registry',
+  outputs: outputPaths,
+  normalize: (content) => JSON.stringify(JSON.parse(content)),
+  render,
 });
 
 if (

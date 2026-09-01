@@ -39,7 +39,7 @@
 
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 
 export type PiiSeverity = 'secret' | 'pii';
 export type PiiAction = 'block' | 'mask';
@@ -115,6 +115,16 @@ function defaultRulesPath(): string {
   return pathResolver.knowledge('product/governance/knowledge-sync-rules.json');
 }
 
+const RULES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/knowledge-sync-rules.schema.json'
+);
+
+interface KnowledgeSyncRulesFile {
+  security?: {
+    pii_patterns?: Array<Record<string, unknown>>;
+  };
+}
+
 function codepointSort(values: string[]): string[] {
   return [...values].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));
 }
@@ -128,13 +138,21 @@ export function loadPiiRules(options: PiiRuleOptions = {}): PiiRule[] {
   if (!safeExistsSync(rulesPath)) {
     fail(`rules file not found: ${rulesPath} — the ingest PII gate cannot run without rules`);
   }
-  let parsed: unknown;
+  let parsed: KnowledgeSyncRulesFile;
   try {
-    parsed = readJson<unknown>(rulesPath);
+    parsed = defineCatalog<KnowledgeSyncRulesFile>({
+      id: 'knowledge-sync-rules',
+      path: rulesPath,
+      schema: RULES_SCHEMA_PATH,
+    }).load();
   } catch (err) {
-    fail(`rules file ${rulesPath} is not valid JSON: ${err instanceof Error ? err.message : err}`);
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.startsWith('Invalid catalog ')) {
+      fail(`rules file ${rulesPath} failed schema validation: ${message}`);
+    }
+    fail(`rules file ${rulesPath} is not valid JSON: ${message}`);
   }
-  const entries = (parsed as { security?: { pii_patterns?: unknown } })?.security?.pii_patterns;
+  const entries = parsed.security?.pii_patterns;
   if (!Array.isArray(entries) || entries.length === 0) {
     fail(`security.pii_patterns in ${rulesPath} must be a non-empty array`);
   }

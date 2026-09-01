@@ -3,18 +3,25 @@ import { createServer } from 'node:http';
 import * as path from 'node:path';
 import {
   assertSurfaceOperation,
+  SurfaceAuthorizationError,
+  type SurfaceAuthorizationContext,
+} from '@agent/core/surface-authorization';
+import {
   buildComputerSurfaceManifest,
   filterHeadlessManifestForViewer,
-  pathResolver,
+} from '@agent/core/headless-surface-contract';
+import type { A2UIMessage } from '@agent/core/a2ui';
+import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
   loadJson,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
-  SurfaceAuthorizationError,
-  withExecutionContext,
-  type A2UIMessage,
-  type SurfaceAuthorizationContext,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
 import {
   assertComputerSurfacePayloadInScope,
   computerSurfaceServerTenantResource,
@@ -38,6 +45,21 @@ interface SurfaceSnapshot {
   data: Record<string, unknown>;
 }
 
+/**
+ * Normalize the optional display-only intent contract at the A2UI boundary.
+ * It is never used for authorization or execution decisions.
+ */
+export function projectComputerSurfaceData(data: Record<string, unknown>): Record<string, unknown> {
+  const projected = { ...data };
+  const candidate = projected.intentResolution ?? projected.intent_resolution;
+  delete projected.intentResolution;
+  delete projected.intent_resolution;
+  if (candidate === undefined) return projected;
+  const contract = parseIntentResolutionContract(candidate);
+  if (contract) projected.intentResolution = contract;
+  return projected;
+}
+
 export const app: express.Express = express();
 export const server = createServer(app);
 const staticDir = path.join(pathResolver.rootDir(), 'presence/displays/computer-surface/static');
@@ -45,6 +67,15 @@ const PORT = Number(process.env.COMPUTER_SURFACE_PORT || 3040);
 const HOST = process.env.COMPUTER_SURFACE_HOST || '127.0.0.1';
 const sseClients = new Set<Client>();
 const computerSurfaceManifest = buildComputerSurfaceManifest();
+
+export function resolveExistingIdentityFile(filePath: string): string | null {
+  try {
+    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return safeExistsSync(safePath) && safeLstat(safePath).isFile() ? safePath : null;
+  } catch {
+    return null;
+  }
+}
 
 function authorizeSurface(
   req: express.Request,
@@ -154,7 +185,7 @@ function applyA2UIMessage(message: A2UIMessage): void {
       ...current,
       data: {
         ...(current.data || {}),
-        ...(message.updateDataModel.data || {}),
+        ...projectComputerSurfaceData(message.updateDataModel.data || {}),
       },
     };
   }
@@ -201,10 +232,13 @@ app.get('/api/identity', (req, res) => {
       const idPath = path.join(personalDir, 'my-identity.json');
       const agentPath = path.join(personalDir, 'agent-identity.json');
       const visionPath = path.join(personalDir, 'my-vision.md');
-      const sovereign = safeExistsSync(idPath) ? loadJson<unknown>(idPath) : null;
-      const agent = safeExistsSync(agentPath) ? loadJson<unknown>(agentPath) : null;
-      const visionRaw = safeExistsSync(visionPath)
-        ? (safeReadFile(visionPath, { encoding: 'utf8' }) as string)
+      const safeIdPath = resolveExistingIdentityFile(idPath);
+      const safeAgentPath = resolveExistingIdentityFile(agentPath);
+      const safeVisionPath = resolveExistingIdentityFile(visionPath);
+      const sovereign = safeIdPath ? loadJson<unknown>(safeIdPath) : null;
+      const agent = safeAgentPath ? loadJson<unknown>(safeAgentPath) : null;
+      const visionRaw = safeVisionPath
+        ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
         : null;
       const vision = visionRaw
         ? visionRaw

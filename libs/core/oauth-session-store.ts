@@ -4,12 +4,14 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import {
+  assertSafeRepositoryPath,
   safeExistsSync,
   safeCreateExclusiveFileSync,
   safeFsyncFile,
   safeMkdir,
   safeReadFile,
   safeReaddir,
+  safeLstat,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -53,17 +55,25 @@ function statesEqual(left: string, right: string): boolean {
 }
 
 export function serviceSessionDir(serviceId: string): string {
-  return path.join(OAUTH_SESSION_ROOT, serviceId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-'));
+  const normalized = serviceId.toLowerCase().replace(/[^a-z0-9._-]+/g, '-');
+  return assertSafeRepositoryPath(path.join(OAUTH_SESSION_ROOT, normalized), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function serviceSessionPath(serviceId: string, state: string): string {
   assertSafeOAuthState(state);
-  return path.join(serviceSessionDir(serviceId), `${state}.json`);
+  return assertSafeRepositoryPath(path.join(serviceSessionDir(serviceId), `${state}.json`), {
+    allowMissingLeaf: true,
+  });
 }
 
 export function serviceSessionLockPath(serviceId: string, state: string): string {
   assertSafeOAuthState(state);
-  return path.join(serviceSessionDir(serviceId), `.${state}.callback.lock`);
+  return assertSafeRepositoryPath(
+    path.join(serviceSessionDir(serviceId), `.${state}.callback.lock`),
+    { allowMissingLeaf: true }
+  );
 }
 
 export function randomUrlSafe(length = 48): string {
@@ -120,7 +130,9 @@ export function loadPendingOAuthSession(
       .sort()
       .reverse();
     if (files.length === 0) return null;
-    const session = readJson<PendingOAuthSession>(path.join(dir, files[0]));
+    const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));
+    if (!safeLstat(filePath).isFile()) return null;
+    const session = readJson<PendingOAuthSession>(filePath);
     if (isOAuthSessionExpired(session)) {
       clearPendingOAuthSession(serviceId, session.state);
       return null;
@@ -139,16 +151,28 @@ export function clearPendingOAuthSession(serviceId: string, state: string): void
 }
 
 export function listPendingOAuthSessions(): PendingOAuthSession[] {
-  if (!safeExistsSync(OAUTH_SESSION_ROOT)) return [];
+  let sessionRoot: string;
+  try {
+    sessionRoot = assertSafeRepositoryPath(OAUTH_SESSION_ROOT, { allowMissingLeaf: true });
+  } catch {
+    return [];
+  }
+  if (!safeExistsSync(sessionRoot)) return [];
   const sessions: PendingOAuthSession[] = [];
   try {
-    for (const serviceDir of safeReaddir(OAUTH_SESSION_ROOT)) {
-      const fullDir = path.join(OAUTH_SESSION_ROOT, serviceDir);
+    for (const serviceDir of safeReaddir(sessionRoot)) {
+      let fullDir: string;
+      try {
+        fullDir = assertSafeRepositoryPath(path.join(sessionRoot, serviceDir));
+      } catch {
+        continue;
+      }
       if (!safeExistsSync(fullDir)) continue;
       for (const fileName of safeReaddir(fullDir)) {
         if (!fileName.endsWith('.json')) continue;
         try {
-          const session = readJson<PendingOAuthSession>(path.join(fullDir, fileName));
+          const filePath = assertSafeRepositoryPath(path.join(fullDir, fileName));
+          const session = readJson<PendingOAuthSession>(filePath);
           if (!isSafeOAuthState(session.state)) {
             continue;
           }

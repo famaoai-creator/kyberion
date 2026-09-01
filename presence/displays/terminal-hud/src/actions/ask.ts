@@ -1,5 +1,5 @@
-import { runSurfaceMessageConversation } from '@agent/core';
-import type { IntentResolutionContract } from '@agent/core';
+import { runSurfaceMessageConversation } from '@agent/core/channel-surface';
+import type { IntentResolutionContract } from '@agent/core/intent-resolution-contract';
 import { auditAction } from './dispatch.js';
 
 export interface AskReply {

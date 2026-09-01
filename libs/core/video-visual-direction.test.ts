@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import {
   DEFAULT_VISUAL_DIRECTION,
   generateVideoVisualDirection,
+  loadVideoVisualPatternCatalog,
   normalizeVideoVisualDirection,
   visualDirectionToCssVars,
 } from './video-visual-direction.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 
 const PORTRAIT = { width: 1080, height: 1920 };
 const LANDSCAPE = { width: 1920, height: 1080 };
@@ -99,5 +103,24 @@ describe('video visual direction (agy short-video quality)', () => {
     expect(thrown.palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
     expect(thrown.typography.headline_px).toBe(68);
     expect(thrown.resolution?.degraded).toBe(true);
+  });
+
+  it('uses the deterministic fallback when the pattern catalog is schema-invalid', () => {
+    const rootDir = pathResolver.sharedTmp('video-visual-pattern-catalog-tests');
+    const catalogDir = path.join(rootDir, 'knowledge/public/design-patterns/media-templates');
+    try {
+      safeMkdir(catalogDir, { recursive: true });
+      safeWriteFile(
+        path.join(catalogDir, 'video-visual-patterns.json'),
+        JSON.stringify({ version: '1.0.0', description: 'invalid', patterns: {} })
+      );
+
+      const catalog = loadVideoVisualPatternCatalog(rootDir);
+
+      expect(Object.keys(catalog)).toEqual(['calm-tech']);
+      expect(catalog['calm-tech'].palette).toEqual(DEFAULT_VISUAL_DIRECTION.palette);
+    } finally {
+      safeRmSync(rootDir, { recursive: true, force: true });
+    }
   });
 });

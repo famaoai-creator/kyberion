@@ -26,8 +26,8 @@ import {
   getActuatorDependencyBundle,
   loadActuatorDependencyBundles,
   type ActuatorDependencyBundleEntry,
-} from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+} from '@agent/core/actuator-dependency-bundles';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export type DependencyLevel = 'must' | 'should' | 'nice';
 export type DependencyStatus = 'ok' | 'missing' | 'degraded';
@@ -206,7 +206,7 @@ const WHISPER: Dependency = {
     if (r2.ok) return { ok: true, version: `faster-whisper ${r2.stdout}` };
     return { ok: false, detail: 'neither whisper CLI nor faster_whisper python module found' };
   },
-  installCommand: 'pnpm voice:setup --apply',
+  installCommand: 'pnpm kyberion voice setup --apply',
   fallbackMode: 'voice transcription unavailable; use cloud STT',
 };
 
@@ -381,10 +381,20 @@ export function formatResolutionReport(result: ResolutionResult): string {
 
 // ─── CLI entry ────────────────────────────────────────────────────────────────
 
-async function main(args: string[]) {
+export const DEPENDENCY_RESOLVER_USAGE = 'Usage: pnpm deps:check --actuator <id|all> [--json]';
+
+export async function main(args: string[]): Promise<{
+  result?: ResolutionResult;
+  actuator?: string;
+  status: number;
+  help?: string;
+}> {
+  if (args.includes('--help') || args.includes('-h')) {
+    return { status: 0, help: DEPENDENCY_RESOLVER_USAGE };
+  }
+
   const actuatorIdx = args.indexOf('--actuator');
   const actuator = actuatorIdx >= 0 ? args[actuatorIdx + 1] : 'all';
-  const jsonOutput = args.includes('--json');
 
   const deps = ACTUATOR_DEPS[actuator ?? 'all'];
   if (!deps) {
@@ -394,15 +404,11 @@ async function main(args: string[]) {
   }
 
   const result = await resolveDependencies(deps);
-
-  if (jsonOutput) {
-    console.log(JSON.stringify(result, null, 2));
-  } else {
-    console.log(`\nDependency check — actuator: ${actuator}\n`);
-    console.log(formatResolutionReport(result));
-  }
-
-  if (!result.allMustsSatisfied) throw new Error('one or more required dependencies are missing');
+  return {
+    result,
+    actuator,
+    status: result.allMustsSatisfied ? 0 : 1,
+  };
 }
 
 if (
@@ -411,8 +417,19 @@ if (
 )
   void defineScript({
     name: 'dependency:resolve',
-    flags: [],
+    flags: ['json'],
     run(context) {
-      return main(context.argv);
+      return main(context.argv).then((outcome) => {
+        if (outcome.help) context.print(context.json ? outcome : outcome.help);
+        else if (outcome.result) {
+          context.print(
+            context.json
+              ? outcome.result
+              : `\nDependency check — actuator: ${outcome.actuator}\n\n${formatResolutionReport(outcome.result)}`
+          );
+        }
+        if (outcome.status !== 0) throw new ScriptExitError(outcome.status, '', true, outcome);
+        return outcome;
+      });
     },
   })();

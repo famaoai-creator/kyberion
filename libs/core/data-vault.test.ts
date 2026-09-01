@@ -22,6 +22,14 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./foundation/json.js', async () => {
+  const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+  return {
+    readJson: (filePath: string) =>
+      JSON.parse(actualFs.readFileSync(filePath, { encoding: 'utf8' })),
+  };
+});
+
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));

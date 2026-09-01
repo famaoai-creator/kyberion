@@ -17,8 +17,7 @@ import {
 } from './structured-output-contracts.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeReadFile } from './secure-io.js';
-import { compileSchemaFromPath } from './schema-loader.js';
-import { createAjv } from './foundation/ajv.js';
+import { compileSchema } from './foundation/ajv.js';
 import type { ReasoningBackend } from './reasoning-backend.js';
 
 export interface PipelineReportContract {
@@ -74,8 +73,7 @@ function compileReportSchema(schemaRef: string): CompiledReportSchema {
   }
 
   const schemaPath = schemaPathFromRef(schemaRef);
-  const ajv = createAjv();
-  const validate: ValidateFunction = compileSchemaFromPath(ajv, schemaPath);
+  const validate: ValidateFunction = compileSchema(schemaPath);
   return {
     validate: (value) => Boolean(validate(value)),
     errors: () =>

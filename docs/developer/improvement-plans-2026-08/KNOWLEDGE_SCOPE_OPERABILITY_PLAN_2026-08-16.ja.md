@@ -13,7 +13,7 @@ tags:
     observability,
     governance,
   ]
-last_updated: 2026-08-17
+last_updated: 2026-08-29
 status: active
 ---
 
@@ -45,7 +45,7 @@ UX 経路は正準 chain(`tenant_slug → organization_id → project_id → mis
 ### UX
 
 - 「今どの tenant/org/project か」を出す手段が **CLI・Chronos・MCP のいずれにも無い**。289 の pnpm script に `scope`/`whoami` 相当なし。`onboarding:context show` は binding 表示で `currentScope()` を反映しない。`run_doctor.ts:170` は誤変数 `KYBERION_TENANT_ID` を読む。
-- 切替 facade なし。`pnpm tenant` は create/update/…で `use` なし、`pnpm org` は role 管理、唯一の永続スイッチャ `customer:switch` は **stance**(chain 外)を書く。`current_mission_focus.json` は `{mission_id, ts}` のみで `shared/` 直下(区画なし)。
+- 切替 facade なし。`pnpm tenant` は create/update/…で `use` なし、`pnpm organization role` は role 管理、唯一の永続スイッチャ `customer:switch` は **stance**(chain 外)を書く。`current_mission_focus.json` は `{mission_id, ts}` のみで `shared/` 直下(区画なし)。
 - ranker の scope 除外は `continue` のみ(`context_ranker.ts:229`)で件数も理由も出ない。scope を深くすると deepest root のみになり **doc が減るのに無言**。
 - `mission create/start` は `tier:'confidential'` 既定で tenant 未指定を許容(`mission_controller.ts:421-428,505-511`)。`[SCOPE_CONTEXT_INVALID]` に是正案なし。tenant root が解決できても **0 件**のとき無警告(現に `knowledge/confidential/kyberion-service-studio/` は空)。
 - 正準配置 `confidential/{tenant}/organizations/{org}/projects/{project}/…` はコード(`entityRoot()`)にしか無く、`pnpm knowledge place` 相当がない。実ツリーに `organizations/` 階層は未出現。

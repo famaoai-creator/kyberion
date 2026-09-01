@@ -1,10 +1,11 @@
-import type { ValidateFunction } from 'ajv';
-import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { loadJson } from './secure-io.js';
 
 const CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/capability-bundle-registry.schema.json'
+);
+const CAPABILITY_BUNDLE_REGISTRY_PATH = pathResolver.knowledge(
+  'product/governance/capability-bundle-registry.json'
 );
 
 export type CapabilityBundleStatus = 'active' | 'experimental' | 'conceptual' | 'deprecated';
@@ -26,28 +27,14 @@ export interface CapabilityBundleRegistryFile {
   bundles: CapabilityBundleEntry[];
 }
 
-let capabilityBundleRegistryCache: CapabilityBundleRegistryFile | null = null;
-let capabilityBundleRegistryValidateFn: ValidateFunction | null = null;
-
-function ensureCapabilityBundleRegistryValidator(): ValidateFunction {
-  if (capabilityBundleRegistryValidateFn) return capabilityBundleRegistryValidateFn;
-  capabilityBundleRegistryValidateFn = compileSchema(CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH);
-  return capabilityBundleRegistryValidateFn;
-}
+const capabilityBundleRegistryCatalog = defineCatalog<CapabilityBundleRegistryFile>({
+  id: 'capability-bundle-registry',
+  path: CAPABILITY_BUNDLE_REGISTRY_PATH,
+  schema: CAPABILITY_BUNDLE_REGISTRY_SCHEMA_PATH,
+});
 
 export function loadCapabilityBundleRegistry(): CapabilityBundleRegistryFile {
-  if (capabilityBundleRegistryCache) return capabilityBundleRegistryCache;
-  const filePath = pathResolver.knowledge('product/governance/capability-bundle-registry.json');
-  const parsed = loadJson<CapabilityBundleRegistryFile>(filePath);
-  const validate = ensureCapabilityBundleRegistryValidator();
-  if (!validate(parsed)) {
-    const errors = (validate.errors || [])
-      .map((error) => `${error.instancePath || '/'} ${error.message || 'schema violation'}`)
-      .join('; ');
-    throw new Error(`Invalid capability-bundle-registry: ${errors}`);
-  }
-  capabilityBundleRegistryCache = parsed;
-  return capabilityBundleRegistryCache;
+  return capabilityBundleRegistryCatalog.load();
 }
 
 function statusRank(status: CapabilityBundleStatus): number {

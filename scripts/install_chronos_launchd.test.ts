@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   buildChronosLaunchdPlist,
   chronosLaunchAgentTargetPath,
   CHRONOS_LAUNCHD_LABEL,
+  main,
 } from './install_chronos_launchd.js';
 
 // LC-01d: plist generation is a pure string function — pin its load-bearing
@@ -76,5 +78,20 @@ describe('install_chronos_launchd plist generation', () => {
     expect(plist.match(/<\/dict>/g)).toHaveLength(2);
     expect(plist).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>/);
     expect(plist.trimEnd()).toMatch(/<\/plist>$/);
+  });
+
+  it('routes dry-run output through the shared script harness printer', () => {
+    const source = readFileSync(new URL('./install_chronos_launchd.ts', import.meta.url), 'utf8');
+    expect(source).toContain('run: ({ argv, print }) => main(argv, print)');
+    expect(source).not.toContain('console.log(');
+  });
+
+  it('keeps uninstall dry-run output injectable and side-effect free', async () => {
+    const output: string[] = [];
+    await main(['--uninstall'], (value) => output.push(String(value)));
+
+    expect(output).toHaveLength(1);
+    expect(output[0]).toContain('Uninstall steps (dry-run: nothing was changed)');
+    expect(output[0]).toContain('pnpm chronos:uninstall -- --apply');
   });
 });

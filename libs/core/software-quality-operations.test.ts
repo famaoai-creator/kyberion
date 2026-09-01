@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
 import { registerReasoningBackend, resetReasoningBackend } from './reasoning-backend.js';
-import { safeRmSync } from './secure-io.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 import type { SoftwareQualityContract, TestInventory } from './software-quality.js';
 import {
   compileTestInventoryToAdf,
@@ -10,6 +10,7 @@ import {
   deriveTestInventory,
   dispatchTestInventory,
   evaluateQualityEnforcement,
+  parseDefectTransitionEvent,
   recordDefectCandidate,
   transitionDefect,
 } from './software-quality-operations.js';
@@ -250,6 +251,42 @@ describe('software quality operations', () => {
       filePath: defectPath,
     });
     expect(defectCurrentStatus('DEF-1', defectPath)).toBe('accepted_risk');
+  });
+
+  it('accepts only well-formed defect transition events', () => {
+    const valid = {
+      defect_id: 'DEF-2',
+      from: null,
+      to: 'candidate',
+      actor_id: 'agent:test',
+      actor_type: 'ai_agent',
+      reason: 'Observed failure',
+      evidence_refs: ['trace:2'],
+      occurred_at: '2026-09-01T00:00:00.000Z',
+    };
+    expect(parseDefectTransitionEvent(valid)).toEqual(valid);
+    expect(parseDefectTransitionEvent({ ...valid, evidence_refs: [42] })).toBeUndefined();
+    expect(parseDefectTransitionEvent(['not-an-event'])).toBeUndefined();
+  });
+
+  it('skips malformed JSONL events without hiding valid defect state', () => {
+    safeWriteFile(
+      defectPath,
+      [
+        '{not-json',
+        JSON.stringify({
+          defect_id: 'DEF-3',
+          from: null,
+          to: 'candidate',
+          actor_id: 'agent:test',
+          actor_type: 'ai_agent',
+          reason: 'Observed failure',
+          evidence_refs: [],
+          occurred_at: '2026-09-01T00:00:00.000Z',
+        }),
+      ].join('\n') + '\n'
+    );
+    expect(defectCurrentStatus('DEF-3', defectPath)).toBe('candidate');
   });
 
   it('graduates enforcement from report-only through warn to blocking', () => {

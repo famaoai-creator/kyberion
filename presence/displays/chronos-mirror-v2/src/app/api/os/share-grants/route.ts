@@ -1,21 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { CloudflareOsControlPlane } from '@agent/core/cloudflare-os-control-plane';
 import {
-  CloudflareOsControlPlane,
   createShareGrantRegistryAuthorizer,
-  ProvenanceTaintPolicyError,
+  shareGrantActorFromViewer,
+} from '@agent/core/share-grant-authorizer';
+import { ProvenanceTaintPolicyError } from '@agent/core/provenance-taint';
+import {
   ShareGrantAuthorizationError,
   ShareGrantGraph,
-  ShareGrantLiveSessionRegistry,
   ShareGrantValidationError,
-  resolveTenant,
-  shareGrantActorFromViewer,
-} from '@agent/core';
+} from '@agent/core/share-grant-graph';
+import { ShareGrantLiveSessionRegistry } from '@agent/core/share-grant-live-sessions';
+import { resolveTenant } from '@agent/core/tenant-registry';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   viewerErrorResponse,
   withViewerExecutionContext,
 } from '../../../../lib/viewer-context';
+import { readChronosJsonObject } from '../../../../lib/request-input';
+import { parseShareGrantInput } from './share-grant-input';
 
 const cloudflareOsControlPlane = new CloudflareOsControlPlane();
 const shareGrantLiveSessions = new ShareGrantLiveSessionRegistry({ persist: true });
@@ -33,14 +37,6 @@ const shareGrantGraph = new ShareGrantGraph({
   liveSessionEvictor: shareGrantLiveSessions,
 });
 
-function isString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function badRequest(message: string): NextResponse {
-  return NextResponse.json({ ok: false, error: message }, { status: 400 });
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const denied = guardRequest(req);
   if (denied) return denied;
@@ -50,90 +46,58 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (resolvedViewer.response) return resolvedViewer.response;
 
   try {
-    const body = (await req.json()) as Record<string, unknown>;
-    const operation = isString(body.operation) ? body.operation : '';
-    const resourceRef = isString(body.resourceRef) ? body.resourceRef : '';
+    const parsedBody = await readChronosJsonObject(req, 'Chronos share grants');
+    if (!parsedBody.ok)
+      return NextResponse.json({ ok: false, error: parsedBody.error }, { status: 400 });
+    let input;
+    try {
+      input = parseShareGrantInput(parsedBody.body);
+    } catch (error) {
+      return viewerErrorResponse(error, 400);
+    }
     const actor = shareGrantActorFromViewer(resolvedViewer.context);
 
     const result = withViewerExecutionContext(resolvedViewer.context, () => {
-      switch (operation) {
+      switch (input.operation) {
         case 'register_resource':
-          if (
-            !resourceRef ||
-            !isString(body.tenantSlug) ||
-            !isString(body.taint) ||
-            (body.taint !== 'public' && !isString(body.provenanceMissionId))
-          ) {
-            return badRequest(
-              'operation, resourceRef, tenantSlug, and taint are required; provenanceMissionId is also required for non-public taint'
-            );
-          }
           return shareGrantGraph.registerResource({
-            resourceRef,
-            tenantSlug: body.tenantSlug,
-            taint: body.taint as 'personal' | 'confidential' | 'public',
+            resourceRef: input.resourceRef,
+            tenantSlug: input.tenantSlug,
+            taint: input.taint,
             actor,
-            ...(isString(body.provenanceMissionId)
-              ? { provenanceMissionId: body.provenanceMissionId }
+            ...(input.provenanceMissionId
+              ? { provenanceMissionId: input.provenanceMissionId }
               : {}),
           });
         case 'grant_edge':
-          if (
-            !resourceRef ||
-            !isString(body.grantee) ||
-            !isString(body.targetTenantSlug) ||
-            !isString(body.role)
-          ) {
-            return badRequest(
-              'operation, resourceRef, grantee, targetTenantSlug, and role are required'
-            );
-          }
           return shareGrantGraph.grantEdge({
-            resourceRef,
+            resourceRef: input.resourceRef,
+            grantee: input.grantee,
+            targetTenantSlug: input.targetTenantSlug,
+            role: input.role,
             actor,
-            grantee: body.grantee,
-            targetTenantSlug: body.targetTenantSlug,
-            role: body.role as 'view' | 'operate',
-            ...(isString(body.audienceFloor)
-              ? {
-                  audienceFloor: body.audienceFloor as 'personal' | 'confidential' | 'public',
-                }
-              : {}),
+            ...(input.audienceFloor ? { audienceFloor: input.audienceFloor } : {}),
           });
         case 'revoke_edge':
-          if (!isString(body.edgeId)) return badRequest('edgeId is required');
-          return shareGrantGraph.revokeEdge(body.edgeId, actor);
+          return shareGrantGraph.revokeEdge(input.edgeId, actor);
         case 'issue_link':
-          if (!resourceRef || !isString(body.role)) {
-            return badRequest('operation, resourceRef, and role are required');
-          }
           return shareGrantGraph.issueShareLink({
-            resourceRef,
+            resourceRef: input.resourceRef,
+            role: input.role,
             actor,
-            role: body.role as 'view' | 'operate',
-            ...(typeof body.ttlMs === 'number' ? { ttlMs: body.ttlMs } : {}),
-            ...(isString(body.expiresAt) ? { expiresAt: body.expiresAt } : {}),
-            ...(isString(body.audienceFloor)
-              ? {
-                  audienceFloor: body.audienceFloor as 'personal' | 'confidential' | 'public',
-                }
-              : {}),
+            ...(input.ttlMs !== undefined ? { ttlMs: input.ttlMs } : {}),
+            ...(input.expiresAt ? { expiresAt: input.expiresAt } : {}),
+            ...(input.audienceFloor ? { audienceFloor: input.audienceFloor } : {}),
           });
         case 'revoke_link':
-          if (!isString(body.linkId)) return badRequest('linkId is required');
-          return shareGrantGraph.revokeShareLink(body.linkId, actor);
+          return shareGrantGraph.revokeShareLink(input.linkId, actor);
         case 'register_session':
-          if (!resourceRef || !isString(body.token) || !isString(body.sessionId)) {
-            return badRequest('operation, resourceRef, token, and sessionId are required');
-          }
           return shareGrantGraph.openShareLinkSession({
-            resourceRef,
-            token: body.token,
-            sessionId: body.sessionId,
-            connectedAt: isString(body.connectedAt) ? body.connectedAt : new Date().toISOString(),
+            resourceRef: input.resourceRef,
+            token: input.token,
+            sessionId: input.sessionId,
+            connectedAt: input.connectedAt || new Date().toISOString(),
           });
-        default:
-          return badRequest('unknown share grant operation');
       }
     });
 

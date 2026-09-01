@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "security-posture.schema.json",
+  "title": "Security Posture",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "posture": { "type": "string", "enum": ["dangerous", "auto", "strict"] }
+  },
+  "required": ["version", "posture"]
+}

@@ -21,17 +21,22 @@
 import * as path from 'node:path';
 
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { isDirectScript } from './lib/harness.js';
+import {
+  currentProcessArgv,
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+} from './lib/harness.js';
 import { readJson } from '@agent/core/foundation';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
-  findMissionPath,
   listApprovalRequests,
   type ApprovalRequestRecord,
-} from '@agent/core';
+} from '@agent/core/approval-store';
+import { findMissionPath as resolveMissionPath } from '@agent/core/path-resolver';
 
 import { ALIGNMENT_BRIEF_RELATIVE_PATH } from './mission_alignment_decision.js';
 
@@ -70,7 +75,7 @@ export function openAlignmentApproval(
   options: { requestedBy?: string } = {}
 ): OpenAlignmentApprovalResult {
   const missionId = missionIdInput.trim().toUpperCase();
-  const missionDir = findMissionPath(missionId);
+  const missionDir = resolveMissionPath(missionId);
   if (!missionDir) {
     return {
       missionId,
@@ -80,13 +85,40 @@ export function openAlignmentApproval(
     };
   }
 
-  const briefPath = path.join(missionDir, ALIGNMENT_BRIEF_RELATIVE_PATH);
+  const candidateBriefPath = path.join(missionDir, ALIGNMENT_BRIEF_RELATIVE_PATH);
+  let briefPath: string;
+  try {
+    briefPath = assertSafeRepositoryPath(candidateBriefPath, { allowMissingLeaf: true });
+  } catch (error) {
+    return {
+      missionId,
+      created: false,
+      briefPath: candidateBriefPath,
+      reason: `Alignment brief path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
   if (!safeExistsSync(briefPath)) {
     return {
       missionId,
       created: false,
       briefPath,
       reason: `Alignment brief not found at ${briefPath}. Author it before requesting approval.`,
+    };
+  }
+  if (!safeLstat(briefPath).isFile()) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief must be a regular file: ${briefPath}.`,
+    };
+  }
+  if (!safeLstat(briefPath).isFile()) {
+    return {
+      missionId,
+      created: false,
+      briefPath,
+      reason: `Alignment brief must be a regular file: ${briefPath}.`,
     };
   }
 
@@ -173,8 +205,20 @@ function formatVictoryConditions(conditions: string[] | undefined): string | und
   return ['Victory Conditions:', ...conditions.map((entry) => `- ${entry}`)].join('\n');
 }
 
-export async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export function formatAlignmentRequest(result: OpenAlignmentApprovalResult): string {
+  if (result.requestId && !result.reason) {
+    return (
+      `[alignment-request] ${result.created ? 'opened' : 'reusing'} ${result.requestId} for ${result.missionId}\n` +
+      `  brief : ${result.briefPath}\n` +
+      `  bound : ${result.payloadHash?.slice(0, 16)}…\n` +
+      `  ${mt('mission_alignment:approval_surfaces_notice')}`
+    );
+  }
+  return `[alignment-request] ${result.reason || 'Alignment approval was not created.'}`;
+}
+
+export async function main(args = currentProcessArgv()): Promise<OpenAlignmentApprovalResult> {
+  const argv = await createStandardYargs(['node', 'mission_alignment_request', ...args])
     .option('mission', { alias: 'm', type: 'string', demandOption: true })
     .option('requested-by', { type: 'string' })
     .option('json', { type: 'boolean', default: false })
@@ -184,24 +228,22 @@ export async function main(): Promise<void> {
     ...(argv['requested-by'] ? { requestedBy: String(argv['requested-by']) } : {}),
   });
 
-  if (argv.json) {
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  } else if (result.requestId && !result.reason) {
-    process.stdout.write(
-      `[alignment-request] ${result.created ? 'opened' : 'reusing'} ${result.requestId} for ${result.missionId}\n` +
-        `  brief : ${result.briefPath}\n` +
-        `  bound : ${result.payloadHash?.slice(0, 16)}…\n` +
-        `  ${mt('mission_alignment:approval_surfaces_notice')}\n`
-    );
-  } else {
-    process.stdout.write(`[alignment-request] ${result.reason}\n`);
-  }
-
-  process.exitCode = result.reason ? 1 : 0;
+  return result;
 }
+
+export const runMissionAlignmentRequest = defineScript({
+  name: 'mission:alignment-request',
+  flags: ['json'],
+  async run(context) {
+    const result = await main(context.argv);
+    context.print(context.json ? result : formatAlignmentRequest(result));
+    if (result.reason) throw new ScriptExitError(1, result.reason);
+    return result;
+  },
+});
 
 if (
   isDirectScript(import.meta.url, 'mission_alignment_request.ts') ||
   isDirectScript(import.meta.url, 'mission_alignment_request.js')
 )
-  void main();
+  void runMissionAlignmentRequest();

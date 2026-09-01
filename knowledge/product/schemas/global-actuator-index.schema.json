@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "global-actuator-index.schema.json",
+  "title": "Global Actuator Index Compatibility Snapshot",
+  "type": "object",
+  "required": ["v", "t", "actuators"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "v": { "type": "string", "minLength": 1 },
+    "t": { "type": "integer", "minimum": 0 },
+    "u": { "type": "string", "minLength": 1 },
+    "actuators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["n", "path", "d", "s", "version", "capability_count", "ops"],
+        "properties": {
+          "n": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "d": { "type": "string" },
+          "s": { "type": "string", "minLength": 1 },
+          "version": { "type": "string", "minLength": 1 },
+          "capability_count": { "type": "integer", "minimum": 0 },
+          "ops": { "type": "array", "items": { "type": "string" } },
+          "contract_schema": { "type": "string" },
+          "prerequisites_summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

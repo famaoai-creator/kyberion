@@ -1,15 +1,20 @@
-import { loadJson, safeExistsSync, safeWriteFile, pathResolver } from '@agent/core';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { nowIso } from '@agent/core/foundation';
+import { readWisdomJsonObject } from '../wisdom-persisted-json.js';
 
 type StakeholderNode = Record<string, unknown>;
 
 function readJson(path: string): unknown {
-  return loadJson<unknown>(pathResolver.rootResolve(path));
+  return readWisdomJsonObject(path);
 }
 
 function writeJson(path: string, value: unknown): void {
-  safeWriteFile(pathResolver.rootResolve(path), JSON.stringify(value, null, 2));
+  safeWriteFile(
+    assertSafeRepositoryPath(pathResolver.rootResolve(path), { allowMissingLeaf: true }),
+    JSON.stringify(value, null, 2)
+  );
 }
 
 function rank(node: StakeholderNode): number {
@@ -35,15 +40,24 @@ export function computeReadinessMatrix(input: {
   recommendation: 'proceed' | 'delay' | 'redesign';
   written_to: string;
 } {
-  const directory = pathResolver.rootResolve(input.visits_dir);
+  const directory = assertSafeRepositoryPath(pathResolver.rootResolve(input.visits_dir), {
+    allowMissingLeaf: true,
+  });
   const files = safeExistsSync(directory)
-    ? getAllFiles(directory).filter((file) => file.endsWith('.json'))
+    ? getAllFiles(directory)
+        .map((file) => {
+          try {
+            return assertSafeRepositoryPath(file);
+          } catch {
+            return null;
+          }
+        })
+        .filter((file): file is string => Boolean(file && file.endsWith('.json')))
     : [];
   const visits = files
     .map((file) => {
       try {
-        const value: unknown = loadJson<unknown>(file);
-        return value && typeof value === 'object' ? (value as StakeholderNode) : null;
+        return readWisdomJsonObject(file) as StakeholderNode;
       } catch {
         return null;
       }

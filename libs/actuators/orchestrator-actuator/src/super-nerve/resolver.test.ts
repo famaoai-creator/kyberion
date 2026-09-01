@@ -22,6 +22,16 @@ describe('super-nerve resolver stop-service flow', () => {
     expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
   });
 
+  it('preserves the source utterance when execution receives a selected intent ID', async () => {
+    const steps = await resolveIntentToSteps('stop-service', {
+      source_text: 'voice-hub を停止して',
+    });
+
+    expect(steps).toHaveLength(1);
+    expect(String(steps[0]?.params?.cmd || '')).toContain('--operation stop');
+    expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
+  });
+
   it('lists startable services when no target service is specified', async () => {
     const steps = await resolveIntentToSteps('サービスを起動して');
 
@@ -42,6 +52,16 @@ describe('super-nerve resolver stop-service flow', () => {
     expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
   });
 
+  it('preserves the source utterance for a selected start-service intent ID', async () => {
+    const steps = await resolveIntentToSteps('start-service', {
+      source_text: 'voice-hub を起動して',
+    });
+
+    expect(steps).toHaveLength(1);
+    expect(String(steps[0]?.params?.cmd || '')).toContain('--operation start');
+    expect(String(steps[0]?.params?.cmd || '')).toContain('--service-name voice-hub');
+  });
+
   it('resolves static standard-intent pipeline entries through the canonical catalog', async () => {
     const verifyCapabilitySteps = await resolveIntentToSteps('verify-actuator-capability');
     const baselineSteps = await resolveIntentToSteps('check-kyberion-baseline');
@@ -56,12 +76,16 @@ describe('super-nerve resolver stop-service flow', () => {
     expect(String(baselineSteps[0]?.params?.cmd || '')).toContain('pipelines/baseline-check.json');
 
     expect(diagnoseSteps.length).toBeGreaterThan(0);
-    expect(String(diagnoseSteps[0]?.params?.cmd || '')).toContain('pipelines/system-diagnostics.json');
+    expect(String(diagnoseSteps[0]?.params?.cmd || '')).toContain(
+      'pipelines/system-diagnostics.json'
+    );
 
     expect(readinessSteps.length).toBeGreaterThan(0);
     expect(String(readinessSteps[0]?.params?.cmd || '')).toContain('pipelines/baseline-check.json');
 
     expect(supervisorSteps.length).toBeGreaterThan(0);
-    expect(String(supervisorSteps[0]?.params?.cmd || '')).toContain('agent_runtime_supervisor_status.js');
+    expect(String(supervisorSteps[0]?.params?.cmd || '')).toContain(
+      'agent_runtime_supervisor_status.js'
+    );
   });
 });

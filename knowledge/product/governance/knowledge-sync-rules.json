@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/knowledge-sync-rules.schema.json",
   "version": "1.1.0",
   "name": "Knowledge & Documentation Sync Rules",
   "jobs_note": "DA-03 incremental-sync job registry, consumed by pipelines/tenant-ingest.json (cron) and pipelines/knowledge-sync.json (manual alias). Job shape: { id: string (unique), tenant_slug: string (registered tenant, see tenant-registry), source_system: 'box'|'slack'|'confluence', source_params: object (box → { folder_id }, slack → { channel }, confluence → { domain? }), enabled: boolean (disabled jobs are skipped), dry_run: boolean (required: true = list changes without persisting the watermark), schedule_hint?: string (documentation only — the cron lives in the pipeline's schedule block). Watermarks are stored per tenant × source under active/shared/runtime/ingest-cursors/ and advance only on fully successful listings (ingest:sync_source).",

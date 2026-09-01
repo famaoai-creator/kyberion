@@ -1,19 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@agent/core', async () => {
-  const actual = await vi.importActual<typeof import('@agent/core')>('@agent/core');
+vi.mock('@agent/core/audit-chain', async () => {
+  const actual =
+    await vi.importActual<typeof import('@agent/core/audit-chain')>('@agent/core/audit-chain');
   return {
     ...actual,
-    auditChain: {
-      record: vi.fn(),
-    },
+    auditChain: { record: vi.fn() },
   };
 });
 import { recordTenantDriftAudit } from './watch_tenant_drift.js';
 
 describe('watch_tenant_drift audit metadata', () => {
   it('records only summary metadata and omits raw confidential paths', async () => {
-    const { auditChain } = await import('@agent/core');
+    const { auditChain } = await import('@agent/core/audit-chain');
     const report = {
       timestamp: '2026-07-05T00:00:00.000Z',
       scanned_paths: 4,

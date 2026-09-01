@@ -51,7 +51,7 @@ The runner records each completed migration in `active/shared/runtime/migrations
 node migration/<script>.js
 
 # Or run all pending in order:
-pnpm migration:run
+pnpm migration
 ```
 
 Maintainers must call out each required migration in the release notes and `CHANGELOG.md`.
@@ -59,7 +59,7 @@ Use `Migration required: None` when no state migration applies, so operators do 
 
 ## Rollback
 
-`pnpm migration:rollback` reverses the most recent migration, when the script declares a `rollback` export.
+`pnpm migration -- --rollback` reverses the most recent migration, when the script declares a `rollback` export.
 
 Not all migrations are safely reversible. When a migration has no `rollback` (or `rollback` throws), users must restore from backup to downgrade.
 

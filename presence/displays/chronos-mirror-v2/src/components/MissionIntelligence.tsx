@@ -10,6 +10,7 @@ import { MissionIntelligenceAgentTrafficPanel } from './MissionIntelligenceAgent
 import { MissionIntelligenceSurfaceOverview } from './MissionIntelligenceSurfaceOverview';
 import { MissionIntelligenceDangerousActionDialog } from './MissionIntelligenceDangerousActionDialog';
 import { MissionIntelligenceStatusGate } from './MissionIntelligenceStatusGate';
+import { LiveSyncScheduler, bindVisibilityToLiveSync } from '../lib/live-sync';
 import {
   buildMissionThread,
   missionActionLabel,
@@ -25,15 +26,11 @@ import {
   providerResolutionSummary,
 } from './MissionIntelligencePrimitives';
 import type {
-  A2AHandoffSummary,
-  AgentMessageSummary,
   ArtifactRecordSummary,
-  BrowserSessionSummary,
   CompanySnapshot,
   ControlActionAvailability,
   ControlActionCatalog,
   ControlActionDefinition,
-  ControlActionDetail,
   ControlActionSummary,
   DistillCandidateSummary,
   IntelligencePayload,
@@ -42,7 +39,6 @@ import type {
   MissionSeedRecordSummary,
   MissionSummary,
   MissionThreadEntry,
-  OrchestrationEvent,
   OwnerSummary,
   PendingApprovalSummary,
   ProjectManagementSummary,
@@ -223,28 +219,41 @@ export function MissionIntelligence({
 
   useEffect(() => {
     let alive = true;
-    const load = async () => {
-      try {
+    const scheduler = new LiveSyncScheduler<IntelligencePayload>({
+      fetchSnapshot: async () => {
         const res = await fetch(intelligenceUrl, { cache: 'no-store' });
         const body = await res.json();
+        if (!res.ok) throw new Error(body.error || 'Failed to load mission intelligence');
+        return body as IntelligencePayload;
+      },
+      onSnapshot: (snapshot) => {
         if (!alive) return;
-        if (!res.ok) {
-          setError(body.error || 'Failed to load mission intelligence');
-          return;
-        }
-        setData(body);
-      } catch (err: any) {
-        if (alive) setError(err.message || 'Failed to load mission intelligence');
-      }
-    };
-
-    load();
-    const timer = setInterval(load, 10000);
+        setData(snapshot);
+        setError(null);
+      },
+      onError: (err) => {
+        if (alive) setError(err instanceof Error ? err.message : String(err));
+      },
+      revisionOf: (snapshot) => snapshot.revision,
+      isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+    });
+    void scheduler.refresh().catch(() => undefined);
+    const source = new EventSource(
+      tenant
+        ? `/api/intelligence/stream?tenant=${encodeURIComponent(tenant)}`
+        : '/api/intelligence/stream'
+    );
+    source.onmessage = () => scheduler.invalidate();
+    source.onerror = () => scheduler.invalidate();
+    const unbindVisibility = bindVisibilityToLiveSync(scheduler);
+    scheduler.start();
     return () => {
       alive = false;
-      clearInterval(timer);
+      source.close();
+      unbindVisibility();
+      scheduler.stop();
     };
-  }, [intelligenceUrl]);
+  }, [intelligenceUrl, tenant]);
 
   const focusMissionThread = (missionId: string) => {
     setSelectedMissionId(missionId);
@@ -268,73 +277,6 @@ export function MissionIntelligence({
       });
     });
   };
-
-  useEffect(() => {
-    const source = new EventSource(
-      tenant
-        ? `/api/intelligence/stream?tenant=${encodeURIComponent(tenant)}`
-        : '/api/intelligence/stream'
-    );
-
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data) as {
-          recentEvents?: OrchestrationEvent[];
-          agentMessages?: AgentMessageSummary[];
-          a2aHandoffs?: A2AHandoffSummary[];
-          controlActions?: ControlActionSummary[];
-          controlActionDetails?: Record<string, ControlActionDetail[]>;
-          ownerSummaries?: OwnerSummary[];
-          browserSessions?: BrowserSessionSummary[];
-          runtime?: {
-            total: number;
-            ready: number;
-            busy: number;
-            error: number;
-          };
-          runtimeTopology?: IntelligencePayload['runtimeTopology'];
-        };
-        setData((current) =>
-          current
-            ? {
-                ...current,
-                recentEvents: Array.isArray(payload.recentEvents)
-                  ? payload.recentEvents
-                  : current.recentEvents,
-                agentMessages: Array.isArray(payload.agentMessages)
-                  ? payload.agentMessages
-                  : current.agentMessages,
-                a2aHandoffs: Array.isArray(payload.a2aHandoffs)
-                  ? payload.a2aHandoffs
-                  : current.a2aHandoffs,
-                controlActions: Array.isArray(payload.controlActions)
-                  ? payload.controlActions
-                  : current.controlActions,
-                controlActionDetails: payload.controlActionDetails || current.controlActionDetails,
-                ownerSummaries: Array.isArray(payload.ownerSummaries)
-                  ? payload.ownerSummaries
-                  : current.ownerSummaries,
-                browserSessions: Array.isArray(payload.browserSessions)
-                  ? payload.browserSessions
-                  : current.browserSessions,
-                runtime: payload.runtime || current.runtime,
-                runtimeTopology: payload.runtimeTopology || current.runtimeTopology,
-              }
-            : current
-        );
-      } catch {
-        // Ignore malformed SSE payloads and keep polling fallback.
-      }
-    };
-
-    source.onerror = () => {
-      source.close();
-    };
-
-    return () => {
-      source.close();
-    };
-  }, [tenant]);
 
   useEffect(() => {
     if (!focusedView) return;

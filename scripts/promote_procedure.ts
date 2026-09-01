@@ -19,17 +19,22 @@
  *     [--status active]
  */
 
+import { auditChain } from '@agent/core/audit-chain';
+import { compileBrowserRecording } from '@agent/core/browser-recording-compiler';
 import {
-  auditChain,
-  compileBrowserRecording,
   invalidateProcedureCache,
   resolveAllowlistedRecordingRef,
+} from '@agent/core/procedure-registry';
+import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
   safeWriteFile,
-  validateBrowserExtensionRecording,
-  pathResolver,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
-import type { ProcedureCatalog, ProcedureEntry } from '@agent/core';
+import type { ProcedureCatalog, ProcedureEntry } from '@agent/core/procedure-types';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const CATALOG_PATH = 'knowledge/product/orchestration/procedures.json';
@@ -99,6 +104,9 @@ export function main(argv: string[] = []): void {
   if (!recordingAbs) {
     fail(`--recording "${recordingRef}" is not inside the allowlisted recordings store`);
   }
+  if (!safeExistsSync(recordingAbs) || !safeLstat(recordingAbs).isFile()) {
+    fail(`--recording "${recordingRef}" must be an existing regular file`);
+  }
 
   let intentPhrases: string[];
   try {
@@ -136,7 +144,12 @@ export function main(argv: string[] = []): void {
   });
 
   // Load the catalog through secure-io, dedupe by id, append, write back.
-  const catalogAbs = pathResolver.rootResolve(CATALOG_PATH);
+  const catalogAbs = assertSafeRepositoryPath(pathResolver.rootResolve(CATALOG_PATH), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(catalogAbs) && !safeLstat(catalogAbs).isFile()) {
+    fail(`procedure catalog must be a regular file: ${catalogAbs}`);
+  }
   let catalog: ProcedureCatalog;
   try {
     catalog = readJson<ProcedureCatalog>(catalogAbs);

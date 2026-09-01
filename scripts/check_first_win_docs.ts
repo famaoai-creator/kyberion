@@ -1,5 +1,6 @@
-import { pathResolver, safeReadFile } from '@agent/core';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const FIRST_WIN_DOCS = [
   'README.md',
@@ -10,7 +11,7 @@ export const FIRST_WIN_DOCS = [
 export const FIRST_WIN_COMMANDS = [
   'pnpm install',
   'pnpm build',
-  'pnpm prereq:check',
+  'pnpm env:bootstrap --manifest kyberion-toolchain',
   'pnpm doctor',
   'pnpm pipeline --input pipelines/verify-session.json',
 ] as const;
@@ -89,7 +90,7 @@ export const runCheckFirstWinDocs = defineScript({
   run(context) {
     const failures = checkFirstWinDocs();
     if (failures.length > 0) {
-      throw new Error(failures.join('; '));
+      throw new ScriptExitError(1, failures.map((failure) => `- ${failure}`).join('\n'));
     }
     context.print(`[check:first-win-docs] OK (${FIRST_WIN_DOCS.length} documents)`);
   },

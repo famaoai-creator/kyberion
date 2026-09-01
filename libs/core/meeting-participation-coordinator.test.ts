@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   EnergyVad,
   MeetingParticipationCoordinator,
+  checkMeetingParticipationConsent,
   TraceContext,
   finalizeAndPersist,
   StubAudioBus,
@@ -16,6 +17,11 @@ import {
   type MeetingTarget,
   type TranscriptChunk,
   pathResolver,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+  withExecutionContext,
 } from './index.js';
 
 const ROOT = pathResolver.rootDir();
@@ -306,6 +312,38 @@ describe('MeetingParticipationCoordinator (stub end-to-end)', () => {
 
     expect(openSpy).not.toHaveBeenCalled();
     expect(JSON.stringify(trace.finalize())).toContain('meeting_participation.recording_denied');
+  });
+
+  it('fails closed before reading consent through an invalid mission id or symlinked evidence dir', () => {
+    const invalid = checkMeetingParticipationConsent({
+      mission_id: '../outside',
+      purpose: 'recording',
+    });
+    expect(invalid.allowed).toBe(false);
+    expect(invalid.reason).toMatch(/mission evidence path rejected/);
+
+    const outsideDir = path.join(ROOT, 'active/shared/tmp/meeting-consent-outside');
+    const evidenceDir = path.join(CONSENT_MISSION_DIR, 'evidence');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(CONSENT_MISSION_DIR, { recursive: true });
+      safeMkdir(outsideDir, { recursive: true });
+      safeWriteFile(
+        path.join(CONSENT_MISSION_DIR, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: CONSENT_MISSION,
+          tier: 'confidential',
+          assigned_persona: 'ecosystem_architect',
+        })
+      );
+      safeSymlinkSync(outsideDir, evidenceDir, 'dir');
+      const result = checkMeetingParticipationConsent({
+        mission_id: CONSENT_MISSION,
+        purpose: 'recording',
+      });
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/voice-consent path rejected/);
+      safeRmSync(outsideDir);
+    });
   });
 
   it('re-checks voice consent before TTS speech', async () => {

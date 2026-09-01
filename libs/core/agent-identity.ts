@@ -44,8 +44,9 @@
  */
 
 import { z } from 'zod';
+import { parseSafeJsonInput } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { loadOrganizationProfile } from './organization-profile.js';
 import { isValidTenantSlug } from './entity-scope.js';
@@ -397,7 +398,9 @@ export class AgentIdentityJournal {
   private seq = 0;
 
   constructor(options: AgentIdentityJournalOptions) {
-    this.journalPath = pathResolver.rootResolve(options.journalPath);
+    this.journalPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.journalPath), {
+      allowMissingLeaf: true,
+    });
     this.now = options.now ?? (() => new Date().toISOString());
   }
 
@@ -450,7 +453,9 @@ export class AgentIdentityJournal {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        const parsed = journalEventEnvelopeSchema.parse(JSON.parse(trimmed));
+        const parsed = journalEventEnvelopeSchema.parse(
+          parseSafeJsonInput(trimmed, 'agent identity journal entry')
+        );
         events.push(parsed);
         if (parsed.seq > maxSeq) maxSeq = parsed.seq;
       } catch {

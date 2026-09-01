@@ -3,7 +3,7 @@
  * Media Actuator native-xlsx-engine を使用
  * 予実管理対応版: 実績開始/実績終了 + 条件付き書式（ステータスで色変更）
  */
-import { pathResolver } from '@agent/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '../../../secure-io.js';
 import { generateNativeXlsx } from '../engine.js';
 import type {

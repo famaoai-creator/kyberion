@@ -22,7 +22,14 @@ import { logger } from './core.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
 import { queueMissionMemoryPromotionCandidate } from './memory-promotion-queue.js';
 import { summarizeReviewGateVerdicts } from './mission-review-gates.js';
-import { safeExec, safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+} from './secure-io.js';
 import { recordMissionGateOverride, writeMissionGateRecord } from './mission-gate-engine.js';
 import { closeMissionArtifacts } from './mission-artifact-closure.js';
 import { reconcileCompletion, reconcileCompletionStructurally } from './intent-reconciliation.js';
@@ -426,6 +433,13 @@ export async function verifyMission(
     logger.error(`Mission directory for ${upperId} not found.`);
     return;
   }
+  try {
+    assertSafeRepositoryPath(missionDir);
+    assertSafeRepositoryPath(path.join(missionDir, 'gates'), { allowMissingLeaf: true });
+  } catch (error: any) {
+    logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
+    return;
+  }
   const runtimeEventPath = path.join(missionDir, 'runtime-events.jsonl');
 
   logger.info(`🛡️ Verifying Mission ${upperId}: Result = ${result.toUpperCase()}`);
@@ -566,6 +580,15 @@ export async function finishMission(
   });
   const missionDir = findMissionPath(upperId);
   if (!missionDir) return;
+  try {
+    assertSafeRepositoryPath(missionDir);
+    assertSafeRepositoryPath(path.join(missionDir, 'gates'), { allowMissingLeaf: true });
+    assertSafeRepositoryPath(args.agentRuntimeEventPath, { allowMissingLeaf: true });
+    assertSafeRepositoryPath(args.archiveDir, { allowMissingLeaf: true });
+  } catch (error: any) {
+    logger.error(`Mission ${upperId} path rejected: ${error?.message || String(error)}`);
+    return;
+  }
   const missionHead = args.getGitHash(missionDir);
   if (preState.git?.latest_commit !== missionHead) {
     const headSubject = safeExec('git', ['log', '-1', '--pretty=%s'], { cwd: missionDir }).trim();
@@ -946,11 +969,12 @@ export async function finishMission(
       pathResolver.volatile('mission', upperId, { tier: state.tier }),
       'MEMORY.md'
     );
-    const memorySummary = safeExistsSync(memoryPath)
-      ? extractPromotableMissionMemory(safeReadFile(memoryPath, { encoding: 'utf8' }) as string)
+    const safeMemoryPath = assertSafeRepositoryPath(memoryPath, { allowMissingLeaf: true });
+    const memorySummary = safeExistsSync(safeMemoryPath)
+      ? extractPromotableMissionMemory(safeReadFile(safeMemoryPath, { encoding: 'utf8' }) as string)
       : null;
     const memoryEvidenceRefs = memorySummary
-      ? [...evidence.map((item) => item.ref), memoryPath]
+      ? [...evidence.map((item) => item.ref), safeMemoryPath]
       : evidence.map((item) => item.ref);
     const queued = queueMissionMemoryPromotionCandidate({
       missionId: upperId,
@@ -962,7 +986,7 @@ export async function finishMission(
         `Mission ${upperId} completed and yielded reusable operational memory.`,
       evidenceRefs: memoryEvidenceRefs,
     });
-    if (memorySummary) updateMissionMemorySidecar(memoryPath, queued.candidate_id);
+    if (memorySummary) updateMissionMemorySidecar(safeMemoryPath, queued.candidate_id);
     logger.info(
       `🧠 [MEMORY_PROMOTION] queued candidate ${queued.candidate_id} (${queued.proposed_memory_kind}).`
     );
@@ -1023,15 +1047,19 @@ export async function finishMission(
   }
 
   const missionTmpDir = pathResolver.sharedTmp(path.join('missions', upperId));
-  if (safeExistsSync(missionTmpDir)) {
+  const safeMissionTmpDir = assertSafeRepositoryPath(missionTmpDir, { allowMissingLeaf: true });
+  if (safeExistsSync(safeMissionTmpDir)) {
     traceCtx.startSpan('mission:purge-temp');
     logger.info('🧹 Purging mission runtime temp...');
-    safeRmSync(missionTmpDir, { recursive: true, force: true });
+    safeRmSync(safeMissionTmpDir, { recursive: true, force: true });
     traceCtx.endSpan('ok');
   }
 
-  if (!safeExistsSync(args.archiveDir)) safeMkdir(args.archiveDir, { recursive: true });
-  const archivePath = path.join(args.archiveDir, upperId);
+  const safeArchiveDir = assertSafeRepositoryPath(args.archiveDir, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeArchiveDir)) safeMkdir(safeArchiveDir, { recursive: true });
+  const archivePath = assertSafeRepositoryPath(path.join(safeArchiveDir, upperId), {
+    allowMissingLeaf: true,
+  });
   traceCtx.startSpan('mission:archive');
   if (safeExistsSync(archivePath)) safeExec('rm', ['-rf', archivePath]);
   safeExec('cp', ['-r', missionDir, archivePath]);

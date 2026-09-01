@@ -151,6 +151,45 @@ describe('mission-artifact-closure (AL-03)', () => {
     expect(result.deleted_directories).toEqual([]);
   });
 
+  it('fails closed without deleting through a symlinked mission root', () => {
+    const id = 'MSN-CLOSURE-SYMLINK';
+    const target = path.join(tmpRoot, 'external-mission-target');
+    const linked = missionDirFor(id);
+    fs.mkdirSync(target, { recursive: true });
+    fs.mkdirSync(path.dirname(linked), { recursive: true });
+    fs.symlinkSync(target, linked, 'dir');
+
+    try {
+      const missionResult = mod.closeMissionArtifacts({ missionId: id, missionDir: linked });
+      expect(missionResult.status).toBe('error');
+      expect(fs.existsSync(target)).toBe(true);
+
+      const taskResult = mod.closeTaskArtifacts(id, 'task-1', { missionDir: linked });
+      expect(taskResult.status).toBe('error');
+      expect(fs.existsSync(target)).toBe(true);
+    } finally {
+      fs.rmSync(linked, { force: true });
+      fs.rmSync(target, { recursive: true, force: true });
+    }
+  });
+
+  it('preflights disposable class paths before partially reclaiming a mission', () => {
+    const id = 'MSN-CLOSURE-CLASS-SYMLINK';
+    const dir = seedClosableMission(id, { withGit: false });
+    const target = path.join(tmpRoot, 'external-cache-target');
+    const cacheDir = path.join(dir, 'artifacts', 'cache');
+    fs.mkdirSync(target, { recursive: true });
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    fs.symlinkSync(target, cacheDir, 'dir');
+
+    const result = mod.closeMissionArtifacts({ missionId: id, missionDir: dir });
+
+    expect(result.status).toBe('error');
+    expect(fs.existsSync(target)).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'artifacts', 'tmp'))).toBe(true);
+    expect(fs.lstatSync(cacheDir).isSymbolicLink()).toBe(true);
+  });
+
   it('closes a mission: deletes cache/tmp classes, keeps evidence/gates/report, rewrites the index, bundles + removes .git, audits', () => {
     const id = 'MSN-CLOSURE-E2E';
     const dir = seedClosableMission(id);

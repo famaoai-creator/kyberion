@@ -56,7 +56,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
@@ -148,8 +148,8 @@ export const TASK_GRANTS_STORE_PATH = pathResolver.shared(
 
 export function resolveTaskGrantsStorePath(): string {
   const override = process.env[TASK_GRANTS_PATH_ENV]?.trim();
-  if (override) return pathResolver.rootResolve(override);
-  return TASK_GRANTS_STORE_PATH;
+  const configured = override ? pathResolver.rootResolve(override) : TASK_GRANTS_STORE_PATH;
+  return assertSafeRepositoryPath(configured, { allowMissingLeaf: true });
 }
 
 // ---------------------------------------------------------------------------

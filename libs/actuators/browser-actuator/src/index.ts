@@ -1,12 +1,12 @@
+import { logger } from '@agent/core/core';
+import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import {
-  logger,
-  emitComputerSurfacePatch,
   buildBrowserExtensionPipelineCandidate,
   preflightBrowserExtensionSession,
-  ensureDefaultOpPreflight,
-  runOpPreflight,
-  defineCatalogBackedActuator,
-} from '@agent/core';
+} from '@agent/core/browser-extension-bridge';
+import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
+import { runOpPreflight } from '@agent/core/op-preflight';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import {
   buildBrowserElementPresentPipeline,
@@ -16,7 +16,7 @@ import { executePipeline as executeBrowserPipeline } from './browser-pipeline-he
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Page } from '@playwright/test';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 /**
@@ -192,6 +192,7 @@ async function buildSnapshot(
 const main = async () => {
   await runActuatorCli({
     name: 'browser-actuator',
+    args: process.argv,
     handleAction,
   });
 };

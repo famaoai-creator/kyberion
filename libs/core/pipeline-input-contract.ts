@@ -13,6 +13,10 @@ function schemaPlaceholder(schema: PipelineInputSchema | undefined): unknown {
   if (schema.format === 'email') return 'operator@example.invalid';
   if (schema.format === 'date-time') return '2026-01-01T00:00:00.000Z';
   if (schema.format === 'date') return '2026-01-01';
+  if (typeof schema.pattern === 'string') {
+    if (/\\d\{4\}-W\\d\{2\}/u.test(schema.pattern)) return '2026-W01';
+    if (/\\d\{4\}-\\d\{2\}-\\d\{2\}/u.test(schema.pattern)) return '2026-01-01';
+  }
   switch (schema.type) {
     case 'boolean':
       return false;
@@ -24,7 +28,11 @@ function schemaPlaceholder(schema: PipelineInputSchema | undefined): unknown {
     case 'object':
       return {};
     default:
-      return '';
+      return typeof schema.minLength === 'number'
+        ? 'p'.repeat(
+            Math.max(1, Math.min(schema.minLength, Number(schema.maxLength) || schema.minLength))
+          )
+        : 'pipeline-placeholder';
   }
 }
 

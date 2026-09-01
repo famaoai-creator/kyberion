@@ -155,6 +155,34 @@ describe('marketing publication dry-run', () => {
     ).toThrow('artifact binding changed: video');
   });
 
+  it('rejects approved artifacts outside the repository boundary', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    const approval = JSON.parse(
+      safeReadFile(approvalPath, { encoding: 'utf8' }) as string
+    ) as PublicationApproval;
+    approval.approved_artifacts.video!.path = '../package.json';
+    safeWriteFile(approvalPath, JSON.stringify(approval));
+
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(root, 'output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a dry-run output root outside the repository boundary', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(pathResolver.rootDir(), '..', 'kyberion-marketing-output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
   it('rejects unauthenticated or expired approval', () => {
     const { root, approvalPath, sharedApprovalRequest } = fixture();
     const approval = JSON.parse(

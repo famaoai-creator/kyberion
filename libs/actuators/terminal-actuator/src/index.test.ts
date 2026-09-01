@@ -20,27 +20,13 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock('@agent/core', () => ({
-  logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
-  createStandardYargs: vi.fn(),
-  pathResolver: {
-    rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
-    rootResolve: vi.fn((value: string) => value),
-  },
-  resolveShellAdapter: vi.fn(() => ({ shell: '/bin/bash', args: ['-lc'] })),
-  safeReadFile: vi.fn(),
-  encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
-  emitComputerSurfacePatch: vi.fn(),
-  classifyError: mocks.classifyError,
-  buildGovernedRetryOptions: vi.fn(({ defaults, override }: any) => ({
-    ...defaults,
-    ...(override || {}),
-    shouldRetry: vi.fn(() => true),
-  })),
-  retry: mocks.retry,
+// Mirror the terminal helper's canonical imports. The previous barrel mock
+// left the real PTY and retry implementations active after the import split.
+vi.mock('@agent/core/core', () => ({ logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
+vi.mock('@agent/core/semantic-decide', () => ({
   executeLlmDecideOp: mocks.executeLlmDecideOp,
-  ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,
-  runOpPreflight: mocks.runOpPreflight,
+}));
+vi.mock('@agent/core/pty-engine', () => ({
   ptyEngine: {
     spawn: vi.fn((shell: string, args: string[], cwd?: string) => {
       const id = `pty-${ptyState.sessions.size + 1}`;
@@ -70,6 +56,47 @@ vi.mock('@agent/core', () => ({
     list: vi.fn(() => Array.from(ptyState.sessions.keys())),
     popMessages: vi.fn(() => []),
   },
+}));
+vi.mock('@agent/core/terminal-keys', () => ({
+  encodeTerminalInput: vi.fn((keys: string[]) => keys.join('+')),
+}));
+vi.mock('@agent/core/secure-io', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/secure-io')>()),
+  assertSafeRepositoryPath: vi.fn((candidate: string) => {
+    if (!candidate.startsWith('/tmp/terminal-actuator-test/')) {
+      throw new Error('[RESOURCE_PATH_SCOPE] test path is outside the repository root');
+    }
+    return candidate;
+  }),
+}));
+vi.mock('@agent/core/computer-surface', () => ({ emitComputerSurfacePatch: vi.fn() }));
+vi.mock('@agent/core/platform-command-adapters', () => ({
+  resolveShellAdapter: vi.fn(() => ({ shell: '/bin/bash', args: ['-lc'] })),
+}));
+vi.mock('@agent/core/path-resolver', () => ({
+  rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
+  rootResolve: vi.fn((value: string) => value),
+  pathResolver: {
+    rootDir: vi.fn(() => '/tmp/terminal-actuator-test'),
+    rootResolve: vi.fn((value: string) => value),
+    shared: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/${value}`),
+    sharedTmp: vi.fn((value = '') => `/tmp/terminal-actuator-test/active/shared/tmp/${value}`),
+    knowledge: vi.fn((value: string) => `/tmp/terminal-actuator-test/knowledge/${value}`),
+    resolve: vi.fn((value: string) => value),
+  },
+}));
+vi.mock('@agent/core/recovery-policy', () => ({
+  createGovernedRetryOptionsBuilder:
+    (input: { defaults: Record<string, unknown> }) => (override?: Record<string, unknown>) => ({
+      ...input.defaults,
+      ...(override || {}),
+      shouldRetry: vi.fn(() => true),
+    }),
+}));
+vi.mock('@agent/core/async-utils', () => ({ retry: mocks.retry }));
+vi.mock('@agent/core/op-preflight', () => ({ runOpPreflight: mocks.runOpPreflight }));
+vi.mock('@agent/core/op-preflight-defaults', () => ({
+  ensureDefaultOpPreflight: mocks.ensureDefaultOpPreflight,
 }));
 
 describe('terminal-actuator computer_interaction adapter', () => {
@@ -127,7 +154,7 @@ describe('terminal-actuator direct actions', () => {
       action: 'spawn',
       params: {
         shell: '/bin/bash',
-        cwd: '/tmp',
+        cwd: 'active/shared/tmp',
       },
     } as any);
 
@@ -319,13 +346,24 @@ describe('terminal-actuator computer_interaction edge cases', () => {
       action: {
         type: 'spawn_terminal',
         shell: '/bin/bash',
-        cwd: '/tmp',
+        cwd: 'active/shared/tmp',
       },
     } as any);
 
     expect(result.status).toBe('created');
     expect(result.sessionId).toBeDefined();
     expect(mocks.retry).toHaveBeenCalled();
+  });
+
+  it('rejects a spawn cwd outside the repository root', async () => {
+    const { handleAction } = await import('./index');
+
+    await expect(
+      handleAction({
+        action: 'spawn',
+        params: { cwd: '../../etc' },
+      } as any)
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
   it('poll_terminal returns session output', async () => {

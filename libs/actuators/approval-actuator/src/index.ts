@@ -1,10 +1,10 @@
-import { logger } from '@agent/core';
+import { logger } from '@agent/core/core';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApprovalAction } from './approval-actuator-helpers.js';
-import { defineCatalogBackedActuator } from '@agent/core';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 export { handleApprovalAction as handleAction } from './approval-actuator-helpers.js';
 
 export const actuator = defineCatalogBackedActuator({
@@ -18,6 +18,7 @@ export { evaluateDecisionRightsOp, requestReviewOp } from './approval-ops.js';
 const main = async () => {
   await runActuatorCli({
     name: 'approval-actuator',
+    args: process.argv,
     handleAction: handleApprovalAction,
   });
 };

@@ -4,10 +4,26 @@ import {
   getWorkItem,
   clearWorkCoordinationStore,
   setWorkCoordinationNamespace,
-} from '@agent/core';
-import { delegateMeetingReasoning } from './meeting-intelligence-ops.js';
+} from '@agent/core/work-coordination';
+import {
+  delegateMeetingReasoning,
+  parseMeetingModelObject,
+  parseMeetingModelObjectArray,
+} from './meeting-intelligence-ops.js';
 
 describe('meeting intelligence governed delegation', () => {
+  it('accepts only object roots for model projections', () => {
+    expect(parseMeetingModelObject({ speech_text: 'continue' })).toEqual({
+      speech_text: 'continue',
+    });
+    expect(parseMeetingModelObjectArray([{ title: 'Send notes' }])).toEqual([
+      { title: 'Send notes' },
+    ]);
+    expect(() => parseMeetingModelObject([])).toThrow('JSON object');
+    expect(() => parseMeetingModelObjectArray({ title: 'Send notes' })).toThrow('JSON array');
+    expect(() => parseMeetingModelObjectArray([{ title: 'ok' }, 'bad'])).toThrow('item 1');
+  });
+
   beforeEach(() => {
     setWorkCoordinationNamespace(`meeting-intelligence-test-${process.pid}`);
     clearWorkCoordinationStore();

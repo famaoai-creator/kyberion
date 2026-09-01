@@ -4,26 +4,29 @@
  * Standardized with Secure-IO and Physical Evidence-as-State.
  */
 
+import { installProcessGuards } from '@agent/core/process-guards';
+import { logger } from '@agent/core/core';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
-  installProcessGuards,
-  logger,
-  terminalBridge,
+  assertSafeRepositoryPath,
   loadJson,
   safeReadFile,
   safeWriteFile,
-  pathResolver,
-  secretGuard,
   safeMkdir,
   safeExistsSync,
+  safeLstat,
   safeUnlinkSync,
   safeReaddir,
-  sensoryMemory,
-  capabilityEntry,
   safeExec,
-} from '@agent/core';
+} from '@agent/core/secure-io';
+import { capabilityEntry, pathResolver } from '@agent/core/path-resolver';
+import { secretGuard } from '@agent/core/secret-guard';
+import { sensoryMemory } from '@agent/core/sensory-memory';
 import { reflexEngine } from '@agent/shared-nerve';
 import { handleAction as dispatchService } from '@actuator/service';
 import * as path from 'node:path';
+import { parseGuspStimulusLine, type GuspStimulus } from './nexus-stimulus.js';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('nexus-daemon');
@@ -35,7 +38,50 @@ const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
 
 function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
-  return loadJson(filePath);
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
+    throw new Error(`Nexus JSON resource must be an existing regular file: ${safePath}`);
+  }
+  return loadJson(safePath);
+}
+
+function safeNexusPath(filePath: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(filePath, { allowMissingLeaf });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function isExistingDirectory(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+interface NexusDispatchResult {
+  ok: boolean;
+  error?: string;
+}
+
+function parseNexusDispatchResult(value: unknown): NexusDispatchResult | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const ok = record.ok;
+  if (ok !== undefined && typeof ok !== 'boolean') return null;
+  if (record.error !== undefined && typeof record.error !== 'string') return null;
+  return {
+    ok: typeof ok === 'boolean' ? ok : true,
+    ...(typeof record.error === 'string' ? { error: record.error } : {}),
+  };
 }
 
 /**
@@ -43,10 +89,11 @@ function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
  */
 function ensureSystemMission() {
   const missionDir = path.join(ROOT_DIR, 'active/missions', NEXUS_MISSION_ID);
-  const statePath = path.join(missionDir, 'mission-state.json');
+  const safeMissionDir = safeNexusPath(missionDir, true);
+  const statePath = safeNexusPath(path.join(safeMissionDir, 'mission-state.json'), true);
 
-  if (!safeExistsSync(missionDir)) {
-    safeMkdir(missionDir, { recursive: true });
+  if (!safeExistsSync(safeMissionDir)) {
+    safeMkdir(safeMissionDir, { recursive: true });
   }
 
   const state = {
@@ -62,19 +109,6 @@ function ensureSystemMission() {
 
 const CHECK_INTERVAL_MS = Number(process.env.NEXUS_INTERVAL) || 3000;
 
-interface GUSPStimulus {
-  id: string;
-  ts: string;
-  ttl: number;
-  origin: { channel: string; source_id: string; context?: string; metadata?: any };
-  signal: { type: string; priority: number; payload: string };
-  policy: { flow: string; feedback: string; retention: string };
-  control: {
-    status: 'pending' | 'injected' | 'processed' | 'expired' | 'failed';
-    evidence: Array<{ step: string; ts: string; agent: string }>;
-  };
-}
-
 interface Channel {
   id: string;
   connector_skill?: string;
@@ -85,8 +119,7 @@ interface Channel {
 
 async function loadChannelRegistry(): Promise<Channel[]> {
   try {
-    const content = safeReadFile(REGISTRY_PATH, { encoding: 'utf8' }) as string;
-    return JSON.parse(content).channels;
+    return loadJsonValue(safeNexusPath(REGISTRY_PATH)).channels;
   } catch (err) {
     logger.error(`[Nexus] Registry load error: ${err}`);
     return [];
@@ -95,17 +128,20 @@ async function loadChannelRegistry(): Promise<Channel[]> {
 
 async function updateStimulusStatus(
   id: string,
-  status: GUSPStimulus['control']['status'],
+  status: GuspStimulus['control']['status'],
   step?: string
 ) {
   try {
-    const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+    const stimuliPath = safeNexusPath(STIMULI_PATH);
+    if (!isExistingRegularFile(stimuliPath)) return false;
+    const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
     const lines = content
       .trim()
       .split('\n')
       .map((line) => {
         if (!line) return '';
-        const s = JSON.parse(line) as GUSPStimulus;
+        const s = parseGuspStimulusLine(line);
+        if (!s) return line;
         if (s.id === id) {
           s.control.status = status;
           if (step)
@@ -114,7 +150,7 @@ async function updateStimulusStatus(
         return JSON.stringify(s);
       })
       .filter((l) => l !== '');
-    safeWriteFile(STIMULI_PATH, lines.join('\n') + '\n');
+    safeWriteFile(stimuliPath, lines.join('\n') + '\n');
     return true;
   } catch (err: any) {
     logger.error(`[Nexus] Status update failed for ${id}: ${err.message}`);
@@ -122,7 +158,7 @@ async function updateStimulusStatus(
   }
 }
 
-async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: Channel[]) {
+async function dispatchFeedback(stimulus: GuspStimulus, text: string, channels: Channel[]) {
   const channelCfg = channels.find((c) => c.id === stimulus.origin.channel);
 
   if (channelCfg?.connector_skill) {
@@ -150,7 +186,8 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
     const tempPath = pathResolver.resolve(
       `active/shared/logs/dispatch_${stimulus.id}_${Date.now()}.json`
     );
-    safeWriteFile(tempPath, JSON.stringify(payload, null, 2));
+    const safeTempPath = safeNexusPath(tempPath, true);
+    safeWriteFile(safeTempPath, JSON.stringify(payload, null, 2));
 
     try {
       const serviceId = channelCfg.service_id || stimulus.origin.channel || 'slack';
@@ -159,7 +196,7 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
       const actuatorPath = capabilityEntry(channelCfg.connector_skill);
       logger.info(`🚀 [Nexus] Dispatching via node ${actuatorPath}...`);
 
-      const rawOutput = await safeExec('node', [actuatorPath, '--input', tempPath], {
+      const rawOutput = await safeExec('node', [actuatorPath, '--input', safeTempPath], {
         env: { ...process.env, MISSION_ID: NEXUS_MISSION_ID },
       });
 
@@ -172,7 +209,10 @@ async function dispatchFeedback(stimulus: GUSPStimulus, text: string, channels: 
       const output = rawOutput.substring(jsonStart);
 
       logger.info(`📡 [Nexus] Actuator Response received (${output.length} bytes)`);
-      const result = JSON.parse(output);
+      const result = parseNexusDispatchResult(
+        parseSafeJsonInput(output, 'Nexus actuator response')
+      );
+      if (!result) throw new Error('Invalid actuator response envelope.');
       if (result.ok === false) {
         logger.error(`❌ [Nexus] Slack API Error: ${result.error}`);
       } else {
@@ -196,8 +236,9 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
 
     try {
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
-      if (safeExistsSync(registryPath)) {
-        const registry = loadJsonValue(registryPath);
+      const safeRegistryPath = safeNexusPath(registryPath, true);
+      if (safeExistsSync(safeRegistryPath)) {
+        const registry = loadJsonValue(safeRegistryPath);
         if (registry.profiles[profile]) {
           return { profile, cleanPayload };
         }
@@ -211,30 +252,41 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
 }
 
 async function scanAndDispatch(channels: Channel[]) {
-  if (!safeExistsSync(STIMULI_PATH)) return;
+  const stimuliPath = safeNexusPath(STIMULI_PATH, true);
+  const runtimeBase = safeNexusPath(RUNTIME_BASE, true);
+  if (!isExistingRegularFile(stimuliPath)) return;
 
-  const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+  const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
   const allStimuli = content
     .trim()
     .split('\n')
     .filter((l) => l.length > 0)
-    .map((line) => JSON.parse(line) as GUSPStimulus);
+    .map(parseGuspStimulusLine)
+    .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
 
   const injected = allStimuli.filter((s) => s.control.status === 'injected');
 
   for (const stimulus of injected) {
-    if (stimulus.policy?.feedback === 'silent') {
+    if ((stimulus.policy?.feedback ?? stimulus.control.feedback) === 'silent') {
       await updateStimulusStatus(stimulus.id, 'processed', 'ignored_by_silent_policy');
       continue;
     }
 
-    const sessions = safeExistsSync(RUNTIME_BASE) ? safeReaddir(RUNTIME_BASE) : [];
+    const sessions = isExistingDirectory(runtimeBase)
+      ? safeReaddir(runtimeBase).filter((sid) => {
+          try {
+            return safeLstat(safeNexusPath(path.join(runtimeBase, sid))).isDirectory();
+          } catch {
+            return false;
+          }
+        })
+      : [];
     for (const sid of sessions) {
-      const outDir = path.join(RUNTIME_BASE, sid, 'out');
-      const metaPath = path.join(outDir, 'latest_metadata.json');
-      const responsePath = path.join(outDir, 'latest_response.json');
+      const outDir = safeNexusPath(path.join(runtimeBase, sid, 'out'), true);
+      const metaPath = safeNexusPath(path.join(outDir, 'latest_metadata.json'), true);
+      const responsePath = safeNexusPath(path.join(outDir, 'latest_response.json'), true);
 
-      if (safeExistsSync(metaPath) && safeExistsSync(responsePath)) {
+      if (isExistingRegularFile(metaPath) && isExistingRegularFile(responsePath)) {
         try {
           const meta = loadJsonValue(metaPath);
           if (meta.stimulus_id === stimulus.id) {
@@ -288,13 +340,15 @@ async function nexusLoop() {
     try {
       const channels = await loadChannelRegistry();
 
-      if (safeExistsSync(STIMULI_PATH)) {
-        const content = safeReadFile(STIMULI_PATH, { encoding: 'utf8' }) as string;
+      if (isExistingRegularFile(STIMULI_PATH)) {
+        const stimuliPath = safeNexusPath(STIMULI_PATH);
+        const content = safeReadFile(stimuliPath, { encoding: 'utf8' }) as string;
         const allStimuli = content
           .trim()
           .split('\n')
           .filter((l) => l.length > 0)
-          .map((line) => JSON.parse(line) as GUSPStimulus);
+          .map(parseGuspStimulusLine)
+          .filter((stimulus): stimulus is GuspStimulus => stimulus !== undefined);
 
         const pending = allStimuli.filter((s) => s.control.status === 'pending');
 
@@ -323,10 +377,10 @@ async function nexusLoop() {
 
           const { profile, cleanPayload } = extractBrainProfile(stimulus.signal.payload);
 
-          const sessionInDir = path.join(RUNTIME_BASE, targetSessionId, 'in');
+          const sessionInDir = safeNexusPath(path.join(RUNTIME_BASE, targetSessionId, 'in'), true);
           if (!safeExistsSync(sessionInDir)) safeMkdir(sessionInDir, { recursive: true });
 
-          const metaInPath = path.join(sessionInDir, 'metadata.json');
+          const metaInPath = safeNexusPath(path.join(sessionInDir, 'metadata.json'), true);
           safeWriteFile(
             metaInPath,
             JSON.stringify(

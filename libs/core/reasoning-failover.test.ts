@@ -5,6 +5,22 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const absolute = path.resolve(filePath);
+    const relative = path.relative(root, absolute);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    return absolute;
+  },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>

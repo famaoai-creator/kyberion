@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 /**
  * scripts/refactor/mission-maintenance.ts
  * Maintenance and recovery operations for missions.
@@ -6,14 +6,15 @@ import { appendJsonLine } from './foundation/json.js';
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
 import {
+  assertSafeRepositoryPath,
   safeExec,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -26,7 +27,10 @@ import {
 } from './mission-team-binding.js';
 import { TraceContext, persistTrace } from './src/trace.js';
 import { loadMissionOrchestrationReplayPlan } from './mission-orchestration-journal.js';
-import { startMissionOrchestrationWorker } from './mission-orchestration-events.js';
+import {
+  enqueueMissionOrchestrationEvent,
+  startMissionOrchestrationWorker,
+} from './mission-orchestration-events.js';
 import {
   recoverMissionRequestedTasks,
   reissueBlockedMissionTasks,
@@ -53,9 +57,30 @@ import {
   tryAutoCompleteTaskFromEvidence,
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
-import { readJsonFile } from './cli-input.js';
 import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
+import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
+
+function safeMissionRoot(missionDir: string): string {
+  return assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
+}
+
+function safeMissionArtifactPath(missionDir: string, relativePath: string): string {
+  return assertSafeRepositoryPath(path.join(safeMissionRoot(missionDir), relativePath), {
+    allowMissingLeaf: true,
+  });
+}
+
+function isPathInside(parent: string, candidate: string): boolean {
+  const relative = path.relative(parent, candidate);
+  return (
+    relative !== '' &&
+    relative !== '..' &&
+    !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative)
+  );
+}
 
 function resolveApprovalActor(requestedBy?: string): string {
   const resolvedActor =
@@ -67,6 +92,24 @@ function resolveApprovalActor(requestedBy?: string): string {
     );
   }
   return resolvedActor;
+}
+
+/**
+ * Materialize the operator-editable reconcile-work scaffold once a recovery
+ * plan finds an interrupted provisioned write. Applying the manifest remains
+ * a separate human-gated operation; resume only creates the bounded handoff.
+ */
+export function ensureRecoveryScaffold(missionId: string): string {
+  const relativePath = `active/shared/tmp/reconciliation-${missionId}.scaffold.json`;
+  const outputPath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath), {
+    allowMissingLeaf: true,
+  });
+  if (safeExistsSync(outputPath)) return pathResolver.toRepoRelative(outputPath);
+  return generateMissionWorkReconciliationScaffold({
+    missionId,
+    outputPath: relativePath,
+    reason: 'Recover an interrupted provisioned artifact before orchestration replay.',
+  }).manifest_path;
 }
 
 export async function createCheckpoint(args: {
@@ -139,6 +182,7 @@ async function recordCheckpointForMission(
   }
 ): Promise<void> {
   const { taskId, note, writeFocusedMissionId, getGitHash, syncProjectLedgerIfLinked } = args;
+  const safeMissionDir = safeMissionRoot(missionPath);
   writeFocusedMissionId(activeMissionId);
 
   const state = loadState(activeMissionId);
@@ -160,7 +204,7 @@ async function recordCheckpointForMission(
     await withLock(`mission-${activeMissionId}`, async () => {
       traceCtx.startSpan('git.stage');
       try {
-        safeExec('git', ['add', '.'], { cwd: missionPath });
+        safeExec('git', ['add', '.'], { cwd: safeMissionDir });
         traceCtx.endSpan('ok');
       } catch (err: any) {
         traceCtx.endSpan('error', err?.message);
@@ -171,7 +215,7 @@ async function recordCheckpointForMission(
       traceCtx.startSpan('git.commit');
       try {
         safeExec('git', ['commit', '-m', `checkpoint(${activeMissionId}): ${taskId} - ${note}`], {
-          cwd: missionPath,
+          cwd: safeMissionDir,
         });
         traceCtx.endSpan('ok');
       } catch (_) {
@@ -183,7 +227,7 @@ async function recordCheckpointForMission(
         traceCtx.endSpan('ok');
       }
 
-      const hash = getGitHash(missionPath);
+      const hash = getGitHash(safeMissionDir);
       traceCtx.startSpan('state.save');
       const currentState = loadState(activeMissionId)!;
       currentState.git.latest_commit = hash;
@@ -261,10 +305,11 @@ export async function approveScopeChange(args: {
 }): Promise<void> {
   assertCanGrantMissionAuthority();
   const missionId = args.missionId.toUpperCase();
-  const missionPath = findMissionPath(missionId);
-  if (!missionPath) {
+  const missionPathCandidate = findMissionPath(missionId);
+  if (!missionPathCandidate) {
     throw new Error(`Mission directory for ${missionId} not found.`);
   }
+  safeMissionRoot(missionPathCandidate);
 
   const goalSummary = String(args.goalSummary || '').trim();
   if (!goalSummary) {
@@ -395,11 +440,26 @@ export async function resumeMission(
   if (!preState) throw new Error(`Mission ${targetId} not found.`);
 
   logger.info(`🔄 Resuming Mission: ${targetId}...`);
-  const missionPath = findMissionPath(targetId);
-  if (!missionPath) throw new Error(`Mission ${targetId} path not found.`);
+  const missionPathCandidate = findMissionPath(targetId);
+  if (!missionPathCandidate) throw new Error(`Mission ${targetId} path not found.`);
+  const missionPath = safeMissionRoot(missionPathCandidate);
 
   const replayPlan = loadMissionOrchestrationReplayPlan(targetId);
-  if (replayPlan.next_event) {
+  if (replayPlan.recovery_required) {
+    let scaffoldPath = 'unavailable';
+    try {
+      scaffoldPath = ensureRecoveryScaffold(targetId);
+    } catch (error) {
+      logger.warn(
+        `Journal recovery scaffold could not be generated: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+    logger.warn(
+      `Journal recovery blocked: ${replayPlan.unverified_provisioned_entries.length} unverified and ${replayPlan.missing_provisioned_entries.length} missing provision receipt(s) detected; automatic replay is stopped. Complete reconcile-work using scaffold=${scaffoldPath}.`
+    );
+  } else if (replayPlan.next_event) {
     logger.info(
       `journal から再開: 次イベント=${replayPlan.next_event.event_type} (${replayPlan.next_event.event_id}) / 回収タスク=${replayPlan.replay_count} 件`
     );
@@ -429,15 +489,16 @@ export async function resumeMission(
     safeExec('git', ['checkout', preState.git.branch], { cwd: missionPath });
   }
 
-  const flightRecorderPath = path.join(missionPath, 'LATEST_TASK.json');
+  const flightRecorderPath = safeMissionArtifactPath(missionPath, 'LATEST_TASK.json');
   if (safeExistsSync(flightRecorderPath)) {
-    const task = readJsonFile<{ description?: string }>(flightRecorderPath);
+    const task = readJson<{ description?: string }>(flightRecorderPath);
     logger.warn(`📍 FLIGHT RECORDER DETECTED: Last intended task was: ${task.description}`);
     logger.info('Please verify the physical state and continue from this point.');
   }
 
   // Atomic RESUME: re-load fresh state inside the lock to avoid clobbering
   // a concurrent checkpoint, and dedupe RESUMEs within the idempotency window.
+  let resumeEntryRecorded = false;
   await withLock(`mission-${targetId}`, async () => {
     const fresh = loadState(targetId!)!;
     const now = new Date();
@@ -454,9 +515,30 @@ export async function resumeMission(
         event: 'RESUME',
         note: 'Session re-established.',
       });
+      resumeEntryRecorded = true;
       await saveState(targetId!, fresh, { alreadyLocked: true });
     }
   });
+
+  // The provider runtime supervisor owns provider/agent process prewarm. A
+  // paused goal is a mission-worker concern, so hand it to a dedicated,
+  // journaled orchestration event after the explicit resume is recorded.
+  // Do not enqueue when artifact recovery is blocked or when this resume was
+  // coalesced with a recent one; both cases preserve at-most-once recovery
+  // intent without silently applying a reconcile manifest.
+  if (resumeEntryRecorded && !replayPlan.recovery_required) {
+    const recoveryEvent = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_worker_recovery_requested',
+      missionId: targetId,
+      requestedBy: 'mission_controller',
+      correlationId: `mission-resume:${targetId}`,
+      payload: { operation: 'resume_goal_driven' },
+    });
+    const recoveryEventPath = startMissionOrchestrationWorker(recoveryEvent);
+    logger.info(
+      `Mission worker recovery started: ${recoveryEvent.event_id} (${recoveryEventPath})`
+    );
+  }
 
   await args.syncProjectLedgerIfLinked(targetId);
   args.writeFocusedMissionId(targetId);
@@ -474,7 +556,8 @@ export async function recordTask(
   const detailRecord =
     details && typeof details === 'object' ? (details as Record<string, unknown>) : {};
 
-  const flightRecorderPath = path.join(missionDir, 'LATEST_TASK.json');
+  const safeMissionDir = safeMissionRoot(missionDir);
+  const flightRecorderPath = safeMissionArtifactPath(safeMissionDir, 'LATEST_TASK.json');
   safeWriteFile(
     flightRecorderPath,
     JSON.stringify(
@@ -592,8 +675,9 @@ export async function recordEvidence(args: {
   syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
 }): Promise<void> {
   const upperId = args.missionId.toUpperCase();
-  const missionPath = findMissionPath(upperId);
-  if (!missionPath) throw new Error(`Mission ${upperId} not found.`);
+  const missionPathCandidate = findMissionPath(upperId);
+  if (!missionPathCandidate) throw new Error(`Mission ${upperId} not found.`);
+  const missionPath = safeMissionRoot(missionPathCandidate);
 
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} state not found.`);
@@ -657,19 +741,18 @@ export async function recordEvidence(args: {
 
 /** Distinct actor_ids that recorded evidence for `taskId` in this mission's execution ledger. */
 function findLedgerActorIdsForTask(missionPath: string, taskId: string): string[] {
-  const ledgerPath = path.join(missionPath, 'execution-ledger.jsonl');
+  const ledgerPath = safeMissionArtifactPath(missionPath, 'execution-ledger.jsonl');
   if (!safeExistsSync(ledgerPath)) return [];
-  const lines = String(safeReadFile(ledgerPath, { encoding: 'utf8' }))
-    .split('\n')
-    .filter(Boolean);
   const actorIds = new Set<string>();
-  for (const line of lines) {
-    try {
-      const entry = JSON.parse(line) as { task_id?: string; actor_id?: string };
-      if (entry.task_id === taskId && entry.actor_id) actorIds.add(String(entry.actor_id));
-    } catch {
-      /* skip malformed ledger line */
-    }
+  const entries = readJsonLines<Record<string, unknown> | null>(ledgerPath, {
+    onMalformed: 'skip',
+    map: (value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null,
+  });
+  for (const entry of entries) {
+    if (entry?.task_id === taskId && entry.actor_id) actorIds.add(String(entry.actor_id));
   }
   return Array.from(actorIds);
 }
@@ -706,8 +789,9 @@ export async function recordArtifactReview(args: {
   getGitHash: (cwd: string) => string;
 }): Promise<RecordArtifactReviewResult> {
   const upperId = args.missionId.toUpperCase();
-  const missionPath = findMissionPath(upperId);
-  if (!missionPath) throw new Error(`Mission ${upperId} not found.`);
+  const missionPathCandidate = findMissionPath(upperId);
+  if (!missionPathCandidate) throw new Error(`Mission ${upperId} not found.`);
+  const missionPath = safeMissionRoot(missionPathCandidate);
 
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} state not found.`);
@@ -729,7 +813,11 @@ export async function recordArtifactReview(args: {
   if (!deliverable) {
     throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
   }
-  const artifactPath = path.resolve(missionPath, deliverable);
+  const artifactCandidate = path.resolve(missionPath, deliverable);
+  if (!isPathInside(missionPath, artifactCandidate)) {
+    throw new Error(`Reviewed artifact must remain inside the mission directory: ${deliverable}`);
+  }
+  const artifactPath = assertSafeRepositoryPath(artifactCandidate, { allowMissingLeaf: false });
   if (!safeExistsSync(artifactPath)) {
     throw new Error(`Reviewed artifact does not exist yet: ${deliverable}`);
   }
@@ -775,12 +863,16 @@ export async function recordArtifactReview(args: {
   });
 
   const receiptRelPath = `evidence/reviews/${args.reviewTaskId}-r1.json`;
+  const receiptPath = safeMissionArtifactPath(missionPath, receiptRelPath);
 
   let evaluation: { ready: boolean; reasons: string[] } = { ready: false, reasons: [] };
   await withLock(`mission-${upperId}`, async () => {
-    const reviewsDir = path.join(missionPath, 'evidence', 'reviews');
+    const reviewsDir = safeMissionArtifactPath(missionPath, 'evidence/reviews');
     if (!safeExistsSync(reviewsDir)) safeMkdir(reviewsDir, { recursive: true });
-    safeWriteFile(path.join(missionPath, receiptRelPath), JSON.stringify(receipt, null, 2));
+    writeDispatchArtifact(receiptPath, receipt, {
+      missionId: upperId,
+      missionPath,
+    });
 
     // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
     // validateMissionArtifactReviewGate (finish-time) see the same receipt.
@@ -881,10 +973,15 @@ export interface PurgeMissionsResult {
 }
 
 function readMissionStatus(missionDir: string): string | null {
-  const statePath = path.join(missionDir, 'mission-state.json');
+  let statePath: string;
+  try {
+    statePath = safeMissionArtifactPath(missionDir, 'mission-state.json');
+  } catch {
+    return null;
+  }
   if (!safeExistsSync(statePath)) return null;
   try {
-    const state = readJsonFile<{ status?: string }>(statePath);
+    const state = readJson<{ status?: string }>(statePath);
     return typeof state?.status === 'string' ? state.status : null;
   } catch (_) {
     return null;
@@ -897,6 +994,19 @@ interface MissionLifecyclePolicy {
   target_dir: string;
   naming_pattern: string;
 }
+
+interface MissionLifecyclePolicyFile {
+  policies: MissionLifecyclePolicy[];
+}
+
+const MISSION_LIFECYCLE_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-lifecycle-policy.schema.json'
+);
+const missionLifecyclePolicyCatalog = defineCatalog<MissionLifecyclePolicyFile>({
+  id: 'mission-lifecycle-policy',
+  path: () => pathResolver.knowledge('product/governance/mission-lifecycle.json'),
+  schema: MISSION_LIFECYCLE_POLICY_SCHEMA_PATH,
+});
 
 /**
  * Loads the mission lifecycle ADF policies. AL-01: the ADF lives under
@@ -922,7 +1032,7 @@ function loadMissionLifecyclePolicies(): {
     });
     return { adfPath, policies: null };
   }
-  const adf = readJsonFile<{ policies: MissionLifecyclePolicy[] }>(adfPath);
+  const adf = missionLifecyclePolicyCatalog.load();
   return { adfPath, policies: adf.policies };
 }
 
@@ -933,8 +1043,11 @@ function resolvePolicyTargetPath(policy: MissionLifecyclePolicy, mission: string
     '{YYYY-MM}',
     `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   );
-  return pathResolver.rootResolve(
-    path.join(targetDir, policy.naming_pattern.replace('{mission_id}', mission))
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      path.join(targetDir, policy.naming_pattern.replace('{mission_id}', mission))
+    ),
+    { allowMissingLeaf: true }
   );
 }
 
@@ -963,6 +1076,15 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
   const candidates: PurgeMissionCandidate[] = [];
 
   for (const { missionId: mission, missionPath: missionDir } of listMissionsInSearchDirs()) {
+    let safeMissionDir: string;
+    try {
+      safeMissionDir = safeMissionRoot(missionDir);
+    } catch (error) {
+      logger.warn(
+        `Skipping unsafe mission path ${mission}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      continue;
+    }
     for (const policy of policies) {
       const { condition } = policy;
 
@@ -972,21 +1094,33 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
       // condition never matches (fail-safe).
       const checks: boolean[] = [];
       if (condition.has_file) {
-        checks.push(safeExistsSync(path.join(missionDir, condition.has_file)));
+        try {
+          checks.push(safeExistsSync(safeMissionArtifactPath(safeMissionDir, condition.has_file)));
+        } catch {
+          checks.push(false);
+        }
       }
       if (condition.max_age_days) {
-        const stat = safeStat(missionDir);
+        const stat = safeStat(safeMissionDir);
         const ageDays = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60 * 24);
         checks.push(ageDays > condition.max_age_days);
       }
       if (condition.status) {
-        checks.push(readMissionStatus(missionDir) === condition.status);
+        checks.push(readMissionStatus(safeMissionDir) === condition.status);
       }
       const match = checks.length > 0 && checks.every(Boolean);
       if (!match) continue;
 
-      const targetPath = resolvePolicyTargetPath(policy, mission);
-      candidates.push({ mission, missionDir, targetPath, policyName: policy.name });
+      let targetPath: string;
+      try {
+        targetPath = resolvePolicyTargetPath(policy, mission);
+      } catch (error) {
+        logger.warn(
+          `Skipping unsafe archive target for ${mission}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        continue;
+      }
+      candidates.push({ mission, missionDir: safeMissionDir, targetPath, policyName: policy.name });
       break;
     }
   }
@@ -1011,22 +1145,36 @@ export async function purgeMissions(rootDir: string, dryRun = false): Promise<Pu
     return { status: 'ok', adfPath, dryRun, candidates, archived: [] };
   }
 
+  // Revalidate every source and destination before the first move so one
+  // late symlink/configuration violation cannot leave a partially archived
+  // sweep.
+  for (const candidate of candidates) {
+    safeMissionRoot(candidate.missionDir);
+    const safeTarget = assertSafeRepositoryPath(candidate.targetPath, { allowMissingLeaf: true });
+    assertSafeRepositoryPath(path.dirname(safeTarget), { allowMissingLeaf: true });
+  }
+
   const archived: PurgeMissionCandidate[] = [];
   for (const candidate of candidates) {
+    const safeSource = safeMissionRoot(candidate.missionDir);
+    const safeTarget = assertSafeRepositoryPath(candidate.targetPath, { allowMissingLeaf: true });
     logger.info(
-      `Archiving mission ${candidate.mission} to ${candidate.targetPath} (Policy: ${candidate.policyName})`
+      `Archiving mission ${candidate.mission} to ${safeTarget} (Policy: ${candidate.policyName})`
     );
-    if (!safeExistsSync(path.dirname(candidate.targetPath))) {
-      safeMkdir(path.dirname(candidate.targetPath), { recursive: true });
+    const targetDir = assertSafeRepositoryPath(path.dirname(safeTarget), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(targetDir)) {
+      safeMkdir(targetDir, { recursive: true });
     }
-    safeExec('cp', ['-r', candidate.missionDir, candidate.targetPath]);
-    safeRmSync(candidate.missionDir, { recursive: true, force: true });
+    safeExec('cp', ['-r', safeSource, safeTarget]);
+    safeRmSync(safeSource, { recursive: true, force: true });
     archived.push(candidate);
     appendMissionPurgeAudit({
       event: 'MISSION_PURGE_ARCHIVED',
       mission: candidate.mission,
-      from: candidate.missionDir,
-      to: candidate.targetPath,
+      from: safeSource,
+      to: safeTarget,
       policy: candidate.policyName,
     });
     // AL-04: the mission tree moved to the archive — reclaim the runtime
@@ -1077,10 +1225,15 @@ export async function archiveMissionById(missionId: string): Promise<ArchiveMiss
     };
   }
 
-  const missionDir = findMissionPath(mission);
-  if (!missionDir) {
+  const missionDirCandidate = findMissionPath(mission);
+  if (!missionDirCandidate) {
     for (const policy of policies) {
-      const target = resolvePolicyTargetPath(policy, mission);
+      let target: string;
+      try {
+        target = resolvePolicyTargetPath(policy, mission);
+      } catch {
+        continue;
+      }
       if (safeExistsSync(target)) {
         return { status: 'already_archived', mission, to: target, policy: policy.name };
       }
@@ -1089,6 +1242,17 @@ export async function archiveMissionById(missionId: string): Promise<ArchiveMiss
       status: 'not_found',
       mission,
       reason: 'mission directory not found in active mission roots or lifecycle archive targets',
+    };
+  }
+
+  let missionDir: string;
+  try {
+    missionDir = safeMissionRoot(missionDirCandidate);
+  } catch (error) {
+    return {
+      status: 'not_archivable',
+      mission,
+      reason: `mission path is unsafe: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
@@ -1114,9 +1278,20 @@ export async function archiveMissionById(missionId: string): Promise<ArchiveMiss
     };
   }
 
-  const targetPath = resolvePolicyTargetPath(policy, mission);
-  if (!safeExistsSync(path.dirname(targetPath))) {
-    safeMkdir(path.dirname(targetPath), { recursive: true });
+  let targetPath: string;
+  try {
+    targetPath = resolvePolicyTargetPath(policy, mission);
+  } catch (error) {
+    return {
+      status: 'not_archivable',
+      mission,
+      from: missionDir,
+      reason: `archive target is unsafe: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  const targetDir = assertSafeRepositoryPath(path.dirname(targetPath), { allowMissingLeaf: true });
+  if (!safeExistsSync(targetDir)) {
+    safeMkdir(targetDir, { recursive: true });
   }
   if (safeExistsSync(targetPath)) safeRmSync(targetPath, { recursive: true, force: true });
   safeExec('cp', ['-r', missionDir, targetPath]);

@@ -5,9 +5,15 @@ import * as path from 'node:path';
 vi.mock('../secure-io.js', () => ({
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
   safeExistsSync: (p: string) => fs.existsSync(p),
+  safeLstat: (p: string) => fs.lstatSync(p),
+}));
+
+vi.mock('../foundation/json.js', () => ({
+  readJson: (p: string) => JSON.parse(fs.readFileSync(p, 'utf8')),
 }));
 
 import { previewPipeline } from './pipeline-preview.js';
+import { pathResolver } from '../path-resolver.js';
 
 describe('pipeline-preview', () => {
   describe('previewPipeline', () => {
@@ -55,7 +61,7 @@ describe('pipeline-preview', () => {
           { id: 'sub2', type: 'capture', op: 'wait', params: { duration: 1000 } },
         ],
       };
-      const tmpPath = '/tmp/test-preview-sub-pipeline.json';
+      const tmpPath = pathResolver.shared('tmp/test-preview-sub-pipeline.json');
       fs.writeFileSync(tmpPath, JSON.stringify(subPipeline));
 
       try {
@@ -193,6 +199,45 @@ describe('pipeline-preview', () => {
       expect(result.steps[1].resolvedParams.message).toContain('Required inputs');
       expect(result.steps[2].resolvedParams.message).toContain('preview it with');
     });
+  });
+
+  it('warns instead of reading a ref outside the repository root', () => {
+    const result = previewPipeline({
+      steps: [{ op: 'ref', params: { path: '/tmp/preview-outside.json' } }],
+    });
+
+    expect(result.steps[0].children).toBeUndefined();
+    expect(result.warnings).toContain('ref path not readable: /tmp/preview-outside.json');
+  });
+
+  it('warns instead of reading a ref reached through a symbolic link', () => {
+    const target = pathResolver.shared('tmp/preview-symlink-target.json');
+    const link = pathResolver.shared('tmp/preview-symlink-link.json');
+    fs.writeFileSync(target, JSON.stringify({ steps: [] }));
+    fs.symlinkSync(target, link);
+    try {
+      const result = previewPipeline({ steps: [{ op: 'ref', params: { path: link } }] });
+      expect(result.steps[0].children).toBeUndefined();
+      expect(result.warnings).toContain(`ref path not readable: ${link}`);
+    } finally {
+      if (fs.existsSync(link)) fs.unlinkSync(link);
+      if (fs.existsSync(target)) fs.unlinkSync(target);
+    }
+  });
+
+  it('warns instead of previewing a referenced file that is not a pipeline ADF', () => {
+    const invalidPath = pathResolver.shared('tmp/preview-invalid-pipeline.json');
+    fs.writeFileSync(invalidPath, JSON.stringify({ steps: { invalid: true } }));
+    try {
+      const result = previewPipeline({
+        steps: [{ op: 'ref', params: { path: invalidPath } }],
+      });
+
+      expect(result.steps[0].children).toBeUndefined();
+      expect(result.warnings).toContain(`ref path not readable: ${invalidPath}`);
+    } finally {
+      if (fs.existsSync(invalidPath)) fs.unlinkSync(invalidPath);
+    }
   });
 
   it('renders explicit graph edges in the preview', () => {

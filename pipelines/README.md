@@ -68,12 +68,12 @@ Rules of thumb:
 | Pipeline                      | pnpm shortcut                                         | Description                                                   |
 | ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
 | `baseline-check`              | `pnpm pipeline --input pipelines/baseline-check.json` | Session-start health gate (onboarding / recovery / all-clear) |
-| `vital-check`                 | `pnpm vital`                                          | Core liveness check                                           |
-| `system-diagnostics`          | `pnpm diagnose`                                       | Detailed system-level diagnostic report                       |
+| `vital-check`                 | `pnpm pipeline vital-check`                           | Core liveness check                                           |
+| `system-diagnostics`          | `pnpm pipeline system-diagnostics`                    | Detailed system-level diagnostic report                       |
 | `full-health-report`          | —                                                     | Aggregated health across all surfaces                         |
 | `monitor-service-health`      | —                                                     | Continuous service health monitor                             |
-| `system-upgrade-check`        | `pnpm system:upgrade:check`                           | Detect available system + dependency upgrades                 |
-| `system-upgrade-execute`      | `pnpm system:upgrade:execute`                         | Apply upgrades interactively                                  |
+| `system-upgrade-check`        | `pnpm system:upgrade -- --mode check`                 | Detect available system + dependency upgrades                 |
+| `system-upgrade-execute`      | `pnpm system:upgrade -- --mode execute`               | Apply upgrades interactively                                  |
 | `inspect-system-hardware`     | —                                                     | Hardware and resource inventory                               |
 | `inspect-network-environment` | —                                                     | Network topology and connectivity check                       |
 | `inspect-workspace-surfaces`  | —                                                     | Active surface and channel inventory                          |
@@ -186,7 +186,7 @@ Canonical user-facing pipeline patterns. These are parameterized (use `{{params.
 
 Templates cover: voice setup, meeting facilitation, sales workflows, content generation, code review, deployment, analysis, and more. See `knowledge/product/pipeline-templates/` for the full list.
 
-For cross-tool office work, use `productivity-task-orchestration.json` after creating a plan with `pnpm cli -- task plan`. The template is dry-run only: it creates a review package and receipt but performs no calendar write, meeting participation, email send, browser action, payment, or network request.
+For cross-tool office work, use `productivity-task-orchestration.json` after creating a plan with `pnpm kyberion task plan`. The template is dry-run only: it creates a review package and receipt but performs no calendar write, meeting participation, email send, browser action, payment, or network request.
 
 ---
 

@@ -1,5 +1,11 @@
 import * as path from 'node:path';
-import { safeWriteFile, safeMkdir, safeExistsSync, pathResolver } from '@agent/core';
+import {
+  assertSafeRepositoryPath,
+  safeWriteFile,
+  safeMkdir,
+  safeExistsSync,
+} from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { activateApplication, detectFocusedInput } from '@agent/core/os-automation';
@@ -7,26 +13,104 @@ import { activateApplication, detectFocusedInput } from '@agent/core/os-automati
 const COMPUTER_RUNTIME_DIR = pathResolver.shared('runtime/computer');
 const FOCUS_TARGET_STORE_PATH = path.join(COMPUTER_RUNTIME_DIR, 'focused-targets.json');
 
+function safeFocusTargetStorePath(options: { allowMissingLeaf?: boolean } = {}): string {
+  return assertSafeRepositoryPath(FOCUS_TARGET_STORE_PATH, options);
+}
+
+export interface FocusTargetRecord {
+  id: string;
+  application?: string;
+  windowTitle?: string;
+  role?: string;
+  description?: string;
+  editable?: boolean;
+  updatedAt?: string;
+}
+
+export type FocusTargetStore = Record<string, FocusTargetRecord>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function isSafeStoreKey(key: string): boolean {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
+function optionalString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return value === undefined ? undefined : typeof value === 'string' ? value : undefined;
+}
+
+/** Normalize persisted focus targets before any guard or activation uses them. */
+export function parseFocusTargetStore(value: unknown): FocusTargetStore {
+  if (!isRecord(value)) return {};
+
+  const store: FocusTargetStore = {};
+  for (const [key, candidate] of Object.entries(value)) {
+    if (!isSafeStoreKey(key) || !isRecord(candidate) || candidate.id !== key) continue;
+    if (typeof candidate.id !== 'string' || candidate.id.trim().length === 0) continue;
+
+    const stringFields = ['application', 'windowTitle', 'role', 'description', 'updatedAt'];
+    if (
+      stringFields.some(
+        (field) => candidate[field] !== undefined && typeof candidate[field] !== 'string'
+      )
+    ) {
+      continue;
+    }
+    if (candidate.editable !== undefined && typeof candidate.editable !== 'boolean') continue;
+
+    store[key] = {
+      id: candidate.id,
+      ...(optionalString(candidate, 'application') !== undefined
+        ? { application: optionalString(candidate, 'application') }
+        : {}),
+      ...(optionalString(candidate, 'windowTitle') !== undefined
+        ? { windowTitle: optionalString(candidate, 'windowTitle') }
+        : {}),
+      ...(optionalString(candidate, 'role') !== undefined
+        ? { role: optionalString(candidate, 'role') }
+        : {}),
+      ...(optionalString(candidate, 'description') !== undefined
+        ? { description: optionalString(candidate, 'description') }
+        : {}),
+      ...(typeof candidate.editable === 'boolean' ? { editable: candidate.editable } : {}),
+      ...(optionalString(candidate, 'updatedAt') !== undefined
+        ? { updatedAt: optionalString(candidate, 'updatedAt') }
+        : {}),
+    };
+  }
+  return store;
+}
+
 function ensureComputerRuntimeDir() {
-  if (!safeExistsSync(COMPUTER_RUNTIME_DIR)) {
-    safeMkdir(COMPUTER_RUNTIME_DIR, { recursive: true });
+  const safeRuntimeDir = assertSafeRepositoryPath(COMPUTER_RUNTIME_DIR, {
+    allowMissingLeaf: true,
+  });
+  if (!safeExistsSync(safeRuntimeDir)) {
+    safeMkdir(safeRuntimeDir, { recursive: true });
   }
 }
 
-function loadFocusTargetStore(): Record<string, any> {
-  if (!safeExistsSync(FOCUS_TARGET_STORE_PATH)) {
+function loadFocusTargetStore(): FocusTargetStore {
+  const safeStorePath = safeFocusTargetStorePath({ allowMissingLeaf: true });
+  if (!safeExistsSync(safeStorePath)) {
     return {};
   }
   try {
-    return readJson<Record<string, any>>(FOCUS_TARGET_STORE_PATH);
+    return parseFocusTargetStore(readJson<unknown>(safeStorePath));
   } catch {
     return {};
   }
 }
 
-function saveFocusTargetStore(store: Record<string, any>) {
+function saveFocusTargetStore(store: FocusTargetStore) {
   ensureComputerRuntimeDir();
-  safeWriteFile(FOCUS_TARGET_STORE_PATH, JSON.stringify(store, null, 2));
+  safeWriteFile(
+    safeFocusTargetStorePath({ allowMissingLeaf: true }),
+    JSON.stringify(parseFocusTargetStore(store), null, 2)
+  );
 }
 
 function rememberFocusedTarget(explicitId: string | undefined, focusedInput: FocusedInputState) {
@@ -157,6 +241,7 @@ function detectFocusedInputWithGuard(
 
 export const systemFocusHelpers = {
   loadFocusTargetStore,
+  parseFocusTargetStore,
   saveFocusTargetStore,
   rememberFocusedTarget,
   loadRememberedFocusTarget,

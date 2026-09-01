@@ -1,14 +1,15 @@
 import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
 import {
-  pathResolver,
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
-} from '@agent/core';
+} from '@agent/core/secure-io';
 import {
   detectResourceRegressions,
   runSoakEnduranceHarness,
@@ -195,5 +196,89 @@ describe('soak_endurance', () => {
     expect(safeReadFile(report.evidence.manifest_path, { encoding: 'utf8' })).toContain(
       '"run_count": 1'
     );
+  });
+
+  it('rejects repository-external soak resources before executing a cycle', async () => {
+    const exercise = async () => {
+      throw new Error('exercise should not run for an unsafe resource');
+    };
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        reportPath: `/tmp/kyberion-soak-report-${process.pid}.json`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        samplePaths: [`/tmp/kyberion-soak-sample-${process.pid}.json`],
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        cycles: 1,
+        metricsDir: `/tmp/kyberion-soak-metrics-${process.pid}`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+
+    await expect(
+      runSoakEnduranceHarness({
+        mode: 'live',
+        cycles: 1,
+        evidenceDir: `/tmp/kyberion-soak-evidence-${process.pid}`,
+        exercise,
+      })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects symlinked soak resources and path-shaped metric filenames', async () => {
+    const root = pathResolver.sharedTmp(`soak-endurance-tests/boundary-${process.pid}`);
+    const outside = path.join(root, 'target');
+    const reportLink = path.join(root, 'report.json');
+    const metricsLink = path.join(root, 'metrics');
+    const evidenceLink = path.join(root, 'evidence');
+    const sampleLink = path.join(root, 'sample.json');
+    safeMkdir(root, { recursive: true });
+    safeMkdir(outside, { recursive: true });
+    safeWriteFile(path.join(outside, 'sample.json'), '{}\n');
+    safeSymlinkSync(path.join(outside, 'report.json'), reportLink);
+    safeSymlinkSync(outside, metricsLink);
+    safeSymlinkSync(outside, evidenceLink);
+    safeSymlinkSync(path.join(outside, 'sample.json'), sampleLink);
+
+    try {
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, reportPath: reportLink, exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, metricsDir: metricsLink, exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({
+          mode: 'live',
+          cycles: 1,
+          evidenceDir: evidenceLink,
+          exercise: async () => {},
+        })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({ cycles: 1, samplePaths: [sampleLink], exercise: async () => {} })
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+      await expect(
+        runSoakEnduranceHarness({
+          cycles: 1,
+          metricsFile: '../history.jsonl',
+          exercise: async () => {},
+        })
+      ).rejects.toThrow('metricsFile must be a single safe filename');
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
   });
 });

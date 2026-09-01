@@ -1,13 +1,10 @@
-import {
-  collectOperatorHomeSummary,
-  formatNextAction,
-  getGovernanceControlSummary,
-  listCustomerChannelBindings,
-} from '@agent/core';
-import { readJson } from '@agent/core/foundation';
+import { listCustomerChannelBindings } from '@agent/core/customer-channel-binding';
 import { collectDoctorReport } from './run_doctor.js';
-import { pathResolver } from '@agent/core';
-import type { VocabularyKey } from '@agent/core';
+import { loadCliManifest } from './check_cli_manifest.js';
+import { getGovernanceControlSummary } from '@agent/core/governance-status';
+import { formatNextAction } from '@agent/core/next-action';
+import { collectOperatorHomeSummary } from '@agent/core/operator-home-summary';
+import type { VocabularyKey } from '@agent/core/t';
 
 export type HomeUi = (key: VocabularyKey, params?: Record<string, string | number>) => string;
 
@@ -57,9 +54,7 @@ export function printCommands(ui: HomeUi): void {
       : description;
     console.log(`  ${command.padEnd(52)} ${rendered}`);
   }
-  const registry = readJson<{
-    commands: Array<{ command: string; noun: string; verb: string; audience: string }>;
-  }>(pathResolver.knowledge('product/governance/cli-commands.json'));
+  const registry = loadCliManifest();
   const registryCommands = registry.commands.filter((command) => command.audience === 'user');
   console.log('');
   console.log('  Registered user commands:');

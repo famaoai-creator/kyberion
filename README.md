@@ -79,7 +79,7 @@ The canonical first-win command sequence is:
 ```bash
 pnpm install
 pnpm build
-pnpm prereq:check
+pnpm env:bootstrap --manifest kyberion-toolchain
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
@@ -99,7 +99,7 @@ git clone https://github.com/famaoai-creator/kyberion.git
 cd kyberion
 pnpm install
 pnpm build
-pnpm prereq:check                       # verifies Node 24+ floor; warns if Playwright browsers are missing
+pnpm env:bootstrap --manifest kyberion-toolchain # verifies Node 24+ floor; warns if Playwright browsers are missing
 pnpm doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
@@ -110,7 +110,7 @@ pipeline writes its governed text fallback instead of hiding the readiness resul
 If you already have onboarding JSON, use Path B instead of the wizard:
 
 ```bash
-pnpm onboard:apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
+pnpm onboard apply --identity knowledge/public/templates/onboarding/identity.example.json --dry-run
 ```
 
 Copy that template, edit it for your identity, then rerun without `--dry-run` to write the onboarding artifacts.

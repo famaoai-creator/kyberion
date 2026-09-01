@@ -18,7 +18,7 @@ your local environment, credentials, or host permissions.
 | Area                                                     | Status                | What that means                                                                                                                                                                                                                                     |
 | -------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Customer overlays                                        | Ready                 | Create, inspect, switch, and migrate customer workspaces.                                                                                                                                                                                           |
-| Toolchain preflight                                      | Ready                 | Run `pnpm prereq:check` before you build from source.                                                                                                                                                                                               |
+| Toolchain preflight                                      | Ready                 | Run `pnpm env:bootstrap --manifest kyberion-toolchain` before you build from source.                                                                                                                                                                |
 | Onboarding                                               | Ready                 | Run `pnpm onboard`, then register the tenant, bind organization context, complete activation probes, and obtain human acceptance before tenant-bound first work. See [`onboarding-flow.md`](../../knowledge/product/governance/onboarding-flow.md). |
 | Health checks                                            | Ready                 | Run `pnpm doctor` to see what is missing before you start.                                                                                                                                                                                          |
 | Consolidated readiness                                   | Ready                 | Run `pnpm setup:report` for surfaces, services, reasoning, and doctor together.                                                                                                                                                                     |
@@ -35,7 +35,7 @@ your local environment, credentials, or host permissions.
 ## How to use this
 
 1. Run `pnpm pipeline --input pipelines/baseline-check.json`.
-2. Run `pnpm prereq:check`.
+2. Run `pnpm env:bootstrap --manifest kyberion-toolchain`.
 3. Run `pnpm setup:report`.
 4. Run `pnpm doctor`.
 5. Run `pnpm customer:list` if you use customer overlays.

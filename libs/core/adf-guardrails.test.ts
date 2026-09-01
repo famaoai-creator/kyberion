@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { forbiddenGitCoexecutionMutation, validatePipelineGuardrails } from './adf-guardrails.js';
+import {
+  forbiddenGitCoexecutionMutation,
+  isScriptWrapperCommand,
+  validatePipelineGuardrails,
+} from './adf-guardrails.js';
 
 describe('validatePipelineGuardrails', () => {
   it('blocks broad git mutations in ADF shell steps while allowing explicit-path push', () => {
@@ -33,6 +37,26 @@ describe('validatePipelineGuardrails', () => {
       ],
     });
     expect(report.ok).toBe(false);
+    expect(
+      report.findings.filter((finding) => finding.code === 'script-wrapper-forbidden')
+    ).toHaveLength(3);
+  });
+
+  it('keeps runtime wrapper detection aligned for alternate executable forms', () => {
+    expect(isScriptWrapperCommand('/usr/bin/node', ['scripts/task.ts'])).toBe(true);
+    expect(
+      isScriptWrapperCommand('node', ['--import', './scripts/ts-loader.mjs', 'scripts/task.ts'])
+    ).toBe(true);
+    expect(isScriptWrapperCommand('tsx', ['scripts/task.ts'])).toBe(true);
+    expect(isScriptWrapperCommand('node', ['--version'])).toBe(false);
+
+    const report = validatePipelineGuardrails({
+      steps: [
+        { op: 'system:exec', params: { command: '/usr/bin/node', args: ['scripts/task.ts'] } },
+        { op: 'system:shell', params: { cmd: 'node scripts/task.ts' } },
+        { op: 'system:exec', params: { command: 'tsx', args: ['scripts/task.ts'] } },
+      ],
+    });
     expect(
       report.findings.filter((finding) => finding.code === 'script-wrapper-forbidden')
     ).toHaveLength(3);

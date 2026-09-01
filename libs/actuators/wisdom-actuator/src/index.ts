@@ -1,9 +1,12 @@
-import { loadJson, logger, pathResolver, defineCatalogBackedActuator } from '@agent/core';
+import { loadJson } from '@agent/core/foundation';
+import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { fileURLToPath } from 'node:url';
 import * as path from 'node:path';
 import { handleAction } from './wisdom-pipeline-helpers.js';
 import { describeOps } from './op-catalog.js';
-import { runActuatorCli } from '@agent/core';
+import { runActuatorCli } from '@agent/core/cli-utils';
 
 const main = async () => {
   const schema = loadJson<object>(
@@ -11,6 +14,7 @@ const main = async () => {
   );
   await runActuatorCli({
     name: 'wisdom-actuator',
+    args: process.argv,
     handleAction,
     schema,
   });

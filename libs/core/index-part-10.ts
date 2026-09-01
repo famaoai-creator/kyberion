@@ -233,7 +233,6 @@ export {
   parsePosture,
   composeSecurityPosture,
   resolveConfiguredPosture,
-  resetConfiguredPostureCache,
   MAX_SCREEN_PAYLOAD_CHARS,
   buildScreenPayload,
   firstJsonObject,

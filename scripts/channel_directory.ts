@@ -4,62 +4,69 @@ import {
   formatChannelDirectoryEntry,
   getChannelDirectoryEntry,
   listChannelDirectoryEntries,
-  isSurfaceAsyncChannel,
-} from '@agent/core';
-import { isDirectScript } from './lib/harness.js';
+} from '@agent/core/channel-directory';
+import type { ChannelDirectoryEntry } from '@agent/core/channel-directory';
+import { isSurfaceAsyncChannel } from '@agent/core/channel-surface-types';
+import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
-async function main(): Promise<void> {
-  const argv = await createStandardYargs()
+export function resolveChannelDirectoryEntries(channel: unknown): ChannelDirectoryEntry[] {
+  if (channel === undefined) return listChannelDirectoryEntries();
+  if (typeof channel !== 'string') throw new Error('channel must be a string');
+  const normalized = channel.trim().toLowerCase();
+  if (!isSurfaceAsyncChannel(normalized)) {
+    throw new Error(`Channel "${normalized}" is not registered in the surface manifest.`);
+  }
+  const entry = getChannelDirectoryEntry(normalized);
+  if (!entry) {
+    throw new Error(
+      `Channel "${channel}" was not found. Try one of: ${listChannelDirectoryEntries()
+        .map((item) => item.channel)
+        .join(', ')}`
+    );
+  }
+  return [entry];
+}
+
+export function renderChannelDirectory(entries: ChannelDirectoryEntry[]): string {
+  if (entries.length === 0) return 'No channel directory entries found.';
+  const lines = ['Channel directory:'];
+  for (const entry of entries) {
+    lines.push(`- ${entry.displayName} (${entry.channel})`);
+    for (const line of formatChannelDirectoryEntry(entry)) lines.push(`  ${line}`);
+  }
+  return lines.join('\n');
+}
+
+async function main(args: string[], print: (value: unknown) => void, json: boolean): Promise<void> {
+  const argv = await createStandardYargs([
+    'node',
+    'channel_directory',
+    ...stripSharedScriptFlags(args),
+  ])
     .option('channel', {
       type: 'string',
       describe:
         'Limit output to a single surface channel such as slack, imessage, discord, telegram, chronos, or presence',
     })
-    .option('json', { type: 'boolean', default: false })
     .parseSync();
 
-  const entries = argv.channel
-    ? (() => {
-        const channel = String(argv.channel).trim().toLowerCase();
-        if (!isSurfaceAsyncChannel(channel)) {
-          throw new Error(`Channel "${channel}" is not registered in the surface manifest.`);
-        }
-        const entry = getChannelDirectoryEntry(channel);
-        if (!entry) {
-          throw new Error(
-            `Channel "${String(argv.channel)}" was not found. Try one of: ${listChannelDirectoryEntries()
-              .map((item) => item.channel)
-              .join(', ')}`
-          );
-        }
-        return [entry];
-      })()
-    : listChannelDirectoryEntries();
+  const entries = resolveChannelDirectoryEntries(argv.channel);
 
-  if (argv.json) {
-    console.log(JSON.stringify({ status: 'ok', entries }, null, 2));
+  if (json) {
+    print({ status: 'ok', entries });
     return;
   }
-
-  if (entries.length === 0) {
-    console.log('No channel directory entries found.');
-    return;
-  }
-
-  console.log('Channel directory:');
-  for (const entry of entries) {
-    console.log(`- ${entry.displayName} (${entry.channel})`);
-    for (const line of formatChannelDirectoryEntry(entry)) {
-      console.log(`  ${line}`);
-    }
-  }
+  print(renderChannelDirectory(entries));
 }
+
+export const runChannelDirectory = defineScript({
+  name: 'channel-directory',
+  flags: ['json', 'quiet'],
+  run: ({ argv, print, json }) => main(argv, print, json),
+});
 
 if (
   isDirectScript(import.meta.url, 'channel_directory.ts') ||
   isDirectScript(import.meta.url, 'channel_directory.js')
 )
-  void main().catch((err) => {
-    console.error(err?.message ?? String(err));
-    process.exitCode = 1;
-  });
+  void runChannelDirectory();

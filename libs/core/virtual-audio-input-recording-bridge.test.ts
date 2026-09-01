@@ -1,5 +1,8 @@
 import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
+import { pathResolver } from './path-resolver.js';
 
 const mocks = vi.hoisted(() => {
   const createVirtualDeviceInventoryBridge = vi.fn();
@@ -17,12 +20,16 @@ vi.mock('./virtual-device-inventory-bridge.js', () => ({
   createVirtualDeviceInventoryBridge: mocks.createVirtualDeviceInventoryBridge,
 }));
 
-vi.mock('./secure-io.js', () => ({
-  safeExec: mocks.safeExec,
-  safeExecResult: mocks.safeExecResult,
-  safeMkdir: vi.fn(),
-  safeWriteFile: vi.fn(),
-}));
+vi.mock('./secure-io.js', async () => {
+  const actual = await vi.importActual<typeof import('./secure-io.js')>('./secure-io.js');
+  return {
+    ...actual,
+    safeExec: mocks.safeExec,
+    safeExecResult: mocks.safeExecResult,
+    safeMkdir: vi.fn(),
+    safeWriteFile: vi.fn(),
+  };
+});
 
 describe('createVirtualAudioInputRecordingBridge', () => {
   const originalPlatform = process.platform;
@@ -74,6 +81,10 @@ describe('createVirtualAudioInputRecordingBridge', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(pathResolver.sharedTmp('virtual-audio-input-boundary-test'), {
+      recursive: true,
+      force: true,
+    });
     Object.defineProperty(process, 'platform', {
       configurable: true,
       value: originalPlatform,
@@ -81,26 +92,59 @@ describe('createVirtualAudioInputRecordingBridge', () => {
   });
 
   it('records a sample from the selected input using ffmpeg', async () => {
-    const { createVirtualAudioInputRecordingBridge } = await import('./virtual-audio-input-recording-bridge.js');
+    const { createVirtualAudioInputRecordingBridge } =
+      await import('./virtual-audio-input-recording-bridge.js');
     const bridge = createVirtualAudioInputRecordingBridge();
+    const outputPath = 'active/shared/tmp/audio-input-recordings/mic-test.wav';
+    const expectedPath = pathResolver.rootResolve(outputPath);
     const result = await bridge.recordOnInputs(['Built-in Microphone'], {
       duration_sec: 3,
-      output_path: '/tmp/mic-test.wav',
+      output_path: outputPath,
       prompt_text: 'Please speak clearly.',
     });
 
     expect(result.recordings).toHaveLength(1);
-    expect(result.recordings[0]).toEqual(expect.objectContaining({
-      device_name: 'Built-in Microphone',
-      status: 'recorded',
-      recorded_path: '/tmp/mic-test.wav',
-      selected_backend: 'ffmpeg-avfoundation',
-    }));
+    expect(result.recordings[0]).toEqual(
+      expect.objectContaining({
+        device_name: 'Built-in Microphone',
+        status: 'recorded',
+        recorded_path: expectedPath,
+        selected_backend: 'ffmpeg-avfoundation',
+      })
+    );
     expect(mocks.safeExec).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-f', 'avfoundation', '-t', '3', '/tmp/mic-test.wav']),
-      expect.objectContaining({ timeoutMs: 30000 }),
+      expect.arrayContaining(['-f', 'avfoundation', '-t', '3', expectedPath]),
+      expect.objectContaining({ timeoutMs: 30000 })
     );
+  });
+
+  it('rejects a recording output outside the repository', async () => {
+    const { createVirtualAudioInputRecordingBridge } =
+      await import('./virtual-audio-input-recording-bridge.js');
+    const bridge = createVirtualAudioInputRecordingBridge();
+
+    await expect(
+      bridge.recordOnInputs(['Built-in Microphone'], { output_path: '/tmp/mic-test.wav' })
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
+  it('rejects a recording output that traverses a symbolic link', async () => {
+    const boundaryRoot = pathResolver.sharedTmp('virtual-audio-input-boundary-test');
+    const targetDir = path.join(boundaryRoot, 'target');
+    const linkedDir = path.join(boundaryRoot, 'linked');
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.symlinkSync(targetDir, linkedDir, 'dir');
+    const outputPath = path.join(linkedDir, 'recording.wav');
+
+    const { createVirtualAudioInputRecordingBridge } =
+      await import('./virtual-audio-input-recording-bridge.js');
+    const bridge = createVirtualAudioInputRecordingBridge();
+    await expect(
+      bridge.recordOnInputs(['Built-in Microphone'], { output_path: outputPath })
+    ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
+    expect(mocks.safeExec).not.toHaveBeenCalled();
   });
 
   it('captures a pcm stream from the selected input', async () => {
@@ -123,7 +167,8 @@ describe('createVirtualAudioInputRecordingBridge', () => {
     fakeChild.kill = vi.fn();
     mocks.spawn.mockReturnValue(fakeChild);
 
-    const { createVirtualAudioInputRecordingBridge } = await import('./virtual-audio-input-recording-bridge.js');
+    const { createVirtualAudioInputRecordingBridge } =
+      await import('./virtual-audio-input-recording-bridge.js');
     const bridge = createVirtualAudioInputRecordingBridge();
     const chunks = [];
     for await (const chunk of bridge.captureStream('Built-in Microphone', { duration_sec: 1 })) {
@@ -131,17 +176,29 @@ describe('createVirtualAudioInputRecordingBridge', () => {
     }
 
     expect(chunks).toHaveLength(1);
-    expect(chunks[0]).toEqual(expect.objectContaining({
-      format: expect.objectContaining({
-        encoding: 'pcm_s16le',
-        sample_rate_hz: 16000,
-        channels: 1,
-      }),
-    }));
+    expect(chunks[0]).toEqual(
+      expect.objectContaining({
+        format: expect.objectContaining({
+          encoding: 'pcm_s16le',
+          sample_rate_hz: 16000,
+          channels: 1,
+        }),
+      })
+    );
     expect(mocks.spawn).toHaveBeenCalledWith(
       'ffmpeg',
-      expect.arrayContaining(['-f', 'avfoundation', '-i', ':0', '-t', '1', '-f', 's16le', 'pipe:1']),
-      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] }),
+      expect.arrayContaining([
+        '-f',
+        'avfoundation',
+        '-i',
+        ':0',
+        '-t',
+        '1',
+        '-f',
+        's16le',
+        'pipe:1',
+      ]),
+      expect.objectContaining({ stdio: ['ignore', 'pipe', 'pipe'] })
     );
   });
 });

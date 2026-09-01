@@ -1,11 +1,14 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { logger } from './core.js';
-import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
+import { setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
+import { getInjectionSignalPath } from './injection-signal.js';
+export { isInjectionSuspected } from './injection-signal.js';
 import {
   firstJsonObject,
   quarantineStub,
@@ -33,6 +36,16 @@ export interface ScanOptions {
 
 function quarantineEnabled(options?: ScanOptions): boolean {
   return options?.quarantine ?? resolveConfiguredPosture() !== 'dangerous';
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string')
+    : [];
 }
 
 export interface ScanResult {
@@ -152,63 +165,6 @@ export function scanForInjection(content: string): ScanResult {
   };
 }
 
-function getSignalPath(): string {
-  const missionId = process.env.MISSION_ID || 'global';
-  return pathResolver.sharedTmp(`injection_suspected_${missionId}.json`);
-}
-
-/**
- * Checks if the injection suspected status is active in the current session/mission context.
- */
-export function isInjectionSuspected(scope?: string): boolean {
-  const injectionSuspected = getRegisteredEnvText('KYBERION_INJECTION_SUSPECTED');
-  if (injectionSuspected === '1' || injectionSuspected === 'true') {
-    const envScope = getRegisteredEnvText('KYBERION_INJECTION_SCOPE') || 'global';
-    if (!scope || envScope === 'global' || envScope === scope) {
-      return true;
-    }
-  }
-  const signalPath = getSignalPath();
-  if (safeExistsSync(signalPath)) {
-    try {
-      const raw = safeReadFile(signalPath, { encoding: 'utf8' }) as string;
-      const parsed = JSON.parse(raw);
-      if (parsed.injection_suspected === true) {
-        const scopes = Array.isArray(parsed.scopes) ? parsed.scopes : ['global'];
-        if (!scope || scopes.includes('global') || scopes.includes(scope)) {
-          return true;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-  const missionId = process.env.MISSION_ID;
-  if (missionId) {
-    const tierPath = pathResolver.findMissionPath(missionId);
-    if (tierPath) {
-      const statePath = path.join(tierPath, 'mission-state.json');
-      if (safeExistsSync(statePath)) {
-        try {
-          const raw = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-          const state = JSON.parse(raw);
-          if (state.injection_suspected === true) {
-            const scopes = Array.isArray(state.injection_scopes)
-              ? state.injection_scopes
-              : ['global'];
-            if (!scope || scopes.includes('global') || scopes.includes(scope)) {
-              return true;
-            }
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }
-  return false;
-}
-
 /**
  * Set the injection suspected status in env, signal file, and mission-state.json.
  */
@@ -220,12 +176,14 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
     setRegisteredEnv('KYBERION_INJECTION_SUSPECTED', undefined);
     setRegisteredEnv('KYBERION_INJECTION_SCOPE', undefined);
   }
-  const signalPath = getSignalPath();
+  const signalPath = getInjectionSignalPath();
   try {
-    let currentSignal: any = { scopes: [] };
+    let currentSignal: { scopes: string[] } = { scopes: [] };
     if (safeExistsSync(signalPath)) {
-      currentSignal = loadJson<typeof currentSignal>(signalPath);
-      if (!Array.isArray(currentSignal.scopes)) currentSignal.scopes = [];
+      const storedSignal = readJson<unknown>(signalPath);
+      currentSignal = {
+        scopes: isJsonRecord(storedSignal) ? stringArray(storedSignal.scopes) : [],
+      };
     }
 
     if (suspected) {
@@ -261,19 +219,24 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
   if (missionId) {
     const tierPath = pathResolver.findMissionPath(missionId);
     if (tierPath) {
-      const statePath = path.join(tierPath, 'mission-state.json');
+      const statePath = assertSafeRepositoryPath(path.join(tierPath, 'mission-state.json'), {
+        allowMissingLeaf: true,
+      });
       if (safeExistsSync(statePath)) {
         try {
-          const raw = safeReadFile(statePath, { encoding: 'utf8' }) as string;
-          const state = JSON.parse(raw);
-          if (!Array.isArray(state.injection_scopes)) state.injection_scopes = [];
+          const stateValue = readJson<unknown>(statePath);
+          if (!isJsonRecord(stateValue)) return;
+          const state = stateValue;
+          const scopes = stringArray(state.injection_scopes);
+          state.injection_scopes = scopes;
 
           if (suspected) {
-            if (!state.injection_scopes.includes(scope)) state.injection_scopes.push(scope);
+            if (!scopes.includes(scope)) scopes.push(scope);
             state.injection_suspected = true;
           } else {
-            state.injection_scopes = state.injection_scopes.filter((s: string) => s !== scope);
-            state.injection_suspected = state.injection_scopes.length > 0;
+            const remainingScopes = scopes.filter((entry) => entry !== scope);
+            state.injection_scopes = remainingScopes;
+            state.injection_suspected = remainingScopes.length > 0;
           }
           safeWriteFile(statePath, JSON.stringify(state, null, 2));
         } catch {

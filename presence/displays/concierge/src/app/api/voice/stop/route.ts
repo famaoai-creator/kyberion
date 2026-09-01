@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
+import { parseVoiceStopResponse } from '../../../../lib/voice-types';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,13 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({ reason: 'concierge_manual_stop' }),
       signal: AbortSignal.timeout(STOP_TIMEOUT_MS),
     });
-    const payload = (await response.json().catch(() => ({ ok: false }))) as Record<string, unknown>;
+    const payload = parseVoiceStopResponse(await response.json().catch(() => null));
+    if (!payload) {
+      return NextResponse.json(
+        { ok: false, stopped: false, reason: 'invalid_voice_hub_response' },
+        { status: response.ok ? 502 : response.status }
+      );
+    }
     return NextResponse.json(payload, { status: response.ok ? 200 : response.status });
   } catch {
     // Daemon unreachable — treat as "already stopped".

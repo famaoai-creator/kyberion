@@ -2,17 +2,25 @@ import { resolveLatinFontFamily } from '@agent/core/design-fonts';
 import {
   resolveDrawioEdgeLabelStyleParts,
   resolveDrawioEdgeRoutingStyleParts,
+} from '@agent/core/media-drawio-edge-policy';
+import {
   resolveDrawioBoundaryIconCandidates,
   resolveDrawioBoundaryPaletteOverride,
+} from '@agent/core/media-drawio-boundary-policy';
+import {
   resolveMediaDrawioBoundaryPalette,
   resolveMediaDrawioNodeSize,
-  resolveMediaAwsIconCandidates,
-  resolveMediaDrawioTierRank,
+} from '@agent/core/media-drawio-policy';
+import { resolveMediaAwsIconCandidates } from '@agent/core/media-aws-icon-rules';
+import { resolveMediaDrawioTierRank } from '@agent/core/media-drawio-tier-order';
+import {
   resolveMediaDrawioGroupRank,
   resolveMediaDrawioTypeRank,
-  resolveMediaDrawioSecurityGroupRelationPrefix,
-} from '@agent/core';
-import { escapeXml, safeExistsSync, safeReadFile, pathResolver } from '@agent/core';
+} from '@agent/core/media-drawio-sort-policy';
+import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/core/media-drawio-security-group-order';
+import { escapeXml } from '@agent/core/text-escaping';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 
@@ -289,7 +297,10 @@ function resolveDiagramSource(rootDir: string, params: any, ctx: any, resolve: F
   }
 
   if (params.input_path) {
-    const inputPath = path.resolve(rootDir, resolve(params.input_path));
+    const inputPath = assertSafeRepositoryPath(
+      path.resolve(rootDir, String(resolve(params.input_path) || '').trim()),
+      { allowMissingLeaf: true }
+    );
     return safeReadFile(inputPath, { encoding: 'utf8' }) as string;
   }
 

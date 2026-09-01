@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  resetWindowsLocalAssistAvailabilityCache,
+  _resetWindowsLocalAssistAvailabilityCacheForTests,
   windowsLocalAssistPrompt,
   classifyLocallyWithWindowsAi,
 } from './windows-local-assist-bridge.js';
@@ -9,7 +9,7 @@ describe('windows local assist bridge', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     delete process.env.KYBERION_WINDOWS_AI_ENDPOINT;
-    resetWindowsLocalAssistAvailabilityCache();
+    _resetWindowsLocalAssistAvailabilityCacheForTests();
   });
 
   it('discovers the local endpoint and returns chat text', async () => {

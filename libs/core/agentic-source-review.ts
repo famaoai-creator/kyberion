@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 
-import { safeReadFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type { SourceAnalysisIr } from './source-analysis.js';
 import type { ReasoningParticipant } from './reasoning-participant.js';
 import type { TierLevel } from './types.js';
@@ -13,6 +13,9 @@ import {
 
 const RULE_PACK_PATH = pathResolver.knowledge(
   'product/capability-assets/security-scanner/agentic-rule-hierarchy.json'
+);
+const RULE_PACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agentic-source-review-rules.schema.json'
 );
 const REVIEW_PLAN_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agentic-source-review-plan.schema.json'
@@ -38,8 +41,15 @@ interface AgenticRule {
 interface AgenticRulePack {
   kind: 'agentic-source-review-rules';
   version: string;
+  description?: string;
   rules: AgenticRule[];
 }
+
+const rulePackCatalog = defineCatalog<AgenticRulePack>({
+  id: 'agentic-source-review-rules',
+  path: RULE_PACK_PATH,
+  schema: RULE_PACK_SCHEMA_PATH,
+});
 
 export interface AgenticSourceReviewPlan {
   kind: 'agentic-source-review-plan';
@@ -104,13 +114,7 @@ export interface CompileAgenticSourceReviewOptions {
 }
 
 function readRulePack(): AgenticRulePack {
-  const parsed = JSON.parse(
-    String(safeReadFile(RULE_PACK_PATH, { encoding: 'utf8' }))
-  ) as AgenticRulePack;
-  if (parsed.kind !== 'agentic-source-review-rules' || !Array.isArray(parsed.rules)) {
-    throw new Error('[AGENTIC_SOURCE_REVIEW_RULES] invalid rule pack');
-  }
-  return parsed;
+  return rulePackCatalog.load();
 }
 
 function deriveDomain(analysis: SourceAnalysisIr): string {

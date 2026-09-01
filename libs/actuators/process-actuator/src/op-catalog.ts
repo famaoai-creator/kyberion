@@ -7,7 +7,8 @@
 // change; every other op previously made determineActuatorStepType throw, so
 // those entries are strictly additive.
 
-type OpSpecKind = 'capture' | 'transform' | 'apply' | 'control';
+import type { PipelineStepType } from '../../../core/actuator-op-registry.js';
+import type { ActuatorOpDescription } from '../../../core/actuator-sdk.js';
 
 const PROCESS_PROPERTIES = {
   args: { type: 'array', items: { type: 'string' } },
@@ -52,7 +53,7 @@ export const PROCESS_ACTUATOR_TRANSFORM_OPS = [] as const;
 
 export const PROCESS_ACTUATOR_APPLY_OPS = ['spawn', 'stop'] as const;
 
-function toSpec(op: string, kind: OpSpecKind) {
+function toSpec(op: string, kind: PipelineStepType) {
   const required =
     op === 'spawn'
       ? ['resourceId', 'command', 'kind', 'ownerId', 'ownerType']
@@ -67,7 +68,7 @@ function toSpec(op: string, kind: OpSpecKind) {
   };
 }
 
-export function describeOps() {
+export function describeOps(): ActuatorOpDescription[] {
   return [
     ...PROCESS_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...PROCESS_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),

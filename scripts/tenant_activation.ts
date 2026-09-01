@@ -11,7 +11,7 @@ import {
   type TenantActivationCheck,
   type TenantActivationProbeCheck,
   type TenantActivationProbeRefs,
-} from '@agent/core';
+} from '@agent/core/tenant-activation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function value(argv: string[], name: string): string | undefined {

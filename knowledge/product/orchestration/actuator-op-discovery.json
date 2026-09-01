@@ -29199,6 +29199,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -29509,6 +29512,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -29813,6 +29819,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -30121,6 +30130,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -30427,6 +30439,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -30731,6 +30746,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -31043,6 +31061,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -31351,6 +31372,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -31663,6 +31687,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -31967,6 +31994,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -32275,6 +32305,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -32579,6 +32612,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -32887,6 +32923,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -33191,6 +33230,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -33517,6 +33559,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -33826,6 +33871,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -34130,6 +34178,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -34437,6 +34488,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -34779,6 +34833,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -35087,6 +35144,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -35416,6 +35476,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -35722,6 +35785,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -36026,6 +36092,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -36352,6 +36421,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -36660,6 +36732,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -36987,6 +37062,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -37312,6 +37390,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -37620,6 +37701,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -37932,6 +38016,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -38240,6 +38327,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -38552,6 +38642,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -38856,6 +38949,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -39168,6 +39264,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -39478,6 +39577,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -39782,6 +39884,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -40094,6 +40199,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -40402,6 +40510,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -40714,6 +40825,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -41022,6 +41136,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -41349,6 +41466,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -41657,6 +41777,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -41969,6 +42092,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -42277,6 +42403,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -42592,6 +42721,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -42900,6 +43032,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -43212,6 +43347,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -43518,6 +43656,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -43822,6 +43963,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -44145,6 +44289,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -44451,6 +44598,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -44755,6 +44905,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -45067,6 +45220,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -45371,6 +45527,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -45679,6 +45838,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -46017,6 +46179,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46342,6 +46507,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46664,6 +46832,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -46969,6 +47140,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -47292,6 +47466,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -47602,6 +47779,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -47908,6 +48088,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -48220,6 +48403,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -48530,6 +48716,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -48834,6 +49023,9 @@
                 "type": "string"
               },
               "tools": {
+                "type": "array"
+              },
+              "deferred_tools": {
                 "type": "array"
               },
               "use_subagent": {
@@ -49146,6 +49338,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49456,6 +49651,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49762,6 +49960,9 @@
               "tools": {
                 "type": "array"
               },
+              "deferred_tools": {
+                "type": "array"
+              },
               "use_subagent": {
                 "type": "boolean"
               },
@@ -49793,8 +49994,1284 @@
     {
       "n": "working-memory-actuator",
       "path": "libs/actuators/working-memory-actuator",
-      "source": "registry",
-      "ops": []
+      "source": "describeOps",
+      "ops": [
+        {
+          "op": "note",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "set-now",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "add-action-item",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "complete-action-item",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "daily-open",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-add",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-done",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "todo-rollover",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "weekly-open",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "nominate-promotion",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "consolidation-status",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "run-gc",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "build-index",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "read",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "list",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "scope": {
+                "type": "string",
+                "enum": ["session", "mission", "project", "personal", "tenant", "global"]
+              },
+              "scope_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "section": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "focus": {
+                "type": "string"
+              },
+              "nextAction": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              },
+              "item": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "weekKey": {
+                "type": "string",
+                "pattern": "^\\d{4}-W\\d{2}$"
+              },
+              "mdPath": {
+                "type": "string",
+                "minLength": 1
+              },
+              "summary": {
+                "type": "string"
+              },
+              "source_ref": {
+                "type": "string"
+              },
+              "source_type": {
+                "type": "string",
+                "enum": ["mission", "task_session", "artifact", "incident"]
+              },
+              "proposed_memory_kind": {
+                "type": "string",
+                "enum": ["sop", "template", "heuristic", "risk_rule", "clarification_prompt"]
+              },
+              "sensitivity_tier": {
+                "type": "string",
+                "enum": ["personal", "confidential", "public"]
+              },
+              "evidence_refs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "trusted": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        }
+      ]
     }
   ]
 }

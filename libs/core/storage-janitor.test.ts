@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 // Stub secure-io to use real temp fs so we can test file operations
 vi.mock('./secure-io.js', async () => {
@@ -62,6 +63,7 @@ vi.mock('./foundation/io.js', () => ({
 let tmpDir: string;
 let logsDir: string;
 let dataVaultDir: string;
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 vi.mock('./path-resolver.js', () => ({
   sharedTmp: (sub = '') => path.join(tmpDir, sub),
@@ -164,6 +166,11 @@ describe('storage-janitor', () => {
     dataVaultDir = path.join(base, 'active', 'shared', 'data-vault');
     fs.mkdirSync(tmpDir, { recursive: true });
     fs.mkdirSync(logsDir, { recursive: true });
+    fs.mkdirSync(path.join(base, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/schemas/storage-retention-catalog.schema.json'),
+      path.join(base, 'knowledge/product/schemas/storage-retention-catalog.schema.json')
+    );
   });
 
   afterEach(() => {

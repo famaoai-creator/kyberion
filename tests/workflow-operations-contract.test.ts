@@ -65,18 +65,18 @@ describe('Workflow operations contract', () => {
   it('documents the distinction between local terminal residue and managed surfaces', () => {
     const workflowReadme = read('.github/workflows/README.md');
     expect(workflowReadme).toContain('Waited for background terminal');
-    expect(workflowReadme).toContain('pnpm surfaces:status');
+    expect(workflowReadme).toContain('pnpm surfaces status');
     expect(workflowReadme).toContain('Codex unified exec sessions');
   });
 
   it('keeps the cross-os workflow on representative schema, preview, and shell checks', () => {
     const crossOs = read('.github/workflows/cross-os.yml');
-    expect(crossOs).toContain('pnpm run check:contract-schemas');
-    expect(crossOs).toContain('pnpm run test:core');
-    expect(crossOs).toContain('pnpm run test:meeting-dry-run');
-    expect(crossOs).toContain('pnpm run cli -- preview pipelines/baseline-check.json');
-    expect(crossOs).toContain('pnpm run cli -- preview pipelines/meeting-proxy-workflow.json');
-    expect(crossOs).toContain('pnpm run check:pipeline-shell-independence');
+    expect(crossOs).toContain('pnpm run check -- --scope full --only contract-schemas');
+    expect(crossOs).toContain('pnpm test -- --suite core');
+    expect(crossOs).toContain('pnpm test -- --suite meeting-dry-run');
+    expect(crossOs).toContain('pnpm run kyberion -- preview pipelines/baseline-check.json');
+    expect(crossOs).toContain('pnpm run kyberion -- preview pipelines/meeting-proxy-workflow.json');
+    expect(crossOs).toContain('pnpm run check -- --scope full --only pipeline-shell-independence');
     expect(crossOs).not.toContain('|| true');
   });
 

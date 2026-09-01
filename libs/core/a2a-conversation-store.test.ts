@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { appendConversationTurn, readConversationHistory } from './a2a-conversation-store.js';
-import { pathResolver, safeExistsSync, safeRmSync, withExecutionContext } from '@agent/core';
+import { withExecutionContext } from '@agent/core/authority';
+import { pathResolver } from '@agent/core/path-resolver';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
 const CONVERSATION_ID = `CONV-STORE-${Date.now()}`;
 const CONVERSATION_FILE = pathResolver.shared(`runtime/a2a-conversations/${CONVERSATION_ID}.jsonl`);
@@ -34,6 +42,20 @@ describe('a2a conversation store', () => {
     ).rejects.toThrow('Invalid conversation_id');
 
     expect(() => readConversationHistory('a/b')).toThrow('Invalid conversation_id');
+  });
+
+  it('rejects a conversation file that traverses a symlink', () => {
+    const target = pathResolver.sharedTmp(`a2a-conversation-target-${CONVERSATION_ID}.jsonl`);
+    safeMkdir(pathResolver.shared('runtime/a2a-conversations'), { recursive: true });
+    safeWriteFile(target, '{"secret":"outside"}\n');
+    safeSymlinkSync(target, CONVERSATION_FILE);
+
+    try {
+      expect(() => readConversationHistory(CONVERSATION_ID)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    } finally {
+      safeRmSync(CONVERSATION_FILE, { force: true });
+      safeRmSync(target, { force: true });
+    }
   });
 
   it('appends and reads safe conversation ids', async () => {
@@ -78,5 +100,39 @@ describe('a2a conversation store', () => {
     const history = readConversationHistory(conversationId);
     expect(history).toHaveLength(messages.length);
     expect(new Set(history.map((turn) => turn.prompt))).toEqual(new Set(messages));
+  });
+
+  it('filters malformed JSONL turns without discarding valid history', () => {
+    safeMkdir(pathResolver.shared('runtime/a2a-conversations'), { recursive: true });
+    safeWriteFile(
+      CONVERSATION_FILE,
+      [
+        JSON.stringify({
+          ts: '2026-09-01T00:00:00.000Z',
+          sender: 'sender-x',
+          receiver: 'agent-y',
+          performative: 'request',
+          prompt: 'valid',
+        }),
+        '[1]',
+        JSON.stringify({
+          ts: 'not-a-date',
+          sender: 'sender-x',
+          receiver: 'agent-y',
+          performative: 'request',
+        }),
+        '{"ts":"2026-09-01T00:00:00.000Z","sender":"sender-x","receiver":"agent-y","performative":"request","__proto__":{"tier":"personal"}}',
+      ].join('\n') + '\n'
+    );
+
+    expect(readConversationHistory(CONVERSATION_ID)).toEqual([
+      {
+        ts: '2026-09-01T00:00:00.000Z',
+        sender: 'sender-x',
+        receiver: 'agent-y',
+        performative: 'request',
+        prompt: 'valid',
+      },
+    ]);
   });
 });

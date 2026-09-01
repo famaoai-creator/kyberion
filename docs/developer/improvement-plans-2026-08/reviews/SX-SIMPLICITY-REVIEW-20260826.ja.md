@@ -226,7 +226,7 @@ git diff --check
 - agent runtime、Super-Nerve、mission worker の遅延 import に残っていた runtime cycle は registration port へ置換した。organization operating model の分割群に残っていた型クエリも `import type` へ統合した。現行 `check:module-boundaries` は **0 static cycles / 1 runtime cycle / 62 direction violations / 73 dynamic imports** で、baseline の方向違反 81・runtime cycle 2 を下回る。
 - intent contract の責務分割後に追加された純粋 formatter / routing / input context / event modules は contracts 層へ分類し、実行 compiler 本体は domain 層として boundary manifest に明示した。checker の既存違反を baseline の上方更新で隠していない。
 - `intent-contract` は **1,488 行**、max-file-lines gate は green。現在の最大行数例外は **11 件**で、残る例外は CLI / surface / orchestration の責務分割 wave として継続管理する。npm scripts **240 件**、foundation reader の完全 adopt-or-delete、未移行 actuator operation-table、state-documentation は未完了のため、レビュー判定は引き続き **partial / Request changes** とする。
-- 追加検証: `pnpm run typecheck`、`pnpm run check:module-boundaries`、`pnpm run check:max-file-lines`、`pnpm run check:script-integrity`、`pnpm exec vitest run libs/core/actuator-sdk.test.ts libs/core/intent-contract.test.ts libs/core/intent-resolution.test.ts`、`pnpm run test:actuators`。いずれも終了コード 0。visual-review の外部 backend skip と既存の audit tenant-mirror warning は、テスト失敗ではなく環境・権限制約として残る。
+- 追加検証: `pnpm run typecheck`、`pnpm run check -- --scope pr --only module-boundaries`、`pnpm run check -- --scope pr --only max-file-lines`、`pnpm run check -- --scope pr --only script-integrity`、`pnpm exec vitest run libs/core/actuator-sdk.test.ts libs/core/intent-contract.test.ts libs/core/intent-resolution.test.ts`、`pnpm run test:actuators`。いずれも終了コード 0。visual-review の外部 backend skip と既存の audit tenant-mirror warning は、テスト失敗ではなく環境・権限制約として残る。
 
 ## 12. 2026-08-26 最終ゲート
 
@@ -241,7 +241,7 @@ git diff --check
 - `reasoning-backend.ts` の公開契約・vision path 制約を `reasoning-backend-contracts.ts`、retry/cancellation を `reasoning-retry-policy.ts`、delegation summary retry を `reasoning-delegation-policy.ts` へ分離した。本体は **2,072 → 1,480 行**で、契約は旧 module から再 export した。summary-retry / failover を含む対象回帰を通過した。
 - native PDF engine の `PdfWriter`、encoding/XMP/page-label、CJK font embedding primitive を `libs/core/src/native-pdf-engine/primitives.ts` へ分離し、本体を **1,893 → 1,434 行**へ縮小した。PDF engine 回帰 **38 tests**を通過し、PDF output assembly の public entrypoint は維持した。
 - `android`、`blockchain`、`email`、`ingest`、`ios`、`media`、`media-generation`、`meeting`、`orchestrator`、`presence`、`process`、`service`、`video-composition`、`vision`、`voice`、`working-memory` の既存 `handleAction` を `defineLegacyPipelineActuator` へ接続した。これにより独立 meeting browser driver を除く actuator index は SDK の共通 ABI (`actuator.dispatch` / `describeOps`) を公開し、内部 operation-table の段階移行を可能にした。
-- 検証結果は `pnpm run typecheck`、`pnpm run build:actuators`、`pnpm run check:max-file-lines`、`pnpm run check:module-boundaries`（0 static cycles / 1 runtime cycle / 62 direction violations / 73 dynamic imports）、`pnpm run check:script-integrity`、catalog integrity、op input contract coverage、actuator 全体 **80 files / 867 passed / 11 skipped**。既知の audit tenant-mirror / visual-review external-backend warning は失敗ではない。
+- 検証結果は `pnpm run typecheck`、`pnpm run build:actuators`、`pnpm run check -- --scope pr --only max-file-lines`、`pnpm run check -- --scope pr --only module-boundaries`（0 static cycles / 1 runtime cycle / 62 direction violations / 73 dynamic imports）、`pnpm run check -- --scope pr --only script-integrity`、catalog integrity、op input contract coverage、actuator 全体 **80 files / 867 passed / 11 skipped**。既知の audit tenant-mirror / visual-review external-backend warning は失敗ではない。
 - 現在の max-file-lines exception は **8 件**まで減少した。scripts 240 件、state-documentation の正本統合、legacy operation-table の個別 schema 化、foundation reader の adopt-or-delete、残存 direction violations / runtime cycle は引き続き未完了であり、レビュー判定は **partial / Request changes** を維持する。
 - 生成物同期後の承認済み full gate は **64/64 passed**（`pnpm run check -- --scope full`）。直前の 63/64 は knowledge index / integrity manifest の stale が原因で、`pnpm run generate:knowledge-index` 後に解消した。
 
@@ -566,7 +566,7 @@ git diff --check
 - registry manager と mission controller は direct CLI process ではなく、既存 controller の library `main` を core operation から呼ぶ形へ変更した。GitHub issue ingest、mission bootstrap、system upgrade、gateway/harness assimilation の mission/registry 境界は維持した。
 - avatar capture/generation/registration は pipeline shell / `npx tsx` を除去し、既存の script facade を typed core operation から利用する形へ統合した。OAuth setup も callback surface を維持したまま typed operation 入口へ移行した。
 - chaos check の存在しない CLI classification wrapper は削除し、network fetch fallback の handled-failure を system log で明示した。残る secret expiry/rotate の未実装 action は自動実行せず、OS keychain に expiry metadata がないことを明示した human review request へ置換した。
-- avatar、OAuth、secret、mission、trial video の代表 dry-run は ready。baseline は **13 → 0 件**となり、`pnpm check:pipeline-shell-independence` は新規違反なしの `OK` を返した。
+- avatar、OAuth、secret、mission、trial video の代表 dry-run は ready。baseline は **13 → 0 件**となり、`pnpm run check -- --scope full --only pipeline-shell-independence` は新規違反なしの `OK` を返した。
 
 ## 71. 2026-08-26 最終突合: wrapper baseline の解消
 
