@@ -11160,8 +11160,8 @@ SX-03 の intent resolution confidence 上限を継続監査し、schedule read�
 SX-08b／SX-09b の direct JSONL inventory を継続監査し、operator-surface の監査ログ投影が
 JSON parse 後の `any` を直接表示し、tenant-scoped viewer に tenant 無しイベントを返していた残存を修正した。
 監査イベントの必須文字列、legacy alias の一致、metadata shape、危険キーを読み出し時に検証し、tenant-scoped
-projection は明示的に一致する tenant のイベントだけへ fail-closed とした。unscoped の公開監査観測と、symlink／
-malformed resource の既存除外 semantics は維持した。
+projection は明示的に一致する tenant のイベントだけへ fail-closed とした。tenant 未設定時も tenant 付きイベントを
+返さず、tenantless の公開監査観測だけを返す。symlink／malformed resource の既存除外 semantics は維持した。
 
 検証: operator-surface resource boundary **1 file / 5 tests passed**、root typecheck、Prettier、`git diff --check`。
 残る改善計画は全surfaceの実ブラウザ／外部provider実機確認、SX-04〜SX-14の未完了項目、およびvoice provider／

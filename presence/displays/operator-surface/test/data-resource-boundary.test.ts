@@ -110,6 +110,12 @@ describe('operator surface resource boundaries', () => {
       expect(events.some((event) => event.id === `audit-other-${suffix}`)).toBe(false);
       expect(events.some((event) => event.id === `audit-global-${suffix}`)).toBe(false);
       expect(events.some((event) => event.id === `audit-malformed-${suffix}`)).toBe(false);
+
+      vi.stubEnv('KYBERION_TENANT', '');
+      const unscopedEvents = listRecentAuditEvents();
+      expect(unscopedEvents.some((event) => event.id === `audit-tenant-${suffix}`)).toBe(false);
+      expect(unscopedEvents.some((event) => event.id === `audit-other-${suffix}`)).toBe(false);
+      expect(unscopedEvents.some((event) => event.id === `audit-global-${suffix}`)).toBe(true);
     });
   });
 

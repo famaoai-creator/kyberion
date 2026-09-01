@@ -423,8 +423,8 @@ export function listRecentAuditEvents(limit = 100): AuditEventRow[] {
       const event = parseAuditEvent(trimmed);
       if (!event) continue;
       // A tenant-scoped viewer must never receive an event without an explicit
-      // tenant; an unscoped viewer is limited to public/tenantless observations.
-      if (scope && (!event.tenantSlug || event.tenantSlug !== scope)) continue;
+      // tenant; an unscoped viewer is limited to tenantless public observations.
+      if (scope ? !event.tenantSlug || event.tenantSlug !== scope : event.tenantSlug) continue;
       rows.push(event);
     }
   }
