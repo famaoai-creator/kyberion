@@ -27,6 +27,10 @@
       "types": "./dist/foundation/scope.d.ts",
       "default": "./dist/foundation/scope.js"
     },
+    "./foundation/primitives": {
+      "types": "./dist/foundation/primitives.d.ts",
+      "default": "./dist/foundation/primitives.js"
+    },
     "./audit-chain": {
       "types": "./dist/audit-chain.d.ts",
       "default": "./dist/audit-chain.js"
