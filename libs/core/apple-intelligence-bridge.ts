@@ -2,6 +2,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
@@ -234,7 +235,9 @@ async function probeUncached(): Promise<AppleIntelligenceAvailability> {
     return { available: false, reason: `probe failed: ${result.stderr.slice(0, 200)}` };
   }
   try {
-    const parsed = normalizeAppleIntelligenceAvailability(JSON.parse(result.stdout.trim()));
+    const parsed = normalizeAppleIntelligenceAvailability(
+      parseSafeJsonInput(result.stdout.trim(), 'Apple Intelligence availability response')
+    );
     if (parsed) return parsed;
   } catch {
     // fall through to the stable unavailable result below
@@ -356,7 +359,9 @@ export async function recognizeImageLocallyWithAppleVision(
     const start = line.indexOf('{"text"');
     if (start === -1) continue;
     try {
-      const parsed = normalizeAppleVisionResult(JSON.parse(line.slice(start)));
+      const parsed = normalizeAppleVisionResult(
+        parseSafeJsonInput(line.slice(start), 'Apple Vision response')
+      );
       if (parsed) return parsed;
     } catch {
       continue;
@@ -613,7 +618,9 @@ function parseLastJsonLine<T>(
     const start = line.indexOf(marker);
     if (start === -1) continue;
     try {
-      const parsed = normalize(JSON.parse(line.slice(start)));
+      const parsed = normalize(
+        parseSafeJsonInput(line.slice(start), 'Apple Intelligence response')
+      );
       if (parsed) return parsed;
     } catch {
       continue;

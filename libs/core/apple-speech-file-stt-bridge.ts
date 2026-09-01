@@ -15,6 +15,7 @@
 import * as path from 'node:path';
 
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -77,7 +78,9 @@ function parseLastJsonLine(stdout: string): NativeSttPayload | null {
     const line = lines[index].trim();
     if (!line.startsWith('{')) continue;
     try {
-      const payload = normalizeAppleSpeechFilePayload(JSON.parse(line));
+      const payload = normalizeAppleSpeechFilePayload(
+        parseSafeJsonInput(line, 'Apple Speech response')
+      );
       if (payload) return payload;
     } catch {
       continue;
