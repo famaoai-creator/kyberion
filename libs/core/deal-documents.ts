@@ -1,8 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeMkdir,
   safeReadFile,
@@ -267,7 +267,7 @@ function contractReviewApproved(tenantSlug: string, dealId: string, version: num
   );
   try {
     if (!safeExistsSync(filePath)) return false;
-    const record = loadJson<{
+    const record = readJson<{
       verdict?: string;
     }>(filePath);
     return record.verdict === 'approve';
