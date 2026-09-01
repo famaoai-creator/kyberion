@@ -37,7 +37,7 @@ import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import chalk from 'chalk';
-import { readJson, readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   handleCalendarWorkflowCommand,
@@ -645,7 +645,7 @@ function loadPacketFile(targetPath: string): PacketFile {
   const content = readTextFile(resolvedPath);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content) as unknown;
+    parsed = parseSafeJsonInput(content, 'Packet file');
   } catch (error) {
     throw new Error(
       `Packet file contains invalid JSON: ${error instanceof Error ? error.message : String(error)}`
@@ -1334,7 +1334,7 @@ export async function main(args: string[] = []) {
     const resolvedPreviewPath = pathResolver.rootResolve(filePath);
     assertPipelinePreviewResourcePath(resolvedPreviewPath);
     const content = readTextFile(resolvedPreviewPath);
-    const pipeline = JSON.parse(content);
+    const pipeline = parseSafeJsonInput(content, 'Pipeline preview file');
     const preview = previewPipeline(pipeline);
 
     console.log(`\n=== Pipeline Preview ===`);

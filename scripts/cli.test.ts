@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 const legacyIntentAsk = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('./kyberion_home.js', () => ({ main: legacyIntentAsk }));
 import {
@@ -19,6 +20,15 @@ import {
 import { handleTaskCommand } from './cli-workflow-handlers.js';
 
 describe('Kyberion CLI helpers', () => {
+  it('uses the governed parser for packet and pipeline preview files', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/cli.ts'), { encoding: 'utf8' })
+    );
+    expect(source).toContain("parseSafeJsonInput(content, 'Packet file')");
+    expect(source).toContain("parseSafeJsonInput(content, 'Pipeline preview file')");
+    expect(source).not.toContain('JSON.parse(content)');
+  });
+
   it('routes legacy intent resolution to the canonical ask explanation path', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
