@@ -2,7 +2,7 @@ import { grantVoiceConsent } from '@agent/core/voice-consent';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { safeExecResult } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline-contract';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 import { applyOnboardingInput } from './onboarding_apply.js';
@@ -65,7 +65,7 @@ function parseJsonPayload(raw: unknown, label: string): Record<string, unknown> 
   );
   const unwrapped = wrapped ? wrapped[1] : text;
   const fenced = unwrapped.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const parsed = JSON.parse((fenced ? fenced[1] : unwrapped).trim()) as unknown;
+  const parsed = parseSafeJsonInput((fenced ? fenced[1] : unwrapped).trim(), label);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${label} must decode to an object`);
   }
@@ -613,7 +613,10 @@ export async function runInlineMissionStartFromIssues(
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? ((raw as Record<string, unknown>).stdout ?? (raw as Record<string, unknown>).output ?? raw)
       : raw;
-  const issues = typeof candidate === 'string' ? JSON.parse(candidate) : candidate;
+  const issues = parseSafeJsonInput(
+    typeof candidate === 'string' ? candidate : JSON.stringify(candidate) || '',
+    'mission start issues'
+  );
   if (!Array.isArray(issues))
     throw new Error('core:run_mission_start_from_issues requires an array');
   const started: string[] = [];
