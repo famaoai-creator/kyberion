@@ -1,6 +1,7 @@
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { resolveIdentityContext } from './authority.js';
 
@@ -148,7 +149,7 @@ export function getAutonomousOpsPolicy(): AutonomousOpsPolicy {
 
 function clampAxisScore(score: number | undefined): number {
   if (!Number.isFinite(score ?? Number.NaN)) return 0;
-  return Math.max(0, Math.min(3, Math.trunc(score ?? 0)));
+  return clamp(Math.trunc(score ?? 0), 0, 3);
 }
 
 function mergeActionPolicy(

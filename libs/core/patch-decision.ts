@@ -1,3 +1,5 @@
+import { clamp } from './foundation/text.js';
+
 export type PatchDecision = 'auto_apply' | 'urgent_approval' | 'scheduled' | 'defer' | 'approval';
 
 export interface PatchDecisionInput {
@@ -18,7 +20,7 @@ export interface PatchDecisionResult {
 
 function clampScore(value: number): number {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(3, Math.trunc(value)));
+  return clamp(Math.trunc(value), 0, 3);
 }
 
 export function computePatchDecisionScores(input: PatchDecisionInput): {
