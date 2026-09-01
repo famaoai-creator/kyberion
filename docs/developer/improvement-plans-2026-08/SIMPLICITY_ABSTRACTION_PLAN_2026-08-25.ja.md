@@ -10675,6 +10675,12 @@ Team／Authority role generatorの生成物比較用 `normalize` を再監査し
 
 検証: team／authority role generator **2 files / 4 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 157
+
+Contract semver checkerのactuator contract schema fingerprintを再監査し、直接 `JSON.parse` していたschema内容の正規化前処理をfoundation safe parserへ移行した。malformed／nested dangerous keyは従来どおりraw fallbackへ閉じ、canonical fingerprint／version bump判定の既存semanticsを維持した。
+
+検証: contract semver **1 file / 20 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

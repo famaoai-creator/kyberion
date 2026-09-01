@@ -26,7 +26,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -99,7 +99,7 @@ function fingerprint(manifest: Manifest): ActuatorFingerprint {
       const raw = safeReadFile(schemaPath, { encoding: 'utf8' }) as string;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(raw);
+        parsed = parseSafeJsonInput(raw, `contract schema ${manifest.contract_schema}`);
       } catch {
         parsed = raw;
       }
