@@ -1,3 +1,4 @@
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 
 export interface VadBridgeResponse {
@@ -47,7 +48,7 @@ export function normalizeVadBridgeResponse(value: unknown): VadBridgeResponse | 
 /** Parse and normalize one non-empty VAD NDJSON line; malformed lines are ignored. */
 export function parseVadBridgeLine(line: string): VadBridgeResponse | null {
   try {
-    return normalizeVadBridgeResponse(JSON.parse(line));
+    return normalizeVadBridgeResponse(parseSafeJsonInput(line, 'VAD bridge response'));
   } catch {
     return null;
   }

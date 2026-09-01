@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { safeExecResult } from './secure-io.js';
 
 /** Availability of the optional Windows local-LLM assist adapter. */
@@ -72,7 +73,10 @@ async function probeUncached(): Promise<WindowsLocalAssistAvailability> {
     });
     if (cli.status === 0) {
       try {
-        const parsed = JSON.parse(cli.stdout) as { webUrls?: unknown };
+        const parsed = parseSafeJsonInput(
+          cli.stdout,
+          'Windows local assist availability response'
+        ) as { webUrls?: unknown };
         const url = Array.isArray(parsed.webUrls) ? parsed.webUrls[0] : undefined;
         if (typeof url === 'string') configured = url.replace(/\/$/, '');
       } catch {

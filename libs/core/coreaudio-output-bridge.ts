@@ -5,6 +5,7 @@ import {
   type ManagedProcessHandle,
 } from './managed-process.js';
 import { rootResolve } from './path-resolver.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
@@ -133,7 +134,7 @@ export class CoreAudioOutputBridge implements AudioOutputPort {
       const text = data.toString('utf8').trim();
       if (text) {
         try {
-          const parsed: unknown = JSON.parse(text);
+          const parsed: unknown = parseSafeJsonInput(text, 'CoreAudio output bridge response');
           if (isRecord(parsed) && typeof parsed.underrun_count === 'number') {
             this.metricsValue.underrun_count = parsed.underrun_count;
           }

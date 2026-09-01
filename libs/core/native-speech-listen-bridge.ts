@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
 import { pathResolver } from './path-resolver.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 export const NATIVE_SPEECH_LISTEN_BRIDGE_ID = 'native-speech-listen-bridge' as const;
 
@@ -164,7 +165,7 @@ export async function listenNativeSpeech(
         return reject(new Error(stderr.trim() || `native_speech_failed_${code}`));
       }
       try {
-        const parsed: unknown = JSON.parse(raw);
+        const parsed: unknown = parseSafeJsonInput(raw, 'native speech listen response');
         resolve(normalizeNativeSpeechListenResult(parsed, request));
       } catch (error: unknown) {
         const detail = error instanceof Error ? error.message : String(error);
