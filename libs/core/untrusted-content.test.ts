@@ -6,6 +6,7 @@ import {
   isInjectionSuspected,
   setInjectionSuspected,
   processUntrustedContent,
+  parseInjectionScannerVerdict,
 } from './untrusted-content.js';
 import { evaluateShellCommandPolicy } from './shell-command-policy.js';
 import { resolveApprovalPolicy } from './approval-policy.js';
@@ -17,6 +18,17 @@ describe('SA-03 Prompt Injection & Untrusted Content Defense', () => {
   const testMissionId = 'test-mission-sa-03';
   const origMissionId = process.env.MISSION_ID;
   const origSuspected = process.env.KYBERION_INJECTION_SUSPECTED;
+
+  it('fails closed for malformed or dangerous LLM scanner verdicts', () => {
+    expect(parseInjectionScannerVerdict('{"injection_suspected":false,"indicators":[]}')).toEqual({
+      injection_suspected: false,
+      indicators: [],
+    });
+    expect(
+      parseInjectionScannerVerdict('{"injection_suspected":false,"meta":{"__proto__":{}}}')
+    ).toBeNull();
+    expect(parseInjectionScannerVerdict('[{"injection_suspected":false}]')).toBeNull();
+  });
 
   it('rejects a mission id that could escape the injection signal store', () => {
     process.env.MISSION_ID = '../outside';
