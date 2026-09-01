@@ -1,4 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -223,10 +224,6 @@ export function isScopedArtifactPath(logicalPath: string): boolean {
     return true;
   }
   return false;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function persistedString(record: Record<string, unknown>, key: string): string {

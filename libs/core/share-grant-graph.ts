@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
@@ -158,10 +159,6 @@ interface StoredShareLink extends ShareLinkSummary {
 interface ReachableAccess {
   role: ShareGrantRole;
   audienceFloor: ShareGrantTaint;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function persistedString(record: Record<string, unknown>, key: string): string {
