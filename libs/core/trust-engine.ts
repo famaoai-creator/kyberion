@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { clamp } from './foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -188,7 +189,7 @@ class TrustEngineImpl {
     let record = this.records.get(agentId);
     if (!record) record = this.initialize(agentId);
 
-    record.dimensions[dimension] = Math.max(0, Math.min(200, record.dimensions[dimension] + delta));
+    record.dimensions[dimension] = clamp(record.dimensions[dimension] + delta, 0, 200);
     record.score = this.computeComposite(record.dimensions);
     record.tier = this.computeTier(record.score);
     record.lastUpdated = Date.now();
