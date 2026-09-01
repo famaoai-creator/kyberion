@@ -181,7 +181,7 @@ describe('mission-gate-engine', () => {
     expect(passGate.verdict).toBe('pass');
     disposeFirstBackend();
 
-    registerReasoningBackend({
+    const disposeSecondBackend = registerReasoningBackend({
       name: 'fake-llm',
       prompt: async () =>
         '{"pass": false, "reasons": ["結論に根拠がない"], "improvements": ["出典を追加"]}',
@@ -193,6 +193,19 @@ describe('mission-gate-engine', () => {
     });
     expect(failGate.verdict).toBe('fail');
     expect(failGate.reasons.join(' ')).toContain('結論に根拠がない');
+    disposeSecondBackend();
+
+    registerReasoningBackend({
+      name: 'fake-llm',
+      prompt: async () => '{"pass":true,"metadata":{"__proto__":{"x":1}}}',
+    } as never);
+    const dangerousGate = await evaluateMissionGate({
+      missionId,
+      gate: gateDef,
+      evidenceDir: `${missionPath}/gates`,
+    });
+    expect(dangerousGate.verdict).toBe('fail');
+    expect(dangerousGate.reasons.join(' ')).toContain('dangerous JSON key');
     resetReasoningBackend();
   });
 
