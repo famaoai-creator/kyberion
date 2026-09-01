@@ -1,7 +1,6 @@
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExec,
   safeReadFile,
   safeWriteFile,
@@ -14,7 +13,7 @@ import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -1077,7 +1076,7 @@ function loadAndroidUiDefaults(): any {
   });
   if (safeExistsSync(safeDefaultsPath)) {
     try {
-      return loadJson<unknown>(safeDefaultsPath);
+      return readJson<unknown>(safeDefaultsPath);
     } catch (err) {
       logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
     }

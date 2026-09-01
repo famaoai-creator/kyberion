@@ -13,12 +13,8 @@ import {
   type RequirementsDraft,
 } from '@agent/core/requirements-draft-store';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeReadFile,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import type { SoftwareQualityContract } from '@agent/core/software-quality';
 
@@ -54,7 +50,7 @@ export async function extractRequirements(input: ExtractRequirementsInput) {
   if (input.prior_draft_ref) {
     const priorAbs = resolveRepositoryInput(input.prior_draft_ref);
     if (safeExistsSync(priorAbs)) {
-      priorDraft = loadJson<unknown>(priorAbs);
+      priorDraft = readJson<unknown>(priorAbs);
     }
   }
 
@@ -110,7 +106,7 @@ export async function extractDesignSpec(input: {
     `active/missions/${input.mission_id}/evidence/requirements-draft.json`;
   const abs = resolveRepositoryInput(requirementsPath);
   const requirementsDraft = safeExistsSync(abs)
-    ? loadJson<unknown>(abs)
+    ? readJson<unknown>(abs)
     : readRequirementsDraft(input.mission_id);
   if (!requirementsDraft) {
     throw new Error(`[extract_design_spec] requirements draft not found at ${requirementsPath}`);
@@ -151,14 +147,14 @@ export async function extractTestPlan(input: {
     readRequirementsDraft(input.mission_id) ??
     (input.requirements_draft_path &&
     safeExistsSync(resolveRepositoryInput(input.requirements_draft_path))
-      ? loadJson<RequirementsDraft>(resolveRepositoryInput(input.requirements_draft_path))
+      ? readJson<RequirementsDraft>(resolveRepositoryInput(input.requirements_draft_path))
       : null);
   if (!requirementsDraft) throw new Error('[extract_test_plan] requirements draft not found');
 
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(resolveRepositoryInput(input.design_spec_path))
-      ? loadJson<unknown>(resolveRepositoryInput(input.design_spec_path))
+      ? readJson<unknown>(resolveRepositoryInput(input.design_spec_path))
       : undefined);
   const extracted = await backend.extractTestPlan({
     requirementsDraft,
