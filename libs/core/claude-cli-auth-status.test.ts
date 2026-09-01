@@ -18,4 +18,14 @@ describe('claude-cli-auth-status', () => {
   it('falls back to the exit code for older human-readable success output', () => {
     expect(isClaudeCliAuthenticated({ ok: true, stdout: 'Logged in' })).toBe(true);
   });
+
+  it('does not trust malformed or prototype-bearing JSON as auth state', () => {
+    expect(isClaudeCliAuthenticated({ ok: true, stdout: '[]' })).toBe(true);
+    expect(
+      isClaudeCliAuthenticated({
+        ok: true,
+        stdout: '{"loggedIn":false,"__proto__":{"loggedIn":true}}',
+      })
+    ).toBe(true);
+  });
 });
