@@ -1,7 +1,7 @@
 import { assertSafeRepositoryPath, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readTextFile } from '@agent/core/foundation';
+import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 import {
   defineGenerator,
@@ -397,7 +397,7 @@ function resolveInputPath(input: string, label: string): string {
 
 function normalizeGeneratedContent(content: string): string {
   try {
-    const value = JSON.parse(content) as Record<string, unknown>;
+    const value = parseSafeJsonObjectInput(content, 'design catalog generated output') || {};
     delete value.generated_at;
     return JSON.stringify(value);
   } catch {
