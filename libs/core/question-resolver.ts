@@ -12,7 +12,7 @@ import { notifyOperator } from './operator-notifications.js';
 import { getNarratedVideoBriefQuestions } from './narrated-video-preference-profile.js';
 import { getPresentationPreferenceProfile } from './presentation-preference-registry.js';
 import { getPresentationBriefQuestions } from './presentation-preference-profile.js';
-import { slugify } from './foundation/text.js';
+import { clamp, slugify } from './foundation/text.js';
 import type { ActuatorExecutionBrief } from './src/types/actuator-execution-brief.js';
 import type { OperatorInteractionPacket } from './src/types/operator-interaction-packet.js';
 import type { MeetingOperationsProfile } from './src/types/meeting-operations-profile.js';
@@ -29,6 +29,11 @@ const MEETING_PROFILE_PATH = pathResolver.knowledge(
 const MEETING_PROFILE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/meeting-operations-profile.schema.json'
 );
+
+function clampConfidence(value: unknown, fallback = 0.5): number {
+  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
+  return clamp(value, 0, 1);
+}
 const NARRATED_VIDEO_PROFILE_PATH = pathResolver.knowledge(
   'product/schemas/narrated-video-preference-profile.example.json'
 );
@@ -212,11 +217,6 @@ const narratedVideoProfileCatalog = defineCatalog<NarratedVideoPreferenceProfile
 
 function loadPolicyFile(): QuestionResolutionPolicyFile {
   return policyCatalog.load();
-}
-
-function clampConfidence(value: unknown, fallback = 0.5): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) return fallback;
-  return Math.min(1, Math.max(0, value));
 }
 
 function toSet(values: string[] | undefined): Set<string> {

@@ -11059,6 +11059,12 @@ SX-03 の単純な数値範囲制限を再監査し、video render／voice gener
 
 検証: video runtime／direction／lead score／composition lint **5 files / 53 tests passed**。残る SX-03 は domain-specific `clamp` と時刻 helper の追加残差、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe である。
 
+## 2026-09-02 再レビュー修正 220
+
+SX-03 の confidence clamp 残差を再監査し、execution brief／contextual clarification／question resolver の入力型チェックとfallbackを維持したまま、0〜1の範囲制限を `foundation/text` の canonical `clamp`へ委譲した。非数値・NaN・既定値の挙動は変更せず、各domainのconfidence semanticsを薄いsemantic wrapperとして保持した。
+
+検証: execution brief／clarification／question resolver **5 files / 42 tests passed**、root typecheck、foundation adoption、`git diff --check`。残る SX-03 は丸め・finite判定を含む domain-specific `clamp` と追加時刻 helper、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
