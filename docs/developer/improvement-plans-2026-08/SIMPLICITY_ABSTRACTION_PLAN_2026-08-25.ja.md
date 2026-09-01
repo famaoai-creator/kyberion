@@ -10711,6 +10711,12 @@ Programmatic Tool Runnerのstdin envelope／Unix socket RPC response境界を再
 
 検証: programmatic tool runner **1 file / 1 test passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 163
+
+Component inventory／design catalogの生成物比較、connection document migration、meeting attendee CLI JSONを再監査し、直接 `JSON.parse` をshared safe parserへ移行した。malformed／nested dangerous keyは生成物同値比較、再暗号化、meeting orchestrationへ渡さず、非JSON生成物のraw fallback、接続文書のskip、attendeeのwarning-and-empty fallback semanticsは維持した。
+
+検証: **4 files / 10 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

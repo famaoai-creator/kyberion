@@ -22,6 +22,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export function migrateConnectionDocuments(input: { decrypt: boolean; connectionsDir?: string }): {
@@ -39,7 +40,7 @@ export function migrateConnectionDocuments(input: { decrypt: boolean; connection
     const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
     let parsed: unknown;
     try {
-      parsed = JSON.parse(raw);
+      parsed = parseSafeJsonInput(raw, `connection document ${entry}`);
     } catch {
       counts.skipped += 1;
       continue;

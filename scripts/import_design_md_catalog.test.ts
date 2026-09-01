@@ -73,6 +73,14 @@ describe('import design-md catalog entrypoint', () => {
     expect(fs.readFileSync(outputPath, 'utf8')).toBe(before);
   });
 
+  it('uses the governed parser for generated catalog comparison', () => {
+    const source = String(
+      fs.readFileSync(path.join(process.cwd(), 'scripts/import_design_md_catalog.ts'), 'utf8')
+    );
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).not.toContain('JSON.parse(content)');
+  });
+
   it('rejects source paths outside the repository before reading them', async () => {
     const previousExitCode = process.exitCode;
     process.exitCode = undefined;

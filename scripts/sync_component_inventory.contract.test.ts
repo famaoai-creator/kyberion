@@ -16,6 +16,8 @@ describe('component inventory generator boundary', () => {
     expect(source).toContain('LEGACY_INDEX_PATH');
     expect(source).toContain('REPORT_PATH');
     expect(source).toContain('CAPABILITIES_GUIDE_PATH');
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).not.toContain('JSON.parse(withoutGeneratedDate)');
     expect(source).not.toContain('withExecutionContext');
     expect(source).not.toContain('safeWriteFile');
   });

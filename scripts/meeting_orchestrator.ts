@@ -46,7 +46,7 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;
@@ -65,6 +65,10 @@ interface OrchestratorOptions {
   skipFacilitate: boolean;
   skipSelf: boolean;
   skipTracking: boolean;
+}
+
+export function parseMeetingAttendeesJson(value: string): unknown {
+  return parseSafeJsonInput(value, '--attendees');
 }
 
 function runPipeline(name: string, context: Record<string, unknown>): void {
@@ -182,7 +186,7 @@ async function main(args: string[] = []): Promise<void> {
     try {
       const a = (argv.attendees as string).startsWith('@')
         ? readJson(resolveMeetingResourcePath((argv.attendees as string).slice(1)))
-        : JSON.parse(argv.attendees as string);
+        : parseMeetingAttendeesJson(argv.attendees as string);
       attendees = Array.isArray(a) ? a : [];
     } catch (err: any) {
       logger.warn(
