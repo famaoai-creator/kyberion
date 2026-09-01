@@ -11468,6 +11468,20 @@ semantics は変更していない。
 `git diff --check`。残る改善計画は追加の domain-specific clamp／時刻 helper、SX-04〜SX-14 の未完了項目、
 および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 263
+
+SX-03／SX-08b／SX-09b の surface input／reader を再監査し、Chronos deliverable inbox の mission
+state reader、operator-surface intent snapshot reader、collaboration API limit に残っていた旧
+`loadJson`／手書き `Math.max(Math.min(...))` を foundation の `readJson`／`clamp` へ統一した。
+collaboration limit は malformed／infinite を既存 default 100、fraction を floor、範囲外を 1..500 へ
+収束し、deliverable／intent の tenant・tier・path filtering と projection semantics は変更していない。
+canonical limit helper の境界テストを追加し、operator-surface test double も実 import 契約へ合わせた。
+
+検証: Chronos deliverable／collaboration limit／operator intent **3 test files / 16 tests passed**、
+Prettier、ESLint、`git diff --check`。残る改善計画は追加の surface contract／catalog／god-module 項目、
+全surfaceの実ブラウザ・外部provider実機確認、SX-04〜SX-14 の未完了項目、および voice provider／
+provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -2,13 +2,9 @@ import path from 'node:path';
 import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
 import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core/deliverable-inbox';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
+import { clamp, readJson } from '@agent/core/foundation';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';
 
 export interface DeliverableInboxItem {
@@ -69,7 +65,7 @@ function readMissionStatus(missionId?: string): string | undefined {
   try {
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return undefined;
-    const parsed = loadJson<{ status?: string }>(safeStatePath);
+    const parsed = readJson<{ status?: string }>(safeStatePath);
     return typeof parsed.status === 'string' ? parsed.status : undefined;
   } catch {
     return undefined;
@@ -90,7 +86,7 @@ function readMissionContext(missionId?: string): {
   try {
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return {};
-    const state = loadJson<{
+    const state = readJson<{
       tenant_slug?: string;
       tenant_id?: string;
       tier?: unknown;
@@ -304,6 +300,6 @@ export function collectDeliverableInbox(input: DeliverableInboxQuery = {}): Deli
   // eats the whole page and the real deliverables never reach the operator.
   return dedupeDeliverables(filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))).slice(
     0,
-    Math.max(1, Math.min(200, Number(input.limit || 50)))
+    clamp(Number(input.limit || 50), 1, 200)
   );
 }
