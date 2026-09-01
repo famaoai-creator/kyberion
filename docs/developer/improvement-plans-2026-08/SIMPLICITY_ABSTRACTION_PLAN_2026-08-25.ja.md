@@ -11041,6 +11041,12 @@ PR #711 の旧SHAで観測した契約不一致を修正した。intent smoke �
 
 検証: path boundary／storage retention **2 files / 19 tests passed**、email／adapter／storage／schema **5 files / 409 tests passed**。残る SX-03 は型付きprivate record、`clamp`、時刻 helper の adopt-or-deleteであり、SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。旧SHAで失敗したリモートcore／intent smoke は、この修正を新SHAへ反映後に再評価する。
 
+## 2026-09-02 再レビュー修正 217
+
+SX-03 の時刻 helper 残差を再監査し、mesh router／peer directory／topic registry／hub inspection に残っていた同一の `normalizeIso` 実装を `foundation/time` の canonical helperへ移行した。mesh固有の peer eligibility、topic resolution、heartbeat inspection、policy routing は変更せず、固定時刻を使う4テストファイルで結果契約を確認した。
+
+検証: mesh routing／directory／topic／inspection **4 files / 18 tests passed**。残る SX-03 は型付きprivate record、`clamp`、時刻 helper の追加残差、および SX-04〜SX-14 の未完了項目、voice provider 実機依存、provider CLI の実 OS-level enforcement probe である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

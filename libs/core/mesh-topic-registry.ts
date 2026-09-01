@@ -1,7 +1,7 @@
 import * as crypto from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJsonLines } from './foundation/json.js';
-import { nowIso } from './foundation/time.js';
+import { normalizeIso, nowIso } from './foundation/time.js';
 
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { withExecutionContext } from './authority.js';
@@ -84,15 +84,6 @@ export interface MeshTopicResolutionOptions {
   namespace?: string;
   maxFanOut?: number;
   policyVersion?: string;
-}
-
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
 }
 
 function normalizeNamespace(namespace?: string): string {

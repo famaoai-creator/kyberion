@@ -1,4 +1,5 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { normalizeIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -68,15 +69,6 @@ const meshHubPolicyCatalog = defineCatalog<MeshHubPolicySnapshot>({
   path: MESH_HUB_POLICY_PATH,
   schema: MESH_HUB_POLICY_SCHEMA_PATH,
 });
-
-function normalizeIso(value?: string | Date): string {
-  const input = value ?? new Date();
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error(`invalid_iso_timestamp:${String(value)}`);
-  }
-  return date.toISOString();
-}
 
 function loadMeshHubPolicy(): MeshHubPolicySnapshot {
   return meshHubPolicyCatalog.load();
