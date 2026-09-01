@@ -50,6 +50,7 @@ import {
   presenceStudioEmailDeliverSchema,
   presenceStudioEmailDraftSchema,
   presenceStudioLocationSchema,
+  presenceStudioDemoFrameSchema,
   presenceStudioVoiceStopSchema,
   presenceStudioBrowserBootstrapSchema,
   summarizePresenceStudioIdentity,
@@ -1433,16 +1434,21 @@ presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
 });
 
 presenceStudioData.app.post('/api/demo/frame', (req, res) => {
+  const parsed = presenceStudioDemoFrameSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
+  }
+  const body = parsed.data;
   const messages = buildPresenceSurfaceFrame({
-    surfaceId: typeof req.body?.surfaceId === 'string' ? req.body.surfaceId : 'presence-studio',
-    agentId: typeof req.body?.agentId === 'string' ? req.body.agentId : 'presence-surface-agent',
-    title: typeof req.body?.title === 'string' ? req.body.title : 'Presence Studio',
-    status: typeof req.body?.status === 'string' ? req.body.status : 'speaking',
-    expression: typeof req.body?.expression === 'string' ? req.body.expression : 'joy',
-    subtitle: typeof req.body?.subtitle === 'string' ? req.body.subtitle : 'Hello from Kyberion.',
-    transcript: Array.isArray(req.body?.transcript)
-      ? req.body.transcript
-      : [{ speaker: 'AI', text: 'Hello from Kyberion.' }],
+    surfaceId: body.surfaceId || 'presence-studio',
+    agentId: body.agentId || 'presence-surface-agent',
+    title: body.title || 'Presence Studio',
+    status: body.status || 'speaking',
+    expression: body.expression || 'joy',
+    subtitle: body.subtitle || 'Hello from Kyberion.',
+    transcript: body.transcript || [{ speaker: 'AI', text: 'Hello from Kyberion.' }],
   });
   for (const message of messages) presenceStudioData.applyA2UIMessage(message);
   presenceStudioData.emitState();
