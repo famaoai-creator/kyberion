@@ -119,7 +119,10 @@ describe('peer tenant runtime migration', () => {
   it('keeps records without a trustworthy tenant quarantined unless explicitly overridden', () => {
     safeWriteFile(
       `${LEGACY_ROOT}/peer-a/outbox.jsonl`,
-      JSON.stringify({ message_id: 'legacy-without-tenant' }) + '\n'
+      [
+        JSON.stringify({ message_id: 'legacy-without-tenant' }),
+        '{"__proto__":{"tenant_id":"tenant-acme"},"message_id":"unsafe"}',
+      ].join('\n') + '\n'
     );
     const plan = buildPeerTenantMigrationPlan({
       migrationId: 'migration-unknown',
@@ -127,6 +130,7 @@ describe('peer tenant runtime migration', () => {
       legacyRoots: [legacyRoots[0]],
     });
     expect(plan.sources[0].action).toBe('quarantine');
+    expect(plan.sources[0].unknown_record_count).toBe(2);
     applyPeerTenantMigrationPlan(plan);
     expect(safeExistsSync(`${LEGACY_ROOT}/peer-a/outbox.jsonl`)).toBe(false);
     expect(safeExistsSync(`${LEGACY_ROOT}/tenants`)).toBe(false);
