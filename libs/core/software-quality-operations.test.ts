@@ -11,6 +11,7 @@ import {
   dispatchTestInventory,
   evaluateQualityEnforcement,
   parseDefectTransitionEvent,
+  parseReasoningItems,
   recordDefectCandidate,
   transitionDefect,
 } from './software-quality-operations.js';
@@ -94,6 +95,11 @@ describe('software quality operations', () => {
     expect(
       result.items.filter((item) => item.viewpoint_ids.includes('security.trust-boundary'))
     ).toHaveLength(1);
+  });
+
+  it('rejects array and dangerous-key reasoning inventory responses', () => {
+    expect(parseReasoningItems('[{"items":[]}]')).toEqual([]);
+    expect(parseReasoningItems('{"items":[],"meta":{"__proto__":{}}}')).toEqual([]);
   });
 
   it('dispatches safe tests and separates approval, manual, and prohibited work', async () => {
@@ -274,6 +280,7 @@ describe('software quality operations', () => {
       defectPath,
       [
         '{not-json',
+        '{"defect_id":"DEF-3","from":null,"to":"candidate","actor_id":"agent:test","actor_type":"ai_agent","reason":"bad","evidence_refs":[],"occurred_at":"2026-09-01T00:00:00.000Z","meta":{"__proto__":{}}}',
         JSON.stringify({
           defect_id: 'DEF-3',
           from: null,
