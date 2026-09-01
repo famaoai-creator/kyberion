@@ -21,6 +21,7 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import {
   safeReadFile,
@@ -152,7 +153,9 @@ function sleepSync(ms: number): void {
 function isStaleLock(lockPath: string): boolean {
   try {
     const raw = safeReadFile(lockPath, { encoding: 'utf8' }) as string;
-    const parsed = normalizeTenantRateLimitLockRecord(JSON.parse(raw || '{}'));
+    const parsed = normalizeTenantRateLimitLockRecord(
+      parseSafeJsonInput(raw || '{}', 'tenant rate limit lock')
+    );
     if (!parsed) return true;
     process.kill(parsed.pid, 0);
     return false;

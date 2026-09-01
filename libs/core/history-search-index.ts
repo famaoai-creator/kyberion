@@ -12,6 +12,7 @@ import {
 import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readJson, readJsonLines } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { validateTraceReplay } from './trace-schema.js';
 
@@ -314,7 +315,7 @@ function ensureFtsHealthy(): boolean {
   );
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw || '[]') as unknown;
+    parsed = parseSafeJsonInput(raw || '[]', 'history search index response');
   } catch {
     return false;
   }
@@ -434,7 +435,7 @@ function normalizeSqlSearchRow(value: unknown): SqlSearchRow | undefined {
 function parseSqlSearchRows(raw: string): SqlSearchRow[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw || '[]') as unknown;
+    parsed = parseSafeJsonInput(raw || '[]', 'history search rows response');
   } catch {
     return [];
   }
@@ -448,7 +449,7 @@ function parseSqlSearchRows(raw: string): SqlSearchRow[] {
 function parseSqlContent(raw: string): string | undefined {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw || '[]') as unknown;
+    parsed = parseSafeJsonInput(raw || '[]', 'history search content response');
   } catch {
     return undefined;
   }
@@ -460,7 +461,7 @@ function parseSqlContent(raw: string): string | undefined {
 function parseSqlCount(raw: string): number {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw || '[]') as unknown;
+    parsed = parseSafeJsonInput(raw || '[]', 'history search count response');
   } catch {
     return 0;
   }

@@ -22,6 +22,7 @@ let tmpDir: string;
 
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
+    rootDir: () => path.join('/tmp', 'kyberion-test-root'),
     shared: (sub = '') => path.join(tmpDir, sub),
     knowledge: (sub = '') => path.join('/tmp', 'kyberion-test-knowledge', sub),
     rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),

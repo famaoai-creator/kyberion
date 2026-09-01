@@ -78,6 +78,8 @@
  * See docs/developer/improvement-plans-2026-07/
  * CROSS_PROVIDER_EXECUTION_PLAN_2026-07-25.ja.md §XP-06.
  */
+
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import * as path from 'node:path';
 import { Semaphore } from './semaphore.js';
 import { logger } from './core.js';
@@ -122,8 +124,14 @@ function resolveProviderCapOverrides(): Record<string, number> {
   const raw = getRegisteredEnvText('KYBERION_DELEGATION_PROVIDER_CAPS');
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
+    const parsed = parseSafeJsonInput(raw, 'delegation provider capabilities');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const overrides: Record<string, number> = {};
+      for (const [provider, value] of Object.entries(parsed)) {
+        if (Number.isInteger(value) && value > 0) overrides[provider] = value;
+      }
+      return overrides;
+    }
   } catch (err) {
     logger.warn(
       `[delegation-concurrency] KYBERION_DELEGATION_PROVIDER_CAPS is not valid JSON (ignored): ${err instanceof Error ? err.message : String(err)}`

@@ -18,6 +18,7 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { metrics } from './metrics.js';
 import type { MissionWorkingMemory } from './mission-working-memory.js';
 import { pathResolver } from './path-resolver.js';
@@ -398,7 +399,10 @@ export function loadCarryover(
       .filter((entry) => entry.key === CARRYOVER_WORKING_MEMORY_KEY);
     const latest = entries[entries.length - 1];
     if (!latest) return null;
-    const parsed = JSON.parse(latest.value) as CompactionCarryover;
+    const parsed = parseSafeJsonInput(
+      latest.value,
+      'worker compaction carryover'
+    ) as CompactionCarryover;
     return parsed && typeof parsed.goal === 'string' ? parsed : null;
   } catch {
     return null;

@@ -23,6 +23,7 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -199,7 +200,7 @@ export function readSyncCursor(
   }
   let state: unknown;
   try {
-    state = JSON.parse(source) as unknown;
+    state = parseSafeJsonInput(source, `ingest sync cursor state at ${file}`);
   } catch (error) {
     throw new Error(
       `[ingest-sync-cursors] cursor state at ${file} is not valid JSON: ${(error as Error).message}. ` +

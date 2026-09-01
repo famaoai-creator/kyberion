@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
@@ -117,7 +118,7 @@ export function normalizeInboxLockRecord(value: unknown): { pid: number } | unde
 function isStaleLock(lockPath: string): boolean {
   try {
     const raw = String(safeReadFile(lockPath, { encoding: 'utf8' }) || '');
-    const parsed = normalizeInboxLockRecord(JSON.parse(raw));
+    const parsed = normalizeInboxLockRecord(parseSafeJsonInput(raw, 'deliverable inbox lock'));
     if (!parsed) return true;
     process.kill(parsed.pid, 0);
     return false;

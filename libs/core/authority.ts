@@ -9,6 +9,7 @@ import { rawExistsSync, rawLstatSync, rawReaddir, rawReadTextFile } from './fs-p
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';
 import { getServiceAuthorities } from './service-authority-map.js';
 import { createLogger } from './logger.js';
@@ -69,7 +70,7 @@ function isJsonRecord(value: unknown): value is JsonRecord {
 
 function parseJsonRecord(raw: string): JsonRecord | null {
   try {
-    const value: unknown = JSON.parse(raw);
+    const value: unknown = parseSafeJsonInput(raw, 'authority JSON');
     return isJsonRecord(value) ? value : null;
   } catch {
     return null;
@@ -514,7 +515,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
   const grantsPath = pathResolver.active('shared/auth-grants.json');
   if (rawExistsSync(grantsPath) && missionId) {
     try {
-      const grants: unknown = JSON.parse(rawReadTextFile(grantsPath));
+      const grants: unknown = parseSafeJsonInput(rawReadTextFile(grantsPath), 'authority grants');
       const activeGrants = Array.isArray(grants)
         ? grants.filter((value): value is JsonRecord => {
             if (!isJsonRecord(value)) return false;
@@ -560,7 +561,7 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
             const trimmed = line.trim();
             if (!trimmed) continue;
             try {
-              const parsed: unknown = JSON.parse(trimmed);
+              const parsed: unknown = parseSafeJsonInput(trimmed, 'authority grant entry');
               if (isJsonRecord(parsed)) {
                 const grantId = stringField(parsed, 'grant_id');
                 if (grantId) latestGrants.set(grantId, parsed);
