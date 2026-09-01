@@ -20,6 +20,16 @@ describe('voice-hub request input boundary', () => {
     expect(readVoiceHubRequestObject(body)).toBe(body);
   });
 
+  it('uses the foundation record predicate for every object response boundary', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('satellites/voice-hub/request-input.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).toContain("import { isRecord } from '@agent/core/foundation';");
+    expect(source).not.toContain('function isRecord(');
+  });
+
   it('strictly validates the optional event scope', () => {
     expect(readVoiceHubEventScope(undefined)).toBeUndefined();
     expect(readVoiceHubEventScope({ tier: 'public', scope_kind: 'system' })).toEqual({
@@ -60,7 +70,7 @@ describe('voice-hub request input boundary', () => {
         encoding: 'utf8',
       })
     );
-    expect(source).toContain('parseVoiceBridgeResponse(JSON.parse');
+    expect(source).toMatch(/parseVoiceBridgeResponse\(\s*parseSafeJsonInput\(/u);
     expect(source).toContain('parseVoiceTranscriptionResponse(await response.json())');
     expect(source).not.toContain('as { text?: string }');
   });

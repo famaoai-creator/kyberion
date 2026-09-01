@@ -1,4 +1,5 @@
 import { parseEventScopeInput, type EventScopeInput } from '@agent/core/event-scope';
+import { isRecord } from '@agent/core/foundation';
 
 export type VoiceHubRequestBody = Record<string, unknown>;
 
@@ -10,16 +11,12 @@ export type VoiceBridgeResponse = {
 
 export type VoiceTranscriptionResponse = { text: string };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 /** Reject JSON values that cannot represent a voice-hub request object. */
 export function readVoiceHubRequestObject(value: unknown): VoiceHubRequestBody {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new Error('request body must be a JSON object');
   }
-  return value as VoiceHubRequestBody;
+  return value;
 }
 
 /** Parse an optional event scope before voice-hub performs any side effect. */
