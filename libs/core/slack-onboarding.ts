@@ -1,7 +1,8 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
-import { loadJson, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
 import * as customerResolver from './customer-resolver.js';
@@ -89,7 +90,7 @@ export function isEnvironmentInitialized(): boolean {
 function loadOnboardingState(channel: string, threadTs: string): OnboardingState | null {
   const resolved = pathResolver.resolve(onboardingStateLogicalPath(channel, threadTs));
   if (!safeExistsSync(resolved)) return null;
-  return loadJson<OnboardingState>(resolved);
+  return readJson<OnboardingState>(resolved);
 }
 
 export function getSlackOnboardingState(channel: string, threadTs: string): OnboardingState | null {

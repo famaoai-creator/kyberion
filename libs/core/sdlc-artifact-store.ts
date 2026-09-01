@@ -12,7 +12,8 @@
 import * as path from 'node:path';
 import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   DecomposedTaskPlan,
   ExtractedDesignSpec,
@@ -72,7 +73,7 @@ function readArtifact<T>(missionId: string, filename: string, schemaPath?: strin
       schema: schemaPath,
     }).load();
   }
-  return loadJson<T>(file);
+  return readJson<T>(file);
 }
 
 function writeArtifact(

@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import { readJson } from './foundation/json.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
@@ -247,7 +247,7 @@ function loadOperatorLlmSelection(): { provider: string; model_id?: string } | n
       { allowMissingLeaf: true }
     );
     if (!safeExistsSync(filePath)) return null;
-    const value = loadJson<{
+    const value = readJson<{
       provider?: unknown;
       model_id?: unknown;
     }>(filePath);

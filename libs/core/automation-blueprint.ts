@@ -1,5 +1,6 @@
 import * as path from 'node:path';
-import { assertSafeRepositoryPath, loadJson, safeLstat, safeReaddir } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeLstat, safeReaddir } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
@@ -618,7 +619,7 @@ function validatePipelineRef(pipelineRef: string): string {
 function readPipelineAdf(pipelineRef: string): PipelineAdf {
   const ref = validatePipelineRef(pipelineRef);
   const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(ref));
-  const raw = loadJson<unknown>(absolute);
+  const raw = readJson<unknown>(absolute);
   const pipeline = validatePipelineAdf(raw);
   const guardrails = validatePipelineGuardrails(pipeline, ref);
   if (!guardrails.ok) {

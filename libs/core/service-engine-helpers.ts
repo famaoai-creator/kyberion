@@ -1,12 +1,13 @@
 import { classifyError } from './error-classifier.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { createLogger } from './logger.js';
+import { readJson } from './foundation/json.js';
 const logger = createLogger('service-engine-helpers');
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { resolveRepositoryPathToken } from './path-token-resolver.js';
 import { resolveServiceBinding } from './service-binding.js';
-import { assertSafeRepositoryPath, loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 import { secretGuard } from './secret-guard.js';
 import { transform } from './transformer.js';
 
@@ -48,7 +49,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
       const safeConnectionPath = assertSafeRepositoryPath(connectionPath, {
         allowMissingLeaf: true,
       });
-      const primary = loadJson<Record<string, unknown>>(safeConnectionPath);
+      const primary = readJson<Record<string, unknown>>(safeConnectionPath);
       if (primary && typeof primary === 'object' && Object.keys(primary).length > 0) return primary;
     } catch (err) {
       logger.warn(`suppressed error in loadConnectionWithFallback: ${err}`);
@@ -62,7 +63,7 @@ export function loadConnectionWithFallback(serviceId: string): Record<string, an
       pathResolver.resolve(`knowledge/personal/connections/${normalizedServiceId}.json`),
       { allowMissingLeaf: true }
     );
-    const fallback = loadJson<Record<string, unknown>>(fallbackPath);
+    const fallback = readJson<Record<string, unknown>>(fallbackPath);
     if (fallback && typeof fallback === 'object' && Object.keys(fallback).length > 0)
       return fallback;
   } catch (err) {

@@ -1,5 +1,5 @@
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
-import { assertSafeRepositoryPath, loadJson, safeMkdir, safeExistsSync } from './secure-io.js';
+import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeMkdir, safeExistsSync } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
 import chalk from 'chalk';
@@ -507,7 +507,7 @@ export class MetricsCollector {
       try {
         const safeCandidate = assertSafeRepositoryPath(candidate);
         if (!safeExistsSync(safeCandidate)) continue;
-        sloTargets = loadJson<{
+        sloTargets = readJson<{
           critical_path?: Record<string, { latency_ms: number }>;
           default: { latency_ms: number };
         }>(assertSafeRepositoryPath(safeCandidate));

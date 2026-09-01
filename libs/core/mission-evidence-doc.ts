@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 /**
  * MissionEvidenceDoc — typed JSON document under a mission's
  * `evidence/` directory.
@@ -17,7 +17,7 @@ import { appendJsonLine } from './foundation/json.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, loadJson } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 
@@ -68,7 +68,7 @@ export class MissionEvidenceDoc<T> {
   read(): T | null {
     if (!this.exists()) return null;
     try {
-      const data = loadJson<unknown>(this.filePath);
+      const data = readJson<unknown>(this.filePath);
       if (this.options.validate && !this.options.validate(data)) {
         logger.warn(`[mission-evidence-doc] ${this.filePath} failed validator; ignoring`);
         return null;
