@@ -10795,6 +10795,12 @@ Shell streaming STT bridgeの外部プロセスNDJSONを再監査し、直接 `J
 
 検証: shell streaming STT boundary **1 file / 3 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 177
+
+Service engineのCLI alternative出力を再監査し、直接 `JSON.parse` の結果をoutput mappingへ渡していた境界をshared safe parserへ移行した。malformed outputは既存の保守的repairへ委譲し、nested dangerous keyを含むobjectはstructured resultへ昇格させずraw outputへ留める。正常なCLI JSON、既存repair、output mappingの契約は維持した。
+
+検証: service CLI output boundaryを含む **2 files / 6 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
