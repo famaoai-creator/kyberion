@@ -1,3 +1,5 @@
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
+
 export type JsonRecord = Record<string, unknown>;
 
 export function isJsonRecord(value: unknown): value is JsonRecord {
@@ -6,8 +8,7 @@ export function isJsonRecord(value: unknown): value is JsonRecord {
 
 export function parseJsonRecord(raw: string): JsonRecord | null {
   try {
-    const parsed: unknown = JSON.parse(raw);
-    return isJsonRecord(parsed) ? parsed : null;
+    return parseSafeJsonObjectInput(raw, 'JSON record') ?? null;
   } catch {
     return null;
   }
