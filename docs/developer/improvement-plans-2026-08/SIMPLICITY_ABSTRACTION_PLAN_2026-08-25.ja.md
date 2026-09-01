@@ -10921,6 +10921,12 @@ Tool loop guardrailの引数署名化を再監査し、直接 `JSON.parse` の�
 
 検証: tool loop guardrail **1 file / 4 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
 
+## 2026-09-02 再レビュー修正 198
+
+Deckのtheme選択／section body draftingを再監査し、モデル応答の直接 `JSON.parse` をfoundation safe parserへ移行した。malformed／nested dangerous keyはcatalog選択・本文草稿へ採用せず、軽量JSON repair、catalog allowlist、既存本文を保護するfallback semanticsは維持した。
+
+検証: deck theme direction **1 file / 8 tests passed**、root typecheck。残るvoice providerの実機依存とprovider CLIの実OS-level enforcement probeは、該当ハードウェア／隔離実行環境が必要なため継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。
