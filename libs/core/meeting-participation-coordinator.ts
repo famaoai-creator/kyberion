@@ -21,10 +21,11 @@
 
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { readJson } from './foundation/json.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
-import { assertSafeRepositoryPath, loadJson, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { TraceContext } from './src/trace.js';
 import { teeAudio } from './audio-tee.js';
 import type { AudioBus } from './audio-bus.js';
@@ -161,7 +162,7 @@ export function checkMeetingParticipationConsent(input: {
   }
   let raw: MeetingParticipationConsentRecord;
   try {
-    const parsed = loadJson<unknown>(consentPath);
+    const parsed = readJson<unknown>(consentPath);
     if (!isPlainObject(parsed)) {
       return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
     }

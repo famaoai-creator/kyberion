@@ -1,4 +1,5 @@
-import { loadJson, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeExistsSync, safeWriteFile } from './secure-io.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 
@@ -63,7 +64,7 @@ export const preferenceAdapter = {
   get: (key: string, defaultValue: unknown = null): unknown => {
     try {
       if (!safeExistsSync(PREF_PATH)) return defaultValue;
-      const prefs = parseUserPreferences(loadJson<unknown>(PREF_PATH));
+      const prefs = parseUserPreferences(readJson<unknown>(PREF_PATH));
       return prefs ? readUserPreference(prefs, key, defaultValue) : defaultValue;
     } catch (_e) {
       return defaultValue;
@@ -73,7 +74,7 @@ export const preferenceAdapter = {
   set: (key: string, value: unknown): boolean => {
     try {
       const prefs = safeExistsSync(PREF_PATH)
-        ? parseUserPreferences(loadJson<unknown>(PREF_PATH))
+        ? parseUserPreferences(readJson<unknown>(PREF_PATH))
         : {};
       if (!prefs || !writeUserPreference(prefs, key, value)) return false;
 

@@ -8,7 +8,7 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ValidationResult, ValidationError, JsonSchema } from './types.js';
-import { loadJson } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const schemasDir: string = path.resolve(currentDir, '../../knowledge/product/schemas');
@@ -17,7 +17,7 @@ const schemaCache: Record<string, JsonSchema> = {};
 export function loadSchema(schemaName: string): JsonSchema {
   if (schemaCache[schemaName]) return schemaCache[schemaName];
   const filePath = path.join(schemasDir, `${schemaName}.schema.json`);
-  const schema = loadJson<JsonSchema>(filePath);
+  const schema = readJson<JsonSchema>(filePath);
   schemaCache[schemaName] = schema;
   return schema;
 }

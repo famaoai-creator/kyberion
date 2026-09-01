@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
-import { loadJson, safeWriteFile, safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import * as nodePath from 'node:path';
 
@@ -35,7 +36,7 @@ function readRegistry(): FallbackRegistry {
   try {
     const p = path.join(pathResolver.rootDir(), REGISTRY_RELATIVE);
     if (!safeExistsSync(p)) return { version: '1.0.0', entries: [] };
-    return loadJson<FallbackRegistry>(p);
+    return readJson<FallbackRegistry>(p);
   } catch {
     return { version: '1.0.0', entries: [] };
   }
