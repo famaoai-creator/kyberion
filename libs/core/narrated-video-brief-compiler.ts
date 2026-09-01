@@ -1,4 +1,5 @@
 import type { VideoStoryboard } from './video-content-brief-contract.js';
+import { clamp } from './foundation/text.js';
 import { createLogger } from './logger.js';
 
 const logger = createLogger('narrated-video-brief-compiler');
@@ -504,11 +505,11 @@ function resolveDefaultCompositionFormat(): {
 }
 
 function clampDuration(value: number): number {
-  return Math.max(3, Math.min(300, value));
+  return clamp(value, 3, 300);
 }
 
 function clampFps(value: number): number {
-  return Math.max(1, Math.min(60, Math.round(value)));
+  return clamp(Math.round(value), 1, 60);
 }
 
 function roundTo2(value: number): number {
