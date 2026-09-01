@@ -50,6 +50,7 @@ import {
   presenceStudioEmailDeliverSchema,
   presenceStudioEmailDraftSchema,
   presenceStudioLocationSchema,
+  presenceStudioVoiceStopSchema,
   presenceStudioBrowserBootstrapSchema,
   summarizePresenceStudioIdentity,
   summarizePresenceStudioState,
@@ -1414,11 +1415,17 @@ presenceStudioData.app.post('/api/context/location', (req, res) => {
 });
 
 presenceStudioData.app.post('/api/voice/stop-speaking', async (req, res) => {
+  const parsed = presenceStudioVoiceStopSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ ok: false, error: presenceStudioData.validationErrorMessage(parsed.error) });
+  }
   const response = await fetch(`${presenceStudioData.VOICE_HUB_URL}/api/stop-speaking`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      reason: typeof req.body?.reason === 'string' ? req.body.reason : 'manual_stop',
+      reason: parsed.data.reason || 'manual_stop',
     }),
   });
   const payload = await response.text();

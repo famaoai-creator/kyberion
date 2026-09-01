@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PresenceStudioViewerError,
+  presenceStudioMinutesSessionStartSchema,
+  presenceStudioVoiceStopSchema,
   requirePresenceStudioLocalAdmin,
   resolvePresenceStudioViewerContext,
 } from './security.js';
@@ -63,5 +65,33 @@ describe('Presence Studio OS viewer scope', () => {
         source: 'loopback',
       })
     ).not.toThrow();
+  });
+
+  it('rejects ambiguous minutes and voice-stop request bodies before side effects', () => {
+    expect(
+      presenceStudioMinutesSessionStartSchema.safeParse({
+        missionId: ['MSN-1'],
+      }).success
+    ).toBe(false);
+    expect(
+      presenceStudioMinutesSessionStartSchema.safeParse({
+        missionId: 'MSN-1',
+        unexpected: true,
+      }).success
+    ).toBe(false);
+    expect(
+      presenceStudioMinutesSessionStartSchema.parse({
+        missionId: ' MSN-1 ',
+        title: ' Weekly sync ',
+      })
+    ).toEqual({ missionId: 'MSN-1', title: 'Weekly sync' });
+
+    expect(presenceStudioVoiceStopSchema.safeParse({ reason: { value: 'stop' } }).success).toBe(
+      false
+    );
+    expect(presenceStudioVoiceStopSchema.safeParse({ unexpected: true }).success).toBe(false);
+    expect(presenceStudioVoiceStopSchema.parse({ reason: ' manual ' })).toEqual({
+      reason: 'manual',
+    });
   });
 });
