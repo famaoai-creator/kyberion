@@ -10699,6 +10699,12 @@ Procedure promotionのintent phrase入力とpipeline promotionのreasoning advic
 
 検証: promotion boundaries **2 files / 5 tests passed**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
 
+## 2026-09-02 再レビュー修正 161
+
+Project Controllerのmetadata、Surface Runtimeのregister args、Virtual Officeのops alert JSONLを再監査し、直接 `JSON.parse` をshared safe parserへ移行した。metadata／register argsはobject・string array shapeを入口で検証し、Surface Runtimeのlegacy plain-argument fallbackとVirtual Officeのmalformed alert skip semanticsは維持した。
+
+検証: project／surface／virtual office **3 files / 対象テスト通過**、root typecheck、Prettier、`git diff --check`。残る全 direct JSONL／外部応答 inventory、script-level command の全 harness／generator 移行、12 surface の全面 contract 描画、voice provider の実機依存、provider CLI の実 OS-level enforcement probe は継続課題である。
+
 ## 2026-09-02 CI 再レビュー修正 139
 
 PR #711 の直前SHAで `check:i18n` が、Presence Studio の整理で同ファイルのベースライン件数が **4 → 3** に減少したことを stale baseline として検出していた。実装側の回帰ではなく、既存の意図した削減を反映するため `knowledge/product/governance/i18n-baseline.json` を checker の `--update-baseline` ceremony で再生成した。ハードコードを追加せず、他ファイルの件数は変更していない。

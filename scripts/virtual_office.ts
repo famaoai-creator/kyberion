@@ -53,6 +53,7 @@ import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
 import {
   getRegisteredEnvText,
   isRecord,
+  parseSafeJsonInput,
   readJson as readFoundationJson,
 } from '@agent/core/foundation';
 
@@ -620,7 +621,7 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const alerts = alertLines
     .map((line) => {
       try {
-        const parsed = JSON.parse(line) as unknown;
+        const parsed = parseSafeJsonInput(line, 'virtual office ops alert');
         if (!isRecord(parsed)) return null;
         const title = typeof parsed.title === 'string' ? parsed.title : '';
         const severity = typeof parsed.severity === 'string' ? parsed.severity : 'info';

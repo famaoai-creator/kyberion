@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeSurfaceRuntimeArgs } from './surface_runtime.js';
+import { normalizeSurfaceRuntimeArgs, parseSurfaceRegisterArgs } from './surface_runtime.js';
 
 describe('surface runtime entrypoint', () => {
   it('maps the unified positional action to the legacy action option', () => {
@@ -22,5 +22,15 @@ describe('surface runtime entrypoint', () => {
       '--surface',
       'chronos',
     ]);
+  });
+
+  it('accepts only string arrays for JSON register args and rejects dangerous keys', () => {
+    expect(parseSurfaceRegisterArgs('["--port","3000"]')).toEqual(['--port', '3000']);
+    expect(() => parseSurfaceRegisterArgs('{"__proto__":{"polluted":true}}')).toThrow(
+      'surface register args contains a dangerous JSON key'
+    );
+    expect(() => parseSurfaceRegisterArgs('{"port":3000}')).toThrow(
+      'surface register args must be a JSON array of strings'
+    );
   });
 });
