@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
+import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import { loadTeamRoleDirectory, loadTeamRoleSnapshot } from '@agent/core/mission-team-index';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
@@ -111,7 +112,8 @@ const outputPaths = [
 export const runSyncTeamRoles = defineGenerator({
   id: 'team-roles',
   outputs: outputPaths,
-  normalize: (content) => JSON.stringify(JSON.parse(content)),
+  normalize: (content) =>
+    JSON.stringify(parseSafeJsonObjectInput(content, 'team-role generated output')),
   render,
 });
 

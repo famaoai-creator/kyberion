@@ -21,6 +21,8 @@ describe('sync_authority_roles', () => {
     expect(source).toContain('loadGovernedAuthorityRoleIndex()');
     expect(source).toContain('defineGenerator');
     expect(source).toContain('runSyncAuthorityRoles');
+    expect(source).toContain('parseSafeJsonObjectInput');
+    expect(source).not.toContain('JSON.parse(content)');
     expect(source).not.toContain('readJson<');
   });
 
