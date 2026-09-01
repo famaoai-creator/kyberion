@@ -11446,6 +11446,17 @@ private `clamp*` wrapper を削除して `foundation/text` の canonical `clamp`
 `git diff --check`。残る改善計画は追加の domain-specific clamp／時刻 helper、SX-04〜SX-14 の未完了項目、
 および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 261
+
+SX-03 の bounded value helper を継続監査し、video render／voice generation の percent alias と browser
+pipeline／runtime の action-trail・scroll bounds に残っていた同型の `Math.max(Math.min(...))` を
+`foundation/text` の canonical `clamp` へ統一した。既存の範囲、入力変換、丸め、NaN の扱い、action-trail
+保存 semantics は変更していない。
+
+検証: browser／video／voice runtime **5 test files / 13 tests passed**、Prettier、ESLint、
+`git diff --check`。残る改善計画は追加の domain-specific clamp／時刻 helper、SX-04〜SX-14 の未完了項目、
+および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

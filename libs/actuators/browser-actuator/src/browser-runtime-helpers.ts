@@ -1,4 +1,4 @@
-import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { clamp, loadJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -877,7 +877,7 @@ function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>
         : {}),
     ts: new Date().toISOString(),
   };
-  const max = Math.max(1, Math.min(2000, Number(ctx?.action_trail_max || 200)));
+  const max = clamp(Number(ctx?.action_trail_max || 200), 1, 2000);
   return {
     ...ctx,
     action_trail: [...trail, recorded].slice(-max),

@@ -234,7 +234,7 @@ export class VoiceGenerationRuntime {
       status,
       progress: {
         ...data.progress,
-        percent: clampPercent(data.progress.percent),
+        percent: clamp(data.progress.percent, 0, 100),
       },
       message: data.message,
       artifact_refs: data.artifact_refs,
@@ -258,5 +258,3 @@ export class VoiceGenerationRuntime {
     for (const listener of this.listeners) listener(packet);
   }
 }
-
-const clampPercent = (percent: number): number => clamp(percent, 0, 100);
