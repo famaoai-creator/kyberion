@@ -49,6 +49,11 @@ describe('email-workflow shared helpers', () => {
     expect(parsed).toEqual({ to: 'team@example.com' });
   });
 
+  it('rejects arrays and dangerous JSON keys in model email output', () => {
+    expect(extractFirstJsonBlock('[{"to":"team@example.com"}]')).toBeNull();
+    expect(extractFirstJsonBlock('{"to":"team@example.com","meta":{"__proto__":{}}}')).toBeNull();
+  });
+
   it('rejects a request id that escapes the draft artifact directory', async () => {
     await expect(
       generateEmailReplyDraft({ requestId: '../outside', triageText: 'safe triage' })
