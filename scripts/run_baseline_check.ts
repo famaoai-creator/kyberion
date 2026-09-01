@@ -3,7 +3,7 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -118,7 +118,10 @@ export function readAuditLedgerFreshness(
         if (!line.trim()) continue;
         try {
           const timestamp = Date.parse(
-            String((JSON.parse(line) as { timestamp?: unknown }).timestamp || '')
+            String(
+              (parseSafeJsonInput(line, 'baseline audit entry') as { timestamp?: unknown })
+                .timestamp || ''
+            )
           );
           if (Number.isFinite(timestamp)) {
             lastEntryMs = Math.max(lastEntryMs ?? 0, timestamp);
@@ -328,7 +331,10 @@ export function shouldEmitDailyOpsAlert(markerRaw: string | null, key: string, n
   const today = now.toISOString().slice(0, 10);
   if (!markerRaw) return true;
   try {
-    const parsed = JSON.parse(markerRaw) as Record<string, unknown>;
+    const parsed = parseSafeJsonInput(markerRaw, 'baseline alert marker') as Record<
+      string,
+      unknown
+    >;
     return parsed?.[key] !== today;
   } catch {
     return true;
@@ -464,7 +470,10 @@ export function parseConnectionReadinessConfig(
   configDegraded: boolean;
 } {
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = parseSafeJsonInput(raw, 'baseline configuration') as {
+      required_services?: Record<string, ReadinessRule>;
+      tenant_guard?: { require_zero_drift?: unknown };
+    };
     baselineConfigDegraded = false;
     return {
       requiredServices:
