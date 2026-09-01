@@ -4,6 +4,7 @@ import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
 import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { redactSensitiveString } from './network.js';
 import { scrubContent } from './pii-scrubber.js';
@@ -525,7 +526,7 @@ export function buildDesktopRecording(
     ...body,
     recording_id: options.recordingId || `DR-${randomUUID()}`,
     source: 'desktop-capture',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     // A recording is a human demonstration artifact even when every observed
     // step is read-only. Promotion and execution must still pass review.
     risk_summary: { requires_manual_review: true, approval_required_count: highRisk },
@@ -545,7 +546,7 @@ export function reviewDesktopRecording(
     ...recording,
     review: {
       status: decision,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       reviewer,
       ...(note ? { note } : {}),
     },
@@ -655,7 +656,7 @@ export class DesktopDemonstrationRecorder {
   private lastBrowserHost = '';
 
   constructor(private readonly options: DesktopRecorderOptions) {
-    this.now = options.now || (() => new Date().toISOString());
+    this.now = options.now || nowIso;
     this.baseIntervalMs = options.baseIntervalMs || 1000;
     this.browserIntervalMs = options.browserIntervalMs || 1500;
     this.heartbeatMs = options.heartbeatMs || 5000;

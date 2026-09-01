@@ -43,6 +43,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { resolveRole, withExecutionContext } from './authority.js';
@@ -270,7 +271,7 @@ export class OrchestratorSessionJournal {
     this.journalPath = assertSafeRepositoryPath(pathResolver.rootResolve(options.journalPath), {
       allowMissingLeaf: true,
     });
-    this.now = options.now ?? (() => new Date().toISOString());
+    this.now = options.now ?? nowIso;
   }
 
   /** Validate, stamp seq/ts, and append. Refused during restore (no mutation while replaying). */
@@ -567,7 +568,7 @@ export function createOrchestratorSession(
     throw error;
   }
 
-  const createdAt = new Date().toISOString();
+  const createdAt = nowIso();
   const payload = {
     session_id: sessionId,
     surface: params.surface,
@@ -637,7 +638,7 @@ export function releaseOrchestratorSession(
   const existing = state.sessions[sessionId];
   if (!existing || existing.status === 'released') return null;
 
-  const releasedAt = new Date().toISOString();
+  const releasedAt = nowIso();
   withExecutionContext('mission_controller', () => {
     getDefaultJournal().append(ORCHESTRATOR_SESSION_OPS.sessionReleased, {
       session_id: sessionId,
