@@ -1,6 +1,7 @@
 /* HA-04: isolated child for Programmatic Tool Calling. */
 import * as net from 'node:net';
 import * as vm from 'node:vm';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface RunnerEnvelope {
@@ -101,7 +102,7 @@ function readEnvelope(): Promise<RunnerEnvelope> {
     });
     process.stdin.on('end', () => {
       try {
-        const parsed: unknown = JSON.parse(data);
+        const parsed = parseSafeJsonInput(data, 'PTC runner envelope');
         resolve(normalizeRunnerEnvelope(parsed));
       } catch {
         reject(new Error('[PTC_RUNNER] invalid envelope.'));
@@ -133,7 +134,7 @@ function rpc(
       const newline = buffer.indexOf('\n');
       if (newline < 0) return;
       const line = buffer.slice(0, newline);
-      const parsed: unknown = JSON.parse(line);
+      const parsed = parseSafeJsonInput(line, 'PTC RPC response');
       const response = normalizeRpcResponse(parsed);
       if (response.id !== id) return;
       socket.off('data', onData);

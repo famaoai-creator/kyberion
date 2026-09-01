@@ -10,6 +10,10 @@ describe('programmatic tool runner entrypoint', () => {
       })
     );
     expect(source).toContain('import { defineScript, isDirectScript, ScriptExitError }');
+    expect(source).toContain("parseSafeJsonInput(data, 'PTC runner envelope')");
+    expect(source).toContain("parseSafeJsonInput(line, 'PTC RPC response')");
+    expect(source).not.toContain('JSON.parse(data)');
+    expect(source).not.toContain('JSON.parse(line)');
     expect(source).not.toContain('main()\n  .catch');
     expect(source.match(/method: 'call_op'/gu)).toHaveLength(1);
   });
