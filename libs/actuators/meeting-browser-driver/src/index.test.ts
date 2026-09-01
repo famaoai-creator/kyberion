@@ -5,6 +5,7 @@ import {
   resetMeetingJoinDriverRegistry,
   redactMeetingUrl,
   resolveMeetingPlatform,
+  resolveMeetingPlatformFromUrl,
   validateMeetingTarget,
 } from '@agent/core/meeting-join-driver';
 import {
@@ -219,6 +220,20 @@ describe('resolveMeetingPlatform', () => {
         platform: 'meet',
       })
     ).toThrow(/not allow-listed/i);
+  });
+
+  it('uses DNS label boundaries for host inference and validation', () => {
+    expect(resolveMeetingPlatformFromUrl('https://evilzoom.us/j/123')).toBeNull();
+    expect(resolveMeetingPlatformFromUrl('https://company.zoom.us/j/123')).toBe('zoom');
+    expect(
+      validateMeetingTarget({ url: 'https://company.zoom.us/j/123', platform: 'zoom' }).platform
+    ).toBe('zoom');
+    expect(
+      validateMeetingTarget({ url: 'https://zoom.us./j/123', platform: 'zoom' }).platform
+    ).toBe('zoom');
+    expect(() =>
+      validateMeetingTarget({ url: 'https://user:pass@zoom.us/j/123', platform: 'zoom' })
+    ).toThrow(/invalid meeting URL host/i);
   });
 
   it('redacts meeting urls down to host-only values', () => {

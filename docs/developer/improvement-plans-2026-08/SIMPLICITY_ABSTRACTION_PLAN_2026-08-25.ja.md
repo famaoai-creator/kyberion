@@ -11314,6 +11314,20 @@ trailing dot／不正 URL）、Python syntax、`git diff --check`。残る改善
 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13 の未完了項目、
 および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 250
+
+meeting browser driver の直接実行境界を再監査し、stdin／argv の JSON を直接 `JSON.parse` し、
+`params` を暗黙 object として扱い、host 判定を部分文字列で行っていた残存を修正した。stdin は
+stream として読み、foundation の safe JSON object parser で root／params／危険キーを検証する。
+さらに meeting の canonical target validator へ host 判定を集約し、Python bridge を経由しない
+実行でも http(s)・userinfo 禁止・完全一致または DNS label 境界の許可 host を適用する。既存の
+join／status／leave の出力 envelope と provider driver 選択は維持した。
+
+検証: malformed／array／dangerous key／偽 host／userinfo／許可 host の直接 bridge 境界テスト、
+Python meeting bridge の URL boundary 回帰、Prettier、`git diff --check`。残る改善計画は Python bridge
+の全 subprocess 出力 shape、全surfaceの実ブラウザ／外部provider実機確認、SX-03〜SX-13 の未完了項目、
+および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
