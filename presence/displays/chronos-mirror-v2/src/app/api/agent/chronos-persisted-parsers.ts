@@ -1,3 +1,4 @@
+import { isRecord } from '@agent/core/foundation';
 import type { AgentRoutingDecision } from '@agent/core/intent-contract';
 
 export type MissionProposal = {
@@ -33,10 +34,6 @@ export type ChronosAuditEvent = {
   agentId?: string;
   result?: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value : undefined;

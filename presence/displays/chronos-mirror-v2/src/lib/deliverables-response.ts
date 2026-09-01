@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 export type ClientDeliverable = {
   artifactId: string;
   tenantSlug?: string;
@@ -23,10 +25,6 @@ export type DeliverablesResponse = {
 
 type JsonRecord = Record<string, unknown>;
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-function isRecord(value: unknown): value is JsonRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function safeOptionalString(record: JsonRecord, key: string): string | undefined {
   const value = record[key];

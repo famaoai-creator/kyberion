@@ -1,4 +1,5 @@
 import { eventScopeMatches, type EventScope, type EventScopeInput } from '@agent/core/event-scope';
+import { isRecord } from '@agent/core/foundation';
 import { t } from '@agent/core/t';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import type { MissionProposal } from '@agent/core/channel-surface-types';
@@ -179,10 +180,6 @@ const CHRONOS_AGENT_STRING_LIMITS: Record<(typeof CHRONOS_AGENT_STRING_FIELDS)[n
   systemPrompt: 100_000,
   query: 100_000,
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

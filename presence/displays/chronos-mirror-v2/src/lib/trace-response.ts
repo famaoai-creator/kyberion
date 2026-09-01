@@ -1,3 +1,4 @@
+import { isRecord } from '@agent/core/foundation';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
 
 export type TraceStatus = 'ok' | 'error' | 'in_progress';
@@ -78,10 +79,6 @@ const STATUSES: readonly TraceStatus[] = ['ok', 'error', 'in_progress'];
 const TIERS: readonly OsKnowledgeTier[] = ['public', 'confidential', 'personal'];
 const ARTIFACT_TYPES: readonly TraceArtifactType[] = ['screenshot', 'file', 'document', 'log'];
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-
-function isRecord(value: unknown): value is JsonRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function safeRecord(value: unknown): JsonRecord | undefined {
   if (!isRecord(value)) return undefined;

@@ -1,4 +1,4 @@
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 
 export type GuspStimulusStatus = 'pending' | 'injected' | 'processed' | 'expired' | 'failed';
 
@@ -28,10 +28,6 @@ export interface GuspStimulus {
     feedback?: string;
     evidence: Array<{ step: string; ts: string; agent: string }>;
   };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function assertAllowedKeys(

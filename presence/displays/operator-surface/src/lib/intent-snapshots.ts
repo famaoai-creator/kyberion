@@ -1,5 +1,9 @@
 import * as path from 'node:path';
-import { loadJson, readJsonLines as readFoundationJsonLines } from '@agent/core/foundation';
+import {
+  isRecord,
+  loadJson,
+  readJsonLines as readFoundationJsonLines,
+} from '@agent/core/foundation';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -24,10 +28,6 @@ interface MissionLocation {
   tier: 'public' | 'confidential';
   tenant_slug?: string;
   directory: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function readJson<T>(filePath: string): T | null {

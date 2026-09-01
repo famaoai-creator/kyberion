@@ -1,3 +1,4 @@
+import { isRecord } from '@agent/core/foundation';
 import type { OrganizationOperatingModelView } from '../components/OrganizationOperatingModel';
 
 type JsonRecord = Record<string, unknown>;
@@ -8,10 +9,6 @@ const INTERVENTIONS = ['reconciliation', 'project', 'incident', 'decision', 'ope
 const APPROVAL = ['draft', 'approved'] as const;
 const READINESS_PURPOSE = ['missing', 'draft', 'approved'] as const;
 const READINESS_OPERATIONAL = ['missing', 'available'] as const;
-
-function isRecord(value: unknown): value is JsonRecord {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
 
 function safeRecord(value: unknown): JsonRecord | undefined {
   return isRecord(value) && !Object.keys(value).some((key) => DANGEROUS_KEYS.has(key))

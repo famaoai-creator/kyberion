@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 export interface PresetInputSpec {
   key: string;
   type: 'string' | 'enum' | 'boolean' | 'secret';
@@ -26,10 +28,6 @@ export interface ConfigMissionBrief {
 
 const INPUT_TYPES = ['string', 'enum', 'boolean', 'secret'] as const;
 const BRIEF_STATUSES = ['draft', 'applying', 'applied', 'failed'] as const;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function nonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

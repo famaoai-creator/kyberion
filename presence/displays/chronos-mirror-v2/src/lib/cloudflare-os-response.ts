@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation';
+
 type HeldAction = {
   id: string;
   op: string;
@@ -28,10 +30,6 @@ export type CloudflareOsSnapshot = {
 
 export type CloudflareOsResponse =
   { ok: true; snapshot: CloudflareOsSnapshot } | { ok: false; error: string };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function requiredString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;

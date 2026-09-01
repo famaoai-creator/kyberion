@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { isRecord } from '@agent/core/foundation';
 import { metrics } from '@agent/core/metrics';
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/src/trace';
@@ -28,10 +29,6 @@ export interface StatsData {
   regressions: string[];
   usageByKind: Array<{ kind: string; count: number }>;
   traces: TraceLine[];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseTraceRecord(value: unknown): Record<string, unknown> | null {

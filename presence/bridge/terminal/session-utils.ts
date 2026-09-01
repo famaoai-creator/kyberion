@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -189,10 +189,6 @@ export function buildSessionPaths(runtimeBase: string, sessionId: string): Sessi
 export function normalizeSessionName(name: string | undefined, sessionId: string): string {
   const trimmed = name?.trim();
   return trimmed ? trimmed.slice(0, 80) : `Session ${sessionId}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isTimestamp(value: unknown): value is string {

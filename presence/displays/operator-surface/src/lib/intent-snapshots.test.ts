@@ -52,6 +52,8 @@ vi.mock('@agent/core/path-resolver', () => ({
   pathResolver: { rootResolve: (value: string) => `/repo/${value}` },
 }));
 vi.mock('@agent/core/foundation', () => ({
+  isRecord: (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value),
   loadJson: <T>(value: string) => JSON.parse(files[value]) as T,
   readJsonLines: <T>(value: string) =>
     String(files[value] ?? '')

@@ -2,6 +2,7 @@ import {
   parseIntentResolutionContract,
   type IntentResolutionContract,
 } from '@agent/core/intent-resolution-contract-parser';
+import { isRecord } from '@agent/core/foundation';
 
 /**
  * Shared request/response contract for the CS-02 voice tiers. Used by the
@@ -90,10 +91,6 @@ export interface VoiceListenOnceResponse {
     elapsed_ms: number;
   };
   error?: string;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 function optionalString(value: unknown): string | undefined {
