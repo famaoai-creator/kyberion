@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { customerRoot } from '@agent/core/customer-resolver';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import {
@@ -52,7 +53,7 @@ export function filterTraceLogContent(
     const trimmed = line.trim();
     if (!trimmed) continue;
     try {
-      const parsed = normalizePersistedTrace(JSON.parse(trimmed), {
+      const parsed = normalizePersistedTrace(parseSafeJsonInput(trimmed, 'trace log entry'), {
         strictUnknownSpans: true,
       });
       if (!parsed) continue;

@@ -1,6 +1,7 @@
 import { logger } from '@agent/core/core';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
@@ -181,8 +182,8 @@ const main = async () => {
     .parseSync();
 
   const inputPath = resolveProcessPath(String(argv.input), false);
-  const inputContent = safeReadFile(inputPath, { encoding: 'utf8' }) as string;
-  const result = await handleAction(parseProcessAction(JSON.parse(inputContent)));
+  const input = readJson<unknown>(inputPath);
+  const result = await handleAction(parseProcessAction(input));
   console.log(JSON.stringify(result, null, 2));
 };
 
