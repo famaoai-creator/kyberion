@@ -208,7 +208,12 @@ export async function POST(req: NextRequest) {
   if (resolved.response) return resolved.response;
   const scope = conciergeConversationScope(resolved.context);
 
-  const parsedBody = await readRequestObject(req);
+  const parsedBody = await readRequestObject(req, 'request body', [
+    'text',
+    'locale',
+    'speaker',
+    'sessionId',
+  ]);
   if (!parsedBody.ok) {
     return NextResponse.json(
       {
