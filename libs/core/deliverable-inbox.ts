@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
@@ -97,10 +98,6 @@ function ensureInboxDir(): void {
 
 function sleepSync(ms: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeInboxLockRecord(value: unknown): { pid: number } | undefined {
