@@ -203,6 +203,40 @@ describe('mission lifecycle finish gate', () => {
     }
   });
 
+  it('rejects malformed task objects without dropping valid task fields', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          deliverable: 'evidence/task-1.md',
+        },
+        { task_id: 42 },
+      ])
+    );
+
+    expect(readMissionNextTasks(missionPath)).toEqual([]);
+
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          deliverable: 'evidence/task-1.md',
+        },
+      ])
+    );
+    expect(readMissionNextTasks(missionPath)).toEqual([
+      {
+        task_id: 'task-1',
+        status: 'planned',
+        deliverable: 'evidence/task-1.md',
+      },
+    ]);
+  });
+
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
     const reconciliation = reconcileLifecycleClosureCriteria(
       {
