@@ -8,6 +8,7 @@
 
 import { logger } from '../core.js';
 import { readJson } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExec, safeExistsSync } from '../secure-io.js';
 import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
@@ -217,7 +218,7 @@ export async function checkActuatorCapabilities(
       actuatorId: manifest.actuator_id || actuatorId,
       version: manifest.version || '0.0.0',
       capabilities,
-      checkedAt: new Date().toISOString(),
+      checkedAt: nowIso(),
     };
   } else {
     // Fallback: evaluate manifest prerequisites. Capabilities without
@@ -226,7 +227,7 @@ export async function checkActuatorCapabilities(
       actuatorId: manifest.actuator_id || actuatorId,
       version: manifest.version || '0.0.0',
       capabilities: manifestCapabilities,
-      checkedAt: new Date().toISOString(),
+      checkedAt: nowIso(),
     };
   }
 }
