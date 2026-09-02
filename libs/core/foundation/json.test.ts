@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getFoundationIo, registerFoundationIo, type FoundationIo } from './io.js';
-import { parseSafeJsonInput, parseSafeJsonObjectValue, readJsonLines } from './json.js';
+import {
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+  readJsonObjectRequest,
+  readJsonLines,
+} from './json.js';
 
 describe('foundation safe JSON parser', () => {
   it('accepts safe trees and rejects malformed or dangerous input', () => {
@@ -16,6 +21,27 @@ describe('foundation safe JSON parser', () => {
   it('requires object roots after safe-tree validation', () => {
     expect(parseSafeJsonObjectValue({ ok: true }, 'request')).toEqual({ ok: true });
     expect(() => parseSafeJsonObjectValue([], 'request')).toThrow('request must be a JSON object');
+  });
+
+  it.each([
+    ['malformed JSON', () => Promise.reject(new SyntaxError('invalid JSON'))],
+    ['null', async () => null],
+    ['array', async () => []],
+    ['dangerous object', async () => ({ nested: { constructor: {} } })],
+  ])('rejects %s at the async request boundary', async (_label, json) => {
+    await expect(readJsonObjectRequest({ json }, 'surface request')).resolves.toMatchObject({
+      ok: false,
+    });
+  });
+
+  it('returns a safe JSON object unchanged at the async request boundary', async () => {
+    const body = { action: 'approve', nested: { value: true } };
+    await expect(
+      readJsonObjectRequest({ json: async () => body }, 'surface request')
+    ).resolves.toEqual({
+      ok: true,
+      body,
+    });
   });
 });
 

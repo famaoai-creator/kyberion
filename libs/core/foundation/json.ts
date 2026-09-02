@@ -7,6 +7,9 @@ export {
   parseSafeJsonInput,
   parseSafeJsonObjectInput,
   parseSafeJsonObjectValue,
+  readJsonObjectRequest,
+  type JsonObjectRequest,
+  type JsonObjectRequestResult,
 } from './safe-json.js';
 import { parseSafeJsonInput } from './safe-json.js';
 
