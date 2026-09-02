@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { parseMissionNextTaskRecords } from './mission-next-task-reader.js';
+import {
+  parseMissionNextTaskObjects,
+  parseMissionNextTaskRecords,
+} from './mission-next-task-reader.js';
 
 describe('parseMissionNextTaskRecords', () => {
   it('keeps the task and status projection for valid records', () => {
@@ -26,6 +29,26 @@ describe('parseMissionNextTaskRecords', () => {
   it('rejects dangerous object keys through the safe JSON parser', () => {
     expect(
       parseMissionNextTaskRecords([JSON.parse('{"__proto__":{"status":"completed"}}')])
+    ).toBeNull();
+  });
+});
+
+describe('parseMissionNextTaskObjects', () => {
+  it('preserves fields for lifecycle flows that write the task object back', () => {
+    const tasks = parseMissionNextTaskObjects([
+      { task_id: 'task-1', status: 'planned', deliverable: 'evidence/task-1.md' },
+    ]);
+    expect(tasks).toEqual([
+      { task_id: 'task-1', status: 'planned', deliverable: 'evidence/task-1.md' },
+    ]);
+  });
+
+  it('rejects non-object entries and dangerous nested keys', () => {
+    expect(parseMissionNextTaskObjects([{ task_id: 'task-1' }, 'invalid'])).toBeNull();
+    expect(
+      parseMissionNextTaskObjects([
+        JSON.parse('{"task_id":"task-1","metadata":{"constructor":{}}}'),
+      ])
     ).toBeNull();
   });
 });
