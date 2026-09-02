@@ -6,6 +6,7 @@ import { loadProvisionedEntryRecords } from './mission-orchestration-journal.js'
 import { composeMissionTeamBrief, writeMissionTeamBrief } from './mission-team-brief-composer.js';
 import {
   composeMissionTeamPlan,
+  loadMissionTeamPlan,
   resolveMissionTeamReceiver,
   resolveMissionTeamPlan,
   writeMissionTeamPlan,
@@ -239,6 +240,35 @@ describe('mission-team-composer classification integration', () => {
           provider: expect.not.stringMatching(/^gemini$/),
         })
       );
+    } finally {
+      safeRmSync(missionPath, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('rejects schema-invalid and cross-mission persisted team plans', () => {
+    const missionId = 'MSN-TEAM-PLAN-SCOPE-001';
+    const missionPath = pathResolver.missionDir(missionId, 'public');
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'mission_controller';
+    process.env.KYBERION_PERSONA = 'mission-controller-test';
+    try {
+      safeMkdir(missionPath, { recursive: true });
+      const plan = composeMissionTeamPlan({
+        missionId,
+        missionType: 'development',
+        tier: 'public',
+      });
+      writeMissionTeamPlan(missionPath, { ...plan, mission_id: 'MSN-OTHER-001' });
+
+      expect(() => loadMissionTeamPlan(missionId)).toThrow('[MISSION_TEAM_PLAN_SCOPE_MISMATCH]');
+
+      writeMissionTeamPlan(missionPath, { ...plan, assignments: null as never });
+      expect(() => loadMissionTeamPlan(missionId)).toThrow(/Invalid catalog mission-team-plan/);
     } finally {
       safeRmSync(missionPath, { recursive: true, force: true });
       if (previousRole === undefined) delete process.env.MISSION_ROLE;

@@ -13319,6 +13319,12 @@ SX-03／SX-04／SX-08 のmission phase gate definitionを再監査し、phase ex
 
 検証: mission phase gate／process planning **2 files / 30 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 510
+
+SX-03／SX-04／SX-08 のmission team planを再監査し、persisted `team-composition.json`を`readJson<MissionTeamPlan>`の型アサーションだけで読み、ファイル内のmission identityを要求元missionへbindingしていない残存を修正した。既存の`mission-team-plan.schema.json`を`defineCatalog`のcanonical loaderへ接続し、regular-file境界、schema validation、mission ID bindingを共有read boundaryへ集約した。schema不正または別missionのteam planはteam receiver／orchestrationへ進まずfail-closedし、tenant scope検査、obsolete provider refresh、organization enrichment、provisioning semanticsは維持している。
+
+検証: mission team composer／binding／runtime **3 files / 23 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
