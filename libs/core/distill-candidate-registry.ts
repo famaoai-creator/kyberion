@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -71,7 +72,7 @@ export function createDistillCandidateRecord(
     candidate_id?: string;
   }
 ): DistillCandidateRecord {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     candidate_id:
       input.candidate_id ||
@@ -103,7 +104,7 @@ export function saveDistillCandidateRecord(record: DistillCandidateRecord): stri
   const filePath = recordPath(record.candidate_id);
   const updated: DistillCandidateRecord = {
     ...record,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   safeWriteFile(filePath, JSON.stringify(updated, null, 2));
   distillCandidateListCache = null;
@@ -154,7 +155,7 @@ export function updateDistillCandidateRecord(
     ...patch,
     candidate_id: current.candidate_id,
     created_at: current.created_at,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   saveDistillCandidateRecord(next);
   return next;
