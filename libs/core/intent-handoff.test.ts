@@ -5,9 +5,13 @@ import * as os from 'node:os';
 
 let tmpBase: string;
 
-vi.mock('./path-resolver.js', () => ({
-  sharedTmp: (sub = '') => path.join(tmpBase, sub),
-}));
+vi.mock('./path-resolver.js', async () => {
+  const actual = await vi.importActual<typeof import('./path-resolver.js')>('./path-resolver.js');
+  return {
+    ...actual,
+    sharedTmp: (sub = '') => path.join(tmpBase, sub),
+  };
+});
 
 vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -17,6 +21,7 @@ vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
     safeExistsSync: (p: string) => actual.existsSync(p),
+    safeLstat: (p: string) => actual.lstatSync(p),
     assertSafeRepositoryPath: (p: string) => p,
     safeReadFile: (p: string, opts: { encoding?: string }) =>
       actual.readFileSync(p, opts as { encoding: BufferEncoding }),
@@ -32,7 +37,11 @@ vi.mock('./foundation/json.js', () => ({
   readJson: <T>(filePath: string) => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 
-import { writeIntentGoalHandoff, consumeIntentGoalHandoff } from './intent-handoff.js';
+import {
+  writeIntentGoalHandoff,
+  consumeIntentGoalHandoff,
+  loadIntentGoalHandoffAtPath,
+} from './intent-handoff.js';
 
 describe('intent-handoff', () => {
   it('round-trips the payload and deletes the file on consume', () => {
@@ -90,5 +99,25 @@ describe('intent-handoff', () => {
     expect(() =>
       writeIntentGoalHandoff('../escape', { source_text: 'should not be written' })
     ).toThrow(/missionId must be a single safe path segment/u);
+  });
+
+  it('rejects a directory at the handoff path before attempting JSON validation', () => {
+    tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-intent-handoff-'));
+    const directoryPath = path.join(tmpBase, 'directory.json');
+    fs.mkdirSync(directoryPath);
+
+    expect(() => loadIntentGoalHandoffAtPath(directoryPath)).toThrow(
+      'handoff must be a regular file'
+    );
+  });
+
+  it('rejects schema-invalid persisted handoff fields', () => {
+    tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-intent-handoff-'));
+    const bad = path.join(tmpBase, 'bad-schema.json');
+    fs.writeFileSync(bad, JSON.stringify({ source_text: 'ok', unexpected: true }));
+
+    expect(() => loadIntentGoalHandoffAtPath(bad)).toThrow(/Invalid catalog intent-goal-handoff/u);
+    expect(consumeIntentGoalHandoff(bad)).toBeNull();
+    expect(fs.existsSync(bad)).toBe(false);
   });
 });
