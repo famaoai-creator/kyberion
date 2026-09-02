@@ -2,6 +2,7 @@ import { appendJsonLine, readJson } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import { getMissionAgentInputQueue, type AgentInputQueueEntry } from './agent-input-queue.js';
 import { enqueueDelegationNotification } from './delegation-notifications.js';
@@ -442,7 +443,7 @@ export function startDelegatedTaskTrace(input: {
   const trace: DelegatedTaskTrace = {
     trace_id: randomUUID(),
     kind: 'delegated_task',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     status: 'started',
     owner: input.owner,
     instruction: input.instruction,
@@ -478,7 +479,7 @@ export function completeDelegatedTaskTrace(
   const gapPhases = outcome.gapPhases
     ? sanitizeGapSamples(outcome.gapPhases, (message) => logger.warn(message))
     : undefined;
-  const completedAt = new Date().toISOString();
+  const completedAt = nowIso();
   const completed: DelegatedTaskTrace = {
     ...trace,
     completed_at: completedAt,
@@ -533,7 +534,7 @@ export function cancelDelegatedTaskTrace(
   trace: DelegatedTaskTrace,
   reason = 'cancelled by caller'
 ): DelegatedTaskTrace {
-  const cancelledAt = new Date().toISOString();
+  const cancelledAt = nowIso();
   const cancelled: DelegatedTaskTrace = {
     ...trace,
     completed_at: cancelledAt,
@@ -579,7 +580,7 @@ export function claimDelegatedTaskActivation(
       ...record,
       activation_count: 1,
       activation_id: randomUUID(),
-      activated_at: new Date().toISOString(),
+      activated_at: nowIso(),
       activation_status: 'claimed',
     };
     const { delegation_id, ...rest } = activated;
@@ -612,7 +613,7 @@ export function recordDelegatedTaskActivationFailure(
     }
     if (record.activation_failure) return record;
 
-    const failedAt = new Date().toISOString();
+    const failedAt = nowIso();
     const failure: DelegatedTaskRecord = {
       ...record,
       activation_status: 'failed',
@@ -663,7 +664,7 @@ export function recordDelegatedTaskActivationCompletion(
     if (record.activation_failure) return record;
     if (record.activation_status === 'completed') return record;
 
-    const completedAt = new Date().toISOString();
+    const completedAt = nowIso();
     const completed: DelegatedTaskRecord = {
       ...record,
       activation_status: 'completed',
