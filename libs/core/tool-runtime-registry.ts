@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -774,7 +775,7 @@ export function markToolRuntimeInstalled(
     command: tool.installed_backend?.command || tool.trial_backend.command,
     args: tool.installed_backend?.args || tool.trial_backend.args,
     managed_env_path: resolveManagedEnvPath(tool),
-    installed_at: new Date().toISOString(),
+    installed_at: nowIso(),
     provenance: provenance || undefined,
   };
   writeToolRuntimeStateFile(state);
@@ -794,7 +795,7 @@ export function markToolRuntimePinned(
     command: tool.installed_backend?.command || tool.trial_backend.command,
     args: tool.installed_backend?.args || tool.trial_backend.args,
     managed_env_path: resolveManagedEnvPath(tool),
-    pinned_at: new Date().toISOString(),
+    pinned_at: nowIso(),
     provenance: provenance || undefined,
   };
   writeToolRuntimeStateFile(state);
