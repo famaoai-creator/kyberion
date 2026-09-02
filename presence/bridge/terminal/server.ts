@@ -3,6 +3,7 @@ import {
   appendJsonLine,
   getRegisteredEnvBool,
   getRegisteredEnvText,
+  nowIso,
   parseSafeJsonInput,
   readJson,
 } from '@agent/core/foundation';
@@ -145,7 +146,7 @@ function saveSessionState(session: Session, active = Boolean(session.rt)) {
         {
           id: session.id,
           pid: session.rt?.getPid(),
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           active,
           active_brain: session.active_brain || 'none',
           name: session.name,
@@ -172,7 +173,7 @@ function persistSessionFeedback(session: Session, text: string, skipBroadcast = 
       sessionId: session.id,
       status: 'success',
       data: { message: cleanText },
-      metadata: { timestamp: new Date().toISOString() },
+      metadata: { timestamp: nowIso() },
     };
 
     safeWriteFile(responseFile, JSON.stringify(envelope, null, 2));
@@ -187,7 +188,7 @@ function persistSessionFeedback(session: Session, text: string, skipBroadcast = 
         JSON.stringify(
           {
             stimulus_id: session.current_stimulus_id,
-            ts: new Date().toISOString(),
+            ts: nowIso(),
           },
           null,
           2
@@ -211,7 +212,7 @@ function emitGlobalStimulus(text: string, session: Session) {
 
     const stimulus = {
       id: `term-${Date.now()}`,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ttl: 60,
       origin: { channel: 'terminal', source_id: session.id },
       signal: {
@@ -440,7 +441,7 @@ function hydratePersistedSession(id: string, requestedName?: string): Session {
     captureBuffer: '',
     backlog: [],
     active_brain: persisted?.active_brain || 'none',
-    createdAt: persisted?.createdAt || new Date().toISOString(),
+    createdAt: persisted?.createdAt || nowIso(),
     paths,
   };
 }
@@ -560,7 +561,7 @@ app.get('/health', (req, res) => {
     persistedSessions: listPersistedSessionStates(RUNTIME_BASE).length,
     runtimeResources: runtimeResources.length,
     runtimeByKind,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 
@@ -577,7 +578,7 @@ app.get('/runtime', (req, res) => {
       idleForMs: record.idleForMs,
       metadata: record.metadata || {},
     })),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 

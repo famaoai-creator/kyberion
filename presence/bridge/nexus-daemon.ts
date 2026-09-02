@@ -7,7 +7,7 @@
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
 import { loadChannelRegistry, type ChannelRegistryChannel } from '@agent/core/channel-registry';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
   assertSafeRepositoryPath,
@@ -98,7 +98,7 @@ function ensureSystemMission() {
   const state = {
     mission_id: NEXUS_MISSION_ID,
     status: 'Active',
-    started_at: new Date().toISOString(),
+    started_at: nowIso(),
     role: 'System Dispatcher',
   };
 
@@ -135,8 +135,7 @@ async function updateStimulusStatus(
         if (!s) return line;
         if (s.id === id) {
           s.control.status = status;
-          if (step)
-            s.control.evidence.push({ step, ts: new Date().toISOString(), agent: 'nexus-daemon' });
+          if (step) s.control.evidence.push({ step, ts: nowIso(), agent: 'nexus-daemon' });
         }
         return JSON.stringify(s);
       })
