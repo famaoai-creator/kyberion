@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { writeGovernedArtifactJson, ensureGovernedArtifactDir } from './artifact-store.js';
 import type { IntentResolutionContract } from './intent-resolution-contract.js';
@@ -94,7 +95,7 @@ export function deliverToCowork(
 
   const packet: CoworkArtifactPacket = {
     delivery_id: deliveryId,
-    delivered_at: new Date().toISOString(),
+    delivered_at: nowIso(),
     mission_id: options.missionId,
     trace_id: options.traceId,
     title: options.title ?? 'Kyberion Result',
@@ -161,7 +162,7 @@ export function buildOperatorInteractionPacket(params: {
 
   return {
     delivery_id: deliveryId,
-    delivered_at: new Date().toISOString(),
+    delivered_at: nowIso(),
     mission_id: params.missionId,
     trace_id: params.traceId,
     title: params.title,

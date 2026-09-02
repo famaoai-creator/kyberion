@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { createApprovalRequest, loadApprovalRequest } from './approval-store.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import { appendGovernedArtifactJsonl } from './artifact-store.js';
 import {
@@ -27,7 +28,7 @@ function emitSlackApprovalEvent(event: Record<string, unknown>): string {
     'slack_bridge',
     'active/shared/observability/channels/slack/approvals.jsonl',
     {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event_id: randomUUID(),
       channel: 'slack',
       ...event,

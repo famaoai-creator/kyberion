@@ -4,6 +4,7 @@ import {
   type SurfaceAuthorizationRole,
   type SurfacePermission,
 } from './surface-authorization.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Framework-neutral contracts for surface APIs.
@@ -417,7 +418,7 @@ export function createHeadlessEnvelope<T>(input: {
     api_version: HEADLESS_API_VERSION,
     surface: input.surface || 'chronos',
     resource: input.resource,
-    generated_at: input.generatedAt || new Date().toISOString(),
+    generated_at: input.generatedAt || nowIso(),
     scope: input.scope,
     available_operations: availableHeadlessOperationIds(
       input.authorizationContext || input.scope.role,

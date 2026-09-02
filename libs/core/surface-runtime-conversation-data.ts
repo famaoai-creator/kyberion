@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { parseSurfaceActuatorResult } from './surface-runtime-result.js';
 import { queryKnowledgeHybrid } from './src/knowledge-index.js';
 
@@ -1302,7 +1303,7 @@ export function buildSurfaceDelegationRequest(params: {
       sender: params.senderAgentId,
       receiver: params.receiver,
       performative: 'request',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     },
     payload,
   };
