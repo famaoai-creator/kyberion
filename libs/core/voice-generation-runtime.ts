@@ -1,5 +1,6 @@
 import { getVoiceRuntimePolicy, type VoiceRuntimePolicy } from './voice-runtime-policy.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 export type VoiceJobStatus =
   | 'queued'
@@ -238,7 +239,7 @@ export class VoiceGenerationRuntime {
       },
       message: data.message,
       artifact_refs: data.artifact_refs,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     };
   }
 
