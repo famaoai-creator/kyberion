@@ -2,6 +2,7 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { loadServiceEndpointsCatalog } from './service-binding.js';
@@ -38,18 +39,51 @@ function getServicePresetsDir(): string {
   );
 }
 
-function loadPresetFromPath(presetPath: string): ServicePresetRecord {
+/** Load one preset through the shared schema boundary and optional service binding. */
+export function loadServicePresetAtPath(
+  presetPath: string,
+  expectedServiceId?: string
+): ServicePresetRecord {
+  const safePath = assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
+    allowMissingLeaf: false,
+  });
+  const catalog = defineCatalog<ServicePresetRecord>({
+    id: 'service-preset',
+    path: safePath,
+    schema: SERVICE_PRESETS_SCHEMA_PATH,
+  });
   try {
-    return defineCatalog<ServicePresetRecord>({
-      id: 'service-preset',
-      path: assertSafeRepositoryPath(pathResolver.rootResolve(presetPath), {
-        allowMissingLeaf: true,
-      }),
-      schema: SERVICE_PRESETS_SCHEMA_PATH,
-    }).load();
+    const normalizedExpected = expectedServiceId?.trim();
+    const raw = normalizedExpected ? readJson<unknown>(safePath) : undefined;
+    const rawRecord =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : undefined;
+    const candidate =
+      normalizedExpected && rawRecord
+        ? {
+            ...rawRecord,
+            service_id:
+              rawRecord.service_id === undefined ? normalizedExpected : rawRecord.service_id,
+          }
+        : undefined;
+    const preset = candidate ? catalog.validate(candidate, safePath) : catalog.load();
+    if (
+      normalizedExpected &&
+      preset.service_id.trim().toLowerCase() !== normalizedExpected.toLowerCase()
+    ) {
+      throw new Error(
+        `service_id ${preset.service_id} does not match expected service ${normalizedExpected}`
+      );
+    }
+    return preset;
   } catch (error: any) {
     throw new Error(`Failed to load service preset at ${presetPath}: ${error?.message || error}`);
   }
+}
+
+function loadPresetFromPath(presetPath: string): ServicePresetRecord {
+  return loadServicePresetAtPath(presetPath);
 }
 
 function loadServicePresetsDirectory(catalogDir: string): ServicePresetsCatalog {

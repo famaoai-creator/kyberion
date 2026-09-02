@@ -1,5 +1,4 @@
 import { createRequire } from 'node:module';
-import { readJson } from '../../foundation/json.js';
 import { validatePhysicalDependencies } from './PhysicalLayer.js';
 import { loadServiceEndpointsCatalog } from '../../service-binding.js';
 import {
@@ -7,7 +6,7 @@ import {
   collectServicePresetCliFallbacks,
   getServicePresetPolicy,
 } from '../../service-preset-policy.js';
-import type { ServicePresetRecord } from '../../service-preset-registry.js';
+import { loadServicePresetAtPath } from '../../service-preset-registry.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeExec } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
 import { secretGuard } from '../../secret-guard.js';
@@ -156,7 +155,7 @@ export function inspectServiceAuth(serviceId: string, presetPath?: string): Serv
   }
 
   try {
-    const preset = readJson<ServicePresetRecord>(resolvedPresetPath);
+    const preset = loadServicePresetAtPath(resolvedPresetPath, serviceId);
     const presetPolicy = getServicePresetPolicy(preset);
     const oauthAvailable = Boolean(preset.oauth && typeof preset.oauth === 'object');
     const strategy = (presetPolicy.auth_strategy || 'none').toLowerCase();

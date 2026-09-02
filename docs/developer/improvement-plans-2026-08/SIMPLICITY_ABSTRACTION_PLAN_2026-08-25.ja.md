@@ -13331,6 +13331,12 @@ SX-03／SX-04／SX-08 のA2A CLI入力を再監査し、`run_a2a`がpersisted en
 
 検証: run_a2a／A2A bridge／task contract **3 files / 32 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 512
+
+SX-03／SX-04 のservice auth readinessを再監査し、`ServiceValidator`が明示されたservice presetを`readJson<ServicePresetRecord>`の型アサーションだけで読み、presetのservice identityを検証していない残存を修正した。既存の`service-presets.schema.json`と`service-preset-registry`へ`loadServicePresetAtPath`を追加し、schema validation、regular repository path、期待service ID bindingを一つのloaderへ集約した。旧来のservice_id省略型custom auth presetは要求service IDを明示的に補完して互換性を維持しつつ、別serviceへのbindingはauth readinessをfail-closedにした。
+
+検証: ServiceValidator／service preset registry **2 files / 14 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
