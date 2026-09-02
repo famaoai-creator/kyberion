@@ -12,6 +12,8 @@ describe('mission team composition entrypoint', () => {
     );
 
     expect(source).toContain('print(result)');
+    expect(source).toContain('loadStateAtPath(');
+    expect(source).not.toContain('readJson<');
     expect(source).not.toContain('console.log(');
   });
 
