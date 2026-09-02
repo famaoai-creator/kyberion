@@ -11,10 +11,11 @@ import {
 } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
-import { readJson, readJsonLines } from './foundation/json.js';
+import { readJsonLines } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { clamp, isRecord } from './foundation/text.js';
 import { validateTraceReplay } from './trace-schema.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 
 /**
  * HA-02: zero-LLM search over raw conversation and mission history.
@@ -638,15 +639,6 @@ function readValidatedTraceLines(filePath: string): Record<string, unknown>[] {
   });
 }
 
-function readHistoryRecord(filePath: string): Record<string, unknown> | undefined {
-  try {
-    const value = readJson<unknown>(filePath);
-    return isRecord(value) ? value : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function recordItems(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.filter(isRecord) : [];
 }
@@ -683,11 +675,11 @@ export function resolveMissionHistoryScope(missionIdInput: string): MissionHisto
   if (!safeExistsSync(statePath)) {
     throw new Error(`[POLICY_VIOLATION] Mission state is missing: ${missionId}`);
   }
-  const state = readHistoryRecord(statePath);
+  const state = loadMissionStateAtPath(statePath);
   if (!state) {
     throw new Error(`[POLICY_VIOLATION] Mission state is unreadable: ${missionId}`);
   }
-  if (resolveHistoryTier(state) !== tier) {
+  if (state.tier !== tier) {
     throw new Error(
       `[POLICY_VIOLATION] Mission path/state tier mismatch for governed history search: ${missionId}`
     );
@@ -725,7 +717,7 @@ function matchesMission(raw: unknown, missionId: string): boolean {
 function collectMissionScopedEntries(scope: MissionHistorySearchScope): HistoryIndexEntry[] {
   const entries: HistoryIndexEntry[] = [];
   const statePath = assertSafeRepositoryPath(path.join(scope.missionPath, 'mission-state.json'));
-  const state = readHistoryRecord(statePath);
+  const state = loadMissionStateAtPath(statePath);
   if (!state) return entries;
   recordItems(state.history).forEach((item, index) => {
     const content = [item.event, item.note]
@@ -963,14 +955,9 @@ function collectPublicMissionEntries(): HistoryIndexEntry[] {
   for (const missionId of safeReaddir(directory)) {
     const statePath = safeHistoryFile(path.join(directory, missionId, 'mission-state.json'));
     if (!statePath) continue;
-    const state = readHistoryRecord(statePath);
+    const state = loadMissionStateAtPath(statePath);
     if (!state) continue;
-    if (
-      String(state.tier || '')
-        .trim()
-        .toLowerCase() !== 'public'
-    )
-      continue;
+    if (state.tier !== 'public') continue;
     recordItems(state.history).forEach((item, index) => {
       const content = [item.event, item.note]
         .filter((value): value is string => typeof value === 'string')

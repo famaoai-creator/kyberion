@@ -31,6 +31,26 @@ const TRACE_FIXTURE_PATH = pathResolver.shared(
 const VALID_TRACE_TOKEN = `validtracesignal${process.pid}${Date.now()}`;
 const INVALID_TRACE_TOKEN = `invalidtracesignal${process.pid}${Date.now()}`;
 
+function missionState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    mission_id: PRIVATE_MISSION_ID,
+    tier: 'confidential',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: {
+      branch: 'history-search-test',
+      start_commit: 'abc123',
+      latest_commit: 'abc123',
+      checkpoints: [],
+    },
+    history: [],
+    ...overrides,
+  };
+}
+
 function entry(
   input: Partial<HistoryIndexEntry> & Pick<HistoryIndexEntry, 'entryId' | 'content'>
 ): HistoryIndexEntry {
@@ -260,19 +280,17 @@ describe('history-search-index', () => {
       safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
       safeWriteFile(
         pathResolver.rootResolve(`${PRIVATE_MISSION_PATH}/mission-state.json`),
-        JSON.stringify({
-          tier: 'confidential',
-          mission_id: PRIVATE_MISSION_ID,
-          history: [
-            'malformed history row',
-            { event: { unexpected: true }, note: ['not text'] },
-            {
-              ts: '2026-07-18T00:00:00.000Z',
-              event: 'PRIVATE_CHECK',
-              note: 'confidential invoice recovery',
-            },
-          ],
-        })
+        JSON.stringify(
+          missionState({
+            history: [
+              {
+                ts: '2026-07-18T00:00:00.000Z',
+                event: 'PRIVATE_CHECK',
+                note: 'confidential invoice recovery',
+              },
+            ],
+          })
+        )
       );
       safeWriteFile(
         pathResolver.rootResolve(PRIVATE_CONVERSATION_PATH),
@@ -311,13 +329,35 @@ describe('history-search-index', () => {
       safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
       safeWriteFile(
         pathResolver.rootResolve(`${PRIVATE_MISSION_PATH}/mission-state.json`),
-        JSON.stringify({ tier: 'confidential', mission_id: PRIVATE_MISSION_ID, history: [] })
+        JSON.stringify(missionState())
       );
     });
     process.env.MISSION_ID = `${PRIVATE_MISSION_ID}-other`;
     expect(() => searchMissionHistory({ missionId: PRIVATE_MISSION_ID, mode: 'browse' })).toThrow(
       'requires MISSION_ID'
     );
+  });
+
+  it('rejects a schema-invalid private mission state before indexing history', () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(pathResolver.rootResolve(PRIVATE_MISSION_PATH), { recursive: true });
+      safeWriteFile(
+        pathResolver.rootResolve(`${PRIVATE_MISSION_PATH}/mission-state.json`),
+        JSON.stringify({
+          mission_id: PRIVATE_MISSION_ID,
+          tier: 'confidential',
+          history: [
+            {
+              ts: '2026-07-18T00:00:00.000Z',
+              event: 'SHOULD_NOT_INDEX',
+              note: 'invalid state must stay out of the search index',
+            },
+          ],
+        })
+      );
+    });
+    process.env.MISSION_ID = PRIVATE_MISSION_ID;
+    expect(() => resolveMissionHistoryScope(PRIVATE_MISSION_ID)).toThrow('unreadable');
   });
 
   it('rejects a symlinked private mission before reading its history state', () => {
@@ -328,7 +368,7 @@ describe('history-search-index', () => {
     fs.mkdirSync(targetMissionPath, { recursive: true });
     fs.writeFileSync(
       path.join(targetMissionPath, 'mission-state.json'),
-      JSON.stringify({ tier: 'confidential', mission_id: missionId, history: [] })
+      JSON.stringify(missionState({ mission_id: missionId }))
     );
     fs.mkdirSync(path.dirname(linkedMissionPath), { recursive: true });
     fs.symlinkSync(targetMissionPath, linkedMissionPath, 'dir');
