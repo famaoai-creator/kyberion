@@ -12467,6 +12467,12 @@ SX-04 の core mission-context-pack に残っていた mission ID／tier から�
 
 検証: mission-context-pack **2 files / 35 tests passed**、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 368
+
+SX-04 の orchestrator actuator execution brief に残っていた mission status snapshot の汎用 `readJson` を、core の canonical `loadStateAtPath` へ統合した。status／tier／project／persona の一覧 projection は schema 検証済み state だけを採用し、欠損・不正・symlink state は一覧から除外する。archetype catalog、execution plan、project ledger など別契約の任意 JSON reader と target／metric の既存 semantics は変更していない。valid／invalid state の projection 回帰テストも追加した。
+
+検証: orchestrator actuator **7 files / 54 tests passed**、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

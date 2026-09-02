@@ -9,6 +9,7 @@ import {
 } from '@agent/core/secure-io';
 import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import type {
@@ -953,17 +954,20 @@ export function collectMissionStatusSnapshot(targetId?: string) {
   const missionFiles = getAllFiles(missionRoot, { maxDepth: 4 }).filter((filePath) =>
     filePath.endsWith('mission-state.json')
   );
-  const missions = missionFiles.map((filePath) => {
+  const missions = missionFiles.flatMap((filePath) => {
     const logicalPath = path.relative(pathResolver.rootDir(), filePath);
-    const state = loadRepositoryJson<Record<string, any>>(filePath);
-    return {
-      mission_id: String(state.mission_id || path.basename(path.dirname(filePath))),
-      tier: String(state.tier || 'unknown'),
-      status: String(state.status || 'unknown'),
-      project_id: state.relationships?.project?.project_id || null,
-      assigned_persona: state.assigned_persona || null,
-      path: logicalPath,
-    };
+    const state = loadStateAtPath(filePath);
+    if (!state) return [];
+    return [
+      {
+        mission_id: state.mission_id || path.basename(path.dirname(filePath)),
+        tier: state.tier,
+        status: state.status,
+        project_id: state.relationships?.project?.project_id || null,
+        assigned_persona: state.assigned_persona || null,
+        path: logicalPath,
+      },
+    ];
   });
   const target = targetId
     ? missions.find((item) => item.mission_id === targetId || item.project_id === targetId) || null
