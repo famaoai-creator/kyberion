@@ -9157,6 +9157,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-outbox-message.schema.json",
+      "tier": "public",
+      "size": 2302,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-policy.schema.json",
       "tier": "public",
       "size": 5704,
