@@ -1,7 +1,6 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { readJson } from './foundation/json.js';
-import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
@@ -152,7 +151,10 @@ function toProjectedTask(item: WorkItem): NextTask {
 
 function readExistingTasks(nextTasksPath: string): NextTask[] {
   if (!safeExistsSync(nextTasksPath)) return [];
-  const parsed = parseMissionNextTaskObjects(readJson<unknown>(nextTasksPath));
+  const parsed = loadMissionNextTaskObjectsAtPath(
+    nextTasksPath,
+    nodePath.basename(nodePath.dirname(nextTasksPath))
+  );
   if (!parsed) throw new Error(`NEXT_TASKS.json must contain an array: ${nextTasksPath}`);
   return parsed.map((entry, index) => {
     if (
