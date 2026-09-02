@@ -38,6 +38,7 @@ import { listProjectRecords } from '@agent/core/project-registry';
 import { listTenants } from '@agent/core/tenant-governance';
 import { listTaskSessions } from '@agent/core/task-session';
 import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
+import { loadAgentPerformanceIndex } from '@agent/core/agent-performance-index';
 import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -544,21 +545,8 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   });
 
   // performance index (retrospective loop output)
-  const performanceFile = tenantScopeReadable
-    ? readJson<{
-        by_agent_role?: Record<
-          string,
-          {
-            samples: number;
-            success: number;
-            review: number;
-            blocked: number;
-            success_rate: number;
-          }
-        >;
-      }>(pathResolver.shared('observability/retrospectives/agent-performance.json'))
-    : null;
-  const performance = Object.entries(performanceFile?.by_agent_role || {})
+  const performanceFile = tenantScopeReadable ? loadAgentPerformanceIndex() : {};
+  const performance = Object.entries(performanceFile)
     .map(([key, record]) => {
       const [agent, role] = key.split('|');
       return { agent, role, samples: record.samples, success_rate: record.success_rate };
