@@ -5,6 +5,7 @@ import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import type { CapabilityResolveOptions } from './agent-provider-resolution.js';
 import {
   isInstanceDemoted,
@@ -126,7 +127,7 @@ export function pinProviderDecision(decisionKey: string, decision: ProviderDecis
     modelId: decision.modelId,
     instance: decision.instance,
     orchestration: decision.orchestration,
-    pinnedAt: new Date().toISOString(),
+    pinnedAt: nowIso(),
     by: actorId(),
   };
   file.version = PIN_FILE_VERSION;

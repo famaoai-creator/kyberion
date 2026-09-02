@@ -10,6 +10,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { readJsonIfPresent, appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -144,7 +145,7 @@ function ensureBridgeRoot(): void {
 }
 
 function isoNow(): string {
-  return new Date().toISOString();
+  return nowIso();
 }
 
 function projectBridgeActionInfo(value: unknown): ManualDriveActionInfo | null {
@@ -269,7 +270,7 @@ function writeDescriptor(input: {
       scope: input.scope,
       status: 'online',
       updated_at: updatedAt,
-      expires_at: new Date(Date.now() + DESCRIPTOR_TTL_MS).toISOString(),
+      expires_at: nowIso(new Date(Date.now() + DESCRIPTOR_TTL_MS)),
       action,
     } satisfies DurableManualDriverDescriptor)}\n`
   );
