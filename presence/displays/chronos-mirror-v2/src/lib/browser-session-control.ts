@@ -6,6 +6,7 @@ import {
   safeLstat,
   safeWriteFile,
 } from './intelligence-primitives';
+import { parseBrowserSessionSummary } from './intelligence-observations';
 
 type BrowserSessionControlAction = 'close_browser_session' | 'restart_browser_session';
 
@@ -47,12 +48,14 @@ export function applyBrowserSessionControl(
     return false;
   }
 
-  let record: BrowserSessionRecord;
+  let rawRecord: unknown;
   try {
-    record = readJson<BrowserSessionRecord>(filePath);
+    rawRecord = readJson<unknown>(filePath);
   } catch {
     return false;
   }
+  if (!parseBrowserSessionSummary(rawRecord)) return false;
+  const record = rawRecord as BrowserSessionRecord;
   const nextStatus = action === 'restart_browser_session' ? 'expired' : 'released';
   const nextRecord: BrowserSessionRecord = {
     ...record,

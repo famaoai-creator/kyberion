@@ -34,4 +34,23 @@ describe('browser session control resource boundary', () => {
 
     expect(applyBrowserSessionControl(suffix, 'close_browser_session')).toBe(false);
   });
+
+  it('does not mutate a schema-invalid session record', () => {
+    safeMkdir(sessionDir, { recursive: true });
+    safeWriteFile(
+      sessionPath,
+      JSON.stringify({
+        session_id: suffix,
+        active_tab_id: 'tab-1',
+        tab_count: -1,
+        updated_at: '2026-09-01T00:00:00.000Z',
+        lease_status: 'active',
+        retained: true,
+        action_trail_count: 0,
+        recent_actions: [],
+      })
+    );
+
+    expect(applyBrowserSessionControl(suffix, 'close_browser_session')).toBe(false);
+  });
 });
