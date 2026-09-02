@@ -19,6 +19,7 @@ vi.mock('@agent/core/foundation', async (importOriginal) => {
   return {
     ...actual,
     loadJson: mocks.loadJson,
+    readJson: mocks.loadJson,
   };
 });
 

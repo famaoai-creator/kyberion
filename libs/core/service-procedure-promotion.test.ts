@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteServiceProcedure } from './service-procedure-promotion.js';
 import { serviceRecordingContentHash, type ServiceRecording } from './service-recording.js';
 import * as secureIo from './secure-io.js';
+import * as foundationJson from './foundation/json.js';
 
 const recording: ServiceRecording = {
   schema_version: 'service-recording.v1',
@@ -38,7 +39,7 @@ describe('promoteServiceProcedure', () => {
       return actualRead(filePath, options);
     });
     vi.spyOn(secureIo, 'safeExistsSync').mockReturnValue(false);
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
       if (filePath.includes('service-promotion-test.json')) return recording;
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
     });
@@ -77,7 +78,7 @@ describe('promoteServiceProcedure', () => {
       }
       return actualRead(filePath, options);
     });
-    vi.spyOn(secureIo, 'loadJson').mockImplementation((filePath) => {
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
       if (filePath.includes('service-promotion-test.json')) {
         return { ...recording, review: { ...recording.review, status: 'pending' } };
       }

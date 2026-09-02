@@ -11545,6 +11545,18 @@ parser validation、retry、provider／session 境界、pipeline の入力・出
 `git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 269
+
+SX-03 の追加 reader 移行を検証する中で、core の cowork knowledge bridge／service procedure promotion が
+`readJson` を secure-io 側から誤って参照していたこと、meeting browser／wisdom actuator の test double と
+service promotion／cowork bridge の reader fixture が旧 `loadJson` 契約を固定していたことを検出した。reader
+の import を `foundation/json` に正し、fixture／mock を canonical `readJson` 契約へ更新した。path guard、
+review／approval、tier filtering、knowledge idempotency、cookie／wisdom の fail-closed semantics は変更していない。
+
+検証: core／actuator **8 test files / 56 tests passed**、root typecheck、foundation adoption、Prettier、
+`git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
+未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
