@@ -7,18 +7,36 @@
  * specific matches are rejected as ambiguous.
  */
 
-export const SCOPED_REGISTRY_LEVELS = [
-  'tenant',
-  'organization',
-  'project',
-  'mission',
-  'task',
-  'session',
-] as const;
+import { ENTITY_SCOPE_HIERARCHY, type EntityScopeKey } from './entity-scope.js';
 
-export type ScopedRegistryLevel = (typeof SCOPED_REGISTRY_LEVELS)[number];
+/**
+ * Registry scope ordering is the entity containment ordering. Keep this as a
+ * reference to the canonical declaration so a new entity level cannot be
+ * added to one model and silently omitted from the other.
+ */
+export const SCOPED_REGISTRY_LEVELS = ENTITY_SCOPE_HIERARCHY;
 
-export type ScopedRegistryScope = Partial<Record<ScopedRegistryLevel, string>>;
+export type ScopedRegistryLevel = EntityScopeKey;
+
+type LegacyScopedRegistryLevel =
+  'tenant' | 'organization' | 'project' | 'mission' | 'task' | 'session';
+
+const LEGACY_SCOPE_LEVELS: Readonly<Record<LegacyScopedRegistryLevel, ScopedRegistryLevel>> = {
+  tenant: 'tenant_slug',
+  organization: 'organization_id',
+  project: 'project_id',
+  mission: 'mission_id',
+  task: 'task_id',
+  session: 'session',
+};
+
+/**
+ * Legacy short keys remain accepted at the boundary for persisted callers and
+ * existing integrations. They are normalized immediately to entity-scope
+ * keys; entries and canonical keys never expose the legacy vocabulary.
+ */
+export type ScopedRegistryScope = Partial<Record<ScopedRegistryLevel, string>> &
+  Partial<Record<LegacyScopedRegistryLevel, string>>;
 
 export type ScopedRegistryEvent = 'added' | 'removed';
 
@@ -39,11 +57,21 @@ type Listener<T> = (payload: ScopedRegistryEventPayload<T>) => void;
 
 function normalizeScope(scope: ScopedRegistryScope): Readonly<ScopedRegistryScope> {
   const normalized: Partial<Record<ScopedRegistryLevel, string>> = {};
-  for (const level of SCOPED_REGISTRY_LEVELS) {
-    const value = scope[level];
+  for (const [rawLevel, value] of Object.entries(scope)) {
     if (value === undefined) continue;
+    const level = (SCOPED_REGISTRY_LEVELS as readonly string[]).includes(rawLevel)
+      ? (rawLevel as ScopedRegistryLevel)
+      : LEGACY_SCOPE_LEVELS[rawLevel as LegacyScopedRegistryLevel];
+    // Preserve the previous permissive boundary for unrelated metadata while
+    // canonicalizing all known scope vocabulary.
+    if (!level) continue;
     const trimmed = String(value).trim();
-    if (!trimmed) throw new Error(`[SCOPED_REGISTRY_SCOPE] ${level} cannot be empty`);
+    if (!trimmed) throw new Error(`[SCOPED_REGISTRY_SCOPE] ${rawLevel} cannot be empty`);
+    if (normalized[level] !== undefined && normalized[level] !== trimmed) {
+      throw new Error(
+        `[SCOPED_REGISTRY_SCOPE] conflicting values for ${level}: ${normalized[level]} and ${trimmed}`
+      );
+    }
     normalized[level] = trimmed;
   }
   return normalized;
