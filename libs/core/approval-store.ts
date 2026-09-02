@@ -7,6 +7,7 @@ import {
   type GovernedArtifactRole,
 } from './artifact-store.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import type { SurfaceAsyncChannel } from './channel-surface-types.js';
 import {
@@ -329,7 +330,7 @@ export function recordSessionCacheAutoApproval(
   }
 ): void {
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.entry.storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'auto_approved_via_session_cache',
     request_id: params.entry.grantedByRequestId,
     correlation_id: params.correlationId,
@@ -456,7 +457,7 @@ export function createApprovalRequest(
     threadTs: params.threadTs,
     correlationId: params.correlationId,
     requestedBy: params.requestedBy,
-    requestedAt: new Date().toISOString(),
+    requestedAt: nowIso(),
     status: 'pending',
     title: params.draft.title,
     summary: params.draft.summary,
@@ -487,7 +488,7 @@ export function createApprovalRequest(
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'approval_requested',
     request_id: record.id,
     correlation_id: record.correlationId,
@@ -564,7 +565,7 @@ export function expireApprovalRequest(
   const updated: ApprovalRequestRecord = { ...record, status: 'expired' };
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'expired',
     request_id: updated.id,
     correlation_id: updated.correlationId,
@@ -593,7 +594,7 @@ export function cancelApprovalRequest(
   const updated: ApprovalRequestRecord = { ...record, status: 'cancelled' };
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'cancelled',
     request_id: updated.id,
     correlation_id: updated.correlationId,
@@ -702,7 +703,7 @@ export function annotateApprovalRejectionReason(
   const updated: ApprovalRequestRecord = { ...record, workflow };
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'rejection_reason_captured',
     request_id: updated.id,
     correlation_id: updated.correlationId,
@@ -882,7 +883,7 @@ export function decideApprovalRequest(
     }
   }
 
-  const decidedAt = new Date().toISOString();
+  const decidedAt = nowIso();
   const workflow = record.workflow
     ? {
         ...record.workflow,
@@ -923,7 +924,7 @@ export function decideApprovalRequest(
 
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: params.decision,
     request_id: updated.id,
     correlation_id: updated.correlationId,
@@ -974,7 +975,7 @@ export function decideApprovalRequest(
     };
     sessionApprovalCache.set(key, entry);
     appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'session_cache_written',
       request_id: updated.id,
       correlation_id: updated.correlationId,
@@ -1026,7 +1027,7 @@ function schedulePipelineApprovalResume(
       const { resumePipelineRunAfterApproval } = await import('./pipeline-approval-resume.js');
       const outcome = await resumePipelineRunAfterApproval(record);
       applyResult = {
-        appliedAt: new Date().toISOString(),
+        appliedAt: nowIso(),
         appliedBy: 'pipeline_approval_resume',
         result:
           outcome.status === 'started' || outcome.status === 'already_running'
@@ -1036,7 +1037,7 @@ function schedulePipelineApprovalResume(
       };
     } catch (error) {
       applyResult = {
-        appliedAt: new Date().toISOString(),
+        appliedAt: nowIso(),
         appliedBy: 'pipeline_approval_resume',
         result: 'failed',
         auditRef: error instanceof Error ? error.message : String(error),
@@ -1088,14 +1089,14 @@ function scheduleSteeringApprovalExecution(
         await import('./surface-mission-steering.js');
       const outcome = await executeApprovedMissionSteeringApproval(record);
       applyResult = {
-        appliedAt: new Date().toISOString(),
+        appliedAt: nowIso(),
         appliedBy: 'surface_mission_steering',
         result: 'success',
         auditRef: outcome,
       };
     } catch (error) {
       applyResult = {
-        appliedAt: new Date().toISOString(),
+        appliedAt: nowIso(),
         appliedBy: 'surface_mission_steering',
         result: 'failed',
         auditRef: error instanceof Error ? error.message : String(error),
@@ -1145,7 +1146,7 @@ export function recordApprovalApplyResult(
   const updated: ApprovalRequestRecord = { ...record, applyResult: params.applyResult };
   writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
   appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: params.applyResult.result === 'success' ? 'applied' : 'apply_failed',
     request_id: updated.id,
     correlation_id: updated.correlationId,
