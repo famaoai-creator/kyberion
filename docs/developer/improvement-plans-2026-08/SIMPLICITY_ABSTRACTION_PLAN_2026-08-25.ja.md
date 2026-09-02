@@ -12207,6 +12207,16 @@ SX-04 の layout resolverに残っていた confidential tenant `layout-template
 catalog／governance-rules、knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの
 廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 332
+
+SX-04 の media action inputで、既存 `design-pattern.schema.json` を持つ `apply_pattern` が直接 `loadJsonValue` を呼んでいた
+残存を修正した。repository-bound path guard後に専用 `defineCatalog` loaderでschema検証するようにし、patternの選択・context格納・
+content merge semanticsは維持した。任意のstyle／content拡張はschemaの既存open領域として保持している。
+
+検証: media catalog／transform／layout **4 files / 4 tests passed**、media actuator build、root typecheck、root lint、catalog／
+governance-rules、knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、
+および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

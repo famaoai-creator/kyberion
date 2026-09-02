@@ -72,11 +72,11 @@ import {
 
 import {
   cloneJsonValue,
-  loadJsonValue,
   loadLayoutTemplateCatalog,
   buildPptxSlideFromPattern,
 } from './media-layout-runtime.js';
 import { loadLayoutTemplateCatalogFromPath } from './media-layout-catalog.js';
+import { loadDesignPattern } from './media-catalog-loaders.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
 
 function resolveMediaRepositoryPath(rootDir: string, value: unknown, label: string): string {
@@ -290,7 +290,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (!safeExistsSync(patternPath)) {
         throw new Error(`Design pattern not found: ${patternPath}`);
       }
-      const pattern = loadJsonValue(patternPath);
+      const pattern = loadDesignPattern(rootDir, patternPath);
       return { ...ctx, active_pattern: pattern, pattern_id: pattern.pattern_id };
     }
     case 'merge_content': {
