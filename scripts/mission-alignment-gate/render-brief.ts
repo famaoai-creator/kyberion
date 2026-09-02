@@ -20,51 +20,25 @@ import {
   safeLstat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { resolveLocale } from '@agent/core/locale';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import { reviewLayerMarkup } from '../report-review/review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import {
+  loadMissionBriefAtPath,
+  type MissionBrief,
+  type MissionBriefFlowStep,
+  type MissionBriefRisk,
+  type MissionBriefRole,
+} from './mission-brief.js';
 
-/** MO-11: the brief schema (README.md). Every field is optional — the renderer
- *  degrades to “—” rather than failing on a partially drafted brief. */
-export interface MissionBriefFlowStep {
-  step?: string | number;
-  title?: string;
-  detail?: string;
-  pipeline?: string;
-}
-export interface MissionBriefRisk {
-  risk?: string;
-  level?: string;
-  mitigation?: string;
-}
-export interface MissionBriefRole {
-  who?: string;
-  role?: string;
-}
-export interface MissionBrief {
-  missionId?: string;
-  title?: string;
-  intent?: string;
-  persona?: string;
-  tier?: string;
-  sovereignSwitch?: string;
-  victoryConditions?: string[];
-  scope?: { in?: string[]; out?: string[] };
-  flow?: MissionBriefFlowStep[];
-  roles?: MissionBriefRole[];
-  deliverables?: string[];
-  risks?: MissionBriefRisk[];
-  openItems?: string[];
-  gate?: { sudoGate?: string; riskLevel?: string; approvalRequired?: boolean };
-  estimate?: { effort?: string; cost?: string };
-  projectId?: string;
-  projectPath?: string;
-  trackId?: string;
-  trackType?: string;
-  lifecycleModel?: string;
-}
+export {
+  loadMissionBriefAtPath,
+  type MissionBrief,
+  type MissionBriefFlowStep,
+  type MissionBriefRisk,
+  type MissionBriefRole,
+} from './mission-brief.js';
 
 const HTML_ESCAPES: Record<string, string> = {
   '<': '&lt;',
@@ -371,7 +345,7 @@ export const runRenderBrief = defineScript({
       throw new ScriptExitError(1, `brief not found: ${src}`);
     }
     const out = resolveRenderBriefOutputPath(argv[1] || safeSrc.replace(/\.json$/iu, '') + '.html');
-    const brief = readJson<MissionBrief>(safeSrc);
+    const brief = loadMissionBriefAtPath(safeSrc);
     const rendered = renderMissionBriefHtml(brief);
     safeWriteFile(resolveRenderBriefOutputPath(out), rendered, { mkdir: true, encoding: 'utf8' });
     print(`rendered mission brief → ${out}`);

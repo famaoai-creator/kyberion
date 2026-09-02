@@ -16,9 +16,9 @@ import {
   safeExistsSync,
   safeLstat,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
+import { loadMissionBriefAtPath } from './mission-brief.js';
 
 export function resolveDecisionResourcePath(inputPath: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(inputPath, { allowMissingLeaf });
@@ -49,7 +49,7 @@ export function main(argv: string[] = []): void {
   const safeJsonPath = resolveDecisionResourcePath(jsonPath, true);
   const b =
     safeExistsSync(safeJsonPath) && safeLstat(safeJsonPath).isFile()
-      ? readJson<Record<string, unknown>>(safeJsonPath)
+      ? loadMissionBriefAtPath(safeJsonPath)
       : {};
 
   console.log(

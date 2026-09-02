@@ -27,7 +27,6 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
 import {
@@ -37,6 +36,10 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/approval-store';
 import { findMissionPath as resolveMissionPath } from '@agent/core/path-resolver';
+import {
+  loadMissionBriefAtPath,
+  type MissionBrief,
+} from './mission-alignment-gate/mission-brief.js';
 
 import { ALIGNMENT_BRIEF_RELATIVE_PATH } from './mission_alignment_decision.js';
 
@@ -54,12 +57,6 @@ export interface OpenAlignmentApprovalResult {
   payloadHash?: string;
   briefPath: string;
   reason?: string;
-}
-
-interface MissionBriefShape {
-  title?: string;
-  intent?: string;
-  victoryConditions?: string[];
 }
 
 /**
@@ -122,27 +119,19 @@ export function openAlignmentApproval(
     };
   }
 
-  let brief: MissionBriefShape & Record<string, unknown>;
+  let brief: MissionBrief;
   try {
-    brief = readJson<MissionBriefShape & Record<string, unknown>>(briefPath);
+    brief = loadMissionBriefAtPath(briefPath);
   } catch (error) {
     return {
       missionId,
       created: false,
       briefPath,
-      reason: `Alignment brief is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-  if (!brief || typeof brief !== 'object' || Array.isArray(brief)) {
-    return {
-      missionId,
-      created: false,
-      briefPath,
-      reason: 'Alignment brief must be a JSON object.',
+      reason: `Alignment brief is invalid: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
 
-  const payloadHash = computeApprovalPayloadHash(brief);
+  const payloadHash = computeApprovalPayloadHash(brief as unknown as Record<string, unknown>);
 
   const existing = findPendingAlignmentApproval(missionId);
   if (existing) {

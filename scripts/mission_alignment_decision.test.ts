@@ -32,6 +32,9 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => {
 // because foundation dispatches through its own registered IO bridge.
 vi.mock('@agent/core/foundation', () => ({
   readJson: vi.fn((filePath: string) => JSON.parse(mocks.safeReadFile(filePath))),
+  defineCatalog: vi.fn(({ path: catalogPath }: { path: string }) => ({
+    load: () => JSON.parse(mocks.safeReadFile(catalogPath)),
+  })),
 }));
 
 vi.mock('@agent/core/secure-io', () => ({
