@@ -1,7 +1,7 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
@@ -249,7 +249,7 @@ function normalizeTraceNode(node: TraceNode | null): TraceSpanDetail | null {
     spanId: node.spanId,
     name: node.name || 'trace',
     status: node.status || 'in_progress',
-    startTime: node.startTime || new Date().toISOString(),
+    startTime: node.startTime || nowIso(),
     endTime: node.endTime,
     attributes: node.attributes,
     events: Array.isArray(node.events) ? node.events.filter(isTraceEventDetail) : [],
@@ -312,10 +312,7 @@ export function summarizePersistedTrace(
 
   const counts = countTraceNode(rootSpan);
   const startedAt =
-    record.metadata?.startedAt ||
-    rootSpan.startTime ||
-    record._persistedAt ||
-    new Date().toISOString();
+    record.metadata?.startedAt || rootSpan.startTime || record._persistedAt || nowIso();
   const completedAt = record.metadata?.completedAt || rootSpan.endTime;
 
   const missionScope = resolveMissionScope(record.metadata?.missionId);

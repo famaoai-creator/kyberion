@@ -7,6 +7,7 @@ import {
 } from './intelligence-primitives';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { BoundedRingBuffer, CE_STREAM_LIMITS } from '@agent/core/ce-adoption';
+import { nowIso } from '@agent/core/foundation';
 import { optionalStringField, parseJsonRecord, stringField } from './json-record';
 
 export interface AgentMessageSummary {
@@ -109,7 +110,7 @@ function readObservedA2AHandoffs(options: AgentMessageFeedOptions = {}): A2AHand
         if (!missionId) continue;
 
         handoffs.push({
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           missionId,
           sender: stringField(event, 'sender', 'unknown'),
           receiver: stringField(event, 'receiver', 'unknown'),
