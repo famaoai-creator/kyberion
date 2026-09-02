@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
@@ -10,7 +11,6 @@ import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
-  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -172,8 +172,6 @@ const TASK_SESSION_POLICY_PATH = pathResolver.knowledge(
   'product/governance/task-session-policy.json'
 );
 const SERVICE_PID_FILE = pathResolver.shared('services-pids.json');
-const SURFACE_MANIFEST_DIR = pathResolver.knowledge('product/governance/surfaces');
-const SURFACE_STATE_PATH = pathResolver.shared('runtime/surfaces/state.json');
 
 function taskSessionCatalog(filePath: string) {
   return defineCatalog<TaskSession>({
@@ -338,14 +336,10 @@ type SurfaceStartableChoice = {
 
 function loadSurfaceStateRunningIds(): Set<string> {
   try {
-    const safeStatePath = assertSafeRepositoryPath(SURFACE_STATE_PATH);
-    if (!safeExistsSync(safeStatePath)) return new Set();
-    const parsed = readJson<{
-      surfaces?: Record<string, { pid?: unknown }>;
-    }>(safeStatePath);
+    const parsed = loadSurfaceState();
     return new Set(
-      Object.entries(parsed.surfaces || {})
-        .filter(([, record]) => isRunningPid(record?.pid))
+      Object.entries(parsed.surfaces)
+        .filter(([, record]) => isRunningPid(record.pid))
         .map(([surfaceId]) => surfaceId)
     );
   } catch {
@@ -354,45 +348,29 @@ function loadSurfaceStateRunningIds(): Set<string> {
 }
 
 function loadStartableServiceChoices(): SurfaceStartableChoice[] {
-  const safeManifestDir = assertSafeRepositoryPath(SURFACE_MANIFEST_DIR, {
-    allowMissingLeaf: true,
-  });
-  if (!safeExistsSync(safeManifestDir) || !safeLstat(safeManifestDir).isDirectory()) return [];
   const runningIds = loadSurfaceStateRunningIds();
-  return safeReaddir(safeManifestDir)
-    .filter((entry) => entry.endsWith('.json'))
-    .sort()
-    .flatMap((entry) => {
-      try {
-        const manifestPath = assertSafeRepositoryPath(path.join(safeManifestDir, entry));
-        if (!safeLstat(manifestPath).isFile()) return [];
-        const manifest = readJson<{ surfaces?: Array<Record<string, unknown>> }>(manifestPath);
-        return (manifest.surfaces || [])
-          .filter((surface) => surface && surface.enabled !== false)
-          .map((surface) => {
-            const serviceName = String(surface.id || '').trim();
-            return {
-              service_name: serviceName,
-              surface_id: serviceName,
-              description:
-                typeof surface.description === 'string' ? surface.description : undefined,
-              kind: typeof surface.kind === 'string' ? surface.kind : undefined,
-              startup_mode:
-                typeof surface.startupMode === 'string' ? surface.startupMode : undefined,
-              service_id: typeof surface.service_id === 'string' ? surface.service_id : undefined,
-            } satisfies SurfaceStartableChoice;
-          })
-          .filter(
-            (choice) =>
-              choice.service_name &&
-              choice.startup_mode === 'background' &&
-              !runningIds.has(choice.surface_id)
-          );
-      } catch {
-        return [];
-      }
-    })
-    .sort((left, right) => left.service_name.localeCompare(right.service_name));
+  try {
+    const manifest = loadSurfaceManifest();
+    const choices = manifest.surfaces
+      .filter((surface) => surface.enabled !== false)
+      .map((surface) => {
+        const serviceName = surface.id.trim();
+        return {
+          service_name: serviceName,
+          surface_id: serviceName,
+          description: surface.description,
+          kind: surface.kind,
+          startup_mode: surface.startupMode,
+          service_id: surface.service_id,
+        } satisfies SurfaceStartableChoice;
+      })
+      .filter(
+        (choice) => choice.startup_mode === 'background' && !runningIds.has(choice.surface_id)
+      );
+    return choices.sort((left, right) => left.service_name.localeCompare(right.service_name));
+  } catch {
+    return [];
+  }
 }
 
 function inferRequiresApproval(input: {

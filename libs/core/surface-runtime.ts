@@ -4,6 +4,7 @@ import * as net from 'node:net';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { createLogger } from './logger.js';
 
@@ -38,6 +39,8 @@ export interface SurfaceRuntimeDefinition {
   ownerType?: string;
   port?: number;
   healthPath?: string;
+  service_id?: string;
+  preset_path?: string;
   enabled?: boolean;
 }
 
@@ -153,6 +156,107 @@ export function surfaceResourceId(surfaceId: string): string {
   return `surface:${surfaceId}`;
 }
 
+const SURFACE_STATE_FIELDS = ['version', 'surfaces'] as const;
+const SURFACE_STATE_RECORD_FIELDS = [
+  'id',
+  'pid',
+  'resourceId',
+  'kind',
+  'command',
+  'args',
+  'cwd',
+  'logPath',
+  'startedAt',
+  'shutdownPolicy',
+  'metadata',
+] as const;
+const SURFACE_STATE_RECORD_FIELD_SET = new Set<string>(SURFACE_STATE_RECORD_FIELDS);
+
+function stateString(record: Record<string, unknown>, field: string, label: string): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parsePersistedSurfaceState(value: unknown): SurfaceRuntimeState {
+  const root = parseSafeJsonObjectValue(value, 'surface runtime state');
+  const allowedRootFields = new Set<string>(SURFACE_STATE_FIELDS);
+  if (Object.keys(root).some((key) => !allowedRootFields.has(key))) {
+    throw new Error('surface runtime state contains unknown fields');
+  }
+  if (root.version !== 1) throw new Error('surface runtime state version is invalid');
+  const surfaces = parseSafeJsonObjectValue(root.surfaces, 'surface runtime state.surfaces');
+  const normalized = Object.entries(surfaces).map(([surfaceKey, candidate]) => {
+    const label = `surface runtime state.surfaces.${surfaceKey}`;
+    const record = parseSafeJsonObjectValue(candidate, label);
+    if (Object.keys(record).some((key) => !SURFACE_STATE_RECORD_FIELD_SET.has(key))) {
+      throw new Error(`${label} contains unknown fields`);
+    }
+    const id = stateString(record, 'id', label);
+    assertSurfaceId(id);
+    if (surfaceKey !== id) throw new Error(`${label}.id does not match its map key`);
+    const pid = record.pid;
+    if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) {
+      throw new Error(`${label}.pid must be a positive integer`);
+    }
+    const resourceId = stateString(record, 'resourceId', label);
+    if (resourceId !== surfaceResourceId(id)) {
+      throw new Error(`${label}.resourceId does not match its surface id`);
+    }
+    const kind = stateString(record, 'kind', label) as SurfaceRuntimeKind;
+    if (!['gateway', 'ui', 'service'].includes(kind)) {
+      throw new Error(`${label}.kind is invalid`);
+    }
+    const command = stateString(record, 'command', label);
+    if (!Array.isArray(record.args)) {
+      throw new Error(`${label}.args must be an array of strings`);
+    }
+    const args = record.args.map((arg, index) => {
+      if (typeof arg !== 'string') {
+        throw new Error(`${label}.args[${index}] must be a string`);
+      }
+      return arg;
+    });
+    const cwd = stateString(record, 'cwd', label);
+    const logPath = stateString(record, 'logPath', label);
+    if (path.resolve(cwd) !== path.resolve(pathResolver.rootDir())) {
+      assertSafeRepositoryPath(cwd, { allowMissingLeaf: true });
+    }
+    assertSafeRepositoryPath(logPath, { allowMissingLeaf: true });
+    const startedAt = stateString(record, 'startedAt', label);
+    if (!Number.isFinite(Date.parse(startedAt))) {
+      throw new Error(`${label}.startedAt must be a valid timestamp`);
+    }
+    const shutdownPolicy = stateString(record, 'shutdownPolicy', label) as RuntimeShutdownPolicy;
+    if (!['manual', 'idle', 'detached'].includes(shutdownPolicy)) {
+      throw new Error(`${label}.shutdownPolicy is invalid`);
+    }
+    const metadata =
+      record.metadata === undefined
+        ? undefined
+        : parseSafeJsonObjectValue(record.metadata, `${label}.metadata`);
+    return [
+      surfaceKey,
+      {
+        id,
+        pid,
+        resourceId,
+        kind,
+        command,
+        args,
+        cwd,
+        logPath,
+        startedAt,
+        shutdownPolicy,
+        ...(metadata ? { metadata } : {}),
+      } satisfies SurfaceRuntimeStateRecord,
+    ];
+  });
+  return { version: 1, surfaces: Object.fromEntries(normalized) };
+}
+
 function readSurfaceManifestFile(filePath: string): SurfaceRuntimeManifest {
   let value: SurfaceRuntimeManifest;
   try {
@@ -261,7 +365,7 @@ export function loadSurfaceState(statePath = surfaceStatePath()): SurfaceRuntime
   if (!safeExistsSync(safeStatePath)) {
     return { version: 1, surfaces: {} };
   }
-  return readJson<SurfaceRuntimeState>(safeStatePath);
+  return parsePersistedSurfaceState(readJson<unknown>(safeStatePath));
 }
 
 export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surfaceStatePath()): void {
@@ -269,7 +373,7 @@ export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surface
     allowMissingLeaf: true,
   });
   ensureParentDir(safeStatePath);
-  safeWriteFile(safeStatePath, JSON.stringify(state, null, 2));
+  safeWriteFile(safeStatePath, JSON.stringify(parsePersistedSurfaceState(state), null, 2));
 }
 
 export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {
