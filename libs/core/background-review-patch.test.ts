@@ -21,6 +21,7 @@ import {
   applyBackgroundReviewSkillPatch,
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
+  loadManagedSkillProvenanceAtPath,
 } from './background-review-patch.js';
 import { approvalRequestLogicalPath, decideApprovalRequest } from './approval-store.js';
 
@@ -179,6 +180,58 @@ afterEach(() => {
 });
 
 describe('background-review-patch', () => {
+  it('loads managed skill provenance through the canonical schema and skill binding', () => {
+    const ref = writeManagedSkill('loader');
+    const sidecar = pathResolver.rootResolve(
+      `${ref.slice(0, ref.lastIndexOf('/'))}/provenance.json`
+    );
+
+    expect(loadManagedSkillProvenanceAtPath(sidecar, ref)).toMatchObject({
+      managed_by: 'background-review',
+      owner: 'background-review-agent',
+      skill_ref: ref,
+      allow_append_only: true,
+    });
+  });
+
+  it('rejects malformed or non-file managed skill provenance', () => {
+    const ref = writeManagedSkill('loader-invalid');
+    const sidecar = pathResolver.rootResolve(
+      `${ref.slice(0, ref.lastIndexOf('/'))}/provenance.json`
+    );
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(
+        sidecar,
+        `${JSON.stringify({
+          version: 1,
+          managed_by: 'background-review',
+          owner: 'background-review-agent',
+          skill_ref: ref,
+          allow_append_only: true,
+          registered_by: 'operator-test',
+          unexpected: true,
+        })}\n`
+      )
+    );
+    expect(() => loadManagedSkillProvenanceAtPath(sidecar, ref)).toThrow(
+      'Invalid catalog background-review-managed-skill-provenance'
+    );
+
+    withExecutionContext('ecosystem_architect', () => {
+      safeRmSync(sidecar, { force: true });
+      safeMkdir(sidecar, { recursive: true });
+    });
+    try {
+      expect(() => loadManagedSkillProvenanceAtPath(sidecar, ref)).toThrow(
+        'must be a regular file'
+      );
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(sidecar, { recursive: true, force: true })
+      );
+    }
+  });
+
   it('applies an approved hash-bound append step and keeps a backup', () => {
     const ref = targetRef('success');
     const before = writePipeline(ref, {

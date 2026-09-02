@@ -13493,6 +13493,12 @@ SX-03／SX-04／SX-09 のgeneration cost settlementを再監査し、provider ac
 
 検証: generation cost settlement **1 file / 5 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 539
+
+SX-03／SX-04／SX-09 のbackground review managed-skill provenanceを再監査し、`provenance.json`をraw `readJson<ManagedSkillProvenance>`とconsumer側の手書き条件検査で読み、schema・regular-file・skill reference bindingを共有していなかった残存を修正した。`background-review-managed-skill-provenance.schema.json`と`loadManagedSkillProvenanceAtPath`を追加し、skill patchの承認前検証へstrict schema、未知フィールド、regular-file、skill ref bindingを統合した。不正・directory・別skillのprovenanceはpatch適用へ進まずfail-closedし、既存のbackground-review provenance、append-only、human approval、pre-image hash、backup semanticsは維持している。
+
+検証: background-review patch **1 file / 12 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

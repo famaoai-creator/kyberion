@@ -6553,6 +6553,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/background-review-managed-skill-provenance.schema.json",
+      "tier": "public",
+      "size": 790,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/blockchain-action.schema.json",
       "tier": "public",
       "size": 294,
