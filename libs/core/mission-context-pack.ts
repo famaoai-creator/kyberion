@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
   provisionMissionEntry,
@@ -619,7 +620,7 @@ function missionSources(input: {
         ? safeMissionArtifactPath(input.missionPath, 'mission-state.json')
         : missionStatePath(input.missionId, input.missionTier),
       summary: `Mission state for ${input.missionId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     },
   ];
 
@@ -632,7 +633,7 @@ function missionSources(input: {
       summary: input.missionTeamAssignment.agent_id
         ? `Role ${input.teamRole} assigned to ${input.missionTeamAssignment.agent_id}`
         : `Role ${input.teamRole} is unfilled`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -642,7 +643,7 @@ function missionSources(input: {
       ref: `project:${input.projectId}`,
       path: projectOperationalStatePath(input.projectId, input.missionTier, input.tenantSlug),
       summary: `Project state for ${input.projectId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -652,7 +653,7 @@ function missionSources(input: {
       ref: `track:${input.trackId}`,
       path: pathResolver.shared(`runtime/project-tracks/${input.trackId}.json`),
       summary: `Project track record for ${input.trackId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -662,7 +663,7 @@ function missionSources(input: {
       ref: `task-session:${input.taskSessionId}`,
       path: pathResolver.shared(`runtime/task-sessions/${input.taskSessionId}.json`),
       summary: `Task session ${input.taskSessionId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -671,7 +672,7 @@ function missionSources(input: {
       kind: 'work_item',
       ref: `work-item:${input.workItemId}`,
       summary: `Work item ${input.workItemId}`,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
 
     const metadata = input.workItem.metadata as Record<string, unknown> | undefined;
@@ -684,7 +685,7 @@ function missionSources(input: {
         ref: `work-item-evidence:${targetPath}`,
         path: targetPath,
         summary: `Scoped review artifact for ${input.workItemId}: ${targetPath}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
     const verificationDone = Array.isArray(metadata?.verification_done)
@@ -695,7 +696,7 @@ function missionSources(input: {
         kind: 'other',
         ref: `work-item-verification:${input.workItemId}:${sources.length + 1}`,
         summary: `Scoped verification: ${verification}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
     const criterionEvidence = metadata?.criterion_evidence;
@@ -704,7 +705,7 @@ function missionSources(input: {
         kind: 'other',
         ref: `work-item-criterion-evidence:${input.workItemId}`,
         summary: `Scoped criterion evidence: ${JSON.stringify(criterionEvidence).slice(0, 2200)}`,
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       });
     }
   }
@@ -715,7 +716,7 @@ function missionSources(input: {
       ref: hint.path,
       path: hint.path,
       summary: hint.title,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -725,7 +726,7 @@ function missionSources(input: {
       ref: skill.name,
       path: skill.path,
       summary: skill.description,
-      captured_at: new Date().toISOString(),
+      captured_at: nowIso(),
     });
   }
 
@@ -1213,7 +1214,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
         workItemId,
       }),
     version: '1',
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     summary,
     scope,
     security_scope: securityScope,
