@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import type { RejectionReasonCategory } from './rejection-reason.js';
 import {
@@ -138,7 +139,7 @@ function withInboxLock<T>(fn: () => T): T {
         lockPath,
         JSON.stringify({
           pid: process.pid,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           resource: 'deliverable-inbox',
         })
       );
@@ -171,7 +172,7 @@ function normalizeEntry(value: unknown): DeliverableInboxEntry | null {
   if (typeof parsed.entry_id !== 'string') return null;
   if (!Array.isArray(parsed.artifact_paths)) parsed.artifact_paths = [];
   if (typeof parsed.status !== 'string') parsed.status = 'unread';
-  if (typeof parsed.created_at !== 'string') parsed.created_at = new Date().toISOString();
+  if (typeof parsed.created_at !== 'string') parsed.created_at = nowIso();
   if (typeof parsed.updated_at !== 'string') parsed.updated_at = parsed.created_at;
   if (typeof parsed.title !== 'string') parsed.title = parsed.entry_id;
   if (typeof parsed.summary !== 'string') parsed.summary = '';
@@ -239,7 +240,7 @@ export function addInboxEntry(input: {
   roleSections?: DeliverableRoleSection[];
   integratedSummary?: string;
 }): DeliverableInboxEntry {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const entry: DeliverableInboxEntry = {
     entry_id: input.entryId || `INBOX-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId?.trim() || undefined,
@@ -357,7 +358,7 @@ export function markInboxEntry(
       ...(verdictNote ? { verdict_note: verdictNote } : {}),
       ...(verdictReasonCategory ? { verdict_reason_category: verdictReasonCategory } : {}),
       ...(reviewedBy ? { reviewed_by: reviewedBy } : {}),
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     };
     writeInboxEntries(entries);
     return entries[index];
@@ -404,7 +405,7 @@ export function acceptInboxEntryWithHumanReceipt(input: {
     const index = entries.findIndex((entry) => entry.entry_id === input.entryId.trim());
     if (index < 0) return null;
     const entry = entries[index];
-    const now = new Date().toISOString();
+    const now = nowIso();
     const updated: DeliverableInboxEntry = {
       ...entry,
       status: 'accepted',
@@ -453,7 +454,7 @@ export function finalizeAcceptedDeliverable(input: {
     if (digest !== entry.acceptance_receipt.artifact_digest) {
       throw new Error('[POLICY_VIOLATION] Deliverable changed after human acceptance');
     }
-    const now = new Date().toISOString();
+    const now = nowIso();
     const updated: DeliverableInboxEntry = {
       ...entry,
       updated_at: now,
