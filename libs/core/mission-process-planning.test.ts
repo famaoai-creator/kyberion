@@ -134,6 +134,20 @@ describe('mission process planning', () => {
     }
   });
 
+  it('does not render malformed seeded task records into the planner prompt', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([
+        { task_id: 'seed-1', origin: 'process_template', phase: 'plan' },
+        { task_id: 42, origin: 'process_template', phase: 'plan' },
+      ])
+    );
+
+    const prompt = renderProcessTemplateSkeleton(missionId);
+    expect(prompt).toContain('Process template:');
+    expect(prompt).not.toContain('seed-1 (phase: plan)');
+  });
+
   it('expands the presentation process template into NEXT_TASKS.json, gates, and the task board', () => {
     const result = applyProcessTemplatePlan({
       missionId,
