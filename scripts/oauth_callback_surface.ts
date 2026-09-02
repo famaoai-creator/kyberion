@@ -10,7 +10,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeWriteFile, safeExistsSync } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import * as path from 'node:path';
 
@@ -85,7 +85,7 @@ app.get(CALLBACK_PATH, async (req, res) => {
       LATEST_RESULT_PATH,
       JSON.stringify(
         {
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           callback_path: CALLBACK_PATH,
           ...persistedResult,
         },
@@ -124,7 +124,7 @@ app.get(CALLBACK_PATH, async (req, res) => {
       LATEST_RESULT_PATH,
       JSON.stringify(
         {
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           callback_path: CALLBACK_PATH,
           ok: false,
           error: error.message,

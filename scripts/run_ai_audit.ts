@@ -37,7 +37,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { TraceContext, finalizeAndPersist } from '@agent/core/src/trace';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 
 export const AI_AUDIT_CASES_SCHEMA = z.object({
   cases: z
@@ -374,7 +374,7 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
     ? resolveFromRoot(options.outputDir)
     : pathResolver.sharedTmp('ai-audit');
   const reportPath = path.join(outputDir, 'report.json');
-  const runId = `ai-audit-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+  const runId = `ai-audit-${nowIso().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
   const trace = new TraceContext('ai-audit', { correlationId: runId });
 
   const enumerated = enumerateInvariants(options.invariantsDir);
@@ -424,7 +424,7 @@ export async function runAiAudit(options: RunAiAuditOptions = {}): Promise<{
 
   const report: AiAuditReport = {
     run_id: runId,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     status,
     backend_mode: backendMode,
     skip_reason: skipReason,

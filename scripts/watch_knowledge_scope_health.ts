@@ -14,7 +14,7 @@ import {
 import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAllFiles } from '@agent/core/fs-utils';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type HealthRow = {
@@ -179,7 +179,7 @@ function scanRows(): HealthRow[] {
 export function scanKnowledgeScopeHealth(
   options: { persistHistory?: boolean } = {}
 ): KnowledgeScopeHealthReport {
-  const generatedAt = new Date().toISOString();
+  const generatedAt = nowIso();
   const rows = scanRows();
   const legacyFiles = listLegacyUnscopedFiles();
   const legacyTtlDays = legacyQuarantineTtlDays();

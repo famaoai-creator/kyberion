@@ -1,6 +1,6 @@
 import { logger } from '@agent/core/core';
 import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 
 export const simulateTelegram = defineScript({
@@ -20,7 +20,7 @@ export const simulateTelegram = defineScript({
       channel: '123456789',
       threadTs: 'telegram-demo-1',
       correlationId: 'demo-telegram-123',
-      receivedAt: new Date().toISOString(),
+      receivedAt: nowIso(),
       actorId: '987654321',
       senderAgentId: 'kyberion:telegram-bridge',
       agentId: 'telegram-surface-agent',

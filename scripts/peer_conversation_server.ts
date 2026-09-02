@@ -11,7 +11,7 @@ import {
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import type { MeshRequest } from '@agent/core/mesh-hub-contract';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 function normalizePeerServerArguments(args: string[]): string[] {
@@ -133,7 +133,7 @@ async function main(
             sender_peer_id: peerId,
             recipient_peer_id: envelope.sender_peer_id,
             text: `Transport accepted; proposal ${proposal.proposal_id} is pending local acceptance.`,
-            created_at: new Date().toISOString(),
+            created_at: nowIso(),
             related_work_item_ids: message.related_work_item_ids,
             payload: {
               proposal_id: proposal.proposal_id,

@@ -24,7 +24,7 @@ import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycle,
 } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { createReportReviewContext, reviewReceiptLogicalPath } from './context.js';
 import { reviewLayerMarkup, RV_LAYER_OPEN, RV_LAYER_CLOSE } from './review-layer.js';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
@@ -88,7 +88,7 @@ async function main(args: string[] = []): Promise<void> {
     }
     return html;
   }
-  const ts = () => new Date().toISOString().replace(/[:.]/g, '').slice(0, 15);
+  const ts = () => nowIso().replace(/[:.]/g, '').slice(0, 15);
 
   const server = http.createServer((req, res) => {
     try {
@@ -149,7 +149,7 @@ async function main(args: string[] = []): Promise<void> {
                   artifact_ref: portableProtocolServicePathRef(reviewContext.artifact_ref),
                   viewer_principal: reviewContext.viewer_principal,
                   scope: reviewContext.scope,
-                  saved_at: new Date().toISOString(),
+                  saved_at: nowIso(),
                   bytes: html.length,
                   backup: backup.split('/').pop(),
                   comment_count: (html.match(/class=["']rv-cmt["']/g) || []).length,

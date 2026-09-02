@@ -2,7 +2,7 @@ import chalk from 'chalk';
 // chalk imported dynamically
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
@@ -62,7 +62,7 @@ async function processInbox(): Promise<void> {
       {
         status: 'thinking',
         thought,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       null,
       2
@@ -92,7 +92,7 @@ async function processInbox(): Promise<void> {
         status: 'complete',
         thought: '任務完了。分析結果をポータルへ投影した。',
         result,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       null,
       2

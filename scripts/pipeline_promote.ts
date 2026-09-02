@@ -29,7 +29,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { isRecord, parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
   validatePipelineAdf,
@@ -284,7 +284,7 @@ async function main(args: string[] = []): Promise<void> {
   pipeline.description = description;
   pipeline.promotion = {
     promoted_from: inputPath,
-    promoted_at: new Date().toISOString(),
+    promoted_at: nowIso(),
     ...(traceId ? { trace_id: traceId } : {}),
     ...(advice?.rationale ? { rationale: String(advice.rationale).slice(0, 500) } : {}),
     ...(advice

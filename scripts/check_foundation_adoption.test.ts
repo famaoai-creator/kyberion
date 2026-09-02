@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeRmSync, safeWriteFile } from '@agent/core/secure-io';
-import { checkFoundationAdoption } from './check_foundation_adoption.js';
+import {
+  checkFoundationAdoption,
+  countSimpleIsoTimestampViolations,
+} from './check_foundation_adoption.js';
 
 describe('checkFoundationAdoption', () => {
   it('detects multiline foundation JSON loader bypasses', () => {
@@ -29,5 +32,12 @@ describe('checkFoundationAdoption', () => {
     } finally {
       safeRmSync(filePath, { force: true });
     }
+  });
+
+  it('rejects duplicated simple ISO timestamp construction', () => {
+    expect(countSimpleIsoTimestampViolations('const createdAt = new Date().toISOString();')).toBe(
+      1
+    );
+    expect(countSimpleIsoTimestampViolations('const createdAt = nowIso();')).toBe(0);
   });
 });

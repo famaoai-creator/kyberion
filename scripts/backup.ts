@@ -24,6 +24,7 @@ import {
 import {
   getRegisteredEnvText,
   isRecord,
+  nowIso,
   parseSafeJsonInput,
   readJson,
 } from '@agent/core/foundation';
@@ -425,7 +426,7 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
 }
 
 function stamp(): string {
-  return new Date().toISOString().replace(/[:.]/g, '-');
+  return nowIso().replace(/[:.]/g, '-');
 }
 
 function defaultBackupDir(): string {
@@ -654,7 +655,7 @@ export function createBackup(options: BackupCliOptions): {
 
   const manifest = {
     format: 'kyberion-backup-v1',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     scope: plan.scope,
     mission: options.mission || null,
     tenant: options.tenant || null,
@@ -1092,7 +1093,7 @@ function quarantineRestoredPeerRuntime(
         {
           format: 'kyberion-peer-runtime-quarantine-v1',
           tenant,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           reason: 'tenant_restore_requires_reenrollment_and_fresh_heartbeat',
           moved,
         },
