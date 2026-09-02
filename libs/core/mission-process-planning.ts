@@ -37,6 +37,7 @@ import {
   safeReaddir,
   safeReadFile,
 } from './secure-io.js';
+import { loadMissionPhaseGateDefinitionAtPath } from './mission-orchestration-phase-gates.js';
 import {
   type MissionClass,
   type MissionDeliveryShape,
@@ -345,11 +346,7 @@ export async function evaluateStoredMissionGate(args: {
   const definitionPath = gateDefinitionPath(missionDir, args.gateId);
   if (!safeExistsSync(definitionPath)) return { found: false };
 
-  const definition = readJson<{
-    phase?: string;
-    position?: 'entry' | 'exit';
-    gate: MissionGateDefinition;
-  }>(definitionPath);
+  const definition = loadMissionPhaseGateDefinitionAtPath(definitionPath, missionId);
 
   const gate = resolveGateCheckPaths(definition.gate, missionDir, args.humanConfirmed ?? false);
   const evaluation = await evaluateMissionGate({
@@ -387,14 +384,17 @@ export async function evaluatePhaseEntryGate(args: {
   if (!safeExistsSync(definitionsDir)) return undefined;
   for (const entry of safeReaddir(definitionsDir) as string[]) {
     if (!entry.endsWith('.json')) continue;
-    let definition: { phase?: string; position?: string; gate?: { id?: string } };
+    let definition: ReturnType<typeof loadMissionPhaseGateDefinitionAtPath>;
     try {
-      definition = readJson(assertSafeRepositoryPath(path.join(definitionsDir, entry)));
+      definition = loadMissionPhaseGateDefinitionAtPath(
+        assertSafeRepositoryPath(path.join(definitionsDir, entry)),
+        missionId
+      );
     } catch {
       continue;
     }
     if (definition.phase !== args.phase || definition.position !== 'entry') continue;
-    const gateId = definition.gate?.id ?? entry.replace(/\.json$/u, '');
+    const gateId = definition.gate.id;
     const stored = await evaluateStoredMissionGate({ missionId, gateId });
     if (!stored.found || !stored.evaluation) return undefined;
     return {
