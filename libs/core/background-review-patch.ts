@@ -19,6 +19,7 @@ import {
 } from './distill-candidate-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
@@ -27,6 +28,7 @@ import { applyConsolidationActions, type ConsolidationAction } from './memory-no
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeWriteFile,
@@ -46,6 +48,9 @@ const MEMORY_NOTEBOOK_REF_PATTERN =
   /^(?:knowledge\/(?:personal|confidential|public)\/missions\/[A-Za-z0-9._-]+|active\/missions\/(?:personal|confidential|public)\/[A-Za-z0-9._-]+|active\/shared\/runtime\/session\/[A-Za-z0-9._-]+|active\/personal)\/MEMORY\.md$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const CANDIDATE_ID_PATTERN = /^[A-Za-z0-9._-]+$/u;
+const MANAGED_SKILL_PROVENANCE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/background-review-managed-skill-provenance.schema.json'
+);
 
 export interface BackgroundPipelineAppendStepPatch {
   operation: 'append_step';
@@ -556,13 +561,42 @@ export function applyBackgroundReviewPipelinePatch(
   };
 }
 
-interface ManagedSkillProvenance {
-  version?: unknown;
-  managed_by?: unknown;
-  owner?: unknown;
-  skill_ref?: unknown;
-  allow_append_only?: unknown;
-  registered_by?: unknown;
+export interface ManagedSkillProvenance {
+  version: 1;
+  managed_by: 'background-review';
+  owner: 'background-review-agent';
+  skill_ref: string;
+  allow_append_only: true;
+  registered_by: string;
+}
+
+const managedSkillProvenanceCatalog = defineCatalog<ManagedSkillProvenance>({
+  id: 'background-review-managed-skill-provenance',
+  path: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
+  schema: MANAGED_SKILL_PROVENANCE_SCHEMA_PATH,
+});
+
+/** Load managed-skill provenance through schema, regular-file, and skill binding checks. */
+export function loadManagedSkillProvenanceAtPath(
+  sidecarPath: string,
+  skillRef: string
+): ManagedSkillProvenance {
+  const safeSidecarPath = assertSafeRepositoryPath(sidecarPath, { allowMissingLeaf: true });
+  if (!safeLstat(safeSidecarPath).isFile()) {
+    throw new Error(
+      `[POLICY_VIOLATION] Managed skill provenance must be a regular file: ${sidecarPath}`
+    );
+  }
+  const provenance = managedSkillProvenanceCatalog.validate(
+    readJson<unknown>(safeSidecarPath),
+    safeSidecarPath
+  );
+  if (provenance.skill_ref !== skillRef) {
+    throw new Error(
+      `[POLICY_VIOLATION] Managed skill provenance skill reference mismatch: ${skillRef}`
+    );
+  }
+  return provenance;
 }
 
 function resolveManagedSkillTarget(targetRef: unknown): {
@@ -591,8 +625,11 @@ function resolveManagedSkillTarget(targetRef: unknown): {
   }
   let provenance: ManagedSkillProvenance;
   try {
-    provenance = readJson<ManagedSkillProvenance>(sidecar);
+    provenance = loadManagedSkillProvenanceAtPath(sidecar, ref);
   } catch (error) {
+    if (error instanceof Error && error.message.includes('Invalid catalog')) {
+      throw new Error(`[POLICY_VIOLATION] Managed skill provenance is not valid: ${error.message}`);
+    }
     throw new Error(
       `[POLICY_VIOLATION] Managed skill provenance is not valid JSON: ${
         error instanceof Error ? error.message : String(error)

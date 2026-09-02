@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "background-review-managed-skill-provenance.schema.json",
+  "title": "Background review managed skill provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "managed_by": { "const": "background-review" },
+    "owner": { "const": "background-review-agent" },
+    "skill_ref": {
+      "type": "string",
+      "pattern": "^active/shared/runtime/background-review/skills/[a-z0-9][a-z0-9._-]{0,63}/SKILL\\.md$"
+    },
+    "allow_append_only": { "const": true },
+    "registered_by": { "type": "string", "minLength": 1 }
+  },
+  "required": ["version", "managed_by", "owner", "skill_ref", "allow_append_only", "registered_by"]
+}
