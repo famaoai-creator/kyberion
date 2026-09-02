@@ -21,7 +21,7 @@ vi.mock('./policy-engine.js', () => ({
 }));
 
 import { pathResolver, rootResolve } from './path-resolver.js';
-import { safeSymlinkSync, safeUnlinkSync } from './secure-io.js';
+import { safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
 import {
   getTrustLevel,
   listNgTopics,
@@ -168,6 +168,25 @@ describe('relationship-graph-store', () => {
   describe('read helpers', () => {
     it('returns null from readNode when absent', () => {
       expect(readNode('nbs', 'nobody')).toBeNull();
+    });
+
+    it('rejects malformed persisted nodes before relationship data is used', () => {
+      const file = path.join(tmpDir, 'knowledge/confidential/relationships/nbs/malformed.json');
+      safeWriteFile(
+        file,
+        JSON.stringify({
+          identity: { name: 'Malformed', org: 'nbs', person_slug: 'malformed' },
+          trust_level: {
+            current: 99,
+            updated_at: '2026-04-20T10:00:00.000Z',
+          },
+          history: [],
+          updated_at: '2026-04-20T10:00:00.000Z',
+        }),
+        { encoding: 'utf8', mkdir: true }
+      );
+
+      expect(() => readNode('nbs', 'malformed')).toThrow(/trust_level.current/);
     });
 
     it('returns defaults for missing fields', () => {
