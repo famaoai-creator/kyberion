@@ -4,10 +4,12 @@ import type { FocusedInputState } from './apple-event-bridge.js';
 import type { OsAutomationBridge } from './os-automation-bridge.js';
 import type { MacOSAutomationProbe } from './macos-automation-bridge.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { redactSensitiveString } from './network.js';
 import { scrubContent } from './pii-scrubber.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 let desktopRecordingValidator: ValidateFunction | null = null;
 
@@ -260,6 +262,21 @@ export function validateDesktopRecording(input: unknown): DesktopRecordingValida
   return errors.length > 0
     ? { valid: false, errors }
     : { valid: true, errors: [], value: recording };
+}
+
+/** Load one persisted desktop recording through its regular-file and contract boundary. */
+export function loadDesktopRecordingAtPath(filePath: string): DesktopRecording {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_RECORDING] recording must be a regular file: ${filePath}`);
+  }
+  const validation = validateDesktopRecording(readJson<unknown>(safeFilePath));
+  if (!validation.value) {
+    throw new Error(
+      `[DESKTOP_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
+    );
+  }
+  return validation.value;
 }
 
 export interface DesktopObservationSnapshot {

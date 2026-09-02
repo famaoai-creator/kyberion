@@ -19,6 +19,7 @@ import {
 import type { ProcedureCatalog, ProcedureEntry, ProcedureRiskClass } from './procedure-types.js';
 import {
   computeDesktopRecordingHash,
+  loadDesktopRecordingAtPath,
   validateDesktopRecording,
   type DesktopRecording,
 } from './desktop-recording.js';
@@ -161,21 +162,38 @@ export function promoteDesktopProcedure(options: {
 } {
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  let raw: unknown;
+  let recording: DesktopRecording;
   try {
-    raw = readJson<unknown>(recordingAbs);
+    recording = loadDesktopRecordingAtPath(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const validation = validateDesktopRecording(raw);
-  if (!validation.value)
-    throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);
-  if (validation.value.review.status !== 'approved') {
+  return promoteDesktopProcedureFromRecording(recording, recordingAbs, options);
+}
+
+function promoteDesktopProcedureFromRecording(
+  recording: DesktopRecording,
+  recordingAbs: string,
+  options: {
+    recordingRef: string;
+    procedureId: string;
+    intentPhrases: string[];
+    status?: ProcedureEntry['status'];
+    catalogPath?: string;
+    intentRef?: string;
+  }
+): {
+  procedureEntry: ProcedureEntry;
+  catalogPath: string;
+  pipelinePath: string;
+  warnings: string[];
+} {
+  if (recording.review.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
-  if (!validation.value.intent_hash) {
+  if (!recording.intent_hash) {
     throw new Error(
       'intent review artifact is required before promotion; run recording review --approve-intent'
     );
@@ -197,29 +215,26 @@ export function promoteDesktopProcedure(options: {
       `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  if (intent.source_recording_id !== validation.value.recording_id) {
+  if (intent.source_recording_id !== recording.recording_id) {
     throw new Error('intent review artifact does not belong to the recording');
   }
   if (intent.review.status !== 'approved') {
     throw new Error('intent review must be approved before promotion');
   }
-  if (intentDraftHash(intent) !== validation.value.intent_hash) {
+  if (intentDraftHash(intent) !== recording.intent_hash) {
     throw new Error('intent review artifact does not match the recorded intent source');
   }
-  if (validation.value.steps.some((step) => step.needs_semantic_resolution)) {
+  if (recording.steps.some((step) => step.needs_semantic_resolution)) {
     throw new Error(
       'desktop recording contains unresolved semantic targets; resolve them before promotion'
     );
   }
 
   const recordingRef = pathResolver.toRepoRelative(recordingAbs);
-  if (
-    validation.value.capture?.event_source !== 'native-cg-event-tap' ||
-    validation.value.steps.length === 0
-  ) {
+  if (recording.capture?.event_source !== 'native-cg-event-tap' || recording.steps.length === 0) {
     throw new Error('desktop recording must contain native OS events before promotion');
   }
-  const screenArtifact = validation.value.artifacts?.screen_recording;
+  const screenArtifact = recording.artifacts?.screen_recording;
   if (screenArtifact?.status === 'succeeded' && screenArtifact.recording_ref) {
     const artifactAbs = resolveAllowlistedRecordingRef(screenArtifact.recording_ref);
     if (!artifactAbs)
@@ -229,7 +244,7 @@ export function promoteDesktopProcedure(options: {
     if (digest !== screenArtifact.sha256)
       throw new Error('screen recording artifact hash mismatch');
   }
-  const compiled = compileDesktopRecording(validation.value, {
+  const compiled = compileDesktopRecording(recording, {
     procedureId: options.procedureId,
     intentPhrases: options.intentPhrases,
     recordingRef,
