@@ -919,7 +919,7 @@ export async function runActionItemReminderSweepOp(input?: {
     input?.mission_ids?.length ? input.mission_ids.includes(mission.id) : true
   );
   const report: ActionItemReminderSweepReport = {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     missions_scanned: missions.length,
     missions_with_pending_items: 0,
     reminders_sent: 0,

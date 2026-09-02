@@ -11992,6 +11992,17 @@ domain 処理は変更していない。
 `git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14 の
 未完了項目である。
 
+## 2026-09-02 再レビュー修正 311
+
+残っていた actuator／satellite の単純 timestamp 42箇所を foundation の `nowIso()` へ統一した。Android／iOS／network／
+system／modeling／meeting／approval／deployment の pipeline context、orchestrator の task／trace、voice／Telegram／
+Discord／voice-hub の受信・session metadata、blockchain／secret／presence／ingest／code／build／Wisdom の記録時刻を対象とし、
+Telegram の既存 message date 変換、Wisdom の日付キー化、期限計算・経過時間・一意 ID の `Date.now()` は意味固有処理として維持した。
+
+検証: 対象 actuator／surface **37 files / 381 tests passed**、production 側の単純 `new Date().toISOString()` **0件**、
+typecheck、lint、PR scope **33/33 gates passed**、Prettier、`git diff --check`。残る SX-03 は非単純な domain-specific helper の
+adopt-or-delete と、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
+import { nowIso } from '@agent/core/foundation';
 import { missionDir } from '@agent/core/path-resolver';
 import * as pathResolver from '@agent/core/path-resolver';
 import {
@@ -157,7 +158,7 @@ export function buildCommandForOp(input: BuildActuatorInput): {
 }
 
 function buildLogPath(op: BuildOp, missionId?: string): string {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   if (missionId) {
     const dir = path.join(missionDir(missionId, 'public'), 'evidence', 'build');
     safeMkdir(dir, { recursive: true });

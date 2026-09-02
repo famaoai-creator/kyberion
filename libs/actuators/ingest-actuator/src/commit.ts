@@ -62,7 +62,7 @@ import type { MemoryCandidate } from '@agent/core/memory-promotion-queue';
 import type { PiiScrubApplication } from '@agent/core/pii-scrubber';
 import type { TierPromotionTargetRoot } from '@agent/core/ingest-tier-gate';
 import { auditChain } from '@agent/core/audit-chain';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import type { DedupResult, IngestRegistryRecord } from './dedup.js';
 import type { NormalizeCardResult } from './normalize-card.js';
 import type { IngestSourceMeta } from './parse-document.js';
@@ -509,7 +509,7 @@ export function commitIngest(input: IngestCommitInput): IngestCommitResult {
   ];
   const stewardApprovalId = stewardApproval?.candidate_id;
 
-  const ingestedAt = String(input.now || '').trim() || new Date().toISOString();
+  const ingestedAt = String(input.now || '').trim() || nowIso();
   const assetId = deriveAssetId(sourceSystem, sourceId);
 
   // Ledger reads/writes and the card write all run under the narrowly-scoped

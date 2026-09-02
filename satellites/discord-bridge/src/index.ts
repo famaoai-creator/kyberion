@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { appendJsonLine, readJsonLines } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJsonLines } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -237,7 +237,7 @@ async function collectDiscordThreadContext(
           messageId: entry.id || '',
           threadTs: message.channelId,
           channelId: message.channelId,
-          receivedAt: entry.createdAt?.toISOString() || new Date().toISOString(),
+          receivedAt: entry.createdAt?.toISOString() || nowIso(),
         });
       }
     } catch (error: unknown) {
@@ -327,7 +327,7 @@ export async function handleDiscordMessage(message: Message) {
         messageId: `reply-${message.id}`,
         threadTs,
         channelId: message.channelId,
-        receivedAt: new Date().toISOString(),
+        receivedAt: nowIso(),
       });
     },
   };
@@ -376,7 +376,7 @@ export async function handleDiscordMessage(message: Message) {
               messageId: `reply-${message.id}`,
               threadTs,
               channelId: message.channelId,
-              receivedAt: new Date().toISOString(),
+              receivedAt: nowIso(),
             });
             return;
           }

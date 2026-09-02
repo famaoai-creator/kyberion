@@ -6,7 +6,7 @@ import {
   safeExistsSync,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso, readJson } from '@agent/core/foundation';
 import type { FocusedInputState } from '@agent/core/os-automation';
 import { activateApplication, detectFocusedInput } from '@agent/core/os-automation';
 
@@ -119,7 +119,7 @@ function rememberFocusedTarget(explicitId: string | undefined, focusedInput: Foc
     role: focusedInput.role,
     description: focusedInput.description,
     editable: focusedInput.editable,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso(),
   };
   saveFocusTargetStore(store);
   return targetId;

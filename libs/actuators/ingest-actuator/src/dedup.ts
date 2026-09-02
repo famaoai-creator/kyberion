@@ -21,7 +21,7 @@ import {
   safeMkdir,
   safeReadFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -142,7 +142,7 @@ export function dedupContent(input: DedupInput): DedupResult {
       content_sha256: input.content_sha256,
       ...(input.source_system !== undefined ? { source_system: input.source_system } : {}),
       ...(input.source_id !== undefined ? { source_id: input.source_id } : {}),
-      first_seen: input.now ?? new Date().toISOString(),
+      first_seen: input.now ?? nowIso(),
       ...(input.target_path !== undefined ? { target_path: input.target_path } : {}),
     };
     safeMkdir(path.dirname(absPath), { recursive: true });
