@@ -13091,6 +13091,12 @@ SX-03／SX-08／SX-09 のbrowser conversation runtime readerを再監査し、br
 
 検証: browser conversation **1 file / 15 tests passed**、root typecheck、5 package build、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 472
+
+SX-03／SX-04／SX-10 のservice runtime state readerを再監査し、`state.json` を型アサーションのまま installed／pinned inventory・probe判定へ渡していた残存を修正した。version／status／service_id、canonical managed path、日時、provenanceの型・未知フィールド・dangerous JSON keyを読み込み時にstrict検証し、別service状態やpath不一致のstateはfail-closedで無視するようにした。registryのcatalog schema、service probe、provision／pinの既存semanticsとruntime root boundaryは変更していない。
+
+検証: service runtime registry **1 file / 6 tests passed**、root typecheck、5 package build、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
