@@ -6,6 +6,7 @@ import {
   writeGovernedArtifactJson,
 } from '@agent/core/artifacts';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
+import { nowIso } from '@agent/core/foundation';
 import {
   listServiceBindingRecords,
   type ServiceBindingRecord,
@@ -102,7 +103,7 @@ export function recordConnectionReview(input: {
     action: input.action,
     note: input.note,
     reviewer: input.reviewer,
-    reviewed_at: new Date().toISOString(),
+    reviewed_at: nowIso(),
   };
   state.latest_action = input.action;
   state.latest_note = input.note;
