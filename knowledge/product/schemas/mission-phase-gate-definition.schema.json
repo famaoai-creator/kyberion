@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mission-phase-gate-definition.schema.json",
+  "title": "Persisted mission phase gate definition",
+  "description": "A phase gate definition persisted under a mission boundary.",
+  "type": "object",
+  "required": ["mission_id", "phase", "position", "gate"],
+  "additionalProperties": false,
+  "properties": {
+    "mission_id": { "type": "string", "minLength": 1 },
+    "phase": { "type": "string", "minLength": 1 },
+    "position": { "type": "string", "enum": ["entry", "exit"] },
+    "gate": {
+      "type": "object",
+      "required": ["id", "checks"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "evidence_exists",
+                  "schema_valid",
+                  "command_succeeds",
+                  "reviewer_approved",
+                  "human_override",
+                  "deliverable_quality",
+                  "llm_review",
+                  "quality_contract_valid",
+                  "dor_satisfied",
+                  "acceptance_criteria_verified",
+                  "dod_satisfied",
+                  "test_traceability",
+                  "quality_release_allowed",
+                  "custom"
+                ]
+              },
+              "params": { "type": "object" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
