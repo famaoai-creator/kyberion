@@ -9,6 +9,7 @@ import {
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
+import { nowIso } from '@agent/core/foundation';
 import {
   createApprovalRequest,
   decideApprovalRequest,
@@ -101,7 +102,7 @@ async function executeApprovalPipeline(
   return runAdfActuatorPipeline({
     actuatorId: 'approval',
     steps,
-    context: { ...initialContext, timestamp: new Date().toISOString() },
+    context: { ...initialContext, timestamp: nowIso() },
     options: {
       maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
       timeoutMs: options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,

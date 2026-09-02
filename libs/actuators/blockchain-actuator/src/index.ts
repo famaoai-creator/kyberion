@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core/cli-utils';
-import { appendJsonLine, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 
 /**
  * Blockchain-Actuator v1.0.0 [IMMUTABLE ANCHOR]
@@ -95,7 +95,7 @@ async function anchorMission(params: any) {
   const tx = {
     block_number: Math.floor(Date.now() / 10000),
     tx_id: createHash('sha256').update(`tx-${Date.now()}-${mission_id}`).digest('hex'),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     type: 'MISSION_ANCHOR',
     mission_id,
     data_hash: hash,
@@ -117,7 +117,7 @@ async function anchorTrust(params: any) {
   const tx = {
     block_number: Math.floor(Date.now() / 10000),
     tx_id: createHash('sha256').update(`tx-trust-${Date.now()}-${agent_id}`).digest('hex'),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     type: 'TRUST_SCORE_ANCHOR',
     agent_id,
     new_score: score,

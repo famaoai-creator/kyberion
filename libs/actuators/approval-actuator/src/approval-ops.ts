@@ -1,4 +1,5 @@
 import { createApprovalRequest, listApprovalRequests } from '@agent/core/governance';
+import { nowIso } from '@agent/core/foundation';
 import { enforceApprovalGate } from '@agent/core/approval-gate';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from '@agent/core/decision-rights';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
@@ -109,7 +110,7 @@ export function requestReviewOp(input: ReviewRequestInput) {
   const role: GovernedArtifactRole = 'mission_controller';
   const request = createApprovalRequest(role, {
     channel,
-    threadTs: new Date().toISOString(),
+    threadTs: nowIso(),
     correlationId,
     requestedBy: input.agent_id || 'mission_controller',
     draft: {

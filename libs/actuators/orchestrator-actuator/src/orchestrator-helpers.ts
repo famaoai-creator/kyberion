@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   safeReadFile,
   safeWriteFile,
@@ -516,7 +516,7 @@ async function opTransform(op: string, params: any, ctx: any) {
         [params.export_as || 'system_status_snapshot']: {
           kind: 'system-status-snapshot',
           scope: brief.scope,
-          captured_at: new Date().toISOString(),
+          captured_at: nowIso(),
           surface_status: surfaceStatus,
           esm_integrity: esmIntegrity,
           catalog_integrity: catalogIntegrity,

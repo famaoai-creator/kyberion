@@ -38,6 +38,7 @@ vi.mock('@agent/core/foundation', () => ({
   appendJsonLine: vi.fn((_target: string, data: string) => {
     writes.push(JSON.stringify(data));
   }),
+  nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
   parseSafeJsonInput: vi.fn((input: string) => JSON.parse(input)),
 }));
 

@@ -16,7 +16,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveTenant, type TenantRegistryPathOptions } from '@agent/core/tenant-registry';
-import { compileSchema, defineCatalog } from '@agent/core/foundation';
+import { compileSchema, defineCatalog, nowIso } from '@agent/core/foundation';
 import type { IngestIr } from './parse-document.js';
 
 // Tracked source, resolved against the real repo root on purpose (same
@@ -196,7 +196,7 @@ export function normalizeCard(input: NormalizeCardInput): NormalizeCardResult {
   }
 
   const meta = input.ir.meta;
-  const timestamp = card.last_updated ?? input.now ?? meta.retrieved_at ?? new Date().toISOString();
+  const timestamp = card.last_updated ?? input.now ?? meta.retrieved_at ?? nowIso();
   const {
     title: _title,
     tags: _tags,

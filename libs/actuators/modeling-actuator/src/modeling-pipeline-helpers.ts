@@ -34,7 +34,7 @@ import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
 } from '@agent/core/agentic-source-review-verification';
-import { createAjv, readJson } from '@agent/core/foundation';
+import { createAjv, nowIso, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -123,7 +123,7 @@ export async function executePipeline(
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx = { ...initialCtx, timestamp: nowIso() };
   const contextPath = resolveContextPath(rootDir, initialCtx.context_path);
 
   if (contextPath && safeExistsSync(contextPath)) {

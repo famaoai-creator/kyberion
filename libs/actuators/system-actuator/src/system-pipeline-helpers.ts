@@ -7,7 +7,7 @@ import {
   safeExec,
   safeExistsSync,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveDesktopLaunchAdapter } from '@agent/core/desktop-launch-adapter';
@@ -376,7 +376,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx = { ...initialCtx, timestamp: nowIso() };
 
   const contextPath = initialCtx.context_path
     ? assertSafeRepositoryPath(path.resolve(rootDir, String(initialCtx.context_path)), {

@@ -22,7 +22,7 @@ import {
 import { getVoiceRuntimePolicy } from '@agent/core/voice-runtime-policy';
 import { getVoiceTtsLanguageConfig } from '@agent/core/voice-tts-config';
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   safeExec,
   safeExecResult,
@@ -220,7 +220,7 @@ async function executeSingleAction(input: VoiceAction) {
       org: p.org,
       source: 'voice-actuator',
       interaction: {
-        at: new Date().toISOString(),
+        at: nowIso(),
         summary: p.summary,
         channel: p.channel ?? 'voice',
         ...(p.tone_shifts ? { tone_shifts: p.tone_shifts } : {}),
@@ -522,7 +522,7 @@ async function recordVerifyRepairVoiceSample(input: {
       JSON.stringify(
         {
           version: 1,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           request_id: requestId,
           sample_id: sampleId,
@@ -1213,7 +1213,7 @@ async function registerVoiceProfile(input: {
     JSON.stringify(
       {
         kind: 'voice_profile_registration_receipt',
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         status: 'validated_pending_promotion',
         request_id: input.request_id,
         profile: input.profile,

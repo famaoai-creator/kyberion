@@ -13,7 +13,7 @@ import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -102,7 +102,7 @@ export async function executePipeline(
 
   let ctx: Record<string, any> = {
     ...initialCtx,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     artifacts_dir: artifactsDir,
     android_serial: options?.serial || initialCtx.android_serial || '',
   };

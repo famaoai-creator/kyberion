@@ -1,4 +1,4 @@
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -262,7 +262,7 @@ export async function executePipeline(
     ? assertSafeRepositoryPath(pathResolver.rootResolve(contextPath), { allowMissingLeaf: true })
     : undefined;
 
-  let ctx: WisdomContext = { ...initialCtx, today: new Date().toISOString().split('T')[0] };
+  let ctx: WisdomContext = { ...initialCtx, today: nowIso().split('T')[0] };
   const receipts: WisdomReceipt[] = [];
   const dispatcher = createWisdomDispatcher(
     {
@@ -794,7 +794,7 @@ async function opApply(
             params.requested_target_tier || params.visibility || sourceTier
           ),
           contentHash: hash,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso(),
           provenance: [resolveVars(params.path, ctx), ...(ingestAssetRef ? [ingestAssetRef] : [])],
           contentPath: resolveVars(params.path, ctx),
           rawData,
