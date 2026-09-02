@@ -5,6 +5,7 @@
  */
 import { logger } from '../core.js';
 import { readJson } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
 import { safeWriteFile, safeExistsSync, safeMkdir } from '../secure-io.js';
 import * as path from 'path';
 import { pathResolver } from '../path-resolver.js';
@@ -147,7 +148,7 @@ export function checkScheduleHealth(
       // Auto-disable
       schedule.enabled = false;
       schedule.disabledReason = `Auto-disabled after ${failCount} consecutive failures`;
-      schedule.disabledAt = new Date().toISOString();
+      schedule.disabledAt = nowIso();
       saveScheduleRegistry(registry, registryOptions);
       logger.warn(`[FEEDBACK] Schedule "${scheduleId}" auto-disabled after ${failCount} failures`);
       return {
@@ -268,7 +269,7 @@ export function recordPipelineResult(
 
     if (!schedule) return;
 
-    schedule.lastRun = new Date().toISOString();
+    schedule.lastRun = nowIso();
     schedule.lastStatus = status;
 
     if (status === 'failed') {
