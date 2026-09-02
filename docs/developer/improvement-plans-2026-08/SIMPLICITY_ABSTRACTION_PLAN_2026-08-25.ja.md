@@ -12911,6 +12911,12 @@ SX-03／SX-10 の残存監査として、config fallback、plugin pack、service
 
 検証: adapter／generation quota／ingest quota／plugin／service harness／service runtime **6 files / 45 tests passed**、対象8ファイルの直接 timestamp **0件**、root typecheck、対象8ファイルの ESLint／Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 442
+
+SX-08／SX-09b のsurface残存監査として、Concierge setup と Chronos intelligence（通常／stream）の **3 production files / 18 箇所**に残っていた直接時刻生成を foundation `nowIso()` へ統合した。Conciergeの同一管理更新では identity／agent の `updated_at` を共有し、Chronosのscope／approval／mission／runtime副作用、SSE revision、request parsing、外部配送境界は変更していない。
+
+検証: setup／intelligence input・control・observation **5 files / 42 tests passed**、対象3ファイルの直接 timestamp **0件**、root typecheck、対象3ファイルの ESLint／Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
