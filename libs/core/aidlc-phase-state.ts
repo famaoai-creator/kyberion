@@ -14,6 +14,7 @@
 
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
@@ -66,7 +67,7 @@ export function createAiDlcPhaseState(
     ...(options.taskBoardRef ? { task_board_ref: options.taskBoardRef } : {}),
     phase: 'alignment',
     attempts: [],
-    updated_at: options.now ?? new Date().toISOString(),
+    updated_at: options.now ?? nowIso(),
   };
 }
 
@@ -124,7 +125,7 @@ export function advanceAiDlcPhase(
     | { phase: 'execution'; result: AiDlcPhaseResult }
     | { phase: 'test'; result: AiDlcPhaseResult & { passed: boolean } }
     | { phase: 'self_review'; result: AiDlcPhaseResult & { approved: boolean } },
-  now: string = new Date().toISOString()
+  now: string = nowIso()
 ): AiDlcPhaseState {
   const expected = nextPhase(state.phase);
   if (input.phase !== expected) {
@@ -181,7 +182,7 @@ export function advanceAiDlcPhase(
 export function tripAiDlcCircuitBreaker(
   state: AiDlcPhaseState,
   failure: AiDlcFailureContext,
-  now: string = new Date().toISOString()
+  now: string = nowIso()
 ): AiDlcPhaseState {
   return {
     ...state,
@@ -238,11 +239,12 @@ export function resumeAiDlcPhaseState(
   if (state.phase === 'complete') {
     throw new Error(`[aidlc-phase-state] cannot resume completed mission ${missionId}`);
   }
+  const resumedAt = options.now ?? nowIso();
   const resumed: AiDlcPhaseState = {
     ...state,
     resume_count: (state.resume_count || 0) + 1,
-    last_resumed_at: options.now ?? new Date().toISOString(),
-    updated_at: options.now ?? new Date().toISOString(),
+    last_resumed_at: resumedAt,
+    updated_at: resumedAt,
   };
   saveAiDlcPhaseState(resumed, options.baseDir);
   return resumed;
