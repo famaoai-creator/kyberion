@@ -17,7 +17,7 @@ describe('media semantic render token boundary', () => {
 
     expect(source).toContain("id: 'semantic-render-tokens'");
     expect(source).toContain('knowledge/product/schemas/semantic-render-tokens.schema.json');
-    expect(source).toMatch(/\.validate\(\s*catalog,/);
+    expect(source).toContain('return catalog.validate(merged, directoryPath);');
 
     expect(loadSemanticRenderTokenCatalog(pathResolver.rootDir()).semantics).toBeDefined();
     expect(resolveSemanticRenderTokens(pathResolver.rootDir(), 'hero').pptx).toEqual(
