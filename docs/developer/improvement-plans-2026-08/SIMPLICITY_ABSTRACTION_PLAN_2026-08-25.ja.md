@@ -11830,6 +11830,17 @@ SX-03 の単純な時刻 helper 残差を整理した。working-memory actuator 
 
 検証: working-memory **8 tests passed**、agent-input-queue **13 tests passed**、root typecheck、Prettier。
 
+## 2026-09-02 再レビュー修正 295
+
+SX-03 の checker 層に残っていた `pathResolver.rootResolve()` と foundation JSON reader を包むだけの private
+`readJson` を、`check_install_script_allowlist`、`check_governance_rules`、
+`check-governance-directory-consistency` から除去した。各呼び出し側で repository-bound path を明示的に解決し、
+reader の責務を foundation に一本化した。governance directory の discovery／specialized rule／allowlist semantics
+は変更していない。
+
+検証: 関連 **4 test files / 6 tests passed**、install-script-allowlist、governance-rules、root typecheck、
+Prettier、`git diff --check`。対象 3 checker の private `readJson` 定義は **0 件**となった。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

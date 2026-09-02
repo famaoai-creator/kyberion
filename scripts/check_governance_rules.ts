@@ -3,11 +3,7 @@ import { readModelRegistryDirectory } from '@agent/core/model-registry-directory
 import { assertProcessDefinitionRegistry } from '@agent/core/process-definition-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
-import {
-  compileSchema,
-  defineCatalog,
-  readJson as readFoundationJson,
-} from '@agent/core/foundation';
+import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   validateActuatorCatalogDirectoryConsistency,
@@ -307,10 +303,6 @@ export function findDeterministicCatalogViolations(): string[] {
     .map((entry) => `${GOVERNANCE_DIR}/${entry}`);
 }
 
-function readJson<T>(relativePath: string): T {
-  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
-}
-
 /**
  * Discover every governance catalog that declares a repository-local schema.
  * The hand-authored list above remains the place for domain-specific rules
@@ -328,7 +320,7 @@ export function discoverGovernanceRuleChecks(): GovernanceRuleCheck[] {
     const dataPath = `${GOVERNANCE_DIR}/${fileName}`;
     let payload: { $schema?: unknown };
     try {
-      payload = readJson<{ $schema?: unknown }>(dataPath);
+      payload = readJson<{ $schema?: unknown }>(pathResolver.rootResolve(dataPath));
     } catch {
       // The catalog-integrity gate reports malformed JSON with the precise
       // parse error; discovery should still allow the rest of this check to
@@ -363,7 +355,7 @@ function allGovernanceRuleChecks(): GovernanceRuleCheck[] {
 }
 
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
-  const data = readJson<Record<string, unknown>>(check.dataPath);
+  const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(check.dataPath));
   const validate = compileSchema(check.schemaPath);
   const ok = validate(data);
   if (!ok) {
@@ -714,7 +706,7 @@ function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
         const surfaceManifest = readJson<{
           version?: number;
           surfaces?: Array<{ id?: string; enabled?: boolean }>;
-        }>(path.join('knowledge/product/governance/surfaces', entry));
+        }>(pathResolver.rootResolve(path.join('knowledge/product/governance/surfaces', entry)));
         if (!validate(surfaceManifest)) {
           for (const error of validate.errors || []) {
             violations.push(

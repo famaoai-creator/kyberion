@@ -1,15 +1,11 @@
 /** PI-12: ensure pnpm build-script policy and its reasons cannot drift. */
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson as foundationReadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type AllowlistEntry = { allow: boolean; reason: string };
 type AllowlistFile = { schema_version: number; packages: Record<string, AllowlistEntry> };
-
-function readJson<T>(relativePath: string): T {
-  return foundationReadJson<T>(pathResolver.rootResolve(relativePath));
-}
 
 function parseAllowBuildsYaml(source: string): Record<string, boolean> {
   const result: Record<string, boolean> = {};
@@ -39,7 +35,7 @@ export function checkInstallScriptAllowlist(): {
   );
   const allowBuilds = parseAllowBuildsYaml(workspace);
   const policy = readJson<AllowlistFile>(
-    'knowledge/product/governance/install-script-allowlist.json'
+    pathResolver.rootResolve('knowledge/product/governance/install-script-allowlist.json')
   );
   const findings: string[] = [];
 
