@@ -12581,6 +12581,12 @@ SX-03 の残存監査として、browser conversation session の生成・更新
 
 検証: browser conversation／router **2 files / 23 tests passed**、対象 `browser-conversation-session.ts` の単純 timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、Prettier、`git diff --check`。残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 387
+
+SX-03 の残存監査として、mission work-item dispatch review の reviewer記録・agent delegation・A2A request／responseに残っていた単純な `new Date().toISOString()` **9 箇所**を foundation `nowIso()` へ統合した。reviewer／agent／runtime の開始・完了・メッセージ時刻 semantics と、request IDの一意性に使う `Date.now()` は変更していない。
+
+検証: mission work-item dispatch **1 file / 33 tests passed**、対象 `mission-workitem-dispatch-review.ts` の単純 timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、Prettier、`git diff --check`。残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
