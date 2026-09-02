@@ -10,6 +10,7 @@ import path from 'node:path';
 // ── vi.hoisted ────────────────────────────────────────────────────────────────
 const {
   mockSafeExistsSync,
+  mockSafeLstat,
   mockSafeReadFile,
   mockSafeReaddir,
   mockSafeWriteFile,
@@ -21,6 +22,7 @@ const {
   mockDeliverToCowork,
 } = vi.hoisted(() => ({
   mockSafeExistsSync: vi.fn(),
+  mockSafeLstat: vi.fn(() => ({ isFile: () => true })),
   mockSafeReadFile: vi.fn(),
   mockSafeReaddir: vi.fn(),
   mockSafeWriteFile: vi.fn(),
@@ -35,6 +37,7 @@ const {
 vi.mock('./secure-io.js', () => ({
   assertSafeRepositoryPath: mockAssertSafeRepositoryPath,
   safeExistsSync: mockSafeExistsSync,
+  safeLstat: mockSafeLstat,
   safeReadFile: mockSafeReadFile,
   safeReaddir: mockSafeReaddir,
   safeWriteFile: mockSafeWriteFile,
@@ -44,6 +47,14 @@ vi.mock('./secure-io.js', () => ({
       return JSON.parse(
         fs.readFileSync(
           path.resolve('knowledge/product/schemas/cowork-sync-policy.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
+    if (filePath.includes('cowork-sync-state.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
           'utf8'
         )
       ) as T;
@@ -92,6 +103,14 @@ registerFoundationIo({
         )
       ) as T;
     }
+    if (filePath.includes('cowork-sync-state.schema.json')) {
+      return JSON.parse(
+        fs.readFileSync(
+          path.resolve('knowledge/product/schemas/cowork-sync-state.schema.json'),
+          'utf8'
+        )
+      ) as T;
+    }
     return JSON.parse(String(mockSafeReadFile(filePath))) as T;
   },
   loadJsonIfPresent: <T>(filePath: string): T | null => {
@@ -113,6 +132,7 @@ registerFoundationIo({
 
 import {
   ingestCoworkArtifacts,
+  loadCoworkSyncStateAtPath,
   supplyKnowledgeToCowork,
   runCoworkKnowledgeSync,
 } from './cowork-knowledge-bridge.js';
@@ -163,6 +183,45 @@ function defaultExistsImpl(p: string): boolean {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('Cowork sync state loader', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSafeLstat.mockReturnValue({ isFile: () => true });
+  });
+
+  it('loads a valid state through the canonical schema', () => {
+    const state = {
+      ingested: { 'work/summary.md': 'hash-1' },
+      supplied: {},
+      last_sync_at: '2026-06-22T00:00:00Z',
+    };
+    mockSafeReadFile.mockReturnValue(JSON.stringify(state));
+
+    expect(loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')).toEqual(
+      state
+    );
+  });
+
+  it('rejects schema-invalid and non-file state before sync use', () => {
+    mockSafeReadFile.mockReturnValue(
+      JSON.stringify({
+        ingested: {},
+        supplied: {},
+        last_sync_at: '2026-06-22T00:00:00Z',
+        unexpected: true,
+      })
+    );
+    expect(() =>
+      loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')
+    ).toThrow('Invalid catalog cowork-sync-state');
+
+    mockSafeLstat.mockReturnValueOnce({ isFile: () => false });
+    expect(() =>
+      loadCoworkSyncStateAtPath('/repo/active/shared/runtime/cowork-sync-state.json')
+    ).toThrow('state must be a regular file');
+  });
+});
 
 describe('ingestCoworkArtifacts()', () => {
   beforeEach(() => {

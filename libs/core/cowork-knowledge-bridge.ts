@@ -28,6 +28,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
@@ -82,6 +83,9 @@ export interface BridgeSyncResult {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SYNC_STATE_LOGICAL = 'active/shared/runtime/cowork-sync-state.json';
+const SYNC_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/cowork-sync-state.schema.json'
+);
 const POLICY_PATH = pathResolver.rootResolve(
   'knowledge/product/governance/cowork-sync-policy.json'
 );
@@ -95,17 +99,36 @@ function syncStateLogicalPath(scope?: ScopeContext): string {
     : SYNC_STATE_LOGICAL;
 }
 
+const syncStateCatalog = defineCatalog<SyncState>({
+  id: 'cowork-sync-state',
+  path: SYNC_STATE_SCHEMA_PATH,
+  schema: SYNC_STATE_SCHEMA_PATH,
+});
+
+function emptySyncState(): SyncState {
+  return { ingested: {}, supplied: {}, last_sync_at: '' };
+}
+
+/** Load Cowork sync state through schema and regular-file validation. */
+export function loadCoworkSyncStateAtPath(statePath: string): SyncState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${statePath}`);
+  }
+  return syncStateCatalog.validate(readJson<unknown>(safeStatePath), safeStatePath);
+}
+
 function loadSyncState(scope?: ScopeContext): SyncState {
   const resolved = assertSafeRepositoryPath(pathResolver.resolve(syncStateLogicalPath(scope)), {
     allowMissingLeaf: true,
   });
   if (!safeExistsSync(resolved)) {
-    return { ingested: {}, supplied: {}, last_sync_at: '' };
+    return emptySyncState();
   }
   try {
-    return readJson<SyncState>(resolved);
+    return loadCoworkSyncStateAtPath(resolved);
   } catch {
-    return { ingested: {}, supplied: {}, last_sync_at: '' };
+    return emptySyncState();
   }
 }
 
@@ -115,7 +138,11 @@ function saveSyncState(state: SyncState, scope?: ScopeContext): void {
   });
   const dir = nodePath.dirname(resolved);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(resolved, JSON.stringify({ ...state, last_sync_at: nowIso() }, null, 2));
+  if (safeExistsSync(resolved) && !safeLstat(resolved).isFile()) {
+    throw new Error(`[COWORK_SYNC_STATE] state must be a regular file: ${resolved}`);
+  }
+  const validated = syncStateCatalog.validate({ ...state, last_sync_at: nowIso() }, resolved);
+  safeWriteFile(resolved, JSON.stringify(validated, null, 2));
 }
 
 function sha256(content: string): string {
