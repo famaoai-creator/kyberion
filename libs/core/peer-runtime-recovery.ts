@@ -9,7 +9,7 @@ import {
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
 import { recordProtocolServiceLifecycleBestEffort } from './protocol-service-lifecycle.js';
 import {
@@ -54,6 +54,75 @@ interface QuarantineManifest {
   created_at: string;
   reason: string;
   moved: string[];
+}
+
+const QUARANTINE_MANIFEST_FORMAT = 'kyberion-peer-runtime-quarantine-v1';
+
+function quarantineLabels(quarantinePath: string): string[] {
+  return safeReaddir(quarantinePath).filter(
+    (entry) => entry !== 'quarantine-manifest.json' && entry !== 'recovery-events.jsonl'
+  );
+}
+
+function parseQuarantineManifest(
+  value: unknown,
+  quarantinePath: string,
+  tenantId: string
+): QuarantineManifest {
+  const record = parseSafeJsonObjectValue(value, 'peer recovery quarantine manifest');
+  const expectedKeys = new Set(['format', 'tenant', 'created_at', 'reason', 'moved']);
+  if (Object.keys(record).some((key) => !expectedKeys.has(key))) {
+    throw new Error('peer_recovery_quarantine_manifest_invalid');
+  }
+  if (record.format !== QUARANTINE_MANIFEST_FORMAT || record.tenant !== tenantId) {
+    throw new Error('peer_recovery_quarantine_manifest_scope_mismatch');
+  }
+  if (
+    typeof record.created_at !== 'string' ||
+    Number.isNaN(new Date(record.created_at).getTime()) ||
+    typeof record.reason !== 'string' ||
+    record.reason.trim() === '' ||
+    !Array.isArray(record.moved)
+  ) {
+    throw new Error('peer_recovery_quarantine_manifest_invalid');
+  }
+
+  const quarantineRoot = path.resolve(pathResolver.resolve(quarantinePath));
+  const moved = record.moved.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      throw new Error(`peer_recovery_quarantine_manifest_invalid:moved[${index}]`);
+    }
+    const resolved = assertSafeRepositoryPath(pathResolver.resolve(entry), {
+      allowMissingLeaf: true,
+    });
+    const relative = path.relative(quarantineRoot, resolved);
+    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+      throw new Error(`peer_recovery_quarantine_manifest_invalid:moved[${index}]`);
+    }
+    return path.relative(pathResolver.rootDir(), resolved).split(path.sep).join('/');
+  });
+
+  if (new Set(moved).size !== moved.length) {
+    throw new Error('peer_recovery_quarantine_manifest_invalid:duplicate_moved');
+  }
+
+  const actual = quarantineLabels(quarantinePath).map((label) =>
+    path
+      .relative(pathResolver.rootDir(), path.resolve(pathResolver.resolve(quarantinePath), label))
+      .split(path.sep)
+      .join('/')
+  );
+  if (actual.length !== moved.length || actual.some((entry) => !moved.includes(entry))) {
+    throw new Error('peer_recovery_quarantine_manifest_contents_mismatch');
+  }
+
+  return {
+    format: QUARANTINE_MANIFEST_FORMAT,
+    tenant: tenantId,
+    created_at: record.created_at,
+    reason: record.reason,
+    moved,
+  };
 }
 
 function normalizeTenant(tenantId: string): string {
@@ -102,20 +171,13 @@ function readManifest(quarantinePath: string, tenantId: string): QuarantineManif
     path.join(quarantinePath, 'quarantine-manifest.json')
   );
   if (!safeExistsSync(manifestPath)) throw new Error('peer_recovery_quarantine_manifest_missing');
-  let manifest: QuarantineManifest;
+  let value: unknown;
   try {
-    manifest = readJson<QuarantineManifest>(manifestPath);
+    value = readJson<unknown>(manifestPath);
   } catch {
     throw new Error('peer_recovery_quarantine_manifest_invalid');
   }
-  if (
-    manifest.format !== 'kyberion-peer-runtime-quarantine-v1' ||
-    manifest.tenant !== tenantId ||
-    !Array.isArray(manifest.moved)
-  ) {
-    throw new Error('peer_recovery_quarantine_manifest_scope_mismatch');
-  }
-  return manifest;
+  return parseQuarantineManifest(value, quarantinePath, tenantId);
 }
 
 function peerIdsInQuarantine(quarantinePath: string): string[] {
@@ -255,9 +317,7 @@ export function resumePeerRuntimeFromQuarantine(
     }
   }
 
-  const labels = safeReaddir(quarantinePath).filter(
-    (entry) => entry !== 'quarantine-manifest.json' && entry !== 'recovery-events.jsonl'
-  );
+  const labels = quarantineLabels(quarantinePath);
   const moves = labels.map((label) => {
     const destination = destinationForLabel(label, tenantId);
     if (!destination) throw new Error(`peer_recovery_unknown_quarantine_label:${label}`);

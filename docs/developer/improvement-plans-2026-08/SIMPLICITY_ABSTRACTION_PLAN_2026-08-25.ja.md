@@ -13073,6 +13073,12 @@ SX-03／SX-08 のmission requested-task recovery readerを再監査し、`NEXT_T
 
 検証: mission task recovery **1 file / 2 tests passed**、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 469
+
+SX-03／SX-04／SX-08 のpeer runtime recovery manifestを再監査し、quarantine manifestを型アサーションのままapproval／resume gateへ渡していた残存を修正した。format／tenant／created_at／reason／movedの必須型、未知フィールド、危険JSON key、moved pathのrepository／quarantine境界、重複を読み込み時にstrict検証し、実際のquarantine label集合とmanifestのmoved集合が一致しない場合もfail-closedとした。人間承認、fresh heartbeat、destination／path boundary、recovery receiptの既存契約は変更していない。
+
+検証: peer runtime recovery **1 file / 5 tests passed**、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
