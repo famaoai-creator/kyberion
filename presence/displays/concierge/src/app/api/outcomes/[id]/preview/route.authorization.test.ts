@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  loadState: vi.fn(),
+}));
+
+vi.mock('@agent/core/mission-state', () => ({
+  loadState: mocks.loadState,
+}));
+
 import { resolveOutcomePreviewTier } from './route';
 
 describe('Concierge outcome preview tier resolution', () => {
@@ -19,5 +28,13 @@ describe('Concierge outcome preview tier resolution', () => {
     expect(
       resolveOutcomePreviewTier(undefined, ['active/shared/exports/public/report.md'])
     ).toBeUndefined();
+  });
+
+  it('uses schema-validated mission state before the legacy path fallback', () => {
+    mocks.loadState.mockReturnValue({ tier: 'confidential' });
+
+    expect(
+      resolveOutcomePreviewTier('MSN-CONFIDENTIAL', ['active/projects/public/report.md'])
+    ).toBe('confidential');
   });
 });

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { listInboxEntries } from '@agent/core/deliverable-inbox';
-import { readJson } from '@agent/core/foundation';
+import { loadState } from '@agent/core/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -71,17 +71,9 @@ function tierFromArtifactPath(artifactPath: string): PreviewTier | undefined {
 
 function tierFromMissionState(missionId: string | undefined): PreviewTier | undefined {
   if (!missionId) return undefined;
-  const missionPath = pathResolver.findMissionPath(missionId.toUpperCase());
-  if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
   try {
     return withExecutionContext('sovereign_concierge', () =>
-      secureIo.withSensitivePathMediation(() => {
-        const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-        if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return undefined;
-        const parsed = readJson<{ tier?: unknown }>(safeStatePath);
-        return normalizePreviewTier(parsed.tier);
-      })
+      normalizePreviewTier(loadState(missionId.toUpperCase())?.tier)
     );
   } catch {
     return undefined;
