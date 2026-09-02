@@ -219,6 +219,7 @@ export {
   markReasoningDegraded,
   clearReasoningDegraded,
   readReasoningDegraded,
+  parseReasoningDegradedMarker,
   reasoningDegradedMarkerPath,
   type ReasoningDegradedMarker,
 } from './reasoning-degradation.js';
@@ -228,6 +229,7 @@ export {
   markReasoningFailover,
   clearReasoningFailover,
   readReasoningFailover,
+  parseReasoningFailoverMarker,
   reasoningFailoverEventsPath,
   reasoningFailoverMarkerPath,
   type ReasoningFailoverEvent,
