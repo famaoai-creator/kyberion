@@ -12,7 +12,7 @@ import {
 } from '@agent/core/agent-runtime-supervisor';
 import { listSurfaceOutboxMessages } from '@agent/core/surface-coordination-store';
 import { discoverProviders } from '@agent/core/provider-discovery';
-import { loadSurfaceManifest } from '@agent/core/surface-runtime';
+import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -111,6 +111,15 @@ export function readMissionDashboardState(statePath: string): DashboardMissionSt
     };
   } catch {
     return null;
+  }
+}
+
+/** Read the runtime surface projection through the canonical fail-closed loader. */
+export function readSurfaceDashboardState(statePath: string): ReturnType<typeof loadSurfaceState> {
+  try {
+    return loadSurfaceState(statePath);
+  } catch {
+    return { version: 1, surfaces: {} };
   }
 }
 
@@ -956,9 +965,7 @@ function drawRuntimeSurfaces() {
     return;
   }
   const manifest = loadSurfaceManifest();
-  const state = safeExistsSync(statePath)
-    ? readJson<{ surfaces: Record<string, { pid: number }> }>(statePath)
-    : { surfaces: {} };
+  const state = readSurfaceDashboardState(statePath);
 
   for (const surface of manifest.surfaces) {
     const record = state.surfaces?.[surface.id];
