@@ -4,7 +4,7 @@ import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { listAgentIdentities } from '@agent/core/agent-identity';
 import { loadOrganizationProfile } from '@agent/core/organization-profile';
 import {
-  loadJson,
+  readJson,
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
@@ -29,7 +29,7 @@ export function loadProfile(): ProfileData {
     const statePath = path.join(profileRoot, 'onboarding', 'onboarding-state.json');
     const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
     if (safeExistsSync(safeStatePath) && safeLstat(safeStatePath).isFile()) {
-      const state = loadJson<Record<string, unknown>>(safeStatePath);
+      const state = readJson<Record<string, unknown>>(safeStatePath);
       onboardingLines = Object.entries(state)
         .filter(([, value]) => typeof value !== 'object' || value === null)
         .slice(0, 10)

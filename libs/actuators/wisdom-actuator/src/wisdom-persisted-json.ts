@@ -1,4 +1,4 @@
-import { isRecord, loadJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 
@@ -37,7 +37,7 @@ export function parseWisdomJsonObject(value: unknown): WisdomJsonObject | null {
 
 export function readWisdomJsonObject(relativePath: string): WisdomJsonObject {
   const absolutePath = assertSafeRepositoryPath(pathResolver.rootResolve(relativePath));
-  const parsed = parseWisdomJsonObject(loadJson<unknown>(absolutePath));
+  const parsed = parseWisdomJsonObject(readJson<unknown>(absolutePath));
   if (!parsed) {
     throw new Error(`[WISDOM_JSON_SHAPE_INVALID] expected an object: ${relativePath}`);
   }

@@ -11,7 +11,7 @@
  */
 
 import * as path from 'node:path';
-import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -131,7 +131,7 @@ function readJsonSafe<T>(absPath: string): T | null {
   try {
     const safePath = assertSafeRepositoryPath(absPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return loadJson<T>(safePath);
+    return readJson<T>(safePath);
   } catch {
     return null;
   }
@@ -528,7 +528,7 @@ export function getProviderPins(): Record<string, any> {
   }
   if (safeDefaultPath) {
     try {
-      const data = loadJson<{ pins?: Record<string, unknown> }>(safeDefaultPath);
+      const data = readJson<{ pins?: Record<string, unknown> }>(safeDefaultPath);
       Object.assign(pins, data.pins || {});
     } catch (err) {
       logger.warn(`[data] suppressed error in getProviderPins: ${err}`);
@@ -553,7 +553,7 @@ export function getProviderPins(): Record<string, any> {
           allowMissingLeaf: true,
         });
         if (!safeExistsSync(fullPath) || !safeLstat(fullPath).isFile()) continue;
-        const data = loadJson<{ pins?: Record<string, unknown> }>(fullPath);
+        const data = readJson<{ pins?: Record<string, unknown> }>(fullPath);
         Object.assign(pins, data.pins || {});
       }
     } catch (err) {

@@ -1,4 +1,4 @@
-import { appendJsonLine, loadJson } from '@agent/core/foundation';
+import { appendJsonLine, readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { withExecutionContext } from '@agent/core/authority';
@@ -99,8 +99,8 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
       const safeIdPath = presenceStudioData.resolveSafeExistingFile(idPath);
       const safeAgentPath = presenceStudioData.resolveSafeExistingFile(agentPath);
       const safeVisionPath = presenceStudioData.resolveSafeExistingFile(visionPath);
-      const sovereign = safeIdPath ? loadJson<unknown>(safeIdPath) : null;
-      const agent = safeAgentPath ? loadJson<unknown>(safeAgentPath) : null;
+      const sovereign = safeIdPath ? readJson<unknown>(safeIdPath) : null;
+      const agent = safeAgentPath ? readJson<unknown>(safeAgentPath) : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
         : null;

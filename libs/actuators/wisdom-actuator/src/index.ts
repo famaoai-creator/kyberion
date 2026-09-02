@@ -1,4 +1,4 @@
-import { loadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
@@ -9,7 +9,7 @@ import { describeOps } from './op-catalog.js';
 import { runActuatorCli } from '@agent/core/cli-utils';
 
 const main = async () => {
-  const schema = loadJson<object>(
+  const schema = readJson<object>(
     pathResolver.rootResolve('knowledge/product/schemas/wisdom-action.schema.json')
   );
   await runActuatorCli({
