@@ -5,6 +5,7 @@ import {
   safeExistsSync,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { loadProjectRecord } from '@agent/core/project-registry';
 import { loadServiceBindingRecord } from '@agent/core/service-binding-registry';
 import {
@@ -68,19 +69,46 @@ function loadArtifactLibraryCatalog(rootDir: string): any {
 }
 
 function loadDocumentCompositionCatalog(rootDir: string): any {
-  const primaryCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/document-composition-presets',
-    filePath: 'knowledge/public/design-patterns/media-templates/document-composition-presets.json',
-    fallback: { defaults: {}, profiles: {} },
+  const fallback = { defaults: {}, profiles: {} };
+  const catalog = defineCatalog<{
+    defaults: Record<string, unknown>;
+    profiles: Record<string, unknown>;
+  }>({
+    id: 'document-composition-presets',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/document-composition-presets.json'
+    ),
+    schema: path.resolve(
+      rootDir,
+      'knowledge/product/schemas/document-composition-presets.schema.json'
+    ),
+    fallback,
+    fallbackOnInvalid: true,
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/document-composition-presets'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  const primaryCatalog =
+    docs.length === 0
+      ? catalog.load()
+      : catalog.validate(
+          docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback)),
+          directoryPath
+        );
   const artifactLibraryCatalog = loadArtifactLibraryCatalog(rootDir);
-  return {
-    ...primaryCatalog,
-    profiles: {
-      ...(artifactLibraryCatalog.profiles || {}),
-      ...(primaryCatalog.profiles || {}),
+  return catalog.validate(
+    {
+      ...primaryCatalog,
+      profiles: {
+        ...(artifactLibraryCatalog.profiles || {}),
+        ...(primaryCatalog.profiles || {}),
+      },
     },
-  };
+    directoryPath
+  );
 }
 
 function loadThemeCatalog(rootDir: string): any {

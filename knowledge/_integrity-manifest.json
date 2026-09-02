@@ -6901,6 +6901,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/document-composition-presets.schema.json",
+      "tier": "public",
+      "size": 367,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/document-contents-policy.schema.json",
       "tier": "public",
       "size": 484,
