@@ -10,6 +10,7 @@
 
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 
 import {
   evaluateMissionGate,
@@ -270,7 +271,7 @@ export async function planProcessTemplateTasks(args: {
     };
     state.history = state.history || [];
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'PLAN_TASKS',
       note: `Expanded process template ${design.workflow_id} into ${result.tasks.length} tasks.`,
     });
@@ -458,7 +459,7 @@ export async function activateMissionOnGateProgress(missionId: string): Promise<
   state.status = 'active';
   state.history = state.history || [];
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'GATE_ACTIVATE',
     note: 'Mission activated automatically on first passed process gate.',
   });

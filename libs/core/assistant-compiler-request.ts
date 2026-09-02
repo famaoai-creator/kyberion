@@ -2,6 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import {
   inferGovernedDeliveryMode,
@@ -525,7 +526,7 @@ export function normalizeAssistantCompilerResult(
   const result: AssistantCompilerResult = {
     kind: 'assistant-compiler-result',
     request_id: request.request_id,
-    compiled_at: new Date().toISOString(),
+    compiled_at: nowIso(),
     execution_brief: executionBrief,
     intent_contract: intentContract,
     work_loop: workLoop,
@@ -563,7 +564,7 @@ export function buildAssistantCompilerRequest(
   const request: AssistantCompilerRequest = {
     kind: 'assistant-compiler-request',
     request_id: requestId,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: input.source,
     source_text: input.sourceText,
     context: {

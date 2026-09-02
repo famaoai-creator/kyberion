@@ -1,5 +1,6 @@
 import { getVideoRenderRuntimePolicy } from './video-render-runtime-policy.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type {
   VideoRenderJobStatus,
   VideoRenderProgressPacket,
@@ -231,7 +232,7 @@ export class VideoRenderRuntime {
       message: data.message,
       artifact_refs: data.artifact_refs,
       queue: data.queue,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     };
   }
 

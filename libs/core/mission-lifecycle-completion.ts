@@ -28,6 +28,7 @@ import {
   receiptToArtifactReviewDecision,
 } from './artifact-review.js';
 import { loadState } from './mission-state.js';
+import { nowIso } from './foundation/time.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
 
 function safeMissionDir(missionDir: string, allowMissingLeaf = false): string {
@@ -298,7 +299,7 @@ export function publishMeetingDeliverablesIfNeeded(input: {
     `${JSON.stringify({
       mission_id: input.missionId,
       tenant_slug: tenantSlug,
-      delivered_at: new Date().toISOString(),
+      delivered_at: nowIso(),
       deliverable_dir: path.relative(pathResolver.rootDir(), missionDeliverablesDir),
       artifacts: copiedArtifacts.map((artifact) => artifact.path),
       summary,
@@ -358,7 +359,7 @@ export function updateMissionMemorySidecar(mdPath: string, candidateId: string):
         ...sidecar,
         promotion_candidate_id: candidateId,
         status: 'promoted',
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
       },
       null,
       2

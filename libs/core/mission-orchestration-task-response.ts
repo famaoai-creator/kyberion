@@ -1,4 +1,5 @@
 import { a2aBridge } from './a2a-bridge.js';
+import { nowIso } from './foundation/time.js';
 import { serializeDelegationChain, type DelegationChain } from './delegation-chain.js';
 import {
   recordKnowledgeUsageFeedback,
@@ -99,7 +100,7 @@ export async function obtainTaskResultResponse(
       sender: 'kyberion:mission-orchestrator',
       receiver: input.agentId,
       performative: 'request',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       ...(input.delegationChain
         ? { delegation_chain: serializeDelegationChain(input.delegationChain) }
         : {}),
@@ -187,7 +188,7 @@ export async function obtainTaskResultResponse(
         sender: 'kyberion:mission-orchestrator',
         receiver: input.agentId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
         ...(input.delegationChain
           ? { delegation_chain: serializeDelegationChain(input.delegationChain) }
           : {}),
