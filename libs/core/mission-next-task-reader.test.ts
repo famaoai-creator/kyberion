@@ -1,8 +1,21 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
+  loadMissionNextTaskObjectsAtPath,
+  loadMissionNextTaskRecordsAtPath,
   parseMissionNextTaskObjects,
   parseMissionNextTaskRecords,
 } from './mission-next-task-reader.js';
+
+const loaderRoot = pathResolver.sharedTmp('mission-next-task-loader-test');
+const loaderMissionId = 'MSN-NEXT-TASK-LOADER';
+const loaderPath = path.join(loaderRoot, loaderMissionId, 'NEXT_TASKS.json');
+
+afterEach(() => {
+  safeRmSync(loaderRoot, { recursive: true, force: true });
+});
 
 describe('parseMissionNextTaskRecords', () => {
   it('keeps the task and status projection for valid records', () => {
@@ -50,5 +63,30 @@ describe('parseMissionNextTaskObjects', () => {
         JSON.parse('{"task_id":"task-1","metadata":{"constructor":{}}}'),
       ])
     ).toBeNull();
+  });
+});
+
+describe('loadMissionNextTaskRecordsAtPath', () => {
+  it('loads a mission-bound NEXT_TASKS projection through its schema', () => {
+    safeMkdir(path.dirname(loaderPath), { recursive: true });
+    safeWriteFile(loaderPath, JSON.stringify([{ task_id: 'review-1', status: 'completed' }]));
+
+    expect(loadMissionNextTaskRecordsAtPath(loaderPath, loaderMissionId)).toEqual([
+      { task_id: 'review-1', status: 'completed' },
+    ]);
+    expect(loadMissionNextTaskObjectsAtPath(loaderPath, loaderMissionId)).toEqual([
+      { task_id: 'review-1', status: 'completed' },
+    ]);
+  });
+
+  it('rejects non-regular and cross-mission NEXT_TASKS paths', () => {
+    safeMkdir(path.dirname(loaderPath), { recursive: true });
+    expect(() =>
+      loadMissionNextTaskRecordsAtPath(path.dirname(loaderPath), loaderMissionId)
+    ).toThrow('[MISSION_NEXT_TASKS]');
+    safeWriteFile(loaderPath, JSON.stringify([]));
+    expect(() => loadMissionNextTaskRecordsAtPath(loaderPath, 'MSN-OTHER')).toThrow(
+      '[MISSION_NEXT_TASKS_SCOPE_MISMATCH]'
+    );
   });
 });

@@ -1,9 +1,54 @@
+import * as path from 'node:path';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/json.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+
+const MISSION_NEXT_TASKS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-next-tasks.schema.json'
+);
+
+function missionNextTasksCatalog(filePath: string) {
+  return defineCatalog<Array<Record<string, unknown>>>({
+    id: 'mission-next-tasks',
+    path: filePath,
+    schema: MISSION_NEXT_TASKS_SCHEMA_PATH,
+  });
+}
 
 /** The fields needed by mission gates and progress projections. */
 export interface MissionNextTaskRecord {
   task_id?: string;
   status?: string;
+}
+
+/** Load NEXT_TASKS through the mission-boundary schema before projecting it. */
+export function loadMissionNextTaskObjectsAtPath(
+  filePath: string,
+  expectedMissionId: string
+): Array<Record<string, unknown>> | null {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_NEXT_TASKS] NEXT_TASKS.json must be a regular file: ${filePath}`);
+  }
+  const missionId = expectedMissionId.trim().toUpperCase();
+  if (path.basename(path.dirname(safeFilePath)).toUpperCase() !== missionId) {
+    throw new Error(
+      `[MISSION_NEXT_TASKS_SCOPE_MISMATCH] NEXT_TASKS.json is outside mission ${missionId}: ${filePath}`
+    );
+  }
+  if (!safeExistsSync(safeFilePath)) return null;
+  const parsed = missionNextTasksCatalog(safeFilePath).load();
+  return parseMissionNextTaskObjects(parsed, safeFilePath);
+}
+
+/** Load the task/status projection used by read-only mission gates. */
+export function loadMissionNextTaskRecordsAtPath(
+  filePath: string,
+  expectedMissionId: string
+): MissionNextTaskRecord[] | null {
+  const objects = loadMissionNextTaskObjectsAtPath(filePath, expectedMissionId);
+  return objects ? parseMissionNextTaskRecords(objects, filePath) : null;
 }
 
 /** Parse NEXT_TASKS entries while preserving fields needed by mutating flows. */
