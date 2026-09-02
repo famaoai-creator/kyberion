@@ -1,5 +1,6 @@
 import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
@@ -381,7 +382,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     path: repoRelative,
     scope: { ...input.scope },
     scope_kind: kind,
-    written_at: new Date().toISOString(),
+    written_at: nowIso(),
   };
 
   const performWrite = (): void => {

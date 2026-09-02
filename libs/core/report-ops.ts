@@ -21,6 +21,7 @@ import { summarizeHeuristics, type HeuristicReport } from './heuristic-feedback.
 import { currentScope, type ScopeContext } from './scope-context.js';
 import { isRecord } from './foundation/text.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import type { TaskModelEffort, TaskModelHint, TaskModelTier } from './reasoning-model-routing.js';
 
 // ─── audit verify (SA-01) ───────────────────────────────────
@@ -318,7 +319,7 @@ export function runKnowledgeValidationSweep(
   const queued = visible.filter((candidate) => candidate.status === 'queued');
   const errors = findings.some((finding) => finding.severity === 'error');
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(scope ? { scope } : {}),
     status: errors ? 'attention' : 'ok',
     heuristics: summarizeHeuristics(10),

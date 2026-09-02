@@ -4,6 +4,7 @@ import { withExecutionContext } from './authority.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -538,7 +539,7 @@ export function buildPromotedMemoryRecord(candidate: DistillCandidateRecord): Pr
     work_loop: candidate.work_loop,
     artifact_ids: candidate.artifact_ids,
     evidence_refs: candidate.evidence_refs,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
   };
   if (candidate.target_kind === 'pattern') {
     return {

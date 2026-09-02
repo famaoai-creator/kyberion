@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   assertMemoryScope,
@@ -102,7 +103,7 @@ export class MissionWorkingMemory {
       writer_agent: input.writer_agent,
       task_id: input.task_id,
       ...(scopeContext ? { scope_context: scopeContext } : {}),
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       metadata: input.metadata,
     };
     this.entries.push(entry);

@@ -9,6 +9,7 @@ import type {
   GraphExecutionOutcome,
 } from './graph-scheduler.js';
 import { hashPipelineOutput } from './pipeline-run-journal.js';
+import { nowIso } from './foundation/time.js';
 
 export interface GraphRunArtifactNode {
   id: string;
@@ -37,7 +38,7 @@ export function createGraphRunArtifact<T>(
     version: 1,
     ...(runId ? { run_id: runId } : {}),
     ...(traceId ? { trace_id: traceId } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     nodes: graph.nodes.map((node) => ({
       id: node.id,
       status: 'pending' as const,

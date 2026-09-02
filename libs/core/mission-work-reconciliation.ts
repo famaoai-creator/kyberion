@@ -16,6 +16,7 @@ import { auditChain } from './audit-chain.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson as readFoundationJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { detectTier } from './tier-guard.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
@@ -826,7 +827,7 @@ export function generateMissionWorkReconciliationScaffold(input: {
     kind: 'mission-work-reconciliation-scaffold',
     version: '1.0.0',
     mission_id: missionId,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     source: { repository: '.', branch, commit },
     adopted_by:
       getRegisteredEnvText('KYBERION_PERSONA') || process.env.USER || 'mission_controller',
@@ -979,7 +980,7 @@ export async function reconcileMissionExistingWork(input: {
     };
     if (input.dryRun) return { status: 'dry_run_ready', ...resultBase };
 
-    const adoptedAt = new Date().toISOString();
+    const adoptedAt = nowIso();
     for (const manifestTask of manifest.tasks) {
       const plannedTask = taskById.get(manifestTask.task_id)!;
       if (alreadyReconciledTaskIds.includes(manifestTask.task_id)) continue;
