@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyBrowserConversationCommand,
+  bootstrapBrowserConversationSession,
   classifyBrowserConversationCommand,
   confirmBrowserConversationCandidate,
   createBrowserConversationCommand,
@@ -21,10 +22,12 @@ import { safeRmSync, safeWriteFile, safeMkdir } from './secure-io.js';
 describe('browser conversation session helpers', () => {
   const sessionDir = pathResolver.shared('runtime/browser/conversation-sessions');
   const snapshotDir = pathResolver.shared('runtime/browser/snapshots');
+  const runtimeDir = pathResolver.shared('runtime/browser/sessions');
 
   afterEach(() => {
     safeRmSync(sessionDir, { recursive: true, force: true });
     safeRmSync(snapshotDir, { recursive: true, force: true });
+    safeRmSync(runtimeDir, { recursive: true, force: true });
   });
 
   it('creates and validates a session with defaults', () => {
@@ -87,6 +90,67 @@ describe('browser conversation session helpers', () => {
 
   it('rejects traversal-shaped session ids before persistence lookup', () => {
     expect(() => loadBrowserConversationSession('../outside')).toThrow(/single path segment/);
+  });
+
+  it('does not use a malformed browser snapshot for target resolution', () => {
+    const session = createBrowserConversationSession({
+      sessionId: 'BRS-TEST-MALFORMED-SNAPSHOT',
+      surface: 'presence',
+      goal: {
+        summary: '承認フローを進める',
+        success_condition: '承認を完了する',
+      },
+    });
+    saveBrowserConversationSession(session);
+    safeMkdir(snapshotDir, { recursive: true });
+    safeWriteFile(
+      `${snapshotDir}/BRS-TEST-MALFORMED-SNAPSHOT.json`,
+      JSON.stringify({
+        session_id: 'BRS-TEST-MALFORMED-SNAPSHOT',
+        tab_id: 'tab-1',
+        url: 'https://example.com',
+        title: 'Approval Console',
+        captured_at: new Date().toISOString(),
+        elements: [null],
+      })
+    );
+
+    const feedback = applyBrowserConversationCommand(
+      'BRS-TEST-MALFORMED-SNAPSHOT',
+      createBrowserConversationCommand({
+        sessionId: 'BRS-TEST-MALFORMED-SNAPSHOT',
+        utterance: '承認ボタンを押して',
+        resolution: {
+          commandType: 'step_command',
+          action: 'click',
+          targetHint: { text: '承認', role: 'button' },
+        },
+      })
+    );
+
+    expect(feedback?.status).toBe('progress');
+    expect(
+      loadBrowserConversationSession('BRS-TEST-MALFORMED-SNAPSHOT')?.candidate_targets
+    ).toEqual([]);
+  });
+
+  it('rejects a malformed browser runtime session before bootstrap', () => {
+    safeMkdir(runtimeDir, { recursive: true });
+    safeWriteFile(
+      `${runtimeDir}/BROWSER-TEST-MALFORMED.json`,
+      JSON.stringify({
+        session_id: 'BROWSER-TEST-MALFORMED',
+        lease_status: 'active',
+        tabs: [null],
+      })
+    );
+
+    expect(() =>
+      bootstrapBrowserConversationSession({
+        browserSessionId: 'BROWSER-TEST-MALFORMED',
+        surface: 'presence',
+      })
+    ).toThrow('Browser runtime session not found');
   });
 
   it('records history entries on an existing session', () => {
