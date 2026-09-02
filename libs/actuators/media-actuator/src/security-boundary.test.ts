@@ -24,7 +24,9 @@ describe('media-actuator security boundary', () => {
       ),
       { encoding: 'utf8' }
     ) as string;
-    expect(source).toContain('const catalogPath = assertSafeRepositoryPath(');
-    expect(source).toContain('loadJson<{');
+    expect(source).toContain('defineCatalog<DocumentLayoutCatalog>({');
+    expect(source).toContain("id: 'document-layouts'");
+    expect(source).toContain('schema: DOCUMENT_LAYOUTS_SCHEMA_PATH');
+    expect(source).toContain('documentLayoutCatalog.load()');
   });
 });

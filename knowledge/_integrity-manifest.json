@@ -6913,6 +6913,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/document-layouts.schema.json",
+      "tier": "public",
+      "size": 701,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/document-outline-label-policy.schema.json",
       "tier": "public",
       "size": 327,

@@ -12082,6 +12082,18 @@ catalog 時の警告と login／passkey selector の既存解決 semantics を�
 検証: android actuator **2 files / 31 tests passed**、対象 entrypoint／catalog boundary、Prettier、`git diff --check`。残る SX-04 は
 他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 320
+
+media actuator の `document-layouts.json` が固定 root catalog であるにもかかわらず、route 内で個別 `readJson` と存在判定を
+行っていたため、family envelope を検証する専用 `document-layouts.schema.json` を追加し、`defineCatalog<DocumentLayoutCatalog>()`
+へ移行した。document family／default template の必須境界は schema で確認し、template payload は invoice／report／tracker の
+形式差を許容する。従来の document type／template id の解決エラーと PDF protocol semantics は維持した。追加 schema は governed
+knowledge index／integrity manifest にも反映した。
+
+検証: document layout／media security **2 files / 15 tests passed**（関連48 tests skipped）、knowledge index generator、typecheck、
+PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-04 は他の domain loader と非catalog層の旧loader整理、
+未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
