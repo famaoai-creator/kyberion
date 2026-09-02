@@ -11,14 +11,13 @@ import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   buildCampaignPlan,
-  type CampaignBrief,
+  loadCampaignBriefAtPath,
   type CampaignManifest,
   type CampaignPlanEntry,
 } from '@agent/core/campaign-suite';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { pathResolver, sharedTmp } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -78,12 +77,7 @@ export function runCampaignSuite(options: {
   if (!safeLstat(briefPath).isFile()) {
     throw new Error(`brief path must be a regular file: ${options.briefPath}`);
   }
-  const brief = readJson<CampaignBrief>(briefPath);
-  if (brief.kind !== 'campaign-brief' || !Array.isArray(brief.deliverables)) {
-    throw new Error(
-      `Invalid campaign brief at ${options.briefPath}: expected kind=campaign-brief with deliverables[]`
-    );
-  }
+  const brief = loadCampaignBriefAtPath(briefPath);
 
   const outputRootPath =
     options.outputRoot ||
