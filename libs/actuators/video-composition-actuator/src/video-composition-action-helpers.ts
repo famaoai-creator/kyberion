@@ -2,7 +2,7 @@ import type { ChildProcess } from 'node:child_process';
 import { authorSceneCompositions } from '@agent/core/video-scene-composition';
 import { generateVideoMotionDirection } from '@agent/core/video-motion-direction';
 import { generateVideoVisualDirection } from '@agent/core/video-visual-direction';
-import { readJsonIfPresent } from '@agent/core/foundation';
+import { nowIso, readJsonIfPresent } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -814,7 +814,7 @@ async function cancelVideoCompositionJob(params: { job_id?: string; reason?: str
   if (reason) {
     upsertJobDiagnostics(jobId, {
       cancellation_reason: reason,
-      cancellation_requested_at: new Date().toISOString(),
+      cancellation_requested_at: nowIso(),
     });
   }
   const cancellation = runtime.cancel(jobId, { reason });
@@ -855,12 +855,12 @@ async function prepareVideoComposition(params: {
     awaitCompletion === false &&
     policy.render.enable_backend_rendering &&
     runMode !== 'in-process';
-  upsertJobDiagnostics(jobId, { created_at: new Date().toISOString() });
+  upsertJobDiagnostics(jobId, { created_at: nowIso() });
   writeVideoCompositionJobTicket(jobTicketPath, {
     job_id: jobId,
     status: 'queued',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso(),
+    updated_at: nowIso(),
     bundle_dir: bundlePreview.bundle_dir,
     output_format: adf.output.format,
     output_target_path: adf.output.target_path,
@@ -959,8 +959,8 @@ async function prepareVideoComposition(params: {
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: 'running',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: plan.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,
@@ -1032,8 +1032,8 @@ async function prepareVideoComposition(params: {
           writeVideoCompositionJobTicket(jobTicketPath, {
             job_id: jobId,
             status: 'completed',
-            created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+            updated_at: nowIso(),
             bundle_dir: plan.bundle_dir,
             output_format: adf.output.format,
             output_target_path: adf.output.target_path,
@@ -1068,8 +1068,8 @@ async function prepareVideoComposition(params: {
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: 'completed',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: plan.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,
@@ -1086,8 +1086,8 @@ async function prepareVideoComposition(params: {
         writeVideoCompositionJobTicket(jobTicketPath, {
           job_id: jobId,
           status: api.isCancelled() ? 'cancelled' : 'failed',
-          created_at: jobDiagnostics.get(jobId)?.created_at || new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: jobDiagnostics.get(jobId)?.created_at || nowIso(),
+          updated_at: nowIso(),
           bundle_dir: bundlePreview.bundle_dir,
           output_format: adf.output.format,
           output_target_path: adf.output.target_path,

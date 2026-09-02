@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
   safeWriteFile: vi.fn(),
   assertSafeRepositoryPath: vi.fn((candidate: string) => {
     const normalized = path.resolve(String(candidate));
-    if (normalized !== '/tmp' && !normalized.startsWith('/tmp/')) {
+    const metricsPath = path.resolve('work/metrics');
+    if (normalized !== '/tmp' && !normalized.startsWith('/tmp/') && normalized !== metricsPath) {
       throw new Error(
         `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${candidate}`
       );
@@ -152,6 +153,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@agent/core/foundation', () => ({
   compileSchema: mocks.compileSchemaFromPath,
   getRegisteredEnvText: (name: string) => process.env[name],
+  nowIso: vi.fn(() => '2026-01-01T00:00:00.000Z'),
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({

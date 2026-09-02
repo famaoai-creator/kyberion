@@ -11969,6 +11969,18 @@ validation、CDP／WebAuthn lifecycle は変更せず、記録時刻の UTC ISO 
 Prettier、`git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14
 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 309
+
+video-composition actuator の cancellation／diagnostics／job ticket lifecycle に残っていた意味固有の変換を持たない
+`new Date().toISOString()` 12箇所を foundation の `nowIso()` へ移行した。queued／running／completed／failed の状態記録、
+cancellation metadata の UTC ISO 形式と既存の render lifecycle は維持し、deadline・経過時間・一意 ID 生成の
+`Date.now()` は対象外とした。あわせてテストの安全パス fixture が repository-bound な `work/metrics` を受け入れ、
+本番の外部パス拒否契約と `nowIso()` のモック契約を検証できるようにした。
+
+検証: video-composition actuator **1 file / 20 tests passed**、対象 helper の単純 timestamp **0件**、Prettier、
+`git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14 の
+未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
