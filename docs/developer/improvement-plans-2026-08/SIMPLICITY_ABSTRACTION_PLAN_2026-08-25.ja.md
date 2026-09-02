@@ -12176,6 +12176,17 @@ SX-04 の media domain loader を継続監査し、外部 `awesome-design-md` �
 knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、
 artifact-library等の動的payloadを持つloaderの段階的な契約化である。
 
+## 2026-09-02 再レビュー修正 329
+
+SX-04 の media domain loader を継続監査し、27 pack／100 profile の `artifact-library` が profile merge 後の shape 検証なしで
+document composition resolverへ渡されていた残存を修正した。`artifact-family`／`document-type`／description／section metadata の
+専用schemaを追加し、既存の pack discovery、profileの優先順位、動的な document payloadの互換性を維持したまま、merged catalogを
+`defineCatalog`で検証するようにした。
+
+検証: artifact library catalog、media design catalog **2 files / 2 tests passed**、media actuator build、root typecheck、root lint、
+catalog／governance-rules、knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの
+廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -6481,6 +6481,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/artifact-library.schema.json",
+      "tier": "public",
+      "size": 1175,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/artifact-ownership-record.schema.json",
       "tier": "public",
       "size": 1462,
