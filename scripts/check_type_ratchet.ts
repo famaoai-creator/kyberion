@@ -7,9 +7,10 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/c
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 const ROOT = pathResolver.rootDir();
-const DEFAULT_BASELINE_PATH = pathResolver.rootResolve('scripts/check_type_ratchet.baseline.json');
+const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('type-ratchet');
 const DEFAULT_SCAN_ROOTS = ['libs', 'scripts', 'satellites', 'presence', 'tests'];
 
 // OP-03: the ratchet baselines are computed against the git-tracked tree.

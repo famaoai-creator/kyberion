@@ -1269,7 +1269,7 @@
     {
       "path": "product/governance/ci-gates.json",
       "tier": "public",
-      "size": 21129,
+      "size": 21450,
       "type": "json"
     },
     {
@@ -7863,7 +7863,7 @@
     {
       "path": "product/schemas/module-layer-boundaries.schema.json",
       "tier": "public",
-      "size": 1445,
+      "size": 1473,
       "type": "json"
     },
     {
@@ -9099,7 +9099,7 @@
     {
       "path": "product/schemas/tier-hygiene-policy.schema.json",
       "tier": "public",
-      "size": 1256,
+      "size": 1288,
       "type": "json"
     },
     {

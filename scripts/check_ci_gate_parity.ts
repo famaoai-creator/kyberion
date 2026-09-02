@@ -1,7 +1,8 @@
 import { pathResolver } from '@agent/core/path-resolver';
 import { readJson } from '@agent/core/foundation';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { loadGateManifest } from './run_checks.js';
+import { resolveDeclaredBaselinePath } from './lib/ci-gate-baseline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const WORKFLOW_SCOPE_REFS = {
@@ -51,6 +52,18 @@ export function checkCiGateParity(): string[] {
     for (const script of collectPnpmScriptReferences(command)) {
       if (!packageJson.scripts?.[script]) {
         failures.push(`ci-gates.json gate ${gate.id} references unknown package script ${script}`);
+      }
+    }
+    if (gate.baseline) {
+      try {
+        const baselinePath = resolveDeclaredBaselinePath(gate.baseline);
+        if (!safeExistsSync(baselinePath)) {
+          failures.push(`ci-gates.json gate ${gate.id} baseline does not exist: ${gate.baseline}`);
+        }
+      } catch (error) {
+        failures.push(
+          `ci-gates.json gate ${gate.id} has an invalid baseline: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
   }
