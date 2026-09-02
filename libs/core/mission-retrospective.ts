@@ -20,6 +20,8 @@ import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
 import { isRecord } from './foundation/text.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
 
 function safeMissionRoot(missionPath: string): string {
   return assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
@@ -465,13 +467,13 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     }
   }
 
-  const state = readMissionJsonIfPresent<{
-    context?: {
-      goal_reconciliation_round?: number;
-      mission_finish_gate_last_reason?: string;
-      mission_finish_gate_failure_count?: number;
-    };
-  }>(missionPath, 'mission-state.json');
+  const state = loadMissionStateAtPath(
+    safeMissionArtifactPath(missionPath, 'mission-state.json')
+  ) as
+    | (MissionState & {
+        context?: MissionState['context'] & Record<string, unknown>;
+      })
+    | null;
   stats.goal_reconciliation_rounds = Number(state?.context?.goal_reconciliation_round || 0);
   if (state?.context?.mission_finish_gate_last_reason) {
     stats.finish_gate_failures.push({

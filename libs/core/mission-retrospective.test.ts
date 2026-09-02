@@ -98,6 +98,12 @@ describe('mission retrospective loop', () => {
     fs.mkdirSync(path.join(missionDir, 'evidence'), { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
     fs.mkdirSync(path.join(tmpRoot, 'knowledge'), { recursive: true });
+    const schemaPath = path.join(tmpRoot, 'knowledge/product/schemas/mission-state.schema.json');
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+      schemaPath
+    );
     process.env.KYBERION_ROOT = tmpRoot;
 
     fs.writeFileSync(
@@ -130,7 +136,23 @@ describe('mission retrospective loop', () => {
     );
     fs.writeFileSync(
       path.join(missionDir, 'mission-state.json'),
-      JSON.stringify({ mission_id: MISSION, context: { goal_reconciliation_round: 1 } })
+      JSON.stringify({
+        mission_id: MISSION,
+        tier: 'public',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'worker',
+        confidence_score: 1,
+        git: {
+          branch: 'mission-retrospective-test',
+          start_commit: 'abc123',
+          latest_commit: 'abc123',
+          checkpoints: [],
+        },
+        history: [],
+        context: { goal_reconciliation_round: 1 },
+      })
     );
     fs.mkdirSync(path.join(tmpRoot, 'work', 'metrics'), { recursive: true });
     fs.writeFileSync(
@@ -220,6 +242,24 @@ describe('mission retrospective loop', () => {
       total_tokens: 15,
     });
     expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
+  });
+
+  it('does not derive lifecycle stats from a schema-invalid mission state', () => {
+    fs.writeFileSync(
+      path.join(missionDir, 'mission-state.json'),
+      JSON.stringify({
+        mission_id: MISSION,
+        context: {
+          goal_reconciliation_round: 99,
+          mission_finish_gate_last_reason: 'must not be reported',
+        },
+      })
+    );
+
+    const stats = mod.collectMissionExecutionStats(MISSION);
+
+    expect(stats.goal_reconciliation_rounds).toBe(0);
+    expect(stats.finish_gate_failures).toEqual([]);
   });
 
   it('skips malformed JSONL records and does not count non-object events', () => {
