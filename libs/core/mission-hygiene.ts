@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
+import { loadStateAtPath } from './mission-state.js';
+import type { MissionState } from './mission-types.js';
 import { readJson as foundationReadJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
@@ -116,11 +118,9 @@ function missionAgeDays(history: Array<{ ts?: string }> | undefined): number | n
   return Math.floor((Date.now() - created) / (24 * 60 * 60 * 1000));
 }
 
-function scopedMissionFields(state: {
-  organization_id?: unknown;
-  tenant_slug?: unknown;
-  context?: unknown;
-}): Pick<PlannedMissionFinding, 'organization_id' | 'tenant_slug'> {
+function scopedMissionFields(
+  state: Pick<MissionState, 'organization_id' | 'tenant_slug' | 'context'>
+): Pick<PlannedMissionFinding, 'organization_id' | 'tenant_slug'> {
   const context =
     state.context && typeof state.context === 'object'
       ? (state.context as Record<string, unknown>)
@@ -189,16 +189,10 @@ export function collectMissionHygieneReport(
   let plannedTotal = 0;
 
   for (const { missionPath, tier } of listMissionDirs()) {
-    const state = readJson<{
-      mission_id?: string;
-      status?: string;
-      organization_id?: string;
-      tenant_slug?: string;
-      context?: Record<string, unknown>;
-      history?: Array<{ ts?: string }>;
-    }>(path.join(missionPath, 'mission-state.json'));
+    const statePath = safeMissionPath(path.join(missionPath, 'mission-state.json'));
+    const state = statePath ? loadStateAtPath(statePath) : null;
     if (!state?.mission_id) continue;
-    const status = String(state.status || '');
+    const status = state.status;
     if (status === 'active' || status === 'distilling') {
       const ageDays = missionAgeDays(state.history);
       if (ageDays !== null && ageDays >= staleDays) {

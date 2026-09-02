@@ -39,6 +39,23 @@ vi.mock('./secure-io.js', () => realFsSecureIo);
 vi.mock('./foundation/json.js', () => ({
   readJson: realFsSecureIo.loadJson,
 }));
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: realFsSecureIo.loadJson,
+    loadJsonIfPresent: <T>(filePath: string) => {
+      try {
+        return realFsSecureIo.loadJson<T>(filePath);
+      } catch {
+        return null;
+      }
+    },
+    appendFile: () => {},
+    exists: (filePath: string) => fs.existsSync(filePath),
+    readFile: (filePath: string) => fs.readFileSync(filePath, 'utf8'),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => fs.writeFileSync(filePath, content),
+  }),
+}));
 vi.mock('./core.js', () => ({
   logger: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
 }));
@@ -70,11 +87,22 @@ function seedMission(
           {
             ts: new Date(Date.now() - ageDays * 24 * 60 * 60 * 1000).toISOString(),
             event: 'CREATE',
+            note: 'test fixture',
           },
         ];
   fs.writeFileSync(
     path.join(dir, 'mission-state.json'),
-    JSON.stringify({ mission_id: id, status, history })
+    JSON.stringify({
+      mission_id: id,
+      status,
+      tier: 'public',
+      execution_mode: 'local',
+      priority: 1,
+      assigned_persona: 'operator',
+      confidence_score: 1,
+      git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+      history,
+    })
   );
   if (options.tasks) {
     fs.writeFileSync(path.join(dir, 'NEXT_TASKS.json'), JSON.stringify(options.tasks));
@@ -93,6 +121,12 @@ describe('mission hygiene', () => {
     tmpRoot = path.join(os.tmpdir(), `kyb-hygiene-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const schemaDir = path.join(tmpRoot, 'knowledge', 'product', 'schemas');
+    fs.mkdirSync(schemaDir, { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+      path.join(schemaDir, 'mission-state.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
 
     seedMission('MSN-FRESH', 'planned', 0, {}); // fresh — not stale yet

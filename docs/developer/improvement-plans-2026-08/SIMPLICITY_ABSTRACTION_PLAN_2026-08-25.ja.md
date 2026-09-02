@@ -12413,6 +12413,12 @@ SX-04 の system actuator `list_missions` に残っていた mission-state の�
 
 検証: system actuator path／mission projection **1 file / 2 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 359
+
+SX-04 の core mission hygiene report に残っていた mission-state の直接 `readJson` を、canonical `loadStateAtPath` へ統合した。stale／abandoned／active／distilling の分類、tenant／organization projection、history に基づく経過日数は schema 検証済み `MissionState` から算出し、不正 state は hygiene report から除外する。`NEXT_TASKS.json`、通知、学習候補 enqueue、human decision boundary は変更していない。
+
+検証: core mission hygiene **1 file / 4 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
