@@ -12437,6 +12437,12 @@ SX-04 の core history-search-index に残っていた mission-state の汎用 `
 
 検証: history-search-index **1 file / 12 tests passed**、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 363
+
+SX-04 の core operator-home-summary に残っていた mission-state の汎用 `readJson` projection を、canonical `loadMissionStateAtPath` へ統合した。operator 一覧の status／tier／tenant／organization／project／history／intent は schema 検証済み `MissionState` だけを採用し、欠損・不正・symlink state は一覧から除外する。quality report、artifact record、inbox、approval などの別契約データの reader と operator action の既存 semantics は変更していない。
+
+検証: operator-home-summary **1 file / 2 tests passed**、不正 state の除外、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
