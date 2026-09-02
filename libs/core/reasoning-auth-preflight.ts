@@ -1,5 +1,6 @@
 import { loadReasoningRoutePolicy, type ReasoningRoutePolicy } from './reasoning-route-resolver.js';
 import { probeExplicitReasoningBackend } from './environment-capability-probes.js';
+import { nowIso } from './foundation/time.js';
 
 export type ReasoningAuthPreflightStatus =
   'configured' | 'missing' | 'cli-managed' | 'not-required';
@@ -112,7 +113,7 @@ export async function probeReasoningBackendAuth(
   } = {}
 ): Promise<ReasoningAuthProbeResult> {
   const base = checkReasoningBackendAuth(mode, env, policy);
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   if (base.status === 'not-required') {
     return {
       ...base,

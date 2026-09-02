@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
@@ -194,7 +195,7 @@ export async function executeApprovedClaudeTaskSession(
     });
 
     if (updated) {
-      const timestamp = new Date().toISOString();
+      const timestamp = nowIso();
       recordTaskSessionHistory(updated.session_id, {
         ts: timestamp,
         type: 'execution',
@@ -231,7 +232,7 @@ export async function executeApprovedClaudeTaskSession(
       },
     });
     if (blocked) {
-      const timestamp = new Date().toISOString();
+      const timestamp = nowIso();
       recordTaskSessionHistory(blocked.session_id, {
         ts: timestamp,
         type: 'error',
