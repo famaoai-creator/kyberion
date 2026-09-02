@@ -1,27 +1,12 @@
 import * as path from 'node:path';
+import {
+  loadActuatorManifest,
+  type ActuatorManifestFile,
+} from '@agent/core/src/actuator-manifest-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { nowIso, parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
-
-interface CapabilityManifest {
-  actuator_id: string;
-  version: string;
-  description: string;
-  contract_schema?: string;
-  capabilities: Array<{
-    op: string;
-    platforms: string[];
-    requirements?: { bin?: string[]; env?: string[]; lib?: string[] };
-    prerequisites?: {
-      binaries?: string[];
-      platforms?: string[];
-      env?: string[];
-      services?: string[];
-      install?: string[] | Record<string, string>;
-    };
-  }>;
-}
 
 interface CurrentIndexRecord {
   n: string;
@@ -61,7 +46,7 @@ const LEGACY_RATIONALES: Record<string, string> = {
     'Retired 2026-05-28 → retired/actuators/physical-bridge/. Was a thin wrapper that shelled into browser/system actuators via temp files. Replaced by direct ADF orchestration.',
 };
 
-function summarizePrerequisites(manifest: CapabilityManifest): string {
+function summarizePrerequisites(manifest: ActuatorManifestFile): string {
   const parts = new Set<string>();
   for (const capability of manifest.capabilities || []) {
     for (const binary of capability.prerequisites?.binaries || capability.requirements?.bin || []) {
@@ -80,7 +65,7 @@ function summarizePrerequisites(manifest: CapabilityManifest): string {
   return parts.size > 0 ? Array.from(parts).sort().join(', ') : '-';
 }
 
-function listOps(manifest: CapabilityManifest): string[] {
+function listOps(manifest: ActuatorManifestFile): string[] {
   return Array.from(
     new Set(
       (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
@@ -88,8 +73,8 @@ function listOps(manifest: CapabilityManifest): string[] {
   ).sort();
 }
 
-function loadManifest(manifestPath: string): CapabilityManifest {
-  return readJson<CapabilityManifest>(manifestPath);
+function loadManifest(manifestPath: string): ActuatorManifestFile {
+  return loadActuatorManifest(manifestPath);
 }
 
 function collectComponentInventory() {
@@ -113,7 +98,7 @@ function collectComponentInventory() {
         d: manifest.description,
         s: 'implemented',
         version: manifest.version,
-        capability_count: manifest.capabilities.length,
+        capability_count: manifest.capabilities?.length || 0,
         ops: listOps(manifest),
         contract_schema: manifest.contract_schema,
         prerequisites_summary: summarizePrerequisites(manifest),
