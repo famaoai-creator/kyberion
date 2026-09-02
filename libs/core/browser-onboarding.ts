@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { withExecutionContext } from './authority.js';
 import { readJson as readFoundationJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   getAdapterDefaultSelectionSnapshot,
   saveAdapterDefaultPreferences,
@@ -271,7 +272,7 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
     withExecutionContext(
       'sovereign_concierge',
       () => {
-        const now = new Date().toISOString();
+        const now = nowIso();
         const artifacts: string[] = [];
         const identityPath = path.join(profileRoot(), 'my-identity.json');
         const existingIdentity = readJson<Record<string, unknown>>(identityPath) || {};

@@ -6,6 +6,7 @@
 import * as path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson, readJsonIfPresent } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import {
   findMissionPath,
@@ -111,7 +112,7 @@ export function writeFocusedMissionId(missionFocusPath: string, missionId: strin
     JSON.stringify(
       {
         mission_id: missionId.toUpperCase(),
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       },
       null,
       2

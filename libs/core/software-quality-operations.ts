@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
 import type {
   DefectCandidate,
@@ -396,7 +397,7 @@ export function recordDefectCandidate(
       actor_type: 'ai_agent',
       reason: defect.title,
       evidence_refs: defect.evidence_refs,
-      occurred_at: new Date().toISOString(),
+      occurred_at: nowIso(),
     },
     filePath
   );
@@ -435,7 +436,7 @@ export function transitionDefect(input: {
       actor_type: input.actorType,
       reason: input.reason,
       evidence_refs: input.evidenceRefs ?? [],
-      occurred_at: new Date().toISOString(),
+      occurred_at: nowIso(),
     },
     filePath
   );

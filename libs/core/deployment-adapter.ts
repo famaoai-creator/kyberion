@@ -23,6 +23,7 @@ import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
@@ -92,7 +93,7 @@ export const stubDeploymentAdapter: DeploymentAdapter = {
       adapter: 'stub',
       status: 'dry_run',
       message: `[DRY RUN] ${input.projectName}@${input.version} → ${input.environment}. To enable real deployment, create knowledge/personal/deployments/${input.projectName}.json matching deployment-adapter-config.schema.json.`,
-      started_at: new Date().toISOString(),
+      started_at: nowIso(),
     };
   },
 };
@@ -179,7 +180,7 @@ export class ShellDeploymentAdapter implements DeploymentAdapter {
       .replace(/\{\{version\}\}/gu, input.version)
       .replace(/\{\{releaseNotesPath\}\}/gu, input.releaseNotesPath ?? '');
     const shell = this.options.shell ?? process.env.SHELL ?? '/bin/sh';
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
