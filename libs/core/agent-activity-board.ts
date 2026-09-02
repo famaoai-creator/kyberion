@@ -7,16 +7,13 @@
  * state(tenant_slug)。純関数 compose + impure build の2層。
  */
 
-import * as path from 'node:path';
 import { listWorkItems, type WorkItem } from './work-coordination.js';
 import {
   buildWorkVisibilityProjection,
   resolveWorkItemContext,
   type WorkVisibilityViewer,
 } from './work-visibility.js';
-import { readJson } from './foundation/json.js';
-import { assertMissionIdArgument, findMissionPath } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadState } from './mission-state.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
@@ -162,16 +159,8 @@ export function composeAgentActivityBoard(input: {
 
 export function readMissionTenantSlug(missionId: string): string | undefined {
   try {
-    assertMissionIdArgument(missionId);
-    const missionDir = findMissionPath(missionId);
-    if (!missionDir) return undefined;
-    const statePath = assertSafeRepositoryPath(path.join(missionDir, 'mission-state.json'));
-    if (!safeExistsSync(statePath)) return undefined;
-    const state = readJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(statePath);
-    return state.tenant_slug || state.tenant_id || undefined;
+    const state = loadState(missionId);
+    return state?.tenant_slug || state?.tenant_id || undefined;
   } catch {
     return undefined;
   }
