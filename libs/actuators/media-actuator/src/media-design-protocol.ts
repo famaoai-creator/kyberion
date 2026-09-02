@@ -48,7 +48,6 @@ import {
   cloneJsonValue,
   deepMergeCatalog,
   readJsonFilesRecursively,
-  loadJsonCatalog,
   loadMediaDesignSystemsCatalog,
 } from './media-catalog-loaders.js';
 
@@ -1083,7 +1082,6 @@ export {
   ensureParentDir,
   deepMergeCatalog,
   readJsonFilesRecursively,
-  loadJsonCatalog,
   loadArtifactLibraryCatalog,
   loadDocumentCompositionCatalog,
   loadThemeCatalog,

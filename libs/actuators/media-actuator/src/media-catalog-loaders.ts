@@ -54,26 +54,6 @@ export function readJsonFilesRecursively(dirPath: string): any[] {
   return docs;
 }
 
-export function loadJsonCatalog(
-  rootDir: string,
-  input: { directoryPath: string; filePath: string; fallback: any }
-): any {
-  const docs = readJsonFilesRecursively(
-    assertSafeRepositoryPath(path.resolve(rootDir, input.directoryPath), {
-      allowMissingLeaf: true,
-    })
-  );
-  if (docs.length > 0) {
-    return docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(input.fallback));
-  }
-  const filePath = assertSafeRepositoryPath(path.resolve(rootDir, input.filePath), {
-    allowMissingLeaf: true,
-  });
-  return safeExistsSync(filePath) && safeLstat(filePath).isFile()
-    ? readJson(filePath)
-    : cloneJsonValue(input.fallback);
-}
-
 export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
   return readJson(assertSafeRepositoryPath(filePath));
 }
