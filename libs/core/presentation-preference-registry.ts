@@ -14,6 +14,9 @@ export interface PresentationPreferenceRegistry {
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/presentation-preference-registry.schema.json'
 );
+const PROFILE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/presentation-preference-profile.schema.json'
+);
 const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/presentation-preference-registry.json'
 );
@@ -67,6 +70,27 @@ function loadRegistryFromPath(registryPath: string): PresentationPreferenceRegis
     id: 'presentation-preference-registry',
     path: registryPath,
     schema: REGISTRY_SCHEMA_PATH,
+  }).load();
+}
+
+export function validatePresentationPreferenceProfile(
+  value: unknown,
+  sourcePath = '<inline>'
+): PresentationPreferenceProfile {
+  return defineCatalog<PresentationPreferenceProfile>({
+    id: 'presentation-preference-profile',
+    path: sourcePath,
+    schema: PROFILE_SCHEMA_PATH,
+  }).validate(value, sourcePath);
+}
+
+export function loadPresentationPreferenceProfileFromPath(
+  profilePath: string
+): PresentationPreferenceProfile {
+  return defineCatalog<PresentationPreferenceProfile>({
+    id: 'presentation-preference-profile',
+    path: profilePath,
+    schema: PROFILE_SCHEMA_PATH,
   }).load();
 }
 
