@@ -13157,6 +13157,12 @@ SX-03／SX-04／SX-08 の品質artifact生成経路を再監査し、`software_q
 
 検証: software-quality／operations／modeling／report **4 files / 34 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 483
+
+SX-03／SX-04／SX-08／SX-12 のworking-memory persisted stateを再監査し、`VolatileSidecar` と `INDEX.volatile.json` を `readJson<T>` の型アサーションだけでGC・一覧・indexへ流していた残存を修正した。sidecar rootのunknown／dangerous JSON key、enum、nullable field、ISO timestamp、cadence／lifetimeごとの期限、index entry shapeをstrict検証し、load／GC／list／indexの全read経路へ統合した。部分更新と新規作成もschema-valid sidecarだけを書き、既存の不正sidecarは上書きせずfail-closedとした。GC／indexのactive走査はunsafe symlink entry単位でskipし、他のstate処理を停止させないようにした。
+
+検証: working-memory **2 files / 10 tests passed**、working-memory package build、root typecheck、Prettier、`git diff --check`、repo build、canonical full gate **69/69 passed**。既存active全体のGC実行受入は、今回の変更外の実環境stateを変更するため個別テストには含めていない。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
