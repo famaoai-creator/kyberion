@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/knowledge-feedback-policy.schema.json",
   "version": "1.0.0",
   "description": "Governed caps for per-scope knowledge usage aggregates. Delivery and feedback JSONL remain the durable event evidence; the aggregate is bounded for ranking and curation.",
   "defaults": {

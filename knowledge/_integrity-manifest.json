@@ -1053,7 +1053,7 @@
     {
       "path": "product/governance/active-surfaces.json",
       "tier": "public",
-      "size": 7340,
+      "size": 7346,
       "type": "json"
     },
     {
@@ -1077,7 +1077,7 @@
     {
       "path": "product/governance/adf-execution-policy.json",
       "tier": "public",
-      "size": 259,
+      "size": 261,
       "type": "json"
     },
     {
@@ -1095,7 +1095,7 @@
     {
       "path": "product/governance/analysis-execution-contracts.json",
       "tier": "public",
-      "size": 2117,
+      "size": 2127,
       "type": "json"
     },
     {
@@ -1245,7 +1245,7 @@
     {
       "path": "product/governance/autonomous-ops-policy.json",
       "tier": "public",
-      "size": 2439,
+      "size": 2442,
       "type": "json"
     },
     {
@@ -1443,7 +1443,7 @@
     {
       "path": "product/governance/execution-boundary-profiles.json",
       "tier": "public",
-      "size": 3798,
+      "size": 3807,
       "type": "json"
     },
     {
@@ -1593,7 +1593,7 @@
     {
       "path": "product/governance/intent-outcome-patterns.json",
       "tier": "public",
-      "size": 27491,
+      "size": 27496,
       "type": "json"
     },
     {
@@ -1635,7 +1635,7 @@
     {
       "path": "product/governance/knowledge-feedback-policy.json",
       "tier": "public",
-      "size": 384,
+      "size": 391,
       "type": "json"
     },
     {
@@ -1701,7 +1701,7 @@
     {
       "path": "product/governance/marketing-risk-policy.json",
       "tier": "public",
-      "size": 1380,
+      "size": 1383,
       "type": "json"
     },
     {
@@ -1725,7 +1725,7 @@
     {
       "path": "product/governance/media-backend-registry.json",
       "tier": "public",
-      "size": 9023,
+      "size": 9027,
       "type": "json"
     },
     {
@@ -2361,7 +2361,7 @@
     {
       "path": "product/governance/protocol-service-registry.json",
       "tier": "public",
-      "size": 5865,
+      "size": 5872,
       "type": "json"
     },
     {
@@ -2415,7 +2415,7 @@
     {
       "path": "product/governance/reasoning-provider-registry.json",
       "tier": "public",
-      "size": 7217,
+      "size": 7226,
       "type": "json"
     },
     {
@@ -2469,7 +2469,7 @@
     {
       "path": "product/governance/runtime-design-profiles.json",
       "tier": "public",
-      "size": 1556,
+      "size": 1561,
       "type": "json"
     },
     {
@@ -2679,7 +2679,7 @@
     {
       "path": "product/governance/surface-roles.json",
       "tier": "public",
-      "size": 3046,
+      "size": 3041,
       "type": "json"
     },
     {
