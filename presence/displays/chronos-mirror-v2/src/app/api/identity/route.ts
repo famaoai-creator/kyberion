@@ -3,6 +3,10 @@ import { guardRequest } from '../../../lib/api-guard';
 import * as customerResolver from '@agent/core/customer-resolver';
 import { readJson as readFoundationJson } from '@agent/core/foundation';
 import {
+  parsePersonalAgentIdentitySummary,
+  parsePersonalSovereignIdentitySummary,
+} from '@agent/core/personal-identity-reader';
+import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
@@ -14,21 +18,6 @@ import {
 } from '../../../lib/viewer-context';
 
 export const runtime = 'nodejs';
-
-interface SovereignIdentity {
-  name?: string;
-  language?: string;
-  interaction_style?: string;
-  primary_domain?: string;
-  status?: string;
-}
-
-interface AgentIdentity {
-  agent_id?: string;
-  role?: string;
-  owner?: string;
-  trust_tier?: string;
-}
 
 function readJson<T>(fileName: string): T | null {
   try {
@@ -65,8 +54,10 @@ export async function GET(req: NextRequest) {
     // over knowledge/personal/, matching operator-identity.ts's resolution
     // order, so vital-check and FirstRunBanner don't misreport identity as
     // missing under a tenant overlay.
-    const sovereign = readJson<SovereignIdentity>('my-identity.json');
-    const agent = readJson<AgentIdentity>('agent-identity.json');
+    const sovereignRaw = readJson<unknown>('my-identity.json');
+    const agentRaw = readJson<unknown>('agent-identity.json');
+    const sovereign = sovereignRaw ? parsePersonalSovereignIdentitySummary(sovereignRaw) : null;
+    const agent = agentRaw ? parsePersonalAgentIdentitySummary(agentRaw) : null;
     const visionRaw = readText('my-vision.md');
     const vision = visionRaw
       ? visionRaw
