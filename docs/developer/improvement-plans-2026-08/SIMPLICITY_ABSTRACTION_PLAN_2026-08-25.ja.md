@@ -12461,6 +12461,12 @@ SX-04 の core injection-signal に残っていた mission-state の直接 `read
 
 検証: untrusted-content **1 file / 19 tests passed**、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 367
+
+SX-04 の core mission-context-pack に残っていた mission ID／tier からの mission-state 読み込みを、独自の raw `readJson`＋validator から canonical `loadMissionStateAtPath` へ統合した。ファイルから resolve する context pack は schema 検証済み state のみを採用し、直接入力された `MissionState` に対する build-time validator は互換性と API 契約のため維持する。context pack 自体、knowledge tenant isolation、project／track／task session reader の既存検証と redaction semantics は変更していない。
+
+検証: mission-context-pack **2 files / 35 tests passed**、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
