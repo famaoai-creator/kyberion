@@ -22,6 +22,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { logger } from './core.js';
 import { auditChain } from './audit-chain.js';
 import * as pathResolver from './path-resolver.js';
@@ -274,7 +275,7 @@ export class MeetingParticipationCoordinator {
       throw err;
     }
 
-    const joinedAt = session.state.joined_at ?? new Date().toISOString();
+    const joinedAt = session.state.joined_at ?? nowIso();
 
     // 2. Pick the transcript source: local STT over the inbound audio
     //    (default), or the driver's native caption stream (captions_first).
@@ -451,7 +452,7 @@ export class MeetingParticipationCoordinator {
     return {
       session_id: session.state.session_id,
       joined_at: joinedAt,
-      left_at: session.state.left_at ?? new Date().toISOString(),
+      left_at: session.state.left_at ?? nowIso(),
       utterances_received: utterancesReceived,
       utterances_spoken: utterancesSpoken,
       ended_by_timeout: endedByTimeout,
