@@ -3,12 +3,8 @@ import { resolveOperatorDisplayName, resolveOperatorLocale } from '@agent/core/o
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { listAgentIdentities } from '@agent/core/agent-identity';
 import { loadOrganizationProfile } from '@agent/core/organization-profile';
-import {
-  readJson,
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-} from '@agent/core/secure-io';
+import { readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
