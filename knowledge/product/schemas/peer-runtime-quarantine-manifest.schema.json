@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "peer-runtime-quarantine-manifest.schema.json",
+  "title": "Peer Runtime Quarantine Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "format": { "const": "kyberion-peer-runtime-quarantine-v1" },
+    "tenant": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "reason": { "type": "string", "minLength": 1 },
+    "moved": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "required": ["format", "tenant", "created_at", "reason", "moved"]
+}
