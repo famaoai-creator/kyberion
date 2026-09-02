@@ -85,4 +85,26 @@ describe('reasoning-degradation marker (LC-08)', () => {
     fs.writeFileSync(markerPath, 'not-json');
     expect(readReasoningDegraded()).toBeNull();
   });
+
+  it('rejects unknown fields, dangerous keys, and invalid timestamps', async () => {
+    const { parseReasoningDegradedMarker } = await import('./reasoning-degradation.js');
+    expect(() =>
+      parseReasoningDegradedMarker({ mode: 'claude-cli', reason: 'x', at: 'not-a-date' })
+    ).toThrow('valid ISO timestamp');
+    expect(() =>
+      parseReasoningDegradedMarker({
+        mode: 'claude-cli',
+        reason: 'x',
+        at: '2026-09-02T18:00:00.000Z',
+        extra: true,
+      })
+    ).toThrow('unknown field(s)');
+    expect(() =>
+      parseReasoningDegradedMarker(
+        JSON.parse(
+          '{"mode":"claude-cli","reason":"x","at":"2026-09-02T18:00:00.000Z","__proto__":{}}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
+  });
 });

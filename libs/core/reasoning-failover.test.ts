@@ -112,6 +112,29 @@ describe('reasoning-failover marker + event log (XP-05)', () => {
     expect(readReasoningFailover()).toBeNull();
   });
 
+  it('rejects unknown fields, dangerous keys, and invalid optional providers', async () => {
+    const { parseReasoningFailoverMarker } = await import('./reasoning-failover.js');
+    const base = {
+      from_mode: 'claude-agent',
+      to_mode: 'codex-cli',
+      method: 'delegateTask',
+      at: '2026-09-02T18:00:00.000Z',
+    };
+    expect(() => parseReasoningFailoverMarker({ ...base, provider_from: null })).toThrow(
+      'non-empty string'
+    );
+    expect(() => parseReasoningFailoverMarker({ ...base, extra: true })).toThrow(
+      'unknown field(s)'
+    );
+    expect(() =>
+      parseReasoningFailoverMarker(
+        JSON.parse(
+          '{"from_mode":"claude-agent","to_mode":"codex-cli","method":"delegateTask","at":"2026-09-02T18:00:00.000Z","__proto__":{}}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
+  });
+
   it('appends a JSONL event with from/to, method, and a truncated error summary', async () => {
     const { appendReasoningFailoverEvent, reasoningFailoverEventsPath, truncateErrorSummary } =
       await import('./reasoning-failover.js');
