@@ -1,5 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -163,7 +164,7 @@ function writeProvisionedEntryRecord(
   }
 ): ProvisionedEntryRecord {
   const record: ProvisionedEntryRecord = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     entry_id: input.entry.id,
     content_hash: input.entry.content_hash,
     target_path: input.targetPath,
@@ -663,7 +664,7 @@ export function appendMissionOrchestrationJournalEntry(input: {
     : missionPathForScope(input.missionId, scope);
   ensureJournalDir(input.missionId, scope, input.missionPathHint);
   const entry: MissionOrchestrationJournalEntry = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: input.eventId,
     event_type: input.eventType,
     mission_id: input.missionId.toUpperCase(),

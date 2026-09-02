@@ -1,5 +1,6 @@
 import { appendJsonLine } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * NI-04: task-scoped short-lived grants — audience-bound authority.
  *
@@ -365,7 +366,7 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
   );
   if (effective <= now) {
     throw new TaskGrantValidationError(
-      `effective expiry ${new Date(effective).toISOString()} is not in the future`
+      `effective expiry ${nowIso(new Date(effective))} is not in the future`
     );
   }
 
@@ -375,9 +376,9 @@ export function issueTaskGrant(params: IssueTaskGrantParams): TaskScopedGrant {
     grantee_nhi_id: granteeNhiId,
     scope: { ...(params.scope ?? {}), tenant_slug: tenantSlug },
     audience: { mission_id: missionId, ...(taskId ? { task_id: taskId } : {}) },
-    expires_at: new Date(effective).toISOString(),
+    expires_at: nowIso(new Date(effective)),
     issued_by: params.issuedBy?.trim() || resolveRole() || 'unknown',
-    issued_at: new Date(now).toISOString(),
+    issued_at: nowIso(new Date(now)),
   };
   appendGrantRecord(grant);
   recordGrantAudit({
@@ -406,7 +407,7 @@ export function revokeTaskGrant(grantId: string, reason: string): TaskScopedGran
   if (existing.revoked_at) return existing;
   const revoked: TaskScopedGrant = {
     ...existing,
-    revoked_at: new Date().toISOString(),
+    revoked_at: nowIso(),
     revoke_reason: reason,
   };
   appendGrantRecord(revoked);
@@ -435,13 +436,14 @@ export function revokeGrantsForTask(
 ): TaskScopedGrant[] {
   assertTaskGrantGovernedContext('revokeGrantsForTask');
   const revoked: TaskScopedGrant[] = [];
+  const revokedAt = nowIso();
   for (const grant of readGrantRecords().values()) {
     if (grant.revoked_at) continue;
     if (grant.audience.mission_id !== missionId) continue;
     if (grant.audience.task_id !== taskId) continue;
     const record: TaskScopedGrant = {
       ...grant,
-      revoked_at: new Date().toISOString(),
+      revoked_at: revokedAt,
       revoke_reason: reason,
     };
     appendGrantRecord(record);
