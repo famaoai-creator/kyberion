@@ -9,6 +9,7 @@ import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 
 function safeMissionArtifactPath(missionId: string, relativePath: string): string {
   const missionPath = assertSafeRepositoryPath(
@@ -65,15 +66,7 @@ export function readProcessTemplateSeededTasks(
 export function renderProcessTemplateSkeleton(missionId: string): string {
   const statePath = safeMissionArtifactPath(missionId, 'mission-state.json');
   if (!safeExistsSync(statePath)) return '';
-  let processTemplate: { workflow_id?: string; phases?: string[] } | undefined;
-  try {
-    const state = readJson<{
-      process_template?: { workflow_id?: string; phases?: string[] };
-    }>(statePath);
-    processTemplate = state.process_template;
-  } catch {
-    return '';
-  }
+  const processTemplate = loadMissionStateAtPath(statePath)?.process_template;
   if (!processTemplate?.workflow_id) return '';
 
   const lines = [

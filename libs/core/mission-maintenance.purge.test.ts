@@ -30,6 +30,16 @@ vi.mock('./secure-io.js', async () => {
   };
 });
 
+vi.mock('./mission-state-reader.js', () => ({
+  loadMissionStateAtPath: (statePath: string) => {
+    try {
+      return JSON.parse(fs.readFileSync(statePath, 'utf8')) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  },
+}));
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const REAL_ADF = path.join(REPO_ROOT, 'knowledge/product/governance/mission-lifecycle.json');
 
@@ -43,7 +53,26 @@ function seedMission(id: string, status: string, ageDays: number): string {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
     path.join(dir, 'mission-state.json'),
-    JSON.stringify({ mission_id: id, status, history: [] }, null, 2)
+    JSON.stringify(
+      {
+        mission_id: id,
+        tier: 'public',
+        status,
+        execution_mode: 'local',
+        priority: 0,
+        assigned_persona: 'mission-controller-test',
+        confidence_score: 1,
+        git: {
+          branch: 'test',
+          start_commit: 'test',
+          latest_commit: 'test',
+          checkpoints: [],
+        },
+        history: [],
+      },
+      null,
+      2
+    )
   );
   fs.writeFileSync(path.join(dir, 'evidence.txt'), `evidence for ${id}`);
   // Directory mtime drives max_age_days matching — set it last.
@@ -185,7 +214,17 @@ describe('purgeMissions (AL-01)', () => {
     fs.mkdirSync(target, { recursive: true });
     fs.writeFileSync(
       path.join(target, 'mission-state.json'),
-      JSON.stringify({ mission_id: 'MSN-SYMLINK-PURGE', status: 'failed', history: [] })
+      JSON.stringify({
+        mission_id: 'MSN-SYMLINK-PURGE',
+        tier: 'public',
+        status: 'failed',
+        execution_mode: 'local',
+        priority: 0,
+        assigned_persona: 'mission-controller-test',
+        confidence_score: 1,
+        git: { branch: 'test', start_commit: 'test', latest_commit: 'test', checkpoints: [] },
+        history: [],
+      })
     );
     fs.utimesSync(target, new Date(Date.now() - 40 * DAY_MS), new Date(Date.now() - 40 * DAY_MS));
     fs.mkdirSync(path.dirname(linked), { recursive: true });

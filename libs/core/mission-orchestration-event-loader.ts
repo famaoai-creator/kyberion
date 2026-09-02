@@ -3,6 +3,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   normalizeEventScope,
   resolveEventScopeAgainstAuthority,
@@ -59,15 +60,15 @@ function resolveMissionOrchestrationScope(
     statePath = undefined;
   }
   try {
-    const state = statePath ? readJson<Record<string, unknown>>(statePath) : {};
+    const state = statePath ? loadMissionStateAtPath(statePath) : null;
     const authority = normalizeEventScope({
       mission_id: missionId,
-      tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
-      ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-      ...(typeof state.organization_id === 'string'
-        ? { organization_id: state.organization_id }
+      tier: state?.tier || 'public',
+      ...(state?.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+      ...(state?.organization_id ? { organization_id: state.organization_id } : {}),
+      ...(state?.relationships?.project?.project_id
+        ? { project_id: state.relationships.project.project_id }
         : {}),
-      ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
     });
     return resolveEventScopeAgainstAuthority(authority, supplied, {
       mission_id: missionId,

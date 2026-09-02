@@ -8,6 +8,8 @@ import { readJson } from './foundation/json.js';
 import { setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { getInjectionSignalPath } from './injection-signal.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 export { isInjectionSuspected } from './injection-signal.js';
@@ -242,9 +244,9 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
       });
       if (safeExistsSync(statePath)) {
         try {
-          const stateValue = readJson<unknown>(statePath);
-          if (!isRecord(stateValue)) return;
-          const state = stateValue;
+          const state = loadMissionStateAtPath(statePath) as
+            (MissionState & Record<string, unknown>) | null;
+          if (!state) return;
           const scopes = stringArray(state.injection_scopes);
           state.injection_scopes = scopes;
 

@@ -61,6 +61,7 @@ import { gcMissionRuntimeResidue } from './scope-offboarding.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 
 function safeMissionRoot(missionDir: string): string {
   return assertSafeRepositoryPath(missionDir, { allowMissingLeaf: true });
@@ -980,12 +981,7 @@ function readMissionStatus(missionDir: string): string | null {
     return null;
   }
   if (!safeExistsSync(statePath)) return null;
-  try {
-    const state = readJson<{ status?: string }>(statePath);
-    return typeof state?.status === 'string' ? state.status : null;
-  } catch (_) {
-    return null;
-  }
+  return loadMissionStateAtPath(statePath)?.status || null;
 }
 
 interface MissionLifecyclePolicy {

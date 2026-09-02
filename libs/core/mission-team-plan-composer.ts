@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -122,14 +123,7 @@ function loadMissionTenantSlug(missionId: string): string | undefined {
     return undefined;
   }
   if (!safeExistsSync(statePath)) return undefined;
-  try {
-    const state = readJson<{ tenant_slug?: unknown }>(statePath);
-    return typeof state?.tenant_slug === 'string' && state.tenant_slug.trim()
-      ? state.tenant_slug.trim()
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  return loadMissionStateAtPath(statePath)?.tenant_slug?.trim() || undefined;
 }
 
 function resolveAvailableTeamProviders(): string[] {

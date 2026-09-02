@@ -14,6 +14,9 @@ vi.mock('./agent-identity.js', () => ({
 vi.mock('./path-resolver.js', () => ({
   findMissionPath: mocks.findMissionPath,
 }));
+vi.mock('./mission-state-reader.js', () => ({
+  loadMissionStateAtPath: mocks.loadJson,
+}));
 vi.mock('./secure-io.js', () => ({
   assertSafeRepositoryPath: (filePath: string) => filePath,
   safeExistsSync: mocks.safeExistsSync,

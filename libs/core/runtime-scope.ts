@@ -7,9 +7,9 @@ import {
   type EventScopeInput,
 } from './event-scope.js';
 import { findMissionPath } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { loadProjectRecord } from './project-registry.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type { TierLevel } from './types.js';
 
 export type RuntimeProcessScope = 'system' | 'tenant-service';
@@ -18,17 +18,6 @@ export interface RuntimeScopeResolutionInput {
   missionId?: string;
   scope?: EventScopeInput;
   authorityScope?: EventScopeInput;
-}
-
-interface MissionScopeState {
-  mission_id?: unknown;
-  tier?: unknown;
-  tenant_slug?: unknown;
-  tenant_id?: unknown;
-  organization_id?: unknown;
-  relationships?: {
-    project?: { project_id?: unknown; organization_id?: unknown };
-  };
 }
 
 const TIERS: readonly TierLevel[] = ['personal', 'confidential', 'public'];
@@ -47,37 +36,28 @@ function readMissionScope(missionId: string): EventScope | null {
   });
   if (!safeExistsSync(statePath)) return null;
 
-  const state = readJson<MissionScopeState>(statePath);
-  const stateMissionId = normalizeMissionId(
-    typeof state.mission_id === 'string' ? state.mission_id : missionId
-  );
+  const state = loadMissionStateAtPath(statePath);
+  if (!state) return null;
+  const stateMissionId = normalizeMissionId(state.mission_id || missionId);
   if (!stateMissionId || stateMissionId !== missionId) {
     throw new Error(
       `[RUNTIME_SCOPE_AUTHORITY_INVALID] mission-state mission_id does not match '${missionId}'`
     );
   }
-  const tier = state.tier as TierLevel;
+  const tier = state.tier;
   if (!TIERS.includes(tier)) {
     throw new Error(`[RUNTIME_SCOPE_AUTHORITY_INVALID] mission '${missionId}' has invalid tier`);
   }
 
-  const tenantSlug =
-    (typeof state.tenant_slug === 'string' && state.tenant_slug.trim()) ||
-    (typeof state.tenant_id === 'string' && state.tenant_id.trim()) ||
-    undefined;
-  const organizationId =
-    typeof state.organization_id === 'string' && state.organization_id.trim()
-      ? state.organization_id.trim()
-      : undefined;
-  const projectId =
-    typeof state.relationships?.project?.project_id === 'string' &&
-    state.relationships.project.project_id.trim()
-      ? state.relationships.project.project_id.trim()
-      : undefined;
-  const relationOrganizationId =
-    typeof state.relationships?.project?.organization_id === 'string' &&
-    state.relationships.project.organization_id.trim()
-      ? state.relationships.project.organization_id.trim()
+  const tenantSlug = state.tenant_slug?.trim() || state.tenant_id?.trim() || undefined;
+  const organizationId = state.organization_id?.trim() || undefined;
+  const projectId = state.relationships?.project?.project_id?.trim() || undefined;
+  const relationOrganizationId = (
+    state.relationships?.project as { organization_id?: unknown } | undefined
+  )?.organization_id;
+  const normalizedRelationOrganizationId =
+    typeof relationOrganizationId === 'string' && relationOrganizationId.trim()
+      ? relationOrganizationId.trim()
       : undefined;
   const projectRecord = projectId ? loadProjectRecord(projectId) : null;
   const registryOrganizationId =
@@ -86,7 +66,8 @@ function readMissionScope(missionId: string): EventScope | null {
     (!tenantSlug || projectRecord.tenant_slug === tenantSlug)
       ? projectRecord.organization_id
       : undefined;
-  const resolvedOrganizationId = registryOrganizationId || organizationId || relationOrganizationId;
+  const resolvedOrganizationId =
+    registryOrganizationId || organizationId || normalizedRelationOrganizationId;
 
   return normalizeEventScope({
     scope_kind: 'mission',

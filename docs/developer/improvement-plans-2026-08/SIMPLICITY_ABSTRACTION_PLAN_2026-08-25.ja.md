@@ -12425,6 +12425,12 @@ SX-04 の core mission team binding に残っていた execution ledger scope �
 
 検証: mission-state／mission-team-binding **3 files / 13 tests passed**、root typecheck、root lint、module-boundaries、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 361
+
+SX-04 の core 実行・scope・planning・maintenance・visual・untrusted-content 周辺に残っていた mission-state の直接 `readJson` を、resolved path を受け取る低依存の canonical reader へ統合した。tier／tenant／organization／project／status の projection は `mission-state.schema.json` を通過した `MissionState` だけを利用し、不在・不正 state は各既存の fail-closed／empty projection semantics を維持する。任意の event payload、team-composition plan、`NEXT_TASKS.json`、repair path の reader は mission-state reader と混同せず既存境界を保持した。テスト用の一時 root fixture は canonical schema 契約を満たす形へ補正し、path-resolver を意図的に差し替える hermetic test では専用 reader mock を追加した。
+
+検証: 対象 core suites **8 files / 64 tests passed**、visual／untrusted／planning suites **4 files / 52 tests passed**、root typecheck、root lint、module-boundaries、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
