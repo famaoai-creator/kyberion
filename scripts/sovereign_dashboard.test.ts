@@ -11,6 +11,7 @@ import {
 import {
   listJsonFiles,
   readMissionDashboardState,
+  readDashboardOperatorIdentity,
   readProviderCapabilitySnapshot,
   readSurfaceDashboardState,
   safeListDir,
@@ -108,5 +109,15 @@ describe('sovereign dashboard governance loaders', () => {
     );
 
     expect(readProviderCapabilitySnapshot(snapshotPath)).toBeNull();
+  });
+
+  it('uses the canonical safe operator identity projection', () => {
+    const identityPath = path.join(resourceBoundaryRoot, 'my-identity.json');
+    safeMkdir(resourceBoundaryRoot, { recursive: true });
+    safeWriteFile(identityPath, JSON.stringify({ name: ' Operator ', secret: 'hidden' }));
+    expect(readDashboardOperatorIdentity(identityPath)).toEqual({ name: 'Operator' });
+
+    safeWriteFile(identityPath, JSON.stringify({ name: 42 }));
+    expect(readDashboardOperatorIdentity(identityPath)).toBeNull();
   });
 });
