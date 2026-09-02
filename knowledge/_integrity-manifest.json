@@ -1089,7 +1089,7 @@
     {
       "path": "product/governance/analysis-config.json",
       "tier": "public",
-      "size": 903,
+      "size": 900,
       "type": "json"
     },
     {
@@ -1551,7 +1551,7 @@
     {
       "path": "product/governance/install-script-allowlist.json",
       "tier": "public",
-      "size": 1737,
+      "size": 1743,
       "type": "json"
     },
     {
@@ -1647,7 +1647,7 @@
     {
       "path": "product/governance/knowledge-scope-check.json",
       "tier": "public",
-      "size": 860,
+      "size": 863,
       "type": "json"
     },
     {
@@ -6409,6 +6409,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/analysis-config.schema.json",
+      "tier": "public",
+      "size": 2160,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/analysis-execution-contracts.schema.json",
       "tier": "public",
       "size": 1332,
@@ -7165,6 +7171,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/install-script-allowlist.schema.json",
+      "tier": "public",
+      "size": 751,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/integration-decision.schema.json",
       "tier": "public",
       "size": 1268,
@@ -7306,6 +7318,12 @@
       "path": "product/schemas/knowledge-package.schema.json",
       "tier": "public",
       "size": 2752,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/knowledge-scope-check.schema.json",
+      "tier": "public",
+      "size": 903,
       "type": "json"
     },
     {
