@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   evaluatePublicationVerification,
+  loadPublicationApprovalAtPath,
   loadMarketingRiskPolicy,
   requiredMarketingControls,
   scanMarketingTextForSensitiveData,
@@ -8,7 +9,6 @@ import {
   validatePublicationApproval,
   validateSharedPublicationApproval,
   type ArtifactBinding,
-  type PublicationApproval,
 } from '@agent/core/marketing-workload';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -22,7 +22,6 @@ import {
 } from '@agent/core/secure-io';
 import { loadApprovalRequest, type ApprovalRequestRecord } from '@agent/core/approval-store';
 import { escapeHtml } from '@agent/core/text-escaping';
-import { readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -73,7 +72,7 @@ export function runMarketingPublishDryRun(input: {
     resolveMarketingPath(input.approvalPath, 'approvalPath'),
     'approvalPath'
   );
-  const approval = readJson<PublicationApproval>(approvalPath);
+  const approval = loadPublicationApprovalAtPath(approvalPath);
   const sharedApprovalRequest =
     input.sharedApprovalRequest ||
     loadApprovalRequest(

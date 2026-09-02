@@ -131,9 +131,21 @@ const DEFAULT_POLICY_PATH = pathResolver.knowledge('product/governance/marketing
 const POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/marketing-risk-policy.schema.json'
 );
+const PUBLICATION_APPROVAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/publication-approval.schema.json'
+);
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
+}
+
+/** Load a persisted publication approval through its canonical schema boundary. */
+export function loadPublicationApprovalAtPath(filePath: string): PublicationApproval {
+  return defineCatalog<PublicationApproval>({
+    id: 'publication-approval',
+    path: filePath,
+    schema: PUBLICATION_APPROVAL_SCHEMA_PATH,
+  }).load();
 }
 
 export function scanMarketingTextForSensitiveData(

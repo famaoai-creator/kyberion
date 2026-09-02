@@ -7485,7 +7485,7 @@
     {
       "path": "product/schemas/marketing-workload.schema.json",
       "tier": "public",
-      "size": 7848,
+      "size": 4946,
       "type": "json"
     },
     {
@@ -8614,6 +8614,12 @@
       "path": "product/schemas/provider-health-state.schema.json",
       "tier": "public",
       "size": 781,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/publication-approval.schema.json",
+      "tier": "public",
+      "size": 2936,
       "type": "json"
     },
     {
