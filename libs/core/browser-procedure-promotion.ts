@@ -1,5 +1,4 @@
 import path from 'node:path';
-import { readJson } from './foundation/json.js';
 import { compileBrowserRecording } from './browser-recording-compiler.js';
 import {
   invalidateProcedureCache,
@@ -9,7 +8,7 @@ import {
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { validateBrowserExtensionRecording } from './browser-extension-bridge.js';
+import { loadBrowserExtensionRecordingAtPath } from './browser-extension-bridge.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -47,22 +46,19 @@ export function promoteBrowserProcedure(
 
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  let raw: unknown;
+  let recording: ReturnType<typeof loadBrowserExtensionRecordingAtPath>;
   try {
-    raw = readJson<unknown>(recordingAbs);
+    recording = loadBrowserExtensionRecordingAtPath(recordingAbs);
   } catch (error) {
     throw new Error(
       `failed to read recording: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  const recording = validateBrowserExtensionRecording(raw);
-  if (!recording.value)
-    throw new Error(`recording failed validation: ${recording.errors.join('; ')}`);
-  if (recording.value.review?.status !== 'approved') {
+  if (recording.review?.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
 
-  const compiled = compileBrowserRecording(recording.value, {
+  const compiled = compileBrowserRecording(recording, {
     procedureId,
     intentPhrases,
     recordingRef: options.recordingRef,
