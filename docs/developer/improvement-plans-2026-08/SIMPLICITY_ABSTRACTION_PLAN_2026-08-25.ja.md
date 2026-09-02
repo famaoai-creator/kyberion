@@ -12187,6 +12187,16 @@ document composition resolverへ渡されていた残存を修正した。`artif
 catalog／governance-rules、knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの
 廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 330
+
+SX-04 の semantic render token loaderを再レビューし、専用schemaを持ちながら先に汎用 `loadJsonCatalog` を呼び、その結果を
+後段で検証していた残存を修正した。base／fragmentの決定的mergeとfallbackをloader内で行い、merge後のenvelopeを直接
+`defineCatalog.validate()`へ渡す構造に統一した。semantic tokenの解決結果とdesign-system overrideの優先順位は変更していない。
+
+検証: semantic／media catalog **5 files / 58 tests passed**、media actuator build、root typecheck、root lint、catalog／governance-rules、
+knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
+各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
