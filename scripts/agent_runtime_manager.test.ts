@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeReadFile } from '@agent/core/secure-io';
+
 const mocks = vi.hoisted(() => ({
   spawn: vi.fn(async () => ({
     agentId: 'demo-agent-1234',
@@ -145,5 +148,16 @@ describe('agent_runtime_manager', () => {
       expect.stringContaining('registered but not actively managed')
     );
     spy.mockRestore();
+  });
+
+  it('delegates command failures to the shared script harness', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('scripts/agent_runtime_manager.ts'), {
+        encoding: 'utf8',
+      })
+    );
+
+    expect(source).toContain('run: ({ argv }) => main(argv)');
+    expect(source).not.toContain('process.exitCode = 1');
   });
 });
