@@ -4,7 +4,7 @@ import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning-model-routing';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { toWireError } from '@agent/core/wire-error';
-import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver as projectPathResolver } from '@agent/core/path-resolver';
 import { guardRequest, requireChronosAccess } from '../../../lib/api-guard';
 import { resolveViewerContextForRequest, type ViewerContext } from '../../../lib/viewer-context';
@@ -274,7 +274,7 @@ function saveChronosMissionProposalState(
           proposal: params.proposal,
           sourceText: params.sourceText,
           routingDecision: params.routingDecision,
-          createdAt: new Date().toISOString(),
+          createdAt: nowIso(),
         } satisfies ChronosMissionProposalState,
         null,
         2
@@ -433,7 +433,7 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: Suppor
       status: 'completed',
     },
     delegations: undefined,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 
@@ -586,7 +586,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'missions': {
@@ -626,7 +626,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'agents': {
@@ -670,7 +670,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'vital-check': {
@@ -719,7 +719,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'diagnostics': {
@@ -804,7 +804,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'capability-audit': {
@@ -846,7 +846,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'provider-check': {
@@ -878,12 +878,12 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'audit-log': {
       const auditChainPath = core.pathResolver.rootResolve(
-        `active/audit/audit-${new Date().toISOString().slice(0, 10)}.jsonl`
+        `active/audit/audit-${nowIso().slice(0, 10)}.jsonl`
       );
       const eventFiles = [
         auditChainPath,
@@ -917,7 +917,7 @@ async function tryHandleChronosQuickAction(
                 .join(', ')
             : undefined;
           events.push({
-            time: String(event.ts || new Date().toISOString()).slice(11, 19),
+            time: String(event.ts || nowIso()).slice(11, 19),
             label: String(event.decision || event.action || event.event_type || 'event'),
             detail: routingSummary
               ? `${String(event.mission_id || event.resource_id || event.agentId || 'system')} · ${routingSummary}`
@@ -946,7 +946,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'policies': {
@@ -979,7 +979,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'knowledge': {
@@ -1027,7 +1027,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     case 'build-test': {
@@ -1055,7 +1055,7 @@ async function tryHandleChronosQuickAction(
             },
           },
         ],
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
     }
     default:
@@ -1176,7 +1176,7 @@ export async function POST(req: NextRequest) {
           'Understood — the mission proposal has been discarded. Nothing was created.',
           locale
         ),
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
@@ -1242,7 +1242,7 @@ export async function POST(req: NextRequest) {
           },
         ],
         mission: issued,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
@@ -1415,7 +1415,7 @@ export async function POST(req: NextRequest) {
             : []),
         ],
         delegations: delegationResults.length > 0 ? delegationResults : undefined,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       });
     }
 
@@ -1438,7 +1438,7 @@ export async function POST(req: NextRequest) {
         ...(conversation.a2uiMessages || []),
       ],
       delegations: delegationResults.length > 0 ? delegationResults : undefined,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   } catch (err: any) {
     clearChronosCache();
