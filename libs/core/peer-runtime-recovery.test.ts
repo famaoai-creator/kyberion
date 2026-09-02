@@ -134,6 +134,52 @@ describe('peer runtime recovery gate', () => {
     ).toThrow('[RESOURCE_PATH_SYMLINK]');
   });
 
+  it('rejects a malformed manifest entry before creating an approval request', () => {
+    safeMkdir(QUARANTINE_PATH, { recursive: true });
+    safeWriteFile(
+      `${QUARANTINE_PATH}/quarantine-manifest.json`,
+      JSON.stringify({
+        format: 'kyberion-peer-runtime-quarantine-v1',
+        tenant: TENANT_ID,
+        created_at: new Date().toISOString(),
+        reason: 'test',
+        moved: [{ path: `${QUARANTINE_PATH}/runtime-peer-messaging` }],
+      })
+    );
+
+    expect(() =>
+      createPeerRuntimeRecoveryApprovalRequest({
+        tenantId: TENANT_ID,
+        quarantinePath: QUARANTINE_PATH,
+        requestedBy: 'test-operator',
+        approvalChannel: APPROVAL_CHANNEL,
+      })
+    ).toThrow('peer_recovery_quarantine_manifest_invalid');
+  });
+
+  it('rejects a manifest that does not match the quarantined labels', () => {
+    safeMkdir(`${QUARANTINE_PATH}/runtime-peer-messaging`, { recursive: true });
+    safeWriteFile(
+      `${QUARANTINE_PATH}/quarantine-manifest.json`,
+      JSON.stringify({
+        format: 'kyberion-peer-runtime-quarantine-v1',
+        tenant: TENANT_ID,
+        created_at: new Date().toISOString(),
+        reason: 'test',
+        moved: [`${QUARANTINE_PATH}/runtime-peer-conversations`],
+      })
+    );
+
+    expect(() =>
+      createPeerRuntimeRecoveryApprovalRequest({
+        tenantId: TENANT_ID,
+        quarantinePath: QUARANTINE_PATH,
+        requestedBy: 'test-operator',
+        approvalChannel: APPROVAL_CHANNEL,
+      })
+    ).toThrow('peer_recovery_quarantine_manifest_contents_mismatch');
+  });
+
   it('rejects a symlinked recovery event log before appending the receipt', () => {
     safeMkdir(QUARANTINE_PATH, { recursive: true });
     safeWriteFile(
