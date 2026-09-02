@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { nowIso } from '@agent/core/foundation';
 import { collectA2AHandoffs, collectAgentMessages } from '../../../../lib/agent-message-feed';
 import { buildRuntimeTopology } from '../../../../lib/runtime-topology';
 import { collectBrowserSessions } from '../../../../lib/intelligence-observations';
@@ -269,7 +270,7 @@ export async function GET(req: NextRequest) {
         const scopedView = tenantSlugs !== 'all';
         const payload = {
           revision: nextIntelligenceStreamRevision(),
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           accessRole,
           ...(scopedView
             ? {}
