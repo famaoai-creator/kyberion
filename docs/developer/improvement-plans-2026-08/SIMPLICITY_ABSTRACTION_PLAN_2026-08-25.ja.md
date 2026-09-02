@@ -12335,6 +12335,12 @@ SX-04 の core agent activity board に残っていた mission-state の raw `re
 
 検証: agent activity board **1 file / 4 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 346
+
+SX-04 の Chronos tenant visibility reader に残っていた mission-state の raw `readJson` を、canonical `loadState` へ移行した。`mission-state.schema.json` と secure path／symlink 境界を再利用し、`tenant_slug` 優先・legacy `tenant_id` fallback は維持しつつ、schema-invalid state を tenant visibility 判定へ渡さないようにした。
+
+検証: Chronos knowledge scope／agent activity board **2 files / 5 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
