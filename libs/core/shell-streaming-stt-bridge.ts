@@ -25,6 +25,7 @@ import { buildSafeExecEnv } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { resolveManagedToolPythonBin } from './tool-runtime-registry.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import {
@@ -51,7 +52,7 @@ export function parseShellStreamingSttTranscript(line: string): TranscriptChunk 
     text: String(parsed.text ?? ''),
     ...(typeof parsed.confidence === 'number' ? { confidence: parsed.confidence } : {}),
     ...(typeof parsed.speaker_label === 'string' ? { speaker_label: parsed.speaker_label } : {}),
-    emitted_at: new Date().toISOString(),
+    emitted_at: nowIso(),
   };
 }
 

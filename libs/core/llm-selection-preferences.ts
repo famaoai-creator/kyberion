@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { readJsonIfPresent } from './foundation/json.js';
 
 import { discoverProviders } from './provider-discovery.js';
@@ -216,7 +217,7 @@ export function saveLlmSelectionPreferences(input: {
     version: '1.0.0',
     provider,
     model_id,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   safeWriteFile(selectionPath(), JSON.stringify(next, null, 2) + '\n', {
     mkdir: true,

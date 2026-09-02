@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
@@ -112,7 +113,7 @@ export function markReconciled(excerpts: string[]): void {
   try {
     const set = new Set(excerpts);
     const registry = readRegistry();
-    const now = new Date().toISOString();
+    const now = nowIso();
     for (const entry of registry.entries) {
       if (set.has(entry.message_excerpt)) {
         entry.reconciled = true;

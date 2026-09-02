@@ -2,6 +2,8 @@
  * Structured Logger - provides leveled, structured logging for skills.
  */
 
+import { nowIso } from './foundation/time.js';
+
 export const LOG_LEVELS: Record<string, number> = {
   debug: 0,
   info: 1,
@@ -28,7 +30,7 @@ export function createLogger(name: string, options: LoggerOptions = {}) {
   const json = options.json || process.env.LOG_FORMAT === 'json';
 
   function _format(lvl: string, msg: string, data: any) {
-    const ts = new Date().toISOString();
+    const ts = nowIso();
     if (json) {
       return JSON.stringify({ ts, level: lvl, skill: name, msg, ...data });
     }

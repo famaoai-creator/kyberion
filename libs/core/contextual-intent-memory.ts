@@ -4,6 +4,7 @@ import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } fr
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 
 export type ScheduleSourceKind =
   'operator_default_calendar' | 'google_calendar' | 'outlook_calendar' | 'browser_calendar';
@@ -102,9 +103,7 @@ export function recordSchedulePreference(input: {
   memory.schedule = {
     default_calendar_source: input.source,
     default_calendar_name: input.calendarName || memory.schedule?.default_calendar_name,
-    last_confirmed_at: input.confirmed
-      ? new Date().toISOString()
-      : memory.schedule?.last_confirmed_at,
+    last_confirmed_at: input.confirmed ? nowIso() : memory.schedule?.last_confirmed_at,
     last_seen_utterance: input.utterance || memory.schedule?.last_seen_utterance,
   };
   saveContextualIntentMemory(memory, input.scope);
@@ -122,9 +121,7 @@ export function recordApprovalPreference(input: {
   memory.approval = {
     default_approval_system: input.system,
     default_approval_scope: input.scope || memory.approval?.default_approval_scope,
-    last_confirmed_at: input.confirmed
-      ? new Date().toISOString()
-      : memory.approval?.last_confirmed_at,
+    last_confirmed_at: input.confirmed ? nowIso() : memory.approval?.last_confirmed_at,
     last_seen_utterance: input.utterance || memory.approval?.last_seen_utterance,
   };
   saveContextualIntentMemory(memory, input.scopeContext);
