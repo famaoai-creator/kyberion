@@ -60,17 +60,10 @@ jobs:
             -o Acquire::https::Timeout=30 \
             -o DPkg::Lock::Timeout=60 install -y -qq fonts-noto-cjk
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build

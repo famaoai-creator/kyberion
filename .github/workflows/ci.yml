@@ -18,6 +18,8 @@ jobs:
       matrix:
         node-version: [24]
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
@@ -103,6 +105,8 @@ jobs:
     needs: lint-and-validate
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
@@ -129,6 +133,8 @@ jobs:
     needs: lint-and-validate
     timeout-minutes: 20
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
@@ -167,6 +173,8 @@ jobs:
           - test-suite: integration
             command: pnpm test -- --suite integration
     steps:
+      - uses: actions/checkout@v4
+
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
         run: |
@@ -211,6 +219,8 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Kyberion
         uses: ./.github/actions/setup-kyberion
         with:
