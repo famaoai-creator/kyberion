@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import {
   loadState,
+  loadStateAtPath,
   readFocusedMissionId,
   readJsonFileSafe,
   writeFocusedMissionId,
@@ -45,12 +46,17 @@ describe('mission-state loader', () => {
       mission_id: missionId,
       status: 'active',
     });
+    expect(loadStateAtPath(`${missionDir}/mission-state.json`)).toMatchObject({
+      mission_id: missionId,
+      status: 'active',
+    });
   });
 
   it('does not expose a schema-invalid state to mission callers', () => {
     writeState({ mission_id: missionId, status: 'active' });
 
     expect(loadState(missionId, { rootDir })).toBeNull();
+    expect(loadStateAtPath(`${missionDir}/mission-state.json`)).toBeNull();
   });
 
   it('rejects symlinked focus and JSON paths', () => {

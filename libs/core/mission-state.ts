@@ -285,6 +285,15 @@ export function loadState(
   }
 }
 
+/** Load a mission state from an already resolved repository path. */
+export function loadStateAtPath(statePath: string): MissionState | null {
+  try {
+    return missionStateCatalog(statePath).load();
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Read a legacy state for the explicit repair command. Normal mission
  * callers must use `loadState`, which rejects schema-invalid state before it
