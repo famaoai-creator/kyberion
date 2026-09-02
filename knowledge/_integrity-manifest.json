@@ -7831,6 +7831,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-flight-recorder.schema.json",
+      "tier": "public",
+      "size": 496,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-gate-record.schema.json",
       "tier": "public",
       "size": 1726,
