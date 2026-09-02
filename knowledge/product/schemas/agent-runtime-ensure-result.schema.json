@@ -1,0 +1,209 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/agent-runtime-ensure-result.schema.json",
+  "title": "Agent Runtime Ensure Result v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "request_id",
+    "mission_id",
+    "scope",
+    "requested_by",
+    "created_at",
+    "completed_at",
+    "runtime_plan"
+  ],
+  "properties": {
+    "request_id": { "type": "string", "minLength": 1 },
+    "mission_id": { "type": "string", "minLength": 1 },
+    "scope": { "$ref": "#/definitions/agent_runtime_scope" },
+    "team_roles": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requested_by": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string" },
+    "created_at": { "type": "string", "minLength": 1 },
+    "completed_at": { "type": "string", "minLength": 1 },
+    "organization_profile": { "$ref": "#/definitions/organization_profile" },
+    "runtime_plan": { "$ref": "#/definitions/runtime_plan" }
+  },
+  "definitions": {
+    "agent_runtime_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope_kind", "tier"],
+      "properties": {
+        "scope_kind": {
+          "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+        },
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "enum": ["public", "confidential", "personal", "shared"] }
+        },
+        "tenant_id": { "type": "string", "minLength": 1 },
+        "organization_id": { "type": "string", "minLength": 1 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "task_id": { "type": "string", "minLength": 1 },
+        "session_id": { "type": "string", "minLength": 1 },
+        "work_shape": { "type": "string", "minLength": 1 },
+        "customer_stance": { "type": "string", "minLength": 1 },
+        "viewer_principal": { "type": "string", "minLength": 1 },
+        "nhi_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "organization_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["organization_id", "name"],
+      "properties": {
+        "organization_id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "default_team_template": { "type": "string", "minLength": 1 },
+        "team_template_catalog_id": { "type": "string", "minLength": 1 },
+        "default_agent_profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "runtime_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mission_id", "assignments"],
+      "properties": {
+        "mission_id": { "type": "string", "minLength": 1 },
+        "organization_profile": { "$ref": "#/definitions/organization_profile" },
+        "assignments": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/runtime_assignment" }
+        }
+      }
+    },
+    "runtime_assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "team_role",
+        "required",
+        "status",
+        "agent_id",
+        "authority_role",
+        "delegation_contract",
+        "provider",
+        "modelId",
+        "required_capabilities",
+        "notes",
+        "runtime_status"
+      ],
+      "properties": {
+        "team_role": { "type": "string", "minLength": 1 },
+        "required": { "type": "boolean" },
+        "status": { "enum": ["assigned", "unfilled"] },
+        "agent_id": { "type": ["string", "null"] },
+        "actor_type": { "enum": ["agent", "human", "service"] },
+        "resource": { "$ref": "#/definitions/workforce_resource_ref" },
+        "accountable_human_id": { "type": ["string", "null"] },
+        "runtime_identity": { "type": ["string", "null"] },
+        "authority_role": { "type": ["string", "null"] },
+        "delegation_contract": { "$ref": "#/definitions/delegation_contract_or_null" },
+        "provider": { "type": ["string", "null"] },
+        "modelId": { "type": ["string", "null"] },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "notes": { "type": "string" },
+        "model_hint": { "$ref": "#/definitions/model_hint" },
+        "organization_role_id": { "type": "string", "minLength": 1 },
+        "perspective_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "reasoning_route_id": { "type": "string", "minLength": 1 },
+        "security_scope": { "$ref": "security-scope.schema.json" },
+        "selection_reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "runtime_status": {
+          "enum": ["spawned", "already_ready", "unfilled", "failed"]
+        },
+        "error": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "runtime_status": { "enum": ["spawned", "already_ready"] }
+            }
+          },
+          "then": { "properties": { "agent_id": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "delegation_contract_or_null": {
+      "type": ["object", "null"],
+      "properties": {
+        "ownership_scope": { "type": "string" },
+        "allowed_delegate_team_roles": { "type": "array", "items": { "type": "string" } },
+        "escalation_parent_team_role": { "type": ["string", "null"] },
+        "required_scope_classes": { "type": "array", "items": { "type": "string" } },
+        "resolved_scope_classes": { "type": "array", "items": { "type": "string" } },
+        "allowed_write_scopes": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": [
+        "ownership_scope",
+        "allowed_delegate_team_roles",
+        "escalation_parent_team_role",
+        "required_scope_classes",
+        "resolved_scope_classes",
+        "allowed_write_scopes"
+      ],
+      "additionalProperties": false
+    },
+    "model_hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "effort", "model_id", "route_reason"],
+      "properties": {
+        "tier": { "enum": ["small", "standard", "large"] },
+        "effort": { "enum": ["low", "medium", "high"] },
+        "model_id": { "type": "string", "minLength": 1 },
+        "route_reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "workforce_resource_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resource_id",
+        "resource_type",
+        "display_name",
+        "authority_roles",
+        "capabilities",
+        "availability",
+        "cost_profile",
+        "status",
+        "accountable_human_id"
+      ],
+      "properties": {
+        "resource_id": { "type": "string", "minLength": 1 },
+        "resource_type": { "enum": ["human", "agent", "service"] },
+        "display_name": { "type": "string", "minLength": 1 },
+        "authority_roles": { "type": "array", "items": { "type": "string" } },
+        "capabilities": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "object", "additionalProperties": true },
+        "cost_profile": { "type": "object", "additionalProperties": true },
+        "status": { "enum": ["active", "suspended", "revoked"] },
+        "accountable_human_id": { "type": ["string", "null"] },
+        "provider": { "type": ["string", "null"] },
+        "model_id": { "type": ["string", "null"] },
+        "runtime_identity": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
