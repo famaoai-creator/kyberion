@@ -2,14 +2,35 @@ import {
   resolveThemeColorRole as resolveThemeColorRolePolicy,
   resolveThemeHexRole as resolveThemeHexRolePolicy,
 } from '@agent/core/media-theme-role-policy';
+import { defineCatalog } from '@agent/core/foundation';
+import * as path from 'node:path';
 import { loadJsonCatalog, loadMediaDesignSystemsCatalog } from './media-catalog-loaders.js';
 
 function loadSemanticRenderTokenCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
+  const fallback = {
+    version: '1.0.0',
+    defaults: { content: {} },
+    semantics: {},
+    signal_tones: {},
+  };
+  const catalog = loadJsonCatalog(rootDir, {
     directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
     filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
-    fallback: { defaults: { content: {} }, semantics: {}, signal_tones: {} },
+    fallback,
   });
+  return defineCatalog({
+    id: 'semantic-render-tokens',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/semantic-render-tokens.schema.json'),
+    fallback,
+    fallbackOnInvalid: true,
+  }).validate(
+    catalog,
+    path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/semantic-render-tokens')
+  );
 }
 
 export function resolveSemanticRenderTokens(

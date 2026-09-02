@@ -12105,6 +12105,17 @@ symlink 除外と fallback semantics は変更していない。
 actuator build、PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-04 は他の domain loader と非catalog層の
 旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 322
+
+media actuator の semantic render token catalog が base／fragment merge後に手書きの shape 前提だけで利用されていたため、
+専用 `semantic-render-tokens.schema.json` を追加し、merged envelope を `defineCatalog.validate()` で検証するようにした。
+`defaults`／`semantics`／`signal_tones` の root 境界を共通 validation に移し、surfaceごとの token payload は既存の拡張性を維持した。
+semantic token 解決と design-system override の merge semantics は変更していない。
+
+検証: media semantic／catalog **4 tests passed**、media index／security／core を含む **4 files / 56 tests passed / 11 skipped**、
+knowledge index generator／check、typecheck、actuator build、PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。
+残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

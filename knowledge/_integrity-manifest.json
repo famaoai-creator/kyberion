@@ -8761,6 +8761,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/semantic-render-tokens.schema.json",
+      "tier": "public",
+      "size": 628,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/sensor-adf.schema.json",
       "tier": "public",
       "size": 1803,
