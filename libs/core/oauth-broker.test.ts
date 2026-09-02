@@ -370,6 +370,8 @@ describe('oauth-broker', () => {
         return JSON.stringify({
           serviceId: 'canva',
           state: 'test-state',
+          scopes: [],
+          createdAt: '2026-03-23T00:00:00.000Z',
           expiresAt: '2099-03-23T00:00:00.000Z',
         });
       }
