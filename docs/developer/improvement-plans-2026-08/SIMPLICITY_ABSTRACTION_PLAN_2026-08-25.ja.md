@@ -12226,6 +12226,17 @@ interactive output semanticsは変更していない。wrapper境界の回帰テ
 検証: agent runtime manager **1 file / 6 tests passed**、root typecheck、root lint、PR scope、Prettier、`git diff --check`。残るSX-06は
 全script harness／generator移行、server／interactive custom outputの整理、孤児scriptのregistry化である。
 
+## 2026-09-02 再レビュー修正 334
+
+SX-04 の confidential `theme.json` が既存の専用 `pptx-theme-pack`／`web-theme-pack` schemaを通らず汎用JSON readerで
+返されていた残存を修正した。packの `kind` に応じて専用schemaを選び、media design protocol の一覧・直接解決・
+fallback解決の全経路で検証済みのtheme packだけを返すようにした。不明なkindやschema違反は既存の呼び出し側catchで
+候補から除外され、public defaultへのfail-closed fallback semanticsは維持している。
+
+検証: media catalog loader **1 file / 5 tests passed**、media actuator **対象テーマpackテスト 2件**、root typecheck、
+root lint、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
+各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
