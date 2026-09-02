@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 
@@ -96,7 +97,7 @@ export function createArtifactOwnershipRecord(
 ): ArtifactOwnershipRecord {
   return {
     ...input,
-    created_at: input.created_at || new Date().toISOString(),
+    created_at: input.created_at || nowIso(),
     evidence_refs: (input.evidence_refs || []).map((value) => String(value).trim()).filter(Boolean),
     ...(input.metadata ? { metadata: input.metadata } : {}),
   };

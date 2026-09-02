@@ -12,6 +12,7 @@
 
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { safeWriteFile } from './secure-io.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -155,7 +156,7 @@ export function registerService(params: {
   url: string;
 }): ExternalServiceEntry {
   const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
-  const now = new Date().toISOString();
+  const now = nowIso();
 
   const entry: ExternalServiceEntry = {
     service_id: params.service_id,
@@ -182,6 +183,7 @@ export function registerService(params: {
  */
 export function updateServiceStats(serviceId: string, success: boolean): void {
   const runtime = parseRegistry(RUNTIME_PATH) ?? { version: '1.0.0', services: [] };
+  const updatedAt = nowIso();
   const idx = runtime.services.findIndex((e) => e.service_id === serviceId);
 
   if (idx < 0) {
@@ -193,7 +195,7 @@ export function updateServiceStats(serviceId: string, success: boolean): void {
       ...entry,
       success_count: success ? 1 : 0,
       failure_count: success ? 0 : 1,
-      ...(success ? { last_success_at: new Date().toISOString() } : {}),
+      ...(success ? { last_success_at: updatedAt } : {}),
     });
   } else {
     const prev = runtime.services[idx];
@@ -201,7 +203,7 @@ export function updateServiceStats(serviceId: string, success: boolean): void {
       ...prev,
       success_count: prev.success_count + (success ? 1 : 0),
       failure_count: prev.failure_count + (success ? 0 : 1),
-      ...(success ? { last_success_at: new Date().toISOString() } : {}),
+      ...(success ? { last_success_at: updatedAt } : {}),
     };
   }
 

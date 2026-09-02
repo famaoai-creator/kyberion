@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   assertSafeRepositoryPath,
@@ -186,7 +187,7 @@ export function saveDealRequirementsCapture(input: {
   const capture: DealRequirementsCapture = {
     deal_id: input.dealId,
     tenant_slug: input.tenantSlug,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     turns_captured: (previous?.turns_captured || 0) + 1,
     requirements: input.requirements,
   };
