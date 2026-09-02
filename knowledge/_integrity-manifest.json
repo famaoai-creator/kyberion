@@ -8797,6 +8797,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/reasoning-degraded-marker.schema.json",
+      "tier": "public",
+      "size": 421,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/reasoning-failover-marker.schema.json",
+      "tier": "public",
+      "size": 611,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/reasoning-level-policy.schema.json",
       "tier": "public",
       "size": 4170,

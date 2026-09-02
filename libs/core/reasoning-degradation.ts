@@ -1,10 +1,17 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { parseIso } from './foundation/time.js';
-import { safeExistsSync, safeMkdir, safeUnlink, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeUnlink,
+  safeWriteFile,
+} from './secure-io.js';
 import { logger } from './core.js';
 
 /**
@@ -22,6 +29,9 @@ export interface ReasoningDegradedMarker {
 }
 
 const MARKER_RELATIVE_PATH = 'active/shared/runtime/state/reasoning-degraded.json';
+const MARKER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/reasoning-degraded-marker.schema.json'
+);
 
 function assertExactKeys(
   record: Record<string, unknown>,
@@ -66,6 +76,25 @@ export function reasoningDegradedMarkerPath(): string {
   return pathResolver.rootResolve(MARKER_RELATIVE_PATH);
 }
 
+/** Load the degraded marker through its schema and regular-file boundary. */
+export function loadReasoningDegradedMarkerAtPath(
+  filePath = reasoningDegradedMarkerPath()
+): ReasoningDegradedMarker {
+  const safeFilePath = assertSafeRepositoryPath(pathResolver.rootResolve(filePath), {
+    allowMissingLeaf: false,
+  });
+  if (!safeExistsSync(safeFilePath)) throw new Error('reasoning degraded marker is missing');
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[REASONING_DEGRADED] marker must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<ReasoningDegradedMarker>({
+    id: 'reasoning-degraded-marker',
+    path: safeFilePath,
+    schema: MARKER_SCHEMA_PATH,
+  }).load();
+  return parseReasoningDegradedMarker(validated);
+}
+
 export function markReasoningDegraded(mode: string, reason: string): void {
   try {
     const markerPath = reasoningDegradedMarkerPath();
@@ -92,7 +121,7 @@ export function readReasoningDegraded(): ReasoningDegradedMarker | null {
   try {
     const markerPath = reasoningDegradedMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    return parseReasoningDegradedMarker(readJson<unknown>(markerPath));
+    return loadReasoningDegradedMarkerAtPath(markerPath);
   } catch {
     return null;
   }

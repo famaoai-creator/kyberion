@@ -1,4 +1,5 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso, parseIso } from './foundation/time.js';
 import * as path from 'node:path';
@@ -7,6 +8,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeUnlink,
   safeWriteFile,
 } from './secure-io.js';
@@ -52,6 +54,9 @@ export interface ReasoningFailoverMarker {
 const EVENTS_RELATIVE_PATH = 'active/shared/runtime/reasoning-failover-events.jsonl';
 const MARKER_RELATIVE_PATH = 'active/shared/runtime/state/reasoning-failover.json';
 const ERROR_SUMMARY_MAX_CHARS = 200;
+const MARKER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/reasoning-failover-marker.schema.json'
+);
 
 function assertExactKeys(
   record: Record<string, unknown>,
@@ -123,6 +128,23 @@ export function reasoningFailoverMarkerPath(): string {
   });
 }
 
+/** Load the latest failover marker through its schema and file boundary. */
+export function loadReasoningFailoverMarkerAtPath(
+  filePath = reasoningFailoverMarkerPath()
+): ReasoningFailoverMarker {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeExistsSync(safeFilePath)) throw new Error('reasoning failover marker is missing');
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[REASONING_FAILOVER] marker must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<ReasoningFailoverMarker>({
+    id: 'reasoning-failover-marker',
+    path: safeFilePath,
+    schema: MARKER_SCHEMA_PATH,
+  }).load();
+  return parseReasoningFailoverMarker(validated);
+}
+
 export function truncateErrorSummary(message: string): string {
   return message.length > ERROR_SUMMARY_MAX_CHARS
     ? `${message.slice(0, ERROR_SUMMARY_MAX_CHARS)}…`
@@ -175,7 +197,7 @@ export function readReasoningFailover(): ReasoningFailoverMarker | null {
   try {
     const markerPath = reasoningFailoverMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    return parseReasoningFailoverMarker(readJson<unknown>(markerPath));
+    return loadReasoningFailoverMarkerAtPath(markerPath);
   } catch {
     return null;
   }

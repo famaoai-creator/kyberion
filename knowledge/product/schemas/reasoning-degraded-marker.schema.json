@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reasoning-degraded-marker.schema.json",
+  "title": "Reasoning Degraded Marker",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "mode": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1 },
+    "at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["mode", "reason", "at"]
+}

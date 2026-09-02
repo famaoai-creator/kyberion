@@ -22,6 +22,7 @@ const secureIo = vi.hoisted(() => ({
     return absolute;
   },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -71,6 +72,14 @@ describe('reasoning-failover marker + event log (XP-05)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-reasoning-failover-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(
+        process.cwd(),
+        'knowledge/product/schemas/reasoning-failover-marker.schema.json'
+      ),
+      path.join(tmpRoot, 'knowledge/product/schemas/reasoning-failover-marker.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 

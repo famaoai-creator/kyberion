@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reasoning-failover-marker.schema.json",
+  "title": "Reasoning Failover Marker",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "from_mode": { "type": "string", "minLength": 1 },
+    "to_mode": { "type": "string", "minLength": 1 },
+    "provider_from": { "type": "string", "minLength": 1 },
+    "provider_to": { "type": "string", "minLength": 1 },
+    "method": { "type": "string", "minLength": 1 },
+    "at": { "type": "string", "format": "date-time" }
+  },
+  "required": ["from_mode", "to_mode", "method", "at"]
+}

@@ -13553,6 +13553,12 @@ SX-03／SX-04／SX-09 のmission orchestration journalを再監査し、provisio
 
 検証: orchestration journal **1 file / 12 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 549
+
+SX-03／SX-04／SX-09 のreasoning degraded／failover markerを再監査し、baselineが読むpersisted JSONを手書きparserとraw `readJson`で処理し、marker schemaとregular-file境界を共有していなかった残存を修正した。`reasoning-degraded-marker.schema.json`／`reasoning-failover-marker.schema.json`とcanonical marker loaderを追加し、baseline readをschema validationへ統合した。壊れたmarkerを従来どおり安全にabsent扱いしつつ、未知フィールド・不正timestamp・directory markerはreasoning状態へ昇格しない。既存のfailover／degraded markerの書き込み、clear、baseline warning semanticsは維持している。
+
+検証: reasoning marker／failover backend **3 files / 11 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
