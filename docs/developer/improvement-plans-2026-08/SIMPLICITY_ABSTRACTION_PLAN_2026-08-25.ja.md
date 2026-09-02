@@ -12260,6 +12260,16 @@ channel catalogと混同しないdomain readerとして残した。
 knowledge index、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
 各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 337
+
+SX-04 の各domain専用schema loader統合後も、media actuatorに利用者のない汎用 `loadJsonCatalog` が実装・re-export
+されたまま残っていたため削除した。`readJsonFilesRecursively`／`deepMergeCatalog` は各専用loaderのmerge primitiveとして
+維持し、任意JSON input向けの `loadJsonValue` と、schema付きcatalog loaderの責務は混同しないようにした。
+
+検証: repository-wide `loadJsonCatalog`参照 **0件**、media catalog／design protocol対象テスト、media actuator build、root typecheck、
+root lint、PR scope、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
+各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
