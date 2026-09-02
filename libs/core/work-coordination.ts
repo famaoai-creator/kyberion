@@ -1,4 +1,4 @@
-import { appendJsonLine, readJsonIfPresent, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
@@ -8,11 +8,19 @@ import { getRegisteredEnvText } from './foundation/env.js';
 
 import { withExecutionContext } from './authority.js';
 import { enforceNhiActorPolicy } from './nhi-actor-verification.js';
-import { assertSafeRepositoryPath, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from './handoff-packet.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { resolveTenant } from './tenant-registry.js';
 import { WorkCoordinationError } from './work-coordination-error.js';
 export { WorkCoordinationError } from './work-coordination-error.js';
@@ -28,6 +36,7 @@ import type {
   RenewWorkItemLeaseInput,
   UpdateWorkItemInput,
   WorkBoard,
+  WorkBoardCatalog,
   WorkBoardFilter,
   WorkCoordinationEventType,
   WorkItem,
@@ -53,6 +62,7 @@ export type {
   RenewWorkItemLeaseInput,
   UpdateWorkItemInput,
   WorkBoard,
+  WorkBoardCatalog,
   WorkBoardFilter,
   WorkCoordinationEventType,
   WorkItem,
@@ -70,6 +80,9 @@ export type {
 
 const WORK_ITEM_SCHEMA_PATH = pathResolver.rootResolve(
   'knowledge/product/schemas/governed-work-item.schema.json'
+);
+const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/work-board-catalog.schema.json'
 );
 let workItemValidator: ValidateFunction | null = null;
 
@@ -201,10 +214,6 @@ function appendJsonl(logicalPath: string, record: unknown): void {
     ensureStore();
     appendJsonLine(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), record);
   });
-}
-
-function readJson<T>(logicalPath: string): T | null {
-  return readJsonIfPresent<T>(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }));
 }
 
 function writeJson(logicalPath: string, value: unknown): void {
@@ -455,19 +464,41 @@ function assertVersion(item: WorkItem, expectedVersion?: number): void {
   }
 }
 
-function materializeBoardCatalog(): { version: '1'; boards: WorkBoard[] } {
-  const catalog = readJson<{ version: '1'; boards: WorkBoard[] }>(boardsPath());
-  if (!catalog || catalog.version !== '1' || !Array.isArray(catalog.boards)) {
-    return { version: '1', boards: [] };
+function workBoardCatalogAtPath(filePath: string) {
+  return defineCatalog<WorkBoardCatalog>({
+    id: 'work-board-catalog',
+    path: filePath,
+    schema: WORK_BOARD_CATALOG_SCHEMA_PATH,
+  });
+}
+
+/** Load the persisted work-board catalog through the shared schema boundary. */
+export function loadWorkBoardCatalogAtPath(filePath: string): WorkBoardCatalog {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[WORK_BOARD_CATALOG] catalog must be a regular file: ${filePath}`);
   }
+  return workBoardCatalogAtPath(safeFilePath).load();
+}
+
+function materializeBoardCatalog(): WorkBoardCatalog {
+  const filePath = boardsPath();
+  if (!safeExistsSync(filePath)) return { version: '1', boards: [] };
+  const catalog = loadWorkBoardCatalogAtPath(filePath);
   return {
     version: '1',
-    boards: catalog.boards.map((board) => ({ ...board })),
+    boards: catalog.boards.map((board) => ({
+      ...board,
+      filters: { ...board.filters },
+      ...(board.lanes ? { lanes: [...board.lanes] } : {}),
+    })),
   };
 }
 
-function writeBoardCatalog(catalog: { version: '1'; boards: WorkBoard[] }): void {
-  writeJson(boardsPath(), catalog);
+function writeBoardCatalog(catalog: WorkBoardCatalog): void {
+  const filePath = assertSafeRepositoryPath(boardsPath(), { allowMissingLeaf: true });
+  const validated = workBoardCatalogAtPath(filePath).validate(catalog, filePath);
+  writeJson(filePath, validated);
 }
 
 function applyWorkItemFilters(items: WorkItem[], filter: WorkItemFilter): WorkItem[] {

@@ -1,7 +1,8 @@
+import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeSymlinkSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from './secure-io.js';
 
 import {
   claimWorkItem,
@@ -14,6 +15,7 @@ import {
   listBoards,
   listCoordinationEvents,
   listWorkItemAttempts,
+  loadWorkBoardCatalogAtPath,
   listWorkItems,
   releaseWorkItem,
   renewWorkItemLease,
@@ -52,6 +54,42 @@ describe('work coordination', () => {
     safeSymlinkSync(target, link);
 
     expect(() => listWorkItems()).toThrow('[RESOURCE_PATH_SYMLINK]');
+  });
+
+  it('loads board catalogs through the strict schema and regular-file boundary', () => {
+    const runtimeDir = pathResolver.rootResolve(
+      'active/shared/runtime/work-coordination/work-coordination-core-test'
+    );
+    const boardPath = path.join(runtimeDir, 'boards.json');
+    safeMkdir(runtimeDir, { recursive: true });
+    safeWriteFile(
+      boardPath,
+      JSON.stringify({
+        version: '1',
+        boards: [
+          {
+            board_id: 'review-board',
+            name: 'Review board',
+            type: 'review',
+            filters: { status: 'review' },
+            sort_by: 'updated_at',
+            created_at: '2026-09-03T00:00:00.000Z',
+            updated_at: '2026-09-03T00:00:00.000Z',
+          },
+        ],
+      })
+    );
+
+    expect(loadWorkBoardCatalogAtPath(boardPath).boards).toHaveLength(1);
+
+    safeWriteFile(boardPath, JSON.stringify({ version: '1', boards: [], unexpected: true }));
+    expect(() => listBoards()).toThrow(/Invalid catalog work-board-catalog/);
+
+    safeRmSync(boardPath, { recursive: true, force: true });
+    safeMkdir(boardPath, { recursive: true });
+    expect(() => loadWorkBoardCatalogAtPath(boardPath)).toThrow(
+      '[WORK_BOARD_CATALOG] catalog must be a regular file'
+    );
   });
 
   it('keeps the canonical context chain when an external item is updated', () => {
