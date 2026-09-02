@@ -11706,6 +11706,28 @@ canonical full runner を呼ぶ保証を持っていなかったため、scope c
 検証: ci-gate parity **5 test files / 35 tests passed**、PR scope **33/33 gates passed**、root lint、root typecheck、
 `git diff --check`。残る SX-07 は validate／CI の全 check 集合統合と外部依存 gate の sandbox-independent 実行である。
 
+## 2026-09-02 再レビュー修正 283
+
+PR 前 checklist を 187 行の重複コマンド列から、canonical `pnpm check -- --scope pr` 1 コマンドと変更範囲別の
+例外表へ縮約した。通常のローカル手順と CI の manifest gate 集合を明示し、knowledge／actuator／ADF／surface／依存／
+platform／release の追加確認だけを残した。`CONTRIBUTING.md` の旧 `pnpm validate` 必須記述も同じ入口へ更新し、
+「validate が green なら PR 可」という CI との誤解を解消した。
+
+検証: checklist **187 行 → 63 行**、documentation links、catalogs、PR scope **33/33 gates passed**、root lint、
+root typecheck、`git diff --check`。残る SX-07 は CI の重複 setup を composite action へ抽出し、full／release の外部依存
+gate を sandbox-independent にする作業である。
+
+## 2026-09-02 再レビュー修正 284
+
+checklist 短縮後の catalog gate で、`i18n-baseline` が manifest-driven baseline resolver から利用されているにも
+かかわらず production source の文字列走査に拾われず、未参照扱いになる指摘を検出した。`check_catalog_integrity` の
+governance runtime source 集合に `ci-gates.json` を加え、manifest の baseline 宣言も catalog の実利用として評価するよう
+修正し、純粋関数テストで回帰を固定した。
+
+検証: `build:repo` 後の catalogs、documentation-links、PR scope **33/33 gates passed**、catalog integrity focused test、
+root lint、root typecheck、`git diff --check`。残る SX-07 は CI の重複 setup を composite action へ抽出し、full／release の
+外部依存 gate を sandbox-independent にする作業である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
