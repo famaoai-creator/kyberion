@@ -6,6 +6,10 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import {
+  parsePersistedControlPlaneState,
+  type PersistedControlPlaneState,
+} from './cloudflare-os-control-plane-state.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -262,24 +266,6 @@ export interface CloudflareOsControlPlaneOptions {
   persist?: boolean;
   /** Read-only adapters must not write a recovery audit while restoring state. */
   auditRestoreFailures?: boolean;
-}
-
-interface PersistedControlPlaneState {
-  version: 1;
-  held: Array<Record<string, unknown>>;
-  introductions: ResourceIntroduction[];
-  observations: ObservationRecord[];
-  autoRules: AutoApproveRule[];
-  capabilities: CapabilityEdge[];
-  threadCapabilities: Record<string, string[]>;
-  blueprints: BlueprintContract[];
-  network: NetworkObservation[];
-  gadgets: PersistedGadget[];
-}
-
-interface PersistedGadget {
-  manifest: GadgetManifest;
-  operations: Array<GadgetOperationDescriptor & { governedCode: string }>;
 }
 
 const TIER_RANK: Record<OsKnowledgeTier, number> = { public: 0, confidential: 1, personal: 2 };
@@ -1185,8 +1171,7 @@ export class CloudflareOsControlPlane {
   private restoreState(): void {
     if (!safeExistsSync(this.statePath)) return;
     try {
-      const state = readJson<PersistedControlPlaneState>(this.statePath);
-      if (state.version !== 1) return;
+      const state = parsePersistedControlPlaneState(readJson<unknown>(this.statePath));
       for (const raw of state.held || []) {
         const record = raw as unknown as HeldActionRecord;
         record.apply = () => {
@@ -1247,8 +1232,7 @@ export class CloudflareOsControlPlane {
   private refreshPersistedObservations(): void {
     if (!this.persist || !safeExistsSync(this.statePath)) return;
     try {
-      const state = readJson<PersistedControlPlaneState>(this.statePath);
-      if (state.version !== 1 || !Array.isArray(state.observations)) return;
+      const state = parsePersistedControlPlaneState(readJson<unknown>(this.statePath));
       this.observations.splice(0, this.observations.length, ...state.observations);
     } catch (error) {
       if (this.auditRestoreFailures) {
