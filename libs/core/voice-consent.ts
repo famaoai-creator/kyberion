@@ -1,5 +1,6 @@
 import { MissionEvidenceDoc } from './mission-evidence-doc.js';
 import { resolveIdentityContext } from './authority.js';
+import { nowIso } from './foundation/time.js';
 
 export interface VoiceConsentRecord {
   consent: 'granted' | 'revoked';
@@ -132,7 +133,7 @@ export function grantVoiceConsent(options: {
     consent: 'granted',
     mission_id: options.missionId,
     operator_handle: options.operator,
-    granted_at: new Date().toISOString(),
+    granted_at: nowIso(),
     ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
     ...(options.expiresAt ? { expires_at: options.expiresAt } : {}),
     ...(options.scope ? { scope: options.scope } : {}),
@@ -157,7 +158,7 @@ export function revokeVoiceConsent(missionId: string, note?: string): VoiceConse
   const record: VoiceConsentRecord = {
     ...existing,
     consent: 'revoked',
-    revoked_at: new Date().toISOString(),
+    revoked_at: nowIso(),
     ...(note ? { note } : {}),
   };
   const { audit_event_id } = doc.write(record, {

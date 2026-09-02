@@ -1,5 +1,6 @@
 import { a2aBridge } from './a2a-bridge.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { readHintsByCategory } from './src/feedback-loop.js';
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { resolveQuestionInteractionPacket } from './question-resolver.js';
@@ -1147,7 +1148,7 @@ export async function requestIndependentAcceptanceReview(input: {
         sender: 'kyberion:mission-orchestrator',
         receiver: reviewerAgentId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         intent: 'mission_task_execution',
