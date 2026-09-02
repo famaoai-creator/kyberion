@@ -11615,6 +11615,18 @@ registry が公開する `scope_key` は `tenant_slug`／`organization_id`／`pr
 root lint、foundation adoption、`git diff --check`。残る SX-04 は governance catalog の dedicated schema 化、
 未参照 catalog の処分、各 loader の完全統合である。
 
+## 2026-09-02 再レビュー修正 275
+
+SX-04 の governance check が手書き `CHECKS` 配列に存在する catalog だけを schema 検証していたため、新しい
+governance JSON が check への追記なしに検査対象から漏れる状態を修正した。`$schema` が repository-local schema
+を指す governance catalog を directory から discovery し、既存 entry の specialized schema／directory consistency
+rule を優先した上で未登録 catalog を追加検証する。既存の malformed JSON、external schema、documentation-only の
+処理は catalog integrity gate に委譲し、specialized governance rule の semantics は変更していない。
+
+検証: governance-rules **OK**、check-governance-rules **2 test files / 4 tests passed**、174 schema-backed governance
+catalogs の discovery、root typecheck、`git diff --check`。残る SX-04 は generic envelope の dedicated schema 化、
+未参照 catalog の処分、各 domain loader の完全統合である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
