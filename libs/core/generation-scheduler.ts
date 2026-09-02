@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -9,7 +10,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReaddir,
-  safeStat,
+  safeLstat,
   safeWriteFile,
 } from './secure-io.js';
 import type { GenerationSchedule } from './src/types/generation-schedule.js';
@@ -65,7 +66,7 @@ function scheduleFiles(root = pathResolver.resolve(GENERATION_SCHEDULE_DIR)): st
   return safeReaddir(root).flatMap((entry) => {
     const entryPath = path.join(root, entry);
     if (entry === '.quarantine') return [];
-    const stat = safeStat(entryPath);
+    const stat = safeLstat(entryPath);
     if (stat.isFile() && entry.endsWith('.json')) return [entryPath];
     if (stat.isDirectory()) return scheduleFiles(entryPath);
     return [];
@@ -207,7 +208,14 @@ export function resolveGenerationScheduleWorkdir(schedule: GenerationSchedule): 
 }
 
 export function readGenerationSchedule(logicalPath: string): GenerationSchedule {
-  const schedule = readJson<GenerationSchedule>(logicalPath);
+  const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: false });
+  if (!safeLstat(safePath).isFile()) {
+    throw new Error(`[GENERATION_SCHEDULE] schedule must be a regular file: ${logicalPath}`);
+  }
+  const schedule = generationScheduleCatalogAtPath(safePath).validate(
+    readJson<unknown>(safePath),
+    safePath
+  );
   return normalizeGenerationSchedule(schedule);
 }
 
@@ -218,18 +226,28 @@ export function writeGenerationSchedule(schedule: GenerationSchedule): Generatio
     physicalScopedPath(GENERATION_SCHEDULE_DIR, normalized.scope, `${normalized.schedule_id}.json`)
   );
   safeMkdir(path.dirname(target), { recursive: true });
-  safeWriteFile(target, JSON.stringify(normalized, null, 2));
-  return normalized;
+  const validated = generationScheduleCatalogAtPath(target).validate(normalized, target);
+  safeWriteFile(target, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 function normalizeGenerationSchedule(schedule: GenerationSchedule): ScopedGenerationSchedule {
   const normalized = {
     ...schedule,
+    kind: 'generation-schedule' as const,
     scope: scheduleScope(schedule),
   } as ScopedGenerationSchedule;
   // Registration/read normalization is also the schedule delivery preflight.
   resolveGenerationScheduleDeliveryPaths(normalized);
   return normalized;
+}
+
+function generationScheduleCatalogAtPath(filePath: string) {
+  return defineCatalog<GenerationSchedule>({
+    id: 'generation-schedule',
+    path: filePath,
+    schema: pathResolver.knowledge('product/schemas/generation-schedule.schema.json'),
+  });
 }
 
 export function assertGenerationScheduleTenantRegistered(
