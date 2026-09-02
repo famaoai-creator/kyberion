@@ -22,6 +22,7 @@
 
 import { auditChain } from '@agent/core/audit-chain';
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -46,7 +47,6 @@ import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   auditSpeakerFairnessOp,
   conduct1on1,
@@ -754,10 +754,9 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && (modulePath === entrypoint || entrypoint.endsWith('index.js'))) {
+if (
+  isDirectEntry(import.meta.url, 'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts')
+) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;
