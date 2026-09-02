@@ -11749,6 +11749,17 @@ action の install shell は Windows では PowerShell、その他では bash �
 検証: 4 workflow と composite action の Prettier check、PR scope **33/33 gates passed**、root lint、root typecheck、
 `git diff --check`。残る SX-07 は reusable workflow へのさらなる整理と、外部依存 gate の sandbox-independent 実行である。
 
+## 2026-09-02 再レビュー修正 287
+
+CI setup 共通化を将来の workflow 変更で失わないよう、`check:ci-gate-parity` に実行 workflow 4 本の
+`.github/actions/setup-kyberion` 使用と repository checkout の先行を検査する回帰ガードを追加した。これにより
+local composite action の checkout 前参照、または個別 workflow への setup 重複の再導入を manifest parity gate で検出できる。
+併せて workflow README の workflow 数、maintenance workflow、共通 setup action の責務を現状へ更新した。
+
+検証: ci-gate parity focused **5 tests passed**、workflow setup の順序・欠落テスト、Prettier、PR scope、root typecheck、
+root lint、`git diff --check`。残る SX-07 は reusable workflow のさらなる整理と、外部依存 gate の sandbox-independent
+実行である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

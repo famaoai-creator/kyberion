@@ -11,6 +11,7 @@ const WORKFLOW_SCOPE_REFS = {
   release: '.github/workflows/release.yml',
 } as const;
 const WORKFLOW_PATHS = [...Object.values(WORKFLOW_SCOPE_REFS), '.github/workflows/cross-os.yml'];
+const KYBERION_SETUP_ACTION = 'uses: ./.github/actions/setup-kyberion';
 
 function read(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
@@ -32,6 +33,23 @@ export function collectCheckScopeReferences(value: string): string[] {
       )
     ),
   ];
+}
+
+export function checkWorkflowSetupOrder(workflowPath: string, workflow: string): string[] {
+  const failures: string[] = [];
+  const setupIndex = workflow.indexOf(KYBERION_SETUP_ACTION);
+  if (setupIndex === -1) {
+    failures.push(`${workflowPath} must use ${KYBERION_SETUP_ACTION}`);
+    return failures;
+  }
+
+  const checkoutIndex = workflow.indexOf('uses: actions/checkout@');
+  if (checkoutIndex === -1) {
+    failures.push(`${workflowPath} must checkout the repository before setup`);
+  } else if (checkoutIndex > setupIndex) {
+    failures.push(`${workflowPath} must checkout the repository before setup`);
+  }
+  return failures;
 }
 
 export function checkCiGateParity(): string[] {
@@ -79,6 +97,7 @@ export function checkCiGateParity(): string[] {
   }
   for (const workflowPath of WORKFLOW_PATHS) {
     const workflow = read(workflowPath);
+    failures.push(...checkWorkflowSetupOrder(workflowPath, workflow));
     const scripts = [...workflow.matchAll(/\bpnpm\s+run\s+(check:[A-Za-z0-9_-]+)/g)].map(
       (match) => match[1]!
     );

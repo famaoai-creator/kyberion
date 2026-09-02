@@ -2,7 +2,7 @@
 
 ## Current Contracts
 
-The repository currently maintains two GitHub Actions workflows.
+The repository currently maintains four execution workflows and one maintenance workflow.
 
 1. `ci.yml`
    Runs on pushes, pull requests to `main`, and the weekly schedule.
@@ -10,7 +10,20 @@ The repository currently maintains two GitHub Actions workflows.
 2. `pr-validation.yml`
    Runs on pull requests targeting `main` or `develop`.
 
-Both workflows are expected to separate **package/app build** from **operational validation**.
+3. `cross-os.yml`
+   Runs the supported-OS smoke matrix on pushes, pull requests to `main`, and the weekly schedule.
+
+4. `release.yml`
+   Builds and publishes tagged releases.
+
+5. `stale.yml`
+   Performs issue and pull-request housekeeping on its own schedule or manual dispatch.
+
+The four execution workflows use `.github/actions/setup-kyberion/action.yml` after checkout. The
+action owns the pinned pnpm version, Node setup, and frozen dependency install; workflow-specific
+native packages and test/build steps remain in each workflow.
+
+The execution workflows are expected to separate **package/app build** from **operational validation**.
 
 - `pnpm build` must build package-local workspace artifacts first, then repo-level `dist/`
 - operational validation still runs against built scripts under `dist/`
