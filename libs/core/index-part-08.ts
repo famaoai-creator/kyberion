@@ -282,6 +282,8 @@ export * from './mission-team-index.js';
 
 export * from './agent-performance-index.js';
 
+export * from './model-performance-index.js';
+
 export * from './delegation-preflight.js';
 
 export * from './mission-orchestration-evaluator.js';

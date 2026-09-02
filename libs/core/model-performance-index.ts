@@ -1,4 +1,9 @@
-import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import {
+  appendJsonLine,
+  parseSafeJsonObjectValue,
+  readJson,
+  readJsonLines,
+} from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -43,6 +48,10 @@ export interface ModelRolePerformance {
   success_rate: number;
   feedback_samples: number;
   average_rating: number;
+}
+
+export interface ModelPerformanceIndex {
+  by_model_role: Record<string, ModelRolePerformance>;
 }
 
 const OUTCOMES_PATH = 'observability/retrospectives/model-role-outcomes.jsonl';
@@ -92,6 +101,90 @@ function scoreStatus(status: string): { success: number; review: number; blocked
     return { success: 0, review: 1, blocked: 0 };
   }
   return { success: 0, review: 0, blocked: 1 };
+}
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parsePerformanceRecord(value: unknown, label: string): ModelRolePerformance {
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(
+    record,
+    [
+      'samples',
+      'success',
+      'review',
+      'blocked',
+      'success_rate',
+      'feedback_samples',
+      'average_rating',
+    ],
+    label
+  );
+  const counters = ['samples', 'success', 'review', 'blocked', 'feedback_samples'] as const;
+  for (const field of counters) {
+    const count = record[field];
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`${label}.${field} must be a non-negative integer`);
+    }
+  }
+  const successRate = record.success_rate;
+  if (
+    typeof successRate !== 'number' ||
+    !Number.isFinite(successRate) ||
+    successRate < 0 ||
+    successRate > 1
+  ) {
+    throw new Error(`${label}.success_rate must be a number between 0 and 1`);
+  }
+  const averageRating = record.average_rating;
+  if (
+    typeof averageRating !== 'number' ||
+    !Number.isFinite(averageRating) ||
+    averageRating < 0 ||
+    averageRating > 5
+  ) {
+    throw new Error(`${label}.average_rating must be a number between 0 and 5`);
+  }
+  return {
+    samples: record.samples as number,
+    success: record.success as number,
+    review: record.review as number,
+    blocked: record.blocked as number,
+    success_rate: successRate,
+    feedback_samples: record.feedback_samples as number,
+    average_rating: averageRating,
+  };
+}
+
+/** Parse the persisted model x role performance projection before routing uses it. */
+export function parseModelPerformanceIndex(value: unknown): ModelPerformanceIndex {
+  const root = parseSafeJsonObjectValue(value, 'model performance index');
+  assertExactKeys(root, ['by_model_role'], 'model performance index');
+  const byModelRole = parseSafeJsonObjectValue(
+    root.by_model_role,
+    'model performance index.by_model_role'
+  );
+  const parsed: Record<string, ModelRolePerformance> = {};
+  for (const [key, valueForKey] of Object.entries(byModelRole)) {
+    if (!key.trim() || !key.includes('|')) {
+      throw new Error(`model performance index.by_model_role key must be "model|role": ${key}`);
+    }
+    parsed[key] = parsePerformanceRecord(
+      valueForKey,
+      `model performance index.by_model_role.${key}`
+    );
+  }
+  return { by_model_role: parsed };
 }
 
 function readJsonl<T>(filePath: string): T[] {
@@ -231,6 +324,13 @@ export function resetModelPerformanceIndexCache(): void {
   cachedIndex = null;
 }
 
+/** Load every validated model x role performance bucket for read-only consumers. */
+export function loadModelPerformanceIndex(): Record<string, ModelRolePerformance> {
+  const indexPath = modelPerformanceIndexPath();
+  if (!safeExistsSync(indexPath)) return {};
+  return parseModelPerformanceIndex(readJson<unknown>(indexPath)).by_model_role;
+}
+
 export function getModelRolePerformance(
   modelId: string,
   teamRole: string
@@ -239,12 +339,7 @@ export function getModelRolePerformance(
   if (!cachedIndex || now - cachedIndex.loadedAt > INDEX_CACHE_TTL_MS) {
     let byKey: Record<string, ModelRolePerformance> = {};
     try {
-      const indexPath = modelPerformanceIndexPath();
-      if (safeExistsSync(indexPath)) {
-        byKey =
-          readJson<{ by_model_role?: Record<string, ModelRolePerformance> }>(indexPath)
-            .by_model_role || {};
-      }
+      byKey = loadModelPerformanceIndex();
     } catch {
       byKey = {};
     }

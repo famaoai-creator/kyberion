@@ -111,4 +111,30 @@ describe('model performance index', () => {
       })
     ).toThrow('modelId is too long');
   });
+
+  it('rejects malformed persisted projections before routing uses them', () => {
+    expect(() =>
+      mod.parseModelPerformanceIndex({
+        by_model_role: {
+          'openai:gpt-5.6-luna|planner': {
+            samples: 5,
+            success: 5,
+            review: 0,
+            blocked: 0,
+            success_rate: 1,
+            feedback_samples: 0,
+            average_rating: 0,
+            unexpected: true,
+          },
+        },
+      })
+    ).toThrow('contains unknown field(s)');
+    expect(() =>
+      mod.parseModelPerformanceIndex(
+        JSON.parse(
+          '{"by_model_role":{"__proto__":{"samples":0,"success":0,"review":0,"blocked":0,"success_rate":0,"feedback_samples":0,"average_rating":0}}}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
+  });
 });
