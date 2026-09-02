@@ -23,6 +23,7 @@ import {
 } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 interface ShellViolation {
   file: string;
@@ -31,7 +32,7 @@ interface ShellViolation {
 }
 
 const ROOT = pathResolver.rootDir();
-const BASELINE_PATH = pathResolver.rootResolve('scripts/pipeline-shell-independence.baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('pipeline-shell-independence');
 const PIPELINE_ROOTS = [
   path.join(ROOT, 'pipelines'),
   path.join(ROOT, 'pipelines', 'fragments'),

@@ -2,6 +2,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 type DiscoveryEntry = {
   n?: string;
@@ -16,12 +17,7 @@ type DiscoveryFile = {
   actuators?: DiscoveryEntry[];
 };
 
-type GateManifest = {
-  gates?: Array<{ id?: string; baseline?: string }>;
-};
-
 const DISCOVERY_PATH = pathResolver.knowledge('product/orchestration/actuator-op-discovery.json');
-const GATE_MANIFEST_PATH = pathResolver.knowledge('product/governance/ci-gates.json');
 
 type ContractCoverageBaseline = {
   version: 1;
@@ -29,13 +25,7 @@ type ContractCoverageBaseline = {
 };
 
 function resolveBaselinePath(): string {
-  const baseline = readJson<GateManifest>(GATE_MANIFEST_PATH).gates?.find(
-    (gate) => gate.id === 'op-input-contract-coverage'
-  )?.baseline;
-  if (!baseline) {
-    throw new Error('op-input-contract-coverage gate must declare a baseline path');
-  }
-  return pathResolver.rootResolve(baseline);
+  return resolveCiGateBaselinePath('op-input-contract-coverage');
 }
 
 function readDiscovery(): DiscoveryFile {

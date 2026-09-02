@@ -5,6 +5,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 type Layer = 'foundation' | 'contracts' | 'domain' | 'orchestration';
 type BoundaryConfig = {
@@ -29,7 +30,7 @@ type DynamicImportEdge = { source: string; target: string };
 
 const ROOT = pathResolver.rootDir();
 const CONFIG_PATH = pathResolver.knowledge('product/governance/module-layer-boundaries.json');
-const BASELINE_PATH = pathResolver.rootResolve('scripts/check_module_boundaries.baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('module-boundaries');
 const SOURCE_ROOTS = ['libs', 'presence', 'satellites', 'scripts'];
 
 function relative(filePath: string): string {

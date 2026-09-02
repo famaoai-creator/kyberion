@@ -63,6 +63,7 @@
       "scope": "pr",
       "executable": "node",
       "args": ["dist/scripts/check_type_ratchet.js"],
+      "baseline": "scripts/check_type_ratchet.baseline.json",
       "owner": "quality",
       "rationale": "Prevents type-safety debt from increasing."
     },
@@ -71,6 +72,7 @@
       "scope": "pr",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_module_boundaries.ts"],
+      "baseline": "scripts/check_module_boundaries.baseline.json",
       "owner": "architecture",
       "rationale": "Prevents import cycles and layer direction debt from increasing."
     },
@@ -431,6 +433,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/check_i18n_hardcoding.ts"],
+      "baseline": "knowledge/product/governance/i18n-baseline.json",
       "owner": "experience",
       "rationale": "Checks internationalization hardcoding ratchets."
     },
@@ -471,6 +474,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_contract_semver.js"],
+      "baseline": "scripts/contract-baseline.json",
       "owner": "quality",
       "rationale": "Checks actuator contract semver compatibility."
     },
@@ -479,6 +483,7 @@
       "scope": "full",
       "executable": "node",
       "args": ["dist/scripts/check_pipeline_shell_independence.js"],
+      "baseline": "scripts/pipeline-shell-independence.baseline.json",
       "owner": "operations",
       "rationale": "Checks portable pipeline shell usage."
     },

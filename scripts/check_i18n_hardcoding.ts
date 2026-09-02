@@ -25,11 +25,10 @@ import { readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 const ROOT = pathResolver.rootDir();
-const DEFAULT_BASELINE_PATH = pathResolver.rootResolve(
-  'knowledge/product/governance/i18n-baseline.json'
-);
+const DEFAULT_BASELINE_PATH = resolveCiGateBaselinePath('i18n');
 
 // The Hiragana block (U+3040-U+309F) and Katakana block (U+30A0-U+30FF) are
 // contiguous, so a single range covers "Hiragana or Katakana". Written as a
