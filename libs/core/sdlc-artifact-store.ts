@@ -13,6 +13,7 @@ import * as path from 'node:path';
 import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   DecomposedTaskPlan,
@@ -120,7 +121,7 @@ export function saveDesignSpec(params: SaveDesignSpecParams): DesignSpec {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
   writeArtifact(params.missionId, DESIGN_FILE, spec, DESIGN_SCHEMA_PATH);
@@ -150,7 +151,7 @@ export function saveTestPlan(params: SaveTestPlanParams): TestPlan {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
   writeArtifact(params.missionId, TEST_PLAN_FILE, plan);
@@ -180,7 +181,7 @@ export function saveTaskPlan(params: SaveTaskPlanParams): TaskPlan {
     version,
     project_name: params.projectName,
     ...(params.sourceRefs ? { source_refs: params.sourceRefs } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
   writeArtifact(params.missionId, TASK_PLAN_FILE, plan, TASK_PLAN_SCHEMA_PATH);
