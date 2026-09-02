@@ -12875,6 +12875,12 @@ SX-08 の surface routing 残件として、task-session route が明示的な S
 
 検証: `tests/channel-surface-agent.test.ts` **19 tests passed**、surface response／orchestrator fastpath／routing／production approval の **5 files / 70 tests passed**、root typecheck、対象3ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 436
+
+SX-01 の初回導線を「文書に書かれている」だけでなく再発防止可能な契約にした。`check:first-win-smoke` が `README.md`、`docs/QUICKSTART.md`、`docs/INITIALIZATION.md` の `# kyberion-first-win` bash block を機械抽出し、`install → build → env:bootstrap → doctor → verify-session` の5コマンド、順序、文書間一致、bash fence を検証するようにした。現行文書の first-win 内容は変更せず、drift は CI で fail する。既存の pipeline smoke／Day-2 導線／dist path は変更していない。
+
+検証: `scripts/check_first_win_smoke.test.ts` **6 tests passed**、実文書に対する `check:first-win-smoke` **OK**、root typecheck、対象2ファイルの ESLint。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
