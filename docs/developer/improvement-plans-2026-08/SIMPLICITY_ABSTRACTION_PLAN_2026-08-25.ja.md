@@ -11651,6 +11651,18 @@ generic envelope のままだった runtime 参照 catalog のうち、構造が
 `git diff --check`。残る SX-04 は generic envelope の dedicated schema 化、未参照 catalog の処分、各 domain loader
 の完全統合である。
 
+## 2026-09-02 再レビュー修正 278
+
+generic envelope のままだった `wisdom-reconcile-strategy`、`role-authority-map`、`role-write-access` に dedicated
+schema を追加し、pipeline step の許可語彙、role entry の必須項目、role ごとの write scope 配列を検証可能にした。
+既存の空 write scope（deny-by-default）と authority role の optional 性は保持し、3 catalog の宣言を更新して
+knowledge integrity manifest を再生成した。これにより governance catalog の実行時参照に対する generic envelope
+依存をさらに減らした。
+
+検証: catalogs／governance-rules **各 1 gate passed**、PR scope **33 gates / 0 failed**、関連 org／wisdom **3 test files / 6 tests passed**、
+root typecheck、root lint。残る SX-04 は generic envelope の dedicated schema 化、未参照 catalog の処分、各 domain
+loader の完全統合である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
