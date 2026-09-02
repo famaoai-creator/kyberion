@@ -7,7 +7,7 @@ import {
   safeMkdir,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import yargs from 'yargs';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -102,7 +102,7 @@ export async function main(args: string[] = []) {
       adapter_profile_path: path.relative(pathResolver.rootDir(), absTargetAdapterPath),
       status: payload.status || 'experimental',
       description: payload.description || payload.notes || '',
-      added_at: new Date().toISOString(),
+      added_at: nowIso(),
     };
 
     if (existingIndex >= 0) {

@@ -11,7 +11,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { appendJsonLine, readJsonIfPresent } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJsonIfPresent } from '@agent/core/foundation';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -191,7 +191,7 @@ function captureSample(cycle: number, samplePaths: string[], durationMs: number)
   const mem = process.memoryUsage();
   return {
     cycle,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     duration_ms: durationMs,
     rss_mb: Math.round((mem.rss / 1024 / 1024) * 100) / 100,
     heap_used_mb: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
@@ -313,7 +313,7 @@ function appendLatencyHistory(metricsDir: string, metricsFile: string, durationM
   appendJsonLine(safeMetricsPath, {
     skill: 'ao-04-soak-cycle',
     duration_ms: durationMs,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 }
 
@@ -573,7 +573,7 @@ export async function runSoakEnduranceHarness(
   const latencyRegressions = historyCollector.detectRegressions(1.2);
   const resourceRegressions = detectResourceRegressions(samples);
   const report: SoakReport = {
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     cycles,
     sample_paths: samplePaths,
     samples,

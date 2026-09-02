@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { safeExistsSync } from '@agent/core/secure-io';
 import { resolveOnboardingText } from '@agent/core/onboarding-flow-policy';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
@@ -135,7 +135,7 @@ export function isValidEvidenceRef(ref: string): boolean {
 }
 
 function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return nowIso().slice(0, 10);
 }
 
 function isValidIsoCalendarDate(value: string): boolean {

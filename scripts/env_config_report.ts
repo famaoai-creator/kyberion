@@ -11,6 +11,7 @@ import {
   loadEnvRegistryEntries,
   validateEnv,
 } from '@agent/core/env-validator';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export interface EnvConfigReport {
@@ -35,7 +36,7 @@ export function buildEnvConfigReport(): EnvConfigReport {
   const entries = loadEnvRegistryEntries();
   const validation = validateEnv();
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     registry: {
       registered: entries.length,
       documented: entries.filter((entry) => entry.documented === true).length,
