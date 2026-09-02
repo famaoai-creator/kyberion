@@ -36,6 +36,7 @@ import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -339,7 +340,7 @@ function saveOrganizationStateLink(
     ...(kind === 'operation'
       ? { active_operation_ids: addUnique(state.active_operation_ids, id) }
       : { open_incident_ids: addUnique(state.open_incident_ids, id) }),
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   return saveOrganizationOperationalState(next, { rootDir });
 }
@@ -451,7 +452,7 @@ function bindingFor(
     );
   }
   const tier = input.tier || 'confidential';
-  const now = new Date().toISOString();
+  const now = nowIso();
   const binding: OnboardingContextBinding = {
     version: '1.0.0',
     kind: 'onboarding_context_binding',
@@ -638,7 +639,7 @@ export function applyOnboardingContextBinding(
       : {
           ...resolved.binding,
           status: 'active',
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso(),
         };
     const organizationState = resolved.organization_state;
     const savedPaths: string[] = [];
@@ -785,7 +786,7 @@ export function applyOnboardingFirstWork(
         const nextBinding: OnboardingContextBinding = {
           ...resolved.binding,
           default_project_id: existing.project_id,
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso(),
         };
         const bindingPath = contextPath(nextBinding.customer_slug, rootDir);
         const previousBinding = safeReadFile(bindingPath, { encoding: 'utf8' }) as string;
@@ -794,7 +795,7 @@ export function applyOnboardingFirstWork(
         });
         let workItem: WorkItem | undefined;
         try {
-          const now = new Date().toISOString();
+          const now = nowIso();
           workItem = createOnboardingWorkItem({
             binding: nextBinding,
             intent: input.intent,
@@ -877,14 +878,14 @@ export function applyOnboardingFirstWork(
             const nextBinding: OnboardingContextBinding = {
               ...resolved.binding,
               default_project_id: bootstrapped.project.project_id,
-              updated_at: new Date().toISOString(),
+              updated_at: nowIso(),
             };
             safeMkdir(path.dirname(bindingPath), { recursive: true });
             safeWriteFile(bindingPath, `${JSON.stringify(nextBinding, null, 2)}\n`, {
               encoding: 'utf8',
             });
             savedPaths.push(bindingPath);
-            const now = new Date().toISOString();
+            const now = nowIso();
             workItem = createOnboardingWorkItem({
               binding: nextBinding,
               intent: input.intent,
@@ -990,7 +991,7 @@ export function applyOnboardingFirstWork(
       ),
       'organization-state.json'
     );
-    const now = new Date().toISOString();
+    const now = nowIso();
     let workItem: WorkItem | undefined;
     try {
       if (!contextUnitId && managementUnit === 'operation') {
