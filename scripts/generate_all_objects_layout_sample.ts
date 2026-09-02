@@ -8,6 +8,7 @@ import {
   footerElements,
 } from '@agent/core/layout-primitives';
 import type { PptxDesignProtocol, PptxElement, PptxSlide } from '@agent/core/types';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const TOTAL_PAGES = 16;
@@ -1416,7 +1417,7 @@ const slide16: PptxSlide = {
 // ═══════════════════════════════════════════════════════════
 const protocol: PptxDesignProtocol = {
   version: '3.0.0',
-  generatedAt: new Date().toISOString(),
+  generatedAt: nowIso(),
   canvas: { w: 10, h: 7.5 },
   // Same values the local txt()/shape()/line() helpers used to inject — now
   // supplied once by the engine cascade instead of per-element.

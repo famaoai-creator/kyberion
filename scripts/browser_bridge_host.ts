@@ -69,7 +69,7 @@ import type {
   BrowserExtensionSessionRequest,
 } from '@agent/core/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/procedure-types';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
@@ -853,12 +853,12 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
     };
   }
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   const reportRel = `knowledge/personal/browser-reports/${procedureId.replace(/[^A-Za-z0-9._-]/g, '_')}/${stamp}.md`;
   const report = [
     `# Observation report: ${procedureId}`,
     '',
-    `- generated_at: ${new Date().toISOString()}`,
+    `- generated_at: ${nowIso()}`,
     `- observations: ${observations.length} (latest: ${observations[observations.length - 1].captured_at})`,
     `- question: ${question}`,
     '',

@@ -15,7 +15,7 @@ import { createProcessLogger } from '@agent/core/process-logger';
 import { runJanitor } from '@agent/core/storage-janitor';
 import { sharedLogsAudit, sharedLogsProcess } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 function hr(label: string) {
@@ -114,7 +114,7 @@ async function simulatedConfluenceFetch(
   return {
     id: pageId,
     title: `Page ${pageId}`,
-    body: `Content fetched at ${new Date().toISOString()}`,
+    body: `Content fetched at ${nowIso()}`,
   };
 }
 

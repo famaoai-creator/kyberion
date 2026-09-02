@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
-import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import { defineGenerator, isDirectScript, type GeneratedFile } from './lib/harness.js';
 
 interface CapabilityManifest {
@@ -230,7 +230,7 @@ function buildCapabilitiesGuide(current: CurrentIndexRecord[]): string {
   lines.push('# Kyberion Capabilities Guide');
   lines.push('');
   lines.push(`Total Actuators: ${current.length}`);
-  lines.push(`Last updated: ${new Date().toISOString().slice(0, 10)}`);
+  lines.push(`Last updated: ${nowIso().slice(0, 10)}`);
   lines.push('');
   lines.push(
     'This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.'

@@ -5,7 +5,7 @@ import { beginInteractiveServiceOAuth } from '@agent/core/oauth-broker';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 let activeCleanup: (() => void) | undefined;
@@ -98,7 +98,7 @@ async function main(args: string[] = []): Promise<void> {
         authorizationUrl: result.authorizationUrl,
         state: result.state,
         scopes: result.scopes,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       },
       null,
       2
