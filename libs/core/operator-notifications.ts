@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
 import {
@@ -53,6 +53,89 @@ export interface OperatorNotificationPayload {
 
 const PREFERENCES_LOGICAL_PATH = 'personal/notification-preferences.json';
 
+const NOTIFICATION_SURFACES = new Set<NotificationChannelTarget['surface']>([
+  'slack',
+  'imessage',
+  'telegram',
+  'discord',
+]);
+const OPERATOR_EVENTS = new Set<OperatorEvent>([
+  'question',
+  'approval_required',
+  'mission_completed',
+  'mission_failed',
+  'deliverable_ready',
+  'ops_alert',
+]);
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(record).every((key) => allowed.includes(key));
+}
+
+function parseNotificationChannelTarget(value: unknown): NotificationChannelTarget | null {
+  let record: Record<string, unknown>;
+  try {
+    record = parseSafeJsonObjectValue(value, 'notification channel target');
+  } catch {
+    return null;
+  }
+  if (!hasOnlyKeys(record, ['surface', 'target'])) return null;
+  if (
+    typeof record.surface !== 'string' ||
+    !NOTIFICATION_SURFACES.has(record.surface as NotificationChannelTarget['surface']) ||
+    typeof record.target !== 'string' ||
+    !record.target.trim()
+  ) {
+    return null;
+  }
+  return {
+    surface: record.surface as NotificationChannelTarget['surface'],
+    target: record.target.trim(),
+  };
+}
+
+function parseNotificationPreferences(value: unknown): NotificationPreferences | null {
+  let record: Record<string, unknown>;
+  try {
+    record = parseSafeJsonObjectValue(value, 'notification preferences');
+  } catch {
+    return null;
+  }
+  if (!hasOnlyKeys(record, ['default_channel', 'per_event'])) return null;
+
+  const defaultChannel =
+    record.default_channel === undefined
+      ? undefined
+      : parseNotificationChannelTarget(record.default_channel);
+  if (record.default_channel !== undefined && !defaultChannel) return null;
+
+  let perEvent: Partial<Record<OperatorEvent, NotificationChannelTarget | 'mute'>> | undefined;
+  if (record.per_event !== undefined) {
+    let perEventRecord: Record<string, unknown>;
+    try {
+      perEventRecord = parseSafeJsonObjectValue(record.per_event, 'notification per_event');
+    } catch {
+      return null;
+    }
+    perEvent = {};
+    for (const [event, target] of Object.entries(perEventRecord)) {
+      if (!OPERATOR_EVENTS.has(event as OperatorEvent)) return null;
+      if (target === 'mute') {
+        perEvent[event as OperatorEvent] = 'mute';
+        continue;
+      }
+      const parsedTarget = parseNotificationChannelTarget(target);
+      if (!parsedTarget) return null;
+      perEvent[event as OperatorEvent] = parsedTarget;
+    }
+  }
+
+  return {
+    ...(defaultChannel ? { default_channel: defaultChannel } : {}),
+    ...(perEvent ? { per_event: perEvent } : {}),
+  };
+}
+
 export function notificationPreferencesPath(): string {
   return assertSafeRepositoryPath(pathResolver.knowledge(PREFERENCES_LOGICAL_PATH), {
     allowMissingLeaf: true,
@@ -63,7 +146,7 @@ export function loadNotificationPreferences(): NotificationPreferences {
   try {
     const filePath = notificationPreferencesPath();
     if (!safeExistsSync(filePath)) return {};
-    return readJson<NotificationPreferences>(filePath);
+    return parseNotificationPreferences(readJson<unknown>(filePath)) || {};
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[operator-notifications] failed to read preferences: ${detail}`);
@@ -72,9 +155,11 @@ export function loadNotificationPreferences(): NotificationPreferences {
 }
 
 export function saveNotificationPreferences(prefs: NotificationPreferences): string {
+  const parsed = parseNotificationPreferences(prefs);
+  if (!parsed) throw new Error('Invalid notification preferences');
   const filePath = notificationPreferencesPath();
   safeMkdir(path.dirname(filePath), { recursive: true });
-  safeWriteFile(filePath, `${JSON.stringify(prefs, null, 2)}\n`);
+  safeWriteFile(filePath, `${JSON.stringify(parsed, null, 2)}\n`);
   return filePath;
 }
 
