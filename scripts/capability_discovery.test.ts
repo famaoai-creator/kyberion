@@ -83,4 +83,47 @@ describe('capability_discovery', () => {
       safeRmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('uses governed manifests to discover platform and binary requirements', () => {
+    const root = pathResolver.sharedTmp('capability-discovery-manifest-tests');
+    const manifestPath = path.join(root, 'actuators', 'demo', 'manifest.json');
+    safeMkdir(path.dirname(manifestPath), { recursive: true });
+    safeWriteFile(
+      manifestPath,
+      JSON.stringify({
+        actuator_id: 'demo-actuator',
+        version: '1.0.0',
+        capabilities: [
+          {
+            op: 'render',
+            platforms: ['linux'],
+            requirements: { bin: ['ffmpeg', 'missing-tool'] },
+          },
+        ],
+      })
+    );
+
+    try {
+      const report = discoverCapabilities({
+        actuatorsDir: path.join(root, 'actuators'),
+        platform: 'linux',
+        binaryAvailable: (bin) => bin === 'ffmpeg',
+      });
+      expect(report.errors).toEqual([]);
+      expect(report.actuators[0]).toMatchObject({
+        actuatorId: 'demo-actuator',
+        description: 'No description available.',
+        capabilities: [
+          {
+            op: 'render',
+            platformMatch: true,
+            missingBins: ['missing-tool'],
+            available: false,
+          },
+        ],
+      });
+    } finally {
+      safeRmSync(root, { recursive: true, force: true });
+    }
+  });
 });

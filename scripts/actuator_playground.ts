@@ -6,26 +6,16 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import {
+  loadActuatorManifest,
+  type ActuatorManifestFile,
+} from '@agent/core/src/actuator-manifest-index';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './lib/json-input.js';
-
-interface ActuatorCapability {
-  op: string;
-  description?: string;
-  platforms?: string[];
-}
-
-interface ActuatorManifest {
-  actuator_id: string;
-  version: string;
-  description: string;
-  capabilities: ActuatorCapability[];
-}
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -76,7 +66,7 @@ async function runPlayground(args: string[]) {
   // 1. Scan available actuators
   const actuatorsDir = assertSafeRepositoryPath(pathResolver.rootResolve('libs/actuators'));
   const dirEntries = safeReaddir(actuatorsDir);
-  const actuators: { id: string; manifestPath: string; manifest: ActuatorManifest }[] = [];
+  const actuators: { id: string; manifestPath: string; manifest: ActuatorManifestFile }[] = [];
 
   for (const entry of dirEntries) {
     let manifestPath: string;
@@ -89,7 +79,7 @@ async function runPlayground(args: string[]) {
     }
     if (safeExistsSync(manifestPath) && safeLstat(manifestPath).isFile()) {
       try {
-        const manifest = readJson<ActuatorManifest>(manifestPath);
+        const manifest = loadActuatorManifest(manifestPath);
         if (manifest && manifest.actuator_id) {
           actuators.push({
             id: entry,

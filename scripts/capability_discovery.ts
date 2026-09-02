@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadActuatorManifest } from '@agent/core/src/actuator-manifest-index';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -9,7 +10,6 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
-import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
@@ -21,13 +21,6 @@ interface Capability {
     bin?: string[];
     lib?: string[];
   };
-}
-
-interface ActuatorManifest {
-  actuator_id: string;
-  version: string;
-  description: string;
-  capabilities: Capability[];
 }
 
 export interface CapabilityDiscoveryCapability {
@@ -111,14 +104,20 @@ export function discoverCapabilities(
     if (!safeExistsSync(manifestPath) || !safeLstat(manifestPath).isFile()) continue;
 
     try {
-      const manifest: ActuatorManifest = readJson<ActuatorManifest>(manifestPath);
+      const manifest = loadActuatorManifest(manifestPath);
       actuators.push({
         actuatorId: manifest.actuator_id,
         version: manifest.version,
-        description: manifest.description,
-        capabilities: manifest.capabilities.map((cap) =>
-          evaluateCapability(cap, currentPlatform, binaryAvailable)
-        ),
+        description: manifest.description || 'No description available.',
+        capabilities: (manifest.capabilities || []).flatMap((cap) => {
+          if (!cap.op || !cap.platforms) return [];
+          const capability: Capability = {
+            op: cap.op,
+            platforms: cap.platforms,
+            requirements: cap.requirements,
+          };
+          return [evaluateCapability(capability, currentPlatform, binaryAvailable)];
+        }),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

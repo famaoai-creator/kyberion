@@ -393,6 +393,7 @@ export type { ActuatorCapability, ActuatorStatus } from './src/actuator-capabili
 
 export {
   buildActuatorManifestIndexSnapshot,
+  loadActuatorManifest,
   loadActuatorManifestCatalog,
 } from './src/actuator-manifest-index.js';
 
