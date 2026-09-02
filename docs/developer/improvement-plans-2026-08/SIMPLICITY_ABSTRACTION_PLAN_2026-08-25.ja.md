@@ -13139,6 +13139,12 @@ SX-03／SX-08／SX-09 の `services-pids.json` reader を再監査し、task-ses
 
 検証: service PID parser／task-session **2 files / 26 tests passed**、5 package build、root typecheck、`git diff --check`、canonical full gate **69/69 passed**。service actuator既存テスト群には今回の変更箇所以外の secure foundation IO未登録／preset path mock不整合が残るため、個別実行では **9 failed / 21 passed** と切り分けて記録する。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 480
+
+SX-03／SX-06 の migration runner state readerを再監査し、`migrations.applied.json` を object／`applied` 配列と確認するだけで要素を文字列フィルタしていた残存を修正した。foundationのsafe JSON object parserでroot／unknown・dangerous JSON keyを検証し、空文字・重複を含む `applied` 配列を不正stateとして空stateへ fail-closed に分類するようにした。migration file discovery、順序実行、dry-run／rollback、state writeの既存semanticsは維持し、同一state fileへの重複regular-file検査も整理した。
+
+検証: migration runner **1 file / 5 tests passed**、repo build、root typecheck、Prettier、`git diff --check`。併せてrepo build後のgovernance checkerで判明した `surface-provider-manifest-catalog` のpackage export欠落を追加修正し、dist実行経路を復旧した。canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

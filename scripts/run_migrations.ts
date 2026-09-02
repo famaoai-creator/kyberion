@@ -15,7 +15,7 @@
 
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readJson } from '@agent/core/foundation';
+import { parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -88,18 +88,23 @@ function readState(statePath: string): MigrationState {
   if (!safeLstat(statePath).isFile()) {
     throw new Error(`Migration state must be a regular file: ${statePath}`);
   }
-  if (!safeLstat(statePath).isFile()) {
-    throw new Error(`Migration state must be a regular file: ${statePath}`);
-  }
   try {
-    const parsed = readJson<{ applied?: unknown }>(statePath);
-    if (Array.isArray(parsed.applied)) {
-      return { applied: parsed.applied.filter((value: unknown) => typeof value === 'string') };
+    const parsed = parseSafeJsonObjectValue(readJson<unknown>(statePath), 'migration state');
+    const keys = Object.keys(parsed);
+    if (keys.some((key) => key !== 'applied') || !Array.isArray(parsed.applied)) {
+      return { applied: [] };
     }
+    const applied = parsed.applied;
+    if (
+      applied.some((value) => typeof value !== 'string' || value.trim().length === 0) ||
+      new Set(applied).size !== applied.length
+    ) {
+      return { applied: [] };
+    }
+    return { applied: [...applied] };
   } catch (err: any) {
     throw new Error(`Failed to read migration state at ${statePath}: ${err?.message ?? err}`);
   }
-  return { applied: [] };
 }
 
 function writeState(statePath: string, state: MigrationState): void {
