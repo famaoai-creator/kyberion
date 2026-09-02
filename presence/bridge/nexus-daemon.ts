@@ -6,11 +6,10 @@
 
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeReadFile,
   safeWriteFile,
   safeMkdir,
@@ -42,7 +41,7 @@ function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`Nexus JSON resource must be an existing regular file: ${safePath}`);
   }
-  return loadJson(safePath);
+  return readJson(safePath);
 }
 
 function safeNexusPath(filePath: string, allowMissingLeaf = false): string {
