@@ -17,6 +17,10 @@ vi.mock('@agent/core/secure-io', () => ({
   withSensitivePathMediation: (fn: () => unknown) => fn(),
 }));
 
+vi.mock('@agent/core/mission-state', () => ({
+  loadState: () => null,
+}));
+
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (_role: string, fn: () => unknown) => fn(),
 }));

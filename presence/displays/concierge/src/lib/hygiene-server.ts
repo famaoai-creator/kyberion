@@ -1,11 +1,8 @@
-import * as path from 'node:path';
-import { readJson } from '@agent/core/foundation';
 import {
   collectMissionHygieneReport,
   type PlannedMissionFinding,
 } from '@agent/core/mission-hygiene';
-import { pathResolver } from '@agent/core/path-resolver';
-import * as secureIo from '@agent/core/secure-io';
+import { loadState } from '@agent/core/mission-state';
 import { withExecutionContext } from '@agent/core/authority';
 import type { ConciergeViewerContext } from './viewer-context';
 
@@ -30,31 +27,9 @@ export interface HygieneInquiry {
   waiting_since?: string;
 }
 
-interface MissionStateSnapshot {
-  status?: string;
-  history?: Array<{ ts?: string }>;
-  intent?: { goal_summary?: string; source_text?: string };
-}
-
-function readMissionStateSnapshot(missionId: string): MissionStateSnapshot | null {
-  const missionPath = pathResolver.findMissionPath(missionId);
-  if (!missionPath) return null;
-  const statePath = path.join(missionPath, 'mission-state.json');
+function readMissionStateSnapshot(missionId: string) {
   try {
-    return withExecutionContext('sovereign_concierge', () =>
-      secureIo.withSensitivePathMediation(() => {
-        const safeStatePath = secureIo.assertSafeRepositoryPath(statePath, {
-          allowMissingLeaf: true,
-        });
-        if (
-          !secureIo.safeExistsSync(safeStatePath) ||
-          !secureIo.safeLstat(safeStatePath).isFile()
-        ) {
-          return null;
-        }
-        return readJson<MissionStateSnapshot>(safeStatePath);
-      })
-    );
+    return withExecutionContext('sovereign_concierge', () => loadState(missionId));
   } catch {
     // A missing/corrupt state file degrades to id-only display; the hygiene
     // report itself already proved the mission exists.
