@@ -1,10 +1,11 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
+  safeLstat,
   safeWriteFile,
   safeReadFile,
   safeExistsSync,
@@ -33,6 +34,23 @@ export interface EvidenceEntry {
 
 interface EvidenceRegistry {
   chain: unknown[];
+}
+
+const EVIDENCE_CHAIN_REGISTRY_PATH = pathResolver.shared('registry/evidence_chain.json');
+const evidenceChainCatalog = defineCatalog<EvidenceRegistry | unknown[]>({
+  id: 'evidence-chain-registry',
+  path: EVIDENCE_CHAIN_REGISTRY_PATH,
+  schema: pathResolver.knowledge('product/schemas/evidence-chain-registry.schema.json'),
+});
+
+function evidenceChainCatalogAtPath(filePath: string) {
+  return filePath === EVIDENCE_CHAIN_REGISTRY_PATH
+    ? evidenceChainCatalog
+    : defineCatalog<EvidenceRegistry | unknown[]>({
+        id: 'evidence-chain-registry',
+        path: filePath,
+        schema: pathResolver.knowledge('product/schemas/evidence-chain-registry.schema.json'),
+      });
 }
 
 function recordField(value: unknown): Record<string, unknown> {
@@ -80,12 +98,24 @@ function normalizeRegistry(value: unknown): EvidenceRegistry {
   return { chain: registryEntries(value) };
 }
 
+/** Load the shared evidence registry through its envelope contract. */
+export function loadEvidenceChainRegistryAtPath(
+  filePath = EVIDENCE_CHAIN_REGISTRY_PATH
+): EvidenceRegistry {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeFilePath)) return { chain: [] };
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[EVIDENCE_CHAIN] registry must be a regular file: ${filePath}`);
+  }
+  return normalizeRegistry(evidenceChainCatalogAtPath(safeFilePath).load());
+}
+
 /**
  * Chain of Evidence: The Blockchain of Artifacts
  * [SECURE-IO COMPLIANT VERSION]
  */
 export const evidenceChain = {
-  registryPath: pathResolver.shared('registry/evidence_chain.json'),
+  registryPath: EVIDENCE_CHAIN_REGISTRY_PATH,
 
   register: (filePath: string, agentId: string, parentId: string | null = null, context = '') => {
     try {
@@ -150,7 +180,7 @@ export const evidenceChain = {
         allowMissingLeaf: true,
       });
       if (!safeExistsSync(safeRegistryPath)) return { chain: [] };
-      return normalizeRegistry(readJson<unknown>(safeRegistryPath));
+      return loadEvidenceChainRegistryAtPath(safeRegistryPath);
     } catch (_) {
       return { chain: [] };
     }
@@ -167,7 +197,7 @@ export function queryEvidence(query: EvidenceQuery = {}): EvidenceEntry[] {
       allowMissingLeaf: true,
     });
     if (!safeExistsSync(registryPath)) return [];
-    entries = normalizeRegistry(readJson<unknown>(registryPath))
+    entries = loadEvidenceChainRegistryAtPath(registryPath)
       .chain.map((entry) => normalizeEvidenceEntry(entry))
       .filter((entry): entry is EvidenceEntry => entry !== null);
   } catch {

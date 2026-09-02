@@ -1,7 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { evidenceChain, queryEvidence, summarizeEvidence } from './evidence-chain.js';
+import {
+  evidenceChain,
+  loadEvidenceChainRegistryAtPath,
+  queryEvidence,
+  summarizeEvidence,
+} from './evidence-chain.js';
 
 const REGISTRY_PATH = path.resolve(process.cwd(), 'active/shared/registry/evidence_chain.json');
 
@@ -104,6 +109,25 @@ describe('evidence-chain', () => {
 
   it('uses the same registry path for query as register', () => {
     expect(evidenceChain.registryPath).toBe(REGISTRY_PATH);
+  });
+
+  it('loads the registry envelope through its schema and preserves legacy entries', () => {
+    fs.writeFileSync(
+      REGISTRY_PATH,
+      JSON.stringify({
+        chain: [{ id: 'EVD-LEGACY', hash: 'hash', path: 'a', timestamp: 'now' }, null],
+      })
+    );
+
+    expect(loadEvidenceChainRegistryAtPath()).toEqual({
+      chain: [{ id: 'EVD-LEGACY', hash: 'hash', path: 'a', timestamp: 'now' }, null],
+    });
+  });
+
+  it('rejects a registry directory at the file boundary', () => {
+    expect(() => loadEvidenceChainRegistryAtPath(path.dirname(REGISTRY_PATH))).toThrow(
+      '[EVIDENCE_CHAIN]'
+    );
   });
 
   it('rejects evidence artifacts reached through a symbolic link', () => {
