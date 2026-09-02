@@ -12749,6 +12749,12 @@ SX-03 の残存監査として、mission hygiene のレポート生成・学習�
 
 検証: mission hygiene **1 file / 4 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象2ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 415
+
+SX-03 の残存監査として、realtime voice conversation のセッション生成・exchange記録・turn記録に残っていた単純な `new Date().toISOString()` **7 箇所**を foundation `nowIso()` へ統合した。session／transcript の timestamp semantics、音声プロファイル検証、低遅延の reasoning／STT 経路、`Date.now()` を使う識別子生成は変更していない。
+
+検証: realtime voice conversation **1 file / 5 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象2ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
