@@ -41,7 +41,7 @@ import {
   type ApprovalRequestRecord,
 } from '@agent/core/approval-store';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { loadMissionBriefAtPath } from './mission-alignment-gate/mission-brief.js';
 
 export const ALIGNMENT_BRIEF_RELATIVE_PATH = path.join('evidence', 'mission-brief.json');
 export const ALIGNMENT_APPROVAL_CHANNEL = 'brief';
@@ -78,9 +78,9 @@ function readBriefHash(briefPath: string): string | undefined {
   if (!safeExistsSync(briefPath)) return undefined;
   if (!safeLstat(briefPath).isFile()) return undefined;
   try {
-    const parsed = readJson<unknown>(briefPath);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
-    return computeApprovalPayloadHash(parsed as Record<string, unknown>);
+    return computeApprovalPayloadHash(
+      loadMissionBriefAtPath(briefPath) as unknown as Record<string, unknown>
+    );
   } catch {
     return undefined;
   }
