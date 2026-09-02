@@ -35,7 +35,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import {
   defineScript,
   isDirectScript,
@@ -187,7 +187,7 @@ function writeTier(tier: Tier): string {
   const updated = {
     ...existing,
     voice_tier: tier,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     notes:
       tier === 0
         ? 'Tier 0: browser Web Speech API + OS native TTS. Default, no external deps.'

@@ -27,6 +27,7 @@
 
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso } from '@agent/core/foundation';
 import {
   safeExistsSync,
   safeMkdir,
@@ -222,7 +223,7 @@ function main(): void {
     REPORT_PATH,
     JSON.stringify(
       {
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
         total_candidates: candidates.length,
         files_with_candidates: byFile.size,
         candidates,

@@ -20,9 +20,8 @@ import {
   safeUnlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { applyOnboardingContextBinding } from '@agent/core/onboarding-context';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -195,7 +194,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
     };
     writeJson(profilePath, profile, rootDir);
 
-    const now = new Date().toISOString();
+    const now = nowIso();
     const readiness = {
       version: '1.0.0',
       status: 'ready_for_first_work',

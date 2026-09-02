@@ -27,7 +27,7 @@ import { sendOpsAlert, type OpsAlertInput } from '@agent/core/ops-alert';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { auditChain } from '@agent/core/audit-chain';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const TENANT_DRIFT_USAGE = 'Usage: pnpm watch:tenant-drift [--json] [--quiet] [--alert]';
@@ -139,7 +139,7 @@ function scan(): DriftReport {
     }
   }
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     scanned_paths: scanned,
     findings,
   };

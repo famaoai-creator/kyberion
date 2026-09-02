@@ -9,7 +9,13 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import { isRecord, parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
+import {
+  isRecord,
+  nowIso,
+  parseSafeJsonInput,
+  readJson,
+  readTextFile,
+} from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -143,7 +149,7 @@ export async function resolveStimulus(timestamp: string, responseText: string = 
         if (!s) return line;
         if (s.timestamp === timestamp) {
           s.status = 'PROCESSED';
-          s.resolved_at = new Date().toISOString();
+          s.resolved_at = nowIso();
           s.agent_response = responseText;
           stimulusToReply = s;
         }
