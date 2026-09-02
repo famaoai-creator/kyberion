@@ -348,7 +348,13 @@ describe('mission-gate-engine', () => {
       version: '1.0.0',
       project_id: 'project-1',
       accountable_human_id: 'human:owner',
-      dor: [],
+      dor: [
+        {
+          check_id: 'DOR-1',
+          description: 'Scope is agreed',
+          status: 'passed',
+        },
+      ],
       acceptance_criteria: [
         {
           criterion_id: 'AC-1',
@@ -359,7 +365,13 @@ describe('mission-gate-engine', () => {
           evidence_refs: [],
         },
       ],
-      dod: [],
+      dod: [
+        {
+          check_id: 'DOD-1',
+          description: 'Regression evidence is attached',
+          status: 'passed',
+        },
+      ],
     };
     const gate = await evaluateMissionGate({
       missionId,
@@ -381,6 +393,50 @@ describe('mission-gate-engine', () => {
     expect(gate.verdict).toBe('fail');
     expect(gate.reasons.join(' ')).toContain('without evidence');
     expect(gate.reasons.join(' ')).toContain('not covered');
+  });
+
+  it('fails closed when quality gate payloads contain unknown fields', async () => {
+    const contract = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      accountable_human_id: 'human:owner',
+      dor: [
+        { check_id: 'DOR-1', description: 'Ready', status: 'passed', evidence_refs: ['e:dor'] },
+      ],
+      acceptance_criteria: [
+        {
+          criterion_id: 'AC-1',
+          description: 'Returns 200',
+          requirement_refs: ['REQ-1'],
+          expected_result: '200',
+          status: 'passed',
+          evidence_refs: ['e:ac'],
+        },
+      ],
+      dod: [{ check_id: 'DOD-1', description: 'Done', status: 'passed', evidence_refs: ['e:dod'] }],
+      unexpected: true,
+    };
+    const inventory = {
+      version: '1.0.0',
+      project_id: 'project-1',
+      items: [],
+      unexpected: true,
+    };
+    const gate = await evaluateMissionGate({
+      missionId,
+      gate: {
+        id: 'malformed-software-quality-gate',
+        checks: [
+          { kind: 'quality_contract_valid', params: { contract } },
+          { kind: 'test_traceability', params: { contract, inventory } },
+        ],
+      },
+    });
+
+    expect(gate.verdict).toBe('fail');
+    expect(
+      gate.reasons.filter((reason) => reason.includes('No software quality contract'))
+    ).toHaveLength(2);
   });
 
   it('enforces a no-go quality report only in enforce mode', async () => {

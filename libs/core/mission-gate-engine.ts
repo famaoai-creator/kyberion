@@ -28,8 +28,9 @@ import {
   evaluateDefinitionOfReady,
   evaluateQualityContract,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestInventory,
   type SoftwareQualityContract,
-  type TestInventory,
   type SoftwareQualityReportSummary,
 } from './software-quality.js';
 import {
@@ -219,7 +220,7 @@ async function evaluateGateCheck(
 }> {
   const qualityContractFrom = (params: Record<string, unknown>): SoftwareQualityContract | null => {
     const value = params.contract ?? params.quality_contract;
-    return value && typeof value === 'object' ? (value as SoftwareQualityContract) : null;
+    return parseSoftwareQualityContract(value);
   };
   switch (check.kind) {
     case 'evidence_exists': {
@@ -481,10 +482,7 @@ async function evaluateGateCheck(
       const params = check.params || {};
       const contract = qualityContractFrom(params);
       const inventoryValue = params.inventory ?? params.test_inventory;
-      const inventory =
-        inventoryValue && typeof inventoryValue === 'object'
-          ? (inventoryValue as TestInventory)
-          : null;
+      const inventory = parseTestInventory(inventoryValue);
       if (!contract) return { passed: false, reason: 'No software quality contract was provided.' };
       if (!inventory) return { passed: false, reason: 'No test inventory was provided.' };
       const result = evaluateTestTraceability({
