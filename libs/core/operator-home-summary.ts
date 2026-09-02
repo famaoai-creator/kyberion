@@ -11,6 +11,7 @@ import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
+import { nowIso } from './foundation/time.js';
 
 export interface OperatorHomeMissionItem {
   missionId: string;
@@ -602,7 +603,7 @@ export function collectOperatorHomeSummary(
               });
 
   return {
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     status,
     statusLabel,
     statusDetail,

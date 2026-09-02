@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { deriveSurfaceSessionId } from './orchestrator-session.js';
 import { missionSteeringRouteHandler } from './surface-mission-steering.js';
 
@@ -734,7 +735,7 @@ async function processDelegations(
           receiver: msg.header?.receiver,
           performative: msg.header?.performative || 'request',
           conversation_id: msg.header?.conversation_id,
-          timestamp: new Date().toISOString(),
+          timestamp: nowIso(),
         },
         payload: normalizeDelegationPayload(msg.payload, fallbackText),
       };
