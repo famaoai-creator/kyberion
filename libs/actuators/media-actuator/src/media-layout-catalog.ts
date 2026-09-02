@@ -1,11 +1,13 @@
 import {
-  loadJsonCatalog,
+  deepMergeCatalog,
+  readJsonFilesRecursively,
   loadMediaDesignSystemsCatalog,
   loadJsonValue,
   loadTenantEntries,
   resolveConfidentialTenantOverride,
 } from './media-catalog-loaders.js';
 import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
+import { defineCatalog } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import {
@@ -62,11 +64,30 @@ function resolveSlideTemplate(template: any, slideData: any, fallback = ''): str
 }
 
 function loadSlideLayoutPresetCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets',
-    filePath: 'knowledge/public/design-patterns/media-templates/slide-layout-presets.json',
-    fallback: { defaults: {}, presets: {} },
+  const fallback = { version: '1.0.0', defaults: {}, presets: {} };
+  const catalog = defineCatalog<{
+    version: string;
+    defaults: Record<string, unknown>;
+    presets: Record<string, unknown>;
+    [key: string]: unknown;
+  }>({
+    id: 'slide-layout-presets',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/slide-layout-presets.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/slide-layout-presets.schema.json'),
+    fallback,
+    fallbackOnInvalid: true,
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/slide-layout-presets'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  return catalog.validate(merged, directoryPath);
 }
 
 function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {

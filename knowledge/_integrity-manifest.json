@@ -8905,6 +8905,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/slide-layout-presets.schema.json",
+      "tier": "public",
+      "size": 842,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/slide-pattern-pack.example.json",
       "tier": "public",
       "size": 1500,
