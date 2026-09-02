@@ -43,6 +43,13 @@ describe('promoteServiceProcedure', () => {
       if (filePath.includes('service-promotion-test.json')) return recording;
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
     });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('service-promotion-test.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
+    });
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
 
@@ -83,6 +90,13 @@ describe('promoteServiceProcedure', () => {
         return { ...recording, review: { ...recording.review, status: 'pending' } };
       }
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('service-promotion-test.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
     });
 
     expect(() =>

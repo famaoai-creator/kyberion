@@ -8,10 +8,9 @@ import {
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
 import { validatePipelineAdf, type PipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
-import { validateServiceRecording } from './service-recording.js';
+import { loadServiceRecordingAtPath } from './service-recording.js';
 import type { ProcedureCatalog, ProcedureEntry } from './procedure-types.js';
 
 const PROCEDURE_ID_RE = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/i;
@@ -51,16 +50,12 @@ export function promoteServiceProcedure(
 
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  const raw = readJson<unknown>(recordingAbs);
-  const validation = validateServiceRecording(raw);
-  if (!validation.value) {
-    throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);
-  }
-  if (validation.value.review?.status !== 'approved') {
+  const recording = loadServiceRecordingAtPath(recordingAbs);
+  if (recording.review?.status !== 'approved') {
     throw new Error('recording review must be approved before promotion');
   }
 
-  const compiled = compileServiceRecording(validation.value, {
+  const compiled = compileServiceRecording(recording, {
     procedureId,
     intentPhrases,
     recordingRef: pathResolver.toRepoRelative(recordingAbs),
