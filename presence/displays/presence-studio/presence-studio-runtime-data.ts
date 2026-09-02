@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
 import {
@@ -510,7 +510,7 @@ export function readEmailTriageArtifact(): EmailTriageArtifact {
   return {
     exists: true,
     path,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     content,
   };
 }
@@ -518,7 +518,7 @@ export function readEmailTriageArtifact(): EmailTriageArtifact {
 export function rememberStimulus(stimulus: Record<string, unknown>): void {
   state.recentStimuli.push(stimulus);
   state.recentStimuli = state.recentStimuli.slice(-20);
-  state.lastUpdatedAt = new Date().toISOString();
+  state.lastUpdatedAt = nowIso();
 }
 
 export const A2UI_SURFACE_ID = /^[a-z0-9][a-z0-9:_-]{0,80}$/u;
@@ -621,7 +621,7 @@ export function applyA2UIMessage(message: A2UIMessage): void {
     delete state.surfaces[message.deleteSurface.surfaceId];
   }
 
-  state.lastUpdatedAt = new Date().toISOString();
+  state.lastUpdatedAt = nowIso();
 }
 
 export function getSurfaceData(surfaceId: string): Record<string, unknown> {
@@ -726,7 +726,7 @@ export function applyTimelineEvent(
     default:
       logger.warn(`[presence-studio] unsupported timeline op ${event.op}`);
   }
-  state.lastUpdatedAt = new Date().toISOString();
+  state.lastUpdatedAt = nowIso();
   emitState();
 }
 
@@ -1097,7 +1097,7 @@ app.post('/api/minutes/session/start', async (req, res) => {
             consent: 'granted',
             mission_id: missionId,
             operator_handle: 'presence-studio-user',
-            granted_at: new Date().toISOString(),
+            granted_at: nowIso(),
           },
           null,
           2

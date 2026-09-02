@@ -6,6 +6,7 @@ import {
   type HeadlessOperationDescriptor,
   type HeadlessResourceDescriptor,
 } from '@agent/core/headless-surface-contract';
+import { nowIso } from '@agent/core/foundation';
 import { listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
 import { listProjectRecords } from '@agent/core/project-registry';
@@ -122,7 +123,7 @@ export function readPresenceHeadlessOverview(
 ) {
   const scoped = scopedViewer(viewer, requestedTenant);
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     projects: listProjectRecords().filter((item) => presenceStudioRecordInScope(scoped, item)),
     approvals: listApprovalRequests({ status: 'pending' }).filter((item) =>
       presenceStudioRecordInScope(scoped, item)
