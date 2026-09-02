@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
+import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import type { PdfDesignProtocol, PdfLayoutElement, PdfPage, PdfImageElement } from '../types/pdf-protocol.js';
@@ -1410,7 +1411,7 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
 
   return {
     version: '4.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     source: { format: 'markdown' as any, body: fullText, title: metadata.title },
     content: { text: fullText, pages },
     metadata: { ...metadata, pageCount: pages.length },
