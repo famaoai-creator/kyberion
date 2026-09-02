@@ -13175,6 +13175,12 @@ SX-03／SX-04／SX-10 のactuator manifest readerを再監査し、capability di
 
 検証: actuator manifest／capability discovery **3 files / 23 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 486
+
+SX-03／SX-04／SX-08 のtenant consistency index readerを再監査し、confidential tenant indexをチェッカーだけが汎用`readJson<T>`で読む二重経路を修正した。tenant-design resolverの正本loaderへ`fallbackOnInvalid`選択を追加し、通常のdesign解決は従来どおり空fallbackを許容しつつ、整合性チェッカーはpresentなschema違反を空集合として隠さずstrict fail-closedとした。tenant slugの収集、customer facet／project registry突合、exception semanticsは変更していない。
+
+検証: tenant index／resolver **2 files / 28 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

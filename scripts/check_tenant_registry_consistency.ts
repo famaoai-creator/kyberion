@@ -31,6 +31,7 @@
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { listTenantProfileSlugs, resolveTenant } from '@agent/core/tenant-registry';
+import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
 import { isValidTenantSlug, TENANT_SLUG_PATTERN } from '@agent/core/foundation/scope';
 import { listProjectRecords } from '@agent/core/project-registry';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -108,12 +109,9 @@ export function collectTenantSystems(options: CheckOptions = {}): TenantSystemsS
     allowMissingLeaf: true,
     rootDir,
   });
-  const indexPayload = readJsonIfExists<{ tenants?: Array<{ id?: string }> }>(indexPath, rootDir);
-  if (indexPayload) {
-    confidentialIndex = (indexPayload.tenants || [])
-      .map((entry) => String(entry.id || ''))
-      .filter((id) => id.length > 0)
-      .sort();
+  if (safeExistsSync(indexPath)) {
+    const indexPayload = loadTenantDesignOverrideIndex(rootDir, { fallbackOnInvalid: false });
+    confidentialIndex = indexPayload.tenants.map((entry) => entry.id).sort();
   } else {
     notes.push(`(b) ${CONFIDENTIAL_INDEX_RELATIVE_PATH} not present — treated as empty set`);
   }
