@@ -6,6 +6,7 @@ import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { processUntrustedContent } from './untrusted-content.js';
 import {
   assertSafeRepositoryPath,
@@ -665,7 +666,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
             typeof parsed.updated_at === 'string'
               ? parsed.updated_at
               : jsonStat?.mtime instanceof Date
-                ? jsonStat.mtime.toISOString()
+                ? nowIso(jsonStat.mtime)
                 : null,
           to: typeof parsed.to === 'string' ? parsed.to : '',
           subject: typeof parsed.subject === 'string' ? parsed.subject : '',
@@ -687,7 +688,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
       exists: true,
       path: markdown,
       json_path: json,
-      updated_at: markdownStat?.mtime instanceof Date ? markdownStat.mtime.toISOString() : null,
+      updated_at: markdownStat?.mtime instanceof Date ? nowIso(markdownStat.mtime) : null,
       to: '',
       subject: '',
       tone: 'clear and concise',
@@ -711,7 +712,7 @@ export function readEmailDraftArtifact(): EmailDraftArtifact {
 }
 
 export function readGwsAuthStatus(): GwsAuthStatus {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   try {
     const raw = safeExec('gws', ['auth', 'status'], { timeoutMs: 5_000, maxOutputMB: 1 }).trim();
     const parsed = raw ? parseSafeJsonObjectInput(raw, 'gws auth status') : {};
@@ -752,7 +753,7 @@ export function readGwsAuthStatus(): GwsAuthStatus {
 }
 
 function writeDraftModeFallbackArtifact(request: EmailDeliveryRequest) {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
   const draftDir = resolveEmailDraftDir();
   safeMkdir(draftDir, { recursive: true });
   const fallbackId = `gws-fallback-${randomUUID()}`;
@@ -935,6 +936,7 @@ export async function generateEmailReplyDraft(
     path.join(artifactDir, `email-draft-${requestId}.json`),
     { allowMissingLeaf: true }
   );
+  const updatedAt = nowIso();
   safeWriteFile(draftPath, draft_markdown, { encoding: 'utf8' });
   safeWriteFile(
     jsonPath,
@@ -949,7 +951,7 @@ export async function generateEmailReplyDraft(
         draft_markdown,
         triage_path: triagePath,
         draft_path: draftPath,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
       },
       null,
       2
@@ -966,7 +968,7 @@ export async function generateEmailReplyDraft(
         exists: true,
         path: draftPath,
         json_path: jsonPath,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
         to: generatedTo,
         subject: generatedSubject,
         tone,
