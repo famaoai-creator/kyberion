@@ -94,6 +94,24 @@ describe('data-vault', () => {
       expect(result.data).toEqual({ content: 'original' });
     });
 
+    it('fails closed when a persisted entry is tampered with', async () => {
+      await fetchWithVaultCache('notion', 'doc:tampered', vi.fn().mockResolvedValue({ value: 1 }), {
+        projectId: 'proj-tampered',
+        ttlMs: 60_000,
+      });
+      const fileName = fs.readdirSync(path.join(sharedBase, 'data-vault'))[0];
+      const filePath = path.join(sharedBase, 'data-vault', fileName);
+      const persisted = JSON.parse(fs.readFileSync(filePath, { encoding: 'utf8' })) as Record<
+        string,
+        unknown
+      >;
+      persisted.data = { value: 'tampered' };
+      fs.writeFileSync(filePath, JSON.stringify(persisted));
+
+      expect(getVaultEntry('notion', 'doc:tampered', 'proj-tampered')).toBeNull();
+      expect(listVaultEntries({ projectId: 'proj-tampered' })).toEqual([]);
+    });
+
     it('re-fetches after TTL expiry', async () => {
       const fetchFn = vi.fn().mockResolvedValue({ v: 1 });
 

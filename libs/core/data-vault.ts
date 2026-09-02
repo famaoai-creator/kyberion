@@ -2,6 +2,7 @@ import * as crypto from 'node:crypto';
 import * as nodePath from 'node:path';
 import { shared } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   safeWriteFile,
   safeExistsSync,
@@ -66,6 +67,76 @@ function entryFilePath(sourceType: string, key: string, projectId: string): stri
   return nodePath.join(vaultDir(), entryFileName(sourceType, key, projectId));
 }
 
+const VAULT_ENTRY_FIELDS = [
+  'sourceType',
+  'key',
+  'projectId',
+  'tier',
+  'data',
+  'contentHash',
+  'createdAt',
+  'expiresAt',
+] as const;
+
+function requiredEntryString(
+  record: Record<string, unknown>,
+  field: string,
+  label: string
+): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseVaultEntry(value: unknown, filePath: string): VaultEntry {
+  const label = `data-vault entry ${filePath}`;
+  const record = parseSafeJsonObjectValue(value, label);
+  const allowed = new Set<string>(VAULT_ENTRY_FIELDS);
+  if (Object.keys(record).some((key) => !allowed.has(key))) {
+    throw new Error(`${label} contains unknown fields`);
+  }
+  if (!Object.hasOwn(record, 'data')) throw new Error(`${label}.data is required`);
+
+  const sourceType = requiredEntryString(record, 'sourceType', label);
+  const key = requiredEntryString(record, 'key', label);
+  const projectId = requiredEntryString(record, 'projectId', label);
+  const tier = record.tier;
+  if (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') {
+    throw new Error(`${label}.tier is invalid`);
+  }
+  const contentHash = requiredEntryString(record, 'contentHash', label);
+  if (!/^sha256:[0-9a-f]{64}$/.test(contentHash)) {
+    throw new Error(`${label}.contentHash is invalid`);
+  }
+  const createdAt = requiredEntryString(record, 'createdAt', label);
+  if (!Number.isFinite(Date.parse(createdAt))) {
+    throw new Error(`${label}.createdAt must be a valid timestamp`);
+  }
+  const expiresAt =
+    record.expiresAt === undefined ? undefined : requiredEntryString(record, 'expiresAt', label);
+  if (expiresAt !== undefined && !Number.isFinite(Date.parse(expiresAt))) {
+    throw new Error(`${label}.expiresAt must be a valid timestamp`);
+  }
+  if (sha256Hex(record.data) !== contentHash) {
+    throw new Error(`${label}.contentHash does not match data`);
+  }
+  if (entryFileName(sourceType, key, projectId) !== nodePath.basename(filePath)) {
+    throw new Error(`${label} does not match its filename binding`);
+  }
+  return {
+    sourceType,
+    key,
+    projectId,
+    tier,
+    data: record.data,
+    contentHash,
+    createdAt,
+    ...(expiresAt ? { expiresAt } : {}),
+  };
+}
+
 function sha256Hex(data: unknown): string {
   return 'sha256:' + crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
 }
@@ -78,7 +149,7 @@ function isExpired(entry: VaultEntry): boolean {
 function readEntryFile<T>(filePath: string): VaultEntry<T> | null {
   if (!safeExistsSync(filePath)) return null;
   try {
-    return readJson<VaultEntry<T>>(filePath);
+    return parseVaultEntry(readJson<unknown>(filePath), filePath) as VaultEntry<T>;
   } catch {
     return null;
   }
@@ -97,6 +168,20 @@ export async function fetchWithVaultCache<T>(
   options: FetchWithVaultCacheOptions = {}
 ): Promise<FetchWithVaultCacheResult<T>> {
   const projectId = options.projectId ?? '_global';
+  if (
+    typeof sourceType !== 'string' ||
+    typeof key !== 'string' ||
+    typeof projectId !== 'string' ||
+    !sourceType.trim() ||
+    !key.trim() ||
+    !projectId.trim()
+  ) {
+    throw new Error('data-vault sourceType, key, and projectId must be non-empty strings');
+  }
+  const tier = options.tier ?? 'confidential';
+  if (tier !== 'personal' && tier !== 'confidential' && tier !== 'public') {
+    throw new Error(`data-vault tier is invalid: ${String(tier)}`);
+  }
   const filePath = entryFilePath(sourceType, key, projectId);
 
   const cached = readEntryFile<T>(filePath);
@@ -111,11 +196,11 @@ export async function fetchWithVaultCache<T>(
     sourceType,
     key,
     projectId,
-    tier: options.tier ?? 'confidential',
+    tier,
     data,
     contentHash: sha256Hex(data),
     createdAt: nowIso(),
-    ...(ttlMs > 0 ? { expiresAt: new Date(Date.now() + ttlMs).toISOString() } : {}),
+    ...(ttlMs > 0 ? { expiresAt: nowIso(new Date(Date.now() + ttlMs)) } : {}),
   };
 
   writeEntryFile(filePath, entry);
