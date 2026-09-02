@@ -13,8 +13,9 @@ describe('modeling preset resource boundary', () => {
       )
     );
 
-    expect(source).toContain('safePresetPath = assertSafeRepositoryPath(');
-    expect(source).toContain('readJson<{');
-    expect(source).toContain('}>(safePresetPath)');
+    expect(source).toContain('defineCatalog<BrowserExecutionPresetCatalog>({');
+    expect(source).toContain("id: 'browser-execution-presets'");
+    expect(source).toContain('schema: BROWSER_EXECUTION_PRESETS_SCHEMA_PATH');
+    expect(source).toContain('browserExecutionPresetCatalog.load()');
   });
 });
