@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
     by_model: [],
     by_day: [],
   })),
+  getAllFiles: vi.fn(() => [] as string[]),
+  loadStateAtPath: vi.fn(),
 }));
 
 vi.mock('@agent/core/foundation', async (importOriginal) => ({
@@ -64,8 +66,13 @@ vi.mock('@agent/core/cost-report', async (importOriginal) => ({
   buildCostReportFromHistory: mocks.buildCostReportFromHistory,
 }));
 
+vi.mock('@agent/core/mission-state', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/mission-state')>()),
+  loadStateAtPath: mocks.loadStateAtPath,
+}));
+
 vi.mock('@agent/core/fs-utils', () => ({
-  getAllFiles: vi.fn(() => []),
+  getAllFiles: mocks.getAllFiles,
 }));
 
 describe('orchestrator-actuator', () => {
@@ -85,6 +92,38 @@ describe('orchestrator-actuator', () => {
     expect(() => parseJsonCommandOutput('{"constructor":{"polluted":true}}')).toThrow(
       'command output contains a dangerous JSON key'
     );
+  });
+
+  it('projects only canonical mission states into the status snapshot', async () => {
+    const validPath = `${ROOT}/active/missions/public/MSN-ORCH-VALID/mission-state.json`;
+    const invalidPath = `${ROOT}/active/missions/public/MSN-ORCH-INVALID/mission-state.json`;
+    mocks.getAllFiles.mockReturnValue([validPath, invalidPath]);
+    mocks.loadStateAtPath.mockImplementation((filePath: string) =>
+      filePath === validPath
+        ? {
+            mission_id: 'MSN-ORCH-VALID',
+            tier: 'public',
+            status: 'active',
+            relationships: {
+              project: { project_id: 'project-1', relationship_type: 'belongs_to' },
+            },
+            assigned_persona: 'operator',
+          }
+        : null
+    );
+
+    const { collectMissionStatusSnapshot } =
+      await import('./orchestrator-execution-brief-helpers.js');
+    const snapshot = collectMissionStatusSnapshot();
+
+    expect(snapshot.metrics).toMatchObject({ total: 1, active: 1, completed: 0 });
+    expect(snapshot.missions).toEqual([
+      expect.objectContaining({
+        mission_id: 'MSN-ORCH-VALID',
+        project_id: 'project-1',
+        tier: 'public',
+      }),
+    ]);
   });
 
   it('renders a music pipeline bundle into an execution plan set', async () => {
