@@ -45,6 +45,7 @@ import {
   organizationIdFromContext,
   resolveScopeBudget,
 } from './mission-context-pack-knowledge.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type {
   BuildMissionContextPackInput,
   MissionContextPack,
@@ -524,13 +525,7 @@ function missionStatePath(missionId: string, tier: MissionTier): string {
 
 function loadMissionState(missionId: string, tier: MissionTier): MissionStateSummary | null {
   const filePath = missionStatePath(missionId, tier);
-  if (!safeExistsSync(filePath)) return null;
-  try {
-    const parsed = readJson<MissionStateSummary>(filePath);
-    return ensureMissionStateValidator()(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return loadMissionStateAtPath(filePath) as MissionStateSummary | null;
 }
 
 function missionContextSummary(input: {
