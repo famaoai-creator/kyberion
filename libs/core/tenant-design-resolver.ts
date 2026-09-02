@@ -34,6 +34,11 @@ export interface TenantDesignOverrideIndex {
   tenants: TenantDesignOverrideIndexEntry[];
 }
 
+export interface TenantDesignOverrideIndexLoadOptions {
+  /** When false, a present but invalid index throws instead of becoming empty. */
+  fallbackOnInvalid?: boolean;
+}
+
 export { loadTenantDesignOverride, type TenantDesignOverride } from './tenant-design-override.js';
 export {
   loadTenantDesignThemeOverlay,
@@ -41,7 +46,8 @@ export {
 } from './tenant-design-override.js';
 
 export function loadTenantDesignOverrideIndex(
-  rootDir = pathResolver.rootDir()
+  rootDir = pathResolver.rootDir(),
+  options: TenantDesignOverrideIndexLoadOptions = {}
 ): TenantDesignOverrideIndex {
   const catalog = defineCatalog<TenantDesignOverrideIndex>({
     id: 'tenant-design-override-index',
@@ -50,7 +56,7 @@ export function loadTenantDesignOverrideIndex(
       'knowledge/product/schemas/tenant-design-override-index.schema.json'
     ),
     fallback: { tenants: [] },
-    fallbackOnInvalid: true,
+    fallbackOnInvalid: options.fallbackOnInvalid ?? true,
   });
   return catalog.load();
 }

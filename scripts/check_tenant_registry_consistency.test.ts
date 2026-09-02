@@ -148,6 +148,28 @@ describe('check_tenant_registry_consistency (DA-01)', () => {
     expect(output).toContain("'ghost-co' is known to confidential index but has no tenant profile");
   });
 
+  it('fails closed when the confidential index violates its governed schema', () => {
+    seedProfile('acme-corp');
+    const indexPath = path.join(fixtureRoot, 'knowledge', 'confidential', 'tenants', 'index.json');
+    fs.mkdirSync(path.dirname(indexPath), { recursive: true });
+    fs.writeFileSync(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'acme-corp',
+            override_path: 'knowledge/confidential/acme-corp/design/tenant-override.json',
+            unexpected: true,
+          },
+        ],
+      })
+    );
+
+    expect(() => collectTenantSystems(options())).toThrow(
+      'Invalid catalog tenant-design-override-index'
+    );
+  });
+
   it('flags an invalid slug (e.g. _template) without an exception as drift', () => {
     seedCustomerTenantProfile('acme-corp', '_template');
     const { exitCode, output } = runCheck(options());
