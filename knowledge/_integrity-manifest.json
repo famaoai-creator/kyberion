@@ -6829,6 +6829,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cowork-sync-state.schema.json",
+      "tier": "public",
+      "size": 618,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cross-device-handoff.schema.json",
       "tier": "public",
       "size": 5466,
