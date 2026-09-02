@@ -255,7 +255,7 @@ describe.sequential('Channel surface agents', () => {
       [
         'Hello',
         '```a2ui',
-        '{"createSurface":{"surfaceId":"s1","title":"Test"}}',
+        '{"createSurface":{"surfaceId":"s1","catalogId":"test","title":"Test"}}',
         '```',
         '```a2a',
         '{"header":{"receiver":"nerve-agent","performative":"request"},"payload":{"text":"help"}}',
