@@ -1365,7 +1365,7 @@
     {
       "path": "product/governance/ecosystem-blueprint.json",
       "tier": "public",
-      "size": 1090,
+      "size": 1091,
       "type": "json"
     },
     {
@@ -1575,7 +1575,7 @@
     {
       "path": "product/governance/intent-coverage-matrix.json",
       "tier": "public",
-      "size": 31851,
+      "size": 31855,
       "type": "json"
     },
     {
@@ -1623,7 +1623,7 @@
     {
       "path": "product/governance/judgment-rules.json",
       "tier": "public",
-      "size": 2076,
+      "size": 2072,
       "type": "json"
     },
     {
@@ -2049,7 +2049,7 @@
     {
       "path": "product/governance/monitoring-rules.json",
       "tier": "public",
-      "size": 804,
+      "size": 802,
       "type": "json"
     },
     {
@@ -2103,7 +2103,7 @@
     {
       "path": "product/governance/orchestration-config.json",
       "tier": "public",
-      "size": 1865,
+      "size": 1867,
       "type": "json"
     },
     {
@@ -2391,7 +2391,7 @@
     {
       "path": "product/governance/qa-rules.json",
       "tier": "public",
-      "size": 633,
+      "size": 623,
       "type": "json"
     },
     {
@@ -2475,7 +2475,7 @@
     {
       "path": "product/governance/sdlc-gate-catalog.json",
       "tier": "public",
-      "size": 4676,
+      "size": 4675,
       "type": "json"
     },
     {
@@ -2529,7 +2529,7 @@
     {
       "path": "product/governance/shared-tmp-allowlist.json",
       "tier": "public",
-      "size": 14043,
+      "size": 14045,
       "type": "json"
     },
     {
@@ -2589,7 +2589,7 @@
     {
       "path": "product/governance/standard-policy.json",
       "tier": "public",
-      "size": 2080,
+      "size": 2077,
       "type": "json"
     },
     {
@@ -6919,6 +6919,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/ecosystem-blueprint.schema.json",
+      "tier": "public",
+      "size": 2152,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/egress-policy.schema.json",
       "tier": "public",
       "size": 814,
@@ -7231,6 +7237,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/intent-coverage-matrix.schema.json",
+      "tier": "public",
+      "size": 2009,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/intent-delta.schema.json",
       "tier": "public",
       "size": 2342,
@@ -7318,6 +7330,12 @@
       "path": "product/schemas/judgment-contract.schema.json",
       "tier": "public",
       "size": 925,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/judgment-rules.schema.json",
+      "tier": "public",
+      "size": 3751,
       "type": "json"
     },
     {
@@ -7897,6 +7915,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/monitoring-rules.schema.json",
+      "tier": "public",
+      "size": 2520,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/music-generation-adf.schema.json",
       "tier": "public",
       "size": 4609,
@@ -8044,6 +8068,12 @@
       "path": "product/schemas/operator-request-log.schema.json",
       "tier": "public",
       "size": 4561,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/orchestration-config.schema.json",
+      "tier": "public",
+      "size": 2806,
       "type": "json"
     },
     {
@@ -8236,6 +8266,12 @@
       "path": "product/schemas/outcome-contract.schema.json",
       "tier": "public",
       "size": 1898,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/package-governance.schema.json",
+      "tier": "public",
+      "size": 946,
       "type": "json"
     },
     {
@@ -8533,6 +8569,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/qa-rules.schema.json",
+      "tier": "public",
+      "size": 1131,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/question-resolution-policy.schema.json",
       "tier": "public",
       "size": 2918,
@@ -8656,6 +8698,12 @@
       "path": "product/schemas/runtime-surface-manifest.schema.json",
       "tier": "public",
       "size": 1451,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/sdlc-gate-catalog.schema.json",
+      "tier": "public",
+      "size": 1562,
       "type": "json"
     },
     {
@@ -8791,6 +8839,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/shared-tmp-allowlist.schema.json",
+      "tier": "public",
+      "size": 1074,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/shell-command-policy.schema.json",
       "tier": "public",
       "size": 1219,
@@ -8902,6 +8956,12 @@
       "path": "product/schemas/standard-intents.schema.json",
       "tier": "public",
       "size": 4628,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/standard-policy.schema.json",
+      "tier": "public",
+      "size": 1068,
       "type": "json"
     },
     {

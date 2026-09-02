@@ -11777,6 +11777,20 @@ compatibility note、ingestion target、integrity check、maintenance task、rep
 明示し、generic envelope の黙示的な受け入れを減らした。既存の documentation_only 宣言と runtime の参照なしという
 扱いは維持し、残り10件は payload shape と廃止可否を確認して段階移行する。
 
+## 2026-09-02 再レビュー修正 290
+
+残っていた documentation-only governance catalog のうち、`ecosystem-blueprint`、`intent-coverage-matrix`、
+`judgment-rules`、`monitoring-rules`、`orchestration-config`、`package-governance`、`qa-rules`、
+`sdlc-gate-catalog`、`shared-tmp-allowlist`、`standard-policy` の10件にも dedicated schema を追加した。
+これにより governance directory 内の全 documentation-only catalog 15件が generic envelope に依存せず、top-level
+未知キー、必須項目、配列要素、閾値、廃止互換情報、shared tmp classification を各 schema で検証する状態になった。
+`sdlc-gate-catalog` は deprecated／superseded_by を schema で固定し、`shared-tmp-allowlist` は既存の allowlist
+件数・分類の意味を変更していない。
+
+検証: documentation-only **15/15 dedicated schemas**、catalogs、governance-rules、PR scope、root typecheck、root lint、
+Prettier、`git diff --check`。SX-04 の governance catalog generic envelope 依存は **0件**。残るSX-04は domain loader
+の完全統合と未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
