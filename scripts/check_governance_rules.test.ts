@@ -3,7 +3,10 @@ import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeUnlinkSync, safeWriteFile } from '@agent/core/secure-io';
-import { findDeterministicCatalogViolations } from './check_governance_rules.js';
+import {
+  discoverGovernanceRuleChecks,
+  findDeterministicCatalogViolations,
+} from './check_governance_rules.js';
 
 const GOVERNANCE_DIR = pathResolver.rootResolve('knowledge/product/governance');
 const TEST_FILE = path.join(GOVERNANCE_DIR, 'test-governance-deterministic.json');
@@ -44,6 +47,13 @@ describe('check_governance_rules', () => {
     const violations = findDeterministicCatalogViolations();
 
     expect(violations).toContain('knowledge/product/governance/test-governance-deterministic.json');
+  });
+
+  it('discovers schema-backed governance catalogs without a hand-authored entry', () => {
+    const checks = discoverGovernanceRuleChecks();
+    expect(checks.map((check) => check.dataPath)).toContain(
+      'knowledge/product/governance/governance-catalog-contracts.json'
+    );
   });
 
   it('reports violations through the shared script failure boundary', () => {

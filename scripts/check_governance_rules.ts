@@ -311,6 +311,57 @@ function readJson<T>(relativePath: string): T {
   return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
 }
 
+/**
+ * Discover every governance catalog that declares a repository-local schema.
+ * The hand-authored list above remains the place for domain-specific rules
+ * and non-governance directory snapshots; schema validation itself must not
+ * require adding a second entry whenever a catalog is introduced.
+ */
+export function discoverGovernanceRuleChecks(): GovernanceRuleCheck[] {
+  const root = pathResolver.rootResolve(GOVERNANCE_DIR);
+  if (!safeExistsSync(root)) return [];
+
+  const checks: GovernanceRuleCheck[] = [];
+  for (const fileName of safeReaddir(root)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()) {
+    const dataPath = `${GOVERNANCE_DIR}/${fileName}`;
+    let payload: { $schema?: unknown };
+    try {
+      payload = readJson<{ $schema?: unknown }>(dataPath);
+    } catch {
+      // The catalog-integrity gate reports malformed JSON with the precise
+      // parse error; discovery should still allow the rest of this check to
+      // run and report independent governance violations.
+      continue;
+    }
+    const schemaRef = typeof payload.$schema === 'string' ? payload.$schema.trim() : '';
+    if (!schemaRef || /^https?:\/\//u.test(schemaRef)) continue;
+    const schemaPath = path.normalize(path.join(GOVERNANCE_DIR, schemaRef));
+    if (!safeExistsSync(pathResolver.rootResolve(schemaPath))) continue;
+    checks.push({
+      id: fileName.replace(/\.json$/iu, ''),
+      schemaPath,
+      dataPath,
+    });
+  }
+  return checks;
+}
+
+function allGovernanceRuleChecks(): GovernanceRuleCheck[] {
+  const checks = new Map<string, GovernanceRuleCheck>();
+  for (const check of CHECKS) {
+    checks.set(check.dataPath, check);
+  }
+  for (const check of discoverGovernanceRuleChecks()) {
+    // A hand-authored entry may carry a specialized schema or directory
+    // consistency rule. Discovery supplies coverage for new catalogs but must
+    // never replace that stronger existing contract.
+    if (!checks.has(check.dataPath)) checks.set(check.dataPath, check);
+  }
+  return [...checks.values()].sort((left, right) => left.dataPath.localeCompare(right.dataPath));
+}
+
 function validateRuleFile(check: GovernanceRuleCheck, violations: string[]) {
   const data = readJson<Record<string, unknown>>(check.dataPath);
   const validate = compileSchema(check.schemaPath);
@@ -1423,7 +1474,7 @@ export const runCheckGovernanceRules = defineScript({
   flags: [],
   run(context) {
     const violations: string[] = [];
-    for (const check of CHECKS) {
+    for (const check of allGovernanceRuleChecks()) {
       validateRuleFile(check, violations);
     }
     validateActuatorCatalogDirectoryConsistency(violations);
