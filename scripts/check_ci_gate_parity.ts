@@ -11,7 +11,7 @@ const WORKFLOW_SCOPE_REFS = {
   release: '.github/workflows/release.yml',
 } as const;
 const WORKFLOW_PATHS = [...Object.values(WORKFLOW_SCOPE_REFS), '.github/workflows/cross-os.yml'];
-const KYBERION_SETUP_ACTION = 'uses: ./.github/actions/setup-kyberion';
+const SETUP_ACTION_MARKER = 'uses: ./.github/actions/setup-kyberion';
 
 function read(relativePath: string): string {
   return String(safeReadFile(pathResolver.rootResolve(relativePath), { encoding: 'utf8' }));
@@ -37,9 +37,9 @@ export function collectCheckScopeReferences(value: string): string[] {
 
 export function checkWorkflowSetupOrder(workflowPath: string, workflow: string): string[] {
   const failures: string[] = [];
-  const setupIndex = workflow.indexOf(KYBERION_SETUP_ACTION);
+  const setupIndex = workflow.indexOf(SETUP_ACTION_MARKER);
   if (setupIndex === -1) {
-    failures.push(`${workflowPath} must use ${KYBERION_SETUP_ACTION}`);
+    failures.push(`${workflowPath} must use ${SETUP_ACTION_MARKER}`);
     return failures;
   }
 
