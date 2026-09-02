@@ -1,7 +1,7 @@
 import { assertSafeRepositoryPath, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { pathResolver } from '@agent/core/path-resolver';
-import { parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectInput, readTextFile } from '@agent/core/foundation';
 import * as path from 'node:path';
 import {
   defineGenerator,
@@ -443,7 +443,7 @@ async function renderImportDesignMdCatalog(context: ScriptContext): Promise<Gene
     imported.map((entry) => [entry.design_system_id, buildDesignSystem(entry)])
   );
   const index = {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     source_repo: SOURCE_REPO,
     source_dir: path.relative(pathResolver.rootDir(), sourceDir),
     count: imported.length,

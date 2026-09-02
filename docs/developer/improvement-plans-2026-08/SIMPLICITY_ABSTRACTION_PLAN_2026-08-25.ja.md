@@ -11850,6 +11850,18 @@ catalog integrity の全 schema／metadata／theme／governance contract 読み�
 
 検証: catalog integrity **17 tests passed**、catalogs、root typecheck、Prettier。
 
+## 2026-09-02 再レビュー修正 297
+
+SX-03 の production `scripts/` に残っていた、意味固有の変換を持たない
+`new Date().toISOString()` を foundation の `nowIso()` へ移行した。company onboarding、onboarding apply、
+TaskScenario smoke、tenant drift、service recording、A2A、knowledge、voice upgrade、control plane、dead-code
+report、dependency scan、design catalog generator、presence controller、mission queue の 14 script を対象とし、
+JSON／tenant／approval／temporary path の責務は変更していない。`Date.now()` による経過時間・一意 ID 生成や、
+domain 固有の date/week 処理は対象外として残した。
+
+検証: 関連 **20 test files / 66 tests passed**、root typecheck、root lint、foundation-adoption、Prettier、
+`git diff --check`。残る SX-03 の時刻移行は、残りの script／surface／actuator の単純 timestamp 呼び出しである。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -18,7 +18,7 @@ import { validatePipelineAdf } from '@agent/core/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/adf-guardrails';
 import { startServiceRecordingSession } from '@agent/core/service-recording-session';
 import { withExecutionContext } from '@agent/core/authority';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   defineScript,
@@ -209,7 +209,7 @@ function review(args: Record<string, string>): CommandResult {
     review: {
       status,
       reviewer: args.reviewer || 'human:operator',
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       decisions: loaded.value.steps.map((step) => ({ step_id: step.step_id, status })),
       ...(args.note ? { note: args.note } : {}),
     },

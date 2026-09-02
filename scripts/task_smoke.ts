@@ -8,6 +8,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import { describeTaskRun } from './task_run.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { loadTaskScenario, type TaskScenario } from './lib/task-scenario.js';
@@ -62,7 +63,7 @@ function buildSmokeProfile(
   return {
     scenario_id: scenario.id,
     scenario_title: scenario.title,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     answers,
     first_run_answers: firstRunAnswers,
     repeat_run: scenario.repeat_run,

@@ -6,7 +6,7 @@
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/src/lock-utils';
-import { appendJsonLine, isRecord, readJsonLines } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
 
 export interface MissionQueueEntry {
   mission_id: string;
@@ -78,7 +78,7 @@ export async function enqueueMission(
     tier,
     priority,
     status: 'pending',
-    enqueued_at: new Date().toISOString(),
+    enqueued_at: nowIso(),
     dependencies: deps,
   };
 

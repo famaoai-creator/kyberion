@@ -23,7 +23,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -536,7 +536,7 @@ async function runDoctor(input: {
 
   const summary = {
     ok: checks.every((check) => check.ok),
-    checked_at: new Date().toISOString(),
+    checked_at: nowIso(),
     surfaces: checks,
   };
 
