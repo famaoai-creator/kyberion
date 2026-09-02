@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -518,8 +519,8 @@ export function createSurfaceAsyncRequest(params: {
     query: params.query,
     accepted_text: params.acceptedText,
     status: 'pending',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: nowIso(),
+    updated_at: nowIso(),
     scope,
   };
   writeJsonAs(
@@ -557,7 +558,7 @@ export function updateSurfaceAsyncRequest(
     request_id: current.request_id,
     surface: current.surface,
     scope: current.scope,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -617,7 +618,7 @@ export function enqueueSurfaceNotification(params: {
     title: params.title,
     text: params.text,
     status: params.status || 'info',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     scope,
   };
   writeJsonAs(
@@ -708,7 +709,7 @@ export function enqueueSurfaceOutboxMessage(params: {
     thread_ts: params.threadTs,
     text: params.text,
     source: params.source || 'system',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     scope,
     ...(deduplicationKey ? { deduplication_key: deduplicationKey } : {}),
   };
@@ -760,7 +761,7 @@ export function markSurfaceDeadTarget(
     failure,
     scope: normalizedScope,
     consecutive_failures: (current?.consecutive_failures || 0) + 1,
-    marked_at: current?.marked_at || new Date().toISOString(),
+    marked_at: current?.marked_at || nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -887,7 +888,7 @@ export function deadLetterSurfaceOutboxMessage(
     kind: 'surface-dead-letter',
     dead_letter_id: `${surface.toUpperCase()}-DLQ-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     failure,
-    dead_lettered_at: new Date().toISOString(),
+    dead_lettered_at: nowIso(),
   };
   writeJsonAs(
     surfaceCoordinationRole(surface),
@@ -1001,7 +1002,7 @@ export function replaySurfaceDeadLetter(
     {
       ...record,
       replay_count: (record.replay_count || 0) + 1,
-      last_replayed_at: new Date().toISOString(),
+      last_replayed_at: nowIso(),
       last_replay_message_id: messageId,
       last_replayed_by: operatorId,
     }
