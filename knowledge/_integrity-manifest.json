@@ -8521,6 +8521,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/pfc-state.schema.json",
+      "tier": "public",
+      "size": 691,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pilot-strategy-policy.schema.json",
       "tier": "public",
       "size": 1051,
