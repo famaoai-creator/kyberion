@@ -1,8 +1,7 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
@@ -47,7 +46,10 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
   const filePath = nextTasksPath(missionId);
   if (!safeExistsSync(filePath)) return [];
   try {
-    return parseMissionNextTaskObjects(readJson<unknown>(filePath)) || [];
+    return (
+      loadMissionNextTaskObjectsAtPath(filePath, nodePath.basename(nodePath.dirname(filePath))) ||
+      []
+    );
   } catch {
     return [];
   }

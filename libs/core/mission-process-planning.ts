@@ -9,9 +9,8 @@
  */
 
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 import {
   evaluateMissionGate,
@@ -170,7 +169,10 @@ export function applyProcessTemplatePlan(input: {
 
 function readTasksSafe(nextTasksPath: string): Array<Record<string, unknown>> {
   try {
-    return parseMissionNextTaskObjects(readJson<unknown>(nextTasksPath)) || [];
+    return (
+      loadMissionNextTaskObjectsAtPath(nextTasksPath, path.basename(path.dirname(nextTasksPath))) ||
+      []
+    );
   } catch {
     return [];
   }

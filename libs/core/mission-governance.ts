@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 /**
  * scripts/refactor/mission-governance.ts
@@ -41,7 +41,7 @@ import { loadLatestArtifactBundleForMission } from './artifact-bundle.js';
 import { readTextFile } from './foundation/text.js';
 import { loadState } from './mission-state.js';
 import { loadPersistedTrustLedger } from './trust-engine.js';
-import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 const SECURITY_POLICY_QUALITY_CATALOG = defineCatalog<{
   quality_requirements?: Record<string, unknown>;
@@ -276,7 +276,10 @@ export function validateMissionArtifactReviewGate(input: {
 
   let tasks: ArtifactReviewPlannedTask[];
   try {
-    const parsed = parseMissionNextTaskObjects(readJson<unknown>(taskPath));
+    const parsed = loadMissionNextTaskObjectsAtPath(
+      taskPath,
+      path.basename(path.dirname(taskPath))
+    );
     if (!parsed) {
       return {
         ok: false,
@@ -285,6 +288,12 @@ export function validateMissionArtifactReviewGate(input: {
     }
     tasks = parsed as ArtifactReviewPlannedTask[];
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Invalid catalog mission-next-tasks')) {
+      return {
+        ok: false,
+        reason: 'NEXT_TASKS.json must contain an array of safe objects.',
+      };
+    }
     return {
       ok: false,
       reason: `Artifact review gate could not read NEXT_TASKS.json: ${error instanceof Error ? error.message : String(error)}`,
