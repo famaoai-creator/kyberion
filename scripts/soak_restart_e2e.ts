@@ -10,8 +10,7 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface RestartE2EReport {
@@ -47,11 +46,7 @@ function writeBootstrapState(root: string): RestartE2EReport['bootstrap'] {
   const statePath = safeSoakPath(root, 'provider-health.json');
   safeWriteFile(
     heartbeatPath,
-    JSON.stringify(
-      { pid: process.pid, phase: 'bootstrap', alive: true, ts: new Date().toISOString() },
-      null,
-      2
-    )
+    JSON.stringify({ pid: process.pid, phase: 'bootstrap', alive: true, ts: nowIso() }, null, 2)
   );
   safeWriteFile(
     journalPath,
@@ -77,11 +72,7 @@ function writeResumeState(root: string): RestartE2EReport['resume'] & { restored
     : {};
   safeWriteFile(
     heartbeatPath,
-    JSON.stringify(
-      { pid: process.pid, phase: 'resume', alive: true, ts: new Date().toISOString() },
-      null,
-      2
-    )
+    JSON.stringify({ pid: process.pid, phase: 'resume', alive: true, ts: nowIso() }, null, 2)
   );
   safeWriteFile(
     journalPath,
@@ -136,7 +127,7 @@ async function runWorker(root: string, phase: 'bootstrap' | 'resume'): Promise<v
         pid: process.pid,
         phase,
         alive: true,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }, 100).unref?.();
     await new Promise<void>(() => {});
@@ -202,7 +193,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
     );
     const resume = writeResumeState(safeRoot);
     return {
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       root: safeRoot,
       bootstrap,
       resume: {
@@ -242,7 +233,7 @@ export async function runSoakRestartE2E(root = DEFAULT_ROOT): Promise<RestartE2E
   }
   const restored = readJson<{ resumed?: boolean; restored_from?: string }>(statePath);
   return {
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     root: safeRoot,
     bootstrap: {
       pid: bootstrap.pid || 0,

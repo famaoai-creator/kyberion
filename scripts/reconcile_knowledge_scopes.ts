@@ -6,7 +6,7 @@ import { safeWriteFile } from '@agent/core/secure-io';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import { withExecutionContext } from '@agent/core/authority';
 import type { ScopeContext } from '@agent/core/scope-context';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { runKnowledgeValidationSweep } from '@agent/core/report-ops';
 import { proposeKnowledgeRankingWeightRecalculation } from '@agent/core/knowledge-weight-recalculation';
 import { buildPlan } from './migrate_physical_namespaces.js';
@@ -63,7 +63,7 @@ export async function reconcileKnowledgeScopes(): Promise<KnowledgeScopeReconcil
       )
     );
     const report: KnowledgeScopeReconciliationReport = {
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       status:
         health.status === 'attention' ||
         validation.status === 'attention' ||

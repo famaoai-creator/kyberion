@@ -24,7 +24,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -172,7 +172,7 @@ async function checkOne(entry: GoldenRegistryEntry, rebaseline: boolean): Promis
   const normalized = normalizeResult(result, entry.ignore_paths ?? []);
   const newHash = hashResult(normalized);
   const newSnap: GoldenSnapshot = {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     pipeline_id: entry.id,
     pipeline_path: entry.pipeline,
     result_hash: newHash,

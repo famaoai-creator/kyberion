@@ -26,7 +26,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
@@ -245,7 +245,7 @@ function writeBaseline(file: BaselineFile): void {
 
 function buildBaseline(actuators: ActuatorFingerprint[]): BaselineFile {
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     generator_note:
       'Baseline of actuator extension-point surfaces for semver enforcement. ' +
       'See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.',

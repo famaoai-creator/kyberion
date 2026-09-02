@@ -21,7 +21,7 @@ import {
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -255,7 +255,7 @@ export function checkI18nHardcoding(
   if (options.updateBaseline) {
     const nextBaseline: I18nBaseline = {
       version: 1,
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       scan_roots: relativeScanRoots,
       files: currentCounts,
     };
@@ -273,7 +273,7 @@ export function checkI18nHardcoding(
     };
   }
 
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const baseline = loadBaseline(baselinePath);
   if (!baseline) {
     return {
