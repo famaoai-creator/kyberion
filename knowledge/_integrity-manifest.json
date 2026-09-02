@@ -9085,6 +9085,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-mission-proposal-state.schema.json",
+      "tier": "public",
+      "size": 1291,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-policy.schema.json",
       "tier": "public",
       "size": 5704,

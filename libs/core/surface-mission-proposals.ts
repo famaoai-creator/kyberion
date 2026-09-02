@@ -7,7 +7,14 @@ import {
   type IntentResolutionContract,
 } from './intent-resolution-contract.js';
 import { readJson } from './foundation/json.js';
-import { safeExec, safeExistsSync, safeRmSync } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExec,
+  safeExistsSync,
+  safeLstat,
+  safeRmSync,
+} from './secure-io.js';
 import { buildExecutionEnv, withExecutionContext } from './authority.js';
 import {
   emitMissionOrchestrationObservation,
@@ -28,7 +35,55 @@ import type {
   SurfaceMissionProposalState,
 } from './channel-surface-types.js';
 
+const SURFACE_MISSION_PROPOSAL_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-mission-proposal-state.schema.json'
+);
+
 type SurfaceProposalRole = 'slack_bridge' | 'chronos_gateway';
+
+export interface MissionProposalStateBinding {
+  surface: string;
+  channel: string;
+  threadTs: string;
+}
+
+function proposalStateCatalogAtPath(filePath: string) {
+  return defineCatalog<SurfaceMissionProposalState>({
+    id: 'surface-mission-proposal-state',
+    path: filePath,
+    schema: SURFACE_MISSION_PROPOSAL_SCHEMA_PATH,
+  });
+}
+
+/** Load a persisted proposal through schema validation and ingress identity binding. */
+export function loadMissionProposalStateAtPath(
+  filePath: string,
+  expected?: Partial<MissionProposalStateBinding>
+): SurfaceMissionProposalState {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[SURFACE_MISSION_PROPOSAL] state must be a regular file: ${filePath}`);
+  }
+  const raw = readJson<unknown>(safeFilePath);
+  const rawRecord =
+    raw && typeof raw === 'object' && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : undefined;
+  const candidate =
+    expected?.surface && rawRecord && rawRecord.surface === undefined
+      ? { ...rawRecord, surface: expected.surface }
+      : raw;
+  const state = proposalStateCatalogAtPath(safeFilePath).validate(candidate, safeFilePath);
+  for (const key of ['surface', 'channel', 'threadTs'] as const) {
+    const expectedValue = expected?.[key];
+    if (expectedValue !== undefined && state[key] !== expectedValue) {
+      throw new Error(
+        `[SURFACE_MISSION_PROPOSAL_SCOPE_MISMATCH] ${key} '${state[key]}' does not match expected '${expectedValue}'`
+      );
+    }
+  }
+  return state;
+}
 
 function writeJsonAs(role: SurfaceProposalRole, logicalPath: string, record: unknown): string {
   return writeGovernedArtifactJson(role, logicalPath, record);
@@ -112,8 +167,13 @@ export function getMissionProposalState(
   const resolved = pathResolver.resolve(
     missionProposalStateLogicalPath(surface.trim().toLowerCase(), channel, threadTs)
   );
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<SurfaceMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  return loadMissionProposalStateAtPath(safeResolved, {
+    surface: surface.trim().toLowerCase(),
+    channel,
+    threadTs,
+  });
 }
 
 export function clearMissionProposalState(
@@ -168,8 +228,14 @@ export function getSlackMissionProposalState(
 ): SlackMissionProposalState | null {
   const logicalPath = missionProposalStateLogicalPath('slack', channel, threadTs);
   const resolved = pathResolver.resolve(logicalPath);
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<SlackMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  const state = loadMissionProposalStateAtPath(safeResolved, {
+    surface: 'slack',
+    channel,
+    threadTs,
+  });
+  return { ...state, surface: 'slack' };
 }
 
 export function saveSlackMissionProposalState(params: {
@@ -209,8 +275,14 @@ export function getChronosMissionProposalState(
 ): ChronosMissionProposalState | null {
   const logicalPath = missionProposalStateLogicalPath('chronos', 'chronos', sessionId);
   const resolved = pathResolver.resolve(logicalPath);
-  if (!safeExistsSync(resolved)) return null;
-  return readJson<ChronosMissionProposalState>(resolved);
+  const safeResolved = assertSafeRepositoryPath(resolved, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeResolved)) return null;
+  const state = loadMissionProposalStateAtPath(safeResolved, {
+    surface: 'chronos',
+    channel: 'chronos',
+    threadTs: sessionId,
+  });
+  return { ...state, surface: 'chronos', channel: 'chronos', threadTs: sessionId };
 }
 
 export function saveChronosMissionProposalState(params: {

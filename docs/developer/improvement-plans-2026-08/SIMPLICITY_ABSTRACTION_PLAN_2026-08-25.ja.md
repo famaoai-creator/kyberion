@@ -13367,6 +13367,12 @@ SX-03／SX-04／SX-10 のdesktop pipelineを再監査し、allowlist／trust検�
 
 検証: desktop pipeline **1 file / 5 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 518
+
+SX-03／SX-04／SX-08／SX-09 のsurface mission proposal stateを再監査し、surface-neutral／Slack／Chronos の各getterが同じ persisted proposalを`readJson<...>`型アサーションだけで確認していた残存を修正した。`surface-mission-proposal-state.schema.json`とcanonical loaderを追加し、proposal、routing decision、createdAt、regular-file境界を検証するとともに、surface／channel／thread identityを要求元へbindingした。不正または別threadのproposalは確認・mission発行へ進まずfail-closedし、旧Slack／Chronos stateのsurface欠落だけは要求元surfaceで補完して既存confirmation semanticsを維持している。
+
+検証: surface mission proposal／channel surface **2 files / 24 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
