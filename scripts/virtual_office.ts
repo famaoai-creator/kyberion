@@ -39,6 +39,7 @@ import { listTenants } from '@agent/core/tenant-governance';
 import { listTaskSessions } from '@agent/core/task-session';
 import { loadAgentProfileIndex } from '@agent/core/mission-team-index';
 import { loadAgentPerformanceIndex } from '@agent/core/agent-performance-index';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { resolveOrganizationOrgChart, summarizeOrganizationOrgChart } from '@agent/core/org-chart';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -51,13 +52,7 @@ import {
 } from '@agent/core/secure-io';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
-import {
-  getRegisteredEnvText,
-  isRecord,
-  nowIso,
-  parseSafeJsonInput,
-  readJson as readFoundationJson,
-} from '@agent/core/foundation';
+import { getRegisteredEnvText, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 
 // ---------- data collection ----------
 
@@ -166,15 +161,6 @@ interface OfficeSnapshot {
   role_counts: Record<string, number>;
   /** CE-03: shared projection consumed by Chronos and the offline renderer. */
   chronos_projection: ChronosOfficeSnapshot;
-}
-
-function readJson<T>(filePath: string): T | null {
-  try {
-    if (!safeExistsSync(filePath)) return null;
-    return readFoundationJson<T>(filePath);
-  } catch {
-    return null;
-  }
 }
 
 function listMissionDirs(): Array<{ missionPath: string; tier: string }> {
@@ -392,14 +378,8 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
   const archivedRecent: Array<{ id: string; mtime: number }> = [];
 
   for (const { missionPath, tier } of listMissionDirs()) {
-    const state = readJson<{
-      mission_id?: string;
-      status?: string;
-      mission_type?: string;
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(path.join(missionPath, 'mission-state.json'));
-    if (!state?.mission_id) continue;
+    const state = loadStateAtPath(path.join(missionPath, 'mission-state.json'));
+    if (!state) continue;
     if (!missionMatchesTenant({ ...state, tier }, visibleTenantSlugs, allowUnscopedRecords))
       continue;
     const status = String(state.status || 'unknown');

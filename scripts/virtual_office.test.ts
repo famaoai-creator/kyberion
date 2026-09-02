@@ -51,7 +51,19 @@ describe('virtual office surface', () => {
         mission_id: 'MSN-OFFICE-1',
         status: 'active',
         mission_type: 'development',
+        tier: 'confidential',
         tenant_slug: 'acme-prod',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     fs.writeFileSync(
@@ -80,7 +92,19 @@ describe('virtual office surface', () => {
         mission_id: 'MSN-OFFICE-2',
         status: 'active',
         mission_type: 'operations',
+        tier: 'confidential',
         tenant_slug: 'beta',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     fs.writeFileSync(
@@ -102,7 +126,19 @@ describe('virtual office surface', () => {
       JSON.stringify({
         mission_id: 'MSN-OFFICE-OLD',
         status: 'archived',
+        tier: 'confidential',
         tenant_slug: 'acme-prod',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     const customerRoot = path.join(tmpRoot, 'customer', 'acme');
