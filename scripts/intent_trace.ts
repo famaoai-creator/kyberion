@@ -19,7 +19,7 @@ import { validateTraceReplay } from '@agent/core/trace-schema';
 import type { IntentContractMemoryEntry } from '@agent/core/intent-contract-learning';
 import { loadMissionOrchestrationJournal } from '@agent/core/mission-orchestration-journal';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
 
@@ -130,12 +130,8 @@ function listJsonlFiles(dir: string): string[] {
     .sort((left, right) => left.localeCompare(right));
 }
 
-function isJsonRecord(value: unknown): value is JsonRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function normalizeJsonRecord(value: unknown): JsonRecord | null {
-  return isJsonRecord(value) ? value : null;
+  return isRecord(value) ? value : null;
 }
 
 function normalizeStringArray(value: unknown): string[] | undefined {
@@ -145,14 +141,14 @@ function normalizeStringArray(value: unknown): string[] | undefined {
 }
 
 function normalizeSnapshotRecord(value: unknown): SnapshotRecord | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   if (
     typeof value.snapshot_id !== 'string' ||
     typeof value.mission_id !== 'string' ||
     typeof value.stage !== 'string' ||
     typeof value.created_at !== 'string' ||
     typeof value.source !== 'string' ||
-    !isJsonRecord(value.intent) ||
+    !isRecord(value.intent) ||
     typeof value.intent.goal !== 'string'
   ) {
     return null;
@@ -179,11 +175,11 @@ function normalizeSnapshotRecord(value: unknown): SnapshotRecord | null {
 }
 
 function normalizeTraceRecord(value: unknown): TraceRecord | null {
-  if (!isJsonRecord(value) || typeof value.traceId !== 'string' || !value.traceId.trim()) {
+  if (!isRecord(value) || typeof value.traceId !== 'string' || !value.traceId.trim()) {
     return null;
   }
   const metadata = value.metadata;
-  if (metadata !== undefined && !isJsonRecord(metadata)) return null;
+  if (metadata !== undefined && !isRecord(metadata)) return null;
   const candidate = { ...value, ...(metadata ? { metadata } : {}) };
   if (validateTraceReplay(candidate, { strictUnknownSpans: true }).length > 0) return null;
   return candidate as TraceRecord;
@@ -233,7 +229,7 @@ function collectIntentIdsFromRecord(record: JsonRecord | undefined): string[] {
   visitValue(record.correlation_id);
 
   const nested = record.attributes;
-  if (isJsonRecord(nested)) {
+  if (isRecord(nested)) {
     visitValue(nested.intentId);
     visitValue(nested.intent_id);
     visitValue(nested.selected_intent_id);
@@ -311,7 +307,7 @@ function collectAuditEntries(
       const fileEntries = readJsonlRecords(path.join(auditDir, fileName), normalizeJsonRecord);
       for (const entry of fileEntries) {
         if (entry.action !== 'approval_gate') continue;
-        const metadata = isJsonRecord(entry.metadata) ? entry.metadata : undefined;
+        const metadata = isRecord(entry.metadata) ? entry.metadata : undefined;
         const entryCorrelationId = normalizeId(metadata?.correlationId);
         const entryIntentId = normalizeId(metadata?.intentId);
         if (entryCorrelationId !== correlationId && entryIntentId !== correlationId) continue;

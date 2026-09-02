@@ -6,7 +6,7 @@
 import { logger } from '@agent/core/core';
 import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/src/lock-utils';
-import { appendJsonLine, readJsonLines } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, readJsonLines } from '@agent/core/foundation';
 
 export interface MissionQueueEntry {
   mission_id: string;
@@ -17,12 +17,8 @@ export interface MissionQueueEntry {
   dependencies: string[];
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   const missionId = value.mission_id;
   const tier = value.tier;
   const priority = value.priority;

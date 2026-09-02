@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -48,10 +49,6 @@ export interface RasterResult {
   /** Why rasterization could not run, when `available` is false. */
   unavailable_reason?: string;
   backend?: 'soffice+pdftoppm' | 'playwright';
-}
-
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function firstNonEmptyString(...values: unknown[]): string | undefined {
@@ -209,8 +206,8 @@ export function assertVisualReviewPathScope(input: {
         if (safeExistsSync(statePath)) {
           try {
             const state = readJson<unknown>(statePath);
-            const stateRecord = isJsonRecord(state) ? state : {};
-            const context = isJsonRecord(stateRecord.context) ? stateRecord.context : {};
+            const stateRecord = isRecord(state) ? state : {};
+            const context = isRecord(stateRecord.context) ? stateRecord.context : {};
             const recordedTenant = firstNonEmptyString(
               context.tenant_slug,
               stateRecord.tenant_slug,

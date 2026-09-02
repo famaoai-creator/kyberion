@@ -11,7 +11,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
-import { clamp } from './foundation/text.js';
+import { clamp, isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
@@ -237,16 +237,12 @@ export function assertNoEscalation(
   }
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function persistedRequiredString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value : null;
 }
 
 function persistedAuthority(value: unknown): TriggerAuthoritySnapshot | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   const authorityRole = persistedRequiredString(value.authority_role);
   const level = value.level;
   if (authorityRole === null || typeof level !== 'number' || !Number.isFinite(level) || level < 0) {
@@ -264,7 +260,7 @@ function persistedAuthority(value: unknown): TriggerAuthoritySnapshot | null {
 
 /** Normalize one persisted receipt before it participates in idempotency state. */
 export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   const idempotencyKey = persistedRequiredString(value.idempotencyKey);
   const recordedAt = persistedRequiredString(value.recordedAt);
   const source = value.source;

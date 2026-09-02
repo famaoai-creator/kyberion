@@ -5,6 +5,7 @@ import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import { defineActuator, type ActuatorDefinition } from './actuator-sdk.js';
 import { createAjv } from './foundation/ajv.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import { assertCapabilityAllowed } from './capability-restriction-policy.js';
 
 /**
@@ -48,12 +49,8 @@ export interface ActuatorServeRequest {
   input?: unknown;
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeActuatorServeRequest(value: unknown): ActuatorServeRequest {
-  if (!isJsonRecord(value)) throw new Error('actuator serve request must be a JSON object');
+  if (!isRecord(value)) throw new Error('actuator serve request must be a JSON object');
   if (value.id !== undefined && value.id !== null) {
     if (typeof value.id !== 'string' || !value.id.trim()) {
       throw new Error('actuator serve request.id must be a non-empty string');

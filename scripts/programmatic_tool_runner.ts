@@ -1,7 +1,7 @@
 /* HA-04: isolated child for Programmatic Tool Calling. */
 import * as net from 'node:net';
 import * as vm from 'node:vm';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface RunnerEnvelope {
@@ -21,10 +21,6 @@ interface RpcResponse {
   error?: string;
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function requiredString(value: unknown, label: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new Error(`[PTC_RUNNER] ${label} must be a non-empty string.`);
@@ -40,7 +36,7 @@ function positiveInteger(value: unknown, label: string): number {
 }
 
 function normalizeRunnerEnvelope(value: unknown): RunnerEnvelope {
-  if (!isJsonRecord(value)) throw new Error('[PTC_RUNNER] envelope must be a JSON object.');
+  if (!isRecord(value)) throw new Error('[PTC_RUNNER] envelope must be a JSON object.');
   const socketPath = requiredString(value.socket_path, 'envelope.socket_path');
   const token = requiredString(value.token, 'envelope.token');
   const code = requiredString(value.code, 'envelope.code');
@@ -66,7 +62,7 @@ function normalizeRunnerEnvelope(value: unknown): RunnerEnvelope {
 }
 
 function normalizeRpcResponse(value: unknown): RpcResponse {
-  if (!isJsonRecord(value)) throw new Error('[PTC_RPC] response must be a JSON object.');
+  if (!isRecord(value)) throw new Error('[PTC_RPC] response must be a JSON object.');
   if (typeof value.id !== 'string' || !value.id.trim()) {
     throw new Error('[PTC_RPC] response id must be a non-empty string.');
   }

@@ -20,6 +20,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -152,14 +153,10 @@ export function normalizeSpeechToTextResult(
   };
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function parseSpeechToTextCapabilities(
   value: unknown
 ): SpeechToTextCapabilities | undefined {
-  if (!isJsonRecord(value) || typeof value.timestamps !== 'boolean') return undefined;
+  if (!isRecord(value) || typeof value.timestamps !== 'boolean') return undefined;
   if (
     value.granularity !== 'none' &&
     value.granularity !== 'segment' &&
@@ -179,7 +176,7 @@ function parseStructuredSegments(value: unknown): TranscriptSegment[] | undefine
   if (!Array.isArray(value)) return undefined;
   return value.flatMap((entry) => {
     if (
-      !isJsonRecord(entry) ||
+      !isRecord(entry) ||
       typeof entry.start_sec !== 'number' ||
       !Number.isFinite(entry.start_sec) ||
       typeof entry.end_sec !== 'number' ||
@@ -207,7 +204,7 @@ function parseStructuredOutput(stdout: string): Partial<TranscribeResult> {
   const parseRecord = (candidate: string): Record<string, unknown> | undefined => {
     try {
       const parsed: unknown = parseSafeJsonInput(candidate, 'speech-to-text response');
-      return isJsonRecord(parsed) ? parsed : undefined;
+      return isRecord(parsed) ? parsed : undefined;
     } catch {
       return undefined;
     }

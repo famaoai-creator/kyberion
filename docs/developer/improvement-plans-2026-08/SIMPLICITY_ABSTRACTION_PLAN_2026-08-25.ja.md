@@ -11810,6 +11810,17 @@ Prettier、`git diff --check`。残るSX-04は domain loader の完全統合と�
 
 検証: catalog integrity、governance-rules、PR scope、`git diff --check`。文書の記述と直前の実測値を突合した。
 
+## 2026-09-02 再レビュー修正 293
+
+SX-03 の production source に残っていた汎用 `isJsonRecord` 私有実装を、foundation の `isRecord` へ移行した。
+対象は context ranker、pipeline promotion、avatar／mission script、intent trace、sovereign dashboard、programmatic
+tool runner、mission queue、および core の speech-to-text／untrusted-content／programmatic-tool-calling／supervisor
+client／visual-raster／CLI serve／trigger／actuator serve の各 JSON 境界である。JSON dangerous-key 検査を担う
+Chronos 専用 parser と、bootstrap cycle を避ける authority の raw reader は責務が異なるため維持した。
+
+検証: 関連 **14 test files / 101 tests passed**、root typecheck、root lint、foundation-adoption、Prettier、
+`git diff --check`。対象 production source の `isJsonRecord` 私有定義は **0 件**となった。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

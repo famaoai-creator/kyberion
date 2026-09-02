@@ -35,7 +35,7 @@ import {
 } from '@agent/core/dashboard-event-parser';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
-import { readJson, readTextFile } from '@agent/core/foundation';
+import { isRecord, readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -92,14 +92,10 @@ type DashboardMissionState = {
   tenant_slug?: string;
 };
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function readMissionDashboardState(statePath: string): DashboardMissionState | null {
   try {
     const value = readJson<unknown>(statePath);
-    if (!isJsonRecord(value) || value.status !== 'active' || typeof value.mission_id !== 'string') {
+    if (!isRecord(value) || value.status !== 'active' || typeof value.mission_id !== 'string') {
       return null;
     }
     const tier =

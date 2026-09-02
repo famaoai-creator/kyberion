@@ -11,7 +11,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
-import { readJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 interface MissionHistoryEntry {
@@ -34,10 +34,6 @@ interface Mission {
   };
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function stringField(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
@@ -49,7 +45,7 @@ function stringArrayField(value: unknown): string[] | undefined {
 }
 
 function normalizeMission(value: unknown): Mission | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   const missionId = stringField(value, 'mission_id');
   const status = stringField(value, 'status');
   const tier = stringField(value, 'tier');
@@ -63,14 +59,14 @@ function normalizeMission(value: unknown): Mission | null {
   }
 
   const history = value.history.flatMap((entry): MissionHistoryEntry[] => {
-    if (!isJsonRecord(entry)) return [];
+    if (!isRecord(entry)) return [];
     const ts = stringField(entry, 'ts');
     const event = stringField(entry, 'event');
     const note = stringField(entry, 'note');
     return ts && event && note ? [{ ts, event, note }] : [];
   });
-  const scope = isJsonRecord(value.scope) ? value.scope : undefined;
-  const relationships = isJsonRecord(value.relationships) ? value.relationships : undefined;
+  const scope = isRecord(value.scope) ? value.scope : undefined;
+  const relationships = isRecord(value.relationships) ? value.relationships : undefined;
   const prerequisites = relationships ? stringArrayField(relationships.prerequisites) : undefined;
   const successors = relationships ? stringArrayField(relationships.successors) : undefined;
   const blockers = relationships ? stringArrayField(relationships.blockers) : undefined;
@@ -105,11 +101,11 @@ export function loadTrustScores(
     const safePath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return {};
     const raw = readJson<unknown>(safePath);
-    if (!isJsonRecord(raw)) return {};
-    const ledger = isJsonRecord(raw.agents) ? raw.agents : raw;
+    if (!isRecord(raw)) return {};
+    const ledger = isRecord(raw.agents) ? raw.agents : raw;
     return Object.fromEntries(
       Object.entries(ledger).flatMap(([agentId, value]) => {
-        if (!isJsonRecord(value)) return [];
+        if (!isRecord(value)) return [];
         const score = value.current_score;
         return typeof score === 'number' && Number.isFinite(score) && score >= 0 && score <= 1000
           ? [[agentId, score]]
