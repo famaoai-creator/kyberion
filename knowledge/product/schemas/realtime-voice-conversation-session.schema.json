@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "realtime-voice-conversation-session.schema.json",
+  "title": "Realtime voice conversation session",
+  "description": "Persisted transcript and profile context for a local realtime voice session.",
+  "type": "object",
+  "required": [
+    "session_id",
+    "created_at",
+    "updated_at",
+    "assistant_name",
+    "profile_id",
+    "language",
+    "transcript"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "assistant_name": { "type": "string", "minLength": 1 },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "language": { "type": "string", "minLength": 1 },
+    "system_prompt": { "type": "string" },
+    "transcript": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/turn" }
+    }
+  },
+  "$defs": {
+    "turn": {
+      "type": "object",
+      "required": ["speaker", "text", "ts"],
+      "additionalProperties": false,
+      "properties": {
+        "speaker": { "type": "string", "enum": ["user", "assistant"] },
+        "text": { "type": "string" },
+        "ts": { "type": "string", "format": "date-time" },
+        "audio_ref": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

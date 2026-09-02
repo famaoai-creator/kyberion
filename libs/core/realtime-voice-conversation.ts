@@ -11,9 +11,15 @@ import { getVoiceRuntimePolicy } from './voice-runtime-policy.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import { getReasoningBackend } from './reasoning-backend.js';
 import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
-import { readJson } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { nowIso } from './foundation/time.js';
 import {
   resolveVoiceEngineForPlatform,
@@ -84,6 +90,9 @@ export interface RealtimeVoiceConversationTurnResult {
 }
 
 const SESSION_DIR = pathResolver.shared('runtime/realtime-voice-conversations');
+const SESSION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/realtime-voice-conversation-session.schema.json'
+);
 
 /** Keep spoken replies short enough to start TTS quickly and sound natural. */
 export const REALTIME_VOICE_REPLY_MAX_CHARS = 160;
@@ -147,7 +156,30 @@ function loadRealtimeVoiceConversationSession(
 ): RealtimeVoiceConversationSession | null {
   const targetPath = sessionPath(sessionId);
   if (!safeExistsSync(targetPath)) return null;
-  return readJson<RealtimeVoiceConversationSession>(targetPath);
+  return loadRealtimeVoiceConversationSessionAtPath(targetPath, sessionId);
+}
+
+/** Load a persisted voice session through schema and filename/session binding. */
+export function loadRealtimeVoiceConversationSessionAtPath(
+  filePath: string,
+  sessionId: string
+): RealtimeVoiceConversationSession {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[realtime-voice-session] session must be a regular file: ${filePath}`);
+  }
+  const session = defineCatalog<RealtimeVoiceConversationSession>({
+    id: 'realtime-voice-conversation-session',
+    path: safeFilePath,
+    schema: SESSION_SCHEMA_PATH,
+  }).load();
+  const expectedSessionId = normalizeSessionId(sessionId);
+  if (session.session_id !== expectedSessionId) {
+    throw new Error(
+      `[REALTIME_VOICE_SESSION_SCOPE_MISMATCH] session belongs to ${session.session_id}, expected ${expectedSessionId}`
+    );
+  }
+  return session;
 }
 
 function writeRealtimeVoiceConversationSession(session: RealtimeVoiceConversationSession): string {

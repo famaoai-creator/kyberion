@@ -8671,6 +8671,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/realtime-voice-conversation-session.schema.json",
+      "tier": "public",
+      "size": 1377,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/reasoning-backend-policy.schema.json",
       "tier": "public",
       "size": 3178,
