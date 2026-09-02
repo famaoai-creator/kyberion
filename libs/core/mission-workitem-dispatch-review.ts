@@ -25,6 +25,7 @@ import { loadAgentProfileIndex } from './mission-team-index.js';
 import * as pathResolver from './path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -962,7 +963,7 @@ export async function runIndependentReviewerReview(input: {
       runtime_id: reviewerResponse.runtimeId,
       output_ref: reviewerResponse.outputRef,
       provider: reviewerResponse.provider,
-      written_at: new Date().toISOString(),
+      written_at: nowIso(),
     },
     { missionId: input.missionId, missionPath: input.missionPath }
   );
@@ -1028,7 +1029,7 @@ export async function delegateSubagentTask(input: {
   const nativeAdopter = backend.getNativeSubagentAdopter?.() ?? null;
 
   const executeText = async (): Promise<AgentExecutionReceipt> => {
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     try {
       let nativeSubagent: Record<string, unknown> | undefined;
       const run = async () => {
@@ -1077,7 +1078,7 @@ export async function delegateSubagentTask(input: {
             : {}),
         status: 'succeeded',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         output_ref: `${input.item.item_id}:result`,
         output,
       };
@@ -1090,7 +1091,7 @@ export async function delegateSubagentTask(input: {
         ...(input.routingOptions.model ? { model_id: String(input.routingOptions.model) } : {}),
         status: 'failed',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         error: error instanceof Error ? error.message : String(error),
       };
     }
@@ -1283,7 +1284,7 @@ export async function routeToAgentOrSubagent(input: {
     }
     const runtimePort: AgentExecutionPort = {
       delegate: async (request) => {
-        const startedAt = new Date().toISOString();
+        const startedAt = nowIso();
         try {
           const response = await routeA2A({
             a2a_version: '1.0',
@@ -1293,7 +1294,7 @@ export async function routeToAgentOrSubagent(input: {
               sender: 'kyberion:workitem-dispatcher',
               receiver: input.assigneePeerId,
               performative: 'request',
-              timestamp: new Date().toISOString(),
+              timestamp: nowIso(),
             },
             payload: {
               intent: 'workitem_execution',
@@ -1335,7 +1336,7 @@ export async function routeToAgentOrSubagent(input: {
             ...(runtimeId ? { runtime_id: runtimeId } : {}),
             status: 'succeeded',
             started_at: startedAt,
-            completed_at: new Date().toISOString(),
+            completed_at: nowIso(),
             output_ref: `${input.item.item_id}:result`,
             output: String(response.payload?.text || ''),
           };
@@ -1346,7 +1347,7 @@ export async function routeToAgentOrSubagent(input: {
             agent_id: request.agent_id || input.assigneePeerId || `task-agent-${request.task_id}`,
             status: 'failed',
             started_at: startedAt,
-            completed_at: new Date().toISOString(),
+            completed_at: nowIso(),
             error: error instanceof Error ? error.message : String(error),
           };
         }
@@ -1401,7 +1402,7 @@ export async function routeToAgentOrSubagent(input: {
         sender: 'kyberion:workitem-dispatcher',
         receiver: input.assigneePeerId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         intent: 'workitem_execution',
