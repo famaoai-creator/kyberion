@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -553,7 +554,7 @@ function writeHostBridgeRequest(
           prompt: request.prompt,
           targetPath,
           aspectRatio: request.aspectRatio || '1:1',
-          timestamp: new Date().toISOString(),
+          timestamp: nowIso(),
         },
         null,
         2

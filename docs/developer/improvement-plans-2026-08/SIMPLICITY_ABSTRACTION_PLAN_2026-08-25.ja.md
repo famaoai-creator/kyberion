@@ -12935,6 +12935,12 @@ SX-03／SX-08／SX-09／SX-10／SX-14 の残存監査として、security quaran
 
 検証: 対象 **10 files / 111 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象10ファイルの ESLint／Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 446
+
+SX-03／SX-08／SX-09／SX-10 のartifact／media bridge残存監査として、Cowork sync、deal document、image generation、promotion candidate、camera／screen capture、video frame、audio input／output、capture-photo task session の **10 production files / 13 箇所**に残っていた直接 `new Date().toISOString()` を foundation `nowIso()` へ統合した。promotion tally と capture history の同一処理内の関連時刻は一つの値を共有し、artifact／customer送信／外部provider／一時ファイルの既存境界は変更していない。
+
+検証: 関連 **9 files / 65 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象10ファイルの ESLint／Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
