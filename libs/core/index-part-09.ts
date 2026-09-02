@@ -397,7 +397,13 @@ export {
   loadActuatorManifestCatalog,
 } from './src/actuator-manifest-index.js';
 
-export type { ActuatorCatalogEntry, ActuatorManifestFile } from './src/actuator-manifest-index.js';
+export type {
+  ActuatorCatalogEntry,
+  ActuatorManifestCapability,
+  ActuatorManifestCapabilityPrerequisites,
+  ActuatorManifestCapabilityRequirements,
+  ActuatorManifestFile,
+} from './src/actuator-manifest-index.js';
 
 // Pre-Flight Check (Sovereign Sentinel)
 

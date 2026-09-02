@@ -59,7 +59,10 @@ describe('actuator-capability', () => {
       const manifest = {
         actuator_id: 'test-actuator',
         version: '1.2.3',
-        capabilities: [{ op: 'read' }, { op: 'write' }],
+        capabilities: [
+          { op: 'read', platforms: ['darwin', 'linux', 'win32'] },
+          { op: 'write', platforms: ['darwin', 'linux', 'win32'] },
+        ],
       };
       fs.writeFileSync(TMP_MANIFEST, JSON.stringify(manifest));
 

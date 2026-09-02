@@ -7,11 +7,14 @@
  */
 
 import { logger } from '../core.js';
-import { readJson } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExec, safeExistsSync } from '../secure-io.js';
-import { loadActuatorManifestCatalog } from './actuator-manifest-index.js';
+import { safeExec, safeExistsSync, assertSafeRepositoryPath } from '../secure-io.js';
+import {
+  loadActuatorManifest,
+  loadActuatorManifestCatalog,
+  type ActuatorManifestFile,
+} from './actuator-manifest-index.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ActuatorCapability {
@@ -29,24 +32,7 @@ export interface ActuatorStatus {
   checkedAt: string;
 }
 
-interface ManifestCapability {
-  op: string;
-  platforms?: string[];
-  /** false = declared but not implemented (AC-01 goal 4; triaged by AC-06). */
-  implemented?: boolean;
-  requirements?: {
-    bin?: string[];
-    env?: string[];
-    lib?: string[];
-  };
-  prerequisites?: {
-    binaries?: string[];
-    platforms?: string[];
-    env?: string[];
-    services?: string[];
-    install?: string[] | Record<string, string>;
-  };
-}
+type ManifestCapability = NonNullable<ActuatorManifestFile['capabilities']>[number];
 
 export type ActuatorCapabilityProbe = () => Promise<ActuatorCapability[]>;
 
@@ -190,15 +176,8 @@ export async function checkActuatorCapabilities(
   manifestPath: string
 ): Promise<ActuatorStatus> {
   // Read manifest
-  const safeManifestPath = assertSafeRepositoryPath(manifestPath);
-  const manifest = readJson<{
-    capabilities?: ManifestCapability[];
-    actuator_id?: string;
-    version?: string;
-  }>(safeManifestPath);
-  const manifestCapabilities = ((manifest.capabilities || []) as ManifestCapability[]).map(
-    evaluateManifestCapability
-  );
+  const manifest = loadActuatorManifest(manifestPath);
+  const manifestCapabilities = (manifest.capabilities || []).map(evaluateManifestCapability);
   const manifestByOp = new Map(
     manifestCapabilities.map((capability) => [capability.op, capability])
   );
