@@ -4,6 +4,7 @@ import { safeExistsSync, safeMkdir, safeWriteFile } from '../secure-io.js';
 import type { PptxDesignProtocol, PptxElement, PptxLayoutRaw, PptxMasterMedia, PptxMasterRaw, PptxStyle, PptxTextRun } from './types/pptx-protocol.js';
 import { generateNativePptx } from './native-pptx-engine/engine.js';
 import { clamp } from '../foundation/text.js';
+import { nowIso } from '../foundation/time.js';
 
 /**
  * PPTX Utilities v3.0.0 [Native Engine]
@@ -750,7 +751,7 @@ export async function distillPptxDesign(sourcePath: string, extractAssetsDir?: s
 
   const protocol: PptxDesignProtocol = {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     canvas,
     theme: palette,
     extensions: presExtMatch ? presExtMatch[0] : undefined,
