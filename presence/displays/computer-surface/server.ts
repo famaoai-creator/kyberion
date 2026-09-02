@@ -16,7 +16,7 @@ import {
   parsePersonalAgentIdentity,
   parsePersonalSovereignIdentity,
 } from '@agent/core/personal-identity-reader';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -198,7 +198,7 @@ function applyA2UIMessage(message: A2UIMessage): void {
     delete state.surfaces[message.deleteSurface.surfaceId];
   }
 
-  state.lastUpdatedAt = new Date().toISOString();
+  state.lastUpdatedAt = nowIso();
 }
 
 function emitState(): void {
@@ -272,7 +272,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     surfaces: Object.keys(state.surfaces).length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 
