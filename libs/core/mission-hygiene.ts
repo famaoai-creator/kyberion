@@ -3,11 +3,10 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
-import { readJson as foundationReadJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import {
-  parseMissionNextTaskRecords,
+  loadMissionNextTaskRecordsAtPath,
   type MissionNextTaskRecord,
 } from './mission-next-task-reader.js';
 import { sendOpsAlert } from './ops-alert.js';
@@ -65,7 +64,7 @@ function readMissionTaskRecords(filePath: string): MissionNextTaskRecord[] {
   try {
     const safePath = safeMissionPath(filePath);
     if (!safePath || !safeExistsSync(safePath)) return [];
-    return parseMissionNextTaskRecords(foundationReadJson<unknown>(safePath)) || [];
+    return loadMissionNextTaskRecordsAtPath(safePath, path.basename(path.dirname(safePath))) || [];
   } catch {
     return [];
   }
