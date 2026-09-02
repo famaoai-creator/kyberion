@@ -53,6 +53,8 @@ import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { assertPhysicalScopeSegment } from './physical-namespace.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
 
 // ---------------------------------------------------------------------------
 // Mission runtime residue
@@ -359,23 +361,22 @@ function missionStateScope(missionDir: string): {
   organizationId?: string;
   projectId?: string;
 } {
-  const record = readJsonRecord(path.join(missionDir, 'mission-state.json'));
+  const record = loadMissionStateAtPath(path.join(missionDir, 'mission-state.json')) as
+    | (MissionState & {
+        organization_profile?: { organization_id?: unknown };
+      })
+    | null;
   if (!record) return {};
-  const relationships = record.relationships as Record<string, unknown> | undefined;
-  const project = relationships?.project as Record<string, unknown> | undefined;
-  const organization = relationships?.organization as Record<string, unknown> | undefined;
-  const organizationProfile = record.organization_profile as Record<string, unknown> | undefined;
+  const organizationProfile = record.organization_profile;
   return {
-    tenantSlug: typeof record.tenant_slug === 'string' ? record.tenant_slug : undefined,
+    tenantSlug: record.tenant_slug,
     organizationId:
-      typeof record.organization_id === 'string'
-        ? record.organization_id
-        : typeof organization?.organization_id === 'string'
-          ? organization.organization_id
-          : typeof organizationProfile?.organization_id === 'string'
-            ? organizationProfile.organization_id
-            : undefined,
-    projectId: typeof project?.project_id === 'string' ? project.project_id : undefined,
+      record.organization_id ||
+      record.relationships?.organization?.organization_id ||
+      (typeof organizationProfile?.organization_id === 'string'
+        ? organizationProfile.organization_id
+        : undefined),
+    projectId: record.relationships?.project?.project_id,
   };
 }
 
