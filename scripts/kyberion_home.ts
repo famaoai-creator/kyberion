@@ -46,7 +46,7 @@ import {
 } from '@agent/core/desktop-intent-reconstruction';
 import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
 import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
-import { validateServiceRecording } from '@agent/core/service-recording';
+import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
@@ -460,6 +460,17 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
       }),
     };
   }
+  if (entry.substrate === 'service') {
+    try {
+      return { value: loadServiceRecordingAtPath(recordingPath) };
+    } catch (error) {
+      return {
+        error: ui('recorder:recorder_recording_read_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      };
+    }
+  }
   let raw: unknown;
   try {
     raw = readJson<unknown>(recordingPath);
@@ -473,11 +484,9 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
   const validation =
     entry.substrate === 'browser'
       ? validateBrowserExtensionRecording(raw)
-      : entry.substrate === 'service'
-        ? validateServiceRecording(raw)
-        : entry.substrate === 'desktop'
-          ? validateDesktopRecording(raw)
-          : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
+      : entry.substrate === 'desktop'
+        ? validateDesktopRecording(raw)
+        : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
   if (!validation.value) return { error: validation.errors.join('; ') };
   return { value: validation.value };
 }

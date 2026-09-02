@@ -16,11 +16,9 @@
  */
 
 import { dispatchProcedure } from '@agent/core/procedure-dispatcher';
-import { validateServiceRecording } from '@agent/core/service-recording';
+import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
 import { withExecutionContext } from '@agent/core/authority';
-import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadProcedures, resolveAllowlistedRecordingRef } from '@agent/core/procedure-registry';
-import { readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { parseSafeJsonObjectInput } from './lib/json-input.js';
 
@@ -64,22 +62,16 @@ export const main = defineScript({
     const recordingAbs = resolveAllowlistedRecordingRef(entry!.adapter.recording_ref);
     if (!recordingAbs)
       throw new ScriptExitError(1, `procedure "${procedureId}" has no allowlisted recording_ref`);
-    if (!safeExistsSync(recordingAbs) || !safeLstat(recordingAbs).isFile()) {
-      throw new ScriptExitError(1, `procedure "${procedureId}" recording is not a regular file`);
-    }
 
-    let raw: unknown;
+    let recording;
     try {
-      raw = readJson<unknown>(recordingAbs!);
+      recording = loadServiceRecordingAtPath(recordingAbs);
     } catch (err) {
       throw new ScriptExitError(
         1,
-        `failed to read recording: ${err instanceof Error ? err.message : String(err)}`
+        `service recording invalid: ${err instanceof Error ? err.message : String(err)}`
       );
     }
-    const recording = validateServiceRecording(raw);
-    if (!recording.value)
-      throw new ScriptExitError(1, `service recording invalid: ${recording.errors.join('; ')}`);
 
     let inputs: Record<string, unknown> = {};
     if (args['inputs']) {
@@ -97,7 +89,7 @@ export const main = defineScript({
     const result = await withExecutionContext('surface_runtime', () =>
       dispatchProcedure({
         procedure: entry!,
-        serviceRecording: recording.value!,
+        serviceRecording: recording,
         serviceInputs: inputs,
         agentId: 'run-service-procedure',
         missionId,

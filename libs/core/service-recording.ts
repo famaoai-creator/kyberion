@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/service-recording.schema.json');
 
@@ -185,4 +187,27 @@ export function validateServiceRecording(input: unknown): {
 
   if (errors.length > 0) return { valid: false, errors };
   return { valid: true, errors: [], value: recording };
+}
+
+/**
+ * Load one persisted service recording through the canonical file and
+ * contract boundary. Callers must not deserialize a recording directly: the
+ * allowlisted path is still untrusted until it is a regular file and passes
+ * both the JSON schema and service-recording invariants.
+ */
+export function loadServiceRecordingAtPath(filePath: string): ServiceRecording {
+  // The regular-file check below is authoritative for the leaf. Keeping the
+  // lexical resolver's missing-leaf mode here also lets callers provide a
+  // virtual test seam while still rejecting missing files at lstat time.
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[SERVICE_RECORDING] recording must be a regular file: ${filePath}`);
+  }
+  const validation = validateServiceRecording(readJson<unknown>(safeFilePath));
+  if (!validation.value) {
+    throw new Error(
+      `[SERVICE_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
+    );
+  }
+  return validation.value;
 }
