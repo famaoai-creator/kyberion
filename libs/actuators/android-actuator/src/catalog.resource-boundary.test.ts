@@ -11,7 +11,9 @@ describe('android catalog resource boundary', () => {
       )
     );
 
-    expect(source).toContain('const safeDefaultsPath = assertSafeRepositoryPath(');
-    expect(source).toContain('readJson<unknown>(safeDefaultsPath)');
+    expect(source).toContain('defineCatalog<AndroidUiDefaults>({');
+    expect(source).toContain("id: 'android-ui-defaults'");
+    expect(source).toContain('schema: ANDROID_UI_DEFAULTS_SCHEMA_PATH');
+    expect(source).toContain('androidUiDefaultsCatalog.load()');
   });
 });
