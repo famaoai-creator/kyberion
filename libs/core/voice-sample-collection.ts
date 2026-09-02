@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeCopyFileSync,
@@ -170,7 +171,7 @@ export function collectVoiceSamples(
   const manifest: VoiceSampleCollectionManifest = {
     kind: 'voice_sample_collection_manifest',
     request_id: input.request_id,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     ...(input.profile_draft ? { profile_draft: input.profile_draft } : {}),
     samples: stagedSamples,
     summary: {
