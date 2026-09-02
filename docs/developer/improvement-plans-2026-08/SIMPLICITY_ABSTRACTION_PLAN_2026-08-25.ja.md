@@ -13343,6 +13343,12 @@ SX-03／SX-04／SX-08 のAIDLC phase stateを再監査し、`aidlc-phase-state.j
 
 検証: AIDLC phase state **1 file / 8 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 514
+
+SX-03／SX-04／SX-08 のmarketing mission completion gateを再監査し、`completion-evidence.json`を`readJson<MarketingCompletionEvidence>`の型アサーションだけでartifact hash／sensitive-data／completion gate評価へ渡していた残存を修正した。`marketing-completion-evidence.schema.json`と`loadMarketingCompletionEvidenceAtPath`を追加し、workload、gate、artifact binding、sensitive-data scan、completion flag、未知フィールドを共有境界でstrict検証するようにした。schema不正 evidenceはsemantic gate評価へ進まず、既存のartifact再hash、dry-run／publication判定、completion semanticsは維持している。
+
+検証: marketing workload／mission completion gate **2 files / 29 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

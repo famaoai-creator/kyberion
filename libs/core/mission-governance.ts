@@ -29,8 +29,8 @@ import {
 } from './secure-io.js';
 import {
   sha256,
+  loadMarketingCompletionEvidenceAtPath,
   validateMarketingCompletionEvidence,
-  type MarketingCompletionEvidence,
 } from './marketing-workload.js';
 import { listArtifactOwnershipRecordsForMission } from './artifact-registry.js';
 import { loadArtifactRecord } from './artifact-record.js';
@@ -426,7 +426,7 @@ export function validateMarketingMissionCompletionGate(input: {
   }
   candidates.sort((left, right) => safeStat(right).mtimeMs - safeStat(left).mtimeMs);
   try {
-    const evidence = readJson<MarketingCompletionEvidence>(candidates[0]);
+    const evidence = loadMarketingCompletionEvidenceAtPath(candidates[0]);
     const currentArtifacts = Object.fromEntries(
       Object.entries(evidence.artifact_bindings || {}).map(([name, binding]) => {
         let artifactPath: string;

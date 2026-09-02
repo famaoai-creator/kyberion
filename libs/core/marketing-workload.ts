@@ -134,6 +134,9 @@ const POLICY_SCHEMA_PATH = pathResolver.knowledge(
 const PUBLICATION_APPROVAL_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/publication-approval.schema.json'
 );
+const MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-completion-evidence.schema.json'
+);
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
@@ -145,6 +148,17 @@ export function loadPublicationApprovalAtPath(filePath: string): PublicationAppr
     id: 'publication-approval',
     path: filePath,
     schema: PUBLICATION_APPROVAL_SCHEMA_PATH,
+  }).load();
+}
+
+/** Load hash-bound marketing completion evidence through its canonical schema boundary. */
+export function loadMarketingCompletionEvidenceAtPath(
+  filePath: string
+): MarketingCompletionEvidence {
+  return defineCatalog<MarketingCompletionEvidence>({
+    id: 'marketing-completion-evidence',
+    path: filePath,
+    schema: MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH,
   }).load();
 }
 
