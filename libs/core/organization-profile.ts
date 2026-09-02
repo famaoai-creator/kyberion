@@ -20,6 +20,16 @@ export interface OrganizationProfileLlmOverride {
   adapter?: string;
 }
 
+export interface OrganizationProfileWorkforce {
+  mode?: string;
+  accountable_owner_id?: string;
+  accountable_human_resource_id?: string;
+  default_approval_holder?: string;
+  default_budget_posture?: string;
+  resource_catalog_id?: string;
+  default_resource_status?: 'active' | 'suspended' | 'revoked';
+}
+
 export interface OrganizationProfile {
   version: string;
   organization_id: string;
@@ -38,6 +48,7 @@ export interface OrganizationProfile {
     default_lifecycle_template?: string;
     max_parallel_missions?: number;
   };
+  workforce?: OrganizationProfileWorkforce;
   llm?: {
     purpose_map?: Record<string, string>;
     default_profile?: string;

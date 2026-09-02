@@ -21,7 +21,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { applyOnboardingContextBinding } from '@agent/core/onboarding-context';
-import { getRegisteredEnvText, nowIso, readJson, setRegisteredEnv } from '@agent/core/foundation';
+import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
+import { getRegisteredEnvText, nowIso, setRegisteredEnv } from '@agent/core/foundation';
 import { bootstrapCompany, listCompanyVerticals } from './company_bootstrap.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -182,7 +183,7 @@ export function onboardAiCompany(input: AiCompanyOnboardingInput): AiCompanyOnbo
       rootDir,
       force: normalized.force,
     });
-    const profile = readJson<Record<string, unknown>>(
+    const profile = loadOrganizationProfileAtPath(
       requireRegularFile(profilePath, rootDir, 'organization profile')
     );
     profile.accountable_human_resource_id = normalized.accountableHumanId;

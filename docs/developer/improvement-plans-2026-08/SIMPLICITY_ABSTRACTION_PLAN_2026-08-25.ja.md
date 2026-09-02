@@ -13259,6 +13259,12 @@ SX-03／SX-08 のsovereign dashboard mission projectionを再監査し、`missio
 
 検証: sovereign dashboard **1 file / 6 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 500
+
+SX-03／SX-04 のcompany onboarding profile readerを再監査し、`organization-profile.json`をonboardingだけが`readJson<Record<string, unknown>>`で読み、schema loaderの外側でworkforce項目を追加していた残存を修正した。既存の`loadOrganizationProfileAtPath`へ統合し、organization profile schemaに定義済みのworkforce契約を共有型へ反映したうえで、検証済みprofileからaccountability／approval／budget設定を更新するようにした。不正profileは書込み処理へ進まず、company bootstrapのrollback、tenant binding、first-work生成 semanticsは変更していない。
+
+検証: company onboarding／organization profile **2 files / 12 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
