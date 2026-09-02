@@ -6,6 +6,10 @@ import type { MissionState } from './mission-types.js';
 import { readJson as foundationReadJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import {
+  parseMissionNextTaskRecords,
+  type MissionNextTaskRecord,
+} from './mission-next-task-reader.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
 import { loadOrganizationProfile } from './organization-profile.js';
@@ -57,13 +61,13 @@ export interface MissionHygieneReport {
   thresholds: { stale_days: number; abandoned_days: number };
 }
 
-function readJson<T>(filePath: string): T | null {
+function readMissionTaskRecords(filePath: string): MissionNextTaskRecord[] {
   try {
     const safePath = safeMissionPath(filePath);
-    if (!safePath || !safeExistsSync(safePath)) return null;
-    return foundationReadJson<T>(safePath);
+    if (!safePath || !safeExistsSync(safePath)) return [];
+    return parseMissionNextTaskRecords(foundationReadJson<unknown>(safePath)) || [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -149,8 +153,7 @@ function classifyPlanned(missionPath: string): {
   task_count: number;
   recommendation: string;
 } {
-  const tasks =
-    readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+  const tasks = readMissionTaskRecords(path.join(missionPath, 'NEXT_TASKS.json'));
   if (tasks.length === 0) {
     return {
       reason: 'design_missing',
@@ -197,8 +200,7 @@ export function collectMissionHygieneReport(
     if (status === 'active' || status === 'distilling') {
       const ageDays = missionAgeDays(state.history);
       if (ageDays !== null && ageDays >= staleDays) {
-        const tasks =
-          readJson<Array<Record<string, unknown>>>(path.join(missionPath, 'NEXT_TASKS.json')) || [];
+        const tasks = readMissionTaskRecords(path.join(missionPath, 'NEXT_TASKS.json'));
         const distilling = status === 'distilling';
         const finding: PlannedMissionFinding = {
           mission_id: state.mission_id,
