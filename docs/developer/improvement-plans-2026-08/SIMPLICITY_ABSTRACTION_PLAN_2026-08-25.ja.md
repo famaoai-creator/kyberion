@@ -12054,6 +12054,16 @@ actual helper entry のみ起動する fail-closed な判定へ正規化した�
 検証: direct-entry／CLI／actuator **35 files / 593 tests passed / 11 skipped**、script-integrity、actuator build、typecheck、
 PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-06 は全 generator 化と、他の独立した server／interactive script の整理である。
 
+## 2026-09-02 再レビュー修正 317
+
+SX-04 の orchestrator execution brief が `actuator-request-archetypes.json` を個別 `readJson` と domain parser だけで読む残存を
+確認したため、専用 `actuator-request-archetypes.schema.json` を指定した `defineCatalog<ActuatorRequestArchetypeCatalog>()` へ移行した。
+共通 catalog の resource path／cache／schema validation を先に適用し、その後に default archetype の存在と非空配列を確認する
+domain parser を残すことで、JSON Schema と意味検証の責務を分離した。execution brief の推論・fallback semantics は変更していない。
+
+検証: orchestrator actuator **7 files / 53 tests passed**、actuator build、typecheck、PR scope **33/33 gates passed**、root lint、
+Prettier、`git diff --check`。残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
