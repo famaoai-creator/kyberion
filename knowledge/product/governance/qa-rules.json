@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/qa-rules.schema.json",
   "documentation_only": true,
   "version": "1.0.0",
   "rules": [
