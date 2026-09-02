@@ -2,7 +2,10 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
-import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
+import {
+  loadServiceEndpointsDirectoryCatalog,
+  type ServiceEndpointsCatalog,
+} from '@agent/core/service-endpoint-registry';
 import {
   loadAgentProfileDirectory,
   loadAgentProfileSnapshot,
@@ -10,6 +13,9 @@ import {
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
 } from '@agent/core/mission-team-index';
+import { loadSurfaceProviderManifestCatalogDirectory } from '@agent/core/surface-provider-manifest-catalog';
+import { loadVoiceEngineRegistryDirectory } from '@agent/core/voice-engine-registry';
+import { loadVoiceProfileRegistryDirectory } from '@agent/core/voice-profile-registry';
 import { loadSpecialistCatalog } from '@agent/core/work-design';
 import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 
@@ -169,38 +175,28 @@ export function validateVoiceProfileDirectoryConsistency(violations: string[]) {
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/voice-profile-registry.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = voiceProfileSnapshotCatalog.load();
   const snapshotProfiles = snapshot.profiles || [];
   const snapshotIds = new Set(snapshotProfiles.map((profile) => String(profile.profile_id || '')));
+  let directoryRegistry: ReturnType<typeof loadVoiceProfileRegistryDirectory>;
+  try {
+    directoryRegistry = loadVoiceProfileRegistryDirectory(directory);
+  } catch (error) {
+    violations.push(
+      `voice-profile-registry: canonical directory failed governed loading (${String(error)})`
+    );
+    return;
+  }
+  const directoryProfiles = new Map(
+    directoryRegistry.profiles.map((profile) => [profile.profile_id, profile])
+  );
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/product/governance/voice-profiles/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `voice-profile-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const typed = data as { profiles?: Array<{ profile_id?: string }> };
-    const profileIds = (typed.profiles || [])
-      .map((profile) => String(profile.profile_id || ''))
-      .filter(Boolean);
-    if (profileIds.length !== 1) {
-      violations.push(`voice-profile-registry/${file}: must contain exactly one profile`);
+    const profileId = file.replace(/\.json$/i, '');
+    if (!directoryProfiles.has(profileId)) {
+      violations.push(`voice-profile-registry/${file}: governed loader did not return this profile`);
       continue;
-    }
-    const profileId = profileIds[0];
-    if (file.replace(/\.json$/i, '') !== profileId) {
-      violations.push(
-        `voice-profile-registry/${file}: file name must match profile id ${profileId}`
-      );
     }
     if (!snapshotIds.has(profileId)) {
       violations.push(`voice-profile-registry/${file}: snapshot is missing profile ${profileId}`);
@@ -362,35 +358,27 @@ export function validateSurfaceProviderCatalogDirectoryConsistency(violations: s
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/surface-provider-manifest-catalog.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = surfaceProviderSnapshotCatalog.load();
   const snapshotIds = new Set((snapshot.entries || []).map((entry) => String(entry.id || '')));
+  let directoryCatalog: ReturnType<typeof loadSurfaceProviderManifestCatalogDirectory>;
+  try {
+    directoryCatalog = loadSurfaceProviderManifestCatalogDirectory();
+  } catch (error) {
+    violations.push(
+      `surface-provider-manifest-catalog: canonical directory failed governed loading (${String(error)})`
+    );
+    return;
+  }
+  const directoryEntries = new Map(directoryCatalog.entries.map((entry) => [entry.id, entry]));
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/product/governance/surface-provider-manifest-catalogs/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `surface-provider-manifest-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const typed = data as { entries?: Array<{ id?: string }> };
-    const ids = (typed.entries || []).map((entry) => String(entry.id || '')).filter(Boolean);
-    if (ids.length !== 1) {
-      violations.push(`surface-provider-manifest-catalog/${file}: must contain exactly one entry`);
-      continue;
-    }
-    const id = ids[0];
-    if (file.replace(/\.json$/i, '') !== id) {
+    const id = file.replace(/\.json$/i, '');
+    if (!directoryEntries.has(id)) {
       violations.push(
-        `surface-provider-manifest-catalog/${file}: file name must match entry id ${id}`
+        `surface-provider-manifest-catalog/${file}: governed loader did not return this entry`
       );
+      continue;
     }
     if (!snapshotIds.has(id)) {
       violations.push(`surface-provider-manifest-catalog/${file}: snapshot is missing entry ${id}`);
@@ -424,48 +412,36 @@ export function validateServiceEndpointsDirectoryConsistency(violations: string[
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/service-endpoints.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = serviceEndpointsSnapshotCatalog.load();
   const snapshotIds = new Set(
     Object.keys(snapshot.services || {}).map((entry) => String(entry || ''))
   );
+  let directoryCatalog: ReturnType<typeof loadServiceEndpointsDirectoryCatalog>;
+  try {
+    directoryCatalog = loadServiceEndpointsDirectoryCatalog(directory);
+  } catch (error) {
+    violations.push(
+      `service-endpoints: canonical directory failed governed loading (${String(error)})`
+    );
+    return;
+  }
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/product/orchestration/service-endpoints/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `service-endpoints/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const typed = data as {
-      default_pattern?: string;
-      services?: Record<string, { intent_aliases?: string[] }>;
-    };
-    const ids = Object.keys(typed.services || {}).filter(Boolean);
-    if (ids.length !== 1) {
-      violations.push(`service-endpoints/${file}: must contain exactly one service`);
+    const id = file.replace(/\.json$/i, '');
+    const directoryRecord = directoryCatalog.services[id];
+    if (!directoryRecord) {
+      violations.push(`service-endpoints/${file}: governed loader did not return this service`);
       continue;
     }
-
-    const id = ids[0];
-    if (file.replace(/\.json$/i, '') !== id) {
-      violations.push(`service-endpoints/${file}: file name must match service id ${id}`);
-    }
-    if (typed.default_pattern !== snapshot.default_pattern) {
+    if (directoryCatalog.default_pattern !== snapshot.default_pattern) {
       violations.push(`service-endpoints/${file}: default_pattern must match the snapshot`);
     }
     if (!snapshotIds.has(id)) {
       violations.push(`service-endpoints/${file}: snapshot is missing service ${id}`);
     }
     const snapshotAliasList = snapshot.services?.[id]?.intent_aliases || [];
-    const directoryAliasList = typed.services?.[id]?.intent_aliases || [];
+    const directoryAliasList = directoryRecord.intent_aliases || [];
     if (JSON.stringify(snapshotAliasList) !== JSON.stringify(directoryAliasList)) {
       violations.push(`service-endpoints/${file}: intent_aliases must match the snapshot`);
     }
@@ -548,36 +524,28 @@ export function validateVoiceEngineDirectoryConsistency(violations: string[]) {
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/voice-engine-registry.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = voiceEngineSnapshotCatalog.load();
   const snapshotEngines = snapshot.engines || [];
   const snapshotIds = new Set(snapshotEngines.map((engine) => String(engine.engine_id || '')));
+  let directoryRegistry: ReturnType<typeof loadVoiceEngineRegistryDirectory>;
+  try {
+    directoryRegistry = loadVoiceEngineRegistryDirectory(directory);
+  } catch (error) {
+    violations.push(
+      `voice-engine-registry: canonical directory failed governed loading (${String(error)})`
+    );
+    return;
+  }
+  const directoryEngines = new Map(
+    directoryRegistry.engines.map((engine) => [engine.engine_id, engine])
+  );
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/product/governance/voice-engines/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `voice-engine-registry/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const typed = data as { engines?: Array<{ engine_id?: string }>; default_engine_id?: string };
-    const engineIds = (typed.engines || [])
-      .map((engine) => String(engine.engine_id || ''))
-      .filter(Boolean);
-    if (engineIds.length !== 1) {
-      violations.push(`voice-engine-registry/${file}: must contain exactly one engine`);
+    const engineId = file.replace(/\.json$/i, '');
+    if (!directoryEngines.has(engineId)) {
+      violations.push(`voice-engine-registry/${file}: governed loader did not return this engine`);
       continue;
-    }
-    const engineId = engineIds[0];
-    if (file.replace(/\.json$/i, '') !== engineId) {
-      violations.push(`voice-engine-registry/${file}: file name must match engine id ${engineId}`);
     }
     if (!snapshotIds.has(engineId)) {
       violations.push(`voice-engine-registry/${file}: snapshot is missing engine ${engineId}`);
