@@ -7537,6 +7537,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/managed-plugin-record.schema.json",
+      "tier": "public",
+      "size": 1967,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/marketing-completion-evidence.schema.json",
       "tier": "public",
       "size": 2789,
