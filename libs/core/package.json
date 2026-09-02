@@ -1107,6 +1107,10 @@
       "types": "./dist/service-runtime-registry.d.ts",
       "default": "./dist/service-runtime-registry.js"
     },
+    "./service-pid-registry": {
+      "types": "./dist/service-pid-registry.d.ts",
+      "default": "./dist/service-pid-registry.js"
+    },
     "./service-engine": {
       "types": "./dist/service-engine.d.ts",
       "default": "./dist/service-engine.js"
