@@ -25,6 +25,7 @@
 
 import { logger } from '@agent/core/core';
 import { retry } from '@agent/core/async-utils';
+import { nowIso } from '@agent/core/foundation';
 import {
   registerMeetingJoinDriver,
   validateMeetingTarget,
@@ -427,7 +428,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
         throw new Error(`[browser-driver] no join button matched (${platform})`);
       }
       state.status = 'in_meeting';
-      state.joined_at = new Date().toISOString();
+      state.joined_at = nowIso();
 
       // Persist cookies so next run skips the login.
       try {
@@ -477,7 +478,7 @@ class BrowserMeetingJoinDriver implements MeetingJoinDriver {
           buildRetryOptions()
         );
         state.status = 'ended';
-        state.left_at = new Date().toISOString();
+        state.left_at = nowIso();
         if (runtime.cleanup_mode === 'browser' && runtime.browser) {
           await retry(
             async () => runtime.browser?.close().catch(() => undefined),

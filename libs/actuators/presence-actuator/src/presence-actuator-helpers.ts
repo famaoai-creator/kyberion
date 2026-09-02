@@ -8,7 +8,7 @@ import { retry } from '@agent/core/async-utils';
 import { secureFetch } from '@agent/core/network';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { WebClient } from '@slack/web-api';
 
 const PRESENCE_MANIFEST_PATH = pathResolver.rootResolve(
@@ -187,7 +187,7 @@ export async function handleAction(input: PresenceAction) {
         org,
         source: 'presence-actuator',
         interaction: {
-          at: new Date().toISOString(),
+          at: nowIso(),
           summary,
           channel: params.channel,
           ...(tone_shifts ? { tone_shifts } : {}),

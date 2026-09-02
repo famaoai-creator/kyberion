@@ -1,6 +1,6 @@
 import { pcmToWav } from '@agent/core/pcm-wav';
 import { pathResolver } from '@agent/core/path-resolver';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   registerStreamingSttBridge,
   type StreamingSpeechToTextBridge,
@@ -82,7 +82,7 @@ function createFasterWhisperBridge(
             utterance_id: `${options.request_id}-final`,
             is_final: true,
             text,
-            emitted_at: new Date().toISOString(),
+            emitted_at: nowIso(),
           };
         }
       } finally {
@@ -142,7 +142,7 @@ function createMlxWhisperBridge(
             utterance_id: `${options.request_id}-final`,
             is_final: true,
             text,
-            emitted_at: new Date().toISOString(),
+            emitted_at: nowIso(),
           };
         }
       } finally {

@@ -1,4 +1,5 @@
 import {
+  nowIso,
   readJson,
   getRegisteredEnv,
   parseSafeJsonInput,
@@ -619,7 +620,7 @@ export async function impactAnalysisOp(input: {
     parsed.size === 'S' || parsed.size === 'M' || parsed.size === 'L' ? parsed.size : 'M';
   const result: ImpactAnalysisResult = {
     kind: 'impact-analysis',
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     repo_path: input.repo_path,
     summary: String(parsed.summary || '').trim(),
     files: Array.isArray(parsed.files)

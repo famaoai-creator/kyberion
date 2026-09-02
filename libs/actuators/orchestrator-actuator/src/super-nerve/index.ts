@@ -17,7 +17,7 @@ import { suggestClosestStrings } from '@agent/core/op-suggestions';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { registerSuperNerveExecutor } from '@agent/core/super-nerve-execution-port';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -79,7 +79,7 @@ export async function executeSuperPipeline(
 
   const initial = {
     ...conversationCtx,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
   let normalizedSteps = steps.map(normalizeStep);
 

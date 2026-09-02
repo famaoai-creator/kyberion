@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { installProcessGuards } from '@agent/core/process-guards';
 import {
   appendJsonLine,
+  nowIso,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
   readJson,
@@ -584,9 +585,7 @@ export async function handleTelegramUpdate(
   const chatId = String(message.chat.id);
   const threadTs = resolveTelegramThreadTs(message);
   const receivedAt =
-    typeof message.date === 'number'
-      ? new Date(message.date * 1000).toISOString()
-      : new Date().toISOString();
+    typeof message.date === 'number' ? new Date(message.date * 1000).toISOString() : nowIso();
   const authorLabel = String(message.from?.username || message.from?.id || chatId);
 
   logger.info(
@@ -658,7 +657,7 @@ export async function handleTelegramUpdate(
         messageId: `reply-${message.message_id}`,
         threadTs,
         chatId,
-        receivedAt: new Date().toISOString(),
+        receivedAt: nowIso(),
       });
     },
   };
@@ -708,7 +707,7 @@ export async function handleTelegramUpdate(
               messageId: `reply-${message.message_id}`,
               threadTs,
               chatId,
-              receivedAt: new Date().toISOString(),
+              receivedAt: nowIso(),
             });
             postTurnReceipt = {
               ok: true,

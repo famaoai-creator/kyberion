@@ -1,4 +1,4 @@
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -115,7 +115,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
   const MAX_STEPS = options.max_steps || DEFAULT_MAX_PIPELINE_STEPS;
   const TIMEOUT = options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS;
 
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx = { ...initialCtx, timestamp: nowIso() };
 
   const contextPath = initialCtx.context_path
     ? resolveNetworkPath(String(initialCtx.context_path))

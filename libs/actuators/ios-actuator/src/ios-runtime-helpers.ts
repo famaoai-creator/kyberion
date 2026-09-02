@@ -12,7 +12,7 @@ import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry } from '@agent/core/async-utils';
-import { isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -79,7 +79,7 @@ export async function executePipeline(
 
   let ctx: Record<string, any> = {
     ...initialCtx,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     artifacts_dir: artifactsDir,
     ios_device_udid: options?.device_udid || initialCtx.ios_device_udid || '',
   };

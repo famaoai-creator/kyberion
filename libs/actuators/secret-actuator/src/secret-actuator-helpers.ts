@@ -7,7 +7,7 @@ import {
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { ledger } from '@agent/core/ledger';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
@@ -94,7 +94,7 @@ function registryAdd(service: string, account: string): void {
   const existing = registry.entries.findIndex(
     (e) => e.service === service && e.account === account
   );
-  const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
+  const entry: RegistryEntry = { service, account, addedAt: nowIso() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
   } else {

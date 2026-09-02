@@ -1,6 +1,11 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { appendJsonLine, getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  appendJsonLine,
+  getRegisteredEnvText,
+  nowIso,
+  parseSafeJsonInput,
+} from '@agent/core/foundation';
 import type { SupportedLocale } from '@agent/core/locale-normalize';
 import { createServer } from 'node:http';
 import { createHash, randomUUID } from 'node:crypto';
@@ -1256,7 +1261,7 @@ app.get('/health', (_req, res) => {
   res.json({
     ok: true,
     recent: recent.length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 

@@ -43,7 +43,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { readJson, getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -429,7 +429,7 @@ async function executeMeetingPipeline(
   const result = await runAdfActuatorPipeline({
     actuatorId: 'meeting',
     steps,
-    context: { ...initialContext, timestamp: new Date().toISOString() } as Record<string, unknown>,
+    context: { ...initialContext, timestamp: nowIso() } as Record<string, unknown>,
     options: {
       maxSteps: options.max_steps || DEFAULT_MAX_PIPELINE_STEPS,
       timeoutMs: options.timeout_ms || DEFAULT_PIPELINE_TIMEOUT_MS,
