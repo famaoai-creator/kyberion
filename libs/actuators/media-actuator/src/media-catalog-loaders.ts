@@ -4,7 +4,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { defineCatalog, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
 export function cloneJsonValue<T>(value: T): T {
@@ -155,9 +155,32 @@ export function resolveConfidentialTenantOverride(
 }
 
 export function loadMediaDesignSystemsCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/media-design-systems',
-    filePath: 'knowledge/public/design-patterns/media-templates/media-design-systems.json',
-    fallback: { default_system: 'executive-standard', systems: {} },
+  const fallback = {
+    version: '1.0.0',
+    default_system: 'executive-standard',
+    systems: {},
+  };
+  const filePath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/media-design-systems.json'
+  );
+  const catalog = defineCatalog<{
+    version: string;
+    default_system: string;
+    systems: Record<string, Record<string, unknown>>;
+  }>({
+    id: 'media-design-systems',
+    path: filePath,
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json'),
+    fallback,
+    fallbackOnInvalid: true,
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/media-design-systems'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  return catalog.validate(merged, directoryPath);
 }
