@@ -888,10 +888,28 @@ export function organizationRecordFiles(rootDir: string, fileName: string): stri
   if (!safeExistsSync(safeRootDir)) return [];
   const files: string[] = [];
   for (const entry of safeReaddir(safeRootDir)) {
-    const fullPath = assertSafeRepositoryPath(path.join(safeRootDir, entry));
-    if (safeStat(fullPath).isDirectory())
-      files.push(...organizationRecordFiles(fullPath, fileName));
-    else if (entry === fileName) files.push(fullPath);
+    // Atomic secure-io writes briefly leave a `${file}.tmp.*` sibling. A
+    // discovery pass must ignore that transient artifact rather than racing
+    // its rename and treating the vanished path as a missing record.
+    if (entry.includes('.tmp.')) continue;
+    try {
+      const fullPath = assertSafeRepositoryPath(path.join(safeRootDir, entry));
+      if (safeStat(fullPath).isDirectory())
+        files.push(...organizationRecordFiles(fullPath, fileName));
+      else if (entry === fileName) files.push(fullPath);
+    } catch (error) {
+      // A concurrent cleanup may remove a directory after readdir but before
+      // stat. Missing records are harmless during discovery; scope and
+      // symlink violations must still fail closed.
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        (error as NodeJS.ErrnoException)?.code === 'ENOENT' ||
+        message.startsWith('Resource path does not exist:')
+      ) {
+        continue;
+      }
+      throw error;
+    }
   }
   return files;
 }
