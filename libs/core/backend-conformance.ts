@@ -16,6 +16,7 @@ import {
 } from './backend-capability-profile.js';
 import { requireSandboxEnforcement, resolveSandboxPolicy } from './sandbox-policy.js';
 import { resolveProviderPermissionArgs, type ProviderId } from './provider-permission-profiles.js';
+import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
@@ -237,7 +238,7 @@ export function runBackendSandboxConformance(
     exists: (file: string) => safeExistsSync(file),
     remove: (fileOrDirectory: string) => safeRmSync(fileOrDirectory),
   };
-  const probeId = (options.probeId || options.now || new Date().toISOString())
+  const probeId = (options.probeId || options.now || nowIso())
     .replace(/[^a-zA-Z0-9_-]/gu, '-')
     .slice(0, 80);
   const uniqueProbeId = `${probeId}-${Math.random().toString(36).slice(2, 10)}`;
@@ -380,7 +381,7 @@ export function runBackendConformance(
   });
   return {
     version: '1.0.0',
-    generated_at: options.now || new Date().toISOString(),
+    generated_at: options.now || nowIso(),
     probe: 'live-cli-version-help',
     results,
   };

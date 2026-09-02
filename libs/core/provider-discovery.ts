@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import { safeExistsSync, safeMkdir, safeUnlinkSync, safeWriteFile } from './secure-io.js';
@@ -205,7 +206,7 @@ export function mergeProbedCapabilitiesIntoCatalog(
   opts: { updatedBy?: string; note?: string; mode?: 'union' | 'replace'; timestamp?: string } = {}
 ): ProviderCapabilityCatalog {
   const mode = opts.mode || 'union';
-  const timestamp = opts.timestamp || new Date().toISOString();
+  const timestamp = opts.timestamp || nowIso();
   const updatedBy = opts.updatedBy || 'probe';
 
   // Read the raw on-disk catalog (NOT merged with fallback) so we preserve its exact structure.
