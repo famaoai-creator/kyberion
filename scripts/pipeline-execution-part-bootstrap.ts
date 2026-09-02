@@ -28,7 +28,7 @@ import {
 import { runJanitor } from '@agent/core/storage-janitor';
 import { checkActuatorCapabilities } from '@agent/core/src/actuator-capability';
 import { validateOpInput } from '@agent/core/op-input-contracts';
-import { getRegisteredEnv, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnv, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { resolveIdentityContext } from '@agent/core/authority';
 import { defineLegacyPipelineActuator } from '@agent/core/actuator-sdk';
 import type {
@@ -1008,7 +1008,7 @@ export async function runInlineSystemWriteFile(
   ctx: Record<string, unknown>,
   rootDir: string
 ): Promise<Record<string, unknown>> {
-  const enrichedCtx = { ...ctx, $now: new Date().toISOString() };
+  const enrichedCtx = { ...ctx, $now: nowIso() };
   const resolvedParams = resolveParamsRecursive(params, enrichedCtx);
   const writePath = nodePath.resolve(rootDir, String(resolvedParams.path ?? ''));
   const rawContent = resolvedParams.content;

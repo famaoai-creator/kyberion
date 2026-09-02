@@ -1,5 +1,6 @@
 import {
   getRegisteredEnvText,
+  nowIso,
   parseSafeJsonObjectInput,
   setRegisteredEnv,
 } from '@agent/core/foundation';
@@ -175,7 +176,7 @@ export async function executePipelineFile(
     repo_root: pathResolver.rootDir(),
     platform_name: process.platform,
     node_options: process.env.NODE_OPTIONS || '',
-    run_utc_now: new Date().toISOString(),
+    run_utc_now: nowIso(),
     __pipeline_options: pipeline.options || {},
     trust_resolved: effectiveTrustResolved,
     ...(options.projectTrustApprovalId
@@ -466,7 +467,7 @@ export async function main(args?: string[]) {
   autoContext.repo_root = pathResolver.rootDir();
   autoContext.platform_name = process.platform;
   autoContext.node_options = process.env.NODE_OPTIONS || '';
-  autoContext.run_utc_now = new Date().toISOString();
+  autoContext.run_utc_now = nowIso();
   autoContext.__pipeline_options = pipeline.options || {};
 
   // Propagate pipeline knowledge_scope so wisdom:query uses the right tier/customer index.
@@ -535,7 +536,7 @@ export async function main(args?: string[]) {
         );
     runJournal = activeRunJournal;
     if (resumeState) {
-      activeRunJournal.append('run_resumed', { resumed_at: new Date().toISOString() });
+      activeRunJournal.append('run_resumed', { resumed_at: nowIso() });
     }
     const sessionStart = await fireLifecycleHooks(
       getDefaultLifecycleHookEngine(),

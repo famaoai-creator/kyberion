@@ -24,6 +24,7 @@ import {
   installReasoningBackends,
 } from '@agent/core/reasoning-bootstrap';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation';
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
 import { logger } from '@agent/core/core';
 import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
@@ -285,7 +286,7 @@ async function recordRoutingDecisionInMissionState(
     routing_decision_summary: summary,
   };
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'ROUTE',
     note: `${event} routing decision: ${summary || 'unknown'}`,
   });
@@ -1104,7 +1105,7 @@ export async function handoffMission(
   });
   state.assigned_persona = nextPersona;
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'HANDOFF',
     from: previousPersona,
     to: nextPersona,

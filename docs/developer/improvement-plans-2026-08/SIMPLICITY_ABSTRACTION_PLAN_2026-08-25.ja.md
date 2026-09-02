@@ -11889,6 +11889,15 @@ SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含�
 検証: CLI／home／vital 関連 **4 test files / 45 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。
 残る SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
 
+## 2026-09-02 再レビュー修正 301
+
+mission controller と pipeline execution の orchestration 経路に残っていた単純 timestamp 6 箇所を foundation の
+`nowIso()` へ移行した。mission の route／handoff history、pipeline の run context／resume journal、ADF の `$now`
+解決値は従来と同じ UTC ISO 形式を維持し、mission lifecycle・pipeline dispatch・resume semantics は変更していない。
+
+検証: mission／pipeline 関連 **5 test files / 158 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。
+残る SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
