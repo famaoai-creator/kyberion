@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
-import { main, runMigrations } from './run_migrations.js';
+import { main, readState, runMigrations } from './run_migrations.js';
 
 const TMP_ROOT = pathResolver.sharedTmp('run-migrations-tests');
 const MIGRATIONS_DIR = path.join(TMP_ROOT, 'migration');
@@ -12,7 +12,7 @@ function writeMigration(fileName: string, body: string): void {
   safeWriteFile(path.join(MIGRATIONS_DIR, fileName), body, { encoding: 'utf8' });
 }
 
-function readState(): { applied: string[] } {
+function readPersistedState(): { applied: string[] } {
   return JSON.parse(String(safeReadFile(STATE_PATH, { encoding: 'utf8' }) || '{"applied":[]}'));
 }
 
@@ -54,7 +54,7 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     });
 
     expect(result.applied).toEqual(['0001-alpha', '0002-beta']);
-    expect(readState().applied).toEqual(['0001-alpha', '0002-beta']);
+    expect(readPersistedState().applied).toEqual(['0001-alpha', '0002-beta']);
     expect((globalThis as any).__migrationCalls).toEqual([
       ['migrate', '0001-alpha', false],
       ['migrate', '0002-beta', false],
@@ -117,7 +117,7 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
     });
 
     expect(dryRun.applied).toEqual(['0001-alpha', '0002-beta']);
-    expect(readState().applied).toEqual(['0001-alpha', '0002-beta']);
+    expect(readPersistedState().applied).toEqual(['0001-alpha', '0002-beta']);
     expect((globalThis as any).__migrationCalls).toEqual([['rollback', '0002-beta', true]]);
   });
 
@@ -141,5 +141,27 @@ export async function rollback(opts) { calls().push(['rollback', id, opts.dryRun
         list: true,
       })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('fails closed for malformed persisted migration state', () => {
+    safeMkdir(path.dirname(STATE_PATH), { recursive: true });
+
+    safeWriteFile(STATE_PATH, JSON.stringify({ applied: ['0001-alpha', ''] }), {
+      encoding: 'utf8',
+    });
+    expect(readState(STATE_PATH)).toEqual({ applied: [] });
+
+    safeWriteFile(STATE_PATH, JSON.stringify({ applied: ['0001-alpha', '0001-alpha'] }), {
+      encoding: 'utf8',
+    });
+    expect(readState(STATE_PATH)).toEqual({ applied: [] });
+
+    safeWriteFile(STATE_PATH, JSON.stringify({ applied: ['0001-alpha'], unexpected: true }), {
+      encoding: 'utf8',
+    });
+    expect(readState(STATE_PATH)).toEqual({ applied: [] });
+
+    safeWriteFile(STATE_PATH, '{"__proto__":{"polluted":true}}', { encoding: 'utf8' });
+    expect(() => readState(STATE_PATH)).toThrow('dangerous JSON key');
   });
 });
