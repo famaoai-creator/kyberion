@@ -68,4 +68,31 @@ describe('provider-discovery', () => {
       { encoding: 'utf8' }
     );
   });
+
+  it('rejects malformed disk cache records before using cached providers', async () => {
+    const { parseProviderDiscoveryCache } = await import('./provider-discovery.js');
+    expect(() =>
+      parseProviderDiscoveryCache({
+        ts: Date.now(),
+        providers: [
+          {
+            provider: 'codex',
+            installed: false,
+            version: null,
+            protocol: 'json-rpc',
+            models: [],
+            healthy: false,
+            unexpected: true,
+          },
+        ],
+      })
+    ).toThrow('contains unknown field(s)');
+    expect(() =>
+      parseProviderDiscoveryCache(
+        JSON.parse(
+          '{"ts":1,"providers":[{"provider":"codex","installed":false,"version":null,"protocol":"json-rpc","models":[],"healthy":false,"modelCapabilities":{"__proto__":[]}}]}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
+  });
 });
