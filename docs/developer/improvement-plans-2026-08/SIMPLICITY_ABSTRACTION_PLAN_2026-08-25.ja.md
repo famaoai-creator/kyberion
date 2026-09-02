@@ -11686,6 +11686,17 @@ deny／allow パターンを型・必須項目・未知キー拒否まで明示�
 root lint、`git diff --check`。runtime 参照の generic envelope は **0 件**。残る SX-04 は documentation-only catalog
 の dedicated schema／処分判断と各 domain loader の完全統合である。
 
+## 2026-09-02 再レビュー修正 281
+
+SX-07 の baseline 管理を `ci-gates.json` に集約した。type ratchet、module boundary、i18n、contract semver、
+pipeline shell independence、op input contract coverage の各 gate が manifest に baseline を宣言し、checker は
+共有 resolver 経由でその宣言を読む。baseline は絶対パス／リポジトリ外参照を拒否し、parity check はファイルの存在も
+検証するため、checker と manifest の固定パス乖離を検出できる。
+
+検証: baseline 関連 **5 test files / 34 tests passed**、各 baseline gate の個別実行、PR scope の ci-gate-parity、
+contract-semver、root typecheck、`git diff --check`。残る SX-07 は validate／CI の全 check 集合統合と外部依存
+gate の sandbox-independent 実行である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

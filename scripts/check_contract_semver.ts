@@ -29,6 +29,7 @@ import {
 import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 interface Manifest {
   actuator_id: string;
@@ -58,7 +59,7 @@ interface BumpKind {
 }
 
 const ACTUATOR_DIR = pathResolver.rootResolve('libs/actuators');
-const BASELINE_PATH = pathResolver.rootResolve('scripts/contract-baseline.json');
+const BASELINE_PATH = resolveCiGateBaselinePath('contract-semver');
 
 function listActuatorManifests(): string[] {
   const entries = safeExistsSync(ACTUATOR_DIR) ? safeReaddir(ACTUATOR_DIR) : [];

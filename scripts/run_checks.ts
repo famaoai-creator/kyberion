@@ -10,6 +10,7 @@ type Gate = {
   args?: string[];
   script?: string;
   timeout_ms?: number;
+  baseline?: string;
   owner: string;
   rationale: string;
 };
