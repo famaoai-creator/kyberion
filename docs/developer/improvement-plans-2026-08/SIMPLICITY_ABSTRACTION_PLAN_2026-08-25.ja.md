@@ -12449,6 +12449,12 @@ SX-04 の core mission-retrospective に残っていた lifecycle projection 用
 
 検証: mission-retrospective **1 file / 10 tests passed**、schema-invalid state の lifecycle stats 除外、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 365
+
+SX-04 の core scope-offboarding に残っていた mission scope lineage 用 `mission-state.json` の汎用 `readJson` を、canonical `loadMissionStateAtPath` へ統合した。tenant／organization／project の削除対象判定は schema 検証済み `MissionState` だけを利用し、欠損・不正・symlink state は対象から除外する。project registry、workspace state、physical namespace、artifact／ingest residue などの別 lineage reader と soft-delete／approval／audit の既存境界は変更していない。
+
+検証: scope-offboarding **1 file / 19 tests passed**、schema-invalid mission の対象外化、root typecheck、root lint、module-boundaries、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

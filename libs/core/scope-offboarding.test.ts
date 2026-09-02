@@ -171,6 +171,26 @@ function abs(repoRelative: string): string {
   return path.join(currentRoot(), ...repoRelative.split('/'));
 }
 
+function missionState(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    mission_id: 'MIS-AL04-TEST',
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'worker',
+    confidence_score: 1,
+    git: {
+      branch: 'scope-offboarding-test',
+      start_commit: 'abc123',
+      latest_commit: 'abc123',
+      checkpoints: [],
+    },
+    history: [],
+    ...overrides,
+  };
+}
+
 function trashPathOf(repoRelative: string): string {
   return path.join(currentRoot(), ...TRASH_REPO_SUBPATH.split('/'), ...repoRelative.split('/'));
 }
@@ -194,7 +214,13 @@ function auditEvents(): Array<Record<string, any>> {
 
 beforeEach(() => {
   rootDirState = undefined;
-  currentRoot();
+  const root = currentRoot();
+  const schemaPath = path.join(root, 'knowledge/product/schemas/mission-state.schema.json');
+  fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+  fs.copyFileSync(
+    path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+    schemaPath
+  );
 });
 
 afterEach(() => {
@@ -301,15 +327,22 @@ describe('AL-04 mission runtime residue GC', () => {
 describe('AL-04 tenant/project offboarding', () => {
   function seedTenant(): void {
     writeJson(abs('active/projects/public/tenant-alpha/workspace/plan.json'), { a: 1 });
-    writeJson(abs('active/missions/public/MIS-ALPHA-1/mission-state.json'), {
-      mission_id: 'MIS-ALPHA-1',
-      tenant_slug: 'tenant-alpha',
-      relationships: { project: { project_id: 'proj-x', relationship_type: 'belongs_to' } },
-    });
+    writeJson(
+      abs('active/missions/public/MIS-ALPHA-1/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-ALPHA-1',
+        tenant_slug: 'tenant-alpha',
+        relationships: { project: { project_id: 'proj-x', relationship_type: 'belongs_to' } },
+      })
+    );
     // Another tenant's mission — must never be swept in.
-    writeJson(abs('active/missions/public/MIS-BETA-1/mission-state.json'), {
-      mission_id: 'MIS-BETA-1',
-      tenant_slug: 'tenant-beta',
+    writeJson(
+      abs('active/missions/public/MIS-BETA-1/mission-state.json'),
+      missionState({ mission_id: 'MIS-BETA-1', tenant_slug: 'tenant-beta' })
+    );
+    writeJson(abs('active/missions/public/MIS-INVALID/mission-state.json'), {
+      mission_id: 'MIS-INVALID',
+      tenant_slug: 'tenant-alpha',
     });
   }
 
@@ -402,10 +435,10 @@ describe('AL-04 tenant/project offboarding', () => {
     const linkedMission = path.join(tierDir, 'MIS-SYMLINK-TENANT');
     fs.mkdirSync(tierDir, { recursive: true });
     fs.mkdirSync(externalMission, { recursive: true });
-    writeJson(path.join(externalMission, 'mission-state.json'), {
-      mission_id: 'MIS-SYMLINK-TENANT',
-      tenant_slug: 'tenant-alpha',
-    });
+    writeJson(
+      path.join(externalMission, 'mission-state.json'),
+      missionState({ mission_id: 'MIS-SYMLINK-TENANT', tenant_slug: 'tenant-alpha' })
+    );
     fs.symlinkSync(externalMission, linkedMission, 'dir');
     try {
       expect(
@@ -429,18 +462,26 @@ describe('AL-04 tenant/project offboarding', () => {
       tenant_slug: 'tenant-b',
       organization_id: 'org-b',
     });
-    writeJson(abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'), {
-      mission_id: 'MIS-PROJ-A',
-      tenant_slug: 'tenant-a',
-      organization_id: 'org-a',
-      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-    });
-    writeJson(abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'), {
-      mission_id: 'MIS-PROJ-B',
-      tenant_slug: 'tenant-b',
-      organization_id: 'org-b',
-      relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
-    });
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-A/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-A',
+        tier: 'confidential',
+        tenant_slug: 'tenant-a',
+        organization_id: 'org-a',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
+    writeJson(
+      abs('active/missions/confidential/MIS-PROJ-B/mission-state.json'),
+      missionState({
+        mission_id: 'MIS-PROJ-B',
+        tier: 'confidential',
+        tenant_slug: 'tenant-b',
+        organization_id: 'org-b',
+        relationships: { project: { project_id: 'proj-shared', relationship_type: 'belongs_to' } },
+      })
+    );
 
     expect(() => collectScopeTargets('project', 'proj-shared')).toThrow(
       'PROJECT_WORKSPACE_AMBIGUOUS'
