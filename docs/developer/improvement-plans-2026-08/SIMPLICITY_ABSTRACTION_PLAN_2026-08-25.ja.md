@@ -12953,6 +12953,12 @@ SX-03／SX-08／SX-09／SX-10／SX-11 のmission／coordination残存監査と�
 
 検証: 関連 **10 files / 83 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象12 production／test filesの ESLint、対象11 filesの Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 449
+
+SX-03／SX-08／SX-09／SX-10／SX-11 のtask／artifact／surface残存監査として、BlueBubbles attachment、task-scoped grant、ledger、mission orchestration journal、computer／presence surface、contextual intent learning、mission evidence、Cowork approval、operator notification の **10 production files / 16 箇所**に残っていた直接時刻生成を foundation `nowIso()` へ統合した。task grantの発行・期限・一括revoke、ledgerの詳細／metadata、computer surfaceのA2UI／session stateは関連する同一時刻を共有し、attachment／A2A／approval／tenant scopeと外部I/O境界は変更していない。
+
+検証: 関連 **10 files / 92 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象10 production filesの ESLint、対象9 filesの Prettier、`git diff --check`。presenceは既存の未整形部分を差分へ取り込まず維持した。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

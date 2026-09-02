@@ -7,6 +7,7 @@ import {
   type IMessageStimulus,
 } from './imessage-utils.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import {
   safeExistsSync,
   safeLstat,
@@ -583,7 +584,7 @@ export function parseBlueBubblesWebhook(payload: unknown): IMessageStimulus | nu
     id,
     sender: sender || 'unknown',
     text,
-    date: String(data.dateCreated || data.date || new Date().toISOString()),
+    date: String(data.dateCreated || data.date || nowIso()),
     isFromMe: false,
     chatId: chatGuid,
     chatGuid,

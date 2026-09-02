@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
@@ -116,7 +117,7 @@ export function recordContextualIntentLearning(input: {
     locale: input.frame.locale,
     response_shape: input.responseShape,
     notes: input.notes,
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     expires_at: input.expiresAt,
   };
   store.entries = [...store.entries, entry].slice(-500);

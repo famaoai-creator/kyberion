@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { dispatchA2UI, type A2UIMessage } from './a2ui.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
@@ -31,6 +32,7 @@ function computerSessionPath(sessionId: string): string {
 
 export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIMessage[] {
   computerSessionPath(patch.sessionId);
+  const updatedAt = patch.updatedAt || nowIso();
   const messages: A2UIMessage[] = [];
   if (!computerSurfaceCreated) {
     messages.push({
@@ -56,7 +58,7 @@ export function buildComputerSurfaceMessages(patch: ComputerSurfacePatch): A2UIM
         metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
-        updatedAt: patch.updatedAt || new Date().toISOString(),
+        updatedAt,
       },
     },
   });
@@ -77,6 +79,7 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
   }
 
   const sessionPath = computerSessionPath(patch.sessionId);
+  const updatedAt = patch.updatedAt || nowIso();
   safeWriteFile(
     sessionPath,
     JSON.stringify(
@@ -90,7 +93,7 @@ function persistComputerSession(patch: ComputerSurfacePatch): void {
         metadata: patch.metadata || {},
         screenshotPath: patch.screenshotPath || '',
         actionCount: patch.actionCount || 0,
-        updatedAt: patch.updatedAt || new Date().toISOString(),
+        updatedAt,
       },
       null,
       2

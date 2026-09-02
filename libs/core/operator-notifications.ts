@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
@@ -137,7 +138,7 @@ function recordUndeliveredNotification(
     safeAppendFileSync(
       logPath,
       `${JSON.stringify({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         kind: 'operator_notification_undelivered',
         event,
         title: payload.title,
