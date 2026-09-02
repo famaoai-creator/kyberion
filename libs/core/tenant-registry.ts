@@ -4,6 +4,7 @@ import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import {
   safeExistsSync,
@@ -397,7 +398,7 @@ export function ensureDefaultTenantProfile(): TenantProfile {
   const existing = readTenantProfile('default');
   if (existing) return existing;
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const profile: TenantProfile = {
     tenant_slug: 'default',
     tenant_id: 'default',

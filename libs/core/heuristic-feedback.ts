@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { pathResolver, rootResolve } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -140,7 +141,7 @@ export function validateHeuristic(params: ValidateParams): HeuristicEntry {
     throw new Error(`[heuristic-feedback] entry not found: ${params.entryId}`);
   }
   const validation: HeuristicValidation = {
-    validated_at: new Date().toISOString(),
+    validated_at: nowIso(),
     outcome_result: params.outcome.result,
     validity_score: scoreValidity(params.outcome),
     ...(params.evidenceRef ? { evidence_ref: params.evidenceRef } : {}),
