@@ -9637,9 +9637,15 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/work-board-catalog.schema.json",
+      "tier": "public",
+      "size": 411,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/work-board.schema.json",
       "tier": "public",
-      "size": 1533,
+      "size": 2398,
       "type": "json"
     },
     {
