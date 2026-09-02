@@ -4,6 +4,7 @@ import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
 import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import {
+  loadAgentProfileDirectory,
   loadAgentProfileSnapshot,
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
@@ -111,40 +112,29 @@ export function validateAgentProfileDirectoryConsistency(violations: string[]) {
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/agent-profile-index.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshotAgents = loadAgentProfileSnapshot();
+  let directoryAgents: ReturnType<typeof loadAgentProfileDirectory>;
+  try {
+    directoryAgents = loadAgentProfileDirectory();
+  } catch (error) {
+    violations.push(
+      `agent-profile-index: canonical directory failed governed loading (${error instanceof Error ? error.message : String(error)})`
+    );
+    return;
+  }
   const seenAgentIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/product/orchestration/agent-profiles/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `agent-profile-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const agentIds = Object.keys((data.agents as Record<string, unknown>) || {});
-    if (agentIds.length !== 1) {
-      violations.push(`agent-profile-index/${file}: must contain exactly one agent profile`);
+    const agentId = file.replace(/\.json$/i, '');
+    const data = directoryAgents?.[agentId];
+    if (!data) {
+      violations.push(`agent-profile-index/${file}: canonical loader did not return this agent`);
       continue;
-    }
-
-    const agentId = agentIds[0];
-    if (file.replace(/\.json$/i, '') !== agentId) {
-      violations.push(`agent-profile-index/${file}: file name must match agent id ${agentId}`);
     }
 
     if (!(agentId in snapshotAgents)) {
       violations.push(`agent-profile-index/${file}: snapshot is missing agent ${agentId}`);
-    } else if (
-      JSON.stringify((data.agents as Record<string, unknown>)[agentId]) !==
-      JSON.stringify(snapshotAgents[agentId])
-    ) {
+    } else if (JSON.stringify(data) !== JSON.stringify(snapshotAgents[agentId])) {
       violations.push(`agent-profile-index/${file}: directory entry does not match snapshot`);
     }
 
