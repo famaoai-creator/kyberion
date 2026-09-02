@@ -68,7 +68,7 @@ jobs:
         run: pnpm run lint
 
       - name: Format check
-        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml
+        run: pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml .github/actions/setup-kyberion/action.yml
 
       - name: Run core tests
         env:
