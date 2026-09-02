@@ -7,7 +7,11 @@ import {
   loadTeamRoleIndex as loadGovernedTeamRoleIndex,
 } from '@agent/core/mission-team-index';
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
+import {
+  defineCatalog,
+  readJson as readFoundationJson,
+  type GovernedCatalog,
+} from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 
@@ -60,6 +64,28 @@ type RoleWriteAccess = {
   default_allow?: string[];
   roles?: Record<string, { allow?: string[] }>;
 };
+
+type RoleAuthorityMap = {
+  version?: string;
+  description?: string;
+  system_roles?: RoleAuthorityEntry[];
+  mission_roles?: RoleAuthorityEntry[];
+  context_roles?: RoleAuthorityEntry[];
+};
+
+const ROLE_AUTHORITY_MAP_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/role-authority-map.schema.json'
+);
+const SECURITY_POLICY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/security-policy.schema.json'
+);
+const ROLE_WRITE_ACCESS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/role-write-access.schema.json'
+);
+
+const roleAuthorityMapCatalogs = new Map<string, GovernedCatalog<RoleAuthorityMap>>();
+const securityPolicyCatalogs = new Map<string, GovernedCatalog<SecurityPolicy>>();
+const roleWriteAccessCatalogs = new Map<string, GovernedCatalog<RoleWriteAccess>>();
 
 type OrgRoleCreateOptions = {
   name: string;
@@ -329,6 +355,63 @@ function readJson<T>(filePath: string): T {
 
 function readJsonIfExists<T>(filePath: string): T | null {
   return safeExistsSync(filePath) ? readJson<T>(filePath) : null;
+}
+
+function roleAuthorityMapCatalog(filePath: string): GovernedCatalog<RoleAuthorityMap> {
+  const existing = roleAuthorityMapCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<RoleAuthorityMap>({
+    id: 'role-authority-map',
+    path: filePath,
+    schema: ROLE_AUTHORITY_MAP_SCHEMA_PATH,
+    fallback: () => ({
+      version: '1.0.0',
+      description: 'Maps knowledge roles to execution mode, persona, and authority_role.',
+      system_roles: [],
+      mission_roles: [],
+      context_roles: [],
+    }),
+  });
+  roleAuthorityMapCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function securityPolicyCatalog(filePath: string): GovernedCatalog<SecurityPolicy> {
+  const existing = securityPolicyCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<SecurityPolicy>({
+    id: 'security-policy',
+    path: filePath,
+    schema: SECURITY_POLICY_SCHEMA_PATH,
+    fallback: () => ({
+      version: '1.0.0',
+      default_allow: [],
+      tier_restrictions: {},
+      persona_permissions: {},
+      authority_role_permissions: {},
+    }),
+  });
+  securityPolicyCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function roleWriteAccessCatalog(filePath: string): GovernedCatalog<RoleWriteAccess> {
+  const existing = roleWriteAccessCatalogs.get(filePath);
+  if (existing) return existing;
+  const catalog = defineCatalog<RoleWriteAccess>({
+    id: 'role-write-access',
+    path: filePath,
+    schema: ROLE_WRITE_ACCESS_SCHEMA_PATH,
+    fallback: () => ({ version: '1.0.0', default_allow: [], roles: {} }),
+  });
+  roleWriteAccessCatalogs.set(filePath, catalog);
+  return catalog;
+}
+
+function resetOrgCatalog(filePath: string): void {
+  roleAuthorityMapCatalogs.get(filePath)?.reset();
+  securityPolicyCatalogs.get(filePath)?.reset();
+  roleWriteAccessCatalogs.get(filePath)?.reset();
 }
 
 function writeJson(filePath: string, payload: unknown): void {
@@ -639,13 +722,7 @@ function syncTeamRoleSnapshot(rootDir: string, roles: Record<string, TeamRoleRec
   writeJson(snapshot, { version: '1.0.0', team_roles });
 }
 
-function loadRoleAuthorityMap(rootDir: string): {
-  version?: string;
-  description?: string;
-  system_roles?: RoleAuthorityEntry[];
-  mission_roles?: RoleAuthorityEntry[];
-  context_roles?: RoleAuthorityEntry[];
-} {
+function loadRoleAuthorityMap(rootDir: string): RoleAuthorityMap {
   const filePath = path.join(
     rootDir,
     'knowledge',
@@ -653,15 +730,7 @@ function loadRoleAuthorityMap(rootDir: string): {
     'governance',
     'role-authority-map.json'
   );
-  return (
-    readJsonIfExists(filePath) ?? {
-      version: '1.0.0',
-      description: 'Maps knowledge roles to execution mode, persona, and authority_role.',
-      system_roles: [],
-      mission_roles: [],
-      context_roles: [],
-    }
-  );
+  return roleAuthorityMapCatalog(filePath).load();
 }
 
 function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): void {
@@ -682,19 +751,12 @@ function upsertRoleAuthorityMap(rootDir: string, entry: RoleAuthorityEntry): voi
     left.role.localeCompare(right.role)
   );
   writeJson(filePath, map);
+  resetOrgCatalog(filePath);
 }
 
 function loadSecurityPolicy(rootDir: string): SecurityPolicy {
   const filePath = path.join(rootDir, 'knowledge', 'product', 'governance', 'security-policy.json');
-  return (
-    readJsonIfExists<SecurityPolicy>(filePath) ?? {
-      version: '1.0.0',
-      default_allow: [],
-      tier_restrictions: {},
-      persona_permissions: {},
-      authority_role_permissions: {},
-    }
-  );
+  return securityPolicyCatalog(filePath).load();
 }
 
 function loadRoleWriteAccess(rootDir: string): RoleWriteAccess {
@@ -705,13 +767,7 @@ function loadRoleWriteAccess(rootDir: string): RoleWriteAccess {
     'governance',
     'role-write-access.json'
   );
-  return (
-    readJsonIfExists<RoleWriteAccess>(filePath) ?? {
-      version: '1.0.0',
-      default_allow: [],
-      roles: {},
-    }
-  );
+  return roleWriteAccessCatalog(filePath).load();
 }
 
 function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]): void {
@@ -726,6 +782,7 @@ function upsertRoleWriteAccess(rootDir: string, roleId: string, scopes: string[]
   access.roles = access.roles || {};
   access.roles[roleId] = { allow: unique(scopes) };
   writeJson(filePath, access);
+  resetOrgCatalog(filePath);
 }
 
 function assertSecurityPolicyApproval(approvalId?: string): void {
@@ -770,6 +827,7 @@ function upsertSecurityPolicy(
     allow_write: [...record.write_scopes],
   };
   writeJson(filePath, policy);
+  resetOrgCatalog(filePath);
 }
 
 function writeRoleDocs(
