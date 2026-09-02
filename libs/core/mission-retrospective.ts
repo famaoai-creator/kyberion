@@ -20,6 +20,7 @@ import { recordAgentRoleOutcomes } from './agent-performance-index.js';
 import { recordModelRoleOutcomes } from './model-performance-index.js';
 import { MetricsCollector, resolveCostRates } from './metrics.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import type { MissionState } from './mission-types.js';
 
@@ -561,7 +562,7 @@ export function applyProcessImprovementProposal(proposalId: string): {
       `- 種別: ${current.kind}`,
       `- 対象: ${current.target}`,
       `- 発生ミッション: ${current.mission_id}`,
-      `- 承認日: ${new Date().toISOString()}`,
+      `- 承認日: ${nowIso()}`,
       '',
       '## 変更内容',
       current.proposal,
@@ -623,11 +624,12 @@ export async function runMissionRetrospective(
   // Cross-mission learning: feed measured agent×role outcomes into the
   // performance index that team-role selection consults for future staffing.
   try {
+    const recordedAt = nowIso();
     recordAgentRoleOutcomes(
       stats.item_outcomes.map((outcome) => ({
         ...outcome,
         mission_id: missionId,
-        recorded_at: new Date().toISOString(),
+        recorded_at: recordedAt,
       }))
     );
     recordModelRoleOutcomes(
@@ -642,7 +644,7 @@ export async function runMissionRetrospective(
           ...(outcome.provider ? { provider: outcome.provider } : {}),
           model_id: outcome.model_id,
           final_status: outcome.final_status,
-          recorded_at: new Date().toISOString(),
+          recorded_at: recordedAt,
         }))
     );
   } catch (err) {
@@ -683,7 +685,7 @@ export async function runMissionRetrospective(
           rationale: entry.rationale,
           evidence: entry.evidence,
           status: 'proposed',
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
         });
       }
     } catch (err) {
