@@ -3,13 +3,38 @@ import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { resolveTenantDesign } from './tenant-design-resolver.js';
+import { loadTenantDesignOverrideIndex, resolveTenantDesign } from './tenant-design-resolver.js';
 
 describe('tenant-design-resolver', () => {
   const rootDir = pathResolver.shared('tmp/tenant-design-resolver-fixture');
 
   afterEach(() => {
     safeRmSync(rootDir, { recursive: true, force: true });
+  });
+
+  it('loads the confidential design override index through its dedicated schema', () => {
+    const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
+    safeMkdir(path.dirname(indexPath), { recursive: true });
+    safeWriteFile(
+      indexPath,
+      JSON.stringify({
+        tenants: [
+          {
+            id: 'tenant-a',
+            override_path: 'knowledge/confidential/tenant-a/design/tenant-override.json',
+          },
+        ],
+      })
+    );
+
+    expect(loadTenantDesignOverrideIndex(rootDir)).toEqual({
+      tenants: [
+        {
+          id: 'tenant-a',
+          override_path: 'knowledge/confidential/tenant-a/design/tenant-override.json',
+        },
+      ],
+    });
   });
 
   it('resolves tenant branding from confidential override files', () => {

@@ -4,6 +4,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
+import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
 import { defineCatalog, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
@@ -123,12 +124,13 @@ export function loadDesignPattern(rootDir: string, filePath: string): any {
 
 export function loadTenantEntries(rootDir: string): { override_path: string }[] {
   const entries: { override_path: string }[] = [];
-  const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
   try {
-    const registry = loadJsonValue(assertSafeRepositoryPath(indexPath));
-    if (Array.isArray(registry.tenants)) {
-      entries.push(...registry.tenants.filter((entry: any) => entry?.override_path));
-    }
+    const registry = loadTenantDesignOverrideIndex(rootDir);
+    entries.push(
+      ...registry.tenants
+        .filter((entry) => Boolean(entry.override_path))
+        .map((entry) => ({ override_path: entry.override_path }))
+    );
   } catch {
     // The registry is optional; use the deterministic directory fallback below.
   }

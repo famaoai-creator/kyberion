@@ -9193,6 +9193,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-design-override-index.schema.json",
+      "tier": "public",
+      "size": 955,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/tenant-group.schema.json",
       "tier": "public",
       "size": 1371,

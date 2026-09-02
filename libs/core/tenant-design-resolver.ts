@@ -1,6 +1,8 @@
 import * as path from 'node:path';
 import { customerRoot } from './customer-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
+import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from './secure-io.js';
 
 export interface ResolveTenantDesignInput {
@@ -20,9 +22,28 @@ export interface TenantDesignResolution {
   matchedPath?: string | null;
 }
 
-interface TenantEntry {
-  id?: string;
+export interface TenantDesignOverrideIndexEntry {
+  id: string;
   override_path: string;
+}
+
+export interface TenantDesignOverrideIndex {
+  tenants: TenantDesignOverrideIndexEntry[];
+}
+
+export function loadTenantDesignOverrideIndex(
+  rootDir = pathResolver.rootDir()
+): TenantDesignOverrideIndex {
+  const catalog = defineCatalog<TenantDesignOverrideIndex>({
+    id: 'tenant-design-override-index',
+    path: path.join(rootDir, 'knowledge/confidential/tenants/index.json'),
+    schema: pathResolver.rootResolve(
+      'knowledge/product/schemas/tenant-design-override-index.schema.json'
+    ),
+    fallback: { tenants: [] },
+    fallbackOnInvalid: true,
+  });
+  return catalog.load();
 }
 
 function isSafeTenantSegment(value: unknown): value is string {
@@ -126,18 +147,15 @@ function collectTenantOverridePaths(rootDir: string, customerId?: string): strin
     }
   }
 
-  const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');
-  const registry = readJsonIfPresent(indexPath, rootDir);
-  if (Array.isArray(registry?.tenants)) {
-    for (const entry of registry.tenants as TenantEntry[]) {
-      if (entry?.override_path) {
-        const candidate = path.resolve(rootDir, entry.override_path);
-        if (
-          (!customerId || entry.id === customerId) &&
-          isConfidentialTenantDesignPath(candidate, rootDir, entry.id)
-        ) {
-          candidates.add(candidate);
-        }
+  const registry = loadTenantDesignOverrideIndex(rootDir);
+  for (const entry of registry.tenants) {
+    if (entry.override_path) {
+      const candidate = path.resolve(rootDir, entry.override_path);
+      if (
+        (!customerId || entry.id === customerId) &&
+        isConfidentialTenantDesignPath(candidate, rootDir, entry.id)
+      ) {
+        candidates.add(candidate);
       }
     }
   }
