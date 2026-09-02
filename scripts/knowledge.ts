@@ -18,7 +18,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 function flag(args: string[], name: string): string | undefined {
@@ -128,7 +128,7 @@ export const main = defineScript({
     const content = [
       '---',
       `title: ${title.replace(/\n/g, ' ')}`,
-      `last_updated: ${new Date().toISOString().slice(0, 10)}`,
+      `last_updated: ${nowIso().slice(0, 10)}`,
       `scope: ${level}`,
       ...(scope.tenant_slug ? [`tenant_slug: ${scope.tenant_slug}`] : []),
       '---',

@@ -9,7 +9,7 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { decidePatchAction, type PatchDecision } from '@agent/core/patch-decision';
-import { appendJsonLine, isRecord, parseSafeJsonInput } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -414,7 +414,7 @@ export function scanDependencyVulnerabilitiesFromInputs(input: {
   const reevaluations = computeDeferReevaluations(previousState, findings);
 
   const result: DependencyVulnerabilityScanResult = {
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     scanned_packages: Object.keys(audit.vulnerabilities || {}).length,
     findings,
     reevaluations,

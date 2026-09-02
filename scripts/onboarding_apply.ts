@@ -21,6 +21,7 @@ import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import {
   compileSchema,
   isRecord,
+  nowIso,
   parseSafeJsonInput,
   readJson,
   setRegisteredEnv,
@@ -468,7 +469,7 @@ export async function applyOnboardingInput(input: ApplyInput) {
 
   process.env.MISSION_ROLE = 'sovereign_concierge';
   setRegisteredEnv('KYBERION_PERSONA', 'sovereign');
-  const now = new Date().toISOString();
+  const now = nowIso();
   const persona = resolveInputPersona(input);
   const personaEnvPath = persistPersona(persona);
   setRegisteredEnv('KYBERION_PERSONA', persona);

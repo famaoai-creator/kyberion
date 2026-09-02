@@ -5,7 +5,7 @@ import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 export async function main(args: string[] = [], print: (value: unknown) => void = () => undefined) {
@@ -48,7 +48,7 @@ export async function main(args: string[] = [], print: (value: unknown) => void 
         sender: 'kyberion:nerve',
         receiver: a2aMsg.header.sender,
         performative: 'result',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: result,
     };
