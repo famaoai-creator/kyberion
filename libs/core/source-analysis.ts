@@ -13,6 +13,7 @@ import * as pathResolver from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJsonIfPresent } from './foundation/json.js';
 import { clamp } from './foundation/text.js';
+import { parseTestInventory } from './software-quality.js';
 
 const SOURCE_EXTENSIONS = new Set([
   '.c',
@@ -800,14 +801,10 @@ export function validateEngineeringArtifacts(bundle: EngineeringArtifactBundle):
   ) {
     throw new Error('[SOURCE_ARTIFACT_SCHEMA] source-analysis counts do not match records.');
   }
-  const inventory = bundle.test_inventory as {
-    items?: Array<{
-      item_id?: string;
-      requirement_refs?: string[];
-      execution_mode?: string;
-      automation?: { params?: { test_path?: string; framework?: string } };
-    }>;
-  };
+  const inventory = parseTestInventory(bundle.test_inventory);
+  if (!inventory) {
+    throw schemaFailure('source-test-inventory', 'strict parser rejected the artifact');
+  }
   for (const item of inventory.items ?? []) {
     for (const ref of item.requirement_refs ?? []) {
       if (ref.startsWith('source:') && !sourcePaths.has(ref.slice('source:'.length))) {
