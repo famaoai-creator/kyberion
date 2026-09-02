@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Design Systems Catalog",
+  "type": "object",
+  "required": ["version", "default_system", "systems"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_system": { "type": "string", "minLength": 1 },
+    "systems": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["theme"],
+        "properties": {
+          "theme": { "type": "string", "minLength": 1 },
+          "profiles": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
