@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeWriteFile } from './secure-io.js';
 import * as nodePath from 'node:path';
@@ -149,7 +150,7 @@ export function markIntentsReconciled(keys: string[]): void {
   try {
     const set = new Set(keys);
     const registry = readRegistry();
-    const now = new Date().toISOString();
+    const now = nowIso();
     for (const entry of registry.entries) {
       const k = entry.intent_id ?? entry.utterance_samples[0] ?? '';
       if (set.has(k)) {

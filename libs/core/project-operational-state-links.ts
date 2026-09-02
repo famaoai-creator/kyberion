@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ProjectOperationalState } from './project-operational-state-registry.js';
 
@@ -81,7 +82,7 @@ export function saveProjectMissionLink(input: {
     JSON.stringify(
       {
         ...input,
-        updated_at: input.updated_at || new Date().toISOString(),
+        updated_at: input.updated_at || nowIso(),
       },
       null,
       2
@@ -118,7 +119,7 @@ export function saveProjectTrackState(input: {
         ...input,
         tenant_slug: input.tenant_slug?.trim() || undefined,
         active_mission_ids: input.active_mission_ids || [],
-        updated_at: input.updated_at || new Date().toISOString(),
+        updated_at: input.updated_at || nowIso(),
       },
       null,
       2

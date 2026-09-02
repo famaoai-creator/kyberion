@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { safeAppendFileSync, safeExistsSync, safeReadFile } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * ACE (Autonomous Consensus Engine) Core Utility
@@ -16,7 +17,7 @@ export const aceCore = {
     }
 
     const prevHash = aceCore.calculateHash(content);
-    const timestamp = new Date().toISOString();
+    const timestamp = nowIso();
 
     const entryHeader = `\n### [${role}] @${timestamp} | PREV_HASH: ${prevHash.substring(0, 8)} | HASH: `;
     const entryBody = `\n> ${thought}\n`;
@@ -35,7 +36,9 @@ export const aceCore = {
     let prefixContent = '';
 
     for (const entry of entries) {
-      const headerMatch = entry.match(/^### \[(.+?)\] @(.+?) \| PREV_HASH: ([a-f0-9]{8}) \| HASH: ([a-f0-9]{8})\n/s);
+      const headerMatch = entry.match(
+        /^### \[(.+?)\] @(.+?) \| PREV_HASH: ([a-f0-9]{8}) \| HASH: ([a-f0-9]{8})\n/s
+      );
       if (!headerMatch) return false;
 
       const [, role, timestamp, prevHash, storedHash] = headerMatch;

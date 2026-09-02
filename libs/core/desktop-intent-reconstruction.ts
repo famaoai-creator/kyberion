@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { DesktopRecording, DesktopRecordingStep } from './desktop-recording.js';
 import { chooseNativeOps } from './native-op-mapping.js';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 
 export interface DesktopIntentStep {
@@ -94,7 +95,7 @@ export function reconstructDesktopIntent(recording: DesktopRecording): DesktopIn
     intent,
     steps,
     source_recording_id: recording.recording_id,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     review: { status: 'pending' },
   });
 }
@@ -110,7 +111,7 @@ export function reviewDesktopIntent(
     review: {
       status: decision,
       reviewer,
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: nowIso(),
       ...(note ? { note } : {}),
     },
   });

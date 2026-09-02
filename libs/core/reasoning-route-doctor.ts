@@ -1,4 +1,5 @@
 import { discoverProviders } from './provider-discovery.js';
+import { nowIso } from './foundation/time.js';
 import {
   probeLmStudioBackendAvailability,
   probeLlamaCppBackendAvailability,
@@ -198,7 +199,7 @@ export async function inspectReasoningRoutes(): Promise<ReasoningRouteDoctorRepo
   );
   return {
     valid: entries.every((entry) => entry.status === 'ready' || entry.status === 'degraded'),
-    checkedAt: new Date().toISOString(),
+    checkedAt: nowIso(),
     entries,
     nextActions,
   };
