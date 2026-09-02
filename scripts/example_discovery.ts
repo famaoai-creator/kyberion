@@ -7,21 +7,12 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import chalk from 'chalk';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord } from '@agent/core/foundation';
+import {
+  loadActuatorExampleCatalog,
+  type ActuatorExampleCatalog,
+} from '@agent/core/src/actuator-example-catalog';
 import { defineScript, isDirectScript } from './lib/harness.js';
-
-interface ActuatorExampleRecord {
-  id: string;
-  title: string;
-  path: string;
-  description: string;
-  tags?: string[];
-}
-
-interface ActuatorExampleCatalog {
-  actuator: string;
-  examples: ActuatorExampleRecord[];
-}
 
 export function isActuatorExampleCatalog(value: unknown): value is ActuatorExampleCatalog {
   if (!isRecord(value) || typeof value.actuator !== 'string' || !Array.isArray(value.examples)) {
@@ -33,7 +24,9 @@ export function isActuatorExampleCatalog(value: unknown): value is ActuatorExamp
       typeof example.id === 'string' &&
       typeof example.title === 'string' &&
       typeof example.path === 'string' &&
-      typeof example.description === 'string'
+      typeof example.description === 'string' &&
+      (example.tags === undefined ||
+        (Array.isArray(example.tags) && example.tags.every((tag) => typeof tag === 'string')))
   );
 }
 
@@ -52,7 +45,13 @@ function loadCatalogs(): ActuatorExampleCatalog[] {
     })
     .filter((catalogPath): catalogPath is string => Boolean(catalogPath))
     .filter((catalogPath) => safeExistsSync(catalogPath) && safeLstat(catalogPath).isFile())
-    .map((catalogPath) => readJson<unknown>(catalogPath))
+    .map((catalogPath) => {
+      try {
+        return loadActuatorExampleCatalog(catalogPath);
+      } catch {
+        return null;
+      }
+    })
     .filter(isActuatorExampleCatalog)
     .sort((left, right) => left.actuator.localeCompare(right.actuator));
 }

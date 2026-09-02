@@ -343,6 +343,10 @@
       "types": "./dist/src/actuator-manifest-index.d.ts",
       "default": "./dist/src/actuator-manifest-index.js"
     },
+    "./src/actuator-example-catalog": {
+      "types": "./dist/src/actuator-example-catalog.d.ts",
+      "default": "./dist/src/actuator-example-catalog.js"
+    },
     "./process-guards": {
       "types": "./dist/process-guards.d.ts",
       "default": "./dist/process-guards.js"
