@@ -1,7 +1,7 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
 import * as pathResolver from './path-resolver.js';
@@ -52,6 +52,34 @@ export interface MissionTeamPlan {
   generated_at: string;
   team_governance?: MissionTeamGovernance;
   assignments: MissionTeamAssignment[];
+}
+
+const MISSION_TEAM_PLAN_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-team-plan.schema.json'
+);
+
+function missionTeamPlanCatalog(filePath: string) {
+  return defineCatalog<MissionTeamPlan>({
+    id: 'mission-team-plan',
+    path: filePath,
+    schema: MISSION_TEAM_PLAN_SCHEMA_PATH,
+  });
+}
+
+/** Load one persisted team plan through the shared schema and mission boundary. */
+export function loadMissionTeamPlanAtPath(filePath: string, missionId: string): MissionTeamPlan {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_TEAM_PLAN] plan must be a regular file: ${filePath}`);
+  }
+  const plan = missionTeamPlanCatalog(safeFilePath).load();
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (plan.mission_id.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[MISSION_TEAM_PLAN_SCOPE_MISMATCH] plan belongs to ${plan.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return plan;
 }
 
 export interface MissionTeamOrganizationProfileSummary {
@@ -555,7 +583,7 @@ export function getMissionTeamPlanPath(missionId: string): string | null {
 export function loadMissionTeamPlan(missionId: string): MissionTeamPlan | null {
   const planPath = getMissionTeamPlanPath(missionId);
   if (!planPath || !safeExistsSync(planPath)) return null;
-  const plan = readJson<MissionTeamPlan>(planPath);
+  const plan = loadMissionTeamPlanAtPath(planPath, missionId);
   const expectedTenant = loadMissionTenantSlug(missionId);
   if (
     expectedTenant &&
