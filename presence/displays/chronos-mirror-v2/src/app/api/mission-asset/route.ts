@@ -8,7 +8,7 @@ import {
 } from '../../../lib/api-guard';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import { loadArtifactRecord } from '@agent/core/artifact-record';
-import { readJson } from '@agent/core/foundation';
+import { loadState } from '@agent/core/mission-state';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -105,14 +105,8 @@ function missionTier(missionId: string): AssetTier | undefined {
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
   try {
-    const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
-      allowMissingLeaf: true,
-    });
-    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) {
-      return tierFromPath(missionPath);
-    }
-    const state = readJson<{ tier?: unknown }>(statePath);
-    if (state.tier === 'personal' || state.tier === 'confidential' || state.tier === 'public') {
+    const state = loadState(missionId);
+    if (state?.tier === 'personal' || state?.tier === 'confidential' || state?.tier === 'public') {
       return state.tier;
     }
   } catch {
@@ -130,15 +124,8 @@ function artifactTenant(artifact: {
   const missionPath = findMissionPath(artifact.mission_id);
   if (!missionPath) return undefined;
   try {
-    const statePath = assertSafeRepositoryPath(path.join(missionPath, 'mission-state.json'), {
-      allowMissingLeaf: true,
-    });
-    if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return undefined;
-    const state = readJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-    }>(statePath);
-    return state.tenant_slug || state.tenant_id;
+    const state = loadState(artifact.mission_id);
+    return state?.tenant_slug || state?.tenant_id;
   } catch {
     return undefined;
   }
