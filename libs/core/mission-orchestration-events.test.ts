@@ -132,6 +132,54 @@ describe('mission-orchestration-events', () => {
     }
   });
 
+  it('rejects an orchestration payload envelope with unknown fields', async () => {
+    const { enqueueMissionOrchestrationEvent, loadMissionOrchestrationEvent } =
+      await import('./mission-orchestration-events.js');
+    const { safeReadFile, safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_issue_requested',
+      missionId: 'MSN-QUEUE',
+      requestedBy: 'test',
+      payload: { sourceText: 'payload schema test' },
+    });
+    const eventPath = `${pathResolver.shared('coordination/orchestration/events')}/${event.event_id}.json`;
+    const payloadPath = pathResolver.rootResolve(event.payload_ref!);
+    const payload = JSON.parse(safeReadFile(payloadPath, { encoding: 'utf8' }) as string);
+    safeWriteFile(payloadPath, JSON.stringify({ ...payload, unexpected: true }));
+    try {
+      expect(() => loadMissionOrchestrationEvent(eventPath)).toThrow(
+        '[MISSION_ORCHESTRATION_EVENT_INVALID]'
+      );
+    } finally {
+      safeUnlinkSync(payloadPath);
+      safeUnlinkSync(eventPath);
+    }
+  });
+
+  it('rejects an orchestration payload envelope bound to another event', async () => {
+    const { enqueueMissionOrchestrationEvent, loadMissionOrchestrationEvent } =
+      await import('./mission-orchestration-events.js');
+    const { safeReadFile, safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');
+    const event = enqueueMissionOrchestrationEvent({
+      eventType: 'mission_issue_requested',
+      missionId: 'MSN-QUEUE',
+      requestedBy: 'test',
+      payload: { sourceText: 'payload binding test' },
+    });
+    const eventPath = `${pathResolver.shared('coordination/orchestration/events')}/${event.event_id}.json`;
+    const payloadPath = pathResolver.rootResolve(event.payload_ref!);
+    const payload = JSON.parse(safeReadFile(payloadPath, { encoding: 'utf8' }) as string);
+    safeWriteFile(payloadPath, JSON.stringify({ ...payload, event_id: 'ME-OTHER' }));
+    try {
+      expect(() => loadMissionOrchestrationEvent(eventPath)).toThrow(
+        '[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH]'
+      );
+    } finally {
+      safeUnlinkSync(payloadPath);
+      safeUnlinkSync(eventPath);
+    }
+  });
+
   it('rejects an orchestration event loaded through a symlink', async () => {
     const { loadMissionOrchestrationEvent } = await import('./mission-orchestration-events.js');
     const { safeUnlinkSync, safeWriteFile } = await import('./secure-io.js');

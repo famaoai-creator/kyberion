@@ -7891,6 +7891,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-orchestration-payload-envelope.schema.json",
+      "tier": "public",
+      "size": 511,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-orchestration-scenario-pack.schema.json",
       "tier": "public",
       "size": 1456,

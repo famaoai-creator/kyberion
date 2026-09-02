@@ -1,8 +1,7 @@
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   normalizeEventScope,
@@ -19,6 +18,9 @@ import {
 const EVENT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-orchestration-event.schema.json'
 );
+const PAYLOAD_ENVELOPE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-orchestration-payload-envelope.schema.json'
+);
 
 function missionOrchestrationEventCatalog(eventPath: string) {
   return defineCatalog<Partial<MissionOrchestrationEvent>>({
@@ -26,6 +28,58 @@ function missionOrchestrationEventCatalog(eventPath: string) {
     path: eventPath,
     schema: EVENT_SCHEMA_PATH,
   });
+}
+
+interface MissionOrchestrationPayloadEnvelope<TPayload = Record<string, unknown>> {
+  event_id: string;
+  mission_id: string;
+  payload: TPayload;
+}
+
+function missionOrchestrationPayloadEnvelopeCatalog(payloadPath: string) {
+  return defineCatalog<MissionOrchestrationPayloadEnvelope>({
+    id: 'mission-orchestration-payload-envelope',
+    path: payloadPath,
+    schema: PAYLOAD_ENVELOPE_SCHEMA_PATH,
+  });
+}
+
+export function validateMissionOrchestrationPayloadEnvelope<TPayload = Record<string, unknown>>(
+  value: unknown,
+  sourcePath: string
+): MissionOrchestrationPayloadEnvelope<TPayload> {
+  return missionOrchestrationPayloadEnvelopeCatalog(sourcePath).validate(
+    value,
+    sourcePath
+  ) as MissionOrchestrationPayloadEnvelope<TPayload>;
+}
+
+/** Load a mission payload envelope through schema, regular-file, and event bindings. */
+export function loadMissionOrchestrationPayloadEnvelopeAtPath<TPayload = Record<string, unknown>>(
+  payloadPath: string,
+  expectedEventId: string,
+  expectedMissionId: string
+): MissionOrchestrationPayloadEnvelope<TPayload> {
+  const safePayloadPath = assertSafeRepositoryPath(payloadPath, { allowMissingLeaf: false });
+  if (!safeLstat(safePayloadPath).isFile()) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_INVALID] payload must be a regular file: ${payloadPath}`
+    );
+  }
+  const envelope = missionOrchestrationPayloadEnvelopeCatalog(
+    safePayloadPath
+  ).load() as MissionOrchestrationPayloadEnvelope<TPayload>;
+  if (envelope.event_id !== expectedEventId) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH] payload belongs to event ${envelope.event_id}, expected ${expectedEventId}`
+    );
+  }
+  if (envelope.mission_id.toUpperCase() !== expectedMissionId.toUpperCase()) {
+    throw new Error(
+      `[MISSION_ORCHESTRATION_PAYLOAD_SCOPE_MISMATCH] payload belongs to mission ${envelope.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return envelope;
 }
 
 function resolveMissionOrchestrationScope(
@@ -138,23 +192,17 @@ export function loadMissionOrchestrationEvent<TPayload = Record<string, unknown>
     const payloadPath = assertSafeRepositoryPath(pathResolver.rootResolve(parsed.payload_ref), {
       allowMissingLeaf: false,
     });
-    const payloadEnvelope = readJson<{
-      event_id?: unknown;
-      mission_id?: unknown;
-      payload?: unknown;
-    }>(payloadPath);
-    if (
-      payloadEnvelope.event_id !== parsed.event_id ||
-      payloadEnvelope.mission_id !== parsed.mission_id.toUpperCase() ||
-      !payloadEnvelope.payload ||
-      typeof payloadEnvelope.payload !== 'object' ||
-      Array.isArray(payloadEnvelope.payload)
-    ) {
+    try {
+      parsed.payload = loadMissionOrchestrationPayloadEnvelopeAtPath<TPayload>(
+        payloadPath,
+        parsed.event_id,
+        parsed.mission_id
+      ).payload;
+    } catch (error) {
       throw new Error(
-        '[MISSION_ORCHESTRATION_EVENT_INVALID] mission payload reference envelope is invalid'
+        `[MISSION_ORCHESTRATION_EVENT_INVALID] ${error instanceof Error ? error.message : String(error)}`
       );
     }
-    parsed.payload = payloadEnvelope.payload as TPayload;
   }
   return {
     ...parsed,

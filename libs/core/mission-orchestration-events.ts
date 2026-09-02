@@ -10,10 +10,15 @@ import { appendMissionOrchestrationJournalEntry } from './mission-orchestration-
 import { getDefaultWorkerEventStream } from './worker-event-stream.js';
 import { redactEventScopeForShared, type EventScope, type EventScopeInput } from './event-scope.js';
 import { redactCollaborationMetadata } from './agent-collaboration-events.js';
-import { resolveMissionOrchestrationScope } from './mission-orchestration-event-loader.js';
+import {
+  resolveMissionOrchestrationScope,
+  validateMissionOrchestrationPayloadEnvelope,
+} from './mission-orchestration-event-loader.js';
 export {
   loadMissionOrchestrationEvent,
+  loadMissionOrchestrationPayloadEnvelopeAtPath,
   resolveMissionOrchestrationScope,
+  validateMissionOrchestrationPayloadEnvelope,
 } from './mission-orchestration-event-loader.js';
 export {
   MISSION_ORCHESTRATION_EVENT_TYPES,
@@ -101,14 +106,11 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
   const payloadPath = missionPayloadPath(input.missionId, scope.tier, eventId, scope.tenant_slug);
   const payloadRef = pathResolver.toRepoRelative(payloadPath);
   safeMkdir(path.dirname(payloadPath), { recursive: true });
-  safeWriteFile(
-    payloadPath,
-    JSON.stringify(
-      { event_id: eventId, mission_id: input.missionId.toUpperCase(), payload: input.payload },
-      null,
-      2
-    )
+  const payloadEnvelope = validateMissionOrchestrationPayloadEnvelope(
+    { event_id: eventId, mission_id: input.missionId.toUpperCase(), payload: input.payload },
+    payloadPath
   );
+  safeWriteFile(payloadPath, JSON.stringify(payloadEnvelope, null, 2));
   const event: MissionOrchestrationEvent<TPayload> = {
     event_id: eventId,
     event_type: input.eventType,
