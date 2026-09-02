@@ -343,6 +343,10 @@
       "types": "./dist/src/actuator-manifest-index.d.ts",
       "default": "./dist/src/actuator-manifest-index.js"
     },
+    "./direct-entry": {
+      "types": "./dist/direct-entry.d.ts",
+      "default": "./dist/direct-entry.js"
+    },
     "./src/actuator-example-catalog": {
       "types": "./dist/src/actuator-example-catalog.d.ts",
       "default": "./dist/src/actuator-example-catalog.js"

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { appendJsonLine, nowIso, readJsonLines } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
@@ -32,7 +33,6 @@ import {
   runSurfaceMessageConversation,
 } from '@agent/core/channel-surface';
 import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
-import { pathToFileURL } from 'node:url';
 
 import {
   ActionRowBuilder,
@@ -514,9 +514,7 @@ async function main() {
 // invocation starts the bridge, so importing this module in a test cannot open
 // a gateway connection — and a leaked VITEST env cannot silently no-op a real
 // start.
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
+const directEntry = isDirectEntry(import.meta.url, 'satellites/discord-bridge/src/index.ts');
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));
