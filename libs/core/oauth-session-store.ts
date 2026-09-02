@@ -163,7 +163,9 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
     for (const serviceDir of safeReaddir(sessionRoot)) {
       let fullDir: string;
       try {
-        fullDir = assertSafeRepositoryPath(path.join(sessionRoot, serviceDir));
+        fullDir = assertSafeRepositoryPath(path.join(sessionRoot, serviceDir), {
+          allowMissingLeaf: true,
+        });
       } catch {
         continue;
       }
@@ -171,7 +173,9 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
       for (const fileName of safeReaddir(fullDir)) {
         if (!fileName.endsWith('.json')) continue;
         try {
-          const filePath = assertSafeRepositoryPath(path.join(fullDir, fileName));
+          const filePath = assertSafeRepositoryPath(path.join(fullDir, fileName), {
+            allowMissingLeaf: true,
+          });
           const session = readJson<PendingOAuthSession>(filePath);
           if (!isSafeOAuthState(session.state)) {
             continue;

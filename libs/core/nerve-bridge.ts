@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * libs/core/nerve-bridge.ts
  * Kyberion Autonomous Nerve System (KANS) - Nerve Bridge v1.2
@@ -52,7 +53,7 @@ export function sendNerveMessage(input: {
 }): string {
   const msg: NerveMessage = {
     id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     from: input.from,
     node_id: NODE_ID,
     to: input.to,

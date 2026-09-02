@@ -1,6 +1,7 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from './authority.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import {
@@ -85,7 +86,7 @@ export function recoverMissionRequestedTasks(
 
   return withExecutionContext('mission_controller', () => {
     const tasks = readNextTasks(upperMissionId);
-    const now = options.now || new Date().toISOString();
+    const now = options.now || nowIso();
     expireWorkItemLeases(now);
     const activeLeases = new Map(listActiveWorkLeases().map((lease) => [lease.item_id, lease]));
 

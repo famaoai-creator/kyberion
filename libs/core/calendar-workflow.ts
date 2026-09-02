@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { executeServicePreset } from './service-engine.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 export { readGwsAuthStatus } from './email-workflow.js';
 
@@ -260,8 +261,9 @@ function normalizeGraphEvent(item: any): CalendarEventSummary {
 export async function listCalendarAgenda(input: CalendarAgendaInput = {}): Promise<CalendarAgendaResult> {
   const provider = resolveProvider(input.provider);
   const calendarId = input.calendar_id?.trim() || 'primary';
-  const timeMin = input.time_min?.trim() || new Date().toISOString();
-  const timeMax = input.time_max?.trim() || new Date(Date.now() + (Math.max(1, Number(input.days) || 7) * 24 * 60 * 60 * 1000)).toISOString();
+  const currentTime = new Date();
+  const timeMin = input.time_min?.trim() || nowIso(currentTime);
+  const timeMax = input.time_max?.trim() || nowIso(new Date(currentTime.getTime() + (Math.max(1, Number(input.days) || 7) * 24 * 60 * 60 * 1000)));
   const maxResults = clamp(Number(input.max_results) || 20, 1, 250);
   const query = input.query?.trim() || '';
   const timeZone = input.time_zone?.trim() || '';
