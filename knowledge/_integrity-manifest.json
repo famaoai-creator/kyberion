@@ -7039,6 +7039,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/evidence-chain-registry.schema.json",
+      "tier": "public",
+      "size": 1513,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/execution-boundary-profiles.schema.json",
       "tier": "public",
       "size": 1456,
