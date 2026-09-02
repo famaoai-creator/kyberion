@@ -10,6 +10,7 @@ import {
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
 } from '@agent/core/mission-team-index';
+import { loadSpecialistCatalog } from '@agent/core/work-design';
 import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 
 type VoiceProfileSnapshot = {
@@ -495,40 +496,28 @@ export function validateSpecialistCatalogDirectoryConsistency(violations: string
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/specialist-catalog.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = specialistSnapshotCatalog.load();
   const snapshotIds = new Set(
     Object.keys(snapshot.specialists || {}).map((entry) => String(entry || ''))
   );
+  let directorySpecialists: ReturnType<typeof loadSpecialistCatalog>;
+  try {
+    directorySpecialists = loadSpecialistCatalog();
+  } catch (error) {
+    violations.push(
+      `specialist-catalog: canonical directory failed governed loading (${error instanceof Error ? error.message : String(error)})`
+    );
+    return;
+  }
   const directoryIds: string[] = [];
 
   for (const file of files) {
-    const relativePath = `knowledge/product/orchestration/specialists/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `specialist-catalog/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const typed = data as { version?: string; specialists?: Record<string, unknown> };
-    const ids = Object.keys(typed.specialists || {}).filter(Boolean);
-    if (ids.length !== 1) {
-      violations.push(`specialist-catalog/${file}: must contain exactly one specialist`);
+    const id = file.replace(/\.json$/i, '');
+    if (!directorySpecialists[id]) {
+      violations.push(`specialist-catalog/${file}: canonical loader did not return this specialist`);
       continue;
     }
 
-    const id = ids[0];
-    if (file.replace(/\.json$/i, '') !== id) {
-      violations.push(`specialist-catalog/${file}: file name must match specialist id ${id}`);
-    }
-    if (typed.version !== snapshot.version) {
-      violations.push(`specialist-catalog/${file}: version must match the snapshot`);
-    }
     if (!snapshotIds.has(id)) {
       violations.push(`specialist-catalog/${file}: snapshot is missing specialist ${id}`);
     }
