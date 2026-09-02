@@ -7,6 +7,7 @@ import {
   importPluginPack,
   listPackImportRecords,
   loadPluginPackRegistry,
+  loadPluginPackRegistryAtPath,
   normalizePackImportRecord,
   packIdFromUrl,
 } from './plugin-pack.js';
@@ -96,6 +97,30 @@ describe('plugin packs (QM-07)', () => {
       safeMkdir(fixtureDir, { recursive: true });
       writePlugin('pack-plugin-a');
       writePlugin('pack-plugin-b');
+    });
+
+    it('validates the persisted registry and rejects unknown fields', () => {
+      const filePath = path.join(registryDir, 'packs.json');
+      safeMkdir(registryDir, { recursive: true });
+      safeWriteFile(filePath, JSON.stringify({ version: '1', packs: [], unexpected: true }));
+      try {
+        expect(() => loadPluginPackRegistryAtPath(filePath)).toThrow(/Invalid catalog/);
+        expect(loadPluginPackRegistry(registryDir)).toEqual({ version: '1', packs: [] });
+      } finally {
+        safeRmSync(registryDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects a directory at the persisted registry path', () => {
+      const filePath = path.join(registryDir, 'packs.json');
+      safeMkdir(filePath, { recursive: true });
+      try {
+        expect(() => loadPluginPackRegistryAtPath(filePath)).toThrow(
+          'registry must be a regular file'
+        );
+      } finally {
+        safeRmSync(registryDir, { recursive: true, force: true });
+      }
     });
 
     afterEach(() => {

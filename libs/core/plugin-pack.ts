@@ -46,6 +46,7 @@ import {
 } from './secure-io.js';
 import { auditChain } from './audit-chain.js';
 import { logger } from './core.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   installPluginManaged,
   listManagedPlugins,
@@ -76,6 +77,16 @@ export interface PluginPackRegistry {
   version: '1';
   packs: PluginPackRecord[];
 }
+
+const PLUGIN_PACK_REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/plugin-pack-registry.schema.json'
+);
+
+const pluginPackRegistryCatalog = defineCatalog<PluginPackRegistry>({
+  id: 'plugin-pack-registry',
+  path: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+  schema: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+});
 
 export interface PackImportRecord {
   pack_id: string;
@@ -179,19 +190,27 @@ export function loadPluginPackRegistry(override?: string): PluginPackRegistry {
   const file = registryPath(override);
   if (!safeExistsSync(file)) return { version: '1', packs: [] };
   try {
-    const parsed = readJson<Partial<PluginPackRegistry>>(file);
-    if (parsed && parsed.version === '1' && Array.isArray(parsed.packs)) {
-      return parsed as PluginPackRegistry;
-    }
+    return loadPluginPackRegistryAtPath(file);
   } catch (error) {
     logger.warn(`[plugin-pack] unreadable pack registry (starting empty): ${error}`);
   }
   return { version: '1', packs: [] };
 }
 
+/** Load a persisted pack registry through its strict schema and file boundary. */
+export function loadPluginPackRegistryAtPath(filePath: string): PluginPackRegistry {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PLUGIN_PACK_REGISTRY] registry must be a regular file: ${filePath}`);
+  }
+  return pluginPackRegistryCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+}
+
 function saveRegistry(registry: PluginPackRegistry, override?: string): void {
+  const file = registryPath(override);
+  const validated = pluginPackRegistryCatalog.validate(registry, file);
   safeMkdir(registryDir(override), { recursive: true });
-  safeWriteFile(registryPath(override), JSON.stringify(registry, null, 2));
+  safeWriteFile(file, JSON.stringify(validated, null, 2));
 }
 
 function appendImportRecord(record: PackImportRecord, override?: string): void {
