@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { findLatestMissionHandoff, type MissionAssetCategory } from '../lib/mission-progress';
+import {
+  findLatestMissionHandoff,
+  type MissionAssetCategory,
+} from '../lib/mission-progress-client';
 import { buildAttentionItems, type AttentionItem } from '../lib/operator-console';
 import { buildRuntimeTopologyGraph } from '../lib/runtime-topology';
 import { buildUserFacingError } from '../lib/user-facing-error';

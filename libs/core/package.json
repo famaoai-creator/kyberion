@@ -631,6 +631,10 @@
       "types": "./dist/customer-resolver.d.ts",
       "default": "./dist/customer-resolver.js"
     },
+    "./personal-identity-reader": {
+      "types": "./dist/personal-identity-reader.d.ts",
+      "default": "./dist/personal-identity-reader.js"
+    },
     "./intent-handoff": {
       "types": "./dist/intent-handoff.d.ts",
       "default": "./dist/intent-handoff.js"
