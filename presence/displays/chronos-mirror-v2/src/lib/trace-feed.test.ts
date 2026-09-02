@@ -1,12 +1,15 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 import { collectTraceDetail, collectTraceFeed, summarizePersistedTrace } from './trace-feed';
 
 const TEST_DIR = pathResolver.sharedTmp('chronos-trace-feed-test');
+const missionIds: string[] = [];
 
 function resetTestDir(): void {
   safeRmSync(TEST_DIR, { recursive: true, force: true });
@@ -15,6 +18,11 @@ function resetTestDir(): void {
 
 afterEach(() => {
   safeRmSync(TEST_DIR, { recursive: true, force: true });
+  withExecutionContext('mission_controller', () => {
+    for (const missionId of missionIds.splice(0)) {
+      safeRmSync(pathResolver.missionDir(missionId, 'public'), { recursive: true, force: true });
+    }
+  });
 });
 
 describe('trace-feed', () => {
@@ -114,6 +122,59 @@ describe('trace-feed', () => {
     expect(feed[0].missionId).toBe('MSN-2');
     expect(feed[0].status).toBe('error');
     expect(feed[0].spanCount).toBe(1);
+  });
+
+  it('uses schema-valid mission state for trace scope fallback', () => {
+    resetTestDir();
+    const missionId = `TRACE-SCOPE-${process.pid}-${randomUUID().slice(0, 8)}`;
+    missionIds.push(missionId);
+    const missionDir = pathResolver.missionDir(missionId, 'public');
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: missionId,
+          tenant_slug: 'tenant-a',
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'operator',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+          history: [],
+        })
+      );
+    });
+    safeWriteFile(
+      path.join(TEST_DIR, 'traces-2026-05-28.jsonl'),
+      `${JSON.stringify({
+        traceId: 'trace-scope',
+        _persistedAt: '2026-05-28T10:00:00.000Z',
+        metadata: {
+          missionId,
+          startedAt: '2026-05-28T09:59:00.000Z',
+          completedAt: '2026-05-28T10:00:00.000Z',
+        },
+        rootSpan: {
+          spanId: 'scope-root-span',
+          name: 'scope-root',
+          status: 'ok',
+          startTime: '2026-05-28T09:59:00.000Z',
+          endTime: '2026-05-28T10:00:00.000Z',
+          events: [],
+          artifacts: [],
+          knowledgeRefs: [],
+          children: [],
+        },
+      })}\n`
+    );
+
+    expect(collectTraceFeed({ dir: TEST_DIR, tenantSlugs: ['tenant-a'] })).toMatchObject([
+      { traceId: 'trace-scope', tenantSlug: 'tenant-a', tier: 'public' },
+    ]);
+    expect(collectTraceFeed({ dir: TEST_DIR, tenantSlugs: ['tenant-b'] })).toEqual([]);
   });
 
   it('does not read symlinked trace files', () => {
