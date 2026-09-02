@@ -210,6 +210,22 @@ describe('mission phase exit gates (MO-02)', () => {
     expect(outcome.failures[0].reasons.join(' ')).toContain('status: requested');
   });
 
+  it('fails closed when NEXT_TASKS contains a malformed task record', async () => {
+    fs.writeFileSync(
+      path.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify([{ task_id: 'review-1', status: 'completed' }, { task_id: 42 }])
+    );
+    writeGateDefinition('REVIEW_PASSED', {
+      id: 'REVIEW_PASSED',
+      checks: [{ kind: 'reviewer_approved', params: { task_id: 'review-1' } }],
+    });
+
+    const outcome = await evaluateMissionPhaseExitGates(missionId);
+    expect(outcome.passed).toBe(false);
+    expect(outcome.failures[0]?.gate_id).toBe('REVIEW_PASSED');
+    expect(outcome.failures[0]?.reasons.join(' ')).toContain('not found in NEXT_TASKS.json');
+  });
+
   it('evaluates blocking intent drift at the phase exit boundary even without a catalog gate', async () => {
     emitIntentSnapshot({
       missionId,

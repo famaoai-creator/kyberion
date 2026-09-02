@@ -1,7 +1,7 @@
 ---
 title: SIMPLICITY ABSTRACTION PLAN 2026 08 25
 tags: [improvement-plan, 2026-08]
-last_updated: 2026-09-02
+last_updated: 2026-09-03
 status: active
 ---
 
@@ -13018,6 +13018,12 @@ SX-04／SX-10 のactuator strategy loader残存を再監査し、code／modeling
 SX-03／SX-04／SX-10 のagent-runtime supervisor queue readerを再監査し、request artifactをpath boundaryだけ検証して型アサーションでruntime orchestrationへ渡していた残存を修正した。queue filenameとの `request_id` 一致、必須文字列、`scope` の許可フィールド／tier／lineage入力、`team_roles` の文字列配列、optional reasonを読み込み時に検証し、不正requestはruntime起動前にfail-closedとした。既存のscope解決、runtime owner、結果保存、supervisor起動semanticsは変更していない。
 
 検証: agent-runtime supervisor **1 file / 7 tests passed**、package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
+## 2026-09-03 再レビュー修正 460
+
+SX-03／SX-08／SX-09 の `NEXT_TASKS.json` projection reader残存を再監査し、Chronosに局所化されていた `status` parserと、mission phase gateに残っていた配列要素の未検証型アサーションを、coreの `parseMissionNextTaskRecords` へ統合した。task／statusの型、object形状、危険JSON keyを共通readerでfail-closedとし、malformedなtaskがreviewer approvalやprogress件数へ混入しないようにした。full task dispatch validation、既存status集計、tenant／tier／path境界は変更していない。
+
+検証: core reader／phase gate／Chronos resource boundary **3 files / 17 tests passed**、package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
 ## 参照
 

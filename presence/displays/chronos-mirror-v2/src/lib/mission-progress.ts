@@ -1,10 +1,11 @@
-import { parseSafeJsonObjectValue } from '@agent/core/foundation';
+import {
+  parseMissionNextTaskRecords,
+  type MissionNextTaskRecord,
+} from '@agent/core/mission-next-task-reader';
 
 export type MissionAssetCategory = 'deliverables' | 'artifacts' | 'outputs' | 'evidence';
 
-export interface NextTaskRecord {
-  status?: string;
-}
+export type NextTaskRecord = MissionNextTaskRecord;
 
 export interface MissionAssetSummary {
   path: string;
@@ -97,20 +98,7 @@ export function summarizeNextTasks(
 
 /** Parse the persisted task list before it enters either Chronos progress projection. */
 export function parseNextTaskRecords(value: unknown): NextTaskRecord[] | null {
-  if (!Array.isArray(value)) return null;
-
-  const records: NextTaskRecord[] = [];
-  for (const [index, candidate] of value.entries()) {
-    let record: Record<string, unknown>;
-    try {
-      record = parseSafeJsonObjectValue(candidate, `NEXT_TASKS[${index}]`);
-    } catch {
-      return null;
-    }
-    if (record.status !== undefined && typeof record.status !== 'string') return null;
-    records.push(record.status === undefined ? {} : { status: record.status });
-  }
-  return records;
+  return parseMissionNextTaskRecords(value, 'NEXT_TASKS');
 }
 
 export function extractMissionDependencies(
