@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
@@ -95,10 +95,6 @@ export interface CustomerConversationResult {
   escalated: boolean;
   grounded_sources: string[];
   mode: CustomerConversationMode;
-}
-
-function readJsonIfPresent(filePath: string): Record<string, unknown> | null {
-  return readFoundationJsonIfPresent<Record<string, unknown>>(filePath);
 }
 
 function loadGroundingSources(tenantSlug: string): {

@@ -1,7 +1,7 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { readJson as readFoundationJson } from './foundation/json.js';
+import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
@@ -100,10 +100,6 @@ const trackCreationPolicyCatalog = defineCatalog<JsonObject>({
 });
 
 let overrideValidator: ValidateFunction | null = null;
-
-function readJson(filePath: string): JsonObject {
-  return readFoundationJson<JsonObject>(filePath);
-}
 
 function isSafeOverridePath(filePath: string): boolean {
   const root = path.resolve(pathResolver.rootDir());
@@ -268,7 +264,7 @@ export async function resolveIntentToTrackPolicy(
   const appliedOverridePaths: string[] = [];
   for (const candidate of collectOverridePaths(tenantId, targetTier, overridePaths)) {
     if (!isSafeOverridePath(candidate)) continue;
-    const override = readJson(candidate);
+    const override = readJson<JsonObject>(candidate);
     assertTrackPolicyShape(override, candidate);
     effectivePolicy = mergeJson(effectivePolicy, override) as JsonObject;
     appliedOverridePaths.push(candidate);
