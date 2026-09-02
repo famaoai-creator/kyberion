@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { withExecutionContext } from './authority.js';
 import { logger } from './core.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
@@ -39,6 +40,16 @@ import type {
   SurfaceNotificationRecord,
   SurfaceOutboxMessage,
 } from './channel-surface-types.js';
+
+const SURFACE_OUTBOX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/surface-outbox-message.schema.json'
+);
+
+const surfaceOutboxCatalog = defineCatalog<SurfaceOutboxMessage>({
+  id: 'surface-outbox-message',
+  path: SURFACE_OUTBOX_SCHEMA_PATH,
+  schema: SURFACE_OUTBOX_SCHEMA_PATH,
+});
 
 function resolveSurfaceScope(scope?: EventScopeInput): EventScope {
   return normalizeEventScope(scope || { scope_kind: 'system', tier: 'public' });
@@ -216,6 +227,37 @@ function collectJsonFiles(root: string, recursive: boolean): string[] {
 
 function loadSurfaceRecordJson<T>(filePath: string): T {
   return readJson<T>(assertSafeRepositoryPath(filePath));
+}
+
+export function loadSurfaceOutboxMessageAtPath(
+  filePath: string,
+  surface: SurfaceAsyncChannel
+): SurfaceOutboxMessage {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[SURFACE_OUTBOX] outbox record must be a regular file: ${filePath}`);
+  }
+  const record = surfaceOutboxCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  if (record.surface !== surface) {
+    throw new Error(
+      `[SURFACE_OUTBOX_SCOPE_MISMATCH] expected surface ${surface}, got ${record.surface}`
+    );
+  }
+  if (!isPersistedScope(record.scope)) {
+    throw new Error('[SURFACE_OUTBOX] persisted scope is invalid');
+  }
+  return record;
+}
+
+function validateSurfaceOutboxMessage(
+  record: SurfaceOutboxMessage,
+  sourcePath: string
+): SurfaceOutboxMessage {
+  const validated = surfaceOutboxCatalog.validate(record, sourcePath);
+  if (!isPersistedScope(validated.scope)) {
+    throw new Error('[SURFACE_OUTBOX] persisted scope is invalid');
+  }
+  return validated;
 }
 
 function hasPathSegments(filePath: string, parts: string[]): boolean {
@@ -713,11 +755,9 @@ export function enqueueSurfaceOutboxMessage(params: {
     scope,
     ...(deduplicationKey ? { deduplication_key: deduplicationKey } : {}),
   };
-  return writeJsonAs(
-    surfaceCoordinationRole(params.surface),
-    surfaceOutboxLogicalPath(params.surface, record.message_id, scope),
-    record
-  );
+  const outputPath = surfaceOutboxLogicalPath(params.surface, record.message_id, scope);
+  const validated = validateSurfaceOutboxMessage(record, outputPath);
+  return writeJsonAs(surfaceCoordinationRole(params.surface), outputPath, validated);
 }
 
 export function getSurfaceDeadTarget(
@@ -816,10 +856,7 @@ export function listSurfaceOutboxMessages(
     const dir = path.dirname(filePath);
     const name = path.basename(filePath);
     try {
-      const parsed = loadSurfaceRecordJson<unknown>(filePath);
-      if (!isSurfaceOutboxMessage(parsed, surface)) {
-        throw new Error('surface outbox schema violation');
-      }
+      const parsed = loadSurfaceOutboxMessageAtPath(filePath, surface);
       return recordMatchesScope(parsed, filter) ? [parsed] : [];
     } catch (error) {
       quarantineSurfaceOutboxFile(surface, dir, name, error);
@@ -864,12 +901,10 @@ export function updateSurfaceOutboxMessage(
     surface: current.surface,
     scope: current.scope,
   };
-  writeJsonAs(
-    surfaceCoordinationRole(surface),
-    surfaceOutboxLogicalPath(surface, messageId, current.scope),
-    next
-  );
-  return next;
+  const outputPath = surfaceOutboxLogicalPath(surface, messageId, current.scope);
+  const validated = validateSurfaceOutboxMessage(next, outputPath);
+  writeJsonAs(surfaceCoordinationRole(surface), outputPath, validated);
+  return validated;
 }
 
 export function deadLetterSurfaceOutboxMessage(
