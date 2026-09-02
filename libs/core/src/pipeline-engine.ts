@@ -1,8 +1,7 @@
 import * as path from 'node:path';
-import { readJson } from '../foundation/json.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { validatePipelineAdf, type PipelineAdfStep } from '../pipeline-contract.js';
+import { loadPipelineAdfAtPath, type PipelineAdfStep } from '../pipeline-contract.js';
 import { assertProjectTrustApproval } from '../project-trust.js';
 import { safeLstat } from '../secure-io.js';
 import { isBuiltinPipelineResource, requiresProjectTrust } from '../trust-requiring-resources.js';
@@ -83,7 +82,7 @@ export async function resolveRef(
     `[PIPELINE] resolveRef: loading sub-pipeline from ${resolvedPath} (depth=${currentDepth})`
   );
 
-  const parsed = validatePipelineAdf(readJson<unknown>(resolvedPath));
+  const parsed = loadPipelineAdfAtPath(resolvedPath);
 
   const subSteps: PipelineAdfStep[] = parsed.steps;
   const subContext: Record<string, unknown> = parsed.context || {};

@@ -13373,6 +13373,12 @@ SX-03／SX-04／SX-08／SX-09 のsurface mission proposal stateを再監査し�
 
 検証: surface mission proposal／channel surface **2 files / 24 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 519
+
+SX-03／SX-04／SX-11 のpipeline ADFを再監査し、pipeline engineのref、previewのsub-pipeline、automation blueprintのschedule対象がそれぞれraw `readJson<unknown>`と個別`validatePipelineAdf`で同じpersisted JSONを読む分散経路を修正した。`loadPipelineAdfAtPath`を追加し、`pipeline-adf.schema.json`によるcanonical validationとregular-file境界へ3経路を統合した。schema不正またはdirectoryのsub-pipelineは実行・preview・schedule登録へ進まずfail-closedし、ref depth、project trust／symlink境界、既存の`Invalid pipeline ADF`エラー semanticsは維持している。
+
+検証: pipeline engine／preview／automation blueprint **3 files / 38 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

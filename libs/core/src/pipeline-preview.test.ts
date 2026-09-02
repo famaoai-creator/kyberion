@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 vi.mock('../secure-io.js', () => ({
+  assertSafeRepositoryPath: (p: string) => p,
   safeReadFile: (p: string, opts: any) => fs.readFileSync(p, opts.encoding),
   safeExistsSync: (p: string) => fs.existsSync(p),
   safeLstat: (p: string) => fs.lstatSync(p),

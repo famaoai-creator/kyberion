@@ -4,6 +4,7 @@ import * as path from 'node:path';
 
 // Mock dependencies before importing the module under test
 vi.mock('../secure-io.js', () => ({
+  assertSafeRepositoryPath: (filePath: string) => filePath,
   safeReadFile: (filePath: string, _opts: any) => {
     return fs.readFileSync(filePath, 'utf8');
   },

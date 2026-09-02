@@ -1,9 +1,8 @@
 import * as path from 'node:path';
 import { safeExistsSync } from '../secure-io.js';
 import { safeLstat } from '../secure-io.js';
-import { readJson } from '../foundation/json.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { validatePipelineAdf } from '../pipeline-contract.js';
+import { loadPipelineAdfAtPath } from '../pipeline-contract.js';
 import { pathResolver } from '../path-resolver.js';
 import { deriveExecutionGraph, type GraphEdge } from '../graph-scheduler.js';
 
@@ -222,7 +221,7 @@ function previewStep(step: any, index: number, ctx: Record<string, any>): Previe
     try {
       const refPath = pathResolver.rootResolve(refPathRaw);
       assertPipelinePreviewResourcePath(refPath);
-      const subPipeline = validatePipelineAdf(readJson<unknown>(refPath));
+      const subPipeline = loadPipelineAdfAtPath(refPath);
       if (subPipeline.steps.length > 0) {
         const children = subPipeline.steps.map((s: any, j: number) =>
           previewStep(s, j, { ...ctx, ...step.params?.bind })
