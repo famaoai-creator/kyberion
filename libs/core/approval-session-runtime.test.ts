@@ -11,6 +11,20 @@ const secureIo = vi.hoisted(() => {
   const abs = (filePath: string) =>
     path.isAbsolute(filePath) ? filePath : path.join(process.env.KYBERION_ROOT || '', filePath);
   return {
+    assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
+      const resolved = abs(filePath);
+      const root = path.resolve(process.env.KYBERION_ROOT || '');
+      const relative = path.relative(root, resolved);
+      if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+        throw new Error(
+          `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+        );
+      }
+      if (!options.allowMissingLeaf && !fs.existsSync(resolved)) {
+        throw new Error(`Resource path does not exist: ${resolved}`);
+      }
+      return resolved;
+    },
     safeAppendFileSync: (filePath: string, data: string) => {
       fs.mkdirSync(path.dirname(abs(filePath)), { recursive: true });
       fs.appendFileSync(abs(filePath), data, 'utf8');
