@@ -12281,6 +12281,17 @@ scope 判定、malformed input の default／候補除外 semantics は維持し
 **69/69 gates passed**、knowledge index、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、
 および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 339
+
+tenant の `theme.json` が core tenant resolver と creative design resolver で汎用 JSON reader に分岐していた残存を修正した。
+部分的な colors／fonts／typography overlay の既存形式を保つ専用 `tenant-design-theme-overlay.schema.json` と共有 loader を追加し、
+不正な token shape は CSS／surface projection 前に除外するようにした。完全な web／PPTX theme pack の schema と混同せず、tenant scope、
+theme pack path、既存の default fallback semantics は維持した。
+
+検証: tenant／creative／media **3 files / 26 tests passed**、media actuator build、root typecheck、root lint、PR scope **69/69 gates passed**、
+knowledge index、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの
+入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

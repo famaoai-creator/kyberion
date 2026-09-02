@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/tenant-design-theme-overlay.schema.json",
+  "title": "Tenant Design Theme Overlay",
+  "description": "Confidential tenant theme values used by core design resolution. Partial token overlays remain extensible.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "brand_name": { "type": "string", "minLength": 1 },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "theme": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "colors": { "type": "object", "additionalProperties": { "type": "string" } },
+        "fonts": { "type": "object", "additionalProperties": { "type": "string" } },
+        "assets": { "type": "object", "additionalProperties": true },
+        "typography": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "layout_templates": { "type": ["object", "null"] },
+    "layout_template_catalog": { "type": ["string", "null"] },
+    "layout_template_id": { "type": "string", "minLength": 1 }
+  }
+}

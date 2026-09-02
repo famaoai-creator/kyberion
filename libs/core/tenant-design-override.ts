@@ -18,7 +18,18 @@ export interface TenantDesignOverride {
   extracted_theme?: Record<string, unknown>;
 }
 
+export interface TenantDesignThemeOverlay {
+  [key: string]: unknown;
+  brand_name?: string;
+  tenant_slug?: string;
+  theme?: Record<string, unknown>;
+  layout_templates?: Record<string, unknown> | null;
+  layout_template_catalog?: string | null;
+  layout_template_id?: string;
+}
+
 let validateOverride: ReturnType<typeof compileSchema<TenantDesignOverride>> | undefined;
+let validateThemeOverlay: ReturnType<typeof compileSchema<TenantDesignThemeOverlay>> | undefined;
 
 function isWithinRoot(filePath: string, rootDir: string): boolean {
   const relative = path.relative(path.resolve(rootDir), path.resolve(filePath));
@@ -40,6 +51,26 @@ export function loadTenantDesignOverride(
     const value = readJson<unknown>(safePath);
     if (!validateOverride(value)) return null;
     return value as TenantDesignOverride;
+  } catch {
+    return null;
+  }
+}
+
+/** Load a partial tenant theme overlay through its dedicated schema boundary. */
+export function loadTenantDesignThemeOverlay(
+  rootDir: string,
+  filePath: string,
+  allowedRootDir = rootDir
+): TenantDesignThemeOverlay | null {
+  if (!isWithinRoot(filePath, allowedRootDir)) return null;
+  try {
+    const safePath = assertSafeRepositoryPath(filePath);
+    validateThemeOverlay ||= compileSchema<TenantDesignThemeOverlay>(
+      pathResolver.rootResolve('knowledge/product/schemas/tenant-design-theme-overlay.schema.json')
+    );
+    const value = readJson<unknown>(safePath);
+    if (!validateThemeOverlay(value)) return null;
+    return value as TenantDesignThemeOverlay;
   } catch {
     return null;
   }

@@ -1,10 +1,12 @@
 import * as path from 'node:path';
 import { customerRoot } from './customer-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from './secure-io.js';
-import { loadTenantDesignOverride } from './tenant-design-override.js';
+import {
+  loadTenantDesignOverride,
+  loadTenantDesignThemeOverlay,
+} from './tenant-design-override.js';
 
 export interface ResolveTenantDesignInput {
   rootDir?: string;
@@ -33,6 +35,10 @@ export interface TenantDesignOverrideIndex {
 }
 
 export { loadTenantDesignOverride, type TenantDesignOverride } from './tenant-design-override.js';
+export {
+  loadTenantDesignThemeOverlay,
+  type TenantDesignThemeOverlay,
+} from './tenant-design-override.js';
 
 export function loadTenantDesignOverrideIndex(
   rootDir = pathResolver.rootDir()
@@ -117,15 +123,6 @@ function isSafeTenantDesignPath(
     }
   }
   return true;
-}
-
-function readJsonIfPresent(
-  filePath: string,
-  rootDir: string,
-  allowedRootDir = rootDir
-): Record<string, any> | null {
-  if (!isSafeTenantDesignPath(filePath, rootDir, true, allowedRootDir)) return null;
-  return readFoundationJsonIfPresent<Record<string, any>>(filePath);
 }
 
 function isConfidentialTenantDesignPath(
@@ -324,7 +321,7 @@ export function resolveTenantDesign(input: ResolveTenantDesignInput): TenantDesi
     const themePackPath = deriveThemePackPath(candidate, override);
     const themePackAbsolute = themePackPath ? path.resolve(rootDir, themePackPath) : null;
     const themePack = themePackAbsolute
-      ? readJsonIfPresent(themePackAbsolute, rootDir, path.dirname(candidate))
+      ? loadTenantDesignThemeOverlay(rootDir, themePackAbsolute, path.dirname(candidate))
       : null;
     const layoutCatalogCandidate = deriveLayoutCatalogPath(candidate, override, themePack);
     const layoutCatalog = layoutCatalogCandidate
