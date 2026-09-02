@@ -1,6 +1,7 @@
 import { safeWriteFile } from '@agent/core/secure-io';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { DEFAULT_MAX_PIPELINE_STEPS } from '@agent/core/execution-bounds';
+import { nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveRef } from '@agent/core/src/pipeline-engine';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
@@ -140,7 +141,7 @@ export async function executeMediaPipeline(
   traceCtx?: any,
   deps?: MediaPipelineDeps
 ) {
-  let ctx = { ...initialCtx, timestamp: new Date().toISOString() };
+  let ctx = { ...initialCtx, timestamp: nowIso() };
 
   const hooks = {
     beforeStep: (step: any, stepNumber: number) => {

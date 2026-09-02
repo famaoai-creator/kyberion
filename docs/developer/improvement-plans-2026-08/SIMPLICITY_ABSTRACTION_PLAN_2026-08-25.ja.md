@@ -11981,6 +11981,17 @@ cancellation metadata の UTC ISO 形式と既存の render lifecycle は維持�
 `git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14 の
 未完了項目である。
 
+## 2026-09-02 再レビュー修正 310
+
+media actuator の PDF／spreadsheet／report／document／diagram protocol と pipeline context に残っていた意味固有の
+変換を持たない単純 timestamp 14箇所を foundation の `nowIso()` へ統一した。生成物の `generatedAt`／`creationDate`、
+Drawio の `modified`、pipeline context の UTC ISO 形式と既存の media lifecycle は維持し、日付・deadline・経過時間の
+domain 処理は変更していない。
+
+検証: media actuator **1 file / 50 tests passed / 11 skipped**、対象 production の単純 timestamp **0件**、Prettier、
+`git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14 の
+未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
