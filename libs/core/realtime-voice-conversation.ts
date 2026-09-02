@@ -14,6 +14,7 @@ import { createVoiceActuatorServeClient } from './actuator-serve-client.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   resolveVoiceEngineForPlatform,
   type VoiceEngineArtifactFormat,
@@ -172,7 +173,7 @@ export function ensureRealtimeVoiceConversationSession(input: {
     input.profileId,
     input.personalVoiceMode || 'require_personal_voice'
   );
-  const now = new Date().toISOString();
+  const now = nowIso();
   const session: RealtimeVoiceConversationSession = {
     session_id: sessionId,
     created_at: now,
@@ -487,7 +488,7 @@ export function recordRealtimeVoiceConversationExchange(input: {
   if (!session) {
     throw new Error(`Realtime voice conversation session not found: ${input.sessionId}`);
   }
-  const now = new Date().toISOString();
+  const now = nowIso();
   session.transcript.push(
     {
       speaker: 'user',
@@ -498,11 +499,11 @@ export function recordRealtimeVoiceConversationExchange(input: {
     {
       speaker: 'assistant',
       text: input.assistantText,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...(input.assistantAudioRef ? { audio_ref: input.assistantAudioRef } : {}),
     }
   );
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   return writeRealtimeVoiceConversationSession(session);
 }
 
@@ -537,7 +538,7 @@ export async function runRealtimeVoiceConversationTurn(
     );
   }
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const inputTimeline = buildPresenceVoiceIngressTimeline({
     surfaceId: input.surfaceId,
     text: userText,
@@ -580,11 +581,11 @@ export async function runRealtimeVoiceConversationTurn(
     {
       speaker: 'assistant',
       text: assistantText,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...(audioArtifactPath ? { audio_ref: audioArtifactPath } : {}),
     }
   );
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   const transcriptPath = writeRealtimeVoiceConversationSession(session);
 
   return {
