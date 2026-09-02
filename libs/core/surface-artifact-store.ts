@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { appendGovernedArtifactJsonl, ensureGovernedArtifactDir, writeGovernedArtifactJson } from './artifact-store.js';
+import { nowIso } from './foundation/time.js';
 
 import type {
   ChronosSurfaceRequest,
@@ -28,7 +29,7 @@ export function emitChannelSurfaceEvent(
   event: Omit<SurfaceEvent, 'ts' | 'event_id' | 'channel'>,
 ): string {
   return appendJsonlAs(role, `active/shared/observability/channels/${channel}/${stream}.jsonl`, {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: randomUUID(),
     channel,
     ...event,
@@ -40,7 +41,7 @@ export function emitChronosSurfaceEvent(
   event: Omit<SurfaceEvent, 'ts' | 'event_id' | 'channel'>,
 ): string {
   return appendJsonlAs('chronos_gateway', `active/shared/observability/chronos/${stream}.jsonl`, {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: randomUUID(),
     channel: 'chronos',
     ...event,
@@ -67,7 +68,7 @@ export function recordChronosSurfaceRequest(input: ChronosSurfaceRequest): strin
   ensureDirAs('chronos_gateway', `active/shared/coordination/chronos/sessions/${sessionId}`);
 
   const artifact = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     correlation_id: correlationId,
     session_id: sessionId,
     requester_id: input.requesterId || 'unknown',
