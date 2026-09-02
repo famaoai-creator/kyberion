@@ -11603,6 +11603,18 @@ foundation barrel の canonical `readJson` へ修正し、terminal-hud build、r
 検証: terminal-hud build、root typecheck、foundation adoption、lint-staged、`git diff --check`。コミット
 `14c21e474` を branch／PR #711 へ push 済み。push 後の GitHub Actions は再実行中であり、完了結果を別途確認する。
 
+## 2026-09-02 再レビュー修正 274
+
+SX-04 の entity scope 二重定義を解消し、`ScopedRegistry` の順序を `ENTITY_SCOPE_HIERARCHY` から導出するようにした。
+registry が公開する `scope_key` は `tenant_slug`／`organization_id`／`project_id`／`mission_id`／`task_id`／`session`
+の canonical vocabulary に統一し、既存の短縮キーは入力境界で canonical key へ正規化する。legacy と canonical の
+同一 level に異なる値が渡された場合は設定エラーとして拒否し、tenant／mission の継承・shadowing・ambiguity の
+既存 semantics は維持した。
+
+検証: scoped-registry／dynamic-injection／worker-goal-driver **3 test files / 40 tests passed**、root typecheck、
+root lint、foundation adoption、`git diff --check`。残る SX-04 は governance catalog の dedicated schema 化、
+未参照 catalog の処分、各 loader の完全統合である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
