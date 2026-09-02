@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const realFsSecureIo = vi.hoisted(() => ({
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeReaddir: (dirPath: string) => fs.readdirSync(dirPath),
   assertSafeRepositoryPath: (filePath: string, options: { allowMissingLeaf?: boolean } = {}) => {
     const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
@@ -131,6 +132,10 @@ describe('mission hygiene', () => {
     fs.copyFileSync(
       path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
       path.join(schemaDir, 'mission-state.schema.json')
+    );
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-next-tasks.schema.json'),
+      path.join(schemaDir, 'mission-next-tasks.schema.json')
     );
     process.env.KYBERION_ROOT = tmpRoot;
 
