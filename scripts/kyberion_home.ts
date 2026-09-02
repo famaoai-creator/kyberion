@@ -45,7 +45,7 @@ import {
   validateDesktopIntentDraft,
 } from '@agent/core/desktop-intent-reconstruction';
 import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
-import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
 import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
 import { loadDesktopRecordingAtPath } from '@agent/core/desktop-recording';
 import { withExecutionContext } from '@agent/core/authority';
@@ -483,22 +483,18 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
       };
     }
   }
-  let raw: unknown;
-  try {
-    raw = readJson<unknown>(recordingPath);
-  } catch (error) {
-    return {
-      error: ui('recorder:recorder_recording_read_failed', {
-        error: error instanceof Error ? error.message : String(error),
-      }),
-    };
+  if (entry.substrate === 'browser') {
+    try {
+      return { value: loadBrowserExtensionRecordingAtPath(recordingPath) };
+    } catch (error) {
+      return {
+        error: ui('recorder:recorder_recording_read_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      };
+    }
   }
-  const validation =
-    entry.substrate === 'browser'
-      ? validateBrowserExtensionRecording(raw)
-      : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
-  if (!validation.value) return { error: validation.errors.join('; ') };
-  return { value: validation.value };
+  return { error: ui('recorder:recorder_unsupported_substrate') };
 }
 
 function resolveRecordingPath(ref: string): string | null {

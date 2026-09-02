@@ -31,6 +31,7 @@ import {
   validateBrowserExtensionSessionRequest,
   persistBrowserExtensionObservation,
   loadBrowserExtensionObservations,
+  loadBrowserExtensionRecordingAtPath,
 } from '@agent/core/browser-extension-bridge';
 import {
   applyProcedureDelta,
@@ -69,7 +70,7 @@ import type {
   BrowserExtensionSessionRequest,
 } from '@agent/core/browser-extension-bridge';
 import type { ProcedureEntry } from '@agent/core/procedure-types';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
@@ -93,17 +94,13 @@ function loadBrowserProcedure(procedureId: string): {
       if (!safeExistsSync(recordingPath) || !safeLstat(recordingPath).isFile()) {
         return { error: `Procedure "${procedureId}" recording must be an existing regular file` };
       }
-      let raw: unknown;
       try {
-        raw = readJson<unknown>(recordingPath);
+        return { entry, recording: loadBrowserExtensionRecordingAtPath(recordingPath) };
       } catch (err) {
         return {
           error: `Failed to load recording: ${err instanceof Error ? err.message : String(err)}`,
         };
       }
-      const rec = validateBrowserExtensionRecording(raw);
-      if (!rec.value) return { error: rec.errors.join('; ') };
-      return { entry, recording: rec.value };
     },
     'sovereign'
   );
@@ -564,10 +561,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
   }
   let deltaRecording;
   try {
-    const parsed = validateBrowserExtensionRecording(readJson<unknown>(deltaRecAbs));
-    if (!parsed.value)
-      return { ok: false, error: `delta recording invalid: ${parsed.errors.join('; ')}` };
-    deltaRecording = parsed.value;
+    deltaRecording = loadBrowserExtensionRecordingAtPath(deltaRecAbs);
   } catch (err) {
     return {
       ok: false,

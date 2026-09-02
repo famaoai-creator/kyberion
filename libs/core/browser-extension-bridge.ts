@@ -1,4 +1,4 @@
-import { appendJsonLine } from './foundation/json.js';
+import { appendJsonLine, readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import type { ValidateFunction } from 'ajv';
 import { Buffer } from 'node:buffer';
@@ -370,6 +370,21 @@ export function validateBrowserExtensionRecording(
   const value = input as BrowserExtensionRecording;
   const errors = validateRecordingSemantics(value);
   return errors.length > 0 ? { valid: false, errors } : { valid: true, errors: [], value };
+}
+
+/** Load one persisted browser recording through the regular-file and contract boundary. */
+export function loadBrowserExtensionRecordingAtPath(filePath: string): BrowserExtensionRecording {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[BROWSER_RECORDING] recording must be a regular file: ${filePath}`);
+  }
+  const validation = validateBrowserExtensionRecording(readJson<unknown>(safeFilePath));
+  if (!validation.value) {
+    throw new Error(
+      `[BROWSER_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
+    );
+  }
+  return validation.value;
 }
 
 export function validateBrowserExtensionSessionRequest(

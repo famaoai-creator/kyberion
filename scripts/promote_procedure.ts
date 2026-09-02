@@ -25,7 +25,7 @@ import {
   invalidateProcedureCache,
   resolveAllowlistedRecordingRef,
 } from '@agent/core/procedure-registry';
-import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
+import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -124,19 +124,17 @@ export function main(argv: string[] = []): void {
   }
 
   // Load + schema-validate the recording (data, never code).
-  let rawRecording: unknown;
+  let recording: ReturnType<typeof loadBrowserExtensionRecordingAtPath>;
   try {
-    rawRecording = readJson<unknown>(recordingAbs);
+    recording = loadBrowserExtensionRecordingAtPath(recordingAbs);
   } catch (err) {
     return fail(`failed to read recording: ${err instanceof Error ? err.message : String(err)}`);
   }
-  const recording = validateBrowserExtensionRecording(rawRecording);
-  if (!recording.value) fail(`recording failed validation: ${recording.errors.join('; ')}`);
-  if (recording.value.review?.status !== 'approved') {
+  if (recording.review?.status !== 'approved') {
     fail('recording review must be "approved" before promotion');
   }
 
-  const compiled = compileBrowserRecording(recording.value, {
+  const compiled = compileBrowserRecording(recording, {
     procedureId,
     intentPhrases,
     recordingRef,
