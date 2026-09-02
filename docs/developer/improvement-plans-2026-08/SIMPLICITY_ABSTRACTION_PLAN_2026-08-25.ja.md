@@ -13325,6 +13325,12 @@ SX-03／SX-04／SX-08 のmission team planを再監査し、persisted `team-comp
 
 検証: mission team composer／binding／runtime **3 files / 23 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 511
+
+SX-03／SX-04／SX-08 のA2A CLI入力を再監査し、`run_a2a`がpersisted envelopeを`readJson<A2AMessage>`の型アサーションと`header`／`payload`の存在確認だけでsuper-nerveへ渡していた残存を修正した。既存の`a2a-envelope.schema.json`を`defineCatalog`ベースの共有validatorへ接続し、version、header必須項目、performative、payload objectをdispatch前に検証するようにした。不正envelopeは実行へ進まず、既存のA2A response／super-pipeline semanticsは維持している。package subpath exportも追加した。
+
+検証: run_a2a／A2A bridge／task contract **3 files / 32 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
