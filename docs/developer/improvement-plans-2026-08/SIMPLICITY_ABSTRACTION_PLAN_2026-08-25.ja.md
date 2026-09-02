@@ -11593,6 +11593,16 @@ guard、機密パス制御、tenant／surface projection、nexus／terminal の�
 adoption、`git diff --check`。残る改善計画は media の domain reader、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 273
+
+PR #711 の push 後 CI で、terminal-hud の profile reader だけが `readJson` を `secure-io` から import していた
+ため、GitHub Actions の build／PR Validation／Cross-OS Smoke が同じ TypeScript エラーで失敗した。import を
+foundation barrel の canonical `readJson` へ修正し、terminal-hud build、root typecheck、foundation adoption check
+を再実行した。reader の path guard と onboarding state の既存表示 semantics は変更していない。
+
+検証: terminal-hud build、root typecheck、foundation adoption、lint-staged、`git diff --check`。コミット
+`14c21e474` を branch／PR #711 へ push 済み。push 後の GitHub Actions は再実行中であり、完了結果を別途確認する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
