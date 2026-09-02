@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
@@ -239,10 +239,123 @@ function resolveStatePath(record: ServiceRuntimeRecord): string {
   return path.join(resolveManagedServicePath(record), 'state.json');
 }
 
-function loadStateFromPath(statePath: string): ServiceRuntimeState | null {
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim() !== '';
+}
+
+function isValidTimestamp(value: unknown): value is string {
+  return isNonEmptyString(value) && !Number.isNaN(new Date(value).getTime());
+}
+
+function parseServiceRuntimeState(
+  value: unknown,
+  statePath: string,
+  serviceId: string
+): ServiceRuntimeState {
+  const record = parseSafeJsonObjectValue(value, 'service runtime state');
+  const allowed = new Set([
+    'version',
+    'service_id',
+    'status',
+    'base_url',
+    'managed_service_path',
+    'installed_at',
+    'pinned_at',
+    'provenance',
+  ]);
+  if (Object.keys(record).some((key) => !allowed.has(key))) {
+    throw new Error('service runtime state contains unknown fields');
+  }
+  if (!isNonEmptyString(record.version) || record.version !== STATE_VERSION) {
+    throw new Error('service runtime state version is invalid');
+  }
+  if (!isNonEmptyString(record.service_id) || record.service_id !== serviceId) {
+    throw new Error('service runtime state service scope mismatch');
+  }
+  if (
+    record.status !== 'trial' &&
+    record.status !== 'approved_install' &&
+    record.status !== 'installed' &&
+    record.status !== 'pinned'
+  ) {
+    throw new Error('service runtime state status is invalid');
+  }
+  if (record.base_url !== undefined && typeof record.base_url !== 'string') {
+    throw new Error('service runtime state base_url is invalid');
+  }
+  if (!isNonEmptyString(record.managed_service_path)) {
+    throw new Error('service runtime state managed path is invalid');
+  }
+  const expectedManagedPath = path.dirname(path.resolve(statePath));
+  const managedPath = assertSafeRepositoryPath(record.managed_service_path, {
+    allowMissingLeaf: true,
+  });
+  if (path.resolve(managedPath) !== expectedManagedPath) {
+    throw new Error('service runtime state managed path mismatch');
+  }
+  for (const field of ['installed_at', 'pinned_at'] as const) {
+    if (record[field] !== undefined && !isValidTimestamp(record[field])) {
+      throw new Error(`service runtime state ${field} is invalid`);
+    }
+  }
+
+  let provenance: ServiceRuntimeState['provenance'];
+  if (record.provenance !== undefined) {
+    const parsedProvenance = parseSafeJsonObjectValue(
+      record.provenance,
+      'service runtime state provenance'
+    );
+    const provenanceAllowed = new Set(['action', 'command', 'args', 'notes']);
+    if (Object.keys(parsedProvenance).some((key) => !provenanceAllowed.has(key))) {
+      throw new Error('service runtime state provenance contains unknown fields');
+    }
+    if (!isNonEmptyString(parsedProvenance.action)) {
+      throw new Error('service runtime state provenance action is invalid');
+    }
+    if (parsedProvenance.command !== undefined && typeof parsedProvenance.command !== 'string') {
+      throw new Error('service runtime state provenance command is invalid');
+    }
+    if (parsedProvenance.notes !== undefined && typeof parsedProvenance.notes !== 'string') {
+      throw new Error('service runtime state provenance notes are invalid');
+    }
+    if (
+      parsedProvenance.args !== undefined &&
+      (!Array.isArray(parsedProvenance.args) ||
+        parsedProvenance.args.some((argument) => typeof argument !== 'string'))
+    ) {
+      throw new Error('service runtime state provenance args are invalid');
+    }
+    const command = parsedProvenance.command;
+    const args = parsedProvenance.args;
+    const notes = parsedProvenance.notes;
+    provenance = {
+      action: parsedProvenance.action,
+      ...(typeof command === 'string' ? { command } : {}),
+      ...(Array.isArray(args) ? { args: args as string[] } : {}),
+      ...(typeof notes === 'string' ? { notes } : {}),
+    };
+  }
+
+  const baseUrl = record.base_url;
+  const installedAt = record.installed_at;
+  const pinnedAt = record.pinned_at;
+
+  return {
+    version: record.version,
+    service_id: record.service_id,
+    status: record.status,
+    ...(typeof baseUrl === 'string' ? { base_url: baseUrl } : {}),
+    managed_service_path: managedPath,
+    ...(typeof installedAt === 'string' ? { installed_at: installedAt } : {}),
+    ...(typeof pinnedAt === 'string' ? { pinned_at: pinnedAt } : {}),
+    ...(provenance ? { provenance } : {}),
+  };
+}
+
+function loadStateFromPath(statePath: string, serviceId: string): ServiceRuntimeState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
-    return readJson<ServiceRuntimeState>(statePath);
+    return parseServiceRuntimeState(readJson<unknown>(statePath), statePath, serviceId);
   } catch {
     return null;
   }
@@ -394,7 +507,7 @@ export async function resolveServiceRuntimeForPlatform(
 
   const managedServicePath = resolveManagedServicePath(service);
   const statePath = resolveStatePath(service);
-  const state = loadStateFromPath(statePath);
+  const state = loadStateFromPath(statePath, service.service_id);
   const selectedProbe = resolveProbe(service, requestedMode);
   const selectedPlan = resolvePlan(service, requestedMode);
   const selectedAction = selectAction(state, requestedMode);
@@ -542,7 +655,7 @@ export async function getServiceRuntimeInventoryItem(
 export function getServiceRuntimeState(serviceId: string): ServiceRuntimeState | null {
   const record = getServiceRuntimeRecord(serviceId);
   if (!record) return null;
-  return loadStateFromPath(resolveStatePath(record));
+  return loadStateFromPath(resolveStatePath(record), record.service_id);
 }
 
 export function markServiceRuntimeInstalled(
