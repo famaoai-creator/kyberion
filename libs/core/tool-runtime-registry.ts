@@ -2,7 +2,6 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -789,7 +788,12 @@ export function loadToolRuntimeStateAtPath(statePath: string, toolId: string): T
   if (!safeLstat(safeStatePath).isFile()) {
     throw new Error(`[TOOL_RUNTIME_STATE] state must be a regular file: ${statePath}`);
   }
-  return parseToolRuntimeState(readJson<unknown>(safeStatePath), safeStatePath, toolId);
+  const value = defineCatalog<ToolRuntimeState>({
+    id: 'tool-runtime-state',
+    path: safeStatePath,
+    schema: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+  }).load();
+  return parseToolRuntimeState(value, safeStatePath, toolId);
 }
 
 export function readToolRuntimeState(toolId?: string): ToolRuntimeState | null {
