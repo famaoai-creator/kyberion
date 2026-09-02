@@ -26,7 +26,7 @@ For deeper setup (voice, surfaces, customer overlay), see [`docs/QUICKSTART.md`]
 
 Before opening a PR:
 
-- [ ] `pnpm validate` is green locally (build + typecheck + ESM check + contract checks + tests).
+- [ ] `pnpm check -- --scope pr` is green locally; use the [PR前CI準備チェックリスト](./knowledge/product/governance/pre-pr-ci-readiness-checklist.ja.md) for change-specific exceptions.
 - [ ] New code has at least one test (unit, integration, or contract — whatever fits).
 - [ ] You've read [`docs/developer/EXTENSION_POINTS.md`](./docs/developer/EXTENSION_POINTS.md) — your change does not silently modify a Stable surface without a semver bump.
 - [ ] If you touched an actuator manifest or schema, you ran `pnpm tsx scripts/check_contract_semver.ts -- --rebaseline` and committed the updated baseline.

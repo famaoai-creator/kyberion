@@ -811,6 +811,15 @@ function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
       sourceFiles[relative] = String(safeReadFile(file, { encoding: 'utf8' }));
     }
   }
+  // Manifest-driven checkers resolve their governed catalogs from the CI gate
+  // manifest rather than embedding each catalog path in production code. Keep
+  // those declarations visible to the unreferenced-catalog audit.
+  const gateManifestPath = pathResolver.rootResolve('knowledge/product/governance/ci-gates.json');
+  if (safeExistsSync(gateManifestPath)) {
+    sourceFiles['knowledge/product/governance/ci-gates.json'] = String(
+      safeReadFile(gateManifestPath, { encoding: 'utf8' })
+    );
+  }
   return sourceFiles;
 }
 

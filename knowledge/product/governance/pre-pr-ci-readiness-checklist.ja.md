@@ -7,7 +7,7 @@ phase: [execution, review]
 tags: [governance, pull-request, ci, validation, generated-artifacts, testing, worktree]
 importance: 9
 author: Codex
-last_updated: 2026-08-23
+last_updated: 2026-09-02
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -15,173 +15,49 @@ status: active
 
 # PR前CI準備チェックリスト
 
-## 目的
+## 標準手順
 
-PRを出した後に、生成物の取りこぼし・build前提の検査・未実行のテスト・別worktreeの混入を原因としてCI修正を繰り返さないための、公開前の確認順を定める。
-
-この文書は [CONTRIBUTING.md](../../../CONTRIBUTING.md) と [PR template](../../../.github/PULL_REQUEST_TEMPLATE.md) の補助であり、置き換えない。チェック結果はPR本文のTest plan、Evidence paths、Governed data欄へ記録する。
-
-## 使い方
-
-変更を一通り実装したら、次の順で確認する。各コマンドは対象範囲に応じて実行する。失敗したコマンドを原因未確認のまま再実行しない。
-
-1. scope と基準点を固定する。
-2. 生成物・snapshot・契約の同期を確認する。
-3. build を先に通す。
-4. 変更範囲の狭いテストから、CIと同じテスト群へ広げる。
-5. 差分とPRのチェック結果を確認してから公開する。
-
-## 0. scope、worktree、基準点
-
-- [ ] `git status --short --branch` で、今回の変更と別作業の変更を分けて把握した。
-- [ ] PR用branchは最新の `origin/main` を基準にしている。
-- [ ] 混在したworktreeでは、別作業を含めてcommitしない。必要なら clean な専用worktreeを `origin/main` から作る。
-- [ ] `git diff --name-only origin/main...HEAD` と `git diff --stat origin/main...HEAD` で、PRに含めるファイルだけを確認した。
-- [ ] `git diff --check` が成功した。
-- [ ] `.env`、生成済み `dist/`、`active/` のホスト依存状態、gitignored runtime fixtureをPRの根拠にしていない。
-
-確認コマンド:
+通常の PR は、実装と差分確認の後に次の 1 コマンドを実行する。これは manifest に登録された PR gate の正本であり、CI の PR validation と同じ gate 集合を実行する。
 
 ```bash
-git fetch origin main
-git diff --name-only origin/main...HEAD
-git diff --stat origin/main...HEAD
-git diff --check
+pnpm check -- --scope pr
 ```
 
-## 1. 生成物・snapshot・catalogの同期
+完了条件は、コマンドが全 gate を通過し、次の確認ができることである。
 
-変更した領域に応じて、正本と生成物を同じcommitへ含める。生成コマンドの実行後は、生成された差分が今回の変更だけか再確認する。
+- [ ] `git status --short --branch` と `git diff --name-only origin/main...HEAD` で、別作業・秘密情報・生成済み `dist/`・不要な runtime state が混ざっていない。
+- [ ] `git diff --check` が成功している。
+- [ ] 実装状況と生成物の変更が同じ commit に含まれている。
+- [ ] push 後に `gh pr checks <number>` を確認し、pending を pass と数えていない。
+- [ ] 未実行の suite、環境依存の検査、既知の CI failure は PR 本文の Test plan / Evidence に明記している。
 
-| 変更した領域                         | 公開前に確認すること                                                                                                                          |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `knowledge/`、語彙、ユーザー向け文言 | `pnpm run generate:pseudo-locale`、`pnpm check -- --only pseudo-locale`、`pnpm run generate:knowledge-index`、`pnpm check -- --only catalogs` |
-| vocabulary key / generated type      | `pnpm run generate:vocabulary-types`、`pnpm check -- --only vocabulary-types`                                                                 |
-| actuator manifest / operation        | `pnpm kyberion sync component-inventory`、`pnpm run generate:op-registry`、`pnpm check -- --only op-registry`                                 |
-| `agent-profiles/`                    | `agent-profile-index.json` を再生成し、差分を確認する                                                                                         |
-| `surfaces/*.json`                    | `active-surfaces.json` のsnapshotを同期し、`pnpm check -- --only governance-rules` を実行する                                                 |
-| `service-endpoints.json`             | 対応する `service-endpoints/` の正本が存在することを確認する                                                                                  |
-| actuator manifest / stable contract  | `pnpm run check:contract-semver` を実行し、必要なbaseline更新と理由をPRに記録する                                                             |
-| improvement plan / roadmap           | 実装状況とcompletion ledgerを同じ変更で更新する                                                                                               |
+`pnpm check -- --scope pr` は build、typecheck、lint、test matrix の代替ではない。これらは PR workflow が実行するため、ローカルで追加実行した場合だけ実測済みとして記録する。CI failure は job 名・run ID・失敗 step・ログを先に記録し、原因仮説を更新してから修正する。
 
-最低限のcatalog確認:
+## 例外表
 
-```bash
-pnpm run generate:knowledge-index
-pnpm check -- --only catalogs
-pnpm check -- --only pseudo-locale
-pnpm check -- --only vocabulary-types
-```
+次の変更だけは、標準手順に加えて該当行を実行する。該当しない行は実行しない。
 
-`knowledge/` を変更した場合、lint-stagedやcommit hookが `_index.md`、`_integrity-manifest.json` などを追加・更新することがある。commit後にもstaged diffとPR changed-filesを再確認する。
+| 変更範囲                                      | 追加確認                                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `knowledge/`、語彙、生成 catalog              | `pnpm generate:knowledge-index`、`pnpm check -- --scope full --only catalogs`。語彙／pseudo-locale を変更した場合は対応する generator と `vocabulary-types`／`pseudo-locale` gate も実行する。                                                                                                           |
+| actuator manifest、operation、stable contract | `pnpm kyberion sync component-inventory`、`pnpm generate:op-registry -- --check`、`pnpm check -- --scope full --only contract-semver`。schema の互換性を変更した場合は baseline 更新理由を PR に記録する。                                                                                               |
+| pipeline、ADF、governance policy              | `pnpm pipeline --input pipelines/baseline-check.json`、`pnpm check -- --scope full --only contract-schemas`、`pnpm check -- --scope full --only governance-rules`、`pnpm check -- --scope full --only work-scope-policy`。ADF は `draft → preflight → auto-repair → commit → execute` の境界で確認する。 |
+| surface、Intent、TUI、voice                   | `pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke` と変更に対応する focused test。viewer / tenant / tier は client input を認可根拠にしない。                                                                                                                                          |
+| dependency、lockfile、install script          | `pnpm install --frozen-lockfile`、`pnpm check -- --scope pr --only pinned-deps`、`pnpm check -- --scope pr --only install-script-allowlist`、`pnpm check -- --scope pr --only lockfile-commit-gate`。                                                                                                    |
+| Node／OS／native capability                   | Cross-OS Smoke の対象 gate と、必要なら `pnpm run build`／該当 suite を実行する。macOS／Windows 固有の結果を Linux の結果で代用しない。                                                                                                                                                                  |
+| user-visible behavior                         | `CHANGELOG.md` の `[Unreleased]` と public terminology を更新し、`pnpm check -- --scope pr --only ux-contract-docs` を確認する。                                                                                                                                                                         |
+| 大規模変更、release、CI failure repair        | `pnpm run validate` または `pnpm check -- --scope full` を実行し、全 test suite と未実行項目を PR 本文へ記録する。                                                                                                                                                                                       |
 
-## 2. buildを先に通す
+## 失敗時の原則
 
-CIの多くのcheckerは `@agent/core` のpackage entrypointや `dist/` を読み込む。検査やテストをbuild前に実行すると、実装不良ではなく `ERR_MODULE_NOT_FOUND` や古い生成物を見て判断することになる。
+- 生成物 drift は canonical generator を先に実行し、手編集で manifest や snapshot を合わせない。
+- `ERR_MODULE_NOT_FOUND` は build 前提の gate を build 後に再実行する。原因未確認のまま同じコマンドを繰り返さない。
+- ローカル pass と CI failure が異なる場合は clean checkout、Node 24、Linux CJK font、macOS／Windows native test、権限・環境変数の差を比較する。
+- worktree が混在している場合は、PR 対象を専用 worktree／明示的な path staging に分離し、他作業の変更を取り込まない。
 
-- [ ] `pnpm install --frozen-lockfile` が成功する（依存関係やlockfileを変更した場合は必須）。
-- [ ] `pnpm run build` が成功する。
-- [ ] build後に `pnpm run typecheck` が成功する。
-- [ ] `pnpm run check -- --scope pr --only esm`、`pnpm run check -- --scope pr --only packaging-contract` が成功する。
-- [ ] `pnpm run lint` と `pnpm exec prettier --check package.json .github/workflows/ci.yml .github/workflows/pr-validation.yml .github/workflows/release.yml .github/workflows/cross-os.yml` が成功する。
-- [ ] source treeに `.js`、`.d.ts`、sourceをshadowするbuild artifactがない。
+## 参照
 
-## 3. 変更範囲別のテスト
-
-まず変更したファイルに最も近いテストを実行し、通過後にCIのsuiteへ広げる。
-
-### 通常のcore変更
-
-```bash
-pnpm exec vitest run <変更に対応するテスト>
-pnpm test -- --suite core
-```
-
-coreがtier-guarded pathやmission stateを扱う場合は、CIと同じ環境を使う。
-
-```bash
-KYBERION_PERSONA=worker MISSION_ROLE=mission_controller pnpm test -- --suite core
-```
-
-### scripts、actuators、integration
-
-```bash
-pnpm test -- --suite scripts
-pnpm test -- --suite actuators
-pnpm test -- --suite integration
-```
-
-変更が複数領域にまたがる場合、1つのsuiteだけでgreenと判断しない。CIの `test (smoke)`、`test (core)`、`test (actuators)`、`test (scripts)`、`test (integration)` に対応する証跡を揃える。
-
-### surface / Intent / TUI変更
-
-- [ ] terminal、Slack、Presenceなどの入口が同じIntent Resolution Contractを通ることを確認した。
-- [ ] `tenant_slug`、tier、viewer scopeをクライアント入力だけで認可に使っていない。
-- [ ] unresolved / clarification、governed shape、approval-ready plan、direct replyの各経路を確認した。
-- [ ] provider固有の委譲、mission team handoff、PresenceのA2A直通など、既存の専用経路をshared compilerで壊していない。
-- [ ] voice入力、Enter送信、Escキャンセル、非TTY/snapshotの境界を確認した。
-- [ ] Intent smokeとsurfaceの関連テストを実行した。
-
-```bash
-pnpm run build
-pnpm kyberion smoke intent --output active/shared/tmp/intent-smoke
-pnpm exec vitest run <surfaceまたはIntentの関連テスト>
-```
-
-### pipeline / ADF / governance変更
-
-- [ ] `pnpm pipeline --input pipelines/baseline-check.json` が成功した。
-- [ ] ADFを直接実行せず、draft → preflight → auto-repair → commit → executeの契約を確認した。
-- [ ] `pnpm run check -- --scope full --only contract-schemas`、`pnpm check -- --only governance-rules`、`pnpm check -- --only work-scope-policy` を実行した。
-
-## 4. validateとCIの対応関係
-
-広い変更では `pnpm run validate` を実行する。ただし、現行の `validate` はbuild・typecheck・catalog・governance系の検査をまとめたゲートであり、CIの全test matrix（core、actuators、scripts、integration、Cross-OS）を代替しない。
-
-したがって、PR前の最低限の組み合わせは次の通りとする。
-
-```bash
-pnpm run validate
-pnpm run test
-pnpm test -- --suite core
-pnpm test -- --suite actuators
-pnpm test -- --suite scripts
-pnpm test -- --suite integration
-```
-
-実行時間や環境制約で全suiteを実行できない場合は、未実行としてPR本文に明記し、CIで確認する対象を隠さない。
-
-## 5. PRを出す直前の最終確認
-
-- [ ] `pnpm run check:pr-title -- --title "<PR title>"` が成功する。
-- [ ] commit titleとPR titleがConventional Commitsに従っている。
-- [ ] user-visible changeなら `CHANGELOG.md` の `[Unreleased]` を更新した。
-- [ ] stable surfaceを変更した場合、`EXTENSION_POINTS.md`を読み、必要なsemver bump / baseline更新を行った。
-- [ ] PR templateのMission / Workitem / Evidence / Test planを実際の値で埋めた。
-- [ ] staged diffに別作業、秘密情報、compiled artifact、不要なruntime stateがない。
-- [ ] commit hook後に `git status`、staged diff、生成物を再確認した。
-- [ ] push後に `gh pr checks <number>` で必須checkをすべて確認する。pendingをpassと数えない。
-- [ ] CIが失敗した場合、最初にjob名・run ID・失敗step・ログを記録し、原因仮説を立ててから修正する。
-
-## 6. よくある失敗と先回り
-
-| CI症状                               | 先に確認すること                                                                                                         |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| pseudo-locale drift                  | `pnpm run generate:pseudo-locale` → `pnpm check -- --only pseudo-locale`                                                 |
-| knowledge index / manifest drift     | `pnpm run generate:knowledge-index` → `pnpm check -- --only catalogs`                                                    |
-| `ERR_MODULE_NOT_FOUND` for `dist/`   | buildを最初に実行したか。fresh checkoutでdistを前提にしていないか                                                        |
-| scriptsだけ失敗                      | `pnpm test -- --suite scripts` を単独実行し、gitignored runtime queue / fixture依存を除く                                |
-| integrationだけ失敗                  | `pnpm test -- --suite integration` と失敗テストのfocused runを実行し、surface delegation / approval / tenant scopeを確認 |
-| surfaceの応答がclarificationへ変わる | shared compilerに入る条件とprovider / mission専用委譲の境界を比較                                                        |
-| ローカルではpass、CIで失敗           | clean checkout、Node 24、Linux CJK font、macOS SQLite FTS5、Windows native testの差を確認                                |
-| PRに不要な変更が混ざる               | `git diff origin/main...HEAD`、dedicated worktree、明示的なpath stagingを確認                                            |
-
-## 完了条件
-
-PR前チェックの完了は「ローカルの一部テストがpass」ではなく、次の証拠が揃った状態とする。
-
-- 対象範囲と `origin/main` との差分が説明できる。
-- 正本と生成物が同期している。
-- build後の静的検査と対象test suiteが実行済みである。
-- 未実行・環境依存・既知の失敗がPR本文に明記されている。
-- push後のGitHub Actionsで、必須checkを全件確認している。
+- [CONTRIBUTING.md](../../../CONTRIBUTING.md)
+- [ci-gates.json](./ci-gates.json)
+- [PR template](../../../.github/PULL_REQUEST_TEMPLATE.md)
+- [Kyberion development practices](./kyberion-development-practices.md)

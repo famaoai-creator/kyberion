@@ -80,6 +80,18 @@ describe('check_catalog_integrity', () => {
         })
       ).toEqual([]);
     });
+
+    it('recognizes a catalog referenced by the manifest-driven CI gate registry', () => {
+      expect(
+        findUnreferencedGovernanceCatalogs({
+          catalogs: [{ fileName: 'i18n-baseline.json', documentationOnly: false }],
+          sourceFiles: {
+            'knowledge/product/governance/ci-gates.json':
+              '"baseline": "knowledge/product/governance/i18n-baseline.json"',
+          },
+        })
+      ).toEqual([]);
+    });
   });
 
   describe('theme catalog drift', () => {
