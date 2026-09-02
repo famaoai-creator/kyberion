@@ -12003,6 +12003,16 @@ Telegram の既存 message date 変換、Wisdom の日付キー化、期限計�
 typecheck、lint、PR scope **33/33 gates passed**、Prettier、`git diff --check`。残る SX-03 は非単純な domain-specific helper の
 adopt-or-delete と、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 312
+
+modeling actuator の browser execution preset loader を `defineCatalog<BrowserExecutionPresetCatalog>()` へ移行し、専用
+`browser-execution-presets.schema.json` による validation と共通 cache／resource path 境界を適用した。従来の retry、missing／
+invalid catalog 時の deterministic fallback、browser pipeline の preset 解決 semantics は維持し、domain loader 独自の JSON read／
+fallback 実装を除去した。
+
+検証: modeling actuator **4 files / 19 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る SX-04 は
+他の domain loader の完全統合、非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

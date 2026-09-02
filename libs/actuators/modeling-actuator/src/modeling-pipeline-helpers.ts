@@ -34,7 +34,7 @@ import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
 } from '@agent/core/agentic-source-review-verification';
-import { createAjv, nowIso, readJson } from '@agent/core/foundation';
+import { createAjv, defineCatalog, nowIso, readJson } from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -75,6 +75,33 @@ addFormats(ajv);
 const BROWSER_EXECUTION_PRESETS_PATH = pathResolver.knowledge(
   'product/orchestration/browser-execution-presets.json'
 );
+const BROWSER_EXECUTION_PRESETS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-execution-presets.schema.json'
+);
+
+interface BrowserExecutionPresetCatalog {
+  default_preset: string;
+  presets: Record<string, Record<string, unknown>>;
+}
+
+const FALLBACK_BROWSER_EXECUTION_PRESETS: BrowserExecutionPresetCatalog = {
+  default_preset: 'standard-web-auth',
+  presets: {
+    'standard-web-auth': {
+      default_email: 'tester@example.com',
+      default_password: 'debug-password',
+      handoff_output_path: 'active/shared/tmp/browser/generated-web-session-handoff.json',
+    },
+  },
+};
+
+const browserExecutionPresetCatalog = defineCatalog<BrowserExecutionPresetCatalog>({
+  id: 'browser-execution-presets',
+  path: BROWSER_EXECUTION_PRESETS_PATH,
+  schema: BROWSER_EXECUTION_PRESETS_SCHEMA_PATH,
+  fallback: FALLBACK_BROWSER_EXECUTION_PRESETS,
+  fallbackOnInvalid: true,
+});
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -757,46 +784,15 @@ async function opTransform(op: string, params: any, ctx: any, resolve: (value: a
   }
 }
 
-async function loadBrowserExecutionPresetCatalog(): Promise<{
-  default_preset?: string;
-  presets: Record<string, any>;
-}> {
-  let safePresetPath: string;
+async function loadBrowserExecutionPresetCatalog(): Promise<BrowserExecutionPresetCatalog> {
   try {
-    safePresetPath = assertSafeRepositoryPath(BROWSER_EXECUTION_PRESETS_PATH);
-  } catch {
-    safePresetPath = '';
+    return await retry(async () => browserExecutionPresetCatalog.load(), buildRetryOptions());
+  } catch (err) {
+    logger.warn(
+      `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
+    );
+    return structuredClone(FALLBACK_BROWSER_EXECUTION_PRESETS);
   }
-  if (safePresetPath && safeExistsSync(safePresetPath)) {
-    try {
-      const parsed = await retry(
-        async () =>
-          readJson<{
-            default_preset?: string;
-            presets?: Record<string, unknown>;
-          }>(safePresetPath),
-        buildRetryOptions()
-      );
-      if (parsed.presets) {
-        return { default_preset: parsed.default_preset, presets: parsed.presets };
-      }
-    } catch (err) {
-      logger.warn(
-        `[modeling-pipeline-helpers] suppressed error in loadBrowserExecutionPresetCatalog: ${err}`
-      );
-    }
-  }
-
-  return {
-    default_preset: 'standard-web-auth',
-    presets: {
-      'standard-web-auth': {
-        default_email: 'tester@example.com',
-        default_password: 'debug-password',
-        handoff_output_path: 'active/shared/tmp/browser/generated-web-session-handoff.json',
-      },
-    },
-  };
 }
 
 async function opApply(op: string, params: any, ctx: any, resolve: (value: any) => any) {
