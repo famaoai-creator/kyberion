@@ -7429,6 +7429,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/layout-template-catalog.schema.json",
+      "tier": "public",
+      "size": 505,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/legacy-media-ops.schema.json",
       "tier": "public",
       "size": 373,

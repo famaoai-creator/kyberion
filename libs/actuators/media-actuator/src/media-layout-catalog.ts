@@ -218,6 +218,28 @@ function loadLayoutTemplateCatalog(rootDir: string): any {
   return _cachedLayoutTemplates;
 }
 
+function loadLayoutTemplateCatalogFromPath(filePath: string): any {
+  const catalogPath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  const fallback = {
+    version: '1.0.0',
+    default: 'corporate-standard',
+    templates: {},
+  };
+  return defineCatalog<{
+    version: string;
+    default: string;
+    templates: Record<string, unknown>;
+  }>({
+    id: 'layout-template-catalog',
+    path: catalogPath,
+    schema: pathResolver.rootResolve(
+      'knowledge/product/schemas/layout-template-catalog.schema.json'
+    ),
+    fallback,
+    fallbackOnInvalid: true,
+  }).load();
+}
+
 function resolveLayoutTemplate(
   rootDir: string,
   designSystemId: string | undefined,
@@ -244,11 +266,9 @@ function resolveLayoutTemplate(
   // Priority 1: tenant override with an explicit confidential catalog path
   if (tenantOverride?.layout_template_catalog) {
     try {
-      const catalogPath = assertSafeRepositoryPath(
-        path.resolve(rootDir, tenantOverride.layout_template_catalog),
-        { allowMissingLeaf: true }
+      const catalog = loadLayoutTemplateCatalogFromPath(
+        path.resolve(rootDir, tenantOverride.layout_template_catalog)
       );
-      const catalog = loadJsonValue(catalogPath);
       const templateId = tenantOverride.layout_template_id || catalog.default;
       const tpl = catalog.templates?.[templateId];
       if (tpl) return tpl;
@@ -514,6 +534,7 @@ export {
   getPngDisplaySize,
   resolveBodyZoneLayout,
   loadLayoutTemplateCatalog,
+  loadLayoutTemplateCatalogFromPath,
   loadTenantEntries,
   resolveConfidentialTenantOverride,
   resolveLayoutTemplate,
