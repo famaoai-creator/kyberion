@@ -11940,6 +11940,15 @@ foundation adoption の残差から、共有 core の trace／deliverable inbox�
 root lint、PR scope **33/33 gates passed**、Prettier、`git diff --check`。残る SX-03 は surface／actuator／domain-specific
 loader の追加 adoption と、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 306
+
+browser actuator の pipeline helper に残っていた session／failure metadata の単純 timestamp 6箇所を foundation の
+`nowIso()` へ移行した。browser session の lease expiry は deadline 計算と ISO serialization が別の意味を持つため変更せず、
+navigation／failure／trace の状態記録における UTC ISO 形式と既存の browser lifecycle は維持した。
+
+検証: browser actuator **3 files / 43 tests passed**、対象ファイルの単純 timestamp **0件**、Prettier、`git diff --check`。
+残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
