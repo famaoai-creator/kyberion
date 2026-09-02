@@ -1,4 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { assertModuleInvariant } from './invariants.js';
@@ -63,7 +64,7 @@ export function appendPromptVisibilityRecord(
   const record: PromptVisibilityRecord = {
     version: PROMPT_VISIBILITY_LEDGER_VERSION,
     record_id: `PVR-${randomUUID()}`,
-    ts: input.now || new Date().toISOString(),
+    ts: input.now || nowIso(),
     mission_id: missionId,
     source,
     form,
