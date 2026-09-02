@@ -6847,6 +6847,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/deal-record.schema.json",
+      "tier": "public",
+      "size": 2725,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
       "size": 2098,

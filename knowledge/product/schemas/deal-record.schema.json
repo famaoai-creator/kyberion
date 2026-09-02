@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "deal-record.schema.json",
+  "title": "Persisted customer deal record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "kind": { "const": "deal" },
+    "deal_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$" },
+    "tenant_slug": { "type": "string", "minLength": 1 },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "surface": { "type": "string", "minLength": 1 },
+        "channel_id": { "type": "string", "minLength": 1 }
+      },
+      "required": ["surface", "channel_id"]
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "inquiry",
+        "qualified",
+        "discovery",
+        "quote",
+        "contract",
+        "won",
+        "delivering",
+        "delivered",
+        "invoiced",
+        "lost"
+      ]
+    },
+    "lead_score": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "grade": { "type": "string", "minLength": 1 },
+        "score": { "type": "number" }
+      },
+      "required": ["grade"]
+    },
+    "summary": { "type": "string" },
+    "requirements_ref": { "type": "string" },
+    "quote_ref": { "type": "string" },
+    "contract_ref": { "type": "string" },
+    "agreed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": { "type": "array", "items": { "type": "string" } },
+        "amount": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": "number" },
+            "currency": { "type": "string", "minLength": 1 }
+          },
+          "required": ["value", "currency"]
+        },
+        "due_date": { "type": "string" },
+        "success_condition": { "type": "string" }
+      },
+      "required": ["scope"]
+    },
+    "mission_ids": { "type": "array", "items": { "type": "string" } },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ts": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "enum": ["customer", "kyberion", "operator"] },
+          "text": { "type": "string" }
+        },
+        "required": ["ts", "role", "text"]
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "kind",
+    "deal_id",
+    "tenant_slug",
+    "channel",
+    "stage",
+    "summary",
+    "mission_ids",
+    "notes",
+    "created_at",
+    "updated_at"
+  ]
+}
