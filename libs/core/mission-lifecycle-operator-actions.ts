@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { safeExec } from './secure-io.js';
 import { loadState, loadStateForRepair, saveState } from './mission-state.js';
 import { readTrustLedger, recordAgentRuntimeEvent } from './mission-governance.js';
@@ -45,11 +46,11 @@ export async function delegateMission(
   state.delegation = {
     agent_id: agentId,
     a2a_message_id: a2aMessageId,
-    last_sync_ts: new Date().toISOString(),
+    last_sync_ts: nowIso(),
     verification_status: 'pending',
   };
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'DELEGATE',
     note: `Mission delegated to ${agentId} (A2A: ${a2aMessageId})`,
   });
@@ -91,11 +92,11 @@ export async function importMission(
     safeExec('git', ['merge', 'origin_remote/main', '--no-edit'], { cwd: missionDir });
     state.status = transitionStatus(state.status, 'validating');
     if (state.delegation) {
-      state.delegation.last_sync_ts = new Date().toISOString();
+      state.delegation.last_sync_ts = nowIso();
       state.delegation.remote_repo_url = remoteUrl;
     }
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'IMPORT',
       note: `Imported results from ${remoteUrl}. Transitioned to VALIDATING.`,
     });
@@ -132,7 +133,7 @@ export async function pauseMission(id: string, note?: string): Promise<void> {
     next_step: 'Resume the mission when the operator is ready.',
   };
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'PAUSE',
     note: note || 'Mission paused by operator request.',
   });
@@ -171,7 +172,7 @@ export async function cancelMission(id: string, note?: string): Promise<void> {
     cancel_reason: reason,
     next_step: 'Create a replacement mission if the work should continue.',
   };
-  state.history.push({ ts: new Date().toISOString(), event: 'CANCEL', note: reason });
+  state.history.push({ ts: nowIso(), event: 'CANCEL', note: reason });
   await saveState(upperId, state);
   recordAgentRuntimeEvent(
     pathResolver.shared('observability/mission-control/agent-runtime-events.jsonl'),
@@ -253,7 +254,7 @@ export async function repairLegacyMissionState(id: string, note?: string): Promi
   state.history = [
     ...(Array.isArray(state.history) ? state.history : []),
     {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'LEGACY_STATE_REPAIRED',
       note:
         note || 'Repaired legacy mission state to the current schema before lifecycle transition.',
