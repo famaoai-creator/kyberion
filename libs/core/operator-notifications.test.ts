@@ -197,6 +197,35 @@ describe('operator notifications (E2E-04 Task 2)', () => {
     expect(mod.loadNotificationPreferences().default_channel?.target).toBe('C9');
   });
 
+  it('fails closed for malformed persisted preference fields', () => {
+    writePrefs({
+      default_channel: { surface: 'slack', target: 42 },
+    });
+    expect(mod.loadNotificationPreferences()).toEqual({});
+
+    expect(() =>
+      mod.saveNotificationPreferences({
+        default_channel: { surface: 'slack', target: 42 } as never,
+      })
+    ).toThrow('Invalid notification preferences');
+  });
+
+  it('rejects unknown events and channel fields before delivery configuration is saved', () => {
+    writePrefs({
+      per_event: { unknown_event: { surface: 'slack', target: 'C1' } },
+    });
+    expect(mod.loadNotificationPreferences()).toEqual({});
+
+    expect(() =>
+      mod.saveNotificationPreferences({
+        default_channel: { surface: 'slack', target: 'C1' },
+        per_event: {
+          question: { surface: 'slack', target: 'C1', extra: true } as never,
+        },
+      })
+    ).toThrow('Invalid notification preferences');
+  });
+
   it('does not read or overwrite preferences through a symlink', () => {
     const preferencePath = path.join(
       tmpRoot,
