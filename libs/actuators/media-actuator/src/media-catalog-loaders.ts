@@ -77,6 +77,14 @@ export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
   return readJson(assertSafeRepositoryPath(filePath));
 }
 
+export function loadDesignPattern(rootDir: string, filePath: string): any {
+  return defineCatalog({
+    id: 'design-pattern',
+    path: assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/design-pattern.schema.json'),
+  }).load();
+}
+
 export function loadTenantEntries(rootDir: string): { override_path: string }[] {
   const entries: { override_path: string }[] = [];
   const indexPath = path.join(rootDir, 'knowledge/confidential/tenants/index.json');

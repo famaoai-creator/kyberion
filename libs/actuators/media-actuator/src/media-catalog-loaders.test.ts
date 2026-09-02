@@ -11,6 +11,7 @@ import {
 
 import {
   loadJsonValue,
+  loadDesignPattern,
   loadMediaDesignSystemsCatalog,
   readJsonFilesRecursively,
 } from './media-catalog-loaders.js';
@@ -59,5 +60,36 @@ describe('media catalog loaders', () => {
     const catalog = loadMediaDesignSystemsCatalog(pathResolver.rootDir());
     expect(catalog.default_system).toBe('executive-standard');
     expect(catalog.systems['executive-standard']).toBeDefined();
+  });
+
+  it('validates a design pattern through its dedicated schema boundary', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve('libs/actuators/media-actuator/src/media-catalog-loaders.ts'),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain("id: 'design-pattern'");
+    expect(source).toContain('knowledge/product/schemas/design-pattern.schema.json');
+
+    const patternPath = `${rootDir}/pattern.json`;
+    safeMkdir(rootDir, { recursive: true });
+    safeWriteFile(
+      patternPath,
+      JSON.stringify({
+        pattern_id: 'test-pattern',
+        category: 'strategic',
+        target_audience: 'operators',
+        layout_strategy: {
+          visual_weight: 'balanced',
+          structure: ['summary'],
+        },
+      })
+    );
+
+    expect(loadDesignPattern(pathResolver.rootDir(), patternPath)).toEqual(
+      expect.objectContaining({ pattern_id: 'test-pattern' })
+    );
   });
 });
