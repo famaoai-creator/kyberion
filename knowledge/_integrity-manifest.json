@@ -6421,6 +6421,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/aidlc-phase-state.schema.json",
+      "tier": "public",
+      "size": 3159,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/analysis-config.schema.json",
       "tier": "public",
       "size": 2160,
