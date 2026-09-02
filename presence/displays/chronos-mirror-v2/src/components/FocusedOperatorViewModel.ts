@@ -1,6 +1,6 @@
 import { chronosSpeechLocale } from '../lib/ux-vocabulary';
 import { optionalStringField, parseJsonRecord } from '../lib/json-record';
-import type { MissionAssetCategory } from '../lib/mission-progress';
+import type { MissionAssetCategory } from '../lib/mission-progress-client';
 import type { AttentionItem } from '../lib/operator-console';
 
 export type FocusedViewId =
