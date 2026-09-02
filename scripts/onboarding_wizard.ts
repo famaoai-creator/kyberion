@@ -22,6 +22,7 @@ import { withLock } from '@agent/core/src/lock-utils';
 import {
   compileSchema,
   getRegisteredEnvText,
+  nowIso,
   readJson,
   setRegisteredEnv,
 } from '@agent/core/foundation';
@@ -336,7 +337,7 @@ async function saveState(state: OnboardingState): Promise<void> {
 }
 
 function createInitialState(): OnboardingState {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const state: OnboardingState = {
     version: '1.0.0',
     status: 'draft',
@@ -547,7 +548,7 @@ async function runIdentityPhase(state: OnboardingState): Promise<void> {
   // LC-05c: the next phase is 'reasoning' — jumping straight to 'services'
   // made a resumed wizard skip backend selection entirely.
   state.current_phase = 'reasoning';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 }
 
@@ -679,7 +680,7 @@ async function runReasoningPhase(state: OnboardingState): Promise<void> {
   state.reasoning = reasoning;
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'reasoning']));
   state.current_phase = 'services';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 }
 
@@ -790,7 +791,7 @@ async function runServicesPhase(
           service_id: serviceId,
           status: 'skipped',
           connection_kind: 'none',
-          captured_at: new Date().toISOString(),
+          captured_at: nowIso(),
         });
         continue;
       }
@@ -808,7 +809,7 @@ async function runServicesPhase(
         payload = await promptGenericConnection(serviceId);
       }
 
-      const capturedAt = new Date().toISOString();
+      const capturedAt = nowIso();
       const ready = payload ? connectionIsReady(serviceId, payload) : false;
       const candidate: ServiceCandidateDraft = {
         service_id: serviceId,
@@ -879,7 +880,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
     created_at:
       typeof defaultTenant.metadata?.created_at === 'string'
         ? defaultTenant.metadata.created_at
-        : new Date().toISOString(),
+        : nowIso(),
   });
 
   if (wantsTenantSetup) {
@@ -901,7 +902,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
     );
     const assignedRole = await ask('Your role in this tenant [strategist]: ', 'strategist');
     const purpose = await ask('Purpose / scope for this tenant [optional]: ');
-    const createdAt = new Date().toISOString();
+    const createdAt = nowIso();
 
     const tenantProfile: TenantDraft = {
       tenant_slug: tenantSlug,
@@ -939,7 +940,7 @@ async function runTenantsPhase(state: OnboardingState): Promise<void> {
   state.tenants = { entries };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'tenants']));
   state.current_phase = 'tutorial';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 }
 
@@ -983,7 +984,7 @@ async function runTutorialPhase(state: OnboardingState): Promise<void> {
   state.tutorial = { mode, summary, plan_path: planPath };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'tutorial']));
   state.current_phase = 'summary';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 }
 
@@ -995,13 +996,13 @@ async function runSummaryPhase(state: OnboardingState): Promise<void> {
     profileRoot: profileRoot(),
     identityName: state.identity?.name,
     agentId: state.identity?.agent_id,
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
   });
   await writeTextArtifact(summaryPath(), summary, 'onboarding-summary');
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'summary']));
   state.status = 'complete';
   state.current_phase = 'summary';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 
   const identity = state.identity;
