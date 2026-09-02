@@ -3,6 +3,7 @@ import { getFoundationIo, registerFoundationIo, type FoundationIo } from './io.j
 import {
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
+  parsePersistedPipelineStrategy,
   readJsonObjectRequest,
   readJsonLines,
 } from './json.js';
@@ -21,6 +22,57 @@ describe('foundation safe JSON parser', () => {
   it('requires object roots after safe-tree validation', () => {
     expect(parseSafeJsonObjectValue({ ok: true }, 'request')).toEqual({ ok: true });
     expect(() => parseSafeJsonObjectValue([], 'request')).toThrow('request must be a JSON object');
+  });
+
+  it('validates persisted pipeline strategy steps before execution', () => {
+    const parsed = parsePersistedPipelineStrategy({
+      strategies: [
+        {
+          pipeline: [
+            {
+              type: 'control',
+              op: 'if',
+              params: {
+                condition: { path: 'ready', equals: true },
+                then: [{ type: 'apply', op: 'log', params: { message: 'ready' } }],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.strategies[0].pipeline[0].params.then).toEqual([
+      { type: 'apply', op: 'log', params: { message: 'ready' } },
+    ]);
+    expect(() =>
+      parsePersistedPipelineStrategy({
+        strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }],
+      })
+    ).toThrow('params must be a JSON object');
+    expect(() =>
+      parsePersistedPipelineStrategy({
+        strategies: [
+          {
+            pipeline: [
+              {
+                type: 'control',
+                op: 'if',
+                params: {
+                  then: [
+                    {
+                      type: 'apply',
+                      op: 'log',
+                      params: JSON.parse('{"__proto__":{}}') as Record<string, unknown>,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      })
+    ).toThrow('dangerous JSON key');
   });
 
   it.each([

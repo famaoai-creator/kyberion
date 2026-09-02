@@ -1,5 +1,5 @@
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -803,9 +803,7 @@ async function performReconcile(input: SystemAction) {
     { allowMissingLeaf: true }
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
-  const config = readJson<{
-    strategies: Array<{ pipeline: SystemPipelineStep[]; params?: Record<string, unknown> }>;
-  }>(strategyPath);
+  const config = parsePersistedPipelineStrategy(readJson<unknown>(strategyPath), 'system strategy');
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

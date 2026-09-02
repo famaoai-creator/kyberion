@@ -1381,6 +1381,20 @@ describe('system-actuator reconcile admission', () => {
     ).rejects.toThrow('[OP_PREFLIGHT_BLOCK] test computer interaction denial');
     expect(core.clickAt).not.toHaveBeenCalled();
   });
+
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    const secureIo = await import('@agent/core/secure-io');
+    vi.mocked(secureIo.safeExistsSync).mockReturnValue(true);
+    vi.mocked(secureIo.safeReadFile).mockReturnValue(
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    const { handleAction } = await import('./index');
+    await expect(
+      handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+    ).rejects.toThrow('system strategy.strategies[0].pipeline[0].params must be a JSON object');
+    expect(testCore.safeExec).not.toHaveBeenCalled();
+  });
 });
 
 describe('system-actuator computer_interaction adapter', () => {

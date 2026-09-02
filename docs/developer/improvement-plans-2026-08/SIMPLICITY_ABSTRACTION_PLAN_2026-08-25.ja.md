@@ -12995,6 +12995,12 @@ SX-04 の reasoning route user-config loaderを再監査し、persisted user con
 
 検証: reasoning route resolver **1 file / 20 tests passed**、root typecheck、対象 lint／Prettier、canonical full gate **69/69 passed**、`git diff --check`。SX-03 のdomain-specific helper、SX-04 の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 456
+
+SX-03／SX-04 のpersisted strategy loader残存を再監査し、orchestrator／system の reconcile strategy JSONを型アサーションのままpipeline実行へ渡していた境界を、foundationの `parsePersistedPipelineStrategy` へ統合した。root／strategy／stepの型、non-empty op、params object、control配下のnested pipeline、危険JSON keyを実行前に検証し、既存のpath／trust／preflight／pipeline semanticsは変更していない。
+
+検証: foundation／orchestrator／system **3 files / 134 tests passed**、対象7ファイルのPrettier、root typecheck、`git diff --check`。canonical full gate実行後、SX-03 のdomain-specific helper、SX-04 の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
