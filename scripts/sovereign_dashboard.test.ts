@@ -66,7 +66,22 @@ describe('sovereign dashboard governance loaders', () => {
 
     safeWriteFile(
       statePath,
-      JSON.stringify({ status: 'active', mission_id: 'MSN-DASHBOARD', tier: 'confidential' })
+      JSON.stringify({
+        mission_id: 'MSN-DASHBOARD',
+        tier: 'confidential',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
+      })
     );
     expect(readMissionDashboardState(statePath)).toEqual({
       status: 'active',
@@ -74,7 +89,25 @@ describe('sovereign dashboard governance loaders', () => {
       tier: 'confidential',
     });
 
-    safeWriteFile(statePath, JSON.stringify({ status: 'active', mission_id: ['not-a-id'] }));
+    safeWriteFile(
+      statePath,
+      JSON.stringify({
+        mission_id: ['not-a-id'],
+        tier: 'confidential',
+        status: 'active',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'main',
+          start_commit: 'abc1234',
+          latest_commit: 'abc1234',
+          checkpoints: [],
+        },
+        history: [],
+      })
+    );
     expect(readMissionDashboardState(statePath)).toBeNull();
 
     safeWriteFile(statePath, JSON.stringify(['not-a-state']));
