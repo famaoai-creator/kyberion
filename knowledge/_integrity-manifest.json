@@ -7813,6 +7813,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-phase-gate-definition.schema.json",
+      "tier": "public",
+      "size": 1727,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-process-registry.schema.json",
       "tier": "public",
       "size": 1383,

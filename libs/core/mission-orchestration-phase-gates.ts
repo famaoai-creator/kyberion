@@ -6,9 +6,10 @@ import {
 } from './mission-gate-engine.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import { latestSnapshot } from './intent-snapshot-store.js';
-import { findMissionPath, missionDir } from './path-resolver.js';
+import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
@@ -37,9 +38,33 @@ export type MissionGateRecord = {
 };
 
 export interface PersistedPhaseGateDefinition {
+  mission_id: string;
   phase: string;
   position: 'entry' | 'exit';
   gate: MissionGateDefinition;
+}
+
+const PHASE_GATE_DEFINITION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-phase-gate-definition.schema.json'
+);
+
+/** Load one persisted gate through the shared schema boundary and mission binding. */
+export function loadMissionPhaseGateDefinitionAtPath(
+  filePath: string,
+  missionId: string
+): PersistedPhaseGateDefinition {
+  const definition = defineCatalog<PersistedPhaseGateDefinition>({
+    id: 'mission-phase-gate-definition',
+    path: filePath,
+    schema: PHASE_GATE_DEFINITION_SCHEMA_PATH,
+  }).load();
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (definition.mission_id.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[MISSION_GATE_SCOPE_MISMATCH] definition belongs to ${definition.mission_id}, expected ${expectedMissionId}`
+    );
+  }
+  return definition;
 }
 
 export interface PhaseExitGateOutcome {
@@ -129,15 +154,10 @@ export function loadMissionPhaseGateDefinitions(missionId: string): PersistedPha
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = readJson<unknown>(assertSafeRepositoryPath(path.join(defsDir, entry)));
-        if (!parsed || typeof parsed !== 'object') return null;
-        const gate = (parsed as Record<string, unknown>).gate;
-        if (!gate || typeof gate !== 'object') return null;
-        return {
-          phase: String((parsed as Record<string, unknown>).phase || ''),
-          position: (parsed as Record<string, unknown>).position === 'entry' ? 'entry' : 'exit',
-          gate: gate as MissionGateDefinition,
-        } satisfies PersistedPhaseGateDefinition;
+        return loadMissionPhaseGateDefinitionAtPath(
+          assertSafeRepositoryPath(path.join(defsDir, entry)),
+          missionId
+        );
       } catch {
         return null;
       }

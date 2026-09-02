@@ -64,6 +64,31 @@ describe('mission phase exit gates (MO-02)', () => {
     expect(definitions[0].position).toBe('exit');
   });
 
+  it('skips schema-invalid and cross-mission gate definitions', () => {
+    const definitionsDir = path.join(missionPath, 'gates', 'definitions');
+    fs.mkdirSync(definitionsDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(definitionsDir, 'UNKNOWN_KIND.json'),
+      JSON.stringify({
+        mission_id: missionId,
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'UNKNOWN_KIND', checks: [{ kind: 'not-a-gate-kind' }] },
+      })
+    );
+    fs.writeFileSync(
+      path.join(definitionsDir, 'OTHER_MISSION.json'),
+      JSON.stringify({
+        mission_id: 'MSN-OTHER-MISSION',
+        phase: 'execution',
+        position: 'exit',
+        gate: { id: 'OTHER_MISSION', checks: [] },
+      })
+    );
+
+    expect(loadMissionPhaseGateDefinitions(missionId)).toEqual([]);
+  });
+
   it('loads gate definitions from an existing confidential mission root', () => {
     const confidentialMissionId = `MSN-GATE-CONF-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const confidentialMissionPath = missionDir(confidentialMissionId, 'confidential');
