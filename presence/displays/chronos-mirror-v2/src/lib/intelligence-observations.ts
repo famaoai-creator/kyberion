@@ -145,7 +145,7 @@ function parseBrowserRecentAction(
   };
 }
 
-function parseBrowserSessionSummary(value: unknown): BrowserSessionSummary | null {
+export function parseBrowserSessionSummary(value: unknown): BrowserSessionSummary | null {
   if (!isSafeObservationRecord(value)) return null;
   const sessionId = requiredObservationString(value, 'session_id');
   const activeTabId = requiredObservationString(value, 'active_tab_id');
