@@ -1,4 +1,9 @@
-import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import {
+  appendJsonLine,
+  parseSafeJsonObjectValue,
+  readJson,
+  readJsonLines,
+} from './foundation/json.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
@@ -31,6 +36,10 @@ export interface AgentRolePerformance {
   success_rate: number;
 }
 
+export interface AgentPerformanceIndex {
+  by_agent_role: Record<string, AgentRolePerformance>;
+}
+
 const OUTCOMES_PATH = 'observability/retrospectives/agent-role-outcomes.jsonl';
 const INDEX_PATH = 'observability/retrospectives/agent-performance.json';
 
@@ -55,6 +64,71 @@ function scoreStatus(status: string): { success: number; review: number; blocked
     return { success: 0, review: 1, blocked: 0 };
   }
   return { success: 0, review: 0, blocked: 1 };
+}
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parsePerformanceRecord(value: unknown, label: string): AgentRolePerformance {
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(record, ['samples', 'success', 'review', 'blocked', 'success_rate'], label);
+  const counters = ['samples', 'success', 'review', 'blocked'] as const;
+  for (const field of counters) {
+    const count = record[field];
+    if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+      throw new Error(`${label}.${field} must be a non-negative integer`);
+    }
+  }
+  const samples = record.samples as number;
+  const success = record.success as number;
+  const review = record.review as number;
+  const blocked = record.blocked as number;
+  const successRate = record.success_rate;
+  if (
+    typeof successRate !== 'number' ||
+    !Number.isFinite(successRate) ||
+    successRate < 0 ||
+    successRate > 1
+  ) {
+    throw new Error(`${label}.success_rate must be a number between 0 and 1`);
+  }
+  return {
+    samples,
+    success,
+    review,
+    blocked,
+    success_rate: successRate,
+  };
+}
+
+/** Parse the persisted agent x role performance projection before consumers use it. */
+export function parseAgentPerformanceIndex(value: unknown): AgentPerformanceIndex {
+  const root = parseSafeJsonObjectValue(value, 'agent performance index');
+  assertExactKeys(root, ['by_agent_role'], 'agent performance index');
+  const byAgentRole = parseSafeJsonObjectValue(
+    root.by_agent_role,
+    'agent performance index.by_agent_role'
+  );
+  const parsed: Record<string, AgentRolePerformance> = {};
+  for (const [key, valueForKey] of Object.entries(byAgentRole)) {
+    if (!key.trim() || !key.includes('|')) {
+      throw new Error(`agent performance index.by_agent_role key must be "agent|role": ${key}`);
+    }
+    parsed[key] = parsePerformanceRecord(
+      valueForKey,
+      `agent performance index.by_agent_role.${key}`
+    );
+  }
+  return { by_agent_role: parsed };
 }
 
 /** Append this mission's outcomes and rebuild the aggregate index. */
@@ -112,6 +186,13 @@ export function resetAgentPerformanceIndexCache(): void {
   cachedIndex = null;
 }
 
+/** Load every validated agent x role performance bucket for read-only projections. */
+export function loadAgentPerformanceIndex(): Record<string, AgentRolePerformance> {
+  const indexPath = agentPerformanceIndexPath();
+  if (!safeExistsSync(indexPath)) return {};
+  return parseAgentPerformanceIndex(readJson<unknown>(indexPath)).by_agent_role;
+}
+
 export function getAgentRolePerformance(
   agentId: string,
   teamRole: string
@@ -120,12 +201,7 @@ export function getAgentRolePerformance(
   if (!cachedIndex || now - cachedIndex.loadedAt > INDEX_CACHE_TTL_MS) {
     let byKey: Record<string, AgentRolePerformance> = {};
     try {
-      const indexPath = agentPerformanceIndexPath();
-      if (safeExistsSync(indexPath)) {
-        byKey =
-          readJson<{ by_agent_role?: Record<string, AgentRolePerformance> }>(indexPath)
-            .by_agent_role || {};
-      }
+      byKey = loadAgentPerformanceIndex();
     } catch {
       byKey = {};
     }
