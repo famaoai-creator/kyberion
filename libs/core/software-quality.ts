@@ -87,11 +87,22 @@ export interface TestExecutionResult {
   status: 'passed' | 'failed' | 'error' | 'blocked' | 'skipped';
   evidence_refs: string[];
   observed_result?: string;
+  defect_refs?: string[];
+  retry_of?: string;
 }
 
 export interface TestExecutionRecord {
+  version?: string;
   run_id: string;
+  project_id?: string;
   subject_ref: string;
+  environment?: string;
+  executor?: {
+    resource_id: string;
+    resource_type: 'human' | 'ai_agent' | 'automation';
+  };
+  started_at?: string;
+  finished_at?: string;
   results: TestExecutionResult[];
 }
 
@@ -129,6 +140,16 @@ const AUTOMATION_ACTUATORS = new Set<NonNullable<TestInventoryItem['automation']
   'browser',
   'network',
 ]);
+const EXECUTION_RESULT_STATUSES = new Set<TestExecutionResult['status']>([
+  'passed',
+  'failed',
+  'error',
+  'blocked',
+  'skipped',
+]);
+const EXECUTOR_RESOURCE_TYPES = new Set<
+  NonNullable<TestExecutionRecord['executor']>['resource_type']
+>(['human', 'ai_agent', 'automation']);
 
 function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
   const allowedKeys = new Set(allowed);
@@ -377,7 +398,7 @@ export function parseSoftwareQualityContract(value: unknown): SoftwareQualityCon
   }
 }
 
-function parseTestInventoryItem(value: unknown): TestInventoryItem | null {
+export function parseTestInventoryItem(value: unknown): TestInventoryItem | null {
   try {
     const record = parseSafeJsonObjectValue(value, 'test inventory item');
     if (
@@ -505,6 +526,133 @@ export function parseTestInventory(value: unknown): TestInventory | null {
     const items = Array.isArray(record.items) ? record.items.map(parseTestInventoryItem) : null;
     if (!version || !projectId || !items || items.some((item) => item === null)) return null;
     return { version, project_id: projectId, items: items as TestInventoryItem[] };
+  } catch {
+    return null;
+  }
+}
+
+function parseTestExecutionResult(value: unknown): TestExecutionResult | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test execution result');
+    if (
+      !hasOnlyKeys(record, [
+        'item_id',
+        'status',
+        'evidence_refs',
+        'observed_result',
+        'defect_refs',
+        'retry_of',
+      ])
+    ) {
+      return null;
+    }
+    const itemId = requiredText(record.item_id);
+    const evidenceRefs = stringList(record.evidence_refs);
+    const observedResult: string | undefined =
+      typeof record.observed_result === 'string' ? record.observed_result : undefined;
+    if (
+      !itemId ||
+      !evidenceRefs ||
+      !EXECUTION_RESULT_STATUSES.has(record.status as TestExecutionResult['status']) ||
+      (observedResult !== undefined && typeof observedResult !== 'string')
+    ) {
+      return null;
+    }
+    const defectRefs =
+      record.defect_refs === undefined ? undefined : stringList(record.defect_refs);
+    const retryOf = optionalText(record.retry_of);
+    if (
+      (record.defect_refs !== undefined && !defectRefs) ||
+      (record.retry_of !== undefined && !retryOf)
+    ) {
+      return null;
+    }
+    return {
+      item_id: itemId,
+      status: record.status as TestExecutionResult['status'],
+      evidence_refs: evidenceRefs,
+      ...(observedResult !== undefined ? { observed_result: observedResult } : {}),
+      ...(defectRefs ? { defect_refs: defectRefs } : {}),
+      ...(retryOf ? { retry_of: retryOf } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Parse a persisted test execution record before report generation consumes it. */
+export function parseTestExecutionRecord(value: unknown): TestExecutionRecord | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'test execution record');
+    if (
+      !hasOnlyKeys(record, [
+        'version',
+        'run_id',
+        'project_id',
+        'subject_ref',
+        'environment',
+        'executor',
+        'started_at',
+        'finished_at',
+        'results',
+      ])
+    ) {
+      return null;
+    }
+    const version = requiredText(record.version);
+    const runId = requiredText(record.run_id);
+    const projectId = requiredText(record.project_id);
+    const subjectRef = requiredText(record.subject_ref);
+    const environment = requiredText(record.environment);
+    const startedAt = requiredText(record.started_at);
+    const finishedAt = requiredText(record.finished_at);
+    const results = Array.isArray(record.results)
+      ? record.results.map(parseTestExecutionResult)
+      : null;
+    if (
+      !version ||
+      !runId ||
+      !projectId ||
+      !subjectRef ||
+      !environment ||
+      !startedAt ||
+      !isDateTime(startedAt) ||
+      !finishedAt ||
+      !isDateTime(finishedAt) ||
+      !results ||
+      results.some((item) => item === null)
+    ) {
+      return null;
+    }
+    const executorRecord = parseSafeJsonObjectValue(record.executor, 'test execution executor');
+    if (!hasOnlyKeys(executorRecord, ['resource_id', 'resource_type'])) return null;
+    const resourceId = requiredText(executorRecord.resource_id);
+    if (
+      !resourceId ||
+      !EXECUTOR_RESOURCE_TYPES.has(
+        executorRecord.resource_type as NonNullable<
+          TestExecutionRecord['executor']
+        >['resource_type']
+      )
+    ) {
+      return null;
+    }
+    return {
+      version,
+      run_id: runId,
+      project_id: projectId,
+      subject_ref: subjectRef,
+      environment,
+      executor: {
+        resource_id: resourceId,
+        resource_type: executorRecord.resource_type as NonNullable<
+          TestExecutionRecord['executor']
+        >['resource_type'],
+      },
+      started_at: startedAt,
+      finished_at: finishedAt,
+      results: results as TestExecutionResult[],
+    };
   } catch {
     return null;
   }
