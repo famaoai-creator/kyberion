@@ -16,19 +16,27 @@ import { resolveVocabularyLocale } from '@agent/core/ux-vocabulary';
 import { isServiceConnectionReady } from '@agent/core/service-connection-readiness';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import type { SupportedLocale } from '@agent/core/locale';
-import { safeExistsSync, safeLstat, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { withLock } from '@agent/core/src/lock-utils';
 import {
   compileSchema,
   getRegisteredEnvText,
   nowIso,
-  readJson,
   setRegisteredEnv,
 } from '@agent/core/foundation';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { withSensitivePathMediation } from '@agent/core/secure-io';
 import { t as catalogT, type VocabularyKey } from '@agent/core/t';
+import {
+  loadOnboardingStateAtPath,
+  type OnboardingIdentity as IdentityDraft,
+  type OnboardingPhase,
+  type OnboardingServiceCandidate as ServiceCandidateDraft,
+  type OnboardingProfileState as OnboardingState,
+  type OnboardingTenant as TenantDraft,
+  type OnboardingTutorial as TutorialDraft,
+} from '@agent/core/onboarding-state';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { createCustomer } from './customer_create.js';
 import { switchCustomer } from './customer_switch.js';
@@ -37,7 +45,6 @@ import {
   evaluateReasoningBackend,
   formatReasoningSummary,
   markReasoningStubAcknowledged,
-  type OnboardingReasoningState,
 } from './onboarding_reasoning.js';
 import {
   generateOnboardingRunbookSkill,
@@ -136,61 +143,6 @@ async function runManagedMenuTask(taskId: string, args: string[]): Promise<void>
 
 function formatMenuTaskError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-type OnboardingPhase = 'identity' | 'reasoning' | 'services' | 'tenants' | 'tutorial' | 'summary';
-type OnboardingStatus = 'draft' | 'complete';
-type ServiceStatus = 'pending' | 'saved' | 'ready' | 'blocked' | 'skipped';
-
-interface IdentityDraft {
-  name: string;
-  language: string;
-  interaction_style: 'Senior Partner' | 'Concierge' | 'Minimalist';
-  primary_domain: string;
-  vision: string;
-  agent_id: string;
-  persona: 'sovereign' | 'ecosystem_architect' | 'mission_owner' | 'worker' | 'analyst';
-}
-
-interface ServiceCandidateDraft {
-  service_id: string;
-  status: ServiceStatus;
-  connection_kind?: 'base_url' | 'output_dir' | 'cli_path' | 'custom' | 'none';
-  base_url?: string;
-  output_dir?: string;
-  cli_path?: string;
-  notes?: string;
-  captured_at: string;
-}
-
-interface TenantDraft {
-  tenant_slug: string;
-  tenant_id?: string;
-  display_name: string;
-  status: 'active' | 'suspended' | 'archived';
-  assigned_role: string;
-  purpose?: string;
-  created_at: string;
-}
-
-interface TutorialDraft {
-  mode: 'simulate' | 'apply' | 'skipped';
-  summary?: string;
-  plan_path?: string;
-}
-
-interface OnboardingState {
-  version: '1.0.0';
-  status: OnboardingStatus;
-  current_phase: OnboardingPhase;
-  completed_phases: OnboardingPhase[];
-  created_at: string;
-  updated_at: string;
-  identity?: IdentityDraft;
-  reasoning?: OnboardingReasoningState;
-  services?: { candidates: ServiceCandidateDraft[] };
-  tenants?: { entries: TenantDraft[] };
-  tutorial?: TutorialDraft;
 }
 
 const PHASES: OnboardingPhase[] = [
@@ -318,14 +270,8 @@ async function writeTextArtifact(
 
 function loadState(): OnboardingState | null {
   const filePath = statePath();
-  if (!safeExistsSync(filePath)) return null;
-  if (!safeLstat(filePath).isFile()) return null;
   try {
-    const parsed = readJson<OnboardingState>(filePath);
-    if (parsed.identity && !parsed.identity.persona) {
-      parsed.identity.persona = 'sovereign';
-    }
-    return parsed;
+    return loadOnboardingStateAtPath(filePath);
   } catch {
     return null;
   }

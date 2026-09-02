@@ -267,6 +267,10 @@
       "types": "./dist/onboarding-context.d.ts",
       "default": "./dist/onboarding-context.js"
     },
+    "./onboarding-state": {
+      "types": "./dist/onboarding-state.d.ts",
+      "default": "./dist/onboarding-state.js"
+    },
     "./tenant-governance": {
       "types": "./dist/tenant-governance.d.ts",
       "default": "./dist/tenant-governance.js"
