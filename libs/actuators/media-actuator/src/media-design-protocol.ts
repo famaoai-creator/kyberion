@@ -116,22 +116,54 @@ function loadDocumentCompositionCatalog(rootDir: string): any {
 }
 
 function loadThemeCatalog(rootDir: string): any {
-  const publicCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/themes',
-    filePath: 'knowledge/public/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  const runtimeCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'active/shared/runtime/design-patterns/media-templates/themes',
-    filePath: 'active/shared/runtime/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  const personalCatalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/personal/design-patterns/media-templates/themes',
-    filePath: 'knowledge/personal/design-patterns/media-templates/themes.json',
-    fallback: { default_theme: 'kyberion-standard', themes: {} },
-  });
-  return deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
+  const fallback = {
+    version: '1.0.0',
+    default_theme: 'kyberion-standard',
+    themes: {},
+  };
+  const schemaPath = path.resolve(rootDir, 'knowledge/product/schemas/media-themes.schema.json');
+  const loadScope = (id: string, directoryPath: string, filePath: string): any => {
+    const catalog = defineCatalog<{
+      version: string;
+      default_theme: string;
+      themes: Record<string, unknown>;
+    }>({
+      id,
+      path: path.resolve(rootDir, filePath),
+      schema: schemaPath,
+      fallback,
+      fallbackOnInvalid: true,
+    });
+    const directory = path.resolve(rootDir, directoryPath);
+    const docs = readJsonFilesRecursively(directory);
+    if (docs.length === 0) return catalog.load();
+    const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+    return catalog.validate(merged, directory);
+  };
+
+  const publicCatalog = loadScope(
+    'media-themes-public',
+    'knowledge/public/design-patterns/media-templates/themes',
+    'knowledge/public/design-patterns/media-templates/themes.json'
+  );
+  const runtimeCatalog = loadScope(
+    'media-themes-runtime',
+    'active/shared/runtime/design-patterns/media-templates/themes',
+    'active/shared/runtime/design-patterns/media-templates/themes.json'
+  );
+  const personalCatalog = loadScope(
+    'media-themes-personal',
+    'knowledge/personal/design-patterns/media-templates/themes',
+    'knowledge/personal/design-patterns/media-templates/themes.json'
+  );
+  const merged = deepMergeCatalog(deepMergeCatalog(publicCatalog, runtimeCatalog), personalCatalog);
+  return defineCatalog({
+    id: 'media-themes',
+    path: path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/themes.json'),
+    schema: schemaPath,
+    fallback,
+    fallbackOnInvalid: true,
+  }).validate(merged, 'media theme scope merge');
 }
 
 function loadConfidentialThemePackEntries(

@@ -7579,6 +7579,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/media-themes.schema.json",
+      "tier": "public",
+      "size": 485,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/media-tone-style-map.schema.json",
       "tier": "public",
       "size": 804,
