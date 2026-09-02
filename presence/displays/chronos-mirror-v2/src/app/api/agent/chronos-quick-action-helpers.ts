@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { nowIso } from '@agent/core/foundation';
 import type { MissionState } from '@agent/core/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
 import { optionalStringField, recordField } from '../../../lib/json-record';
@@ -152,7 +153,7 @@ export function runCommandQuickAction(
         },
       },
     ],
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 
@@ -190,7 +191,7 @@ export async function runScheduleQuickAction(action: 'list' | 'tick', locale: Su
           },
         },
       ],
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     };
   } catch (err: any) {
     const message = String(err?.message || err || 'schedule action failed');
@@ -220,7 +221,7 @@ export async function runScheduleQuickAction(action: 'list' | 'tick', locale: Su
           },
         },
       ],
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     };
   }
 }
