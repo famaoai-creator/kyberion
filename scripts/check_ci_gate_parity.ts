@@ -24,6 +24,16 @@ export function collectPnpmScriptReferences(value: string): string[] {
   return [...refs];
 }
 
+export function collectCheckScopeReferences(value: string): string[] {
+  return [
+    ...new Set(
+      [...value.matchAll(/\bpnpm\s+run\s+check\s+--\s+--scope\s+(pr|full|release)\b/gu)].map(
+        (match) => match[1]!
+      )
+    ),
+  ];
+}
+
 export function checkCiGateParity(): string[] {
   const failures: string[] = [];
   const manifest = loadGateManifest();
@@ -98,6 +108,12 @@ export function checkCiGateParity(): string[] {
   }
   if (!packageJson.scripts?.check?.includes('scripts/run_checks.ts')) {
     failures.push('package.json check script must use scripts/run_checks.ts');
+  }
+  const validateCommand = packageJson.scripts?.validate;
+  if (!validateCommand) {
+    failures.push('package.json must declare a validate script');
+  } else if (!collectCheckScopeReferences(validateCommand).includes('full')) {
+    failures.push('package.json validate script must invoke pnpm run check -- --scope full');
   }
   return failures;
 }
