@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -182,7 +183,7 @@ export function draftContractForDeal(input: {
   const template = String(safeReadFile(templateFile, { encoding: 'utf8' }));
   const rendered = template
     .split('{{DATE}}')
-    .join(new Date().toISOString().slice(0, 10))
+    .join(nowIso().slice(0, 10))
     .split('{{CUSTOMER_NAME}}')
     .join('(担当者名)')
     .split('{{CUSTOMER_ORG}}')
@@ -251,7 +252,7 @@ export function recordContractReview(input: {
         verdict: input.verdict,
         reviewer: input.reviewer,
         notes: input.notes || '',
-        reviewed_at: new Date().toISOString(),
+        reviewed_at: nowIso(),
       },
       null,
       2
@@ -330,7 +331,7 @@ export async function sendDealDocumentToCustomer(input: {
       tenantSlug,
       dealId: input.dealId,
       role: 'kyberion',
-      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${new Date().toISOString()})`,
+      text: `${input.kind}-v${input.version} を送付しました (sent_at: ${nowIso()})`,
     });
   }
   return result;
