@@ -62,4 +62,20 @@ describe('chronos quick action mission projection', () => {
       },
     ]);
   });
+
+  it('does not count malformed NEXT_TASKS entries in the quick-action projection', () => {
+    const mission = collectActiveMissions(
+      makeCore(
+        {
+          mission_id: 'MSN-MALFORMED-TASKS',
+          status: 'active',
+          tier: 'public',
+          git: { checkpoints: [] },
+        },
+        [{ task_id: 'task-1', status: 'planned' }, { task_id: 42 }]
+      )
+    )[0];
+
+    expect(mission?.nextTaskCount).toBe(0);
+  });
 });

@@ -13043,6 +13043,12 @@ SX-03／SX-04 のprocess-template planner reader残存を再監査し、`NEXT_TA
 
 検証: process planning／planning packet **1 file / 19 tests passed**、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 464
+
+SX-08／SX-09 のChronos quick-action mission projectionを再監査し、`NEXT_TASKS.json` を配列長だけで数えていた残存を、core共通 `parseMissionNextTaskRecords` へ統合した。非object task、不正な `task_id`／`status`、危険JSON keyを件数へ反映せず、既存のlocaladmin／all-tenant gate、mission state、path境界とtask status semanticsは変更していない。
+
+検証: Chronos quick-action／intelligence boundary **2 files / 7 tests passed**、package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
