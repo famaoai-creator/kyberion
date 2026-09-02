@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -228,7 +229,7 @@ export function createMemoryPromotionCandidate(input: {
   scope?: MemoryScopeEnvelope;
   promotion?: MemoryCandidate['promotion'];
 }): MemoryCandidate {
-  const now = input.queuedAt || new Date().toISOString();
+  const now = input.queuedAt || nowIso();
   const summary = normalizeMemoryFact(String(input.summary || ''), Date.parse(now) || Date.now());
   return {
     candidate_id:
@@ -286,7 +287,7 @@ export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): str
   const normalizedSourceRef = String(normalizedCandidate.source_ref || '').trim();
   const normalizedScopeKey = resolveScopeKey(normalizedCandidate.scope);
   const now =
-    normalizedCandidate.last_seen || normalizedCandidate.queued_at || new Date().toISOString();
+    normalizedCandidate.last_seen || normalizedCandidate.queued_at || nowIso();
   const existingIndex = rows.findIndex(
     (row) =>
       String(row.source_ref || '').trim() === normalizedSourceRef &&
@@ -429,7 +430,7 @@ export function updateMemoryPromotionCandidateStatus(input: {
   if (matchingQueuePaths.length === 0) return null;
 
   let firstUpdated: MemoryCandidate | null = null;
-  const ratifiedAt = new Date().toISOString();
+  const ratifiedAt = nowIso();
   for (const queuePath of matchingQueuePaths) {
     const rows = readJsonLines<MemoryCandidate>(queuePath);
     let changed = false;
