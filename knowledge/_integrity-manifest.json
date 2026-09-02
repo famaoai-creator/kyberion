@@ -2463,7 +2463,7 @@
     {
       "path": "product/governance/role-write-access.json",
       "tier": "public",
-      "size": 3538,
+      "size": 3537,
       "type": "json"
     },
     {
@@ -2991,7 +2991,7 @@
     {
       "path": "product/governance/wisdom-reconcile-strategy.json",
       "tier": "public",
-      "size": 579,
+      "size": 586,
       "type": "json"
     },
     {
@@ -8587,9 +8587,21 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/role-authority-map.schema.json",
+      "tier": "public",
+      "size": 1076,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/role-capability-map.schema.json",
       "tier": "public",
       "size": 1260,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/role-write-access.schema.json",
+      "tier": "public",
+      "size": 678,
       "type": "json"
     },
     {
@@ -9376,6 +9388,12 @@
       "path": "product/schemas/wisdom-policy.schema.json",
       "tier": "public",
       "size": 2170,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/wisdom-reconcile-strategy.schema.json",
+      "tier": "public",
+      "size": 1063,
       "type": "json"
     },
     {
