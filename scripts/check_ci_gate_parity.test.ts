@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { checkCiGateParity, collectPnpmScriptReferences } from './check_ci_gate_parity.js';
+import {
+  checkCiGateParity,
+  collectCheckScopeReferences,
+  collectPnpmScriptReferences,
+} from './check_ci_gate_parity.js';
 
 describe('ci gate parity', () => {
   it('keeps the checked-in workflows and baseline declarations aligned', () => {
@@ -19,5 +23,13 @@ describe('ci gate parity', () => {
         'pnpm run check:one && pnpm exec vitest run && pnpm run check:two -- --check'
       )
     ).toEqual(['check:one', 'check:two']);
+  });
+
+  it('recognizes only canonical check scope invocations', () => {
+    expect(
+      collectCheckScopeReferences(
+        'pnpm run check -- --scope full && pnpm run check -- --scope full --only catalogs'
+      )
+    ).toEqual(['full']);
   });
 });
