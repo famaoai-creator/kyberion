@@ -1,6 +1,7 @@
 import {
   nowIso,
   readJson,
+  parsePersistedPipelineStrategy,
   getRegisteredEnv,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
@@ -89,10 +90,6 @@ export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
-}
-
-interface StrategyConfig {
-  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
 }
 
 export interface CodeAction {
@@ -675,7 +672,7 @@ async function performReconcile(input: CodeAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => readJson<StrategyConfig>(strategyPath),
+    async () => parsePersistedPipelineStrategy(readJson<unknown>(strategyPath), 'code strategy'),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {
