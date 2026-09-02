@@ -12,7 +12,7 @@
  */
 
 import * as path from 'node:path';
-import { loadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -48,7 +48,7 @@ export function readCookies(accountSlug: string): unknown[] {
   const file = cookiePathFor(accountSlug);
   if (!safeExistsSync(file) || !safeLstat(file).isFile()) return [];
   try {
-    const data = loadJson<unknown>(file);
+    const data = readJson<unknown>(file);
     return Array.isArray(data) ? data : [];
   } catch {
     return [];
