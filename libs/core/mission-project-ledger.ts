@@ -16,6 +16,7 @@ import {
 } from './secure-io.js';
 import { loadState, readJsonFileSafe } from './mission-state.js';
 import { readTextFile } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { normalizeEventScope } from './event-scope.js';
 
 export function resolveProjectLedgerPath(projectPath: string): string {
@@ -155,7 +156,7 @@ export async function syncProjectLedger(id: string, rootDir: string): Promise<vo
     gate_impact: project.gate_impact || 'none',
     traceability_refs: project.traceability_refs || [],
     owner: state.assigned_persona,
-    last_updated: new Date().toISOString(),
+    last_updated: nowIso(),
     ...(projectScope ? { scope: projectScope } : {}),
   };
   jsonLedger.entries = Array.isArray(jsonLedger.entries) ? jsonLedger.entries : [];
