@@ -150,6 +150,17 @@ function loadRegistryDirectory(
     : null;
 }
 
+export function loadVoiceProfileRegistryDirectory(
+  dirPath = getRegistryDir(),
+  fallbackDefaultProfileId = ''
+): VoiceProfileRegistry {
+  const registry = loadRegistryDirectory(dirPath, fallbackDefaultProfileId);
+  if (!registry) {
+    throw new Error(`Voice profile registry directory is empty: ${dirPath}`);
+  }
+  return registry;
+}
+
 function writeRegistryDirectory(dirPath: string, registry: VoiceProfileRegistry): void {
   const safeDirPath = assertSafeRepositoryPath(dirPath, { allowMissingLeaf: true });
   safeMkdir(safeDirPath, { recursive: true });
