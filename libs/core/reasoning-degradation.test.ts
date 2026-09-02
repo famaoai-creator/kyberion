@@ -5,7 +5,24 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const secureIo = vi.hoisted(() => ({
+  assertSafeRepositoryPath: (filePath: string) => {
+    const root = path.resolve(process.env.KYBERION_ROOT || process.cwd());
+    const absolute = path.resolve(filePath);
+    const relative = path.relative(root, absolute);
+    if (
+      !relative ||
+      relative === '..' ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      throw new Error(
+        `[RESOURCE_PATH_SCOPE] resource path is outside the repository root: ${filePath}`
+      );
+    }
+    return absolute;
+  },
   safeExistsSync: (filePath: string) => fs.existsSync(filePath),
+  safeLstat: (filePath: string) => fs.lstatSync(filePath),
   safeMkdir: (dirPath: string) => fs.mkdirSync(dirPath, { recursive: true }),
   safeReadFile: (filePath: string, options: { encoding?: BufferEncoding | null } = {}) =>
     options.encoding === null ? fs.readFileSync(filePath) : fs.readFileSync(filePath, 'utf8'),
@@ -51,6 +68,14 @@ describe('reasoning-degradation marker (LC-08)', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-reasoning-degraded-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    fs.mkdirSync(path.join(tmpRoot, 'knowledge/product/schemas'), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(
+        process.cwd(),
+        'knowledge/product/schemas/reasoning-degraded-marker.schema.json'
+      ),
+      path.join(tmpRoot, 'knowledge/product/schemas/reasoning-degraded-marker.schema.json')
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
