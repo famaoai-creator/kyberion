@@ -17,7 +17,7 @@ import {
   safeWriteFile,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import {
@@ -75,6 +75,154 @@ export const actuator = defineCatalogBackedActuator({
 // ---------------------------------------------------------------------------
 
 const SCHEMA_REF = '../../../knowledge/product/schemas/volatile-knowledge.schema.json';
+
+const VOLATILE_SCOPES = new Set<VolatileScope>([
+  'session',
+  'mission',
+  'project',
+  'personal',
+  'tenant',
+  'global',
+]);
+const VOLATILE_CADENCES = new Set<VolatileCadence>(['resident', 'daily', 'weekly', 'adhoc-ttl']);
+const VOLATILE_TIERS = new Set<VolatileTier>(['personal', 'confidential', 'public']);
+const VOLATILE_LIFETIMES = new Set<VolatileLifetime>([
+  'session',
+  'mission',
+  'daily',
+  'weekly',
+  'ttl',
+  'until-distilled',
+  'sticky',
+]);
+const VOLATILE_STATUSES = new Set<VolatileStatus>([
+  'active',
+  'expired',
+  'rolled-over',
+  'promoted',
+  'archived',
+]);
+
+function requiredText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+}
+
+function isIsoDateTime(value: string): boolean {
+  return (
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(value) &&
+    Number.isFinite(Date.parse(value))
+  );
+}
+
+function isNullableText(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && value.trim().length > 0);
+}
+
+function parseVolatileSidecar(value: unknown): VolatileSidecar | null {
+  try {
+    const record = parseSafeJsonObjectValue(value, 'volatile knowledge sidecar');
+    const allowed = [
+      '$schema',
+      'scope',
+      'scope_ref',
+      'cadence',
+      'period_key',
+      'tier',
+      'lifetime',
+      'expires_at',
+      'created_at',
+      'updated_at',
+      'rollover_to',
+      'rollup_to',
+      'promote_target',
+      'promotion_candidate_id',
+      'status',
+      'pinned',
+    ] as const;
+    if (Object.keys(record).some((key) => !allowed.includes(key as (typeof allowed)[number]))) {
+      return null;
+    }
+    const scopeRef = record.scope_ref;
+    const periodKey = record.period_key;
+    const expiresAt = record.expires_at;
+    const rolloverTo = record.rollover_to;
+    const rollupTo = record.rollup_to;
+    const promoteTarget = record.promote_target;
+    const promotionCandidateId = record.promotion_candidate_id;
+    if (
+      (record.$schema !== undefined && typeof record.$schema !== 'string') ||
+      !VOLATILE_SCOPES.has(record.scope as VolatileScope) ||
+      !isNullableText(scopeRef) ||
+      !VOLATILE_CADENCES.has(record.cadence as VolatileCadence) ||
+      !isNullableText(periodKey) ||
+      !VOLATILE_TIERS.has(record.tier as VolatileTier) ||
+      !VOLATILE_LIFETIMES.has(record.lifetime as VolatileLifetime) ||
+      !isNullableText(expiresAt) ||
+      !isNullableText(rolloverTo) ||
+      !isNullableText(rollupTo) ||
+      !isNullableText(promoteTarget) ||
+      !isNullableText(promotionCandidateId) ||
+      !requiredText(record.created_at) ||
+      !requiredText(record.updated_at) ||
+      !isIsoDateTime(record.created_at as string) ||
+      !isIsoDateTime(record.updated_at as string) ||
+      !VOLATILE_STATUSES.has(record.status as VolatileStatus) ||
+      (record.pinned !== undefined && typeof record.pinned !== 'boolean')
+    ) {
+      return null;
+    }
+    const lifetime = record.lifetime as VolatileLifetime;
+    const cadence = record.cadence as VolatileCadence;
+    if (
+      ((cadence === 'daily' || cadence === 'weekly') &&
+        (typeof periodKey !== 'string' || typeof expiresAt !== 'string')) ||
+      (lifetime === 'ttl' && typeof expiresAt !== 'string') ||
+      (typeof expiresAt === 'string' && !isIsoDateTime(expiresAt))
+    ) {
+      return null;
+    }
+    return {
+      $schema: typeof record.$schema === 'string' ? record.$schema : SCHEMA_REF,
+      scope: record.scope as VolatileScope,
+      scope_ref: scopeRef ?? null,
+      cadence,
+      period_key: periodKey ?? null,
+      tier: record.tier as VolatileTier,
+      lifetime,
+      expires_at: expiresAt ?? null,
+      created_at: record.created_at as string,
+      updated_at: record.updated_at as string,
+      rollover_to: rolloverTo ?? null,
+      rollup_to: rollupTo ?? null,
+      promote_target: promoteTarget ?? null,
+      promotion_candidate_id: promotionCandidateId ?? null,
+      status: record.status as VolatileStatus,
+      pinned: record.pinned === undefined ? false : (record.pinned as boolean),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseVolatileIndex(
+  value: unknown
+): Array<{ mdPath: string; sidecar: VolatileSidecar }> | null {
+  if (!Array.isArray(value)) return null;
+  const entries = value.map((candidate) => {
+    try {
+      const record = parseSafeJsonObjectValue(candidate, 'volatile knowledge index entry');
+      if (!Object.keys(record).every((key) => key === 'mdPath' || key === 'sidecar')) return null;
+      const mdPath = requiredText(record.mdPath);
+      const sidecar = parseVolatileSidecar(record.sidecar);
+      return mdPath && sidecar ? { mdPath, sidecar } : null;
+    } catch {
+      return null;
+    }
+  });
+  return entries.some((entry) => entry === null)
+    ? null
+    : (entries as Array<{ mdPath: string; sidecar: VolatileSidecar }>);
+}
 
 function isoDate(): string {
   return nowIso().slice(0, 10);
@@ -151,25 +299,33 @@ function loadSidecar(mdPath: string): VolatileSidecar | null {
   const sp = sidecarPath(mdPath);
   if (!isExistingRegularFile(sp)) return null;
   try {
-    return readJson<VolatileSidecar>(sp);
+    return parseVolatileSidecar(readJson<unknown>(sp));
   } catch {
     return null;
   }
 }
 
 function saveSidecar(mdPath: string, sidecar: VolatileSidecar): void {
+  const parsed = parseVolatileSidecar(sidecar);
+  if (!parsed) throw new Error('[working-memory] refusing to persist an invalid sidecar');
   const sp = sidecarPath(mdPath);
   ensureDir(path.dirname(sp));
-  safeWriteFile(sp, JSON.stringify(sidecar, null, 2));
+  safeWriteFile(sp, JSON.stringify(parsed, null, 2));
 }
 
 function touchSidecar(mdPath: string, patch: Partial<VolatileSidecar>): VolatileSidecar {
+  const persistedPath = sidecarPath(mdPath);
   const existing = loadSidecar(mdPath);
+  if (isExistingRegularFile(persistedPath) && !existing) {
+    throw new Error('[working-memory] refusing to update an invalid sidecar');
+  }
   const now = nowIso();
   const merged = { ...existing, ...patch, updated_at: now } as VolatileSidecar;
   if (!merged.created_at) merged.created_at = now;
-  saveSidecar(mdPath, merged);
-  return merged;
+  const parsed = parseVolatileSidecar(merged);
+  if (!parsed) throw new Error('[working-memory] refusing to persist an invalid sidecar');
+  saveSidecar(mdPath, parsed);
+  return parsed;
 }
 
 function scopeDefaultTier(scope: VolatileScope): VolatileTier {
@@ -185,6 +341,48 @@ function scopeDefaultLifetime(scope: VolatileScope): VolatileLifetime {
     default:
       return 'until-distilled';
   }
+}
+
+function residentSidecarPatch(
+  scope: VolatileScope,
+  scopeRef: string | null,
+  tier: VolatileTier
+): Partial<VolatileSidecar> {
+  return {
+    $schema: SCHEMA_REF,
+    scope,
+    scope_ref: scopeRef,
+    cadence: 'resident',
+    period_key: null,
+    tier,
+    lifetime: scopeDefaultLifetime(scope),
+    expires_at: null,
+    rollover_to: null,
+    rollup_to: null,
+    promote_target: null,
+    promotion_candidate_id: null,
+    status: 'active',
+    pinned: false,
+  };
+}
+
+function dailySidecarPatch(dateStr: string): Partial<VolatileSidecar> {
+  return {
+    $schema: SCHEMA_REF,
+    scope: 'personal',
+    scope_ref: null,
+    cadence: 'daily',
+    period_key: dateStr,
+    tier: 'personal',
+    lifetime: 'daily',
+    expires_at: dailyExpiry(dateStr),
+    rollover_to: null,
+    rollup_to: null,
+    promote_target: null,
+    promotion_candidate_id: null,
+    status: 'active',
+    pinned: false,
+  };
 }
 
 function personalDir(): string {
@@ -406,7 +604,11 @@ function opAddActionItem(params: Record<string, unknown>): unknown {
     updated = existing.trimEnd() + `\n\n## Action Items\n\n- [ ] ${item}\n`;
   }
   safeWriteFile(mdPath, updated);
-  touchSidecar(mdPath, { updated_at: nowIso(), status: 'active' });
+  touchSidecar(mdPath, {
+    ...(loadSidecar(mdPath) ? {} : residentSidecarPatch(scope, scopeRef, tier)),
+    updated_at: nowIso(),
+    status: 'active',
+  });
   return { path: mdPath };
 }
 
@@ -427,7 +629,10 @@ function opCompleteActionItem(params: Record<string, unknown>): unknown {
     return { path: mdPath, found: false };
   const updated = existing.replace(new RegExp(`^(- \\[ \\] ${escaped})$`, 'gm'), `- [x] ${item}`);
   safeWriteFile(mdPath, updated);
-  touchSidecar(mdPath, { updated_at: nowIso() });
+  touchSidecar(mdPath, {
+    ...(loadSidecar(mdPath) ? {} : residentSidecarPatch(scope, scopeRef, tier)),
+    updated_at: nowIso(),
+  });
   return { path: mdPath, found: true };
 }
 
@@ -529,7 +734,10 @@ function opTodoDone(params: Record<string, unknown>): unknown {
       safeWriteFile(journalPath, j.slice(0, ins) + `\n- [x] ${item}\n` + j.slice(ins));
     }
   }
-  touchSidecar(todoPath, { updated_at: nowIso() });
+  touchSidecar(todoPath, {
+    ...(loadSidecar(todoPath) ? {} : { ...dailySidecarPatch(dateStr), period_key: dateStr }),
+    updated_at: nowIso(),
+  });
   return { path: todoPath, found: true };
 }
 
@@ -546,7 +754,10 @@ function opTodoRollover(params: Record<string, unknown>): unknown {
   const existing = safeReadFile(todoPath, { encoding: 'utf8' }) as string;
   const pendingLines = existing.split('\n').filter((l) => /^- \[ \] /.test(l));
   if (pendingLines.length === 0) {
-    touchSidecar(todoPath, { status: 'rolled-over' });
+    touchSidecar(todoPath, {
+      ...(loadSidecar(todoPath) ? {} : dailySidecarPatch(todayStr)),
+      status: 'rolled-over',
+    });
     return { rolledOver: 0, items: [] };
   }
 
@@ -571,7 +782,12 @@ function opTodoRollover(params: Record<string, unknown>): unknown {
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const nextDayStr = nextDay.toISOString().slice(0, 10);
   safeWriteFile(todoPath, todoTemplate(nextDayStr) + pendingLines.join('\n') + '\n');
-  touchSidecar(todoPath, { status: 'rolled-over', period_key: nextDayStr, updated_at: nowIso() });
+  touchSidecar(todoPath, {
+    ...(loadSidecar(todoPath) ? {} : dailySidecarPatch(nextDayStr)),
+    status: 'rolled-over',
+    period_key: nextDayStr,
+    updated_at: nowIso(),
+  });
 
   return {
     rolledOver: pendingLines.length,
@@ -681,12 +897,8 @@ function opList(params: Record<string, unknown>): unknown {
   });
   if (!isExistingRegularFile(indexPath)) return [];
   try {
-    const all = readJson<
-      Array<{
-        mdPath: string;
-        sidecar: VolatileSidecar;
-      }>
-    >(indexPath);
+    const all = parseVolatileIndex(readJson<unknown>(indexPath));
+    if (!all) return [];
     return all.filter((entry) => {
       if (params.scope && entry.sidecar.scope !== params.scope) return false;
       if (params.cadence && entry.sidecar.cadence !== params.cadence) return false;
@@ -721,15 +933,25 @@ function opRunGc(params: Record<string, unknown>): unknown {
       return;
     }
     for (const entry of entries) {
-      const fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
-        allowMissingLeaf: true,
-      });
+      let fullPath: string;
+      try {
+        fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        results.warnings.push(`unsafe sidecar path skipped: ${path.join(dir, entry)}`);
+        continue;
+      }
       if (entry.endsWith('.volatile.json')) {
         if (!isExistingRegularFile(fullPath)) continue;
-        let sidecar: VolatileSidecar;
+        let sidecar: VolatileSidecar | null;
         try {
-          sidecar = readJson<VolatileSidecar>(fullPath);
+          sidecar = parseVolatileSidecar(readJson<unknown>(fullPath));
         } catch {
+          results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
+          continue;
+        }
+        if (!sidecar) {
           results.warnings.push(`malformed sidecar skipped: ${fullPath}`);
           continue;
         }
@@ -784,13 +1006,19 @@ function opBuildIndex(_params: Record<string, unknown>): unknown {
       return;
     }
     for (const entry of entries) {
-      const fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
-        allowMissingLeaf: true,
-      });
+      let fullPath: string;
+      try {
+        fullPath = assertSafeRepositoryPath(path.join(dir, entry), {
+          allowMissingLeaf: true,
+        });
+      } catch {
+        continue;
+      }
       if (entry.endsWith('.volatile.json')) {
         if (!isExistingRegularFile(fullPath)) continue;
         try {
-          const sidecar = readJson<VolatileSidecar>(fullPath);
+          const sidecar = parseVolatileSidecar(readJson<unknown>(fullPath));
+          if (!sidecar) continue;
           faces.push({ mdPath: fullPath.replace(/\.volatile\.json$/, '.md'), sidecar });
         } catch {
           /* skip */
