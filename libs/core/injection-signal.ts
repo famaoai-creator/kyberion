@@ -3,6 +3,8 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
+import type { MissionState } from './mission-types.js';
 
 export function getInjectionSignalPath(): string {
   const missionId = (getRegisteredEnvText('MISSION_ID') || 'global').trim();
@@ -47,20 +49,17 @@ export function isInjectionSuspected(scope?: string): boolean {
     if (tierPath) {
       const statePath = path.join(tierPath, 'mission-state.json');
       if (safeExistsSync(statePath)) {
-        try {
-          const state = readJson<{
-            injection_suspected?: unknown;
-            injection_scopes?: unknown;
-          }>(statePath);
-          if (state.injection_suspected === true) {
-            const scopes = Array.isArray(state.injection_scopes)
-              ? state.injection_scopes
-              : ['global'];
-            if (!scope || scopes.includes('global') || scopes.includes(scope)) return true;
-          }
-        } catch {
-          // Ignore an unreadable mission state and continue fail-closed at the
-          // policy/scanner boundary that requested this signal.
+        const state = loadMissionStateAtPath(statePath) as
+          | (MissionState & {
+              injection_suspected?: unknown;
+              injection_scopes?: unknown;
+            })
+          | null;
+        if (state?.injection_suspected === true) {
+          const scopes = Array.isArray(state.injection_scopes)
+            ? state.injection_scopes
+            : ['global'];
+          if (!scope || scopes.includes('global') || scopes.includes(scope)) return true;
         }
       }
     }
