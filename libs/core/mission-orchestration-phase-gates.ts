@@ -13,7 +13,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
-  parseMissionNextTaskRecords,
+  loadMissionNextTaskRecordsAtPath,
   type MissionNextTaskRecord,
 } from './mission-next-task-reader.js';
 
@@ -217,8 +217,9 @@ function enrichGateWithTaskOutcomes(
   const nextTasksPath = safeMissionPath(missionId, 'NEXT_TASKS.json');
   let tasks: MissionNextTaskRecord[] = [];
   try {
-    const parsed = readJson<unknown>(nextTasksPath);
-    tasks = parseMissionNextTaskRecords(parsed) || [];
+    if (safeExistsSync(nextTasksPath)) {
+      tasks = loadMissionNextTaskRecordsAtPath(nextTasksPath, missionId) || [];
+    }
   } catch {
     /* no task board — checks keep their declared params */
   }

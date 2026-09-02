@@ -7879,6 +7879,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-next-tasks.schema.json",
+      "tier": "public",
+      "size": 269,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-orchestration-evaluation-report.schema.json",
       "tier": "public",
       "size": 3230,
