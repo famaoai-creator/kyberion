@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
@@ -326,7 +327,7 @@ export function recordIntentContractOutcome(input: {
       execution_shape: input.execution_shape,
       success_rate: input.success ? 1 : 0,
       sample_count: 1,
-      last_seen: new Date().toISOString(),
+      last_seen: nowIso(),
       ...(input.error ? { last_error: input.error } : {}),
       ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
     };
@@ -346,7 +347,7 @@ export function recordIntentContractOutcome(input: {
     context_fingerprint: input.context_fingerprint || prev.context_fingerprint,
     sample_count: nextCount,
     success_rate: Number(nextRate.toFixed(4)),
-    last_seen: new Date().toISOString(),
+    last_seen: nowIso(),
     last_error: input.success ? undefined : input.error || prev.last_error,
     ...(input.completion_summary ? { completion_summary: input.completion_summary } : {}),
   };

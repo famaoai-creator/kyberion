@@ -15,6 +15,7 @@ import { appendJsonLine, readJsonLines } from './foundation/json.js';
 
 import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
@@ -88,7 +89,7 @@ export function enqueueDelegationNotification(input: {
   childSessionId?: string;
   completedAt?: string;
 }): DelegationNotification {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const notification: DelegationNotification = {
     notification_id: randomUUID(),
     delegation_id: String(input.delegationId || '').trim(),
@@ -148,7 +149,7 @@ export function claimPendingDelegationNotifications(
   return withLockSync('delegation-notifications', () => {
     const rows = listDelegationNotifications();
     if (rows.length === 0) return [];
-    const claimedAt = new Date().toISOString();
+    const claimedAt = nowIso();
     const claimed: DelegationNotification[] = [];
     const next = rows.map((row) => {
       const matches =
