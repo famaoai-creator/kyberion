@@ -12401,6 +12401,12 @@ SX-04 の Chronos browser session control に残っていた persisted session r
 
 検証: browser session control **1 file / 2 tests passed**、intelligence observations **1 file / 4 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 357
+
+SX-04 の Chronos quick action mission projection に残っていた dependency-injected core の直接 `readJson` state reader を、route の canonical `loadStateAtPath` 注入へ移行した。active mission の status／tier／mission type／checkpoint projection は schema 検証済み `MissionState` だけを採用し、`NEXT_TASKS.json` の任意 projection は従来の reader と path guard を維持した。quick action の表示・command execution boundary は変更していない。
+
+検証: Chronos quick action **1 file / 2 tests passed**、route resource boundary **1 file / 2 tests passed**、intelligence observations **1 file / 4 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

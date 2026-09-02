@@ -51,6 +51,7 @@ async function loadChronosCore() {
     toolRuntimeRegistry,
     coreLogger,
     foundation,
+    missionState,
   ] = await Promise.all([
     import('@agent/core/presence-bridge'),
     import('@agent/core/path-resolver'),
@@ -65,12 +66,14 @@ async function loadChronosCore() {
     import('@agent/core/tool-runtime-registry'),
     import('@agent/core/core'),
     import('@agent/core/foundation'),
+    import('@agent/core/mission-state'),
   ]);
 
   return {
     logger: coreLogger.logger,
     pathResolver: pathResolverModule.pathResolver,
     assertSafeRepositoryPath: secureIo.assertSafeRepositoryPath,
+    loadStateAtPath: missionState.loadStateAtPath,
     readJson: foundation.readJson,
     safeExistsSync: secureIo.safeExistsSync,
     safeMkdir: secureIo.safeMkdir,
