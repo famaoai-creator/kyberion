@@ -109,14 +109,16 @@ function resolveRuntimeSlidePreset(rootDir: string, slideData: any): any {
   return mergePptxShape(preset || {}, override || {});
 }
 
-let _cachedBzl: ReturnType<typeof loadJsonValue> | null = null;
+let _cachedBzl: any = null;
 function loadBodyZoneLayouts(rootDir: string): any {
   if (_cachedBzl) return _cachedBzl;
-  const p = path.join(
-    rootDir,
-    'knowledge/public/design-patterns/media-templates/slide-layout-presets/body-zone-layouts.json'
-  );
-  _cachedBzl = loadJsonValue(p);
+  const catalog = loadSlideLayoutPresetCatalog(rootDir);
+  _cachedBzl = {
+    version: catalog.version,
+    chrome: catalog.chrome || {},
+    hero: catalog.hero || {},
+    body_zones: catalog.body_zones || {},
+  };
   return _cachedBzl;
 }
 
@@ -207,15 +209,12 @@ function resolveBodyZoneLayout(semanticType: string): string {
 let _cachedLayoutTemplates: any = null;
 function loadLayoutTemplateCatalog(rootDir: string): any {
   if (_cachedLayoutTemplates) return _cachedLayoutTemplates;
-  try {
-    const p = path.join(
-      rootDir,
-      'knowledge/public/design-patterns/media-templates/slide-layout-presets/layout-templates.json'
-    );
-    _cachedLayoutTemplates = loadJsonValue(p);
-  } catch {
-    _cachedLayoutTemplates = { default: 'corporate-standard', templates: {} };
-  }
+  const catalog = loadSlideLayoutPresetCatalog(rootDir);
+  _cachedLayoutTemplates = {
+    version: catalog.version,
+    default: catalog.default || 'corporate-standard',
+    templates: catalog.templates || {},
+  };
   return _cachedLayoutTemplates;
 }
 

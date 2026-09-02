@@ -12136,6 +12136,16 @@ open object として許容し、既存の優先順位（artifact library < prim
 検証: document composition catalog **1 file / 1 test passed**、関連 media、typecheck、catalog gate、lint、Prettier、`git diff --check`。
 残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 325
+
+`slide-layout-presets` の専用schema検証後も、body-zoneとlayout-template resolverだけが同じfragmentを個別の
+`loadJsonValue` で読む残存を確認した。両resolverを検証済みslide catalogの `body_zones`／`chrome`／`hero`／`templates` から
+解決するように統合し、既存の返却形、default、cache、tenant overrideの優先順位は維持した。これにより同一catalog配下で未検証の
+JSON readへ戻る経路を除去した。
+
+検証: media layout **1 file / 1 test passed**、body-zone／layout acceptanceを含む関連47 tests、typecheck、lint、catalog gate、Prettier、
+`git diff --check`。残るSX-04は他のdomain loaderと非catalog層の旧loader整理、未参照catalogの廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
