@@ -17,7 +17,7 @@ function briefPath(): string {
       kind: 'campaign-brief',
       title: 'Path boundary test',
       audience: 'operators',
-      deliverables: [],
+      deliverables: ['web_lp'],
       key_messages: ['Keep paths governed'],
     })
   );
@@ -47,5 +47,28 @@ describe('campaign suite path boundaries', () => {
         dryRun: true,
       })
     ).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  it('rejects a schema-invalid persisted brief before planning', () => {
+    const filePath = briefPath();
+    safeWriteFile(
+      filePath,
+      JSON.stringify({
+        kind: 'campaign-brief',
+        title: 'Path boundary test',
+        audience: 'operators',
+        deliverables: ['web_lp'],
+        key_messages: ['Keep paths governed'],
+        unexpected: true,
+      })
+    );
+
+    expect(() =>
+      runCampaignSuite({
+        briefPath: filePath,
+        outputRoot: path.join(path.dirname(filePath), 'output'),
+        dryRun: true,
+      })
+    ).toThrow(/Invalid catalog campaign-brief/);
   });
 });
