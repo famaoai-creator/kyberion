@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "marketing-completion-evidence.schema.json",
+  "title": "Marketing completion evidence",
+  "description": "Hash-bound local evidence used by the marketing mission completion gate.",
+  "type": "object",
+  "required": [
+    "workload",
+    "run_id",
+    "publication_intent",
+    "dry_run",
+    "required_gates",
+    "gate_results",
+    "artifact_bindings",
+    "sensitive_data_scan",
+    "completion_eligible"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workload": { "const": "marketing-video-production" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "publication_intent": { "type": "string", "enum": ["none", "internal", "public"] },
+    "dry_run": { "type": "boolean" },
+    "required_gates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"] }
+    },
+    "gate_results": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/gate_result" }
+    },
+    "artifact_bindings": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/artifact_binding" }
+    },
+    "sensitive_data_scan": { "$ref": "#/$defs/sensitive_data_scan" },
+    "completion_eligible": { "type": "boolean" }
+  },
+  "$defs": {
+    "artifact_binding": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "gate_result": {
+      "type": "object",
+      "required": ["gate_id", "status", "reasons", "evidence"],
+      "properties": {
+        "gate_id": { "type": "string", "enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"] },
+        "status": { "type": "string", "enum": ["passed", "failed"] },
+        "reasons": { "type": "array", "items": { "type": "string" } },
+        "evidence": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "sensitive_finding": {
+      "type": "object",
+      "required": ["category", "location"],
+      "properties": {
+        "category": { "type": "string", "minLength": 1 },
+        "location": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "sensitive_data_scan": {
+      "type": "object",
+      "required": ["pii_findings", "secret_findings", "passed"],
+      "properties": {
+        "pii_findings": { "type": "array", "items": { "$ref": "#/$defs/sensitive_finding" } },
+        "secret_findings": { "type": "array", "items": { "$ref": "#/$defs/sensitive_finding" } },
+        "passed": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

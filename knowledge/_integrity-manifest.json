@@ -7477,6 +7477,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/marketing-completion-evidence.schema.json",
+      "tier": "public",
+      "size": 2789,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/marketing-risk-policy.schema.json",
       "tier": "public",
       "size": 1556,
