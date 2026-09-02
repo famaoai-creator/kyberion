@@ -29,7 +29,7 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
+import { isRecord, parseSafeJsonInput, readJson, slugify } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
   validatePipelineAdf,
@@ -55,15 +55,11 @@ type PromotablePipeline = PipelineAdf & {
 
 type PromotableStep = PipelineAdfStep & { _semantic?: boolean };
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizePromotionAdvice(value: unknown): PromotionAdvice | null {
-  if (!isJsonRecord(value)) return null;
+  if (!isRecord(value)) return null;
   const placeholders = Array.isArray(value.placeholders)
     ? value.placeholders.flatMap((entry): PromotionAdvice['placeholders'] => {
-        if (!isJsonRecord(entry)) return [];
+        if (!isRecord(entry)) return [];
         if (
           typeof entry.step_index !== 'number' ||
           !Number.isSafeInteger(entry.step_index) ||

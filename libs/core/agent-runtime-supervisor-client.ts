@@ -1,5 +1,6 @@
 import * as net from 'node:net';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { pathResolver, rootDir } from './path-resolver.js';
@@ -47,12 +48,8 @@ interface SupervisorResponse<T = Record<string, unknown>> {
   errorDetail?: Record<string, unknown>;
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeSupervisorResponse<T>(value: unknown): SupervisorResponse<T> {
-  if (!isJsonRecord(value)) throw new Error('supervisor response must be a JSON object');
+  if (!isRecord(value)) throw new Error('supervisor response must be a JSON object');
   const id = value.id;
   const ok = value.ok;
   if (typeof id !== 'string' || id.trim() === '') {
@@ -65,7 +62,7 @@ export function normalizeSupervisorResponse<T>(value: unknown): SupervisorRespon
     throw new Error('supervisor response.error must be a string');
   }
   const errorDetail = value.errorDetail;
-  if (errorDetail !== undefined && !isJsonRecord(errorDetail)) {
+  if (errorDetail !== undefined && !isRecord(errorDetail)) {
     throw new Error('supervisor response.errorDetail must be a JSON object');
   }
 
@@ -74,12 +71,12 @@ export function normalizeSupervisorResponse<T>(value: unknown): SupervisorRespon
     ok,
     ...(Object.prototype.hasOwnProperty.call(value, 'result') ? { result: value.result as T } : {}),
     ...(typeof error === 'string' ? { error } : {}),
-    ...(isJsonRecord(errorDetail) ? { errorDetail } : {}),
+    ...(isRecord(errorDetail) ? { errorDetail } : {}),
   };
 }
 
 function recordResult(value: unknown, label: string): Record<string, unknown> {
-  if (!isJsonRecord(value)) throw new Error(`${label} must be a JSON object`);
+  if (!isRecord(value)) throw new Error(`${label} must be a JSON object`);
   return value;
 }
 
@@ -155,7 +152,7 @@ function parseSupervisorSnapshot(value: unknown): AgentRuntimeSupervisorSnapshot
   if (metadataRecord !== undefined) snapshot.metadata = metadataRecord;
 
   if (record.scope !== undefined) {
-    if (!isJsonRecord(record.scope)) throw new Error('supervisor snapshot result.scope is invalid');
+    if (!isRecord(record.scope)) throw new Error('supervisor snapshot result.scope is invalid');
     const scope = parseEventScopeFromRecord({ scope: record.scope });
     if (scope.invalid || !scope.scope)
       throw new Error('supervisor snapshot result.scope is invalid');
@@ -164,7 +161,7 @@ function parseSupervisorSnapshot(value: unknown): AgentRuntimeSupervisorSnapshot
 
   const log = record.log;
   if (log !== undefined) {
-    if (!Array.isArray(log) || log.some((entry) => !isJsonRecord(entry))) {
+    if (!Array.isArray(log) || log.some((entry) => !isRecord(entry))) {
       throw new Error('supervisor snapshot result.log must be an array of JSON objects');
     }
     snapshot.log = log as Array<Record<string, unknown>>;

@@ -4,6 +4,7 @@ import * as net from 'node:net';
 import * as path from 'node:path';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
 import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool-repeat-advisor.js';
@@ -94,12 +95,8 @@ interface RunnerOutput {
   error?: string;
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeProgrammaticRpcRequest(value: unknown): RpcRequest {
-  if (!isJsonRecord(value)) throw new Error('[PTC_RPC] request must be a JSON object.');
+  if (!isRecord(value)) throw new Error('[PTC_RPC] request must be a JSON object.');
   if (typeof value.token !== 'string' || !value.token.trim()) {
     throw new Error('[PTC_RPC] request token must be a non-empty string.');
   }
@@ -109,7 +106,7 @@ export function normalizeProgrammaticRpcRequest(value: unknown): RpcRequest {
   if (value.method !== 'call_op' || typeof value.op !== 'string' || !OP_PATTERN.test(value.op)) {
     throw new Error('[PTC_RPC] invalid op request.');
   }
-  if (!isJsonRecord(value.params)) throw new Error('[PTC_RPC] request params must be an object.');
+  if (!isRecord(value.params)) throw new Error('[PTC_RPC] request params must be an object.');
   return {
     token: value.token,
     id: value.id,
@@ -120,7 +117,7 @@ export function normalizeProgrammaticRpcRequest(value: unknown): RpcRequest {
 }
 
 export function normalizeProgrammaticRunnerOutput(value: unknown): RunnerOutput {
-  if (!isJsonRecord(value)) throw new Error('[PTC_RUNNER] output must be a JSON object.');
+  if (!isRecord(value)) throw new Error('[PTC_RUNNER] output must be a JSON object.');
   if (typeof value.ok !== 'boolean') throw new Error('[PTC_RUNNER] output.ok must be boolean.');
   if (value.stdout !== undefined && typeof value.stdout !== 'string') {
     throw new Error('[PTC_RUNNER] output.stdout must be a string.');

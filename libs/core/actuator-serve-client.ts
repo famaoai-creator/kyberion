@@ -18,6 +18,7 @@ import { logger } from './core.js';
 import { rootResolve } from './path-resolver.js';
 import { buildSafeExecEnv } from './secure-io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 
 export interface ActuatorServeClientOptions {
   /** Full argv of the serve-mode actuator, e.g. ['node', 'dist/.../index.js', '--serve']. */
@@ -41,12 +42,8 @@ interface ActuatorServeResponse {
   error?: string;
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeActuatorServeResponse(value: unknown): ActuatorServeResponse {
-  if (!isJsonRecord(value)) {
+  if (!isRecord(value)) {
     throw new Error('actuator serve response must be a JSON object');
   }
   if (typeof value.id !== 'string' || !value.id.trim()) {
@@ -55,7 +52,7 @@ export function normalizeActuatorServeResponse(value: unknown): ActuatorServeRes
   if (typeof value.ok !== 'boolean') {
     throw new Error('actuator serve response.ok must be boolean');
   }
-  if (value.result !== undefined && value.result !== null && !isJsonRecord(value.result)) {
+  if (value.result !== undefined && value.result !== null && !isRecord(value.result)) {
     throw new Error('actuator serve response.result must be a JSON object');
   }
   if (value.error !== undefined && typeof value.error !== 'string') {
@@ -64,7 +61,7 @@ export function normalizeActuatorServeResponse(value: unknown): ActuatorServeRes
   return {
     id: value.id,
     ok: value.ok,
-    ...(isJsonRecord(value.result) ? { result: value.result } : {}),
+    ...(isRecord(value.result) ? { result: value.result } : {}),
     ...(typeof value.error === 'string' ? { error: value.error } : {}),
   };
 }

@@ -9,6 +9,7 @@ import { setRegisteredEnv } from './foundation/env.js';
 import { getReasoningBackend, delegateTaskWithUntrustedData } from './reasoning-backend.js';
 import { getInjectionSignalPath } from './injection-signal.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { isRecord } from './foundation/text.js';
 export { isInjectionSuspected } from './injection-signal.js';
 import {
   firstJsonObject,
@@ -37,10 +38,6 @@ export interface ScanOptions {
 
 function quarantineEnabled(options?: ScanOptions): boolean {
   return options?.quarantine ?? resolveConfiguredPosture() !== 'dangerous';
-}
-
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function stringArray(value: unknown): string[] {
@@ -203,7 +200,7 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
     if (safeExistsSync(signalPath)) {
       const storedSignal = readJson<unknown>(signalPath);
       currentSignal = {
-        scopes: isJsonRecord(storedSignal) ? stringArray(storedSignal.scopes) : [],
+        scopes: isRecord(storedSignal) ? stringArray(storedSignal.scopes) : [],
       };
     }
 
@@ -246,7 +243,7 @@ export function setInjectionSuspected(suspected: boolean = true, scope: string =
       if (safeExistsSync(statePath)) {
         try {
           const stateValue = readJson<unknown>(statePath);
-          if (!isJsonRecord(stateValue)) return;
+          if (!isRecord(stateValue)) return;
           const state = stateValue;
           const scopes = stringArray(state.injection_scopes);
           state.injection_scopes = scopes;

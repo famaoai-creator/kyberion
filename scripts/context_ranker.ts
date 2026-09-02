@@ -40,7 +40,7 @@ import { resolveKnowledgeScopeSet, assertKnowledgePathInScope } from '@agent/cor
 import { loadKnowledgeUsageAggregate } from '@agent/core/src/knowledge-feedback-loop';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import type { ScopeContext } from '@agent/core/scope-context';
-import { readJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -131,18 +131,14 @@ function normalizeStringArray(value: unknown): string[] {
       : [];
 }
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeRankingWeights(
   value: unknown,
   defaults: RankingWeights
 ): Partial<RankingWeights> {
-  if (!isJsonRecord(value)) return {};
-  const algorithms = isJsonRecord(value.algorithms) ? value.algorithms : {};
-  const ranking = isJsonRecord(algorithms.ranking) ? algorithms.ranking : {};
-  const weights = isJsonRecord(ranking.weights) ? ranking.weights : {};
+  if (!isRecord(value)) return {};
+  const algorithms = isRecord(value.algorithms) ? value.algorithms : {};
+  const ranking = isRecord(algorithms.ranking) ? algorithms.ranking : {};
+  const weights = isRecord(ranking.weights) ? ranking.weights : {};
   const normalized: Partial<RankingWeights> = {};
   for (const key of Object.keys(defaults) as Array<keyof RankingWeights>) {
     const candidate = weights[key];

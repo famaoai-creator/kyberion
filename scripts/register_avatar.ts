@@ -8,15 +8,11 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
-function isJsonRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
-  return isJsonRecord(value) ? value : null;
+  return isRecord(value) ? value : null;
 }
 
 function parseArgs(argv: string[]): Record<string, string> {
