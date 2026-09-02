@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "qa-rules.schema.json",
+  "title": "Documentation-only QA rules",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "version": { "type": "string", "minLength": 1 },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "severity": { "enum": ["error", "warning", "info"] }
+        },
+        "required": ["id", "description", "severity"]
+      }
+    },
+    "visual_monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "capture_on_failure": { "type": "boolean" }
+      },
+      "required": ["enabled", "capture_on_failure"]
+    }
+  },
+  "required": ["$schema", "documentation_only", "version", "rules", "visual_monitoring"]
+}

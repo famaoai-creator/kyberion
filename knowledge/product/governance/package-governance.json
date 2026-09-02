@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/package-governance.schema.json",
   "documentation_only": true,
   "ignore_deps": ["@agent/core", "chalk", "yargs", "axios", "js-yaml"],
   "normalization": {
