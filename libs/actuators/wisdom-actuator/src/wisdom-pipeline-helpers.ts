@@ -1,4 +1,4 @@
-import { loadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   safeReadFile,
@@ -286,7 +286,7 @@ export async function executePipeline(
 
   if (contextFilePath && safeExistsSync(contextFilePath)) {
     const saved = await retry(async () => {
-      const parsed = parseWisdomJsonObject(loadJson<unknown>(contextFilePath));
+      const parsed = parseWisdomJsonObject(readJson<unknown>(contextFilePath));
       if (!parsed) {
         throw new Error(`[WISDOM_CONTEXT_SHAPE_INVALID] expected an object: ${contextFilePath}`);
       }
@@ -825,7 +825,7 @@ async function opApply(
         if (!safeExistsSync(pkgPath)) throw new Error(`Package not found: ${pkgPath}`);
 
         const targetTier = normalizeKnowledgeTier(params.tier);
-        const rawPackage: unknown = loadJson<unknown>(pkgPath);
+        const rawPackage: unknown = readJson<unknown>(pkgPath);
         if (
           rawPackage &&
           typeof rawPackage === 'object' &&
@@ -900,7 +900,7 @@ export async function performReconcile(input: WisdomAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const rawConfig: unknown = await retry(
-    async () => loadJson<unknown>(strategyPath),
+    async () => readJson<unknown>(strategyPath),
     buildRetryOptions()
   );
   const config = parseWisdomReconcileStrategy(rawConfig);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
-import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -102,7 +102,7 @@ function readBrief(tenant: string, instanceId: string): ConfigMissionBrief | nul
       { allowMissingLeaf: true }
     );
     if (!safeExistsSync(briefPath) || !safeLstat(briefPath).isFile()) return null;
-    return parseConfigMissionBrief(loadJson<unknown>(briefPath));
+    return parseConfigMissionBrief(readJson<unknown>(briefPath));
   } catch {
     return null;
   }

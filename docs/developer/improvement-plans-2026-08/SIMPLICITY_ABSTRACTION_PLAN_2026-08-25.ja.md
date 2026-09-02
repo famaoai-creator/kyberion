@@ -11569,6 +11569,19 @@ tenant／tier isolation、mission artifact、catalog fallback、performance inde
 `git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 271
+
+SX-03 の direct JSON reader adoption を継続し、presence-studio／Concierge config API／terminal-hud／
+operator-surface と meeting-browser／wisdom actuator に残っていた foundation の互換 `loadJson` 利用を
+canonical `readJson` へ移行した。server-side の path validation、surface projection、cookie の不正入力拒否、
+wisdom の schema／fail-closed 処理は変更していない。移行に伴う reader fixture の更新は 269 の検証と合わせて
+実行し、旧 reader 名に依存しない形を確認した。
+
+検証: 対象 source **8 files**、関連 core／actuator／surface test **8 files / 56 tests passed**、root typecheck、
+foundation adoption、Prettier、`git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／
+ADF／surface contract の未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／
+provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
