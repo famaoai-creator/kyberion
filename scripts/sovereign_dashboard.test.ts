@@ -8,7 +8,12 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core';
-import { listJsonFiles, readMissionDashboardState, safeListDir } from './sovereign_dashboard.js';
+import {
+  listJsonFiles,
+  readMissionDashboardState,
+  readSurfaceDashboardState,
+  safeListDir,
+} from './sovereign_dashboard.js';
 
 const resourceBoundaryRoot = pathResolver.sharedTmp(`sovereign-dashboard-boundary-${process.pid}`);
 
@@ -27,6 +32,7 @@ describe('sovereign dashboard governance loaders', () => {
     expect(source).toContain('loadServiceConnectionReadinessConfig()');
     expect(source).toContain('loadPersistedTrustLedger()');
     expect(source).toContain('loadSkillIndex()');
+    expect(source).toContain('loadSurfaceState(');
     expect(source).not.toContain('product/governance/service-connection-readiness.json');
     expect(source).not.toContain('personal/governance/agent-trust-scores.json');
     expect(source).not.toContain(
@@ -71,5 +77,14 @@ describe('sovereign dashboard governance loaders', () => {
 
     safeWriteFile(statePath, JSON.stringify(['not-a-state']));
     expect(readMissionDashboardState(statePath)).toBeNull();
+  });
+
+  it('fails closed when the persisted surface state is malformed', () => {
+    const statePath = pathResolver.sharedTmp(
+      `sovereign-dashboard-surface-state-${process.pid}.json`
+    );
+    safeWriteFile(statePath, JSON.stringify({ version: 1, surfaces: { chronos: { pid: 123 } } }));
+
+    expect(readSurfaceDashboardState(statePath)).toEqual({ version: 1, surfaces: {} });
   });
 });
