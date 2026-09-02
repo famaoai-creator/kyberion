@@ -8,6 +8,7 @@ describe('governance directory consistency loader boundary', () => {
         encoding: 'utf8',
       })
     );
+    expect(source).toContain('loadAgentProfileDirectory()');
     expect(source).toContain('loadAgentProfileSnapshot()');
     expect(source).toContain('loadTeamRoleDirectory()');
     expect(source).toContain('loadTeamRoleSnapshot()');
