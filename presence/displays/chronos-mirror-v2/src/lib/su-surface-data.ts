@@ -8,11 +8,11 @@ import { resolveScopeForRecord } from '@agent/core/scope-migration';
 import { listApprovalRequests } from '@agent/core/approval-store';
 import { listArtifactRecords } from '@agent/core/artifact-record';
 import { loadMissionManagementConfig } from '@agent/core/mission-management-config';
+import { loadState, loadStateAtPath } from '@agent/core/mission-state';
 import type { ApprovalRequestRecord } from '@agent/core/approval-store';
 import type { ArtifactRecord } from '@agent/core/artifact-record';
 import * as pathResolver from '@agent/core/path-resolver';
 import { findMissionPath } from '@agent/core/path-resolver';
-import { readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -122,12 +122,9 @@ export function resolveApprovalTenant(record: ApprovalRequestRecord): string | u
   if (!missionId) return undefined;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) return undefined;
-  const statePath = `${missionPath}/mission-state.json`;
   try {
-    const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return undefined;
-    const state = readJson<{ tenant_slug?: string; tenant_id?: string }>(safeStatePath);
-    return state.tenant_slug || state.tenant_id;
+    const state = loadState(missionId);
+    return state?.tenant_slug || state?.tenant_id;
   } catch {
     return undefined;
   }
@@ -173,8 +170,8 @@ function collectMissionStates(): MissionState[] {
         });
         if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) continue;
         try {
-          const state = readJson<MissionState>(statePath);
-          if (state?.mission_id) states.push(state);
+          const state = loadStateAtPath(statePath);
+          if (state) states.push(state);
         } catch {
           // Ignore malformed mission state files.
         }
