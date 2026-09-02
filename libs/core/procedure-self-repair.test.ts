@@ -14,6 +14,7 @@ import {
   classifyFailure,
   createProcedureDelta,
   loadProcedureDelta,
+  loadProcedureDeltaAtPath,
   saveProcedureDelta,
   suggestRepairAnchor,
 } from './procedure-self-repair.js';
@@ -182,6 +183,10 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
     try {
       const loaded = loadProcedureDelta(filePath);
       expect(loaded).toEqual(delta);
+      expect(loadProcedureDelta(filePath, 'other')).toBeNull();
+      expect(() => loadProcedureDeltaAtPath(filePath, 'other')).toThrow(
+        'PROCEDURE_DELTA_SCOPE_MISMATCH'
+      );
     } finally {
       fs.rmSync(pathResolver.shared('runtime/procedure-deltas/p1'), {
         recursive: true,
@@ -203,6 +208,18 @@ describe('saveProcedureDelta / loadProcedureDelta', () => {
       throw new Error('ENOENT');
     });
     expect(loadProcedureDelta('/missing.json')).toBeNull();
+  });
+
+  it('rejects a directory at the persisted delta path', () => {
+    const filePath = pathResolver.shared('runtime/procedure-deltas/p1/directory.json');
+    fs.mkdirSync(filePath, { recursive: true });
+    try {
+      expect(() => loadProcedureDeltaAtPath(filePath, 'p1')).toThrow(
+        'delta must be a regular file'
+      );
+    } finally {
+      fs.rmSync(filePath, { recursive: true, force: true });
+    }
   });
 });
 

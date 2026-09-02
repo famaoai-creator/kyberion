@@ -546,7 +546,7 @@ function handleApplyProcedureDelta(message: any): HostResponse {
   if (!procedureId || !deltaPath)
     return { ok: false, error: 'apply_procedure_delta requires procedure_id and delta_path' };
 
-  const delta = loadProcedureDelta(deltaPath);
+  const delta = loadProcedureDelta(deltaPath, procedureId);
   if (!delta) return { ok: false, error: `delta not found: ${deltaPath}` };
 
   const base = loadBrowserProcedure(procedureId);

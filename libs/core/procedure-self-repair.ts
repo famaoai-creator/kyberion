@@ -3,6 +3,7 @@ import path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
   type BrowserExtensionAction,
@@ -17,6 +18,13 @@ import { type ProcedureDelta } from './procedure-types.js';
 // ---------------------------------------------------------------------------
 
 const DELTA_BASE = pathResolver.shared('runtime/procedure-deltas');
+const DELTA_SCHEMA_PATH = pathResolver.knowledge('product/schemas/procedure-delta.schema.json');
+
+const deltaCatalog = defineCatalog<ProcedureDelta>({
+  id: 'procedure-delta',
+  path: DELTA_SCHEMA_PATH,
+  schema: DELTA_SCHEMA_PATH,
+});
 
 function deltaDir(procedureId: string): string {
   return `${DELTA_BASE}/${procedureId}`;
@@ -94,12 +102,15 @@ export function createProcedureDelta(input: {
 
 /** Persist a delta and return the file path. */
 export function saveProcedureDelta(delta: ProcedureDelta): string {
-  const dir = deltaDir(delta.procedure_id);
+  const validated = deltaCatalog.validate(delta, 'procedure delta');
+  const dir = deltaDir(validated.procedure_id);
   safeMkdir(dir, { recursive: true });
-  const id = deltaId(delta.created_at);
+  const id = deltaId(validated.created_at);
   const filePath = `${dir}/${id}.json`;
-  safeWriteFile(filePath, JSON.stringify(delta, null, 2));
-  logger.info(`[procedure-self-repair] saved delta "${id}" for procedure "${delta.procedure_id}"`);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  logger.info(
+    `[procedure-self-repair] saved delta "${id}" for procedure "${validated.procedure_id}"`
+  );
   return filePath;
 }
 
@@ -159,15 +170,34 @@ export function applyProcedureDelta(input: {
   };
 }
 
+/** Load one persisted delta through schema, regular-file, and procedure binding. */
+export function loadProcedureDeltaAtPath(
+  filePath: string,
+  expectedProcedureId?: string
+): ProcedureDelta {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[PROCEDURE_DELTA] delta must be a regular file: ${filePath}`);
+  }
+  const delta = deltaCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  if (expectedProcedureId !== undefined && delta.procedure_id !== expectedProcedureId) {
+    throw new Error(
+      `[PROCEDURE_DELTA_SCOPE_MISMATCH] delta belongs to ${delta.procedure_id}, expected ${expectedProcedureId}`
+    );
+  }
+  return delta;
+}
+
 /** Load a delta by its full file path (as returned by saveProcedureDelta). */
-export function loadProcedureDelta(filePath: string): ProcedureDelta | null {
+export function loadProcedureDelta(
+  filePath: string,
+  expectedProcedureId?: string
+): ProcedureDelta | null {
   try {
     const absolute = path.resolve(filePath);
     const deltaRoot = path.resolve(DELTA_BASE);
     if (absolute === deltaRoot || !absolute.startsWith(`${deltaRoot}${path.sep}`)) return null;
-    const safeFilePath = assertSafeRepositoryPath(absolute, { allowMissingLeaf: false });
-    if (!safeLstat(safeFilePath).isFile()) return null;
-    return readJson<ProcedureDelta>(safeFilePath);
+    return loadProcedureDeltaAtPath(absolute, expectedProcedureId);
   } catch {
     return null;
   }
