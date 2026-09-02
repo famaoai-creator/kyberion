@@ -7,6 +7,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -375,7 +376,7 @@ export class CloudflareOsControlPlane {
       ...input,
       id: input.id || randomUUID(),
       status: 'pending' as const,
-      submittedAt: new Date().toISOString(),
+      submittedAt: nowIso(),
       autoApproved: false,
       ...(input.simulatable && input.simulate ? { simulation: input.simulate(input.params) } : {}),
       effectBinding: input.effectBinding || input.op,
@@ -437,7 +438,7 @@ export class CloudflareOsControlPlane {
     record.status = decision === 'approved' ? 'approved' : 'rejected';
     record.resolvedBy = by;
     record.autoApproved = false;
-    record.decidedAt = new Date().toISOString();
+    record.decidedAt = nowIso();
     audit('held_action', 'decide', 'completed', {
       heldActionId: id,
       decision,
@@ -455,7 +456,7 @@ export class CloudflareOsControlPlane {
       op: assertNonEmpty(rule.op, 'auto-approve op'),
       actionTag: assertNonEmpty(rule.actionTag, 'auto-approve actionTag'),
       enabledBy: assertHumanActor(rule.enabledBy),
-      enabledAt: new Date().toISOString(),
+      enabledAt: nowIso(),
     };
     this.autoRules.push(normalized);
     this.persistState();
@@ -516,7 +517,7 @@ export class CloudflareOsControlPlane {
         refs
       );
       record.status = 'applied';
-      record.appliedAt = new Date().toISOString();
+      record.appliedAt = nowIso();
       audit('held_action', 'apply', 'completed', {
         heldActionId: id,
         resolvedBy: by,
@@ -556,7 +557,7 @@ export class CloudflareOsControlPlane {
   private grantIntroduction(
     input: Omit<ResourceIntroduction, 'id' | 'grantedAt' | 'revokedAt'>
   ): ResourceIntroduction {
-    const introduction = { ...input, id: randomUUID(), grantedAt: new Date().toISOString() };
+    const introduction = { ...input, id: randomUUID(), grantedAt: nowIso() };
     this.introductions.set(introduction.id, introduction);
     audit('resource_introduction', 'grant', 'completed', introduction);
     this.persistState();
@@ -588,7 +589,7 @@ export class CloudflareOsControlPlane {
   revokeIntroduction(id: string, revokedBy: string): void {
     const entry = this.introductions.get(id);
     if (!entry) throw new Error(`Resource introduction not found: ${id}`);
-    if (!entry.revokedAt) entry.revokedAt = new Date().toISOString();
+    if (!entry.revokedAt) entry.revokedAt = nowIso();
     audit('resource_introduction', 'revoke', 'completed', { id, revokedBy });
     this.persistState();
   }
@@ -625,7 +626,7 @@ export class CloudflareOsControlPlane {
   }
 
   recordObservation(input: Omit<ObservationRecord, 'id' | 'observedAt'>): ObservationRecord {
-    const record = { ...input, id: randomUUID(), observedAt: new Date().toISOString() };
+    const record = { ...input, id: randomUUID(), observedAt: nowIso() };
     this.observations.push(record);
     audit('observation', 'read', 'completed', record);
     this.persistState();
@@ -772,7 +773,7 @@ export class CloudflareOsControlPlane {
       subject,
       resource,
       scope,
-      grantedAt: new Date().toISOString(),
+      grantedAt: nowIso(),
       ...(options.parentId ? { parentId: options.parentId } : {}),
       ...(options.missionId ? { missionId: options.missionId } : {}),
       ...(options.targetAudience ? { targetAudience: options.targetAudience } : {}),
@@ -787,7 +788,7 @@ export class CloudflareOsControlPlane {
   revokeCapability(id: string, revokedBy: string): void {
     const edge = this.capabilities.get(id);
     if (!edge) throw new Error(`Capability edge not found: ${id}`);
-    edge.revokedAt ||= new Date().toISOString();
+    edge.revokedAt ||= nowIso();
     audit('capability', 'revoke', 'completed', { id, revokedBy });
     this.persistState();
   }
@@ -1112,7 +1113,7 @@ export class CloudflareOsControlPlane {
     record.status = 'approved';
     record.resolvedBy = `auto-approve:${rule.enabledBy}`;
     record.autoApproved = true;
-    record.decidedAt = new Date().toISOString();
+    record.decidedAt = nowIso();
     audit('held_action', 'decide', 'completed', {
       heldActionId: record.id,
       decision: 'approved',
