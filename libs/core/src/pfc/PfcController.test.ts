@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { PfcController } from './PfcController.js';
+import { loadPfcStateAtPath, PfcController } from './PfcController.js';
 
 describe('PfcController - State Management', () => {
   const TEST_DIR = path.join(process.cwd(), 'active/shared/tmp/pfc-controller-test');
@@ -58,6 +58,7 @@ describe('PfcController - State Management', () => {
     expect(fs.existsSync(STATE_FILE)).toBe(true);
     const savedState = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
     expect(savedState.layers['L0'].attempt_count).toBe(3);
+    expect(loadPfcStateAtPath(STATE_FILE).layers.L0.attempt_count).toBe(3);
   });
 
   it('should reset attempt count and mark as passed if successful', async () => {
@@ -96,5 +97,19 @@ describe('PfcController - State Management', () => {
     expect(recovered.circuit_broken).toBe(false);
     expect(controller.getState().layers['L10'].status).toBe('passed');
     expect(controller.getState().layers['L10'].attempt_count).toBe(0);
+  });
+
+  it('falls back to the default state when the persisted state violates its schema', () => {
+    fs.writeFileSync(STATE_FILE, JSON.stringify({ layers: { L0: { status: 'unknown' } } }));
+
+    const controller = new PfcController(STATE_FILE);
+
+    expect(controller.getState().layers.L0).toEqual({ status: 'pending', attempt_count: 0 });
+  });
+
+  it('rejects a directory at the persisted state path before schema loading', () => {
+    fs.mkdirSync(STATE_FILE, { recursive: true });
+
+    expect(() => loadPfcStateAtPath(STATE_FILE)).toThrow('state must be a regular file');
   });
 });

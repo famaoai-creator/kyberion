@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "pfc-state.schema.json",
+  "title": "PFC Controller State",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "layers": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^L[0-9]+$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "status": { "type": "string", "enum": ["pending", "passed", "failed"] },
+            "attempt_count": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["status", "attempt_count"]
+        }
+      }
+    }
+  },
+  "required": ["layers"]
+}
