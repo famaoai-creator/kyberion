@@ -166,6 +166,8 @@ export {
 
 export { resolveTenantDesign } from './tenant-design-resolver.js';
 
+export * from './channel-registry.js';
+
 export * from './creative-design-resolver.js';
 
 export * from './campaign-suite.js';

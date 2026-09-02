@@ -6,6 +6,7 @@
 
 import { installProcessGuards } from '@agent/core/process-guards';
 import { logger } from '@agent/core/core';
+import { loadChannelRegistry, type ChannelRegistryChannel } from '@agent/core/channel-registry';
 import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import { terminalBridge } from '@agent/core/terminal-bridge';
 import {
@@ -32,11 +33,10 @@ installProcessGuards('nexus-daemon');
 
 const ROOT_DIR = pathResolver.rootDir();
 const STIMULI_PATH = path.join(ROOT_DIR, 'presence/bridge/runtime/stimuli.jsonl');
-const REGISTRY_PATH = pathResolver.resolve('presence/bridge/channel-registry.json');
 const RUNTIME_BASE = path.join(ROOT_DIR, 'active/shared/runtime/terminal');
 const NEXUS_MISSION_ID = 'MSN-SYSTEM-NEXUS-DISPATCH';
 
-function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
+function readNexusJson(filePath: string): ReturnType<JSON['parse']> {
   const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) {
     throw new Error(`Nexus JSON resource must be an existing regular file: ${safePath}`);
@@ -108,17 +108,9 @@ function ensureSystemMission() {
 
 const CHECK_INTERVAL_MS = Number(process.env.NEXUS_INTERVAL) || 3000;
 
-interface Channel {
-  id: string;
-  connector_skill?: string;
-  execution_strategy?: string;
-  service_id?: string;
-  execution_mode?: 'API' | 'CLI' | 'SDK';
-}
-
-async function loadChannelRegistry(): Promise<Channel[]> {
+async function loadNexusChannelRegistry(): Promise<ChannelRegistryChannel[]> {
   try {
-    return loadJsonValue(safeNexusPath(REGISTRY_PATH)).channels;
+    return loadChannelRegistry().channels;
   } catch (err) {
     logger.error(`[Nexus] Registry load error: ${err}`);
     return [];
@@ -157,7 +149,11 @@ async function updateStimulusStatus(
   }
 }
 
-async function dispatchFeedback(stimulus: GuspStimulus, text: string, channels: Channel[]) {
+async function dispatchFeedback(
+  stimulus: GuspStimulus,
+  text: string,
+  channels: ChannelRegistryChannel[]
+) {
   const channelCfg = channels.find((c) => c.id === stimulus.origin.channel);
 
   if (channelCfg?.connector_skill) {
@@ -237,7 +233,7 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
       const registryPath = pathResolver.resolve('knowledge/orchestration/brain-profiles.json');
       const safeRegistryPath = safeNexusPath(registryPath, true);
       if (safeExistsSync(safeRegistryPath)) {
-        const registry = loadJsonValue(safeRegistryPath);
+        const registry = readNexusJson(safeRegistryPath);
         if (registry.profiles[profile]) {
           return { profile, cleanPayload };
         }
@@ -250,7 +246,7 @@ function extractBrainProfile(payload: string): { profile: string; cleanPayload: 
   return { profile: 'default', cleanPayload: payload };
 }
 
-async function scanAndDispatch(channels: Channel[]) {
+async function scanAndDispatch(channels: ChannelRegistryChannel[]) {
   const stimuliPath = safeNexusPath(STIMULI_PATH, true);
   const runtimeBase = safeNexusPath(RUNTIME_BASE, true);
   if (!isExistingRegularFile(stimuliPath)) return;
@@ -287,9 +283,9 @@ async function scanAndDispatch(channels: Channel[]) {
 
       if (isExistingRegularFile(metaPath) && isExistingRegularFile(responsePath)) {
         try {
-          const meta = loadJsonValue(metaPath);
+          const meta = readNexusJson(metaPath);
           if (meta.stimulus_id === stimulus.id) {
-            const response = loadJsonValue(responsePath);
+            const response = readNexusJson(responsePath);
             const text = response.data?.message || JSON.stringify(response.data || {}, null, 2);
 
             logger.info(`🎯 [Nexus] Match found! Stimulus ${stimulus.id} -> Session ${sid}`);
@@ -337,7 +333,7 @@ async function nexusLoop() {
 
   while (true) {
     try {
-      const channels = await loadChannelRegistry();
+      const channels = await loadNexusChannelRegistry();
 
       if (isExistingRegularFile(STIMULI_PATH)) {
         const stimuliPath = safeNexusPath(STIMULI_PATH);

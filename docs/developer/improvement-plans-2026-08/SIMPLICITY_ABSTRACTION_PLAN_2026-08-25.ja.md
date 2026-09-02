@@ -12249,6 +12249,17 @@ SX-04 の confidential tenant design override index (`knowledge/confidential/ten
 root typecheck、root lint、PR scope、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの
 廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 336
+
+SX-04 の Presence `channel-registry.json` がNexus daemonとPresence controllerで別々の汎用JSON readerを使っていた残存を
+修正した。`channel-registry.schema.json` とcoreの `loadChannelRegistry` を追加し、両経路を同じschema／型境界へ統合した。
+registryの欠損・不正時は既存の空候補／空perceptionへのfail-closed処理を維持し、Nexusのmetadata／responseなど任意JSONは
+channel catalogと混同しないdomain readerとして残した。
+
+検証: channel／presence／nexus **4 files / 20 tests passed**、core／actuator build、root typecheck、root lint、PR scope、
+knowledge index、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
+各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

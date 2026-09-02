@@ -6715,6 +6715,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/channel-registry.schema.json",
+      "tier": "public",
+      "size": 1691,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/ci-gates.schema.json",
       "tier": "public",
       "size": 1648,

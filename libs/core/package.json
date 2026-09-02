@@ -1375,6 +1375,10 @@
       "types": "./dist/tenant-design-resolver.d.ts",
       "default": "./dist/tenant-design-resolver.js"
     },
+    "./channel-registry": {
+      "types": "./dist/channel-registry.d.ts",
+      "default": "./dist/channel-registry.js"
+    },
     "./tenant-rate-limiter": {
       "types": "./dist/tenant-rate-limiter.d.ts",
       "default": "./dist/tenant-rate-limiter.js"
