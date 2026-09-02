@@ -13547,6 +13547,12 @@ SX-03／SX-04／SX-09 の共有 evidence registryを再監査し、query／linea
 
 検証: evidence chain **1 file / 7 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 548
+
+SX-03／SX-04／SX-09 のmission orchestration journalを再監査し、provisioned artifact receiptのJSONL recordを手書きnormalizerだけで読み、`entry_id`／hash／target／phase／timestampの保存時・復旧時契約とregular-file境界を共有していなかった残存を修正した。`mission-provisioned-entry-record.schema.json`とcanonical record validatorを追加し、receipt append／loadをschema validationへ統合した。不正record・directoryはreplay／recovery判定へ進まず既存の`MISSION_LOG_CORRUPT`分類を維持し、hash-bound artifact verification、provision／verified pairing、scope containment semanticsは変更していない。
+
+検証: orchestration journal **1 file / 12 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
