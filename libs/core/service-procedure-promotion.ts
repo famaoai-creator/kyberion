@@ -7,13 +7,8 @@ import {
   validateProcedureCatalog,
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  loadJson,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import { validatePipelineAdf, type PipelineAdf } from './pipeline-contract.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validateServiceRecording } from './service-recording.js';
@@ -56,7 +51,7 @@ export function promoteServiceProcedure(
 
   const recordingAbs = resolveAllowlistedRecordingRef(options.recordingRef);
   if (!recordingAbs) throw new Error('recording_ref is outside the allowlisted recording stores');
-  const raw = loadJson<unknown>(recordingAbs);
+  const raw = readJson<unknown>(recordingAbs);
   const validation = validateServiceRecording(raw);
   if (!validation.value) {
     throw new Error(`recording failed validation: ${validation.errors.join('; ')}`);

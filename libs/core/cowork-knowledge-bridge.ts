@@ -29,11 +29,11 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeReadFile,
-  loadJson,
   safeReaddir,
   safeWriteFile,
   safeMkdir,
 } from './secure-io.js';
+import { readJson } from './foundation/json.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -102,7 +102,7 @@ function loadSyncState(scope?: ScopeContext): SyncState {
     return { ingested: {}, supplied: {}, last_sync_at: '' };
   }
   try {
-    return loadJson<SyncState>(resolved);
+    return readJson<SyncState>(resolved);
   } catch {
     return { ingested: {}, supplied: {}, last_sync_at: '' };
   }
