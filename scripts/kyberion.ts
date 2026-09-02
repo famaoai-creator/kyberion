@@ -3,6 +3,7 @@ import { validateEnv } from '@agent/core/env-validator';
 import { getRegisteredEnvBool } from '@agent/core/foundation';
 import {
   loadCliManifest,
+  resolveCliModulePath,
   type CliCommand,
   type CliManifest,
   type CliScriptCommand,
@@ -133,7 +134,7 @@ async function runScriptCommand(
         [
           '--import',
           pathResolver.rootResolve('scripts/ts-loader.mjs'),
-          pathResolver.rootResolve(scriptCommand.module),
+          resolveCliModulePath(scriptCommand.module),
           ...(scriptCommand.args || []),
           ...commandArgs,
         ],
