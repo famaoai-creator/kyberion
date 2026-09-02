@@ -113,8 +113,8 @@ import {
 } from '../../../lib/intelligence-primitives';
 import { listWorkItems } from '@agent/core/work-coordination';
 import { getProjectManagementView } from '@agent/core/project-management';
-import { listMissionsInSearchDirs, loadState } from '@agent/core/mission-state';
-import { optionalStringField, recordField, stringField } from '../../../lib/json-record';
+import { listMissionsInSearchDirs, loadState, loadStateAtPath } from '@agent/core/mission-state';
+import { optionalStringField, recordField } from '../../../lib/json-record';
 
 export interface RuntimeTopologySurfaceInput {
   id: string;
@@ -913,9 +913,10 @@ export function collectActiveMissions(): MissionSummary[] {
         if (!missionPath || !safeExistsSync(missionPath) || !safeLstat(missionPath).isDirectory()) {
           continue;
         }
-        const state = recordField(readJson<unknown>(path.join(missionPath, 'mission-state.json')));
-        const status = stringField(state, 'status');
-        if (!['active', 'planned', 'paused', 'failed'].includes(status)) continue;
+        const statePath = safeMissionResourcePath(path.join(missionPath, 'mission-state.json'));
+        const state = statePath ? loadStateAtPath(statePath) : null;
+        const status = state?.status;
+        if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
         const rawNextTasks = readJson<unknown>(path.join(missionPath, 'NEXT_TASKS.json'));
         const nextTaskRecords = Array.isArray(rawNextTasks)
           ? rawNextTasks.map((task) => ({
@@ -944,19 +945,15 @@ export function collectActiveMissions(): MissionSummary[] {
                 : 'planning'
               : 'attention';
         missions.push({
-          missionId: stringField(state, 'mission_id', item),
-          tenantSlug:
-            optionalStringField(state, 'tenant_slug') || optionalStringField(state, 'tenant_id'),
+          missionId: state.mission_id || item,
+          tenantSlug: state.tenant_slug || state.tenant_id,
           status,
-          tier: stringField(state, 'tier', root.tier),
-          missionType: optionalStringField(state, 'mission_type'),
-          projectId: optionalStringField(recordField(state.relationships?.project), 'project_id'),
-          projectPath: optionalStringField(
-            recordField(state.relationships?.project),
-            'project_path'
-          ),
-          trackId: optionalStringField(recordField(state.relationships?.track), 'track_id'),
-          trackName: optionalStringField(recordField(state.relationships?.track), 'track_name'),
+          tier: state.tier || root.tier,
+          missionType: state.mission_type,
+          projectId: state.relationships?.project?.project_id,
+          projectPath: state.relationships?.project?.project_path,
+          trackId: state.relationships?.track?.track_id,
+          trackName: state.relationships?.track?.track_name,
           planReady,
           nextTaskCount,
           controlSummary,
@@ -997,7 +994,7 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
     const nextTasks = nextTasksPath
       ? readJson<Array<{ status?: string }>>(nextTasksPath) || []
       : [];
-    const missionState = statePath ? readJson<Record<string, unknown>>(statePath) || {} : {};
+    const missionState = statePath ? loadStateAtPath(statePath) : null;
     const board = parseTaskBoard(taskBoard);
     const nextTaskSummary = summarizeNextTasks(nextTasks);
     const generatedAssets: MissionProgressSummary['generatedAssets'] = [];
@@ -1028,7 +1025,7 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
       ...board,
       ...nextTaskSummary,
       dependencies: extractMissionDependencies(
-        missionState.relationships as Record<string, unknown> | undefined
+        missionState?.relationships as Record<string, unknown> | undefined
       ),
       generatedAssets: normalizeMissionAssets(generatedAssets),
     });
