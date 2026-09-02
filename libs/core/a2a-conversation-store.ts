@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -163,7 +164,7 @@ export async function appendConversationTurn(
     const tier = resolveMissionTier(turnData.missionId);
 
     const turn: ConversationTurn = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       sender: turnData.sender,
       receiver: turnData.receiver,
       performative: turnData.performative,

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -90,14 +91,15 @@ export function savePendingIntent(
   }
 ): PendingIntentRecord {
   ensurePendingIntentDir();
-  const now = new Date().toISOString();
   const ttlMs = Math.max(60_000, input.ttlMs ?? DEFAULT_TTL_MS);
+  const currentTime = new Date();
+  const now = nowIso(currentTime);
   const record: PendingIntentRecord = {
     kind: 'pending-intent',
     correlation_id: input.correlation_id,
     created_at: input.created_at || now,
     updated_at: input.updated_at || now,
-    expires_at: input.expires_at || new Date(Date.now() + ttlMs).toISOString(),
+    expires_at: input.expires_at || nowIso(new Date(currentTime.getTime() + ttlMs)),
     source_text: input.source_text,
     intent_id: input.intent_id,
     required_inputs: Array.from(
