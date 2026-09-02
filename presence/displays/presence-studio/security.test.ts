@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   PresenceStudioViewerError,
+  parsePresenceStudioAgentIdentity,
+  parsePresenceStudioSovereignIdentity,
   presenceStudioDemoFrameSchema,
   presenceStudioMinutesSessionStartSchema,
   presenceStudioVoiceStopSchema,
@@ -109,5 +111,18 @@ describe('Presence Studio OS viewer scope', () => {
       })
     ).toEqual({ title: 'Demo', transcript: [{ speaker: 'AI', text: 'Hello' }] });
     expect(presenceStudioDemoFrameSchema.parse(undefined)).toEqual({});
+  });
+
+  it('parses identity files through a display-only field contract', () => {
+    expect(parsePresenceStudioSovereignIdentity({ name: ' Operator ', extra: true })).toEqual({
+      name: 'Operator',
+    });
+    expect(parsePresenceStudioAgentIdentity({ agent_id: 'agent-1', trust_tier: 'T2' })).toEqual({
+      agent_id: 'agent-1',
+      trust_tier: 'T2',
+    });
+    expect(parsePresenceStudioSovereignIdentity({ name: 42 })).toBeNull();
+    expect(parsePresenceStudioAgentIdentity({ agent_id: ['agent-1'] })).toBeNull();
+    expect(parsePresenceStudioSovereignIdentity(['Operator'])).toBeNull();
   });
 });
