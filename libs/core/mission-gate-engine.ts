@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 
 import {
   type StructuredOutputSchemaName,
@@ -78,7 +79,7 @@ export function signHumanOverride(input: {
   approvedAt?: string;
   reason?: string;
 }): Record<string, unknown> {
-  const approvedAt = input.approvedAt ?? new Date().toISOString();
+  const approvedAt = input.approvedAt ?? nowIso();
   const { signature } = signA2AContent(
     overrideSignatureContent(input.gateId, input.approvedBy, approvedAt)
   );
@@ -190,7 +191,7 @@ export function writeMissionGateRecord(input: MissionGateRecordInput): string {
 }
 
 export function recordMissionGateOverride(input: MissionGateOverrideInput): string {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const verdict = input.outcome === 'passed' ? 'pass' : 'fail';
   return writeMissionGateRecord({
     missionId: input.missionId,
@@ -554,7 +555,7 @@ export async function evaluateMissionGate(input: {
   evidenceDir?: string;
   recordPath?: string;
 }): Promise<MissionGateEvaluation> {
-  const checkedAt = new Date().toISOString();
+  const checkedAt = nowIso();
   const checks: MissionGateEvaluation['checks'] = [];
   const reasons: string[] = [];
   for (const check of input.gate.checks) {
