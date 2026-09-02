@@ -4,11 +4,7 @@ import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
 import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
 import { loadAgentProfileSnapshot, loadTeamRoleSnapshot } from '@agent/core/mission-team-index';
-import {
-  compileSchema,
-  defineCatalog,
-  readJson as readFoundationJson,
-} from '@agent/core/foundation';
+import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 
 type VoiceProfileSnapshot = {
   default_profile_id?: string;
@@ -92,10 +88,6 @@ const globalActuatorIndexSnapshotCatalog = defineCatalog<GlobalActuatorIndexSnap
   schema: pathResolver.knowledge('product/schemas/global-actuator-index.schema.json'),
 });
 
-function readJson<T>(relativePath: string): T {
-  return readFoundationJson<T>(pathResolver.rootResolve(relativePath));
-}
-
 export function validateAgentProfileDirectoryConsistency(violations: string[]) {
   const directory = pathResolver.rootResolve('knowledge/product/orchestration/agent-profiles');
   if (!safeExistsSync(directory)) {
@@ -122,7 +114,7 @@ export function validateAgentProfileDirectoryConsistency(violations: string[]) {
 
   for (const file of files) {
     const relativePath = `knowledge/product/orchestration/agent-profiles/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -190,7 +182,7 @@ export function validateVoiceProfileDirectoryConsistency(violations: string[]) {
 
   for (const file of files) {
     const relativePath = `knowledge/product/governance/voice-profiles/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -263,7 +255,7 @@ export function validateAuthorityRoleDirectoryConsistency(violations: string[]) 
 
   for (const file of files) {
     const relativePath = `knowledge/product/governance/authority-roles/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -328,7 +320,7 @@ export function validateTeamRoleDirectoryConsistency(violations: string[]) {
 
   for (const file of files) {
     const relativePath = `knowledge/product/orchestration/team-roles/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -396,7 +388,7 @@ export function validateSurfaceProviderCatalogDirectoryConsistency(violations: s
 
   for (const file of files) {
     const relativePath = `knowledge/product/governance/surface-provider-manifest-catalogs/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -460,7 +452,7 @@ export function validateServiceEndpointsDirectoryConsistency(violations: string[
 
   for (const file of files) {
     const relativePath = `knowledge/product/orchestration/service-endpoints/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -532,7 +524,7 @@ export function validateSpecialistCatalogDirectoryConsistency(violations: string
 
   for (const file of files) {
     const relativePath = `knowledge/product/orchestration/specialists/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
@@ -595,7 +587,7 @@ export function validateVoiceEngineDirectoryConsistency(violations: string[]) {
 
   for (const file of files) {
     const relativePath = `knowledge/product/governance/voice-engines/${file}`;
-    const data = readJson<Record<string, unknown>>(relativePath);
+    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
     const ok = validate(data);
     if (!ok) {
       for (const error of validate.errors || []) {
