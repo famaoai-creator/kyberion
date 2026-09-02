@@ -11,6 +11,8 @@ import {
   evaluateDefinitionOfReady,
   evaluateQualityContract,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestInventory,
   type SoftwareQualityContract,
   type TestInventory,
 } from './software-quality.js';
@@ -74,6 +76,49 @@ function inventory(): TestInventory {
 }
 
 describe('software quality lifecycle', () => {
+  it('rejects malformed contract and inventory payloads before evaluation', () => {
+    expect(parseSoftwareQualityContract({ ...contract(), unexpected: true })).toBeNull();
+    expect(
+      parseSoftwareQualityContract({
+        ...contract(),
+        dor: [{ ...contract().dor[0], status: 'unknown' }],
+      })
+    ).toBeNull();
+    expect(
+      parseSoftwareQualityContract({
+        ...contract(),
+        waivers: [
+          {
+            waiver_id: 'W-1',
+            check_refs: ['DOD-1'],
+            reason: 'Temporary exception',
+            accountable_human_id: 'human:owner',
+            expires_at: '2026-09-03',
+            compensating_controls: ['Manual review'],
+            residual_risk: 'Low',
+          },
+        ],
+      })
+    ).toBeNull();
+    expect(parseTestInventory({ ...inventory(), unexpected: true })).toBeNull();
+    expect(
+      parseTestInventory({
+        ...inventory(),
+        items: [
+          {
+            ...inventory().items[0],
+            viewpoint_ids: ['security.authorization', 'security.authorization'],
+          },
+        ],
+      })
+    ).toBeNull();
+    expect(
+      parseTestInventory(
+        JSON.parse('{"version":"1","project_id":"p","items":[{"__proto__":true}]}')
+      )
+    ).toBeNull();
+  });
+
   it('keeps all QA artifacts and the viewpoint catalog schema-valid', () => {
     const ajv = new Ajv({ allErrors: true, strict: false });
     addFormats(ajv);

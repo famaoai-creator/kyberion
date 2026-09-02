@@ -95,6 +95,8 @@ export {
   evaluateAcceptanceCriteria,
   evaluateDefinitionOfDone,
   evaluateTestTraceability,
+  parseSoftwareQualityContract,
+  parseTestInventory,
   createDefectCandidates,
   buildSoftwareQualityReport,
 } from './software-quality.js';
