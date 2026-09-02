@@ -106,6 +106,23 @@ describe('code-actuator', () => {
       ).rejects.toThrow('Strategy not found');
     });
 
+    it('malformed persisted strategyをstep実行前に拒否する', async () => {
+      const { safeExistsSync, safeExec } = await import('@agent/core/secure-io');
+      const foundation = await import('@agent/core/foundation');
+      vi.mocked(safeExistsSync).mockReturnValue(true);
+      const readJsonSpy = vi.spyOn(foundation, 'readJson').mockReturnValue({
+        strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }],
+      });
+      try {
+        await expect(
+          handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+        ).rejects.toThrow('code strategy.strategies[0].pipeline[0].params must be a JSON object');
+        expect(safeExec).not.toHaveBeenCalled();
+      } finally {
+        readJsonSpy.mockRestore();
+      }
+    });
+
     it('サポートされていないactionを拒否する', async () => {
       await expect(handleAction({ action: 'invalid' as any, steps: [] })).rejects.toThrow(
         'Unsupported action: invalid'

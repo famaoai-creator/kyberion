@@ -34,7 +34,13 @@ import {
   compileAgenticSourceReviewVerification,
   validateAgenticSourceReviewVerification,
 } from '@agent/core/agentic-source-review-verification';
-import { createAjv, defineCatalog, nowIso, readJson } from '@agent/core/foundation';
+import {
+  createAjv,
+  defineCatalog,
+  nowIso,
+  parsePersistedPipelineStrategy,
+  readJson,
+} from '@agent/core/foundation';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -107,10 +113,6 @@ export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
-}
-
-interface StrategyConfig {
-  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
 }
 
 export interface ModelingAction {
@@ -1060,7 +1062,8 @@ export async function performReconcile(input: ModelingAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => readJson<StrategyConfig>(strategyPath),
+    async () =>
+      parsePersistedPipelineStrategy(readJson<unknown>(strategyPath), 'modeling strategy'),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {
