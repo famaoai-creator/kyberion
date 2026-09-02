@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as nodePath from 'node:path';
 import { sharedTmp, shared, rootDir, sharedLogsAudit } from './path-resolver.js';
 import {
@@ -290,7 +291,7 @@ function recordTrashEntry(originalRepoRelative: string): void {
   try {
     appendJsonLine(trashIndexPath(), {
       path: originalRepoRelative,
-      trashed_at: new Date().toISOString(),
+      trashed_at: nowIso(),
     });
   } catch (err) {
     // Losing the record only costs precision (mtime fallback), never data.
@@ -306,7 +307,7 @@ function pruneTrashIndex(trashedAt: Map<string, number>): void {
   for (const [repoRel, ms] of trashedAt) {
     const filePath = nodePath.join(trashRootDir(), ...repoRel.split('/'));
     if (safeExistsSync(filePath)) {
-      surviving.push(JSON.stringify({ path: repoRel, trashed_at: new Date(ms).toISOString() }));
+      surviving.push(JSON.stringify({ path: repoRel, trashed_at: nowIso(new Date(ms)) }));
     }
   }
   try {
@@ -331,7 +332,7 @@ function pruneTrashIndex(trashedAt: Map<string, number>): void {
 export function appendRetentionAudit(record: Record<string, unknown>): void {
   try {
     appendJsonLine(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME), {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...record,
     });
   } catch (err) {
@@ -758,9 +759,7 @@ function resolveProcessStartTime(pid: number): string | undefined {
       maxOutputMB: 1,
     });
     const parsed = Date.parse(result.stdout.trim());
-    return result.status === 0 && Number.isFinite(parsed)
-      ? new Date(parsed).toISOString()
-      : undefined;
+    return result.status === 0 && Number.isFinite(parsed) ? nowIso(new Date(parsed)) : undefined;
   } catch {
     return undefined;
   }
@@ -967,7 +966,7 @@ export function runJanitor(opts: { dryRun: boolean }): JanitorReport {
     retentionCatalogSource: catalog.source,
     retentionCatalogWarnings: catalog.warnings,
     errors,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     dryRun: opts.dryRun,
   };
 

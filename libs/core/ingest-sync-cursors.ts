@@ -25,6 +25,7 @@ import * as pathResolver from './path-resolver.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -241,7 +242,7 @@ export function advanceSyncCursor(
   advance: SyncCursorAdvance,
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = advance.now ?? new Date().toISOString();
+  const now = advance.now ?? nowIso();
   const previous = readSyncCursor(tenantSlug, sourceSystem, options);
   const state: SyncCursorState = {
     tenant_slug: tenantSlug,
@@ -279,7 +280,7 @@ export function recordSyncFailure(
   failure: SyncCursorFailure = {},
   options: SyncCursorPathOptions = {}
 ): SyncCursorState {
-  const now = failure.now ?? new Date().toISOString();
+  const now = failure.now ?? nowIso();
   const previous = readSyncCursor(tenantSlug, sourceSystem, options);
   const state: SyncCursorState = previous
     ? {

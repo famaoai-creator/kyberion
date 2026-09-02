@@ -12965,6 +12965,12 @@ SX-03／SX-04／SX-08／SX-10／SX-11 のfoundation／handoff／artifact残存�
 
 検証: 関連 **10 files / 111 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象10 production filesの ESLint／Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 451
+
+SX-03／SX-04／SX-08／SX-09／SX-10／SX-11／SX-14 のruntime／artifact残存監査として、process logger、manual-drive bridge、context promotion、customer conversation、ingest cursor、capability／artifact registry、storage janitor、external service registry、reasoning backend execution adapter の **10 production files / 21 箇所**に残っていた直接時刻生成を foundation `nowIso()` へ統合した。grant／cursor／retention／provider executionの明示時刻と期限計算、同一ledgerやservice更新内の時刻共有は既存semanticsを維持し、I/O／tenant／authority境界は変更していない。
+
+検証: 関連 **10 files / 92 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象10 production filesの ESLint、対象9 filesの Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
