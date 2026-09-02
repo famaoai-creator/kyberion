@@ -7777,6 +7777,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-gate-record.schema.json",
+      "tier": "public",
+      "size": 1726,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-journal-policy.schema.json",
       "tier": "public",
       "size": 915,
