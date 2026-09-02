@@ -12116,6 +12116,16 @@ semantic token 解決と design-system override の merge semantics は変更し
 knowledge index generator／check、typecheck、actuator build、PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。
 残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 323
+
+media actuator の `slide-layout-presets` は base catalog と defaults／presets／body-zone／layout-template の fragment を
+マージするため、従来は汎用 `loadJsonCatalog` の結果を未検証で利用していた。専用 `slide-layout-presets.schema.json` を追加し、
+既存の決定的な fragment 順序と fallback を維持したまま、マージ後の root envelope を `defineCatalog.validate()` で検証するようにした。
+fragment 内の preset／geometry payload は、既存の拡張性を保つためオープンな object として許容する。
+
+検証: slide layout catalog **1 file / 1 test passed**、関連 media／core、typecheck、PR scope、lint、Prettier、`git diff --check`。
+残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
