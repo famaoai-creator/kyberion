@@ -164,16 +164,19 @@ const reasoningRoutePolicyCatalog = defineCatalog<ReasoningRoutePolicy>({
   path: POLICY_PATH,
   schema: SCHEMA_PATH,
 });
+const reasoningRouteUserConfigCatalog = defineCatalog<ReasoningRouteUserConfig>({
+  id: 'reasoning-route-user-config',
+  path: USER_CONFIG_PATH,
+  schema: USER_SCHEMA_PATH,
+  fallback: {},
+});
 
 export function loadReasoningRoutePolicy(): ReasoningRoutePolicy {
   return reasoningRoutePolicyCatalog.load();
 }
 
 export function loadReasoningRouteUserConfig(): ReasoningRouteUserConfig {
-  if (!safeExistsSync(USER_CONFIG_PATH)) return {};
-  const value = readJson<ReasoningRouteUserConfig>(USER_CONFIG_PATH);
-  validateReasoningRouteUserConfig(value, USER_CONFIG_PATH);
-  return value;
+  return reasoningRouteUserConfigCatalog.load();
 }
 
 export function validateReasoningRouteUserConfig(
@@ -793,5 +796,6 @@ export function resolveStepReasoningRoute(input: {
 
 export function _resetReasoningRoutePolicyCacheForTests(): void {
   reasoningRoutePolicyCatalog.reset();
+  reasoningRouteUserConfigCatalog.reset();
   validateUserConfigFn = null;
 }
