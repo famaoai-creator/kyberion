@@ -22,6 +22,7 @@ import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
 import { requireConciergeMutationAccess } from '../../../lib/api-guard';
+import { readRequestObject } from '../../../lib/request-input';
 import { resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import {
@@ -338,7 +339,9 @@ export async function POST(req: NextRequest) {
 
     let body: SetupInputObject;
     try {
-      body = requireSetupObject(await req.json(), 'request body');
+      const parsedBody = await readRequestObject(req, 'request body');
+      if (!parsedBody.ok) throw new SetupInputError(parsedBody.error);
+      body = parsedBody.body;
       const allowedKeys =
         body.action === 'save_management'
           ? ['action', 'tenant', 'agent', 'vision', 'name', 'primary_domain']

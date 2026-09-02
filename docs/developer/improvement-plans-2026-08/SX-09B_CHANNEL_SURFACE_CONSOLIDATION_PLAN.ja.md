@@ -1,7 +1,7 @@
 ---
 title: SX-09b channel surface consolidation follow-up
 tags: [simplicity, channel-adapter, surface, 2026-08]
-last_updated: 2026-08-30
+last_updated: 2026-09-02
 status: partial
 ---
 
@@ -321,3 +321,9 @@ Concierge の config-missions プリセット読込を再監査し、repository-
 Concierge ingest の外部CLI verdict parserを再監査し、marker後のJSON出力を直接 `JSON.parse` してから型判定していた残存を検出した。共有 `parseSafeJsonInput` を先行させ、malformed／primitive／配列／nested dangerous key を既存の verdict 不在扱いへ閉じた。dry-run／commit の判定と target path の既存型検証は変更していない。
 
 検証: Concierge ingest output parser **1 file / 1 test passed**、Concierge build、root typecheck、Prettier、`git diff --check`。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
+
+## 2026-09-02 再レビュー修正 28
+
+surface のJSON request readerを再監査し、Chronos／Concierge／operator-surface に重複していた malformed／非object body の読み取りを foundation の `readJsonObjectRequest` へ統合した。dangerous nested key も共通境界で拒否し、各surfaceの route-specific field parser、認可、approval、multipart、外部配送の責務は維持した。
+
+検証: foundation／surface request input／operator inbox **4 files / 33 tests passed**、core package build、root typecheck、対象 lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。全 route の framework-specific parsing、provider 実機受入、日英 literal の全面移行は引き続き未完了である。
