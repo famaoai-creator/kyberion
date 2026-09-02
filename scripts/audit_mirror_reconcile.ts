@@ -30,7 +30,7 @@ import {
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
 import type { AuditEntry } from '@agent/core/audit-chain';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const AUDIT_MIRROR_APPROVAL_CHANNEL = 'terminal';
@@ -403,7 +403,7 @@ export function runAuditMirrorReconciliation(input: {
     mode: input.apply ? 'apply' : 'dry-run',
     ...(approval?.decidedBy ? { approved_by: approval.decidedBy } : {}),
     ...(approval ? { approval_request_id: approval.id } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     findings,
     archived: [],
     rebuilt: [],

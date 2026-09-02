@@ -29,7 +29,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/authority';
-import { isRecord } from '@agent/core/foundation';
+import { isRecord, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from './lib/json-input.js';
 
@@ -620,7 +620,7 @@ function buildPlan(kind: MigrationKind, apply: boolean): MigrationPlan {
   }
   const plan: MigrationPlan = {
     migration_id: migrationId,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     apply,
     status: 'planned',
     items,
@@ -673,7 +673,7 @@ function applyPlan(plan: MigrationPlan): void {
         persistMigrationManifest(plan);
       }
       plan.status = 'completed';
-      plan.completed_at = new Date().toISOString();
+      plan.completed_at = nowIso();
       persistMigrationManifest(plan);
     } catch (error) {
       plan.status = 'failed';

@@ -10,7 +10,7 @@ import {
 } from '@agent/core/reasoning-route-resolver';
 import { inspectReasoningRoutes } from '@agent/core/reasoning-route-doctor';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
 import { recordGovernanceAction } from '@agent/core/governance-action-recorder';
 import {
@@ -57,7 +57,7 @@ function saveWithBackup(
     ...config,
     version: config.version || '1.0.0',
     revision: (config.revision || 0) + 1,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     last_change: change,
   };
   validateReasoningRouteUserConfig(nextConfig);

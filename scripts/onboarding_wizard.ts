@@ -853,7 +853,7 @@ async function runServicesPhase(
   state.services = { candidates: [...previous, ...candidates] };
   state.completed_phases = Array.from(new Set([...state.completed_phases, 'services']));
   state.current_phase = 'tenants';
-  state.updated_at = new Date().toISOString();
+  state.updated_at = nowIso();
   await saveState(state);
 }
 

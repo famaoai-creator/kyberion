@@ -11898,6 +11898,27 @@ mission controller と pipeline execution の orchestration 経路に残って�
 検証: mission／pipeline 関連 **5 test files / 158 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。
 残る SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
 
+## 2026-09-02 再レビュー修正 302
+
+残っていた script の単純 timestamp 16 箇所を foundation の `nowIso()` へ移行した。task init、onboarding の残存
+state 更新、dependency patch、audit mirror、config mission、actuator scaffold、entity cleanup、validation bundle、
+ingest、physical namespace migration、reasoning config、avatar registration、baseline check、surface runtime を対象とし、
+生成物・監査記録・migration plan の UTC ISO 形式と既存の承認／scope 境界を維持した。`Date.now()` による deadline・
+経過時間・一意 ID 生成は対象外である。
+
+検証: 関連 **13 test files / 70 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。対象 script 群の
+単純 `new Date().toISOString()` は **0 件**となった。残る SX-03 の時刻移行は surface／actuator と、domain 固有の変換を
+含む script の個別判断である。
+
+## 2026-09-02 再レビュー修正 303
+
+review 中に `create_actuator` が生成する scaffold の `nowIso()` import を generator 本体へ誤って追加していた
+ため、生成テンプレート側へ配置を修正した。これにより generator 自体の未使用 import を除去し、生成される actuator
+source は foundation helper を正しく import する。既存 scaffold の構造・CLI entrypoint・契約 schema は変更していない。
+
+検証: create-actuator／onboarding／help 関連 **3 test files / 12 tests passed**、root typecheck、root lint、Prettier、
+`git diff --check`、PR scope **33/33 gates passed**。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
