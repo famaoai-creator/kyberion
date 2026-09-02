@@ -1,4 +1,4 @@
-import { loadJson, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
+import { readJson, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -102,7 +102,7 @@ async function executePipeline(
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(contextPath),
+      async () => readJson<Record<string, unknown>>(contextPath),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
