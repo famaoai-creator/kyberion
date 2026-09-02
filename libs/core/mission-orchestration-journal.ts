@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import * as crypto from 'node:crypto';
@@ -11,6 +12,7 @@ import {
   safeReadFile,
   safeWriteFile,
   safeReaddir,
+  safeLstat,
 } from './secure-io.js';
 import { loadMissionOrchestrationEvent } from './mission-orchestration-event-loader.js';
 import type {
@@ -67,6 +69,15 @@ export interface ProvisionedEntryRecord {
   target_path: string;
   phase: ProvisionedEntryRecordPhase;
 }
+
+const PROVISIONED_ENTRY_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-provisioned-entry-record.schema.json'
+);
+const provisionedEntryRecordCatalog = defineCatalog<ProvisionedEntryRecord>({
+  id: 'mission-provisioned-entry-record',
+  path: PROVISIONED_ENTRY_RECORD_SCHEMA_PATH,
+  schema: PROVISIONED_ENTRY_RECORD_SCHEMA_PATH,
+});
 
 export interface MissionOrchestrationJournalEntry {
   ts: string;
@@ -171,9 +182,10 @@ function writeProvisionedEntryRecord(
     phase: input.phase,
   };
   const safeRecordPath = artifactPath(recordPath);
+  const validated = provisionedEntryRecordCatalog.validate(record, safeRecordPath);
   safeMkdir(nodePath.dirname(safeRecordPath), { recursive: true });
-  appendJsonLine(safeRecordPath, record);
-  return record;
+  appendJsonLine(safeRecordPath, validated);
+  return validated;
 }
 
 function eventDir(): string {
@@ -213,6 +225,16 @@ function normalizeProvisionedEntryRecord(value: unknown): ProvisionedEntryRecord
     target_path: value.target_path,
     phase: value.phase,
   };
+}
+
+function loadProvisionedEntryRecordAtLine(
+  value: unknown,
+  sourcePath: string
+): ProvisionedEntryRecord {
+  const validated = provisionedEntryRecordCatalog.validate(value, sourcePath);
+  const normalized = normalizeProvisionedEntryRecord(validated);
+  if (!normalized) throw new Error('record shape');
+  return normalized;
 }
 
 /** Mint the id and content hash before a worker artifact is written. */
@@ -301,6 +323,9 @@ export function loadProvisionedEntryRecords(
 ): ProvisionedEntryRecord[] {
   const filePath = provisionedEntriesPath(missionId, scope);
   if (!safeExistsSync(filePath)) return [];
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record_file`);
+  }
   const raw = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
   return raw
     .split(/\r?\n/u)
@@ -308,11 +333,10 @@ export function loadProvisionedEntryRecords(
     .filter((entry) => Boolean(entry.line))
     .map(({ line, lineNumber }) => {
       try {
-        const parsed = normalizeProvisionedEntryRecord(
-          parseSafeJsonInput(line, 'mission provisioned entry')
+        return loadProvisionedEntryRecordAtLine(
+          parseSafeJsonInput(line, 'mission provisioned entry'),
+          `${filePath}:${lineNumber}`
         );
-        if (!parsed) throw new Error('record shape');
-        return parsed;
       } catch (error) {
         throw new Error(`MISSION_LOG_CORRUPT:provisioned_entry_record:${lineNumber}`, {
           cause: error,

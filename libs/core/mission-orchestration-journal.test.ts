@@ -446,4 +446,25 @@ describe('mission-orchestration-journal', () => {
       safeRmSync(missionPath, { recursive: true, force: true });
     });
   });
+
+  it('rejects malformed provisioned-entry records through the schema boundary', async () => {
+    const { loadProvisionedEntryRecords } = await import('./mission-orchestration-journal.js');
+    const missionId = `MSN-JOURNAL-RECORD-SCHEMA-${process.pid}`;
+    const missionPath = withExecutionContext('mission_controller', () =>
+      pathResolver.missionDir(missionId, 'public')
+    );
+    const recordPath = `${missionPath}/coordination/provisioned-entries.jsonl`;
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true });
+      safeMkdir(`${missionPath}/coordination`, { recursive: true });
+      safeWriteFile(recordPath, `${JSON.stringify({ entry_id: 'missing-fields' })}\n`);
+    });
+
+    expect(() => loadProvisionedEntryRecords(missionId)).toThrow(
+      'MISSION_LOG_CORRUPT:provisioned_entry_record:1'
+    );
+    withExecutionContext('mission_controller', () =>
+      safeRmSync(`${missionPath}/coordination`, { recursive: true, force: true })
+    );
+  });
 });
