@@ -11959,6 +11959,16 @@ grounding／missing-source semantics は維持した。
 検証: intent-track／financial model **2 files / 10 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。
 残る SX-03 は追加の direct reader caller、surface／actuator の helper adoption、および SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 308
+
+browser actuator の共通 runtime／passkey helper に残っていた session、action trail、WebAuthn event の単純 timestamp
+12箇所を foundation の `nowIso()` へ統一した。browser session の lease expiry／deadline 計算、provider catalog の
+validation、CDP／WebAuthn lifecycle は変更せず、記録時刻の UTC ISO 形式だけを canonical helper に寄せた。
+
+検証: browser actuator 全体 **9 files / 67 tests passed**、対象 helper の単純 timestamp **0件**、root typecheck、root lint、
+Prettier、`git diff --check`。残る SX-03 は他 actuator／surface の単純 timestamp と domain-specific helper、SX-04〜SX-14
+の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

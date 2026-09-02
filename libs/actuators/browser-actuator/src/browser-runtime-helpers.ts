@@ -1,4 +1,4 @@
-import { clamp, readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { clamp, nowIso, readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -251,7 +251,7 @@ function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
       tab_id: tabId,
       type: msg.type(),
       text: msg.text(),
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.consoleEvents = runtime.consoleEvents.slice(-200);
   });
@@ -261,7 +261,7 @@ function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
       method: request.method(),
       url: request.url(),
       resourceType: request.resourceType(),
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.networkEvents = runtime.networkEvents.slice(-200);
   });
@@ -574,7 +574,7 @@ function beginOperatorApproval(options: {
     status: 'pending',
     message: options.message,
     continue_file: options.continueFile,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     timeout_ms: options.timeoutMs,
   };
   const filePath = approvalPath(options.sessionId);
@@ -594,10 +594,7 @@ function completeOperatorApproval(
       // A corrupt approval artifact is replaced with a fresh terminal state.
     }
   }
-  safeWriteFile(
-    filePath,
-    JSON.stringify({ ...current, status, completed_at: new Date().toISOString() }, null, 2)
-  );
+  safeWriteFile(filePath, JSON.stringify({ ...current, status, completed_at: nowIso() }, null, 2));
 }
 
 function saveBrowserSessionSnapshot(sessionId: string, snapshot: BrowserSnapshot): void {
@@ -769,7 +766,7 @@ async function buildSnapshot(
     tab_id: tabId,
     url: page.url(),
     title: await page.title(),
-    captured_at: new Date().toISOString(),
+    captured_at: nowIso(),
     element_count: raw.elements.length,
     viewport: raw.viewport,
     focused_ref:
@@ -875,7 +872,7 @@ function recordBrowserAction(ctx: any, action: Omit<BrowserRecordedAction, 'ts'>
       : text !== undefined
         ? { text }
         : {}),
-    ts: new Date().toISOString(),
+    ts: nowIso(),
   };
   const max = clamp(Number(ctx?.action_trail_max || 200), 1, 2000);
   return {
@@ -1176,7 +1173,7 @@ async function closeBrowserSession(sessionId: string): Promise<boolean> {
     active_tab_id: lease.runtime.activeTabId,
     tab_count: lease.runtime.tabs.size,
     tabs: [],
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     lease_status: 'released',
     retained: false,
     cdp_url: lease.cdpUrl,
@@ -1418,7 +1415,7 @@ function cleanupExpiredBrowserRuntimeLeases(): void {
       active_tab_id: lease.runtime.activeTabId,
       tab_count: lease.runtime.tabs.size,
       tabs: [],
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       video_output_dir: lease.videoDir,
       video_recording_pending: false,
       lease_status: 'expired',

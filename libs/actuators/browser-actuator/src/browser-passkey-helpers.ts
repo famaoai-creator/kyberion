@@ -1,6 +1,6 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -149,7 +149,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialAdded',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
@@ -160,7 +160,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialAsserted',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
@@ -171,7 +171,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialDeleted',
       credentialId: event.credentialId,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = runtime.webAuthn!.credentials.filter(
       (credential) => credential.credentialId !== event.credentialId
@@ -181,7 +181,7 @@ function attachWebAuthnObservers(runtime: BrowserRuntime, session: CDPSession): 
     runtime.webAuthn!.events.push({
       type: 'credentialUpdated',
       credential: event.credential,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
     runtime.webAuthn!.credentials = upsertPasskeyCredential(
       runtime.webAuthn!.credentials,
