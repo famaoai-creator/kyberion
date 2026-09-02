@@ -41,6 +41,7 @@ import { loadLatestArtifactBundleForMission } from './artifact-bundle.js';
 import { readTextFile } from './foundation/text.js';
 import { loadState } from './mission-state.js';
 import { loadPersistedTrustLedger } from './trust-engine.js';
+import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
 
 const SECURITY_POLICY_QUALITY_CATALOG = defineCatalog<{
   quality_requirements?: Record<string, unknown>;
@@ -275,11 +276,14 @@ export function validateMissionArtifactReviewGate(input: {
 
   let tasks: ArtifactReviewPlannedTask[];
   try {
-    const raw = readJson<unknown>(taskPath);
-    if (!Array.isArray(raw)) return { ok: false, reason: 'NEXT_TASKS.json must contain an array.' };
-    tasks = raw.filter((entry): entry is ArtifactReviewPlannedTask =>
-      Boolean(entry && typeof entry === 'object')
-    );
+    const parsed = parseMissionNextTaskObjects(readJson<unknown>(taskPath));
+    if (!parsed) {
+      return {
+        ok: false,
+        reason: 'NEXT_TASKS.json must contain an array of safe objects.',
+      };
+    }
+    tasks = parsed as ArtifactReviewPlannedTask[];
   } catch (error) {
     return {
       ok: false,

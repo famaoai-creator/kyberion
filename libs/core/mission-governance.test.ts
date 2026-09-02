@@ -87,6 +87,20 @@ describe('mission-governance quality validation', () => {
     }
   });
 
+  it('fails the artifact review gate closed for malformed task entries', () => {
+    const missionId = 'MSN-GOVERNANCE-MALFORMED-TASKS';
+    const missionPath = prepareMission(missionId);
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'review-task', status: 'completed' }, null])
+    );
+
+    const review = validateMissionArtifactReviewGate({ missionId, missionPath });
+    expect(review.ok).toBe(false);
+    expect(review.reason).toBe('NEXT_TASKS.json must contain an array of safe objects.');
+    safeRmSync(missionPath, { recursive: true, force: true });
+  });
+
   it('blocks finish when a mission artifact fails deliverable quality', async () => {
     const missionId = 'MSN-GOVERNANCE-QUALITY-FAIL';
     const missionPath = prepareMission(missionId);

@@ -11,6 +11,7 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
+import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
 
 import {
   evaluateMissionGate,
@@ -168,8 +169,7 @@ export function applyProcessTemplatePlan(input: {
 
 function readTasksSafe(nextTasksPath: string): Array<Record<string, unknown>> {
   try {
-    const parsed = readJson<unknown>(nextTasksPath);
-    return Array.isArray(parsed) ? parsed : [];
+    return parseMissionNextTaskObjects(readJson<unknown>(nextTasksPath)) || [];
   } catch {
     return [];
   }

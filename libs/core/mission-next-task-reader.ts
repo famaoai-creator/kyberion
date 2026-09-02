@@ -6,6 +6,27 @@ export interface MissionNextTaskRecord {
   status?: string;
 }
 
+/** Parse NEXT_TASKS entries while preserving fields needed by mutating flows. */
+export function parseMissionNextTaskObjects(
+  value: unknown,
+  label = 'NEXT_TASKS.json'
+): Array<Record<string, unknown>> | null {
+  if (!Array.isArray(value)) return null;
+
+  const records: Array<Record<string, unknown>> = [];
+  for (const [index, candidate] of value.entries()) {
+    try {
+      const record = parseSafeJsonObjectValue(candidate, `${label}[${index}]`);
+      if (record.task_id !== undefined && typeof record.task_id !== 'string') return null;
+      if (record.status !== undefined && typeof record.status !== 'string') return null;
+      records.push(record);
+    } catch {
+      return null;
+    }
+  }
+  return records;
+}
+
 /**
  * Parse the small, shared projection of NEXT_TASKS.json used by read models.
  *
@@ -17,26 +38,18 @@ export function parseMissionNextTaskRecords(
   value: unknown,
   label = 'NEXT_TASKS.json'
 ): MissionNextTaskRecord[] | null {
-  if (!Array.isArray(value)) return null;
+  const objects = parseMissionNextTaskObjects(value, label);
+  if (!objects) return null;
 
   const records: MissionNextTaskRecord[] = [];
-  for (const [index, candidate] of value.entries()) {
-    let record: Record<string, unknown>;
-    try {
-      record = parseSafeJsonObjectValue(candidate, `${label}[${index}]`);
-    } catch {
-      return null;
-    }
-
-    if (record.task_id !== undefined && typeof record.task_id !== 'string') return null;
-    if (record.status !== undefined && typeof record.status !== 'string') return null;
+  for (const record of objects) {
     const taskId = typeof record.task_id === 'string' ? record.task_id : undefined;
     const status = typeof record.status === 'string' ? record.status : undefined;
 
     records.push({
       ...(taskId === undefined ? {} : { task_id: taskId }),
       ...(status === undefined ? {} : { status }),
-    });
+    } satisfies MissionNextTaskRecord);
   }
   return records;
 }
