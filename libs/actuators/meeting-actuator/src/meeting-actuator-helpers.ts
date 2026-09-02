@@ -43,7 +43,7 @@ import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
-import { loadJson, getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { readJson, getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -317,7 +317,7 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
     };
   }
   try {
-    const consent = loadJson<unknown>(consentPath);
+    const consent = readJson<unknown>(consentPath);
     if (!isPlainObject(consent)) {
       return {
         allowed: false,

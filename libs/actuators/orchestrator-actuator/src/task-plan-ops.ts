@@ -1,5 +1,5 @@
 import { getReasoningBackend } from '@agent/core/reasoning-backend';
-import { loadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { missionDir, pathResolver } from '@agent/core/path-resolver';
 import {
   evaluateTaskPlanReadyGate,
@@ -28,7 +28,7 @@ export async function decomposeIntoTasks(input: {
     readRequirementsDraft(input.mission_id) ??
     (input.requirements_draft_path &&
     safeExistsSync(resolveTaskPlanInputPath(input.requirements_draft_path))
-      ? loadJson<unknown>(resolveTaskPlanInputPath(input.requirements_draft_path))
+      ? readJson<unknown>(resolveTaskPlanInputPath(input.requirements_draft_path))
       : null);
   if (!requirementsDraft) {
     throw new Error('[decompose_into_tasks] requirements draft not found');
@@ -36,7 +36,7 @@ export async function decomposeIntoTasks(input: {
   const designSpec =
     readDesignSpec(input.mission_id) ??
     (input.design_spec_path && safeExistsSync(resolveTaskPlanInputPath(input.design_spec_path))
-      ? loadJson<unknown>(resolveTaskPlanInputPath(input.design_spec_path))
+      ? readJson<unknown>(resolveTaskPlanInputPath(input.design_spec_path))
       : undefined);
   const decomposed = await backend.decomposeIntoTasks({
     requirementsDraft,

@@ -1,5 +1,5 @@
 import {
-  loadJson,
+  readJson,
   getRegisteredEnv,
   parseSafeJsonInput,
   parseSafeJsonObjectValue,
@@ -197,7 +197,7 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => loadJson<Record<string, unknown>>(contextPath),
+      async () => readJson<Record<string, unknown>>(contextPath),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -674,7 +674,7 @@ async function performReconcile(input: CodeAction) {
   );
   if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => loadJson<StrategyConfig>(strategyPath),
+    async () => readJson<StrategyConfig>(strategyPath),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {

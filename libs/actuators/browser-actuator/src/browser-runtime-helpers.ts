@@ -1,4 +1,4 @@
-import { clamp, loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { clamp, readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
@@ -366,7 +366,7 @@ function loadBrowserSessionMetadata(filePath: string): BrowserSessionMetadata | 
   const safePath = safeBrowserRuntimePath(filePath);
   if (!isExistingRegularFile(safePath)) return null;
   try {
-    return loadJson<BrowserSessionMetadata>(safePath);
+    return readJson<BrowserSessionMetadata>(safePath);
   } catch {
     return null;
   }
@@ -535,7 +535,7 @@ function loadBrowserActionTrail(sessionId: string): BrowserRecordedAction[] {
   const filePath = trailPath(sessionId);
   if (!isExistingRegularFile(filePath)) return [];
   try {
-    const value = loadJson<unknown>(filePath);
+    const value = readJson<unknown>(filePath);
     return Array.isArray(value) ? value.slice(-200) : [];
   } catch {
     return [];
@@ -589,7 +589,7 @@ function completeOperatorApproval(
   let current: Record<string, unknown> = {};
   if (isExistingRegularFile(filePath)) {
     try {
-      current = loadJson<Record<string, unknown>>(filePath);
+      current = readJson<Record<string, unknown>>(filePath);
     } catch {
       // A corrupt approval artifact is replaced with a fresh terminal state.
     }

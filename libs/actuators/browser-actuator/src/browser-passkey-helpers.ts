@@ -1,6 +1,6 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { isRecord, loadJson } from '@agent/core/foundation';
+import { isRecord, readJson } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -116,7 +116,7 @@ function loadPasskeyProviderCatalog(): PasskeyProviderCatalog {
     safeLstat(passkeyProviderCatalogPath).isFile()
   ) {
     try {
-      const parsed = parsePasskeyProviderCatalog(loadJson<unknown>(passkeyProviderCatalogPath));
+      const parsed = parsePasskeyProviderCatalog(readJson<unknown>(passkeyProviderCatalogPath));
       if (parsed) return parsed;
     } catch (err) {
       logger.warn(

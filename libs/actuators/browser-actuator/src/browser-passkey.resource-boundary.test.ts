@@ -14,6 +14,6 @@ describe('browser passkey resource boundary', () => {
     expect(source).toContain('const passkeyProviderCatalogPath = assertSafeRepositoryPath(');
     expect(source).toContain('{ allowMissingLeaf: true }');
     expect(source).toContain('safeLstat(passkeyProviderCatalogPath).isFile()');
-    expect(source).toContain('loadJson<');
+    expect(source).toContain('readJson<');
   });
 });

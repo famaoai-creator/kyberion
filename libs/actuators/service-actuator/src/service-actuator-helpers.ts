@@ -1,5 +1,5 @@
 import {
-  loadJson,
+  readJson,
   appendJsonLine,
   getRegisteredEnv,
   isRecord,
@@ -690,7 +690,7 @@ function recordServiceObservation(observation: PreparedObservation | null, _resu
 
 async function reconcileServices(input: ServiceAction) {
   const manifestPath = resolveServiceRepositoryPath(input.params.manifest_path);
-  const manifest = parseServiceManifest(loadJson<unknown>(manifestPath));
+  const manifest = parseServiceManifest(readJson<unknown>(manifestPath));
   if (!manifest) {
     throw new Error(`Service manifest has an invalid shape: ${manifestPath}`);
   }

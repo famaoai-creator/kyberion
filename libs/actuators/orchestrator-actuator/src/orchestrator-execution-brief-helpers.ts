@@ -1,6 +1,6 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
-import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -33,7 +33,7 @@ export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog
     throw new Error(`Archetype catalog not found: ${ACTUATOR_ARCHETYPES_PATH}`);
   }
   const parsed = parseActuatorRequestArchetypeCatalog(
-    loadJson<unknown>(assertSafeRepositoryPath(ACTUATOR_ARCHETYPES_PATH))
+    readJson<unknown>(assertSafeRepositoryPath(ACTUATOR_ARCHETYPES_PATH))
   );
   if (!parsed) {
     throw new Error(`Archetype catalog has an invalid shape: ${ACTUATOR_ARCHETYPES_PATH}`);
@@ -42,7 +42,7 @@ export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog
 }
 
 function loadRepositoryJson<T>(filePath: string): T {
-  return loadJson<T>(assertSafeRepositoryPath(filePath));
+  return readJson<T>(assertSafeRepositoryPath(filePath));
 }
 export type DetectedRequestArchetype = ActuatorRequestArchetype & { score: number };
 
@@ -512,7 +512,7 @@ export function renderPipelineBundleJob(
     };
   }
 
-  const raw = loadJson<Record<string, unknown>>(templateFullPath) as Record<string, unknown>;
+  const raw = readJson<Record<string, unknown>>(templateFullPath) as Record<string, unknown>;
   const renderedPipeline = applyPathOverrides(raw, job.parameter_overrides || {}, variables);
   return {
     ...job,
