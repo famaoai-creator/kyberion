@@ -1047,7 +1047,7 @@
     {
       "path": "product/governance/active-services.json",
       "tier": "public",
-      "size": 381,
+      "size": 378,
       "type": "json"
     },
     {
@@ -1545,7 +1545,7 @@
     {
       "path": "product/governance/ingestion-rules.json",
       "tier": "public",
-      "size": 228,
+      "size": 225,
       "type": "json"
     },
     {
@@ -1557,7 +1557,7 @@
     {
       "path": "product/governance/integrity-policy.json",
       "tier": "public",
-      "size": 523,
+      "size": 521,
       "type": "json"
     },
     {
@@ -1695,7 +1695,7 @@
     {
       "path": "product/governance/maintenance-schedule.json",
       "tier": "public",
-      "size": 353,
+      "size": 355,
       "type": "json"
     },
     {
@@ -2427,7 +2427,7 @@
     {
       "path": "product/governance/reporting-config.json",
       "tier": "public",
-      "size": 281,
+      "size": 279,
       "type": "json"
     },
     {
@@ -6301,6 +6301,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/active-services.schema.json",
+      "tier": "public",
+      "size": 425,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/actuator-dependency-bundles.schema.json",
       "tier": "public",
       "size": 874,
@@ -7177,6 +7183,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/ingestion-rules.schema.json",
+      "tier": "public",
+      "size": 761,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/install-script-allowlist.schema.json",
       "tier": "public",
       "size": 751,
@@ -7192,6 +7204,12 @@
       "path": "product/schemas/integrity-check.schema.json",
       "tier": "public",
       "size": 628,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/integrity-policy.schema.json",
+      "tier": "public",
+      "size": 970,
       "type": "json"
     },
     {
@@ -7372,6 +7390,12 @@
       "path": "product/schemas/lifecycle-hooks.schema.json",
       "tier": "public",
       "size": 887,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/maintenance-schedule.schema.json",
+      "tier": "public",
+      "size": 705,
       "type": "json"
     },
     {
@@ -8554,6 +8578,12 @@
       "path": "product/schemas/relationship-node.schema.json",
       "tier": "public",
       "size": 4287,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/reporting-config.schema.json",
+      "tier": "public",
+      "size": 761,
       "type": "json"
     },
     {

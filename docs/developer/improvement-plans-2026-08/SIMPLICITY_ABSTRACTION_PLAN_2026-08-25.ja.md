@@ -11769,6 +11769,14 @@ CLI manifest の entrypoint／script command module 検査と runtime dispatch �
 検証: CLI manifest **9 tests passed**、PR scope、root typecheck、root lint、Prettier、`git diff --check`。
 残る SX-05 は doctor／pipeline／organization の旧入口整理と、runner／script 命名のさらなる縮約である。
 
+## 2026-09-02 再レビュー修正 289
+
+documentation-only governance catalog のうち形状が明確な `active-services`、`ingestion-rules`、
+`integrity-policy`、`maintenance-schedule`、`reporting-config` に dedicated schema を追加した。deprecated
+compatibility note、ingestion target、integrity check、maintenance task、report entry の必須項目と未知キーを
+明示し、generic envelope の黙示的な受け入れを減らした。既存の documentation_only 宣言と runtime の参照なしという
+扱いは維持し、残り10件は payload shape と廃止可否を確認して段階移行する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
