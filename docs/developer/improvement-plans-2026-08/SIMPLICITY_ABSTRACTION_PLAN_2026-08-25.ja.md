@@ -12869,6 +12869,12 @@ SX-03／SX-08／SX-09 の残存監査として、surface artifact store の chan
 
 検証: surface artifact の直接経路 **2 tests passed**、surface response blocks／artifact contract **2 files / 13 tests passed**、対象production fileの直接 timestamp **0件**、root typecheck、対象3ファイルの ESLint、`git diff --check`。`tests/channel-surface-agent.test.ts` 全19件では既知のSX-08系5件が引き続き失敗するため、今回の成功判定には含めず、残存課題として維持する。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 435
+
+SX-08 の surface routing 残件として、task-session route が明示的な Slack conversation／mission-team 委譲より先に応答を奪う条件を抑止し、agentId から導出した surface を task-session の参照・再開・新規作成・実行で一貫利用するよう統合した。相関 ID が異なる active task-session は別の surface conversation に混入させず、旧形式の相関 ID なし session だけ後方互換で許容する。あわせて、現行 A2UI schema で必須の `catalogId` を surface-agent テスト fixture に追加した。business routing、approval、tenant scope、artifact path は変更していない。
+
+検証: `tests/channel-surface-agent.test.ts` **19 tests passed**、surface response／orchestrator fastpath／routing／production approval の **5 files / 70 tests passed**、root typecheck、対象3ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

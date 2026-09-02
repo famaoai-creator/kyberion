@@ -30,7 +30,10 @@ import { buildCompletionNextAction, formatCompletionNextAction } from './next-ac
 import { getSurfaceQueryProviderConfig } from './surface-query.js';
 import { currentScope } from './scope-context.js';
 import { isCorrectionUtterance } from './correction-detection.js';
-import { type SurfaceRuntimeRouteContext } from './surface-runtime-router.js';
+import {
+  surfaceChannelFromAgentId,
+  type SurfaceRuntimeRouteContext,
+} from './surface-runtime-router.js';
 import { resolveSurfaceIntent, resolveDirectIntentCommand } from './router-contract.js';
 import { recordIntentContractOutcome } from './intent-contract-learning.js';
 import { t } from './t.js';
@@ -61,6 +64,16 @@ export {
 } from './surface-runtime-helpers.js';
 
 export const surfaceRuntimeContextStore = new AsyncLocalStorage<SurfaceConversationInput>();
+
+export function getActiveTaskSessionForConversation(
+  surface: TaskSession['surface'],
+  correlationId?: string
+): TaskSession | null {
+  const session = getActiveTaskSession(surface);
+  if (!session) return null;
+  if (!session.correlation_id) return session;
+  return correlationId && session.correlation_id === correlationId ? session : null;
+}
 
 function buildTaskSessionApprovalRequest(
   session: TaskSession,
@@ -379,9 +392,10 @@ export async function handleTaskSessionRoute(
 ): Promise<SurfaceConversationResult> {
   const queryText = structuredSurfaceQueryText(context);
   const correctionDetected = isCorrectionUtterance(queryText);
+  const surface = context.input.surface || surfaceChannelFromAgentId(context.input.agentId);
 
   // 1. Intercept for Progressive Slot-filling state machine
-  const activeSession = getActiveTaskSession(context.input.surface || 'presence');
+  const activeSession = getActiveTaskSessionForConversation(surface, context.input.correlationId);
   let session = activeSession;
   let intent: any = null;
 
@@ -525,10 +539,7 @@ export async function handleTaskSessionRoute(
   if (!intent) {
     if (correctionDetected) {
       const completedSession = context.input.correlationId
-        ? getLatestCompletedTaskSession(
-            context.input.surface || 'presence',
-            context.input.correlationId
-          )
+        ? getLatestCompletedTaskSession(surface, context.input.correlationId)
         : null;
       if (completedSession) {
         const reopened = reopenTaskSession(completedSession.session_id, {
@@ -562,7 +573,7 @@ export async function handleTaskSessionRoute(
     session = createTaskSession({
       sessionId: `TSK-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
       correlationId: context.input.correlationId,
-      surface: context.input.surface || 'presence',
+      surface,
       taskType: intent.taskType,
       status: intent.requirements?.missing?.length ? 'collecting_requirements' : 'planning',
       intentId: intent.intentId,
@@ -659,7 +670,7 @@ export async function handleTaskSessionRoute(
         session,
         queryText,
         agentId: context.input.agentId,
-        channel: context.input.surface,
+        channel: surface,
         missionId: context.input.missionId,
       });
       if (intent.intentId) {

@@ -35,7 +35,7 @@ import {
   resolveMissionTeamReceiver,
 } from './mission-team-plan-composer.js';
 import { buildSurfaceConversationInput } from './surface-interaction-model.js';
-import { classifyTaskSessionIntent, getActiveTaskSession } from './task-session.js';
+import { classifyTaskSessionIntent } from './task-session.js';
 import { loadPendingIntent, savePendingIntent } from './pending-intent-store.js';
 import { currentScope } from './scope-context.js';
 import {
@@ -984,20 +984,35 @@ const SURFACE_RUNTIME_ROUTE_HANDLERS: surfaceRuntimeData.SurfaceRuntimeRouteHand
     matches: (context) => {
       const surface =
         context.input.surface || surfaceChannelFromAgentId(context.input.agentId) || 'presence';
-      const activeSession = getActiveTaskSession(surface);
+      const activeSession = surfaceRuntimeData.getActiveTaskSessionForConversation(
+        surface,
+        context.input.correlationId
+      );
       const hasActiveSlotFilling = Boolean(
         activeSession &&
         activeSession.requirements?.missing &&
         activeSession.requirements.missing.length > 0
       );
+      const hasExplicitMissionTeamRoute = Boolean(
+        context.input.missionId && context.input.teamRole
+      );
+      const hasExplicitSlackConversationBypass = Boolean(
+        context.parsedSlackPrompt?.executionMode === 'conversation' && context.computedReceiver
+      );
       return (
-        hasActiveSlotFilling ||
-        Boolean(
-          classifyTaskSessionIntent(structuredSurfaceQueryText(context), context.resolutionPacket, {
-            tier: context.input.scope?.tier,
-            tenantId: context.input.scope?.tenant_slug,
-          })
-        )
+        !hasExplicitMissionTeamRoute &&
+        !hasExplicitSlackConversationBypass &&
+        (hasActiveSlotFilling ||
+          Boolean(
+            classifyTaskSessionIntent(
+              structuredSurfaceQueryText(context),
+              context.resolutionPacket,
+              {
+                tier: context.input.scope?.tier,
+                tenantId: context.input.scope?.tenant_slug,
+              }
+            )
+          ))
       );
     },
     handle: async (context) => {
