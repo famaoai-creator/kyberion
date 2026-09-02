@@ -1,7 +1,10 @@
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { registerPresentationPreferenceProfile } from '@agent/core/presentation-preference-registry';
+import {
+  loadPresentationPreferenceProfileFromPath,
+  registerPresentationPreferenceProfile,
+  validatePresentationPreferenceProfile,
+} from '@agent/core/presentation-preference-registry';
 import type { PresentationPreferenceProfile } from '@agent/core/types';
 
 export interface RegisterPresentationPreferenceProfileInput {
@@ -34,12 +37,17 @@ export function registerPresentationPreferenceProfileOp(
   registry_path: string;
   default_profile_id: string;
 } {
+  const targetRegistryPath = input.registry_path
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(input.registry_path), {
+        allowMissingLeaf: true,
+      })
+    : undefined;
   const profile =
     input.profile ??
     (input.profile_path
       ? (() => {
           const profilePath = resolveProfilePath(input.profile_path);
-          return profilePath ? readJson<PresentationPreferenceProfile>(profilePath) : null;
+          return profilePath ? loadPresentationPreferenceProfileFromPath(profilePath) : null;
         })()
       : null);
   if (!profile || typeof profile !== 'object') {
@@ -47,19 +55,13 @@ export function registerPresentationPreferenceProfileOp(
       '[register_presentation_preference_profile] requires a presentation-preference-profile'
     );
   }
+  const validatedProfile = validatePresentationPreferenceProfile(profile);
 
-  const registryPath = registerPresentationPreferenceProfile(
-    profile as PresentationPreferenceProfile,
-    input.registry_path
-      ? assertSafeRepositoryPath(pathResolver.rootResolve(input.registry_path), {
-          allowMissingLeaf: true,
-        })
-      : undefined
-  );
+  const registryPath = registerPresentationPreferenceProfile(validatedProfile, targetRegistryPath);
 
   return {
-    profile_id: (profile as PresentationPreferenceProfile).profile_id,
+    profile_id: validatedProfile.profile_id,
     registry_path: registryPath,
-    default_profile_id: (profile as PresentationPreferenceProfile).profile_id,
+    default_profile_id: validatedProfile.profile_id,
   };
 }

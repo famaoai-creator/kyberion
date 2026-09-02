@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { handleAction } from './index.js';
 
 describe('media presentation preference ownership', () => {
@@ -99,6 +105,42 @@ describe('media presentation preference ownership', () => {
       ).toThrow('profile_path must be a regular file');
     } finally {
       if (safeExistsSync(directory)) safeRmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('validates inline profiles and profile files before registry mutation', async () => {
+    const registryPath = pathResolver.sharedTmp(
+      'actuators/media-actuator/invalid-presentation-preference-registry.json'
+    );
+    const profilePath = pathResolver.sharedTmp(
+      'actuators/media-actuator/invalid-presentation-preference-profile.json'
+    );
+    const { registerPresentationPreferenceProfileOp } =
+      await import('./presentation-preference-ops.js');
+
+    try {
+      expect(() =>
+        registerPresentationPreferenceProfileOp({
+          registry_path: pathResolver.toRepoRelative(registryPath),
+          profile: {
+            kind: 'presentation-preference-profile',
+            profile_id: '',
+            brief_question_sets: [],
+            theme_sets: [],
+          } as never,
+        })
+      ).toThrow(/Invalid catalog presentation-preference-profile/);
+
+      safeWriteFile(profilePath, JSON.stringify({ kind: 'presentation-preference-profile' }));
+      expect(() =>
+        registerPresentationPreferenceProfileOp({
+          profile_path: pathResolver.toRepoRelative(profilePath),
+        })
+      ).toThrow(/Invalid catalog presentation-preference-profile/);
+      expect(safeExistsSync(registryPath)).toBe(false);
+    } finally {
+      if (safeExistsSync(registryPath)) safeRmSync(registryPath, { force: true });
+      if (safeExistsSync(profilePath)) safeRmSync(profilePath, { force: true });
     }
   });
 });
