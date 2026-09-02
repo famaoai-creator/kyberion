@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/desktop-promotion-lock.schema.json",
+  "title": "Desktop promotion lock",
+  "description": "Process lock metadata for desktop procedure promotion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pid", "created_at"],
+  "properties": {
+    "pid": { "type": "integer", "minimum": 0 },
+    "created_at": { "type": "integer", "minimum": 0 }
+  }
+}

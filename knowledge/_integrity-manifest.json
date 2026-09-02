@@ -6901,6 +6901,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/desktop-promotion-lock.schema.json",
+      "tier": "public",
+      "size": 464,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/desktop-promotion-transaction.schema.json",
+      "tier": "public",
+      "size": 1186,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/desktop-recording.schema.json",
       "tier": "public",
       "size": 4378,
