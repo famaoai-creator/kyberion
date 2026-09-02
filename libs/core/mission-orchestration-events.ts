@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
@@ -63,7 +64,7 @@ export function emitMissionOrchestrationObservation(event: Record<string, unknow
   safeMkdir(EVENTS_DIR);
   safeMkdir(obsDir);
   appendJsonLine(`${obsDir}/orchestration-events.jsonl`, {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     ...sharedEvent,
   });
 }
@@ -113,7 +114,7 @@ export function enqueueMissionOrchestrationEvent<TPayload = Record<string, unkno
     event_type: input.eventType,
     mission_id: input.missionId.toUpperCase(),
     requested_by: input.requestedBy,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     correlation_id: input.correlationId,
     causation_id: input.causationId,
     scope,

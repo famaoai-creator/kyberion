@@ -11,6 +11,7 @@ import {
   type ContextSecurityScope,
 } from './context-security-scope.js';
 import type { EventScopeInput } from './event-scope.js';
+import { nowIso } from './foundation/time.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
 export interface AgentTaskEnvelope {
@@ -63,7 +64,7 @@ function validateEnvelope(request: AgentTaskEnvelope): void {
 export class SupervisorAgentExecutionPort implements AgentExecutionPort {
   async delegate(request: AgentTaskEnvelope): Promise<AgentExecutionReceipt> {
     validateEnvelope(request);
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     const agentId = request.agent_id || `task-agent-${request.task_id}`;
     try {
       const handle = await ensureAgentRuntime({
@@ -118,7 +119,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         model_id: snapshot?.agent.modelId || handle.getRecord()?.modelId,
         status: 'succeeded',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         output_ref: `${request.task_id}:result`,
         output: response,
       };
@@ -129,7 +130,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         agent_id: agentId,
         status: 'failed',
         started_at: startedAt,
-        completed_at: new Date().toISOString(),
+        completed_at: nowIso(),
         error: error instanceof Error ? error.message : String(error),
       };
     }

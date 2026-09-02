@@ -11,6 +11,7 @@
 import * as path from 'node:path';
 import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import type {
   ExtractedRequirements,
@@ -110,7 +111,7 @@ export function saveRequirementsDraft(params: SaveRequirementsDraftParams): Requ
     assumptions: params.extracted.assumptions,
     open_questions: params.extracted.open_questions,
     ...(params.extracted.scope ? { scope: params.extracted.scope } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     ...(params.generatedBy ? { generated_by: params.generatedBy } : {}),
   };
   const file = draftPath(params.missionId);
@@ -148,7 +149,7 @@ export function recordCustomerSignoff(params: RecordSignoffParams): Requirements
   }
   existing.stakeholder_signoff = {
     customer_signed_off: true,
-    signed_at: new Date().toISOString(),
+    signed_at: nowIso(),
     signed_by: params.signedBy,
     channel: params.channel,
     ...(params.notes ? { notes: params.notes } : {}),
