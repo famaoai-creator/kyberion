@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
@@ -167,7 +168,7 @@ export function sendIMessage(request: IMessageSendRequest): IMessageSendResult {
   buildIMessageSendArgs(normalizedRequest);
 
   const eventBase = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     platform: 'imessage',
     recipient: recipient || `chat:${request.chatId}`,
     text,

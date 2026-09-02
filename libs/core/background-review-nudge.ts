@@ -8,6 +8,7 @@
 
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
@@ -60,7 +61,7 @@ function defaultState(sessionId: string): BackgroundReviewNudgeState {
     turns_since_review: 0,
     tool_calls_since_review: 0,
     review_pending: false,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
 }
 
@@ -95,7 +96,7 @@ function saveState(state: BackgroundReviewNudgeState): BackgroundReviewNudgeStat
   const filePath = statePath(state.session_id);
   const parent = path.dirname(filePath);
   if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
-  const next = { ...state, updated_at: new Date().toISOString() };
+  const next = { ...state, updated_at: nowIso() };
   safeWriteFile(filePath, `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }

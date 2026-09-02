@@ -1,7 +1,15 @@
-import type { CapabilityRegistry, DiscoveredCapability, ProbeResult } from './provider-capability-scanner.js';
+import type {
+  CapabilityRegistry,
+  DiscoveredCapability,
+  ProbeResult,
+} from './provider-capability-scanner.js';
 import type { ProviderInfo } from './provider-discovery.js';
+import { nowIso } from './foundation/time.js';
 
-export type ProviderCapabilitySnapshotProvider = Pick<ProviderInfo, 'provider' | 'installed' | 'version' | 'protocol' | 'healthy'>;
+export type ProviderCapabilitySnapshotProvider = Pick<
+  ProviderInfo,
+  'provider' | 'installed' | 'version' | 'protocol' | 'healthy'
+>;
 
 export type ProviderCapabilitySnapshotCapability = {
   capability_id: string;
@@ -38,7 +46,7 @@ export function buildProviderCapabilitySnapshot(params: {
     .sort();
 
   return {
-    generated_at: params.generatedAt ?? new Date().toISOString(),
+    generated_at: params.generatedAt ?? nowIso(),
     registered_capabilities: params.registry.capabilities.length,
     available_capabilities: params.discovered.length,
     available_providers: availableProviders,
