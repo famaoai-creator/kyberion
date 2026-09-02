@@ -16,7 +16,7 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { processUntrustedContent } from '@agent/core/untrusted-content';
 import { decideFromObservation, executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { getSecret } from '@agent/core/secret-guard';
-import { clamp } from '@agent/core/foundation';
+import { clamp, nowIso } from '@agent/core/foundation';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { resolveRefOrRecordedTarget } from './recorded-ref-resolver.js';
 import { opControl } from './browser-control-helpers.js';
@@ -182,7 +182,7 @@ export async function executePipeline(
       ? initialCtx.action_trail
       : browserRuntimeHelpers.loadBrowserActionTrail(sessionId),
     action_trail_max: clamp(Number(options.action_trail_max || 200), 1, 2000),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 
   const traceCtx = new TraceContext(`browser-pipeline:${sessionId}`, {
@@ -271,7 +271,7 @@ export async function executePipeline(
     ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
       schema_version: 'browser-failure-bundle.v1',
       session_id: sessionId,
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       error: ctx.error,
       url: ctx.last_url || null,
       title: ctx.last_snapshot?.title || null,
@@ -300,7 +300,7 @@ export async function executePipeline(
       ctx.failure_bundle_path = browserRuntimeHelpers.saveFailureBundle(sessionId, {
         schema_version: 'browser-failure-bundle.v1',
         session_id: sessionId,
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         error: ctx.error,
         url: ctx.last_url || null,
         title: ctx.last_snapshot?.title || null,
@@ -336,7 +336,7 @@ export async function executePipeline(
       active_tab_id: runtime.activeTabId,
       tab_count: runtime.tabs.size,
       tabs: ctx.browser_tabs,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       last_trace_path: ctx.last_trace_path,
       last_video_paths: undefined,
       video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
@@ -366,7 +366,7 @@ export async function executePipeline(
         active_tab_id: runtime.activeTabId,
         tab_count: runtime.tabs.size,
         tabs: ctx.browser_tabs,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
         last_trace_path: ctx.last_trace_path,
         last_video_paths: finalizedVideoPaths,
         video_output_dir: videoRecordingEnabled ? resolvedVideoDir : undefined,
@@ -770,7 +770,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       const bundle = {
         schema_version: 'browser-failure-bundle.v1',
         session_id: ctx.session_id || 'default',
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         error: ctx.error || ctx.last_error || null,
         url: ctx.last_url || ctx.last_snapshot?.url || null,
         title: ctx.last_snapshot?.title || null,
