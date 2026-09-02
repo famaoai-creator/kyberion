@@ -12043,6 +12043,16 @@ VITEST 抑制を従来どおり維持し、scripts harness も同じ helper を�
 検証: direct-entry／CLI／4 bridge **6 files / 67 tests passed**、core build、typecheck、PR scope **33/33 gates passed**、
 root lint、Prettier、`git diff --check`。残る SX-06 は actuator template／refactor utility と全 generator 化である。
 
+## 2026-09-02 再レビュー修正 316
+
+SX-06 の actuator CLI entry guard と meeting browser utility の重複した `process.argv[1]`／`fileURLToPath` 判定を、core の
+`isDirectEntry` へ移行した。標準 actuator index、file／process／meeting helper、video meeting utility を含む **30** entrypoint
+で source／compiled path の判定を共通化し、scripts harness と server protocol で先行導入した helper を全実行層で再利用する。
+meeting helper の `index.js` 互換 alias は、既存の広い起動条件を変えないため個別 legacy boundary として残した。
+
+検証: direct-entry／CLI／actuator **35 files / 593 tests passed / 11 skipped**、script-integrity、actuator build、typecheck、
+PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-06 はこの legacy alias の整理と全 generator 化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

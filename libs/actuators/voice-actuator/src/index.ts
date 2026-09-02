@@ -1,4 +1,5 @@
 import { collectVoiceSamples } from '@agent/core/voice-sample-collection';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   getVoiceSampleIngestionPolicy,
   validateVoiceProfileRegistration,
@@ -47,7 +48,6 @@ import { runOpPreflight } from '@agent/core/op-preflight';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   performPlayback,
   parseVoiceSttBridgeResponse,
@@ -1441,10 +1441,7 @@ const main = async () => {
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;
