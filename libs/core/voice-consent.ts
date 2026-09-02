@@ -14,6 +14,80 @@ export interface VoiceConsentRecord {
   audit_event_id?: string;
 }
 
+export interface VoiceConsentValidationOptions {
+  missionId: string;
+  tenantSlug?: string;
+  nowMs?: number;
+}
+
+export interface VoiceConsentValidationResult {
+  allowed: boolean;
+  reason?: string;
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+/** Validate the mission-scoped consent record without reading or writing files. */
+export function validateVoiceConsentRecord(
+  value: unknown,
+  options: VoiceConsentValidationOptions
+): VoiceConsentValidationResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
+  }
+
+  const record = value as Record<string, unknown>;
+  if (record.consent !== 'granted') {
+    return {
+      allowed: false,
+      reason: `voice-consent.json present but consent != 'granted' (got '${String(record.consent)}')`,
+    };
+  }
+
+  const consentMissionId = normalizeOptionalString(record.mission_id);
+  const operatorHandle = normalizeOptionalString(record.operator_handle);
+  if (!consentMissionId || !operatorHandle) {
+    return {
+      allowed: false,
+      reason: 'voice-consent.json is malformed: mission_id and operator_handle are required',
+    };
+  }
+  if (consentMissionId !== options.missionId) {
+    return {
+      allowed: false,
+      reason: `voice-consent.json mission_id '${consentMissionId}' does not match active mission '${options.missionId}'`,
+    };
+  }
+
+  const expiresAt = normalizeOptionalString(record.expires_at);
+  if (expiresAt) {
+    const expiresMs = Date.parse(expiresAt);
+    if (!Number.isFinite(expiresMs)) {
+      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
+    }
+    if (expiresMs <= (options.nowMs ?? Date.now())) {
+      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
+    }
+  }
+
+  const activeTenant = normalizeOptionalString(options.tenantSlug);
+  if (activeTenant) {
+    const consentTenant = normalizeOptionalString(record.tenant_slug);
+    if (consentTenant !== activeTenant) {
+      return {
+        allowed: false,
+        reason: `voice-consent.json tenant_slug '${consentTenant ?? 'missing'}' does not match active tenant '${activeTenant}'`,
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
 export function isVoiceConsentRecord(doc: unknown): doc is VoiceConsentRecord {
   if (!doc || typeof doc !== 'object') return false;
   const record = doc as Partial<VoiceConsentRecord>;

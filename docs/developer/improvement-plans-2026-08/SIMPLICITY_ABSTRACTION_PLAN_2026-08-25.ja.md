@@ -12311,6 +12311,12 @@ projection するようにした。personal tier authorization、path guard、�
 **69/69 gates passed**、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの
 入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 342
+
+SX-04 の voice-consent state reader が meeting actuator と `MeetingParticipationCoordinator` に分岐し、同じ mission／operator／tenant／expiration 判定を重複実装していた残存を修正した。core の `validateVoiceConsentRecord` に判定契約を集約し、両経路は既存の operation-time path guard と JSON read を維持したまま共有 validator を利用するようにした。missing／malformed／pending／expired／wrong mission／wrong tenant の fail-closed semantics と `voice-consent.json` のエラー理由は維持している。
+
+検証: meeting actuator／meeting participation **3 files / 31 tests passed**、core build、shared packages build、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

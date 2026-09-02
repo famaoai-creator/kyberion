@@ -40,6 +40,7 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
 import { createActuatorTrace, finalizeActuatorTrace } from '@agent/core/actuator-trace';
 import { resolveIdentityContext } from '@agent/core/authority';
+import { validateVoiceConsentRecord } from '@agent/core/voice-consent';
 import { runAdfActuatorPipeline } from '@agent/core/actuator-sdk';
 import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -142,14 +143,6 @@ const DEFAULT_MEETING_RETRY = {
   jitter: true,
 };
 
-interface VoiceConsentRecord {
-  consent?: unknown;
-  mission_id?: unknown;
-  operator_handle?: unknown;
-  tenant_slug?: unknown;
-  expires_at?: unknown;
-}
-
 function isPlainObject(value: unknown): value is Record<string, any> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -182,12 +175,6 @@ export function parseMeetingActionInput(value: unknown): MeetingAction | Meeting
     throw new Error('meeting action input params must be an object');
   }
   return value as unknown as MeetingAction;
-}
-
-function normalizeOptionalString(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed || undefined;
 }
 
 const MEETING_RESULT_STRING_FIELDS = [
@@ -243,57 +230,6 @@ export function parseMeetingActionResult(value: unknown): MeetingActionResult | 
   return result;
 }
 
-function validateGrantedConsent(
-  consent: VoiceConsentRecord,
-  missionId: string
-): { allowed: boolean; reason?: string } {
-  if (consent.consent !== 'granted') {
-    return {
-      allowed: false,
-      reason: `voice-consent.json present but consent != 'granted' (got '${String(consent.consent)}')`,
-    };
-  }
-
-  const consentMissionId = normalizeOptionalString(consent.mission_id);
-  const operatorHandle = normalizeOptionalString(consent.operator_handle);
-  if (!consentMissionId || !operatorHandle) {
-    return {
-      allowed: false,
-      reason: 'voice-consent.json is malformed: mission_id and operator_handle are required',
-    };
-  }
-  if (consentMissionId !== missionId) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json mission_id '${consentMissionId}' does not match active mission '${missionId}'`,
-    };
-  }
-
-  const expiresAt = normalizeOptionalString(consent.expires_at);
-  if (expiresAt) {
-    const expiresMs = Date.parse(expiresAt);
-    if (!Number.isFinite(expiresMs)) {
-      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
-    }
-    if (expiresMs <= Date.now()) {
-      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
-    }
-  }
-
-  const activeTenant = resolveIdentityContext().tenantSlug;
-  if (activeTenant) {
-    const consentTenant = normalizeOptionalString(consent.tenant_slug);
-    if (consentTenant !== activeTenant) {
-      return {
-        allowed: false,
-        reason: `voice-consent.json tenant_slug '${consentTenant ?? 'missing'}' does not match active tenant '${activeTenant}'`,
-      };
-    }
-  }
-
-  return { allowed: true };
-}
-
 export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   if (getRegisteredEnvText('KYBERION_SUDO') === 'true') return { allowed: true };
   const missionId = process.env.MISSION_ID;
@@ -318,13 +254,10 @@ export function checkSpeakConsent(): { allowed: boolean; reason?: string } {
   }
   try {
     const consent = readJson<unknown>(consentPath);
-    if (!isPlainObject(consent)) {
-      return {
-        allowed: false,
-        reason: 'voice-consent.json is malformed: expected an object',
-      };
-    }
-    return validateGrantedConsent(consent, missionId);
+    return validateVoiceConsentRecord(consent, {
+      missionId,
+      tenantSlug: resolveIdentityContext().tenantSlug,
+    });
   } catch (err: any) {
     return { allowed: false, reason: `failed to parse voice-consent.json: ${err?.message ?? err}` };
   }
