@@ -11,7 +11,8 @@ import {
 import { loadOrganizationProfile } from '@agent/core/organization-profile';
 import { initializeMissionTeamBindings } from '@agent/core/mission-team-binding';
 import { findMissionPath, missionDir } from '@agent/core/path-resolver';
-import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
+import { loadStateAtPath } from '@agent/core/mission-state';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { withOrganizationContext } from './refactor/organization-context.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
@@ -97,12 +98,11 @@ export async function main(args: string[] = []): Promise<unknown> {
     if (!safeLstat(missionStatePath).isFile()) {
       throw new Error(`Mission state must be a regular file: ${missionStatePath}`);
     }
-    const state = readJson<{
-      tier?: typeof tier;
-      tenant_slug?: string;
-      assigned_persona?: string;
-    }>(missionStatePath);
-    tier = state.tier || tier;
+    const state = loadStateAtPath(missionStatePath);
+    if (!state) {
+      throw new Error(`Mission state is invalid or unreadable: ${missionStatePath}`);
+    }
+    tier = state.tier;
     assignedPersona = assignedPersona || state.assigned_persona;
     missionTenantSlug = state.tenant_slug;
   }
