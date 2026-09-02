@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
@@ -268,7 +269,7 @@ export function buildMissionTeamBlueprint(plan: MissionTeamPlan): MissionTeamBlu
     version: '1.0.0',
     mission_id: plan.mission_id,
     mission_type: plan.mission_type,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     source_artifact: 'team-composition.json',
     organization_profile: plan.organization_profile,
     team_governance: plan.team_governance,
@@ -324,7 +325,7 @@ export function buildMissionStaffingAssignments(plan: MissionTeamPlan): MissionS
   return {
     version: '1.0.0',
     mission_id: plan.mission_id,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     organization_profile: plan.organization_profile,
     assignments,
   };
@@ -524,7 +525,7 @@ export function appendMissionExecutionLedgerEntry(
     });
   }
   const entry: MissionExecutionLedgerEntry = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     mission_id: missionId,
     ...entryPayload,
   };
