@@ -9,12 +9,14 @@ import {
 import { appendGovernedArtifactJsonl, type GovernedArtifactRole } from './artifact-store.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { resolveMeshPeer } from './mesh-peer-directory.js';
 import { recordProtocolServiceLifecycleBestEffort } from './protocol-service-lifecycle.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeMoveSync,
   safeReaddir,
@@ -22,6 +24,9 @@ import {
 
 const RECOVERY_ROLE: GovernedArtifactRole = 'mission_controller';
 const RECOVERY_APPROVAL_CHANNEL = 'peer-recovery';
+const QUARANTINE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/peer-runtime-quarantine-manifest.schema.json'
+);
 
 export interface PeerRuntimeRecoveryApprovalInput {
   tenantId: string;
@@ -166,18 +171,44 @@ function normalizeQuarantinePath(quarantinePath: string, tenantId: string): stri
     .replace(/\/+$/u, '');
 }
 
-function readManifest(quarantinePath: string, tenantId: string): QuarantineManifest {
-  const manifestPath = assertSafeRepositoryPath(
-    path.join(quarantinePath, 'quarantine-manifest.json')
-  );
-  if (!safeExistsSync(manifestPath)) throw new Error('peer_recovery_quarantine_manifest_missing');
-  let value: unknown;
-  try {
-    value = readJson<unknown>(manifestPath);
-  } catch {
+export function loadQuarantineManifestAtPath(
+  manifestPath: string,
+  quarantinePath: string,
+  tenantId: string
+): QuarantineManifest {
+  const safeManifestPath = assertSafeRepositoryPath(manifestPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(safeManifestPath)) {
+    throw new Error('peer_recovery_quarantine_manifest_missing');
+  }
+  if (!safeLstat(safeManifestPath).isFile()) {
     throw new Error('peer_recovery_quarantine_manifest_invalid');
   }
-  return parseQuarantineManifest(value, quarantinePath, tenantId);
+  try {
+    const value = defineCatalog<QuarantineManifest>({
+      id: 'peer-runtime-quarantine-manifest',
+      path: safeManifestPath,
+      schema: QUARANTINE_MANIFEST_SCHEMA_PATH,
+    }).load();
+    return parseQuarantineManifest(value, quarantinePath, tenantId);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message === 'peer_recovery_quarantine_manifest_scope_mismatch' ||
+        error.message.startsWith('peer_recovery_quarantine_manifest_contents_mismatch') ||
+        error.message.startsWith('peer_recovery_quarantine_manifest_invalid:'))
+    ) {
+      throw error;
+    }
+    throw new Error('peer_recovery_quarantine_manifest_invalid');
+  }
+}
+
+function readManifest(quarantinePath: string, tenantId: string): QuarantineManifest {
+  const manifestPath = assertSafeRepositoryPath(
+    path.join(quarantinePath, 'quarantine-manifest.json'),
+    { allowMissingLeaf: true }
+  );
+  return loadQuarantineManifestAtPath(manifestPath, quarantinePath, tenantId);
 }
 
 function peerIdsInQuarantine(quarantinePath: string): string[] {

@@ -13,6 +13,7 @@ import {
 } from './index.js';
 import {
   createPeerRuntimeRecoveryApprovalRequest,
+  loadQuarantineManifestAtPath,
   resumePeerRuntimeFromQuarantine,
 } from './peer-runtime-recovery.js';
 
@@ -154,6 +155,18 @@ describe('peer runtime recovery gate', () => {
         requestedBy: 'test-operator',
         approvalChannel: APPROVAL_CHANNEL,
       })
+    ).toThrow('peer_recovery_quarantine_manifest_invalid');
+  });
+
+  it('rejects a manifest path that is not a regular file', () => {
+    safeMkdir(`${QUARANTINE_PATH}/quarantine-manifest.json`, { recursive: true });
+
+    expect(() =>
+      loadQuarantineManifestAtPath(
+        `${QUARANTINE_PATH}/quarantine-manifest.json`,
+        QUARANTINE_PATH,
+        TENANT_ID
+      )
     ).toThrow('peer_recovery_quarantine_manifest_invalid');
   });
 
