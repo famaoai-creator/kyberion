@@ -40,6 +40,7 @@ import type { MissionState } from './mission-types.js';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { validateWritePermission } from './tier-guard.js';
 import {
   removeMissionFromProjectLedger,
@@ -697,7 +698,7 @@ function createManagedProjectInternal(
           active_project_ids: [
             ...new Set([...(organizationState.active_project_ids || []), projectId]),
           ].sort(),
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso(),
         },
         { rootDir: input.rootDir }
       );
@@ -770,7 +771,7 @@ export function archiveManagedProject(
   }
   const archived = updateManagedProject(current.project_id, {
     status: 'archived',
-    metadata: { lifecycle_reason: reason, archived_at: new Date().toISOString() },
+    metadata: { lifecycle_reason: reason, archived_at: nowIso() },
   });
   const closed = { ...archived, active_missions: [], active_tracks: [], active_task_sessions: [] };
   saveProjectRecord(closed);
@@ -1064,7 +1065,7 @@ export function reconcileProjectOperationalState(
         active_mission_ids: scoped.missions,
         active_track_ids: scoped.tracks,
         active_task_session_ids: scoped.sessions,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
       };
       repairedPaths.push(saveProjectOperationalState(nextState));
     }
@@ -1197,7 +1198,7 @@ export async function reassignMissionToProject(input: {
     history: [
       ...(state.history || []),
       {
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'PROJECT_REASSIGNED',
         from: oldProjectId || 'independent',
         to: targetProjectId,
@@ -1367,7 +1368,7 @@ export function bootstrapManagedProject(input: ProjectBootstrapInput): ProjectBo
       proposed_mission_ids: missionSeedIds,
     };
     saveProjectRecord(nextProject, { rootDir });
-    const now = new Date().toISOString();
+    const now = nowIso();
     for (const item of workItems.filter((candidate) => candidate.kind === 'mission_seed')) {
       const seedId = `MSD-${item.work_id.replace(/^WRK-/, '')}`;
       saveMissionSeedRecord(
