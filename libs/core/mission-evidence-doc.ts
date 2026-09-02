@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * MissionEvidenceDoc — typed JSON document under a mission's
  * `evidence/` directory.
@@ -130,7 +131,7 @@ export class MissionEvidenceDoc<T> {
         try {
           const tier = audit.tier ?? 'confidential';
           const auditDir = pathResolver.missionAuditDir(this.options.mission_id, tier);
-          const date = new Date().toISOString().slice(0, 10);
+          const date = nowIso().slice(0, 10);
           const auditPath = assertSafeRepositoryPath(path.join(auditDir, `audit-${date}.jsonl`), {
             allowMissingLeaf: true,
           });

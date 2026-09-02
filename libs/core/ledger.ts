@@ -20,6 +20,7 @@ import {
 } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Ecosystem Hybrid Ledger v2.0 [STANDARDIZED]
@@ -80,7 +81,7 @@ function safeLedgerPath(ledgerPath: string): string {
 }
 
 export const record = (type: string, data: any) => {
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
   const missionId = data.mission_id;
   const scope = resolveLedgerScope(data);
 
