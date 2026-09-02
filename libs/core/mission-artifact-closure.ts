@@ -1,4 +1,5 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * AL-03: mission finish / task completion artifact closure.
  *
@@ -319,8 +320,9 @@ export function closeMissionArtifacts(input: {
       reason: `mission ${missionId} finished (closure ceremony)`,
     });
 
+    const closedAt = nowIso();
     const auditPath = appendClosureAudit({
-      ts: new Date().toISOString(),
+      ts: closedAt,
       event: 'MISSION_ARTIFACTS_CLOSED',
       mission: missionId,
       mission_dir: toRepoRelativePosix(missionDir),
@@ -342,7 +344,7 @@ export function closeMissionArtifacts(input: {
       JSON.stringify(
         {
           mission_id: missionId,
-          closed_at: new Date().toISOString(),
+          closed_at: closedAt,
           deleted_directories: deletedDirectories,
           deleted_index_entry_count: deletedIndexEntries.length,
           bundle,
@@ -441,7 +443,7 @@ export function closeTaskArtifacts(
     }
 
     const auditPath = appendClosureAudit({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'MISSION_TASK_ARTIFACTS_CLOSED',
       mission: upperMission,
       task: taskId,
