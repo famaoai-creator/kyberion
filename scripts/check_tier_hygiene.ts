@@ -9,7 +9,7 @@
 
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeLstat, safeReadFile, safeReaddir } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -38,10 +38,14 @@ export interface Violation {
 }
 
 const POLICY_PATH = 'knowledge/product/governance/tier-hygiene-policy.json';
+const policyCatalog = defineCatalog<Policy>({
+  id: 'tier-hygiene-policy',
+  path: () => pathResolver.rootResolve(POLICY_PATH),
+  schema: pathResolver.knowledge('product/schemas/tier-hygiene-policy.schema.json'),
+});
 
 async function loadPolicy(): Promise<Policy> {
-  const absolute = pathResolver.rootResolve(POLICY_PATH);
-  return readJson<Policy>(absolute);
+  return policyCatalog.load();
 }
 
 function buildAllowlist(policy: Policy): RegExp[] {
