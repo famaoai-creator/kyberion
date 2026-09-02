@@ -1,6 +1,6 @@
 /** Execution brief archetypes, rendering, preflight, and status read-model helpers. */
 
-import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { defineCatalog, readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -27,14 +27,18 @@ import {
 const ACTUATOR_ARCHETYPES_PATH = pathResolver.knowledge(
   'product/orchestration/actuator-request-archetypes.json'
 );
+const ACTUATOR_ARCHETYPES_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/actuator-request-archetypes.schema.json'
+);
+
+const actuatorRequestArchetypeCatalog = defineCatalog<ActuatorRequestArchetypeCatalog>({
+  id: 'actuator-request-archetypes',
+  path: ACTUATOR_ARCHETYPES_PATH,
+  schema: ACTUATOR_ARCHETYPES_SCHEMA_PATH,
+});
 
 export function loadActuatorRequestArchetypes(): ActuatorRequestArchetypeCatalog {
-  if (!safeExistsSync(ACTUATOR_ARCHETYPES_PATH)) {
-    throw new Error(`Archetype catalog not found: ${ACTUATOR_ARCHETYPES_PATH}`);
-  }
-  const parsed = parseActuatorRequestArchetypeCatalog(
-    readJson<unknown>(assertSafeRepositoryPath(ACTUATOR_ARCHETYPES_PATH))
-  );
+  const parsed = parseActuatorRequestArchetypeCatalog(actuatorRequestArchetypeCatalog.load());
   if (!parsed) {
     throw new Error(`Archetype catalog has an invalid shape: ${ACTUATOR_ARCHETYPES_PATH}`);
   }
