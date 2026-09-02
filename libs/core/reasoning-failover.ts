@@ -1,5 +1,6 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
-import { nowIso } from './foundation/time.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
+import { nowIso, parseIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -52,6 +53,64 @@ const EVENTS_RELATIVE_PATH = 'active/shared/runtime/reasoning-failover-events.js
 const MARKER_RELATIVE_PATH = 'active/shared/runtime/state/reasoning-failover.json';
 const ERROR_SUMMARY_MAX_CHARS = 200;
 
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parseRequiredString(value: unknown, label: string): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseOptionalString(value: unknown, label: string): string | undefined {
+  return value === undefined ? undefined : parseRequiredString(value, label);
+}
+
+function parseTimestamp(value: unknown, label: string): string {
+  const timestamp = parseRequiredString(value, label);
+  try {
+    parseIso(timestamp);
+  } catch {
+    throw new Error(`${label} must be a valid ISO timestamp`);
+  }
+  return timestamp;
+}
+
+export function parseReasoningFailoverMarker(value: unknown): ReasoningFailoverMarker {
+  const record = parseSafeJsonObjectValue(value, 'reasoning failover marker');
+  assertExactKeys(
+    record,
+    ['from_mode', 'to_mode', 'provider_from', 'provider_to', 'method', 'at'],
+    'reasoning failover marker'
+  );
+  const providerFrom = parseOptionalString(
+    record.provider_from,
+    'reasoning failover marker.provider_from'
+  );
+  const providerTo = parseOptionalString(
+    record.provider_to,
+    'reasoning failover marker.provider_to'
+  );
+  return {
+    from_mode: parseRequiredString(record.from_mode, 'reasoning failover marker.from_mode'),
+    to_mode: parseRequiredString(record.to_mode, 'reasoning failover marker.to_mode'),
+    ...(providerFrom !== undefined ? { provider_from: providerFrom } : {}),
+    ...(providerTo !== undefined ? { provider_to: providerTo } : {}),
+    method: parseRequiredString(record.method, 'reasoning failover marker.method'),
+    at: parseTimestamp(record.at, 'reasoning failover marker.at'),
+  };
+}
+
 export function reasoningFailoverEventsPath(): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(EVENTS_RELATIVE_PATH), {
     allowMissingLeaf: true,
@@ -94,7 +153,7 @@ export function markReasoningFailover(marker: Omit<ReasoningFailoverMarker, 'at'
   try {
     const markerPath = reasoningFailoverMarkerPath();
     safeMkdir(path.dirname(markerPath), { recursive: true });
-    const full: ReasoningFailoverMarker = { ...marker, at: nowIso() };
+    const full = parseReasoningFailoverMarker({ ...marker, at: nowIso() });
     safeWriteFile(markerPath, `${JSON.stringify(full, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -116,11 +175,7 @@ export function readReasoningFailover(): ReasoningFailoverMarker | null {
   try {
     const markerPath = reasoningFailoverMarkerPath();
     if (!safeExistsSync(markerPath)) return null;
-    const parsed = readJson<Partial<ReasoningFailoverMarker>>(markerPath);
-    if (parsed && typeof parsed.from_mode === 'string' && typeof parsed.to_mode === 'string') {
-      return parsed as ReasoningFailoverMarker;
-    }
-    return null;
+    return parseReasoningFailoverMarker(readJson<unknown>(markerPath));
   } catch {
     return null;
   }
