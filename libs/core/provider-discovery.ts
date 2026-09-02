@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
@@ -38,10 +39,109 @@ const CACHE_TTL = 300000; // 5 min
 
 const DISK_CACHE_PATH = pathResolver.rootResolve('active/shared/runtime/provider-cache.json');
 
+export interface ProviderDiscoveryCache {
+  ts: number;
+  providers: ProviderInfo[];
+}
+
+function assertExactKeys(
+  record: Record<string, unknown>,
+  expected: readonly string[],
+  label: string
+): void {
+  const expectedKeys = new Set(expected);
+  const unknown = Object.keys(record).filter((key) => !expectedKeys.has(key));
+  if (unknown.length > 0) {
+    throw new Error(`${label} contains unknown field(s): ${unknown.join(', ')}`);
+  }
+}
+
+function parseStringArray(value: unknown, label: string): string[] {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  return value.map((entry, index) => {
+    if (typeof entry !== 'string' || entry.trim() === '') {
+      throw new Error(`${label}[${index}] must be a non-empty string`);
+    }
+    return entry;
+  });
+}
+
+function parseProviderInfo(value: unknown, index: number): ProviderInfo {
+  const label = `provider discovery cache.providers[${index}]`;
+  const record = parseSafeJsonObjectValue(value, label);
+  assertExactKeys(
+    record,
+    [
+      'provider',
+      'installed',
+      'version',
+      'protocol',
+      'models',
+      'capabilities',
+      'modelCapabilities',
+      'healthy',
+    ],
+    label
+  );
+  const version = record.version;
+  if (version !== null && typeof version !== 'string') {
+    throw new Error(`${label}.version must be a string or null`);
+  }
+  const protocol = record.protocol;
+  if (!['acp', 'print-json', 'exec', 'json-rpc'].includes(String(protocol))) {
+    throw new Error(`${label}.protocol is invalid`);
+  }
+  if (typeof record.installed !== 'boolean' || typeof record.healthy !== 'boolean') {
+    throw new Error(`${label}.installed and healthy must be booleans`);
+  }
+  const capabilities =
+    record.capabilities === undefined
+      ? undefined
+      : parseStringArray(record.capabilities, `${label}.capabilities`);
+  let modelCapabilities: Record<string, string[]> | undefined;
+  if (record.modelCapabilities !== undefined) {
+    const raw = parseSafeJsonObjectValue(record.modelCapabilities, `${label}.modelCapabilities`);
+    modelCapabilities = Object.fromEntries(
+      Object.entries(raw).map(([model, values]) => [
+        model,
+        parseStringArray(values, `${label}.modelCapabilities.${model}`),
+      ])
+    );
+  }
+  return {
+    provider:
+      typeof record.provider === 'string' && record.provider.trim() !== ''
+        ? record.provider
+        : (() => {
+            throw new Error(`${label}.provider must be a non-empty string`);
+          })(),
+    installed: record.installed as boolean,
+    version: version as string | null,
+    protocol: protocol as ProviderInfo['protocol'],
+    models: parseStringArray(record.models, `${label}.models`),
+    ...(capabilities !== undefined ? { capabilities } : {}),
+    ...(modelCapabilities !== undefined ? { modelCapabilities } : {}),
+    healthy: record.healthy as boolean,
+  };
+}
+
+/** Parse the persisted provider discovery cache before it affects probing decisions. */
+export function parseProviderDiscoveryCache(value: unknown): ProviderDiscoveryCache {
+  const root = parseSafeJsonObjectValue(value, 'provider discovery cache');
+  assertExactKeys(root, ['ts', 'providers'], 'provider discovery cache');
+  if (typeof root.ts !== 'number' || !Number.isSafeInteger(root.ts) || root.ts <= 0) {
+    throw new Error('provider discovery cache.ts must be a positive integer');
+  }
+  if (!Array.isArray(root.providers)) {
+    throw new Error('provider discovery cache.providers must be an array');
+  }
+  return { ts: root.ts, providers: root.providers.map(parseProviderInfo) };
+}
+
 function readDiskCache(): ProviderInfo[] | null {
   try {
     if (!safeExistsSync(DISK_CACHE_PATH)) return null;
-    const parsed = readJson<{ ts: number; providers: ProviderInfo[] }>(DISK_CACHE_PATH);
+    const parsed = parseProviderDiscoveryCache(readJson<unknown>(DISK_CACHE_PATH));
     if (Date.now() - parsed.ts < CACHE_TTL) return parsed.providers;
   } catch {
     /* cache miss — non-fatal */
