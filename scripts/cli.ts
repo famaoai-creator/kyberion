@@ -29,10 +29,7 @@ import {
 import { t as coreT } from '@agent/core/t';
 import type { VocabularyKey } from '@agent/core/t';
 import { installPythonVoiceBridgeIfAvailable } from '@agent/core/python-voice-bridge';
-import {
-  assertValidMobileAppProfileIndex,
-  assertValidWebAppProfileIndex,
-} from '@agent/core/app-profiles';
+import { loadMobileAppProfileIndex, loadWebAppProfileIndex } from '@agent/core/app-profiles';
 import { decideApprovalRequest, listApprovalRequests } from '@agent/core/governance';
 import { createProjectTrustApprovalRequest } from '@agent/core/project-trust';
 import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
@@ -418,11 +415,9 @@ function loadMobileAppProfiles(): MobileAppProfileRecord[] {
   if (!safeExistsSync(indexPath) || !safeLstat(indexPath).isFile()) {
     return [];
   }
-  const parsed = readJson<MobileAppProfileIndex>(indexPath);
-  assertValidMobileAppProfileIndex(parsed, indexPath, (relativePath) =>
+  return loadMobileAppProfileIndex(indexPath, (relativePath) =>
     safeExistsSync(resolveAppProfileResourcePath(relativePath))
-  );
-  return parsed.profiles;
+  ).profiles;
 }
 
 function resolveWebAppProfileIndexPath(): string {
@@ -432,11 +427,9 @@ function resolveWebAppProfileIndexPath(): string {
 function loadWebAppProfiles(): WebAppProfileIndexRecord[] {
   const indexPath = resolveWebAppProfileIndexPath();
   if (!safeExistsSync(indexPath) || !safeLstat(indexPath).isFile()) return [];
-  const parsed = readJson<{ profiles: WebAppProfileIndexRecord[] }>(indexPath);
-  assertValidWebAppProfileIndex(parsed, indexPath, (relativePath) =>
+  return loadWebAppProfileIndex(indexPath, (relativePath) =>
     safeExistsSync(resolveAppProfileResourcePath(relativePath))
-  );
-  return parsed.profiles;
+  ).profiles;
 }
 
 // ─── Generic profile printer (shared by mobile + web) ──────────────────────────
