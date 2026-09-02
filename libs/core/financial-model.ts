@@ -1,12 +1,9 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { readJsonIfPresent } from './foundation/json.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import {
-  assertSafeRepositoryPath,
-  loadJsonIfPresent as loadOptionalJson,
-  safeExistsSync,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 
 export interface FinancialPeriod {
   period_id: string;
@@ -49,7 +46,7 @@ const FINANCIAL_MODEL_SCHEMA_PATH = pathResolver.knowledge(
 const financialModelCatalogs = new Map<string, GovernedCatalog<FinancialModel>>();
 
 function loadJsonIfPresent<T>(filePath: string): T | null {
-  return loadOptionalJson<T>(filePath);
+  return readJsonIfPresent<T>(filePath);
 }
 
 function loadFinancialModelCatalog(filePath: string, rootDir: string): FinancialModel | null {

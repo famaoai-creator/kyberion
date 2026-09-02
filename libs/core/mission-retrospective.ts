@@ -1,4 +1,8 @@
-import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import {
+  appendJsonLine,
+  parseSafeJsonInput,
+  readJsonIfPresent as readFoundationJsonIfPresent,
+} from './foundation/json.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver, findMissionPath } from './path-resolver.js';
@@ -8,7 +12,6 @@ import {
   safeMkdir,
   safeReadFile,
   safeWriteFile,
-  loadJsonIfPresent as loadOptionalJson,
 } from './secure-io.js';
 import { logger } from './core.js';
 import { getReasoningBackend } from './reasoning-backend.js';
@@ -296,7 +299,7 @@ function readJsonl(filePath: string): JsonRecord[] {
 
 function readJsonIfPresent<T>(filePath: string): T | null {
   try {
-    return loadOptionalJson<T>(safeRepositoryPath(filePath));
+    return readFoundationJsonIfPresent<T>(safeRepositoryPath(filePath));
   } catch {
     return null;
   }

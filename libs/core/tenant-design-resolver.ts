@@ -1,12 +1,7 @@
 import * as path from 'node:path';
 import { customerRoot } from './customer-resolver.js';
-import {
-  loadJsonIfPresent as loadOptionalJson,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-  safeStat,
-} from './secure-io.js';
+import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
+import { safeExistsSync, safeLstat, safeReaddir, safeStat } from './secure-io.js';
 
 export interface ResolveTenantDesignInput {
   rootDir?: string;
@@ -101,7 +96,7 @@ function readJsonIfPresent(
   allowedRootDir = rootDir
 ): Record<string, any> | null {
   if (!isSafeTenantDesignPath(filePath, rootDir, true, allowedRootDir)) return null;
-  return loadOptionalJson<Record<string, any>>(filePath);
+  return readFoundationJsonIfPresent<Record<string, any>>(filePath);
 }
 
 function isConfidentialTenantDesignPath(
