@@ -1527,7 +1527,7 @@
     {
       "path": "product/governance/i18n-baseline.json",
       "tier": "public",
-      "size": 7239,
+      "size": 7234,
       "type": "json"
     },
     {
@@ -2043,7 +2043,7 @@
     {
       "path": "product/governance/module-layer-boundaries.json",
       "tier": "public",
-      "size": 5238,
+      "size": 5243,
       "type": "json"
     },
     {
@@ -2787,7 +2787,7 @@
     {
       "path": "product/governance/tenant-registry-exceptions.json",
       "tier": "public",
-      "size": 3946,
+      "size": 3954,
       "type": "json"
     },
     {
@@ -2799,7 +2799,7 @@
     {
       "path": "product/governance/tier-hygiene-policy.json",
       "tier": "public",
-      "size": 2440,
+      "size": 2441,
       "type": "json"
     },
     {
@@ -7141,6 +7141,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/i18n-baseline.schema.json",
+      "tier": "public",
+      "size": 627,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/image-generation-adf.schema.json",
       "tier": "public",
       "size": 2178,
@@ -7852,6 +7858,12 @@
       "path": "product/schemas/modeling-pipeline.schema.json",
       "tier": "public",
       "size": 1366,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/module-layer-boundaries.schema.json",
+      "tier": "public",
+      "size": 1445,
       "type": "json"
     },
     {
@@ -9055,6 +9067,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-registry-exceptions.schema.json",
+      "tier": "public",
+      "size": 639,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/terminal-action.schema.json",
       "tier": "public",
       "size": 293,
@@ -9076,6 +9094,12 @@
       "path": "product/schemas/test-inventory.schema.json",
       "tier": "public",
       "size": 2685,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/tier-hygiene-policy.schema.json",
+      "tier": "public",
+      "size": 1256,
       "type": "json"
     },
     {

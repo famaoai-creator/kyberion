@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/module-layer-boundaries.schema.json",
   "version": 1,
   "layers": ["foundation", "contracts", "domain", "orchestration"],
   "facade_patterns": [

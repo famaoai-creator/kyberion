@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/i18n-baseline.schema.json",
   "version": 1,
   "generated_at": "2026-09-01T16:44:57.414Z",
   "scan_roots": [
