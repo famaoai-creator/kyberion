@@ -4,6 +4,7 @@ import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 import {
@@ -848,7 +849,7 @@ function withDefinedValues<T extends Record<string, unknown>>(value: T): Partial
 export function buildOperatorRequestLogFromIntentResolution(
   input: BuildOperatorRequestLogInput
 ): OperatorRequestLog {
-  const receivedAt = input.receivedAt || new Date().toISOString();
+  const receivedAt = input.receivedAt || nowIso();
   const selectedIntentId = input.packet.selected_intent_id || 'unresolved_intent';
   const selectedIntent = findIntent(input.packet.selected_intent_id);
   const selectedCandidate = input.packet.candidates.find(
@@ -963,12 +964,13 @@ export function buildOperatorLearningProposal(input: {
   ).length;
   const eligible = sampleCount >= requiredSamples && mismatchCount === 0;
   const recommendedTier = recommendTier(input.requestLogs);
+  const proposalAt = input.now || nowIso();
 
   return {
     kind: 'operator-learning-proposal',
-    proposal_id: `olp-${profileId}-${Date.parse(input.now || new Date().toISOString()).toString(36)}`,
+    proposal_id: `olp-${profileId}-${Date.parse(proposalAt).toString(36)}`,
     profile_id: profileId,
-    created_at: input.now || new Date().toISOString(),
+    created_at: proposalAt,
     recommended_tier: recommendedTier,
     requires_approval: true,
     summary: `Observed ${sampleCount} operator request sample(s), ${correctionCount} correction(s), and ${recurringTasks.length} recurring task candidate(s).`,
@@ -1018,7 +1020,7 @@ export function simulateOperatorLearningFromUtterances(
     throw new Error('Operator learning simulation requires profile or profileId');
   }
 
-  const startAt = input.startAt || new Date().toISOString();
+  const startAt = input.startAt || nowIso();
   const startMs = Date.parse(startAt);
   if (Number.isNaN(startMs)) {
     throw new Error(`Invalid operator learning simulation startAt: ${startAt}`);
@@ -1026,7 +1028,7 @@ export function simulateOperatorLearningFromUtterances(
   const intervalMs = input.intervalMs ?? 1000;
 
   const requestLogs = input.utterances.map((utterance, index) => {
-    const receivedAt = new Date(startMs + index * intervalMs).toISOString();
+    const receivedAt = nowIso(new Date(startMs + index * intervalMs));
     return buildOperatorRequestLogFromIntentResolution({
       packet: resolveIntentResolutionPacket(utterance),
       profileId,
@@ -1045,7 +1047,7 @@ export function simulateOperatorLearningFromUtterances(
     proposal: buildOperatorLearningProposal({
       profile: input.profile,
       requestLogs,
-      now: new Date(startMs + input.utterances.length * intervalMs).toISOString(),
+      now: nowIso(new Date(startMs + input.utterances.length * intervalMs)),
     }),
   };
 }
@@ -1113,7 +1115,7 @@ export function promoteOperatorLearningProposal(input: {
     );
   }
 
-  const approvedAt = input.approvedAt || new Date().toISOString();
+  const approvedAt = input.approvedAt || nowIso();
   const targetTier = input.targetTier || input.proposal.recommended_tier;
   const targetPath =
     input.outputPath ||
