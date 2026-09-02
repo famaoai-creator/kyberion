@@ -1,5 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
@@ -301,7 +302,7 @@ export class MissionCoordinationBus {
       correlation_id: input.correlation_id,
       task_id: input.task_id,
       content: input.content,
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       acknowledged_by: [],
     };
     messages.set(message.message_id, message);
@@ -336,7 +337,7 @@ export class MissionCoordinationBus {
         kind: 'ack',
         message_id: input.messageId,
         agent_id: input.agentId,
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
       });
     }
   }

@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -359,7 +360,7 @@ export async function obtainBestOfTaskResultResponse(input: {
         sender: 'kyberion:mission-orchestrator',
         receiver: input.agentId,
         performative: 'request',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         intent: 'mission_task_execution',

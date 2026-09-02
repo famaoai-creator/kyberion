@@ -12,6 +12,7 @@ import {
 import { logger } from './core.js';
 import { canonicalizeTeamRole } from './working-principles.js';
 import { TraceContext } from './src/trace.js';
+import { nowIso } from './foundation/time.js';
 import { type GapRecorder } from './gap-phase.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
@@ -277,7 +278,7 @@ export async function dispatchPlannedMissionTaskCore(
         clarification_packet_path: clarificationPacketPath,
         needs: taskResultNeeds,
         status: 'needs_input',
-        written_at: new Date().toISOString(),
+        written_at: nowIso(),
       }),
     });
     input.task.status = 'blocked';
