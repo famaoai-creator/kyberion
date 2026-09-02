@@ -202,4 +202,21 @@ describe('source-analysis compiler', () => {
       writeEngineeringArtifactBundle(invalid, 'active/shared/tmp/source-analysis-tests/invalid')
     ).toThrow('[SOURCE_ARTIFACT_SCHEMA] source-analysis-ir is invalid');
   });
+
+  it('rejects schema-compatible but semantically invalid test inventory values', () => {
+    prepareFixture();
+    const analysis = analyzeSourceTree({
+      sourceRoot: 'active/shared/tmp/source-analysis-tests/sample-app',
+    });
+    const bundle = compileEngineeringArtifacts({ analysis });
+    const invalid = JSON.parse(JSON.stringify(bundle)) as typeof bundle;
+    invalid.test_inventory.project_id = '   ';
+
+    expect(() =>
+      writeEngineeringArtifactBundle(
+        invalid,
+        'active/shared/tmp/source-analysis-tests/invalid-semantic'
+      )
+    ).toThrow('[SOURCE_ARTIFACT_SCHEMA] source-test-inventory is invalid');
+  });
 });
