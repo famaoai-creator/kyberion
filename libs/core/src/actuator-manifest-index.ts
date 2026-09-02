@@ -4,6 +4,31 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 
+export interface ActuatorManifestCapabilityRequirements {
+  bin?: string[];
+  lib?: string[];
+  env?: string[];
+}
+
+export interface ActuatorManifestCapabilityPrerequisites {
+  binaries?: string[];
+  platforms?: string[];
+  env?: string[];
+  services?: string[];
+  install?: string[] | Record<string, string>;
+}
+
+export interface ActuatorManifestCapability {
+  op?: string;
+  description?: string;
+  timeout_ms?: number;
+  schema_ref?: string;
+  platforms?: string[];
+  requirements?: ActuatorManifestCapabilityRequirements;
+  prerequisites?: ActuatorManifestCapabilityPrerequisites;
+  implemented?: boolean;
+}
+
 export interface ActuatorManifestFile {
   actuator_id: string;
   version: string;
@@ -12,16 +37,7 @@ export interface ActuatorManifestFile {
   entrypoint?: string;
   resilience_tier?: string;
   recovery_policy?: Record<string, unknown>;
-  capabilities?: Array<{
-    op?: string;
-    description?: string;
-    timeout_ms?: number;
-    schema_ref?: string;
-    platforms?: string[];
-    requirements?: { bin?: string[]; lib?: string[]; env?: string[] };
-    prerequisites?: Record<string, unknown>;
-    implemented?: boolean;
-  }>;
+  capabilities?: ActuatorManifestCapability[];
 }
 
 export interface ActuatorCatalogEntry {
