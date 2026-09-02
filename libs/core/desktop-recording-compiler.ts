@@ -7,7 +7,6 @@ import {
   validateProcedureCatalog,
 } from './procedure-registry.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -24,7 +23,7 @@ import {
   type DesktopRecording,
 } from './desktop-recording.js';
 import { validateDesktopPipeline, type DesktopPipeline } from './desktop-pipeline.js';
-import { intentDraftHash, validateDesktopIntentDraft } from './desktop-intent-reconstruction.js';
+import { intentDraftHash, loadDesktopIntentDraftAtPath } from './desktop-intent-reconstruction.js';
 import {
   assertNoPendingDesktopPromotion,
   acquireDesktopPromotionLock,
@@ -207,16 +206,13 @@ function promoteDesktopProcedureFromRecording(
         )
       );
   if (!intentCandidate) throw new Error('intent_ref is outside the allowlisted recording stores');
-  let intent: ReturnType<typeof validateDesktopIntentDraft>;
+  let intent: ReturnType<typeof loadDesktopIntentDraftAtPath>;
   try {
-    intent = validateDesktopIntentDraft(readJson<unknown>(intentCandidate));
+    intent = loadDesktopIntentDraftAtPath(intentCandidate, recording.recording_id);
   } catch (error) {
     throw new Error(
       `failed to read intent review artifact: ${error instanceof Error ? error.message : String(error)}`
     );
-  }
-  if (intent.source_recording_id !== recording.recording_id) {
-    throw new Error('intent review artifact does not belong to the recording');
   }
   if (intent.review.status !== 'approved') {
     throw new Error('intent review must be approved before promotion');
