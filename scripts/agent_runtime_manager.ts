@@ -226,14 +226,7 @@ export async function inspectAgent(agentId: string) {
 export const runAgentRuntimeManager = defineScript({
   name: 'agent-runtime:manage',
   flags: [],
-  run: async ({ argv }) => {
-    try {
-      await main(argv);
-    } catch (error) {
-      logger.error(error instanceof Error ? error.message : String(error));
-      process.exitCode = 1;
-    }
-  },
+  run: ({ argv }) => main(argv),
 });
 
 if (
