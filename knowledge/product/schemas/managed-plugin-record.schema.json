@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "managed-plugin-record.schema.json",
+  "title": "Managed Plugin Record",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pluginId": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$" },
+    "trust": { "type": "string", "enum": ["official", "curated", "third-party"] },
+    "trustReason": { "type": "string", "minLength": 1 },
+    "resolvedSourcePath": { "type": "string", "minLength": 1 },
+    "managedPath": { "type": "string", "minLength": 1 },
+    "manifest": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pluginId": { "type": "string", "minLength": 1 },
+            "displayName": { "type": "string" },
+            "version": { "type": "string" },
+            "raw": { "type": "object", "additionalProperties": true }
+          },
+          "required": ["pluginId", "raw"]
+        }
+      ]
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string", "minLength": 1 },
+          "message": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["error", "warning"] }
+        },
+        "required": ["code", "message", "severity"]
+      }
+    },
+    "activationStatus": {
+      "type": "string",
+      "enum": ["activatable", "pending_approval", "blocked_broken_manifest"]
+    },
+    "approvalChannel": { "type": "string", "minLength": 1 },
+    "approvalRequestId": { "type": "string", "minLength": 1 },
+    "installedAt": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "pluginId",
+    "trust",
+    "trustReason",
+    "resolvedSourcePath",
+    "managedPath",
+    "manifest",
+    "diagnostics",
+    "activationStatus",
+    "installedAt"
+  ]
+}

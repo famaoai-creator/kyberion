@@ -6,6 +6,7 @@ import { withExecutionContext } from './authority.js';
 import {
   installPluginManaged,
   isManagedPluginActivationAllowed,
+  loadManagedPluginRecordAtPath,
   listManagedPlugins,
   refreshManagedPluginActivation,
 } from './plugin-managed-install.js';
@@ -236,6 +237,30 @@ describe('installPluginManaged', () => {
     expect(listed[0]?.trust).toBe('third-party');
     expect(listed[0]?.activationStatus).toBe('pending_approval');
     expect(isManagedPluginActivationAllowed(listed[0]!)).toBe(false);
+  });
+
+  it('rejects a managed record path that is not a regular file', () => {
+    const managedRoot = managedRootDir('record-directory');
+    const src = sourceDir('record-directory');
+    writeManifest(src, { plugin_id: 'record-directory' });
+    const record = installPluginManaged({
+      pluginId: `record-directory-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+      requestedBy: 'test-suite',
+    });
+
+    withExecutionContext('mission_controller', () => {
+      safeRmSync(path.join(record.managedPath, '.kyberion-managed-plugin.json'));
+      safeMkdir(path.join(record.managedPath, '.kyberion-managed-plugin.json'));
+    });
+
+    expect(() =>
+      loadManagedPluginRecordAtPath(
+        path.join(record.managedPath, '.kyberion-managed-plugin.json'),
+        record.managedPath
+      )
+    ).toThrow('managed plugin record must be a regular file');
   });
 
   it('blocks a manifest containing a dangerous JSON key', () => {
