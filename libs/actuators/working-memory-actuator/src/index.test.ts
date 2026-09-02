@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync, safeReadFile, safeRmSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { MAX_FACTS } from '@agent/core/memory-notebook';
 import { handleAction } from './index.js';
 
@@ -58,6 +58,26 @@ describe('working-memory-actuator', () => {
         },
       })
     ).rejects.toThrow(/active/u);
+  });
+
+  it('fails closed for malformed sidecars and keeps partial updates schema-valid', async () => {
+    await handleAction({
+      action: 'add-action-item',
+      params: { scope: 'session', scope_ref: TEST_SCOPE_REF, item: 'Review parser' },
+    });
+    const mdPath = `${TEST_ROOT}/MEMORY.md`;
+    const sidecarPath = `${TEST_ROOT}/MEMORY.volatile.json`;
+    const sidecar = JSON.parse(String(safeReadFile(sidecarPath, { encoding: 'utf8' })));
+    expect(sidecar).toMatchObject({
+      scope: 'session',
+      cadence: 'resident',
+      lifetime: 'session',
+      status: 'active',
+    });
+    safeWriteFile(sidecarPath, JSON.stringify({ ...sidecar, metadata: { __proto__: true } }));
+
+    const readResult = await handleAction({ action: 'read', params: { mdPath } });
+    expect(readResult.working_memory_result).toMatchObject({ sidecar: null });
   });
 
   it('rejects traversal-shaped daily and weekly period keys', async () => {
