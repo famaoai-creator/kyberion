@@ -26,6 +26,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 
 import { getRegisteredEnvText } from '../foundation/env.js';
 import * as path from 'node:path';
+import { nowIso } from '../foundation/time.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -309,7 +310,7 @@ export function recordHumanKnowledgeFeedback(input: HumanKnowledgeFeedback): str
     ...(input.reason?.trim() ? { reason: input.reason.trim() } : {}),
     ...(input.actor?.trim() ? { actor: input.actor.trim() } : {}),
     ...(input.source?.trim() ? { source: input.source.trim() } : {}),
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     ...(input.scope ? { scope: input.scope } : {}),
   };
   const target = scopedFeedbackPath('human', input.scope);
@@ -337,7 +338,7 @@ export function recordKnowledgeGap(input: {
   const record: KnowledgeGapRecord = {
     topic,
     source_ref: sourceRef,
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     ...(input.scope ? { scope: input.scope } : {}),
   };
   const target = scopedFeedbackPath('gaps', input.scope);
@@ -519,7 +520,7 @@ export function recordKnowledgeDelivery(input: {
 
   const dir = deliveryLogDir(input.scope);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const now = new Date().toISOString();
+  const now = nowIso();
   const day = now.slice(0, 10);
   const filePath = path.join(dir, `delivery-${day}.jsonl`);
   const record: KnowledgeDeliveryRecord = {
@@ -567,7 +568,7 @@ export function recordKnowledgeUsageFeedback(input: {
   const used = normalizeTopicList(feedback.used);
   const notUsed = normalizeTopicList(feedback.not_used).filter((path) => !used.includes(path));
   const missingTopics = normalizeTopicList(feedback.missing_topics);
-  const now = new Date().toISOString();
+  const now = nowIso();
 
   let usageUpdated = false;
   try {

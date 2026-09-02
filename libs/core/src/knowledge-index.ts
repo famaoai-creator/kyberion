@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readJson } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
 import { isRecord } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -301,7 +302,7 @@ export class KnowledgeHintIndex {
 
   constructor(hints: KnowledgeHint[], scope?: KnowledgeScope) {
     this.hints = hints;
-    this.builtAt = new Date().toISOString();
+    this.builtAt = nowIso();
     this.scope = scope;
     this.embedCache = new Map();
   }
@@ -400,7 +401,7 @@ function loadUsageMap(): Record<string, string> {
 function touchScopeUsage(scopeHash: string): void {
   try {
     const usage = loadUsageMap();
-    usage[scopeHash] = new Date().toISOString();
+    usage[scopeHash] = nowIso();
     const dir = cacheDir();
     if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
     safeWriteFile(usageFilePath(), JSON.stringify(usage));
@@ -481,7 +482,7 @@ function saveDiskCache(scopeHash: string, modelName: string, entries: DiskCacheE
     const cache: DiskCache = {
       scopeHash,
       model: modelName,
-      builtAt: new Date().toISOString(),
+      builtAt: nowIso(),
       entries,
     };
     safeWriteFile(filePath, JSON.stringify(cache));
