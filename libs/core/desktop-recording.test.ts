@@ -1,9 +1,11 @@
+import * as path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assessDesktopObservationReadiness,
   buildDesktopRecording,
   computeDesktopRecordingHash,
   DesktopDemonstrationRecorder,
+  loadDesktopRecordingAtPath,
   listDesktopObservationSources,
   validateDesktopRecording,
 } from './desktop-recording.js';
@@ -11,6 +13,10 @@ import { parseDesktopEventLine } from './desktop-event-feed.js';
 import { reconstructDesktopIntent, reviewDesktopIntent } from './desktop-intent-reconstruction.js';
 import { assertObservationOpMappingsValid, chooseNativeOps } from './native-op-mapping.js';
 import { compileDesktopRecording } from './desktop-recording-compiler.js';
+import { pathResolver } from './path-resolver.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+
+const RECORDING_TEST_ROOT = pathResolver.sharedTmp('desktop-recording-loader-test');
 
 const snapshot = (overrides: Record<string, unknown> = {}) => ({
   application: 'Notes',
@@ -198,6 +204,25 @@ describe('desktop recording and distillation', () => {
       valid: false,
       errors: expect.arrayContaining(['recording_hash does not match the reviewed recording body']),
     });
+  });
+
+  it('loads persisted recordings through the regular-file contract boundary', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recording = buildDesktopRecording([snapshot({ event: { op: 'screenshot' } })]);
+    const recordingPath = path.join(RECORDING_TEST_ROOT, 'recording.json');
+    safeWriteFile(recordingPath, `${JSON.stringify(recording)}\n`);
+
+    expect(loadDesktopRecordingAtPath(recordingPath).recording_id).toBe(recording.recording_id);
+  });
+
+  it('rejects a directory at the persisted recording path', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), { recursive: true });
+
+    expect(() =>
+      loadDesktopRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
+    ).toThrow('recording must be a regular file');
   });
 
   it('keeps an empty observation capture valid but non-executable', () => {
