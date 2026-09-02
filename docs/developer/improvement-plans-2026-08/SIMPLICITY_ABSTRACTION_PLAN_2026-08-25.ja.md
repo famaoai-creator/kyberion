@@ -12237,6 +12237,18 @@ fallback解決の全経路で検証済みのtheme packだけを返すように�
 root lint、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
 各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 335
+
+SX-04 の confidential tenant design override index (`knowledge/confidential/tenants/index.json`) が core／mediaの
+両方で汎用JSON readerに依存していた残存を修正した。専用 `tenant-design-override-index` schemaとcoreの共有loaderを
+追加し、tenant design resolver、media theme override discovery、brand registrationのregistry更新を同じ検証済み
+境界へ統合した。override pathは対象tenantのconfidential design配下に限定し、malformed／lower-tier参照は従来どおり
+候補から除外する。
+
+検証: tenant design resolver **1 file / 10 tests passed**、media catalog／media actuator対象テスト、core／actuator build、
+root typecheck、root lint、PR scope、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの
+廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

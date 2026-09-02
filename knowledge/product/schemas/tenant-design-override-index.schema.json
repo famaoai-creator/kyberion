@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/tenant-design-override-index.schema.json",
+  "title": "Tenant Design Override Index",
+  "description": "Confidential design override references keyed by tenant. Entries must remain inside the matching tenant design directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["tenants"],
+  "properties": {
+    "tenants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "override_path"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9_][a-z0-9_-]*$"
+          },
+          "override_path": {
+            "type": "string",
+            "pattern": "^knowledge/confidential/[a-z0-9_][a-z0-9_-]*/design/tenant-override\\.json$"
+          }
+        }
+      }
+    }
+  }
+}
