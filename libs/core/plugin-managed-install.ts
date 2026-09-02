@@ -17,6 +17,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   createApprovalRequest,
   computeApprovalPayloadHash,
@@ -379,7 +380,7 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       activationStatus: resolveActivationStatus({ diagnostics, trust: trust.label, approval }),
       approvalChannel: approval ? approvalChannel : undefined,
       approvalRequestId: approval?.id,
-      installedAt: new Date().toISOString(),
+      installedAt: nowIso(),
     };
     writeManagedRecord(managedDir, record);
     return record;

@@ -5,6 +5,7 @@ import {
 } from './intent-snapshot-store.js';
 import { getIntentExtractor } from './intent-extractor.js';
 import { logger } from './core.js';
+import { nowIso } from './foundation/time.js';
 
 export interface MissionIntentDriftSummary {
   checked_at: string;
@@ -80,7 +81,7 @@ export function evaluateMissionIntentDrift(missionId: string): MissionIntentDrif
   try {
     const gate = evaluateIntentDriftGate(missionId);
     return {
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       passed: gate.passed,
       verdict: gate.verdict,
       drift_score: gate.driftScore,

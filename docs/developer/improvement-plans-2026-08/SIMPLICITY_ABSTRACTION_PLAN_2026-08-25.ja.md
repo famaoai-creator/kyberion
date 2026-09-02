@@ -12551,6 +12551,12 @@ SX-03 の残存監査として、mission work-item dispatch の ticket／executi
 
 検証: mission dispatch **4 files / 41 tests passed**、対象ticket／execution production filesの単純timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14の未完了項目である。
 
+## 2026-09-02 再レビュー修正 382
+
+SX-03 の残存監査として、intent delta／mission intent delta／reasoning auth preflight／managed plugin install／Claude task-session executor に残っていた単純な生成時刻6箇所を foundation `nowIso()` へ統合した。intent drift・認証probe・plugin状態・承認済みtask-sessionの既存入力／状態遷移 semantics は維持した。併せて task-session test のsecure-io mockに不足していた `assertSafeRepositoryPath` を追加し、実行契約を検証可能にした。
+
+検証: intent／reasoning／plugin／task-session **7 files / 52 tests passed**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
