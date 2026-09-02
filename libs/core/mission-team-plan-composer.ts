@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
@@ -485,7 +486,7 @@ export function composeMissionTeamPlan(input: {
     organization_profile: summarizeMissionOrganizationProfile(organizationProfile),
     organization_chart: organizationChart,
     mission_classification: missionClassification,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     team_governance: buildTeamGovernance(template, assignments),
     assignments,
   };

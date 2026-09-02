@@ -1,6 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import type { IntentCompilerProvider, IntentContract } from './intent-contract.js';
 import type { OrganizationWorkLoopSummary } from './work-design.js';
@@ -131,7 +132,7 @@ export function buildAssistantDelegationRequest(
   const request: AssistantDelegationRequest = {
     kind: 'assistant-delegation-request',
     request_id: requestId,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: input.source,
     goal: input.intentContract.goal.summary,
     source_text: input.sourceText,
