@@ -54,6 +54,8 @@ import {
   presenceStudioVoiceStopSchema,
   presenceStudioBrowserBootstrapSchema,
   summarizePresenceStudioIdentity,
+  parsePresenceStudioAgentIdentity,
+  parsePresenceStudioSovereignIdentity,
   summarizePresenceStudioState,
   presenceStudioVoiceMinutesSchema,
   presenceStudioVoiceIngestSchema,
@@ -99,8 +101,12 @@ presenceStudioData.app.get('/api/identity', (_req, res) => {
       const safeIdPath = presenceStudioData.resolveSafeExistingFile(idPath);
       const safeAgentPath = presenceStudioData.resolveSafeExistingFile(agentPath);
       const safeVisionPath = presenceStudioData.resolveSafeExistingFile(visionPath);
-      const sovereign = safeIdPath ? readJson<unknown>(safeIdPath) : null;
-      const agent = safeAgentPath ? readJson<unknown>(safeAgentPath) : null;
+      const sovereign = safeIdPath
+        ? parsePresenceStudioSovereignIdentity(readJson<unknown>(safeIdPath))
+        : null;
+      const agent = safeAgentPath
+        ? parsePresenceStudioAgentIdentity(readJson<unknown>(safeAgentPath))
+        : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
         : null;

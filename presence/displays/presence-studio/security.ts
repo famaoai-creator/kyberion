@@ -542,6 +542,31 @@ export const presenceStudioApprovalDecisionSchema = z
   })
   .strict();
 
+const presenceStudioSovereignIdentitySchema = z
+  .object({ name: z.string().trim().max(200).optional() })
+  .passthrough();
+
+const presenceStudioAgentIdentitySchema = z
+  .object({
+    agent_id: z.string().trim().max(200).optional(),
+    trust_tier: z.string().trim().max(100).optional(),
+  })
+  .passthrough();
+
+export function parsePresenceStudioSovereignIdentity(value: unknown): { name?: string } | null {
+  const parsed = presenceStudioSovereignIdentitySchema.safeParse(value);
+  return parsed.success ? { name: parsed.data.name } : null;
+}
+
+export function parsePresenceStudioAgentIdentity(
+  value: unknown
+): { agent_id?: string; trust_tier?: string } | null {
+  const parsed = presenceStudioAgentIdentitySchema.safeParse(value);
+  return parsed.success
+    ? { agent_id: parsed.data.agent_id, trust_tier: parsed.data.trust_tier }
+    : null;
+}
+
 export function summarizePresenceStudioIdentity(payload: {
   sovereign?: { name?: unknown } | null;
   agent?: { agent_id?: unknown; trust_tier?: unknown } | null;
