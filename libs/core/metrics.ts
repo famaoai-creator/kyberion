@@ -8,6 +8,7 @@ import { normalizeEventScope, type EventScope, type EventScopeInput } from './ev
 import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 const logger = createLogger('metrics');
 
 /**
@@ -266,7 +267,7 @@ export class MetricsCollector {
       type: 'resource_usage',
       usage_id:
         input.usage_id || `${input.resource_kind}:${input.actor_id || 'unknown'}:${Date.now()}`,
-      timestamp: input.timestamp || new Date().toISOString(),
+      timestamp: input.timestamp || nowIso(),
       resource_kind: input.resource_kind,
       actor_id: input.actor_id,
       mission_id: missionId,
@@ -338,7 +339,7 @@ export class MetricsCollector {
     agg.totalMs += durationMs;
     agg.minMs = Math.min(agg.minMs, durationMs);
     agg.maxMs = Math.max(agg.maxMs, durationMs);
-    agg.lastRun = new Date().toISOString();
+    agg.lastRun = nowIso();
     agg.peakHeapMB = Math.max(agg.peakHeapMB, memory.heapUsedMB);
     agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
 
@@ -409,7 +410,7 @@ export class MetricsCollector {
       type: 'intervention',
       context,
       decision: decisionId,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   }
 
