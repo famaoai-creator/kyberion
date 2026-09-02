@@ -30,7 +30,7 @@ import {
 import { loadState } from './mission-state.js';
 import { nowIso } from './foundation/time.js';
 import type { IntentReconciliationInput } from './intent-reconciliation.js';
-import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
+import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
 function safeMissionDir(missionDir: string, allowMissingLeaf = false): string {
   return assertSafeRepositoryPath(missionDir, { allowMissingLeaf });
@@ -372,7 +372,12 @@ export function readMissionNextTasks(missionDir: string): Array<Record<string, u
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   if (!safeExistsSync(nextTasksPath)) return [];
   try {
-    return parseMissionNextTaskObjects(readJson<unknown>(nextTasksPath)) || [];
+    return (
+      loadMissionNextTaskObjectsAtPath(
+        nextTasksPath,
+        path.basename(safeMissionDir(missionDir, true))
+      ) || []
+    );
   } catch {
     return [];
   }

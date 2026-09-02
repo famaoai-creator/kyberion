@@ -4,15 +4,11 @@ import { parseSafeJsonObjectValue } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 
-const MISSION_NEXT_TASKS_SCHEMA_PATH = pathResolver.knowledge(
-  'product/schemas/mission-next-tasks.schema.json'
-);
-
 function missionNextTasksCatalog(filePath: string) {
   return defineCatalog<Array<Record<string, unknown>>>({
     id: 'mission-next-tasks',
     path: filePath,
-    schema: MISSION_NEXT_TASKS_SCHEMA_PATH,
+    schema: pathResolver.knowledge('product/schemas/mission-next-tasks.schema.json'),
   });
 }
 
