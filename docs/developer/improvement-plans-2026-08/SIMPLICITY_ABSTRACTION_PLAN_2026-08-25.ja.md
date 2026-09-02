@@ -11728,6 +11728,17 @@ governance runtime source 集合に `ci-gates.json` を加え、manifest の bas
 root lint、root typecheck、`git diff --check`。残る SX-07 は CI の重複 setup を composite action へ抽出し、full／release の
 外部依存 gate を sandbox-independent にする作業である。
 
+## 2026-09-02 再レビュー修正 285
+
+`.github/workflows/ci.yml` の 5 job に重複していた checkout／pnpm／Node／frozen install を local composite action
+`.github/actions/setup-kyberion/action.yml` へ抽出した。Node version と Playwright install は input で指定でき、CJK
+font、build、test、security、manifest gate など job 固有の順序と責務は workflow 側に残した。PR／CI の format check
+対象にも action 定義を追加し、action 自体の整形 drift を検出する。
+
+検証: composite action／CI workflow／PR workflow の Prettier check、PR scope **33/33 gates passed**、root lint、
+root typecheck、`git diff --check`。残る SX-07 は release／Cross-OS を含む全 workflow の setup 共通化と、外部依存 gate の
+sandbox-independent 実行である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
