@@ -11627,6 +11627,19 @@ rule を優先した上で未登録 catalog を追加検証する。既存の ma
 catalogs の discovery、root typecheck、`git diff --check`。残る SX-04 は generic envelope の dedicated schema 化、
 未参照 catalog の処分、各 domain loader の完全統合である。
 
+## 2026-09-02 再レビュー修正 276
+
+generic envelope を宣言していた governance catalog のうち、既存の dedicated schema と payload が一致する
+`active-surfaces`、ADF execution、analysis execution、autonomous ops、execution boundary、intent outcome、
+knowledge feedback、marketing risk、media backend、protocol service、reasoning provider、runtime design、surface
+roles の **13 catalog** を dedicated schema 参照へ切り替えた。schema の新規作成や payload の意味変更は行わず、
+canonical knowledge integrity manifest は generator で再生成した。catalog／governance-rules の directory-driven
+validation は切替後も成功している。
+
+検証: catalogs／governance-rules **各 1 gate passed**、対象 13 catalog の dedicated schema validation、
+root typecheck、`git diff --check`。残る SX-04 は generic envelope の dedicated schema 化、未参照 catalog の処分、
+各 domain loader の完全統合である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
