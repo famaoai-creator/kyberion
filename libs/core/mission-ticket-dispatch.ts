@@ -15,6 +15,7 @@ import { importExternalWorkItem } from './work-coordination.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { findMissionPath } from './path-resolver.js';
 import type { MissionState } from './mission-types.js';
+import { nowIso } from './foundation/time.js';
 import {
   countWords as countWordsFromDispatchIO,
   ensureDirectory,
@@ -404,7 +405,7 @@ export async function dispatchMissionTickets(
           ? `https://github.com/${options.github.owner}/${options.github.repo}`
           : undefined,
       html_url: undefined,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       draft: false,
     };
     if (status !== 'failed' && targets.includes('github')) {
@@ -474,7 +475,7 @@ export async function dispatchMissionTickets(
           ? { accountId: resolvedAgentId, displayName: resolvedAgentId }
           : undefined,
         project: { key: jiraProjectKey, id: jiraProjectKey },
-        updated: new Date().toISOString(),
+        updated: nowIso(),
       },
     };
     if (status !== 'failed' && targets.includes('jira')) {
@@ -537,7 +538,7 @@ export async function dispatchMissionTickets(
       const nextTask = {
         ...allTasks[taskIndex],
         ticket_dispatch: {
-          registered_at: new Date().toISOString(),
+          registered_at: nowIso(),
           manifest_path: manifestPath(missionPath),
           work_item_id: workItemId,
           targets,
@@ -592,8 +593,8 @@ export async function dispatchMissionTickets(
     track_id: projectLink.track_id,
     tier: state.tier,
     tenant_slug: state.tenant_slug,
-    created_at: existingManifest?.created_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: existingManifest?.created_at || nowIso(),
+    updated_at: nowIso(),
     targets,
     live_targets: liveTargets,
     ticket_count: records.length,
