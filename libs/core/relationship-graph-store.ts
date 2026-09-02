@@ -14,6 +14,7 @@
 import * as path from 'node:path';
 import { rootResolve } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
 
 const RELATIONSHIPS_ROOT = 'knowledge/confidential/relationships';
@@ -113,7 +114,7 @@ function writeNode(org: string, personSlug: string, node: RelationshipNode): voi
 }
 
 function initialNode(identity: RelationshipIdentity): RelationshipNode {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     identity,
     trust_level: { current: 3, updated_at: now, history: [] },
@@ -141,7 +142,7 @@ export function recordInteraction(params: RecordInteractionParams): Relationship
     });
 
   node.history = [...node.history, params.interaction].slice(-HISTORY_MAX);
-  node.updated_at = new Date().toISOString();
+  node.updated_at = nowIso();
   writeNode(params.org, params.personSlug, node);
   return node;
 }
@@ -163,10 +164,10 @@ export function suggestFieldUpdate(params: SuggestFieldUpdateParams): Relationsh
     source: params.source,
     field_path: params.fieldPath,
     proposed_value: params.proposedValue,
-    detected_at: new Date().toISOString(),
+    detected_at: nowIso(),
   };
   existing.pending_suggestions = [...(existing.pending_suggestions ?? []), suggestion];
-  existing.updated_at = new Date().toISOString();
+  existing.updated_at = nowIso();
   writeNode(params.org, params.personSlug, existing);
   return existing;
 }
