@@ -13385,6 +13385,12 @@ SX-03／SX-04／SX-08 のintent goal handoffを再監査し、mission creation�
 
 検証: intent handoff **1 file / 8 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 521
+
+SX-03／SX-04／SX-08 のmission phase gate実行記録を再監査し、`gates/*.json`をraw `readJson<unknown>`と型アサーションでprior failure集計・task board表示へ渡していた残存を修正した。`mission-gate-record.schema.json`と`loadMissionGateRecordAtPath`を追加し、gate evaluation／override／intent driftの共通payload、regular-file境界、`mission_id` bindingを共有loaderへ集約した。不正・別mission・directoryの記録は集計と表示へ進まずfail-closedし、既存のgate評価、override記録、task board描画 semanticsは維持している。
+
+検証: phase-gate **12 tests passed**、gate engine／lifecycle **37 tests passed**、orchestration worker **29 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

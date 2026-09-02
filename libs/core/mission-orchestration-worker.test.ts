@@ -2420,6 +2420,7 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
       `${missionPath}/gates/finish-exit-1.json`,
       JSON.stringify(
         {
+          mission_id: 'MSN-FOLLOWUP',
           gate_id: 'finish-exit',
           verdict: 'fail',
           reason: 'Pending tasks remain: task-1',

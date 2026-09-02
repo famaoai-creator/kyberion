@@ -10,7 +10,7 @@ import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   parseMissionNextTaskRecords,
@@ -28,13 +28,28 @@ function safeMissionPath(missionId: string, relativePath: string, allowMissingLe
 }
 
 export type MissionGateRecord = {
+  mission_id?: string;
   gate_id?: string;
   verdict?: 'pass' | 'fail';
   reason?: string;
+  reasons?: string[];
   failure_count?: number;
   checked_at?: string;
   should_realign?: boolean;
   next_status?: string;
+  phase?: string;
+  position?: string;
+  source?: string;
+  drift_score?: number;
+  review_summary?: Record<string, unknown>;
+  evidence_path?: string;
+  checks?: Array<{ kind: string; passed: boolean; reason?: string }>;
+  override?: boolean;
+  override_outcome?: 'passed' | 'rejected';
+  note?: string;
+  confirmed_by?: string;
+  confirmed_at?: string;
+  source_gate_id?: string;
 };
 
 export interface PersistedPhaseGateDefinition {
@@ -46,6 +61,9 @@ export interface PersistedPhaseGateDefinition {
 
 const PHASE_GATE_DEFINITION_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-phase-gate-definition.schema.json'
+);
+const MISSION_GATE_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-gate-record.schema.json'
 );
 
 /** Load one persisted gate through the shared schema boundary and mission binding. */
@@ -65,6 +83,31 @@ export function loadMissionPhaseGateDefinitionAtPath(
     );
   }
   return definition;
+}
+
+/** Load one persisted gate result through schema and mission binding. */
+export function loadMissionGateRecordAtPath(
+  filePath: string,
+  missionId: string
+): MissionGateRecord {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_GATE_RECORD] record must be a regular file: ${filePath}`);
+  }
+  const record = defineCatalog<MissionGateRecord>({
+    id: 'mission-gate-record',
+    path: safeFilePath,
+    schema: MISSION_GATE_RECORD_SCHEMA_PATH,
+  }).validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const expectedMissionId = missionId.trim().toUpperCase();
+  if (record.mission_id?.trim().toUpperCase() !== expectedMissionId) {
+    throw new Error(
+      `[MISSION_GATE_RECORD_SCOPE_MISMATCH] record belongs to ${
+        record.mission_id || ''
+      }, expected ${expectedMissionId}`
+    );
+  }
+  return record;
 }
 
 export interface PhaseExitGateOutcome {
@@ -102,8 +145,10 @@ function loadMissionGateRecords(missionId: string): MissionGateRecord[] {
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => {
       try {
-        const parsed = readJson<unknown>(assertSafeRepositoryPath(path.join(gateDir, entry)));
-        return parsed && typeof parsed === 'object' ? (parsed as MissionGateRecord) : null;
+        return loadMissionGateRecordAtPath(
+          assertSafeRepositoryPath(path.join(gateDir, entry)),
+          missionId
+        );
       } catch {
         return null;
       }

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   evaluateMissionPhaseExitGates,
+  loadMissionGateRecordAtPath,
   loadMissionPhaseGateDefinitions,
   resolvePhaseGateMode,
 } from './mission-orchestration-worker.js';
@@ -167,6 +168,34 @@ describe('mission phase exit gates (MO-02)', () => {
       fs.unlinkSync(path.join(definitionsDir, 'ESCAPED.json'));
       fs.rmSync(externalDefinition, { force: true });
     }
+  });
+
+  it('rejects invalid, cross-mission, and directory gate records at the read boundary', () => {
+    const recordsDir = path.join(missionPath, 'gates');
+    fs.mkdirSync(recordsDir, { recursive: true });
+    const invalidPath = path.join(recordsDir, 'invalid-record.json');
+    fs.writeFileSync(
+      invalidPath,
+      JSON.stringify({ mission_id: missionId, gate_id: 'GATE_A', verdict: 'maybe' })
+    );
+    expect(() => loadMissionGateRecordAtPath(invalidPath, missionId)).toThrow(
+      'Invalid catalog mission-gate-record'
+    );
+
+    const crossMissionPath = path.join(recordsDir, 'cross-mission.json');
+    fs.writeFileSync(
+      crossMissionPath,
+      JSON.stringify({ mission_id: 'MSN-OTHER', gate_id: 'GATE_A', verdict: 'pass' })
+    );
+    expect(() => loadMissionGateRecordAtPath(crossMissionPath, missionId)).toThrow(
+      'MISSION_GATE_RECORD_SCOPE_MISMATCH'
+    );
+
+    const recordDirectory = path.join(recordsDir, 'record-directory.json');
+    fs.mkdirSync(recordDirectory);
+    expect(() => loadMissionGateRecordAtPath(recordDirectory, missionId)).toThrow(
+      'record must be a regular file'
+    );
   });
 
   it('passes when required evidence exists and records the evaluation', async () => {
