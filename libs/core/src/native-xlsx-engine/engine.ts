@@ -5,6 +5,7 @@
  */
 import AdmZip from 'adm-zip';
 import * as path from 'path';
+import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync, safeMkdir } from '../../secure-io.js';
 import type { XlsxDesignProtocol } from '../types/xlsx-protocol.js';
 import { generateContentTypes } from './content-types.js';
@@ -67,7 +68,7 @@ export async function generateNativeXlsx(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:title>Kyberion Native Spreadsheet</dc:title>
-  <dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || new Date().toISOString()}</dcterms:created>
+<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || nowIso()}</dcterms:created>
 </cp:coreProperties>`,
       'utf8'
     )

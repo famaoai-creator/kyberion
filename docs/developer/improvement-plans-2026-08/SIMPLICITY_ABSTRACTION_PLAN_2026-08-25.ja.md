@@ -12653,6 +12653,12 @@ SX-03 の残存監査として、Office artifact の DOCX／PPTX／XLSX design p
 
 検証: native DOCX／PPTX／XLSX engine **4 files / 119 tests passed**、対象3 extractorの単純 timestamp **0件**、root typecheck、対象ファイルの ESLint、`git diff --check`。対象ファイルは既存の未整形部分を巻き込まない最小差分を維持した。残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 399
+
+SX-03 の残存監査として、native DOCX／XLSX writer と PDF writer の core metadata／signature timestamp に残っていた単純な生成時刻の直書き **4 箇所**を foundation `nowIso()` へ統合した。入力 protocol の `generatedAt` 優先、OOXML／PDF metadata の出力形式、署名日付の既存形式と暗号・出力境界は変更していない。
+
+検証: native DOCX／XLSX／PDF engine **4 files / 96 tests passed**、対象4 production filesの単純 timestamp **0件**、root typecheck、対象ファイルの ESLint／Prettier、`git diff --check`。PDF parser の既存未整形部分はこのスライスに含めず、残課題として維持した。残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
