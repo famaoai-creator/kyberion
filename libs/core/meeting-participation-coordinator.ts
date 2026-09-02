@@ -42,6 +42,7 @@ import type {
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
 import { BargeInController } from './barge-in-controller.js';
+import { validateVoiceConsentRecord } from './voice-consent.js';
 
 export interface ConversationAgent {
   /**
@@ -101,20 +102,8 @@ export interface MeetingParticipationReport {
   error?: string;
 }
 
-interface MeetingParticipationConsentRecord {
-  consent?: unknown;
-  mission_id?: unknown;
-  operator_handle?: unknown;
-  tenant_slug?: unknown;
-  expires_at?: unknown;
-}
-
 function normalizeOptionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function checkMeetingParticipationConsent(input: {
@@ -160,53 +149,16 @@ export function checkMeetingParticipationConsent(input: {
       reason: `voice-consent.json missing at ${path.relative(pathResolver.rootDir(), consentPath)}`,
     };
   }
-  let raw: MeetingParticipationConsentRecord;
   try {
-    const parsed = readJson<unknown>(consentPath);
-    if (!isPlainObject(parsed)) {
-      return { allowed: false, reason: 'voice-consent.json is malformed: expected an object' };
-    }
-    raw = parsed;
+    const raw = readJson<unknown>(consentPath);
+    return validateVoiceConsentRecord(raw, {
+      missionId,
+      tenantSlug: input.tenant_slug,
+    });
   } catch (err: unknown) {
     const reason = err instanceof Error ? err.message : String(err);
     return { allowed: false, reason: `failed to parse voice-consent.json: ${reason}` };
   }
-  if (raw.consent !== 'granted') {
-    return {
-      allowed: false,
-      reason: `voice-consent.json present but consent != 'granted' (got '${String(raw.consent)}')`,
-    };
-  }
-  if (normalizeOptionalString(raw.mission_id) !== missionId) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json mission_id '${String(raw.mission_id)}' does not match active mission '${missionId}'`,
-    };
-  }
-  if (!normalizeOptionalString(raw.operator_handle)) {
-    return {
-      allowed: false,
-      reason: 'voice-consent.json is malformed: operator_handle is required',
-    };
-  }
-  const expiresAt = normalizeOptionalString(raw.expires_at);
-  if (expiresAt) {
-    const expiry = Date.parse(expiresAt);
-    if (!Number.isFinite(expiry)) {
-      return { allowed: false, reason: `voice-consent.json expires_at is invalid: ${expiresAt}` };
-    }
-    if (expiry <= Date.now()) {
-      return { allowed: false, reason: `voice-consent.json expired at ${expiresAt}` };
-    }
-  }
-  const activeTenant = normalizeOptionalString(input.tenant_slug);
-  if (activeTenant && normalizeOptionalString(raw.tenant_slug) !== activeTenant) {
-    return {
-      allowed: false,
-      reason: `voice-consent.json tenant_slug '${normalizeOptionalString(raw.tenant_slug) ?? 'missing'}' does not match active tenant '${activeTenant}'`,
-    };
-  }
-  return { allowed: true };
 }
 
 export function filterSelfAudioFromMeetingInput(
