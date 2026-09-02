@@ -1,6 +1,7 @@
 import path from 'node:path';
+import type { MissionState } from '@agent/core/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
-import { optionalStringField, recordField, stringField } from '../../../lib/json-record';
+import { optionalStringField, recordField } from '../../../lib/json-record';
 
 type ChronosQuickActionCore = {
   pathResolver: {
@@ -10,6 +11,7 @@ type ChronosQuickActionCore = {
   safeExistsSync(filePath: string): boolean;
   safeLstat(filePath: string): { isDirectory(): boolean; isFile(): boolean };
   safeReaddir(directoryPath: string): string[];
+  loadStateAtPath(filePath: string): MissionState | null;
   readJson<T = unknown>(filePath: string): T;
   safeExecResult(
     command: string,
@@ -56,9 +58,9 @@ export function collectActiveMissions(core: ChronosQuickActionCore): ActiveMissi
           path.join(safeMissionDir, 'mission-state.json')
         );
         if (!core.safeExistsSync(statePath) || !core.safeLstat(statePath).isFile()) continue;
-        const state = recordField(core.readJson<unknown>(statePath));
-        const status = stringField(state, 'status');
-        if (!['active', 'planned', 'paused', 'failed'].includes(status)) continue;
+        const state = core.loadStateAtPath(statePath);
+        const status = state?.status;
+        if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
         let nextTaskCount = 0;
         try {
           const nextTasksPath = core.assertSafeRepositoryPath(
@@ -80,10 +82,10 @@ export function collectActiveMissions(core: ChronosQuickActionCore): ActiveMissi
         }
         const git = recordField(state.git);
         missions.push({
-          missionId: stringField(state, 'mission_id', item),
+          missionId: state.mission_id || item,
           status,
-          tier: stringField(state, 'tier', root.tier),
-          missionType: optionalStringField(state, 'mission_type'),
+          tier: state.tier || root.tier,
+          missionType: state.mission_type,
           checkpoints: Array.isArray(git.checkpoints) ? git.checkpoints.length : 0,
           nextTaskCount,
           planReady,

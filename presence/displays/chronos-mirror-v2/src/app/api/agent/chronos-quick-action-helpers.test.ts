@@ -15,6 +15,10 @@ function makeCore(state: unknown, nextTasks: unknown) {
     }),
     safeReaddir: (directoryPath: string) =>
       directoryPath.endsWith('/missions/public') ? [missionId] : [],
+    loadStateAtPath: (filePath: string) =>
+      (filePath.endsWith('mission-state.json') && state && typeof state === 'object'
+        ? state
+        : null) as never,
     readJson: <T = unknown>(filePath: string) =>
       (filePath.endsWith('mission-state.json') ? state : nextTasks) as T,
     safeExecResult: () => ({ status: 0 }),
@@ -37,6 +41,11 @@ describe('chronos quick action mission projection', () => {
             tier: 'confidential',
             mission_type: 'delivery',
             git: { checkpoints: [{ id: 'checkpoint-1' }] },
+            execution_mode: 'local',
+            priority: 1,
+            assigned_persona: 'operator',
+            confidence_score: 1,
+            history: [],
           },
           [{ status: 'planned' }, { status: 'completed' }]
         )
