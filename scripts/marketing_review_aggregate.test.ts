@@ -138,4 +138,45 @@ describe('marketing review aggregation', () => {
     });
     expect(result.ready_for_approval).toBe(false);
   });
+
+  it('rejects schema-invalid persisted review input before aggregation', () => {
+    const input = fixture();
+    const review = JSON.parse(safeReadFile(input.reviewPath, { encoding: 'utf8' }) as string);
+    review.unexpected = true;
+    safeWriteFile(input.reviewPath, JSON.stringify(review));
+
+    expect(() =>
+      runMarketingReviewAggregation({
+        reviewPackagePath: input.packagePath,
+        reviewPaths: [input.reviewPath],
+        outputPath: path.join(input.root, 'result.json'),
+      })
+    ).toThrow(/Invalid catalog marketing-review/);
+  });
+
+  it('rejects a review artifact whose package hash no longer matches', () => {
+    const input = fixture();
+    const reviewPackage = JSON.parse(
+      safeReadFile(input.packagePath, { encoding: 'utf8' }) as string
+    );
+    reviewPackage.artifacts[0].sha256 = '0'.repeat(64);
+    safeWriteFile(input.packagePath, JSON.stringify(reviewPackage));
+
+    expect(() =>
+      runMarketingReviewAggregation({
+        reviewPackagePath: input.packagePath,
+        reviewPaths: [input.reviewPath],
+        outputPath: path.join(input.root, 'result.json'),
+      })
+    ).not.toThrow();
+    const result = runMarketingReviewAggregation({
+      reviewPackagePath: input.packagePath,
+      reviewPaths: [input.reviewPath],
+      outputPath: path.join(input.root, 'result.json'),
+    });
+    expect(result.ready_for_approval).toBe(false);
+    expect(
+      JSON.parse(safeReadFile(result.output_path, { encoding: 'utf8' }) as string).gate.reasons
+    ).toContain('review package artifact hash mismatch: video');
+  });
 });

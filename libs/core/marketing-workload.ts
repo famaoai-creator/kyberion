@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import * as customerResolver from './customer-resolver.js';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { safeExistsSync } from './secure-io.js';
+import { readJson } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { computeApprovalPayloadHash, type ApprovalRequestRecord } from './approval-store.js';
 import { evaluateArtifactReviews } from './artifact-review.js';
 
@@ -53,6 +54,12 @@ export interface MarketingReview {
     required_action?: string;
     location?: Record<string, string>;
   }>;
+}
+
+export interface MarketingReviewPackage {
+  run_id: string;
+  risk_level: MarketingRiskLevel;
+  artifacts: Array<{ name: string; path: string; sha256: string }>;
 }
 
 export interface PublicationApproval {
@@ -137,6 +144,23 @@ const PUBLICATION_APPROVAL_SCHEMA_PATH = pathResolver.knowledge(
 const MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/marketing-completion-evidence.schema.json'
 );
+const MARKETING_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review.schema.json'
+);
+const MARKETING_REVIEW_PACKAGE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/marketing-review-package.schema.json'
+);
+
+const marketingReviewCatalog = defineCatalog<MarketingReview>({
+  id: 'marketing-review',
+  path: MARKETING_REVIEW_SCHEMA_PATH,
+  schema: MARKETING_REVIEW_SCHEMA_PATH,
+});
+const marketingReviewPackageCatalog = defineCatalog<MarketingReviewPackage>({
+  id: 'marketing-review-package',
+  path: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
+  schema: MARKETING_REVIEW_PACKAGE_SCHEMA_PATH,
+});
 
 export function sha256(value: string | Uint8Array): string {
   return createHash('sha256').update(value).digest('hex');
@@ -160,6 +184,26 @@ export function loadMarketingCompletionEvidenceAtPath(
     path: filePath,
     schema: MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH,
   }).load();
+}
+
+function requireRegularMarketingFile(filePath: string, label: string): string {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`${label} must be a regular file: ${filePath}`);
+  }
+  return safeFilePath;
+}
+
+/** Load the persisted review package through its strict schema boundary. */
+export function loadMarketingReviewPackageAtPath(filePath: string): MarketingReviewPackage {
+  const safeFilePath = requireRegularMarketingFile(filePath, 'review package');
+  return marketingReviewPackageCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+}
+
+/** Load one persisted marketing review through its strict schema boundary. */
+export function loadMarketingReviewAtPath(filePath: string): MarketingReview {
+  const safeFilePath = requireRegularMarketingFile(filePath, 'review');
+  return marketingReviewCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
 }
 
 export function scanMarketingTextForSensitiveData(
