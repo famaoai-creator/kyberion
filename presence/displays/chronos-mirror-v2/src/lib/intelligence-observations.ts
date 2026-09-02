@@ -1,4 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
+import { nowIso } from '@agent/core/foundation';
 import { validateBrowserConversationSession } from '@agent/core/browser-conversation-session';
 import path from 'node:path';
 import {
@@ -251,7 +252,7 @@ export function collectRecentEvents(
         const event = parseJsonRecord(line);
         if (!event) continue;
         lines.push({
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           decision: stringField(event, 'decision', stringField(event, 'event_type', 'event')),
           mission_id:
             optionalStringField(event, 'mission_id') || optionalStringField(event, 'resource_id'),
@@ -299,7 +300,7 @@ export function collectControlActions(
             : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: queuedTarget,
           operation: stringField(payload, 'operation', eventType),
@@ -317,7 +318,7 @@ export function collectControlActions(
         const syntheticId = `${decision}:${stringField(event, 'mission_id', stringField(event, 'resource_id', 'system'))}:${stringField(event, 'operation')}:${stringField(event, 'ts')}`;
         lifecycle.set(syntheticId, {
           event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           kind: decision === 'mission_control_action_applied' ? 'mission' : 'surface',
           target: stringField(event, 'mission_id', stringField(event, 'resource_id', 'system')),
           operation: stringField(event, 'operation'),
@@ -340,7 +341,7 @@ export function collectControlActions(
             : stringField(event, 'mission_id', 'system');
         lifecycle.set(eventId, {
           event_id: eventId,
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           kind: eventType === 'mission_control_requested' ? 'mission' : 'surface',
           target: failedTarget,
           operation: stringField(payload, 'operation', eventType),
@@ -394,7 +395,7 @@ export function collectControlActionDetails(
         details[eventId] = [];
       }
       details[eventId].push({
-        ts: stringField(event, 'ts', new Date().toISOString()),
+        ts: stringField(event, 'ts', nowIso()),
         decision: stringField(event, 'decision', 'event'),
         event_type: optionalStringField(event, 'event_type'),
         mission_id: optionalStringField(event, 'mission_id'),
@@ -439,7 +440,7 @@ export function collectOwnerSummaries(
         )
           continue;
         summaries.push({
-          ts: stringField(event, 'ts', new Date().toISOString()),
+          ts: stringField(event, 'ts', nowIso()),
           mission_id: stringField(event, 'mission_id', 'unknown'),
           accepted_count: numberField(event, 'accepted_count'),
           reviewed_count: numberField(event, 'reviewed_count'),
