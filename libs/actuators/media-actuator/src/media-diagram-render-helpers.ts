@@ -19,6 +19,7 @@ import {
 } from '@agent/core/media-drawio-sort-policy';
 import { resolveMediaDrawioSecurityGroupRelationPrefix } from '@agent/core/media-drawio-security-group-order';
 import { escapeXml } from '@agent/core/text-escaping';
+import { nowIso } from '@agent/core/foundation';
 import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { createHash } from 'node:crypto';
@@ -561,7 +562,7 @@ function generateDrawioDocument(
 
   const diagramId = createHash('sha1').update(JSON.stringify(graph)).digest('hex').slice(0, 12);
   return [
-    `<mxfile host="kyberion" modified="${new Date().toISOString()}" agent="Kyberion Media-Actuator" version="1.0.0" type="device">`,
+    `<mxfile host="kyberion" modified="${nowIso()}" agent="Kyberion Media-Actuator" version="1.0.0" type="device">`,
     `  <diagram id="${diagramId}" name="${escapeXml(options.title)}" compressed="false">`,
     '    <mxGraphModel dx="1600" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">',
     '      <root>',
