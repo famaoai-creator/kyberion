@@ -76,6 +76,7 @@ import {
   loadLayoutTemplateCatalog,
   buildPptxSlideFromPattern,
 } from './media-layout-runtime.js';
+import { loadLayoutTemplateCatalogFromPath } from './media-layout-catalog.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
 
 function resolveMediaRepositoryPath(rootDir: string, value: unknown, label: string): string {
@@ -356,7 +357,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
       if (tenantSlug) {
         const confPath = `knowledge/confidential/${tenantSlug}/design/layout-templates.json`;
         try {
-          const confCatalog = loadJsonValue(
+          const confCatalog = loadLayoutTemplateCatalogFromPath(
             resolveMediaRepositoryPath(rootDir, confPath, 'layout_template_from_pptx_design')
           );
           const m = matchLayoutTemplate(geometry, confCatalog);
