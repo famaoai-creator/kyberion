@@ -3,8 +3,10 @@ import { createHash } from 'node:crypto';
 import type { DesktopRecording, DesktopRecordingStep } from './desktop-recording.js';
 import { chooseNativeOps } from './native-op-mapping.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 
 export interface DesktopIntentStep {
   id: string;
@@ -49,6 +51,27 @@ export function validateDesktopIntentDraft(input: unknown): DesktopIntentDraft {
     throw new Error(`Invalid desktop intent: ${errors.join('; ')}`);
   }
   return input as DesktopIntentDraft;
+}
+
+/** Load one persisted intent review artifact through the regular-file contract boundary. */
+export function loadDesktopIntentDraftAtPath(
+  filePath: string,
+  expectedSourceRecordingId?: string
+): DesktopIntentDraft {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_INTENT] intent draft must be a regular file: ${filePath}`);
+  }
+  const intent = validateDesktopIntentDraft(readJson<unknown>(safeFilePath));
+  if (
+    expectedSourceRecordingId !== undefined &&
+    intent.source_recording_id !== expectedSourceRecordingId
+  ) {
+    throw new Error(
+      `[DESKTOP_INTENT_SCOPE_MISMATCH] intent artifact belongs to ${intent.source_recording_id}, expected ${expectedSourceRecordingId}`
+    );
+  }
+  return intent;
 }
 
 function titleFor(step: DesktopRecordingStep): string {

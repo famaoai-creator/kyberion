@@ -8,7 +8,7 @@
  * every other surface uses.
  */
 import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
-import { nowIso, parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectInput } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -40,9 +40,9 @@ import { promoteDesktopProcedure } from '@agent/core/desktop-recording-compiler'
 import { reconcileDesktopPromotionTransaction } from '@agent/core/desktop-promotion-transaction';
 import {
   intentDraftHash,
+  loadDesktopIntentDraftAtPath,
   reconstructDesktopIntent,
   reviewDesktopIntent,
-  validateDesktopIntentDraft,
 } from '@agent/core/desktop-intent-reconstruction';
 import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
 import { loadBrowserExtensionRecordingAtPath } from '@agent/core/browser-extension-bridge';
@@ -716,7 +716,7 @@ function loadDesktopIntent(
   }
   try {
     return {
-      intent: validateDesktopIntentDraft(readJson<unknown>(intentPath)),
+      intent: loadDesktopIntentDraftAtPath(intentPath, recording?.recording_id),
       intentPath,
       reconstructed: false,
     };

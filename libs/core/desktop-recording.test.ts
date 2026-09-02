@@ -10,7 +10,11 @@ import {
   validateDesktopRecording,
 } from './desktop-recording.js';
 import { parseDesktopEventLine } from './desktop-event-feed.js';
-import { reconstructDesktopIntent, reviewDesktopIntent } from './desktop-intent-reconstruction.js';
+import {
+  loadDesktopIntentDraftAtPath,
+  reconstructDesktopIntent,
+  reviewDesktopIntent,
+} from './desktop-intent-reconstruction.js';
 import { assertObservationOpMappingsValid, chooseNativeOps } from './native-op-mapping.js';
 import { compileDesktopRecording } from './desktop-recording-compiler.js';
 import { pathResolver } from './path-resolver.js';
@@ -223,6 +227,30 @@ describe('desktop recording and distillation', () => {
     expect(() =>
       loadDesktopRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
     ).toThrow('recording must be a regular file');
+  });
+
+  it('loads persisted desktop intent artifacts through the regular-file boundary', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recording = buildDesktopRecording([snapshot({ event: { op: 'screenshot' } })]);
+    const intentPath = path.join(RECORDING_TEST_ROOT, 'recording.intent.json');
+    safeWriteFile(intentPath, `${JSON.stringify(reconstructDesktopIntent(recording))}\n`);
+
+    expect(loadDesktopIntentDraftAtPath(intentPath).source_recording_id).toBe(
+      recording.recording_id
+    );
+    expect(() => loadDesktopIntentDraftAtPath(intentPath, 'other-recording')).toThrow(
+      'DESKTOP_INTENT_SCOPE_MISMATCH'
+    );
+  });
+
+  it('rejects a directory at the persisted desktop intent path', () => {
+    safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'), { recursive: true });
+
+    expect(() =>
+      loadDesktopIntentDraftAtPath(path.join(RECORDING_TEST_ROOT, 'recording.intent.json'))
+    ).toThrow('intent draft must be a regular file');
   });
 
   it('keeps an empty observation capture valid but non-executable', () => {
