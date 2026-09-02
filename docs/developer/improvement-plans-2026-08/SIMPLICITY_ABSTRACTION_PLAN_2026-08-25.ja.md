@@ -12126,6 +12126,16 @@ fragment 内の preset／geometry payload は、既存の拡張性を保つた�
 検証: slide layout catalog **1 file / 1 test passed**、関連 media／core、typecheck、PR scope、lint、Prettier、`git diff --check`。
 残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 324
+
+media actuator の `document-composition-presets` は public fragment と artifact-library の profile を統合するにもかかわらず、
+汎用 loader の結果を未検証で利用していた。専用 `document-composition-presets.schema.json` を追加し、public preset の merge後と
+artifact profile 統合後の両方を `defineCatalog.validate()` で検証するようにした。profile payload は document種別ごとの拡張性を維持するため
+open object として許容し、既存の優先順位（artifact library < primary profile）を変更していない。
+
+検証: document composition catalog **1 file / 1 test passed**、関連 media、typecheck、catalog gate、lint、Prettier、`git diff --check`。
+残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
