@@ -7321,6 +7321,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/intent-goal-handoff.schema.json",
+      "tier": "public",
+      "size": 824,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/intent-outcome-patterns.schema.json",
       "tier": "public",
       "size": 1506,
