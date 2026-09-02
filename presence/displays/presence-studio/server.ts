@@ -1,4 +1,4 @@
-import { appendJsonLine, readJson } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import { withExecutionContext } from '@agent/core/authority';
@@ -168,7 +168,7 @@ presenceStudioData.app.get('/health', (_req, res) => {
     ok: true,
     surfaces: Object.keys(presenceStudioData.state.surfaces).length,
     recentStimuli: presenceStudioData.state.recentStimuli.length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   });
 });
 
@@ -1028,7 +1028,7 @@ presenceStudioData.app.post('/api/voice/minutes', async (req, res) => {
         open_questions: minutes.open_questions,
         source_path: sourcePath,
         minutes_path: minutesPath,
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
       },
       null,
       2
@@ -1407,7 +1407,7 @@ presenceStudioData.app.post('/api/context/location', (req, res) => {
     latitude: parsed.data.latitude,
     longitude: parsed.data.longitude,
     accuracy: parsed.data.accuracy,
-    timestamp: parsed.data.timestamp || new Date().toISOString(),
+    timestamp: parsed.data.timestamp || nowIso(),
     source: 'browser_geolocation',
   });
   logger.info(
