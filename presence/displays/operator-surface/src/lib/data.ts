@@ -20,6 +20,7 @@ import {
   safeLstat,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import {
   loadCapabilityBundleRegistry,
   type CapabilityBundleEntry,
@@ -127,11 +128,11 @@ export interface MissionDetail extends MissionRow {
   evidence_files?: Array<{ name: string; bytes: number; modified_at: string }>;
 }
 
-function readJsonSafe<T>(absPath: string): T | null {
+function readMissionState(absPath: string) {
   try {
     const safePath = assertSafeRepositoryPath(absPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return readJson<T>(safePath);
+    return loadStateAtPath(safePath);
   } catch {
     return null;
   }
@@ -152,7 +153,10 @@ function eligibleTier(tier: string, scope: string | undefined): boolean {
   return tier === 'public' || tier === 'confidential';
 }
 
-function detectMissionTenantSlug(state: any, dirPath: string): string | undefined {
+function detectMissionTenantSlug(
+  state: { tenant_slug?: string },
+  dirPath: string
+): string | undefined {
   if (state?.tenant_slug) return state.tenant_slug;
   // Path-based detection: confidential/{slug}/MSN-... layout.
   const segs = dirPath.split(path.sep);
@@ -188,7 +192,7 @@ function listMissionsForTier(tier: 'personal' | 'confidential' | 'public'): Miss
       if (!stat.isDirectory()) continue;
       const statePath = safeResourcePath(path.join(abs, 'mission-state.json'));
       if (statePath && safeExistsSync(statePath) && safeLstat(statePath).isFile()) {
-        const state = readJsonSafe<any>(statePath);
+        const state = readMissionState(statePath);
         if (!state) continue;
         rows.push({
           mission_id: state.mission_id,
@@ -269,7 +273,7 @@ export function getMissionDetail(missionId: string): MissionDetail | null {
           !safeLstat(statePath).isFile()
         )
           continue;
-        const state = readJsonSafe<any>(statePath);
+        const state = readMissionState(statePath);
         if (!state) continue;
         const tenantSlug = detectMissionTenantSlug(state, candidate);
         if (scope && state.tier !== 'public' && tenantSlug !== scope) continue;

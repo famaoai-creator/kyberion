@@ -72,6 +72,39 @@ describe('operator surface resource boundaries', () => {
     });
   });
 
+  it('projects schema-valid mission state through the canonical loader', () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(missionDir, { recursive: true });
+      safeWriteFile(
+        path.join(missionDir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: `MSN-BOUNDARY-${suffix}`,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'operator',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+          history: [],
+        })
+      );
+
+      expect(listMissions()).toContainEqual(
+        expect.objectContaining({
+          mission_id: `MSN-BOUNDARY-${suffix}`,
+          status: 'active',
+          tier: 'public',
+        })
+      );
+      expect(getMissionDetail(`MSN-BOUNDARY-${suffix}`)).toMatchObject({
+        mission_id: `MSN-BOUNDARY-${suffix}`,
+        status: 'active',
+        tier: 'public',
+      });
+    });
+  });
+
   it('fails closed for malformed and tenantless audit events in a tenant scope', () => {
     vi.stubEnv('KYBERION_TENANT', 'tenant-a');
     withExecutionContext('mission_controller', () => {
@@ -131,7 +164,17 @@ describe('operator surface resource boundaries', () => {
       safeMkdir(path.join(missionDir, 'evidence'), { recursive: true });
       safeWriteFile(
         path.join(missionDir, 'mission-state.json'),
-        JSON.stringify({ mission_id: `MSN-BOUNDARY-${suffix}`, status: 'active' })
+        JSON.stringify({
+          mission_id: `MSN-BOUNDARY-${suffix}`,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'operator',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+          history: [],
+        })
       );
       safeWriteFile(evidenceTarget, JSON.stringify({ linked: true }));
       safeSymlinkSync(evidenceTarget, evidenceLink);
