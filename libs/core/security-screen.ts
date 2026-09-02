@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -318,7 +319,7 @@ function rotateQuarantineIfOversized(): void {
   try {
     const raw = safeReadFile(current, { encoding: 'utf8' }) as string;
     if (Buffer.byteLength(raw, 'utf8') < maxQuarantineFileBytes()) return;
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const stamp = nowIso().replace(/[:.]/g, '-');
     safeMoveSync(current, `${quarantineDir()}/quarantine-${stamp}.jsonl`);
   } catch (error) {
     logger.warn(`[QM-04] quarantine rotation failed (ignored): ${error}`);
@@ -335,7 +336,7 @@ export function recordQuarantine(input: {
   const truncated = input.content.length > MAX_QUARANTINE_CONTENT_CHARS;
   const record: QuarantineRecord & { content_truncated?: boolean } = {
     id: randomUUID(),
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     source: input.source,
     ...(input.scope ? { scope: input.scope } : {}),
     reason: input.reason,

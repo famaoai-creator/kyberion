@@ -1,3 +1,5 @@
+import { nowIso } from './foundation/time.js';
+
 export interface ReasoningDriftWatchdogState {
   total_attempts: number;
   consecutive_same_signature: number;
@@ -115,7 +117,7 @@ export function advanceReasoningDriftWatchdog(
     total_attempts: state.total_attempts + 1,
     consecutive_same_signature: repeatedSignature ? state.consecutive_same_signature + 1 : 1,
     last_signature: signature,
-    last_observed_at: new Date().toISOString(),
+    last_observed_at: nowIso(),
     last_reason: repeatedSignature ? 'repeated signature detected' : 'signature advanced',
   };
 

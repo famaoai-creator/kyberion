@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { readJsonLines } from './foundation/json.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import {
@@ -415,7 +416,8 @@ function attentionForEvent(event: AgentCollaborationEvent): CollaborationAttenti
 
 function statusFromEvents(
   events: AgentCollaborationEvent[],
-  options: ComposeCollaborationProjectionOptions
+  options: ComposeCollaborationProjectionOptions,
+  generatedAt: string
 ): { flags: CollaborationStatusFlag[]; gaps: CollaborationSequenceGap[] } {
   const gaps: CollaborationSequenceGap[] = [];
   for (const source of new Set(events.map((event) => event.source))) {
@@ -446,7 +448,7 @@ function statusFromEvents(
   if (gaps.length > 0) flags.add('sequence_gap');
 
   const staleAfterMs = options.staleAfterMs ?? 5 * 60 * 1000;
-  const now = Date.parse(options.now || new Date().toISOString());
+  const now = Date.parse(generatedAt);
   const latestRuntime = events
     .filter((event) => event.source === 'runtime')
     .slice()
@@ -477,7 +479,8 @@ export function composeAgentCollaborationProjection(
         left.ts.localeCompare(right.ts) || left.event_id.localeCompare(right.event_id)
     )
     .slice(-limit);
-  const status = statusFromEvents(events, options);
+  const generatedAt = options.now ?? nowIso();
+  const status = statusFromEvents(events, options, generatedAt);
   const nodes = new Map<string, CollaborationGraphNode>();
   const edges: CollaborationGraphEdge[] = [];
   const attention: CollaborationAttentionItem[] = [];
@@ -579,7 +582,7 @@ export function composeAgentCollaborationProjection(
     }
   }
   return {
-    generated_at: options.now || new Date().toISOString(),
+    generated_at: generatedAt,
     cursor: events.at(-1)?.event_id || null,
     partial: status.flags.length > 0,
     status_flags: status.flags,
