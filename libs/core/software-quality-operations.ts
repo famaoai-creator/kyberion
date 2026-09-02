@@ -8,6 +8,7 @@ import { parseSafeJsonInput, parseSafeJsonObjectInput } from './foundation/safe-
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from './secure-io.js';
+import { parseTestInventoryItem } from './software-quality.js';
 import type {
   DefectCandidate,
   SoftwareQualityContract,
@@ -86,7 +87,10 @@ export function parseReasoningItems(raw: string): TestInventoryItem[] {
   if (!match) return [];
   try {
     const parsed = parseSafeJsonObjectInput(match[0], 'reasoning test inventory');
-    return parsed && Array.isArray(parsed.items) ? (parsed.items as TestInventoryItem[]) : [];
+    if (!parsed || !Array.isArray(parsed.items)) return [];
+    return parsed.items
+      .map(parseTestInventoryItem)
+      .filter((item): item is TestInventoryItem => item !== null);
   } catch {
     return [];
   }

@@ -72,6 +72,42 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
     }
   });
 
+  it('rejects a malformed quality contract before deriving a test inventory', async () => {
+    const result = await handleAction({
+      action: 'pipeline',
+      context: {
+        quality_contract: {
+          version: '1.0.0',
+          project_id: 'project-1',
+          accountable_human_id: 'human:owner',
+          dor: [{ check_id: 'DOR-1', description: 'Ready', status: 'passed' }],
+          acceptance_criteria: [
+            {
+              criterion_id: 'AC-1',
+              description: 'Returns 200',
+              requirement_refs: ['REQ-1'],
+              expected_result: '200',
+              status: 'passed',
+            },
+          ],
+          dod: [{ check_id: 'DOD-1', description: 'Done', status: 'passed' }],
+          unexpected: true,
+        },
+      },
+      steps: [
+        {
+          type: 'apply',
+          op: 'derive_test_inventory',
+          params: { contract_from: 'quality_contract' },
+        },
+      ],
+    });
+    expect(result.status).toBe('failed');
+    expect(result.results[0]?.error).toContain(
+      '[derive_test_inventory] quality contract is invalid'
+    );
+  });
+
   it('rejects a context path outside the repository root', async () => {
     await expect(
       handleAction({

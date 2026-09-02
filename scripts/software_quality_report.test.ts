@@ -70,8 +70,14 @@ describe('software quality report CLI core', () => {
       ],
     });
     const executionPath = write('execution.json', {
+      version: '1.0.0',
       run_id: 'RUN-1',
+      project_id: 'project-1',
       subject_ref: 'git:abc',
+      environment: 'test',
+      executor: { resource_id: 'agent:tester', resource_type: 'ai_agent' },
+      started_at: '2026-07-12T00:00:00.000Z',
+      finished_at: '2026-07-12T00:01:00.000Z',
       results: [
         { item_id: 'TEST-1', status: 'failed', evidence_refs: ['trace:1'], observed_result: '500' },
       ],

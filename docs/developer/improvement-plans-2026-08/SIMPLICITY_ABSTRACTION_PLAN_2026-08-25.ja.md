@@ -13151,6 +13151,12 @@ SX-03／SX-04／SX-08 の品質ゲート入力を再監査し、mission-gate-eng
 
 検証: software-quality／mission-gate **2 files / 22 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 482
+
+SX-03／SX-04／SX-08 の品質artifact生成経路を再監査し、`software_quality_report`、modeling `derive_test_inventory`、reasoning test-inventory responseが品質型を型アサーションのまま下流へ渡していた残存を修正した。`SoftwareQualityContract`／`TestInventory`に加え`TestExecutionRecord`の共通strict parserを整備し、root／nested unknown・dangerous JSON key、schema必須型、enum、timestamp、executor、result shapeを検証するようにした。modelingのcontract入力、reasoning追加item、report CLIのcontract／inventory／execution全経路をparserへ統合し、不正入力は生成・評価へ進めずfail-closedとした。
+
+検証: software-quality／operations／modeling／report **4 files / 34 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
