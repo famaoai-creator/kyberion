@@ -36,7 +36,7 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core/approval-store';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import * as pathResolver from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -373,7 +373,7 @@ function cmdCreate(argv: string[]): void {
     tenant,
     inputs,
     status: 'draft',
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     change: scope,
   };
 
@@ -550,7 +550,7 @@ async function cmdApply(argv: string[]): Promise<void> {
     });
 
     brief.status = 'applied';
-    brief.applied_at = new Date().toISOString();
+    brief.applied_at = nowIso();
     safeWriteFile(bPath, JSON.stringify(brief, null, 2));
 
     auditChain.record({
@@ -595,7 +595,7 @@ async function cmdApply(argv: string[]): Promise<void> {
         storageChannel: 'config-mission',
         requestId: approval.id,
         applyResult: {
-          appliedAt: new Date().toISOString(),
+          appliedAt: nowIso(),
           appliedBy: 'config_mission',
           result: 'failed',
           auditRef: String(err),

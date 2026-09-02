@@ -31,7 +31,7 @@ import { proposeTierPlacement } from '@agent/core/ingest-tier-gate';
 import { scanContent } from '@agent/core/pii-scrubber';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync } from '@agent/core/secure-io';
-import { getRegisteredEnvText } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import {
   commitIngest,
@@ -261,7 +261,7 @@ export async function main(argv: string[] = []): Promise<void> {
     source_meta: {
       source_system: sourceSystem,
       source_id: sourceId,
-      retrieved_at: new Date().toISOString(),
+      retrieved_at: nowIso(),
     },
   });
 

@@ -20,6 +20,7 @@ import {
 } from '@agent/core/secure-io';
 import { listProjectRecords } from '@agent/core/project-registry';
 import { withExecutionContext } from '@agent/core/governance';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 export const CLEANUP_APPROVAL_CHANNEL = 'terminal';
@@ -287,7 +288,7 @@ export function runCleanup(input: {
     mode: input.apply ? 'apply' : 'dry-run',
     ...(approval?.decidedBy ? { approved_by: approval.decidedBy } : {}),
     ...(approval ? { approval_request_id: approval.id } : {}),
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     findings,
     moved,
   };

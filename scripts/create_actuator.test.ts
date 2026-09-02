@@ -37,6 +37,7 @@ describe('create_actuator', () => {
     expect(indexSource).not.toContain('TODO: implement');
     expect(indexSource).not.toContain('node:fs');
     expect(indexSource).toContain('received_params');
+    expect(indexSource).toContain("import { nowIso } from '@agent/core/foundation';");
     expect(indexSource).toContain('defineActuator');
     expect(indexSource).toContain('runActuatorCli');
     expect(indexSource).toContain('runActuatorCliEntryPoint');

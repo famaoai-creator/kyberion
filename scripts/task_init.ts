@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { getRegisteredEnv } from '@agent/core/foundation/env';
+import { nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -139,7 +140,7 @@ function buildProfile(scenario: TaskScenario, answers: Record<string, unknown>) 
   return {
     scenario_id: scenario.id,
     scenario_title: scenario.title,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     answers,
     first_run_answers: firstRunAnswers,
     repeat_run: scenario.repeat_run,

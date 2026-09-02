@@ -111,6 +111,7 @@ function buildPackage(description: string, name: string, fullName: string): stri
 function buildIndexTs(fullName: string, _pascalName: string, _name: string): string {
   return `import { defineActuator } from '@agent/core/actuator-sdk';
 import { logger } from '@agent/core/core';
+import { nowIso } from '@agent/core/foundation';
 import {
   currentProcessArgv,
   runActuatorCli,
@@ -145,7 +146,7 @@ async function opExecute(
     received_params: params,
     state: {
       ...currentState,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     },
   };
 }

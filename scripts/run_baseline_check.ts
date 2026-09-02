@@ -3,7 +3,7 @@ import { SovereignSentinel } from '@agent/core/sovereign-sentinel';
 import { validateService } from '@agent/core/service-validator';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -413,7 +413,7 @@ function storeCachedSnapshot<T>(name: string, value: T, ttlMs: number): void {
     cachePath(name),
     JSON.stringify(
       {
-        computed_at: new Date().toISOString(),
+        computed_at: nowIso(),
         ttl_ms: ttlMs,
         value,
       } satisfies CachedEnvelope<T>,
@@ -575,7 +575,7 @@ function markJanitorSubmission(): void {
     pathResolver.shared(JANITOR_SUBMIT_MARKER),
     JSON.stringify(
       {
-        submitted_at: new Date().toISOString(),
+        submitted_at: nowIso(),
         pipeline_id: 'storage-janitor',
         dry_run: false,
       },
