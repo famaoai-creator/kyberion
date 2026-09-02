@@ -12797,6 +12797,12 @@ SX-03／SX-11 の残存監査として、mission gate engine の human override�
 
 検証: mission gate engine **1 file / 10 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象2ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 423
+
+SX-03／SX-13 の残存監査として、mission retrospective の work order・agent/model performance index・改善提案に残っていた単純な `new Date().toISOString()` **4 箇所**を foundation `nowIso()` へ統合した。同一retrospectiveでagent／model outcomeが同じ `recorded_at` を共有するようにし、統計収集、提案の承認／適用フロー、mission scope、通知境界は変更していない。
+
+検証: mission retrospective **1 file / 10 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象2ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
