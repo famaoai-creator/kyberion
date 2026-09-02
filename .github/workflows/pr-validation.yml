@@ -15,8 +15,7 @@ jobs:
       pull-requests: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       # Native PDF engine CJK embedding test needs a CJK font on Linux
       - name: Install CJK fonts
@@ -36,18 +35,10 @@ jobs:
             -o Acquire::https::Timeout=30 \
             -o DPkg::Lock::Timeout=60 install -y -qq fonts-noto-cjk
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
         with:
           node-version: '24'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.15.1
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build @agent/core
         run: pnpm --filter '@agent/core' build
