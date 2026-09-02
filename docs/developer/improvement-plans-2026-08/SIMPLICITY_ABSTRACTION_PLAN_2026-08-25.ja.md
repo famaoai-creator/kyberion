@@ -13109,6 +13109,12 @@ SX-03／SX-08／SX-09 のOAuth session persistence readerを再監査し、`read
 
 検証: oauth-session-store／oauth-broker **2 files / 18 tests passed**、5 package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 475
+
+SX-03／SX-08／SX-09 のconfidential relationship graph node readerを再監査し、`readJson<RelationshipNode>`の型アサーションのままtrust／history／pending suggestionへ渡していた残存を修正した。node root、identityのorg／person path、trust level、timestamp、history上限、communication／interest、outstanding ask、NG topic、pending suggestionの型・enum・unknown／dangerous JSON keyをstrict検証し、破損nodeをrelationship更新・参照へ流さないようにした。trusted actuatorのappend-only history、manual review待ちsuggestion、confidential path／symlink境界は変更していない。
+
+検証: relationship graph **1 file / 11 tests passed**、5 package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
