@@ -11,6 +11,8 @@ import {
   safeStat,
   safeLstat,
 } from '@agent/core/secure-io';
+import { loadActuatorExampleCatalog } from '@agent/core/src/actuator-example-catalog';
+import type { ActuatorExampleRecord } from '@agent/core/src/actuator-example-catalog';
 import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
 import { installReasoningBackends } from '@agent/core/reasoning-bootstrap';
 import { renderStatus } from '@agent/core/ux-vocabulary';
@@ -58,19 +60,6 @@ interface RawActuatorEntry {
   s?: string;
   status?: string;
   contract_schema?: string;
-}
-
-interface ActuatorExampleRecord {
-  id: string;
-  title: string;
-  path: string;
-  description: string;
-  tags?: string[];
-}
-
-interface ActuatorExampleCatalog {
-  actuator: string;
-  examples: ActuatorExampleRecord[];
 }
 
 interface OperatorPacketAction {
@@ -392,8 +381,11 @@ function loadActuatorExamples(actuator: ActuatorRecord): ActuatorExampleRecord[]
     return [];
   }
 
-  const parsed = readJson<ActuatorExampleCatalog>(catalogPath);
-  return Array.isArray(parsed.examples) ? parsed.examples : [];
+  try {
+    return loadActuatorExampleCatalog(catalogPath).examples;
+  } catch {
+    return [];
+  }
 }
 
 function printActuatorExamples(actuator: ActuatorRecord) {

@@ -1,23 +1,26 @@
-[
-  {
-    "id": "prepare-product-explainer",
-    "title": "Prepare Product Explainer Bundle",
-    "path": "libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json",
-    "description": "Compiles a governed video-composition-adf into a deterministic source bundle for later rendering.",
-    "tags": ["video", "composition", "deterministic", "bundle", "example"]
-  },
-  {
-    "id": "compile-kyberion-intro-brief",
-    "title": "Compile Kyberion Intro Brief",
-    "path": "libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json",
-    "description": "Compiles a narrated-video-brief with design-system inputs into a governed video-composition-adf.",
-    "tags": ["video", "brief", "design-system", "narration", "compiler", "example"]
-  },
-  {
-    "id": "create-kyberion-intro-movie",
-    "title": "Create Kyberion Intro Movie",
-    "path": "libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json",
-    "description": "Runs narrated-video-brief compilation and video composition job enqueue as a single scenario action.",
-    "tags": ["video", "scenario", "narration", "design-system", "example"]
-  }
-]
+{
+  "actuator": "video-composition-actuator",
+  "examples": [
+    {
+      "id": "prepare-product-explainer",
+      "title": "Prepare Product Explainer Bundle",
+      "path": "libs/actuators/video-composition-actuator/examples/prepare-product-explainer.json",
+      "description": "Compiles a governed video-composition-adf into a deterministic source bundle for later rendering.",
+      "tags": ["video", "composition", "deterministic", "bundle", "example"]
+    },
+    {
+      "id": "compile-kyberion-intro-brief",
+      "title": "Compile Kyberion Intro Brief",
+      "path": "libs/actuators/video-composition-actuator/examples/compile-kyberion-intro-brief.json",
+      "description": "Compiles a narrated-video-brief with design-system inputs into a governed video-composition-adf.",
+      "tags": ["video", "brief", "design-system", "narration", "compiler", "example"]
+    },
+    {
+      "id": "create-kyberion-intro-movie",
+      "title": "Create Kyberion Intro Movie",
+      "path": "libs/actuators/video-composition-actuator/examples/create-kyberion-intro-movie.json",
+      "description": "Runs narrated-video-brief compilation and video composition job enqueue as a single scenario action.",
+      "tags": ["video", "scenario", "narration", "design-system", "example"]
+    }
+  ]
+}
