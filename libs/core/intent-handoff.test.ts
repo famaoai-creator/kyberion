@@ -66,6 +66,26 @@ describe('intent-handoff', () => {
     expect(consumeIntentGoalHandoff(bad)).toBeNull();
   });
 
+  it('rejects malformed fields before the handoff reaches mission creation', () => {
+    tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-intent-handoff-'));
+    const bad = path.join(tmpBase, 'bad-fields.json');
+    fs.writeFileSync(
+      bad,
+      JSON.stringify({ source_text: { unexpected: true }, outcome_ids: ['OUT-1'] })
+    );
+    expect(consumeIntentGoalHandoff(bad)).toBeNull();
+    expect(() => writeIntentGoalHandoff('MSN-TEST', { source_text: 42 } as never)).toThrow(
+      'Invalid intent goal handoff payload'
+    );
+  });
+
+  it('rejects unknown and dangerous nested handoff fields', () => {
+    tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'kyberion-intent-handoff-'));
+    const bad = path.join(tmpBase, 'bad-unknown-fields.json');
+    fs.writeFileSync(bad, '{"source_text":"ok","goal":{"summary":"ok","__proto__":{}}}');
+    expect(consumeIntentGoalHandoff(bad)).toBeNull();
+  });
+
   it('rejects mission identifiers that could escape the handoff directory', () => {
     expect(() =>
       writeIntentGoalHandoff('../escape', { source_text: 'should not be written' })
