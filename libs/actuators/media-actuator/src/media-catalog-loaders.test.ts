@@ -10,6 +10,7 @@ import {
 } from '@agent/core/secure-io';
 
 import {
+  loadConfidentialThemePack,
   loadJsonValue,
   loadDesignPattern,
   loadMediaDesignSystemsCatalog,
@@ -90,6 +91,43 @@ describe('media catalog loaders', () => {
 
     expect(loadDesignPattern(pathResolver.rootDir(), patternPath)).toEqual(
       expect.objectContaining({ pattern_id: 'test-pattern' })
+    );
+  });
+
+  it('validates confidential theme packs with the kind-specific schema', () => {
+    const themePath = `${rootDir}/theme.json`;
+    safeMkdir(rootDir, { recursive: true });
+    safeWriteFile(
+      themePath,
+      JSON.stringify({
+        kind: 'pptx-theme-pack',
+        version: '1.0.0',
+        theme_id: 'tenant-theme',
+        brand_name: 'Tenant Theme',
+        tenant_slug: 'tenant-theme',
+        design_system_id: 'executive-standard',
+        theme: {
+          name: 'Tenant Theme',
+          colors: {
+            primary: '#10203A',
+            secondary: '#31415B',
+            accent: '#D97706',
+            background: '#F8FAFC',
+            text: '#0F172A',
+          },
+          fonts: { heading: 'Aptos Display', body: 'Aptos' },
+        },
+        pptx: { canvas: { w: 13.333, h: 7.5 }, master: {} },
+      })
+    );
+
+    expect(loadConfidentialThemePack(pathResolver.rootDir(), themePath)).toEqual(
+      expect.objectContaining({ kind: 'pptx-theme-pack', theme_id: 'tenant-theme' })
+    );
+
+    safeWriteFile(themePath, JSON.stringify({ kind: 'unknown-theme-pack' }));
+    expect(() => loadConfidentialThemePack(pathResolver.rootDir(), themePath)).toThrow(
+      'Unsupported confidential theme pack kind'
     );
   });
 });
