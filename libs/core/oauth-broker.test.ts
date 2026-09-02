@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeMkdir: vi.fn(),
   safeReaddir: vi.fn(),
+  safeLstat: vi.fn(),
   safeCreateExclusiveFileSync: vi.fn(),
   safeUnlinkSync: vi.fn(),
   safeFsyncFile: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('./secure-io.js', async () => {
     safeExistsSync: mocks.safeExistsSync,
     safeMkdir: mocks.safeMkdir,
     safeReaddir: mocks.safeReaddir,
+    safeLstat: mocks.safeLstat,
     safeCreateExclusiveFileSync: mocks.safeCreateExclusiveFileSync,
     safeUnlinkSync: mocks.safeUnlinkSync,
     safeFsyncFile: mocks.safeFsyncFile,
@@ -85,6 +87,7 @@ describe('oauth-broker', () => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(false);
     mocks.safeReaddir.mockReturnValue([]);
+    mocks.safeLstat.mockReturnValue({ isFile: () => true });
     mocks.resolveServiceBinding.mockReturnValue({
       serviceId: 'canva',
       clientId: 'client-id',

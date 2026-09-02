@@ -7,6 +7,7 @@
  */
 
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 
 export const CE_STREAM_LIMITS = Object.freeze({
   maxTailBytes: 16 * 1024,
@@ -251,7 +252,7 @@ export function composeOfficeSnapshot(input: {
     ['blocked', 'review', 'waiting', 'offline'].includes(agent.status)
   );
   return {
-    generated_at: input.now || new Date().toISOString(),
+    generated_at: input.now || nowIso(),
     rooms: [...rooms.values()],
     attention,
   };

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import {
@@ -159,7 +160,7 @@ function writePromotionReceipt(input: {
     JSON.stringify(
       {
         kind: 'voice_profile_promotion_receipt',
-        promoted_at: new Date().toISOString(),
+        promoted_at: nowIso(),
         request_id: input.receipt.request_id,
         approved_by: input.approvedBy,
         promoted_profile: input.promotedProfile,

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { safeWriteFile } from './secure-io.js';
 import {
@@ -247,7 +248,7 @@ export function recordExecutionFeedback(input: ExecutionFeedbackInput): Executio
     intent_id: input.intent_id.trim(),
     outcome: input.outcome,
     source: input.source || 'user',
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
     ...(input.correlation_id?.trim() ? { correlation_id: input.correlation_id.trim() } : {}),
     ...(input.surface?.trim() ? { surface: input.surface.trim() } : {}),
     ...(normalizeFeedbackText(input.comment)
