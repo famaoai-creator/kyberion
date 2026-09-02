@@ -21,7 +21,7 @@ import {
   safeLstat,
   safeMkdir,
 } from '@agent/core/secure-io';
-import { appendJsonLine, readJson } from '@agent/core/foundation';
+import { appendJsonLine, nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { evaluateResolvedFacetFixtures } from './eval_facets.js';
 
@@ -294,7 +294,7 @@ function aggregateQuality(
 function appendRunRecord(runPath: string, result: EvalHarnessTableResult): void {
   const directory = path.dirname(runPath);
   if (!safeExistsSync(directory)) safeMkdir(directory, { recursive: true });
-  appendJsonLine(runPath, { ...result, recorded_at: new Date().toISOString() });
+  appendJsonLine(runPath, { ...result, recorded_at: nowIso() });
 }
 
 /** Run every named configuration against the same ordered multi-step brief. */

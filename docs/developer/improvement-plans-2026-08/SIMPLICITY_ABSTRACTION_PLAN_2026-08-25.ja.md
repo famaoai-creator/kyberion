@@ -11919,6 +11919,15 @@ source は foundation helper を正しく import する。既存 scaffold の構
 検証: create-actuator／onboarding／help 関連 **3 test files / 12 tests passed**、root typecheck、root lint、Prettier、
 `git diff --check`、PR scope **33/33 gates passed**。
 
+## 2026-09-02 再レビュー修正 304
+
+script の単純 `new Date().toISOString()` を 0 件へ移行した状態が再発しないよう、`check_foundation_adoption` に
+0 件 ratchet を追加した。違反時は foundation の `nowIso()` への移行先を明示し、fixture による検出テストも追加した。
+`Date.now()` の deadline／経過時間、ランダム ID、domain 固有の date／week 処理はこの ratchet の対象外である。
+
+検証: foundation-adoption **3 tests passed**、対象 production `scripts/` の単純 timestamp **0 件**、root typecheck、
+root lint、Prettier、`git diff --check`。これにより SX-03 の script timestamp 集約を CI で継続監視する。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

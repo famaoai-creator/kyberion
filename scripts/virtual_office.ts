@@ -53,6 +53,7 @@ import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
 import {
   getRegisteredEnvText,
   isRecord,
+  nowIso,
   parseSafeJsonInput,
   readJson as readFoundationJson,
 } from '@agent/core/foundation';
@@ -729,7 +730,7 @@ export function collectOfficeSnapshot(): OfficeSnapshot {
     }));
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     customer_slug: customerSlug,
     tenant_slug: tenantSlug,
     tenant_scope: requestedTenantSlug,
@@ -1321,7 +1322,7 @@ async function main(args: string[] = []): Promise<void> {
     setInterval(() => {
       void generateOnce(String(argv.out), watchSeconds)
         .then((writtenPath) => {
-          console.log(`[virtual-office] refreshed ${writtenPath} @ ${new Date().toISOString()}`);
+          console.log(`[virtual-office] refreshed ${writtenPath} @ ${nowIso()}`);
         })
         .catch((error) => console.error(`[virtual-office] regeneration failed: ${error}`));
     }, watchSeconds * 1000);

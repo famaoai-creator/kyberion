@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 
 export interface OnboardingRunbookSkillResult {
   skillPath: string;
@@ -25,7 +26,7 @@ export function generateOnboardingRunbookSkill(
   const skillPath = onboardingRunbookSkillPath(input.profileRoot);
   const skillDir = path.dirname(skillPath);
   const provenancePath = path.join(skillDir, 'provenance.json');
-  const generatedAt = input.generatedAt || new Date().toISOString();
+  const generatedAt = input.generatedAt || nowIso();
   const identityName = input.identityName?.trim() || 'the operator';
   const agentId = input.agentId?.trim() || 'KYBERION-PRIME';
   const skill = [

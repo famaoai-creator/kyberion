@@ -9,6 +9,7 @@ import {
 import { safeExistsSync, safeMkdir, safeReaddir, safeWriteFile } from '@agent/core/secure-io';
 import {
   defineCatalog,
+  nowIso,
   readJson as readFoundationJson,
   type GovernedCatalog,
 } from '@agent/core/foundation';
@@ -575,7 +576,7 @@ title: Role Procedure: ${toTitleCase(input.name)}
 tags: [role, ${input.teamRoleId}, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: ${new Date().toISOString().slice(0, 10)}
+last_updated: ${nowIso().slice(0, 10)}
 kind: role
 scope: global
 authority: advisory
@@ -621,7 +622,7 @@ category: Roles
 tags: [roles, ${input.teamRoleId}, mission]
 importance: 7
 author: Ecosystem Architect
-last_updated: ${new Date().toISOString().slice(0, 10)}
+last_updated: ${nowIso().slice(0, 10)}
 ---
 
 # ${toTitleCase(input.name)} Mission Statement

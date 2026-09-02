@@ -18,6 +18,12 @@ const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.mjs']);
 const JSON_LOADER_RATCHET = 0;
 const JSONL_APPEND_RATCHET = 0;
 const ENV_RATCHET = 0;
+const SIMPLE_ISO_TIMESTAMP_RATCHET = 0;
+const SIMPLE_ISO_TIMESTAMP_PATTERN = /new\s+Date\(\)\.toISOString\(\)/gu;
+
+export function countSimpleIsoTimestampViolations(source: string): number {
+  return [...source.matchAll(SIMPLE_ISO_TIMESTAMP_PATTERN)].length;
+}
 const JSONL_APPEND_PATTERN = new RegExp(
   [
     'safeAppendFile',
@@ -50,14 +56,22 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   let jsonlAppendViolations = 0;
   let ajvViolations = 0;
   let envReads = 0;
+  let simpleIsoTimestampViolations = 0;
   let catalogDefinitions = 0;
   let catalogDefinitionsWithoutSchema = 0;
 
   for (const filePath of files) {
     const source = String(safeReadFile(filePath, { encoding: 'utf8' }) || '');
+    const relativePath = path
+      .relative(pathResolver.rootResolve('.'), filePath)
+      .split(path.sep)
+      .join('/');
     jsonLoaderViolations += [
       ...source.matchAll(/JSON\.parse\s*\(\s*(?:String\s*\(\s*)?safeReadFile\s*\(/gu),
     ].length;
+    if (relativePath.startsWith('scripts/')) {
+      simpleIsoTimestampViolations += countSimpleIsoTimestampViolations(source);
+    }
     if (
       !filePath.endsWith(`${path.sep}foundation${path.sep}json.ts`) &&
       path.basename(filePath) !== 'check_foundation_adoption.ts'
@@ -70,10 +84,6 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
     ) {
       ajvViolations += 1;
     }
-    const relativePath = path
-      .relative(pathResolver.rootResolve('.'), filePath)
-      .split(path.sep)
-      .join('/');
     const allowedReads = EDGE_RUNTIME_ENV_READ_ALLOWLIST.get(relativePath);
     for (const match of source.matchAll(/process\.env\.(KYBERION_[A-Z0-9_]+)/gu)) {
       const remaining = allowedReads?.get(match[1]) ?? 0;
@@ -103,6 +113,11 @@ export function checkFoundationAdoption(files = sourceFiles()): string[] {
   if (ajvViolations > 0) failures.push(`Ajv constructor outside foundation: ${ajvViolations}`);
   if (envReads > ENV_RATCHET)
     failures.push(`KYBERION env reads increased: ${envReads} > ${ENV_RATCHET}`);
+  if (simpleIsoTimestampViolations > SIMPLE_ISO_TIMESTAMP_RATCHET) {
+    failures.push(
+      `simple ISO timestamp construction increased: ${simpleIsoTimestampViolations} > ${SIMPLE_ISO_TIMESTAMP_RATCHET}; use foundation nowIso()`
+    );
+  }
   if (catalogDefinitionsWithoutSchema > 0) {
     failures.push(
       `defineCatalog calls without schema: ${catalogDefinitionsWithoutSchema}/${catalogDefinitions}`

@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { physicalScopedPath } from '@agent/core/physical-namespace';
 import { resolveIntentContractMemoryPaths } from '@agent/core/intent-contract-learning';
 import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
-import { defineCatalog } from '@agent/core/foundation';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -186,7 +186,7 @@ export const runSyncIntentContractMemory = defineScript({
       safeWriteFile(seedPath, JSON.stringify(snapshot, null, 2));
     }
     const report = {
-      generated_at: new Date().toISOString(),
+      generated_at: nowIso(),
       ...(missionId ? { mission_id: missionId.toUpperCase() } : {}),
       ...(stage ? { stage } : {}),
       ...(scope ? { scope } : {}),
@@ -204,7 +204,7 @@ export const runSyncIntentContractMemory = defineScript({
     };
     safeWriteFile(reportPath, JSON.stringify(report, null, 2));
     if (persistExport) {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const stamp = nowIso().replace(/[:.]/g, '-');
       const exportPath = resolveIntentContractMemoryPath(
         `${exportDir}/intent-contract-memory-sync-${stamp}.json`,
         'EXPORT'

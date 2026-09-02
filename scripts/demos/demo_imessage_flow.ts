@@ -1,5 +1,6 @@
 import { logger } from '@agent/core/core';
 import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
+import { nowIso } from '@agent/core/foundation';
 import { currentProcessArgv, defineScript, isDirectScript } from '../lib/harness.js';
 
 export const simulateIMessage = defineScript({
@@ -14,7 +15,7 @@ export const simulateIMessage = defineScript({
       channel: 'chat123',
       threadTs: 'msg456',
       correlationId: 'demo-123',
-      receivedAt: new Date().toISOString(),
+      receivedAt: nowIso(),
       actorId: '+81-XX-XXXX-XXXX',
       senderAgentId: 'kyberion:imessage-bridge',
       agentId: 'imessage-surface-agent',

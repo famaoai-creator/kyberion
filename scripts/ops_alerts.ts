@@ -25,6 +25,7 @@ import {
   type OpsAlertLogSummary,
 } from '@agent/core/ops-alert';
 import { enqueueOperationalLearningSignal } from '@agent/core/operational-learning';
+import { nowIso } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
@@ -137,7 +138,7 @@ export async function main(
     enqueueOperationalLearningSignal({
       signalId: 'undelivered-ops-alerts',
       sourceType: 'routine_exception',
-      sourceRef: `ops-alert:undelivered:${new Date().toISOString().slice(0, 10)}`,
+      sourceRef: `ops-alert:undelivered:${nowIso().slice(0, 10)}`,
       title: 'Operator notifications remain undelivered',
       summary:
         'The ops-alert backlog contains notifications that were not delivered. Configure a channel or explicitly acknowledge the backlog, then decide whether the delivery policy needs a permanent runbook update.',
