@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
+import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from '../secure-io.js';
 
 export interface ActuatorManifestFile {
@@ -120,7 +121,7 @@ export function buildActuatorManifestIndexSnapshot(entries: ActuatorCatalogEntry
   return {
     v: '2.2.0',
     t: entries.length,
-    u: new Date().toISOString(),
+    u: nowIso(),
     actuators: entries.map(({ manifest_path: _manifestPath, ...entry }) => entry),
   };
 }
