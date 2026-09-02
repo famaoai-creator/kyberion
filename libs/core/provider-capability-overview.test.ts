@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildProviderCapabilitySnapshot } from './provider-capability-overview.js';
-import type { CapabilityRegistry, DiscoveredCapability, ProbeResult } from './provider-capability-scanner.js';
+import {
+  buildProviderCapabilitySnapshot,
+  parseProviderCapabilitySnapshot,
+} from './provider-capability-overview.js';
+import type {
+  CapabilityRegistry,
+  DiscoveredCapability,
+  ProbeResult,
+} from './provider-capability-scanner.js';
 import type { ProviderInfo } from './provider-discovery.js';
 
 describe('provider-capability-overview', () => {
@@ -117,6 +124,32 @@ describe('provider-capability-overview', () => {
         },
       ],
     });
-    expect(snapshot.capabilities.map((capability) => capability.capability_id)).toEqual(['cap.one', 'cap.two']);
+    expect(snapshot.capabilities.map((capability) => capability.capability_id)).toEqual([
+      'cap.one',
+      'cap.two',
+    ]);
+    expect(parseProviderCapabilitySnapshot(snapshot)).toEqual(snapshot);
+  });
+
+  it('rejects polluted or structurally invalid persisted snapshots', () => {
+    expect(() =>
+      parseProviderCapabilitySnapshot({
+        generated_at: '2026-05-26T00:00:00.000Z',
+        registered_capabilities: 1,
+        available_capabilities: 1,
+        available_providers: [],
+        missing_providers: [],
+        providers: [],
+        capabilities: [],
+        unexpected: true,
+      })
+    ).toThrow('contains unknown field(s)');
+    expect(() =>
+      parseProviderCapabilitySnapshot(
+        JSON.parse(
+          '{"generated_at":"2026-05-26T00:00:00.000Z","registered_capabilities":1,"available_capabilities":1,"available_providers":[],"missing_providers":[],"providers":[{"provider":"alpha","installed":true,"version":null,"protocol":"json-rpc","healthy":true,"__proto__":{}}],"capabilities":[]}'
+        )
+      )
+    ).toThrow('dangerous JSON key');
   });
 });
