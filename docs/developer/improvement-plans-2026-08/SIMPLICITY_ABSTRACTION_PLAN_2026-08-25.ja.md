@@ -12064,6 +12064,24 @@ domain parser を残すことで、JSON Schema と意味検証の責務を分離
 検証: orchestrator actuator **7 files / 53 tests passed**、actuator build、typecheck、PR scope **33/33 gates passed**、root lint、
 Prettier、`git diff --check`。残る SX-04 は他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 318
+
+browser actuator の passkey provider catalog が専用 schema を持ちながら、`readJson` と手書きの存在判定で読み込まれていたため、
+`defineCatalog<PasskeyProviderCatalog>()` へ移行した。schema validation、共有 cache、repository resource boundary を共通 loader に
+集約し、不正／欠損時の既定 provider fallback と provider parser の unknown field 除去 semantics は維持した。
+
+検証: browser actuator **9 files / 67 tests passed**、対象 entrypoint／catalog boundary、Prettier、`git diff --check`。残る SX-04 は
+他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
+## 2026-09-02 再レビュー修正 319
+
+android actuator の UI defaults catalog が専用 schema を持ちながら、個別 `assertSafeRepositoryPath`／`readJson`／fallback で
+読み込まれていたため、`defineCatalog<AndroidUiDefaults>()` へ移行した。欠損時は従来どおり無警告で組み込み defaults を使い、不正
+catalog 時の警告と login／passkey selector の既存解決 semantics を維持した。
+
+検証: android actuator **2 files / 31 tests passed**、対象 entrypoint／catalog boundary、Prettier、`git diff --check`。残る SX-04 は
+他の domain loader と非catalog層の旧loader整理、未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

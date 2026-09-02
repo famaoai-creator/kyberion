@@ -11,9 +11,9 @@ describe('browser passkey resource boundary', () => {
       )
     );
 
-    expect(source).toContain('const passkeyProviderCatalogPath = assertSafeRepositoryPath(');
-    expect(source).toContain('{ allowMissingLeaf: true }');
-    expect(source).toContain('safeLstat(passkeyProviderCatalogPath).isFile()');
-    expect(source).toContain('readJson<');
+    expect(source).toContain('defineCatalog<PasskeyProviderCatalog>({');
+    expect(source).toContain("id: 'browser-passkey-providers'");
+    expect(source).toContain('schema: PASSKEY_PROVIDER_SCHEMA_PATH');
+    expect(source).toContain('passkeyProviderCatalog.load()');
   });
 });

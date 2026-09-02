@@ -13,7 +13,7 @@ import { resolvePipelineContextValues, resolveVars } from '@agent/core/src/logic
 import { assertValidMobileAppProfile } from '@agent/core/mobile-profile-validators';
 import type { MobileAppProfile } from '@agent/core/app-profiles';
 import { retry, sleep } from '@agent/core/async-utils';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { defineCatalog, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { runActuatorStepSequence } from '../../../core/actuator-sdk.js';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
@@ -21,6 +21,9 @@ import * as path from 'node:path';
 
 const ANDROID_UI_DEFAULTS_PATH = pathResolver.knowledge(
   'product/orchestration/android-ui-defaults.json'
+);
+const ANDROID_UI_DEFAULTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/android-ui-defaults.schema.json'
 );
 const ANDROID_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/android-actuator/manifest.json'
@@ -32,6 +35,41 @@ const DEFAULT_ANDROID_RETRY = {
   factor: 2,
   jitter: true,
 };
+
+interface AndroidUiDefaults {
+  login: {
+    email: Record<string, string>;
+    password: Record<string, string>;
+    submit: Record<string, string>;
+  };
+  passkey: {
+    trigger: Record<string, string>;
+  };
+}
+
+const FALLBACK_ANDROID_UI_DEFAULTS: AndroidUiDefaults = {
+  login: {
+    email: { resource_id: 'email', class_name: 'EditText' },
+    password: { resource_id: 'password', class_name: 'EditText' },
+    submit: { text: 'sign in', resource_id: 'sign_in', class_name: 'Button' },
+  },
+  passkey: {
+    trigger: { text: 'passkey', class_name: 'Button' },
+  },
+};
+
+const androidUiDefaultsCatalog = defineCatalog<AndroidUiDefaults>({
+  id: 'android-ui-defaults',
+  path: ANDROID_UI_DEFAULTS_PATH,
+  schema: ANDROID_UI_DEFAULTS_SCHEMA_PATH,
+  fallback: FALLBACK_ANDROID_UI_DEFAULTS,
+  fallbackOnInvalid: true,
+  onFallback: (error) => {
+    if (!String(error).includes(' is missing: ')) {
+      logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${error}`);
+    }
+  },
+});
 
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -1070,27 +1108,8 @@ function serializeTapTarget(target: AndroidTapTarget) {
   };
 }
 
-function loadAndroidUiDefaults(): any {
-  const safeDefaultsPath = assertSafeRepositoryPath(ANDROID_UI_DEFAULTS_PATH, {
-    allowMissingLeaf: true,
-  });
-  if (safeExistsSync(safeDefaultsPath)) {
-    try {
-      return readJson<unknown>(safeDefaultsPath);
-    } catch (err) {
-      logger.warn(`[android-runtime-helpers] suppressed error in loadAndroidUiDefaults: ${err}`);
-    }
-  }
-  return {
-    login: {
-      email: { resource_id: 'email', class_name: 'EditText' },
-      password: { resource_id: 'password', class_name: 'EditText' },
-      submit: { text: 'sign in', resource_id: 'sign_in', class_name: 'Button' },
-    },
-    passkey: {
-      trigger: { text: 'passkey', class_name: 'Button' },
-    },
-  };
+function loadAndroidUiDefaults(): AndroidUiDefaults {
+  return androidUiDefaultsCatalog.load();
 }
 
 function buildSessionHandoffArtifact(
