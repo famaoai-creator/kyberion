@@ -3,6 +3,7 @@ import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
@@ -503,7 +504,7 @@ export function createBrowserConversationSession(input: {
   goal: { summary: string; success_condition: string };
   target?: BrowserConversationSession['target'];
 }): BrowserConversationSession {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     session_id:
       input.sessionId ||
@@ -690,7 +691,7 @@ export function recordBrowserConversationHistory(
   const session = loadBrowserConversationSession(sessionId);
   if (!session) return null;
   session.history = [...session.history, entry].slice(-50);
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveBrowserConversationSession(session);
   return session;
 }
@@ -895,7 +896,7 @@ export function createBrowserConversationCommand(params: {
     session_id: params.sessionId,
     command_type: params.resolution.commandType,
     utterance: params.utterance,
-    issued_at: new Date().toISOString(),
+    issued_at: nowIso(),
     resolution: {
       action: params.resolution.action,
       input_text: params.resolution.inputText,
@@ -915,7 +916,7 @@ export function createBrowserConversationFeedback(params: {
     session_id: params.sessionId,
     status: params.status,
     message: params.message,
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     candidates: params.candidates,
   };
 }
@@ -928,7 +929,7 @@ export function applyBrowserConversationCommand(
   if (!session) return null;
 
   session.conversation_context.last_user_instruction = command.utterance;
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
 
   if (command.command_type === 'control_command') {
     session.status = command.resolution?.action === 'resume' ? 'awaiting_instruction' : 'paused';
@@ -1168,12 +1169,12 @@ export function executeBrowserConversationCandidateAction(
     session.active_step.status = 'completed';
     session.conversation_context.pending_confirmation = false;
     const historyEntry: BrowserConversationHistoryEntry = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       type: 'execution',
       text: `Executed ${session.active_step.kind} on ${selected.element_id}`,
     };
     session.history = [...session.history, historyEntry].slice(-50);
-    session.updated_at = new Date().toISOString();
+    session.updated_at = nowIso();
     saveBrowserConversationSession(session);
     return {
       ok: true,
@@ -1189,12 +1190,12 @@ export function executeBrowserConversationCandidateAction(
     session.status = 'failed';
     session.active_step.status = 'failed';
     const historyEntry: BrowserConversationHistoryEntry = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       type: 'error',
       text: message,
     };
     session.history = [...session.history, historyEntry].slice(-50);
-    session.updated_at = new Date().toISOString();
+    session.updated_at = nowIso();
     saveBrowserConversationSession(session);
     return {
       ok: false,
@@ -1243,7 +1244,7 @@ export function confirmBrowserConversationCandidate(
 
   const selected = session.candidate_targets[candidateIndex];
   session.conversation_context.last_agent_ack = `候補 ${candidateIndex + 1} を選択しました。`;
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveBrowserConversationSession(session);
   return executeBrowserConversationCandidateAction(sessionId, selected.element_id);
 }
