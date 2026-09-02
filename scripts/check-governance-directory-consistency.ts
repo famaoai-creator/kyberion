@@ -3,7 +3,11 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import { loadActuatorManifestCatalog } from '@agent/core/src/actuator-manifest-index';
 import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-registry';
-import { loadAgentProfileSnapshot, loadTeamRoleSnapshot } from '@agent/core/mission-team-index';
+import {
+  loadAgentProfileSnapshot,
+  loadTeamRoleDirectory,
+  loadTeamRoleSnapshot,
+} from '@agent/core/mission-team-index';
 import { compileSchema, defineCatalog, readJson } from '@agent/core/foundation';
 
 type VoiceProfileSnapshot = {
@@ -313,38 +317,31 @@ export function validateTeamRoleDirectoryConsistency(violations: string[]) {
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/team-role.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshotRoles = loadTeamRoleSnapshot();
+  let directoryRoles: ReturnType<typeof loadTeamRoleDirectory>;
+  try {
+    directoryRoles = loadTeamRoleDirectory();
+  } catch (error) {
+    violations.push(
+      `team-role-index: canonical directory failed governed loading (${error instanceof Error ? error.message : String(error)})`
+    );
+    return;
+  }
   const seenRoleIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/product/orchestration/team-roles/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `team-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const role = String((data as { role?: string }).role || '');
-    if (!role) {
-      violations.push(`team-role-index/${file}: role must not be empty`);
+    const role = file.replace(/\.json$/i, '');
+    const data = directoryRoles?.[role];
+    if (!data) {
+      violations.push(`team-role-index/${file}: canonical loader did not return this role`);
       continue;
-    }
-    if (file.replace(/\.json$/i, '') !== role) {
-      violations.push(`team-role-index/${file}: file name must match role id ${role}`);
     }
 
     const snapshotEntry = snapshotRoles[role];
     if (!snapshotEntry) {
       violations.push(`team-role-index/${file}: snapshot is missing role ${role}`);
     } else {
-      const { role: _role, ...dirRecord } = data as { role?: string; [key: string]: unknown };
-      if (JSON.stringify(dirRecord) !== JSON.stringify(snapshotEntry)) {
+      if (JSON.stringify(data) !== JSON.stringify(snapshotEntry)) {
         violations.push(`team-role-index/${file}: directory entry does not match snapshot`);
       }
     }
