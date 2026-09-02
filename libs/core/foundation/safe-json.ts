@@ -47,3 +47,28 @@ export function parseSafeJsonObjectValue(value: unknown, label: string): Record<
   }
   return value as Record<string, unknown>;
 }
+
+export type JsonObjectRequest = {
+  json: () => Promise<unknown>;
+};
+
+export type JsonObjectRequestResult =
+  { ok: true; body: Record<string, unknown> } | { ok: false; error: string };
+
+/** Read an async request body as a safe JSON object before surface route logic. */
+export async function readJsonObjectRequest(
+  request: JsonObjectRequest,
+  label = 'request body'
+): Promise<JsonObjectRequestResult> {
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return { ok: false, error: `${label} must be valid JSON` };
+  }
+  try {
+    return { ok: true, body: parseSafeJsonObjectValue(raw, label) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}

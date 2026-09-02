@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readJsonObjectRequest } from '@agent/core/foundation';
 import { acceptInboxEntryWithHumanReceipt, markInboxEntry } from '@agent/core/deliverable-inbox';
 import { requireOperatorSurfaceMutationAccess } from '../../../lib/api-guard';
 import {
@@ -15,13 +16,9 @@ export async function POST(req: NextRequest) {
   let parsed: InboxMutationParseResult;
 
   if (contentType.includes('application/json')) {
-    let rawBody: unknown;
-    try {
-      rawBody = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'Inbox request body must be valid JSON' }, { status: 400 });
-    }
-    parsed = parseInboxMutationInput(rawBody);
+    const body = await readJsonObjectRequest(req, 'Inbox request body');
+    if (!body.ok) return NextResponse.json({ error: body.error }, { status: 400 });
+    parsed = parseInboxMutationInput(body.body);
   } else {
     let form: FormData;
     try {

@@ -1,3 +1,5 @@
+import { readJsonObjectRequest } from '@agent/core/foundation';
+
 export type RequestInputObject = Record<string, unknown>;
 
 export type RequestObjectResult =
@@ -61,16 +63,11 @@ export async function readRequestObject(
   field = 'request body',
   allowedKeys?: readonly string[]
 ): Promise<RequestObjectResult> {
-  let raw: unknown;
+  const result = await readJsonObjectRequest(request, field);
+  if (!result.ok) return result;
   try {
-    raw = await request.json();
-  } catch {
-    return { ok: false, error: `${field} must be valid JSON` };
-  }
-  try {
-    const body = requireRequestObject(raw, field);
-    if (allowedKeys) requireKnownRequestKeys(body, allowedKeys, field);
-    return { ok: true, body };
+    if (allowedKeys) requireKnownRequestKeys(result.body, allowedKeys, field);
+    return result;
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
   }

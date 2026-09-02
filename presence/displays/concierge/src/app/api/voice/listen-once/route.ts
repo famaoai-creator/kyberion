@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireConciergeMutationAccess } from '../../../../lib/api-guard';
 import {
   optionalRequestString,
-  requireRequestObject,
-  requireKnownRequestKeys,
+  readRequestObject,
   RequestInputError,
 } from '../../../../lib/request-input';
 import { voiceHubUrl } from '../../../../lib/voice-hub';
@@ -28,13 +27,15 @@ export async function POST(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    let body: Record<string, unknown>;
-    try {
-      body = requireRequestObject(await req.json(), 'request body');
-      requireKnownRequestKeys(body, ['backend', 'device', 'locale']);
-    } catch {
+    const parsedBody = await readRequestObject(req, 'request body', [
+      'backend',
+      'device',
+      'locale',
+    ]);
+    if (!parsedBody.ok) {
       return NextResponse.json({ ok: false, error: 'invalid request body' }, { status: 400 });
     }
+    const body = parsedBody.body;
     const backendValue = optionalRequestString(body, 'backend');
     const deviceValue = optionalRequestString(body, 'device');
     const localeValue = optionalRequestString(body, 'locale');
