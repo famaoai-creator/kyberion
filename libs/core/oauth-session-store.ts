@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -34,6 +35,94 @@ export const OAUTH_SESSION_ROOT = pathResolver.sharedTmp('oauth');
 export const OAUTH_INITIATION_TTL_MS = 10 * 60 * 1000;
 export const OAUTH_CALLBACK_TTL_MS = 2 * 60 * 1000;
 const OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{8,256}$/;
+const PERSISTED_OAUTH_SESSION_FIELDS = [
+  'serviceId',
+  'state',
+  'codeVerifier',
+  'redirectUri',
+  'scopes',
+  'createdAt',
+  'expiresAt',
+  'callbackStartedAt',
+  'callbackExpiresAt',
+] as const;
+
+function parsePersistedOAuthSession(
+  value: unknown,
+  label: string,
+  expectedServiceId?: string,
+  expectedState?: string
+): PendingOAuthSession {
+  const record = parseSafeJsonObjectValue(value, label);
+  const allowedFields = new Set<string>(PERSISTED_OAUTH_SESSION_FIELDS);
+  if (Object.keys(record).some((key) => !allowedFields.has(key))) {
+    throw new Error(`${label} contains unknown fields`);
+  }
+
+  const serviceId = record.serviceId;
+  if (typeof serviceId !== 'string' || serviceId.trim() === '') {
+    throw new Error(`${label}.serviceId must be a non-empty string`);
+  }
+  if (expectedServiceId !== undefined && serviceId !== expectedServiceId) {
+    throw new Error(`${label}.serviceId does not match the requested service`);
+  }
+
+  const state = record.state;
+  if (typeof state !== 'string' || !isSafeOAuthState(state)) {
+    throw new Error(`${label}.state must be a safe token`);
+  }
+  if (expectedState !== undefined && !statesEqual(state, expectedState)) {
+    throw new Error(`${label}.state does not match the requested state`);
+  }
+
+  if (
+    !Array.isArray(record.scopes) ||
+    record.scopes.some((scope) => typeof scope !== 'string' || scope.trim() === '')
+  ) {
+    throw new Error(`${label}.scopes must be an array of non-empty strings`);
+  }
+
+  const requiredCreatedAt = record.createdAt;
+  if (typeof requiredCreatedAt !== 'string' || !Number.isFinite(Date.parse(requiredCreatedAt))) {
+    throw new Error(`${label}.createdAt must be a valid timestamp`);
+  }
+
+  const optionalString = (field: 'codeVerifier' | 'redirectUri'): string | undefined => {
+    const candidate = record[field];
+    if (candidate === undefined) return undefined;
+    if (typeof candidate !== 'string' || candidate.trim() === '') {
+      throw new Error(`${label}.${field} must be a non-empty string`);
+    }
+    return candidate;
+  };
+  const optionalTimestamp = (
+    field: 'expiresAt' | 'callbackStartedAt' | 'callbackExpiresAt'
+  ): string | undefined => {
+    const candidate = record[field];
+    if (candidate === undefined) return undefined;
+    if (typeof candidate !== 'string' || !Number.isFinite(Date.parse(candidate))) {
+      throw new Error(`${label}.${field} must be a valid timestamp`);
+    }
+    return candidate;
+  };
+
+  const codeVerifier = optionalString('codeVerifier');
+  const redirectUri = optionalString('redirectUri');
+  const expiresAt = optionalTimestamp('expiresAt');
+  const callbackStartedAt = optionalTimestamp('callbackStartedAt');
+  const callbackExpiresAt = optionalTimestamp('callbackExpiresAt');
+  return {
+    serviceId,
+    state,
+    scopes: [...record.scopes] as string[],
+    createdAt: requiredCreatedAt,
+    ...(codeVerifier ? { codeVerifier } : {}),
+    ...(redirectUri ? { redirectUri } : {}),
+    ...(expiresAt ? { expiresAt } : {}),
+    ...(callbackStartedAt ? { callbackStartedAt } : {}),
+    ...(callbackExpiresAt ? { callbackExpiresAt } : {}),
+  };
+}
 
 export function isSafeOAuthState(state: string): boolean {
   return OAUTH_STATE_PATTERN.test(state);
@@ -109,7 +198,12 @@ export function loadPendingOAuthSession(
     const filePath = serviceSessionPath(serviceId, state);
     if (!safeExistsSync(filePath)) return null;
     try {
-      const session = readJson<PendingOAuthSession>(filePath);
+      const session = parsePersistedOAuthSession(
+        readJson<unknown>(filePath),
+        `OAuth session ${filePath}`,
+        serviceId,
+        state
+      );
       if (session.serviceId !== serviceId || !statesEqual(session.state, state)) {
         clearPendingOAuthSession(serviceId, state);
         return null;
@@ -132,7 +226,12 @@ export function loadPendingOAuthSession(
     if (files.length === 0) return null;
     const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));
     if (!safeLstat(filePath).isFile()) return null;
-    const session = readJson<PendingOAuthSession>(filePath);
+    const session = parsePersistedOAuthSession(
+      readJson<unknown>(filePath),
+      `OAuth session ${filePath}`,
+      serviceId
+    );
+    if (`${session.state}.json` !== files[0]) return null;
     if (isOAuthSessionExpired(session)) {
       clearPendingOAuthSession(serviceId, session.state);
       return null;
@@ -176,8 +275,14 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
           const filePath = assertSafeRepositoryPath(path.join(fullDir, fileName), {
             allowMissingLeaf: true,
           });
-          const session = readJson<PendingOAuthSession>(filePath);
-          if (!isSafeOAuthState(session.state)) {
+          const session = parsePersistedOAuthSession(
+            readJson<unknown>(filePath),
+            `OAuth session ${filePath}`
+          );
+          if (
+            serviceSessionDir(session.serviceId) !== fullDir ||
+            `${session.state}.json` !== fileName
+          ) {
             continue;
           }
           if (isOAuthSessionExpired(session)) {
