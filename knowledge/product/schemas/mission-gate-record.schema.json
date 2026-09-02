@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-gate-record.schema.json",
+  "title": "Persisted mission gate record",
+  "description": "A gate evaluation or override record persisted under a mission boundary.",
+  "type": "object",
+  "required": ["mission_id", "gate_id"],
+  "additionalProperties": false,
+  "properties": {
+    "mission_id": { "type": "string", "minLength": 1 },
+    "gate_id": { "type": "string", "minLength": 1 },
+    "verdict": { "type": "string", "enum": ["pass", "fail"] },
+    "reason": { "type": "string" },
+    "reasons": { "type": "array", "items": { "type": "string" } },
+    "failure_count": { "type": "integer", "minimum": 0 },
+    "checked_at": { "type": "string" },
+    "should_realign": { "type": "boolean" },
+    "next_status": { "type": "string" },
+    "phase": { "type": "string" },
+    "position": { "type": "string" },
+    "source": { "type": "string" },
+    "drift_score": { "type": "number" },
+    "review_summary": { "type": "object", "additionalProperties": true },
+    "evidence_path": { "type": "string" },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "passed"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string" },
+          "passed": { "type": "boolean" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "override": { "type": "boolean" },
+    "override_outcome": { "type": "string", "enum": ["passed", "rejected"] },
+    "note": { "type": "string" },
+    "confirmed_by": { "type": "string" },
+    "confirmed_at": { "type": "string" },
+    "source_gate_id": { "type": "string" }
+  }
+}
