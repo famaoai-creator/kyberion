@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "role-authority-map.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "system_roles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
+    "mission_roles": { "type": "array", "items": { "$ref": "#/$defs/role" } },
+    "context_roles": { "type": "array", "items": { "$ref": "#/$defs/role" } }
+  },
+  "required": ["version", "description", "system_roles", "mission_roles", "context_roles"],
+  "$defs": {
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string", "minLength": 1 },
+        "authority_role": { "type": "string", "minLength": 1 },
+        "persona": { "type": "string", "minLength": 1 },
+        "execution_mode": { "type": "string", "minLength": 1 }
+      },
+      "required": ["role", "persona", "execution_mode"]
+    }
+  }
+}
