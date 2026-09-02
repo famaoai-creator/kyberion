@@ -36,9 +36,14 @@ const realFsSecureIo = vi.hoisted(() => ({
   loadJson: <T>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T,
 }));
 vi.mock('./secure-io.js', () => realFsSecureIo);
-vi.mock('./foundation/json.js', () => ({
-  readJson: realFsSecureIo.loadJson,
-}));
+vi.mock('./foundation/json.js', async () => {
+  const actual =
+    await vi.importActual<typeof import('./foundation/json.js')>('./foundation/json.js');
+  return {
+    ...actual,
+    readJson: realFsSecureIo.loadJson,
+  };
+});
 vi.mock('./foundation/io.js', () => ({
   getFoundationIo: () => ({
     loadJson: realFsSecureIo.loadJson,
@@ -140,6 +145,9 @@ describe('mission hygiene', () => {
     }); // abandoned, dispatched but never activated
     seedMission('MSN-RUNNING', 'active', 5, {}); // not planned — ignored
     seedMission('MSN-NO-HISTORY', 'planned', null, {}); // unknown age → abandoned bucket
+    seedMission('MSN-MALFORMED', 'planned', 5, {
+      tasks: [{ task_id: 'T-1' }, { task_id: 42 }],
+    }); // malformed projection — treat as no usable task design
 
     mod = await import('./mission-hygiene.js');
   });
@@ -151,7 +159,7 @@ describe('mission hygiene', () => {
 
   it('classifies stuck planned missions with per-mission remediation', () => {
     const report = mod.collectMissionHygieneReport();
-    expect(report.planned_total).toBe(5);
+    expect(report.planned_total).toBe(6);
 
     const byId = Object.fromEntries(
       [...report.stale, ...report.abandoned].map((finding) => [finding.mission_id, finding])
@@ -162,6 +170,8 @@ describe('mission hygiene', () => {
     expect(byId['MSN-READY']?.reason).toBe('ready_not_started');
     expect(byId['MSN-READY']?.recommendation).toContain('dispatch-workitems');
     expect(byId['MSN-GATED']?.reason).toBe('awaiting_gate');
+    expect(byId['MSN-MALFORMED']?.reason).toBe('design_missing');
+    expect(byId['MSN-MALFORMED']?.task_count).toBe(0);
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-GATED');
     expect(report.abandoned.map((finding) => finding.mission_id)).toContain('MSN-NO-HISTORY');
     expect(report.active_stale?.map((finding) => finding.mission_id)).toContain('MSN-RUNNING');
