@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
 import type { EnsureAgentRuntimeOptions } from './agent-runtime-contracts.js';
@@ -144,7 +145,7 @@ export function enqueueMissionTeamPrewarmRequest(input: {
     team_roles: input.teamRoles?.length ? [...input.teamRoles] : undefined,
     requested_by: input.requestedBy,
     reason: input.reason,
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
   };
   safeWriteFile(
     getAgentRuntimeEnsureRequestPath(request.request_id),
@@ -192,7 +193,7 @@ export async function processMissionTeamPrewarmRequest(
 
   const result: AgentRuntimeEnsureResult = {
     ...request,
-    completed_at: new Date().toISOString(),
+    completed_at: nowIso(),
     organization_profile: runtime_plan.organization_profile,
     runtime_plan,
   };

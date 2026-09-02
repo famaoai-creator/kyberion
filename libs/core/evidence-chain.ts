@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeWriteFile,
@@ -101,7 +102,7 @@ export const evidenceChain = {
         agentId,
         parentId,
         context,
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       };
 
       const registry = evidenceChain._loadRegistry();
