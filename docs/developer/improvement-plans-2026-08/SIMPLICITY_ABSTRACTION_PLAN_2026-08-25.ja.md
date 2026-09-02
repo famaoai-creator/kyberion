@@ -12024,6 +12024,16 @@ exports と全7 catalog の実ロード契約を追加した。
 検証: actuator example catalog **2 files / 4 tests passed**、source 実行 probe、build、typecheck、root lint、PR scope
 **33/33 gates passed**、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理と未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 314
+
+`scripts/cli` に残っていた mobile／web app profile index の直接 `readJson` を、既存専用 schema と validator を
+再利用する core の `loadMobileAppProfileIndex`／`loadWebAppProfileIndex` へ移行した。`defineCatalog` の共有 cache と
+schema validation の後に、従来の profile resource path existence 検証を実行する二段構成を保ち、欠損 index の空表示も維持した。
+実データをロードする契約テストを追加した。
+
+検証: app profile loader／validator **2 files / 16 tests passed**、CLI の examples／mobile-profiles／web-profiles source probe、
+core build、typecheck。残る SX-04 は非catalog層の旧loader整理と未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
