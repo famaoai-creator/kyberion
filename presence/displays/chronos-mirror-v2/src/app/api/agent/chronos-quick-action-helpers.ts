@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { nowIso } from '@agent/core/foundation';
+import { parseMissionNextTaskRecords } from '@agent/core/mission-next-task-reader';
 import type { MissionState } from '@agent/core/mission-types';
 import { uxMessage, type SupportedLocale } from '../../../lib/ux-vocabulary';
 import { optionalStringField, recordField } from '../../../lib/json-record';
@@ -69,7 +70,7 @@ export function collectActiveMissions(core: ChronosQuickActionCore): ActiveMissi
           );
           if (core.safeExistsSync(nextTasksPath) && core.safeLstat(nextTasksPath).isFile()) {
             const nextTasks = core.readJson<unknown>(nextTasksPath);
-            nextTaskCount = Array.isArray(nextTasks) ? nextTasks.length : 0;
+            nextTaskCount = parseMissionNextTaskRecords(nextTasks)?.length || 0;
           }
         } catch {
           // Optional task projection is omitted when its path is unsafe.
