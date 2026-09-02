@@ -11663,6 +11663,17 @@ knowledge integrity manifest を再生成した。これにより governance cat
 root typecheck、root lint。残る SX-04 は generic envelope の dedicated schema 化、未参照 catalog の処分、各 domain
 loader の完全統合である。
 
+## 2026-09-02 再レビュー修正 279
+
+`scripts/org.ts` の role-authority map、security policy、role-write access の 3 reader を `defineCatalog` へ移行した。
+custom `rootDir` ごとの catalog cache、dedicated schema validation、missing catalog の conservative fallback、
+write 後の cache reset を共通化し、既存の human approval gate、role write scope、security policy mutation semantics は
+変更していない。authority core の bootstrap cycle 回避用 raw reader は別境界として維持した。
+
+検証: org **2 test files / 3 tests passed**、PR scope **33 gates / 0 failed**、catalogs／governance-rules **各 1 gate passed**、
+root typecheck、root lint。残る SX-04 は generic envelope の dedicated schema 化、未参照 catalog の処分、各 domain
+loader の完全統合である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
