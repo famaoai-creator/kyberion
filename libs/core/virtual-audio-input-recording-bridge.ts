@@ -6,6 +6,7 @@ import {
   type VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import type { AudioChunk, AudioFormat } from './meeting-session-types.js';
 import {
   assertSafeRepositoryPath,
@@ -109,7 +110,7 @@ function resolveRecordingPath(deviceName: string, requestedPath?: string): strin
       allowMissingLeaf: true,
     });
   }
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return assertSafeRepositoryPath(
     pathResolver.sharedTmp(
       path.join('audio-input-recordings', `${safeSlug(deviceName)}-${stamp}.wav`)

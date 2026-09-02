@@ -34,6 +34,7 @@ import {
   safeMkdir,
 } from './secure-io.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   createMemoryPromotionCandidate,
   enqueueMemoryPromotionCandidate,
@@ -114,10 +115,7 @@ function saveSyncState(state: SyncState, scope?: ScopeContext): void {
   });
   const dir = nodePath.dirname(resolved);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(
-    resolved,
-    JSON.stringify({ ...state, last_sync_at: new Date().toISOString() }, null, 2)
-  );
+  safeWriteFile(resolved, JSON.stringify({ ...state, last_sync_at: nowIso() }, null, 2));
 }
 
 function sha256(content: string): string {

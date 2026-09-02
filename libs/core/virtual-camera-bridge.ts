@@ -9,6 +9,7 @@ import {
   safeRmSync,
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import type { VideoFrame } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 import type {
@@ -117,7 +118,7 @@ const PLACEHOLDER_PNG = Buffer.from(
 );
 
 function defaultOutputPath(): string {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return path.join(DEFAULT_OUTPUT_DIR, `camera-${stamp}.png`);
 }
 

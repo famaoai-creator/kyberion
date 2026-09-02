@@ -12,6 +12,7 @@ import {
 } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { clamp } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type { VideoFrame, VideoFormat } from './meeting-session-types.js';
 import type { VideoFrameBus } from './video-frame-bus.js';
 
@@ -51,7 +52,7 @@ function frameFileExtension(format: VideoFormat): 'jpg' | 'png' {
 }
 
 function resolveArchiveTempDir(prefix: string): string {
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const stamp = nowIso().replace(/[:.]/g, '-');
   return pathResolver.sharedTmp(
     path.join('video-frame-archive', `${prefix}-${stamp}-${randomUUID()}`)
   );

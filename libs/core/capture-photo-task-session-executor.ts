@@ -1,4 +1,5 @@
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import { recordTaskSessionHistory, updateTaskSession, type TaskSession } from './task-session.js';
 import { createVirtualCameraBridge } from './virtual-camera-bridge.js';
@@ -95,7 +96,7 @@ export async function executeCapturePhotoTaskSession(
   });
 
   if (updated) {
-    const timestamp = new Date().toISOString();
+    const timestamp = nowIso();
     recordTaskSessionHistory(updated.session_id, {
       ts: timestamp,
       type: 'execution',

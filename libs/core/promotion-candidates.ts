@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
@@ -59,12 +60,13 @@ export function recordAdhocPipelineRun(relativePath: string): number {
     const entries = readLedger();
     const existing = entries.find((entry) => entry.path === normalized);
     let count = 1;
+    const recordedAt = nowIso();
     if (existing) {
       existing.count += 1;
-      existing.last_at = new Date().toISOString();
+      existing.last_at = recordedAt;
       count = existing.count;
     } else {
-      entries.push({ path: normalized, count: 1, last_at: new Date().toISOString() });
+      entries.push({ path: normalized, count: 1, last_at: recordedAt });
     }
     // Rotate by recency when over cap.
     const trimmed = entries
