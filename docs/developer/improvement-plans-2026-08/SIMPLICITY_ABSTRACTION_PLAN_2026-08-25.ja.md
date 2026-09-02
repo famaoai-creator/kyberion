@@ -12741,7 +12741,13 @@ SX-03 の残存監査として、confidential relationship graph の node 作成
 
 SX-03 の残存監査として、reasoning degradation marker と provider failover の event／marker 記録に残っていた単純な `new Date().toISOString()` **3 箇所**を foundation `nowIso()` へ統合した。stub degradation／provider failover の判定、JSONL／marker の保存形式、best-effort のエラー境界は変更していない。併せて degradation test の foundation I/O mock を実装契約に合わせ、secure-io mock下でも `readJson` が governed registry を利用できるようにした。
 
-検証: reasoning degradation／failover **3 files / 9 tests passed**、対象production filesの単純 timestamp **0件**、root typecheck、対象3ファイルの ESLint、`git diff --check`。canonical full gate 実行前であり、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+検証: reasoning degradation／failover **3 files / 9 tests passed**、対象production filesの単純 timestamp **0件**、root typecheck、対象3ファイルの ESLint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
+## 2026-09-02 再レビュー修正 414
+
+SX-03 の残存監査として、mission hygiene のレポート生成・学習候補・通知識別子に残っていた単純な `new Date().toISOString()` **4 箇所**を foundation `nowIso()` へ統合した。通知内の dedupe／correlation 用の日付は同一の `notificationDay` を共有し、日付境界で識別子が分裂する余地も閉じた。ミッションの分類、tenant／tier の扱い、human decision の境界は変更していない。
+
+検証: mission hygiene **1 file / 4 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象2ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
 ## 参照
 
