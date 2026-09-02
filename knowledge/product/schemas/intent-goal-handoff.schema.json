@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/intent-goal-handoff.schema.json",
+  "title": "Intent goal handoff",
+  "description": "Confidential intent and agreed-goal payload passed into mission creation.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "source_text": { "type": "string" },
+    "correlation_id": { "type": "string" },
+    "origin_intent_id": { "type": "string" },
+    "origin_utterance_ref": { "type": "string" },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "success_condition": { "type": "string" }
+      }
+    },
+    "outcome_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

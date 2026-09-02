@@ -1,11 +1,13 @@
 import * as path from 'node:path';
-import { sharedTmp } from './path-resolver.js';
+import { pathResolver, sharedTmp } from './path-resolver.js';
 import { logger } from './core.js';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeUnlinkSync,
   safeWriteFile,
 } from './secure-io.js';
@@ -32,6 +34,9 @@ export interface IntentGoalHandoff {
 }
 
 const HANDOFF_SUBDIR = 'intent-handoff';
+const HANDOFF_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/intent-goal-handoff.schema.json'
+);
 
 const HANDOFF_FIELDS = [
   'source_text',
@@ -120,6 +125,24 @@ function parseIntentGoalHandoff(value: unknown): IntentGoalHandoff | null {
   };
 }
 
+/** Load one persisted handoff through the canonical schema and file boundary. */
+export function loadIntentGoalHandoffAtPath(filePath: string): IntentGoalHandoff {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[INTENT_HANDOFF] handoff must be a regular file: ${filePath}`);
+  }
+  const validated = defineCatalog<IntentGoalHandoff>({
+    id: 'intent-goal-handoff',
+    path: safeFilePath,
+    schema: HANDOFF_SCHEMA_PATH,
+  }).validate(readJson<unknown>(safeFilePath), safeFilePath);
+  const parsed = parseIntentGoalHandoff(validated);
+  if (!parsed) {
+    throw new Error(`[INTENT_HANDOFF] invalid handoff payload: ${filePath}`);
+  }
+  return parsed;
+}
+
 export function writeIntentGoalHandoff(missionId: string, payload: IntentGoalHandoff): string {
   const normalizedMissionId = String(missionId || '').trim();
   if (
@@ -148,7 +171,14 @@ export function consumeIntentGoalHandoff(handoffPath: string): IntentGoalHandoff
   try {
     const safeHandoffPath = assertSafeRepositoryPath(handoffPath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeHandoffPath)) return null;
-    const parsed = parseIntentGoalHandoff(readJson<unknown>(safeHandoffPath));
+    let parsed: IntentGoalHandoff | null;
+    try {
+      parsed = loadIntentGoalHandoffAtPath(safeHandoffPath);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn(`[intent-handoff] failed to parse ${handoffPath}: ${message}`);
+      parsed = null;
+    }
     try {
       safeUnlinkSync(safeHandoffPath);
     } catch {
