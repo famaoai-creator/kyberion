@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   checkCiGateParity,
+  checkWorkflowSetupOrder,
   collectCheckScopeReferences,
   collectPnpmScriptReferences,
 } from './check_ci_gate_parity.js';
@@ -31,5 +32,23 @@ describe('ci gate parity', () => {
         'pnpm run check -- --scope full && pnpm run check -- --scope full --only catalogs'
       )
     ).toEqual(['full']);
+  });
+
+  it('requires repository checkout before the shared setup action', () => {
+    expect(
+      checkWorkflowSetupOrder(
+        '.github/workflows/example.yml',
+        'uses: actions/checkout@v4\nuses: ./.github/actions/setup-kyberion'
+      )
+    ).toEqual([]);
+    expect(
+      checkWorkflowSetupOrder(
+        '.github/workflows/example.yml',
+        'uses: ./.github/actions/setup-kyberion\nuses: actions/checkout@v4'
+      )
+    ).toEqual(['.github/workflows/example.yml must checkout the repository before setup']);
+    expect(
+      checkWorkflowSetupOrder('.github/workflows/example.yml', 'uses: actions/checkout@v4')
+    ).toEqual(['.github/workflows/example.yml must use uses: ./.github/actions/setup-kyberion']);
   });
 });
