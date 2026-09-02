@@ -1,7 +1,7 @@
 import { draftDeckSectionBodies, selectDeckTheme } from '@agent/core/deck-theme-direction';
 import { htmlToDeckProtocol } from './html-deck-helpers.js';
 import { logger } from '@agent/core/core';
-import { clamp } from '@agent/core/foundation';
+import { clamp, nowIso } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -306,7 +306,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
         const canvas = ctx.active_canvas || themePack?.pptx?.canvas || { w: 10, h: 5.625 };
         const protocol: any = {
           version: '3.0.0',
-          generatedAt: new Date().toISOString(),
+          generatedAt: nowIso(),
           canvas,
           theme: {
             dk1: (themeColors.primary || '#000000').replace('#', ''),
@@ -847,7 +847,7 @@ async function opTransform(op: string, params: any, ctx: any, resolve: Function)
                   review_outcome: loop.outcome,
                   rounds: loop.rounds,
                   report,
-                  generated_at: new Date().toISOString(),
+                  generated_at: nowIso(),
                 },
                 null,
                 2

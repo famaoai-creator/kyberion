@@ -2,6 +2,7 @@ import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import { resolveDocumentContentsLabel } from '@agent/core/document-contents-policy';
 import { resolveReportSectionTitle } from '@agent/core/document-outline-label-policy';
 import { resolveThemeColorRole as resolveThemeColorRolePolicy } from '@agent/core/media-theme-role-policy';
+import { nowIso } from '@agent/core/foundation';
 import {
   buildMediaGenerationBoundary,
   buildReportNarrativeOutline,
@@ -380,7 +381,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.payload.title || 'Report',
@@ -1078,7 +1079,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.payload.title || 'Report',
@@ -1088,7 +1089,7 @@ export function createMediaReportPipelineHelpers(deps: MediaReportPipelineDeps) 
         title: brief.payload.title || 'Report',
         subject: brief.document_profile || 'summary-report',
         author: 'Kyberion Media-Actuator',
-        creationDate: new Date().toISOString(),
+        creationDate: nowIso(),
         composition: outline,
         generationBoundary: outline.generation_boundary || buildMediaGenerationBoundary(outline),
         recommendedTheme: preset?.recommended_theme || 'kyberion-standard',

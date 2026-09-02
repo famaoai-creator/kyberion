@@ -1,5 +1,6 @@
 import { resolveBorderKeySides } from '@agent/core/media-style-policy';
 import type { PdfDesignProtocol } from '@agent/core/media-contracts';
+import { nowIso } from '@agent/core/foundation';
 import * as mediaPdfHelpers from './media-pdf-helpers.js';
 
 export interface PdfToPptxHints {
@@ -418,7 +419,7 @@ export function buildPptxProtocolFromPdfDesign(
 
   return {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     canvas,
     theme: {
       dk1: resolvedHints.theme?.dk1 || DEFAULT_PDF_TO_PPTX_HINTS.theme!.dk1!,
@@ -461,7 +462,7 @@ export function buildXlsxProtocolFromPdfDesign(
   const pages = Array.isArray(pdfDesign.content?.pages) ? pdfDesign.content.pages : [];
   const emptyProtocol = {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme: {
       name: 'PDF Import',
       colors: H.theme,
@@ -1074,7 +1075,7 @@ export function buildXlsxProtocolFromPdfDesign(
 
   return {
     version: '3.0.0',
-    generatedAt: new Date().toISOString(),
+    generatedAt: nowIso(),
     theme: {
       name: 'PDF Import',
       colors: H.theme,

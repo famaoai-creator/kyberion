@@ -4,7 +4,7 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
 import { designDefaultsFromMediaTheme } from '@agent/core/src/native-pptx-engine/design-cascade';
@@ -174,7 +174,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
     }
     const protocol: any = {
       version: '3.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       metadata: {
         composition: outline,
         generationBoundary:
@@ -523,7 +523,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
 
     return {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       source: {
         format: 'markdown',
         title: brief.title || 'Invoice',
@@ -533,7 +533,7 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
         title: brief.title || 'Invoice',
         subject: brief.document_profile || 'qualified-invoice',
         author: 'Kyberion Media-Actuator',
-        creationDate: new Date().toISOString(),
+        creationDate: nowIso(),
         composition: {
           kind: 'document-outline-adf',
           document_profile: brief.document_profile,

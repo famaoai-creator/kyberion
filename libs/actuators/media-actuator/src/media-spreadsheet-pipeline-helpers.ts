@@ -8,6 +8,7 @@ import { loadMediaSignalEntryPolicyCatalog } from '@agent/core/media-signal-entr
 import { loadTrackerSheetPolicyCatalog } from '@agent/core/tracker-sheet-policy';
 import { resolveSpreadsheetStyleIndex } from '@agent/core/spreadsheet-style-policy';
 import { resolveMediaToneStyle } from '@agent/core/media-tone-style-map';
+import { nowIso } from '@agent/core/foundation';
 
 export interface MediaSpreadsheetPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
@@ -656,7 +657,7 @@ export function createMediaSpreadsheetPipelineHelpers(deps: MediaSpreadsheetPipe
 
     return {
       version: '3.0.0',
-      generatedAt: new Date().toISOString(),
+      generatedAt: nowIso(),
       theme: {
         name: 'Tracker Theme',
         colors: {
