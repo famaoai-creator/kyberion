@@ -251,6 +251,10 @@
       "types": "./dist/mission-team-index.d.ts",
       "default": "./dist/mission-team-index.js"
     },
+    "./agent-performance-index": {
+      "types": "./dist/agent-performance-index.d.ts",
+      "default": "./dist/agent-performance-index.js"
+    },
     "./src/lock-utils": {
       "types": "./dist/src/lock-utils.d.ts",
       "default": "./dist/src/lock-utils.js"
