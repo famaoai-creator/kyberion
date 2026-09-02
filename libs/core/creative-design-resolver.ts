@@ -5,7 +5,10 @@ import { assertSafeRepositoryPath } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { loadTenantDesignOverride } from './tenant-design-override.js';
+import {
+  loadTenantDesignOverride,
+  loadTenantDesignThemeOverlay,
+} from './tenant-design-override.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -451,7 +454,11 @@ function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
       const themePath = assertSafeRepositoryPath(path.join(dir, 'theme.json'), {
         allowMissingLeaf: true,
       });
-      const themePack = readJsonIfPresent(themePath);
+      const themePack = loadTenantDesignThemeOverlay(
+        pathResolver.rootDir(),
+        themePath,
+        path.dirname(overridePath)
+      );
       return { override, themePack, matchedDir: dir };
     } catch {
       // An invalid or symlinked tenant design overlay is not trusted input.

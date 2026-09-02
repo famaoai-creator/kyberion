@@ -6,6 +6,7 @@ import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   loadTenantDesignOverride,
   loadTenantDesignOverrideIndex,
+  loadTenantDesignThemeOverlay,
   resolveTenantDesign,
 } from './tenant-design-resolver.js';
 
@@ -147,6 +148,15 @@ describe('tenant-design-resolver', () => {
 
     expect(loadTenantDesignOverride(rootDir, overridePath, designDir)).toBeNull();
     expect(resolveTenantDesign({ rootDir, brandName: 'Aster Bank' }).source).toBe('default');
+  });
+
+  it('fails closed when a tenant theme overlay violates the shared shape contract', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const themePath = path.join(designDir, 'theme.json');
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(themePath, JSON.stringify({ theme: { colors: { primary: 42 } } }));
+
+    expect(loadTenantDesignThemeOverlay(rootDir, themePath, designDir)).toBeNull();
   });
 
   it('falls back to default when no tenant override matches', () => {
