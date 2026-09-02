@@ -12539,6 +12539,12 @@ SX-03 の残存監査として、mission maintenance の checkpoint／approval�
 
 検証: mission maintenance／prompt visibility **4 files / 31 tests passed**、対象production filesの単純timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 380
+
+SX-04 の残存監査として、`check_tier_hygiene` が直接 `readJson` していた governance policy loader を `defineCatalog<Policy>()` に統合した。policy path と dedicated schema を共通catalog境界へ接続し、tier hygiene scan の正規表現・allowlist・違反判定とcheckerの終了境界は変更していない。
+
+検証: tier hygiene／catalog integrity **3 files / 22 tests passed**、policy schema検証経路、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照 catalog の廃止判断、domain-specific loaderの追加統合であり、SX-03・SX-05〜SX-14も未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
