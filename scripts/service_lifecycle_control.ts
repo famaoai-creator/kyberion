@@ -9,6 +9,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { parseServicePidRegistry } from '@agent/core/service-pid-registry';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const PID_FILE = pathResolver.shared('services-pids.json');
@@ -24,7 +25,7 @@ type SurfaceStartableChoice = {
 };
 
 function isRunningPid(pid: unknown): pid is number {
-  if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
+  if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -38,12 +39,9 @@ function loadPidMap(): Record<string, number> {
   try {
     const safePidFile = assertSafeRepositoryPath(PID_FILE);
     if (!safeLstat(safePidFile).isFile()) return {};
-    const parsed = readJson<Record<string, unknown>>(safePidFile);
-    return Object.fromEntries(
-      Object.entries(parsed)
-        .filter(([, pid]) => isRunningPid(pid))
-        .map(([serviceName, pid]) => [serviceName, pid as number])
-    );
+    const parsed = parseServicePidRegistry(readJson<unknown>(safePidFile));
+    if (!parsed) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, pid]) => isRunningPid(pid)));
   } catch {
     return {};
   }

@@ -13133,6 +13133,12 @@ SX-03／SX-08／SX-09／SX-12 のsurface runtime state loaderを再監査し、`
 
 検証: surface runtime／task-session **3 files / 33 tests passed**、5 package build、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 479
+
+SX-03／SX-08／SX-09 の `services-pids.json` reader を再監査し、task-session／service lifecycle CLIがJSON parse後の値をPID mapとして直接利用していた残存を修正した。service ID、positive safe integer PID、object root、unknown／dangerous JSON keyを検証する `@agent/core/service-pid-registry` parserへ昇格し、task-session・service lifecycle CLI・service actuatorの3 consumerを同じfail-closed契約へ統合した。不正registryは空の候補・registryとして扱い、process probe／stop候補／reconcile cleanupへ流さない既存semanticsを維持している。
+
+検証: service PID parser／task-session **2 files / 26 tests passed**、5 package build、root typecheck、`git diff --check`、canonical full gate **69/69 passed**。service actuator既存テスト群には今回の変更箇所以外の secure foundation IO未登録／preset path mock不整合が残るため、個別実行では **9 failed / 21 passed** と切り分けて記録する。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
