@@ -163,6 +163,12 @@ function loadServiceEndpointsDirectory(catalogDir: string): ServiceEndpointsCata
   };
 }
 
+export function loadServiceEndpointsDirectoryCatalog(
+  catalogDir = DEFAULT_SERVICE_ENDPOINTS_DIR
+): ServiceEndpointsCatalog {
+  return loadServiceEndpointsDirectory(catalogDir);
+}
+
 export function loadServiceEndpointsCatalog(): ServiceEndpointsCatalog {
   const catalogPath = getServiceEndpointsPath();
   const catalogDir = getServiceEndpointsDir();

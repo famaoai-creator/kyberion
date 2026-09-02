@@ -154,6 +154,12 @@ function loadRegistryDirectory(registryDir: string): VoiceEngineRegistry {
   };
 }
 
+export function loadVoiceEngineRegistryDirectory(
+  registryDir = getRegistryDir()
+): VoiceEngineRegistry {
+  return loadRegistryDirectory(registryDir);
+}
+
 export function _resetVoiceEngineRegistryCacheForTests(): void {
   cachedRegistryPath = null;
   cachedRegistryDir = null;

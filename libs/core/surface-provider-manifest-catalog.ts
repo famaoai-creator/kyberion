@@ -72,6 +72,14 @@ function loadCatalogDirectory(): SurfaceProviderManifestCatalog | null {
   return { version: '1.0.0', entries };
 }
 
+export function loadSurfaceProviderManifestCatalogDirectory(): SurfaceProviderManifestCatalog {
+  const catalog = loadCatalogDirectory();
+  if (!catalog) {
+    throw new Error(`Surface provider manifest catalog directory is empty: ${CATALOG_DIR}`);
+  }
+  return catalog;
+}
+
 export function loadSurfaceProviderManifestCatalog(): SurfaceProviderManifestCatalog | null {
   const dirMtime = readMtime(CATALOG_DIR);
   const snapshotMtime = readMtime(CATALOG_PATH);
