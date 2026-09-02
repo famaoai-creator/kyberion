@@ -55,4 +55,21 @@ describe('presence studio browser runtime resource boundaries', () => {
     ).toBeNull();
     expect(resolveSafeExistingFile(linkedSession)).toBeNull();
   });
+
+  it('excludes malformed session and snapshot metadata from operator projections', () => {
+    process.env.KYBERION_SUDO = 'true';
+    safeMkdir(sessionDir, { recursive: true });
+    safeMkdir(snapshotDir, { recursive: true });
+    safeWriteFile(
+      path.join(sessionDir, 'bad-session.json'),
+      JSON.stringify({ session_id: 'bad', tabs: [{ tab_id: 42 }] })
+    );
+    safeWriteFile(
+      path.join(snapshotDir, 'bad-snapshot.json'),
+      JSON.stringify({ session_id: 'bad', element_count: '1' })
+    );
+
+    expect(listBrowserRuntimeSessions({ browserSessionDir: sessionDir })).toEqual([]);
+    expect(loadBrowserSnapshotSummary('bad', { browserSnapshotDir: snapshotDir })).toBeNull();
+  });
 });
