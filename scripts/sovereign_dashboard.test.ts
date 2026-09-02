@@ -11,6 +11,7 @@ import {
 import {
   listJsonFiles,
   readMissionDashboardState,
+  readProviderCapabilitySnapshot,
   readSurfaceDashboardState,
   safeListDir,
 } from './sovereign_dashboard.js';
@@ -86,5 +87,26 @@ describe('sovereign dashboard governance loaders', () => {
     safeWriteFile(statePath, JSON.stringify({ version: 1, surfaces: { chronos: { pid: 123 } } }));
 
     expect(readSurfaceDashboardState(statePath)).toEqual({ version: 1, surfaces: {} });
+  });
+
+  it('fails closed when the provider capability snapshot is malformed', () => {
+    const snapshotPath = pathResolver.sharedTmp(
+      `sovereign-dashboard-provider-capabilities-${process.pid}.json`
+    );
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({
+        generated_at: '2026-09-03T00:00:00.000Z',
+        registered_capabilities: 1,
+        available_capabilities: 1,
+        available_providers: ['alpha'],
+        missing_providers: [],
+        providers: [],
+        capabilities: [],
+        unexpected: true,
+      })
+    );
+
+    expect(readProviderCapabilitySnapshot(snapshotPath)).toBeNull();
   });
 });

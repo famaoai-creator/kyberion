@@ -13,6 +13,10 @@ import {
 import { listSurfaceOutboxMessages } from '@agent/core/surface-coordination-store';
 import { discoverProviders } from '@agent/core/provider-discovery';
 import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface-runtime';
+import {
+  parseProviderCapabilitySnapshot,
+  type ProviderCapabilitySnapshot,
+} from '@agent/core/provider-capability-overview';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -307,27 +311,17 @@ function readJsonIfExists<T>(logicalPath: string): T | null {
   }
 }
 
-type ProviderCapabilitySnapshot = {
-  generated_at: string;
-  registered_capabilities: number;
-  available_capabilities: number;
-  available_providers: string[];
-  missing_providers: string[];
-  providers: Array<{
-    provider: string;
-    installed: boolean;
-    version: string | null;
-    protocol: string;
-    healthy: boolean;
-  }>;
-  capabilities: Array<{
-    capability_id: string;
-    provider: string;
-    status: string;
-    discovery_status: string;
-    evidence?: string;
-  }>;
-};
+export function readProviderCapabilitySnapshot(
+  filePath: string
+): ProviderCapabilitySnapshot | null {
+  const raw = readJsonIfExists<unknown>(filePath);
+  if (raw === null) return null;
+  try {
+    return parseProviderCapabilitySnapshot(raw);
+  } catch {
+    return null;
+  }
+}
 
 export function listJsonFiles(dir: string): string[] {
   try {
@@ -556,7 +550,7 @@ function drawCapabilityLandscape() {
   dashboardLog(chalk.bold.cyan(' 🧰 PROVIDER CAPABILITY LANDSCAPE'));
 
   const snapshotPath = pathResolver.rootResolve('active/shared/runtime/provider-capabilities.json');
-  const snapshot = readJsonIfExists<ProviderCapabilitySnapshot>(snapshotPath);
+  const snapshot = readProviderCapabilitySnapshot(snapshotPath);
   const discovery = discoverProviders();
 
   if (!snapshot) {

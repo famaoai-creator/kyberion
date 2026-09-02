@@ -13217,6 +13217,12 @@ SX-03／SX-08 のmission team composition CLIを再監査し、既存missionの`
 
 検証: mission team composition／mission-state **3 files / 18 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 493
+
+SX-03／SX-04／SX-08 のprovider capability snapshotを再監査し、scan側が生成する`provider-capabilities.json`をsovereign dashboardだけが局所型アサーションで読む残存を修正した。coreの生成型に対応するstrict parserを追加し、rootの必須数値・timestamp・provider／capability配列、protocol／boolean／nullable version、unknown／dangerous JSON keyを表示前に検証するようにした。不正snapshotは従来の「未取得」表示へfail-closedし、provider discoveryやscanの生成・表示順は変更していない。
+
+検証: provider capability overview／sovereign dashboard **2 files / 7 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
