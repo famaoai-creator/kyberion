@@ -46,6 +46,7 @@ import { summarizeBackupStatus } from './backup.js';
 import { isRecord, readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
+import { parsePersonalSovereignIdentity } from '@agent/core/personal-identity-reader';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 /**
@@ -205,7 +206,7 @@ function getDashboardHealthStatus(): 'OPERATIONAL' | 'DEGRADED' {
 }
 
 function drawHeader() {
-  const identity = readJsonIfExists<{ name?: string }>(
+  const identity = readDashboardOperatorIdentity(
     path.join(resolveActiveProfileRoot(), 'my-identity.json')
   );
   const status = getDashboardHealthStatus();
@@ -216,6 +217,11 @@ function drawHeader() {
   dashboardLog(
     ` Status: ${status === 'OPERATIONAL' ? chalk.green(renderStatus('connection', 'connected', 'en').toUpperCase()) : chalk.yellow(renderStatus('connection', 'degraded', 'en').toUpperCase())} | User: ${chalk.bold(identity?.name || 'Operator')} | Time: ${formatDateTime(new Date(), { locale: resolveOperatorLocale(), timeZone: resolveTimeZone(), style: 'time' })}\n`
   );
+}
+
+export function readDashboardOperatorIdentity(identityPath: string): { name?: string } | null {
+  const raw = readJsonIfExists<unknown>(identityPath);
+  return raw === null ? null : parsePersonalSovereignIdentity(raw);
 }
 
 function drawCompanyOverview() {
