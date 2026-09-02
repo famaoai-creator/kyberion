@@ -3,6 +3,7 @@ import {
   collectThemeCatalogViolations,
   collectUndefinedKeyReferenceViolations,
   collectVocabularyCatalogViolations,
+  findGenericGovernanceCatalogs,
   findUnusedVocabularyKeys,
   findUnreferencedGovernanceCatalogs,
   type ThemeEntryShape,
@@ -91,6 +92,23 @@ describe('check_catalog_integrity', () => {
           },
         })
       ).toEqual([]);
+    });
+
+    it('ratchets governance catalogs away from the generic envelope schema', () => {
+      expect(
+        findGenericGovernanceCatalogs([
+          {
+            fileName: 'legacy.json',
+            documentationOnly: true,
+            schemaRef: '../schemas/governance-catalog.schema.json',
+          },
+          {
+            fileName: 'dedicated.json',
+            documentationOnly: true,
+            schemaRef: '../schemas/dedicated.schema.json',
+          },
+        ])
+      ).toEqual(['legacy.json']);
     });
   });
 

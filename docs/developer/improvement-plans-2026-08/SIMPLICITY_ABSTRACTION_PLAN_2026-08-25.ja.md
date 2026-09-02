@@ -11791,6 +11791,16 @@ compatibility note、ingestion target、integrity check、maintenance task、rep
 Prettier、`git diff --check`。SX-04 の governance catalog generic envelope 依存は **0件**。残るSX-04は domain loader
 の完全統合と未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 291
+
+dedicated schema 化した governance catalog が将来 generic envelope に戻らないよう、`check:catalogs` に
+generic schema 再導入の ratchet を追加した。catalog metadata の schema 参照を純粋関数で検査し、該当時は
+`generic envelope is retired` として失敗させる回帰テストを追加した。現行22 documentation-only catalog と
+runtime catalog は全て専用 schema のまま維持される。
+
+検証: catalog integrity **17 tests passed**、catalogs、governance-rules、PR scope、root typecheck、root lint、
+Prettier、`git diff --check`。残るSX-04は domain loader の完全統合と、非catalog層の旧loader整理である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
