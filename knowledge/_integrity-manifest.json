@@ -6763,9 +6763,15 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/config-mission-brief.schema.json",
+      "tier": "public",
+      "size": 3086,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/config-mission-preset.schema.json",
       "tier": "public",
-      "size": 1995,
+      "size": 2034,
       "type": "json"
     },
     {

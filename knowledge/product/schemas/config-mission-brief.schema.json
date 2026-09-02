@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "config-mission-brief.schema.json",
+  "title": "ConfigMissionBrief",
+  "description": "Persisted, approval-bound configuration mission instance.",
+  "type": "object",
+  "required": ["instance_id", "preset_id", "tenant", "inputs", "status", "created_at", "change"],
+  "additionalProperties": false,
+  "properties": {
+    "instance_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{1,127}$" },
+    "preset_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]+$" },
+    "tenant": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "status": { "type": "string", "enum": ["draft", "applying", "applied", "failed"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "applied_at": { "type": "string", "format": "date-time" },
+    "error": { "type": "string" },
+    "change": {
+      "type": "object",
+      "required": [
+        "change_id",
+        "scope",
+        "target_kind",
+        "requested_by",
+        "risk",
+        "desired_hash",
+        "probe_refs"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "change_id": { "type": "string" },
+        "scope": {
+          "type": "object",
+          "required": ["scope_kind", "tier"],
+          "additionalProperties": false,
+          "properties": {
+            "scope_kind": {
+              "type": "string",
+              "enum": ["system", "tenant", "organization", "project", "mission", "task", "session"]
+            },
+            "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+            "tenant_slug": { "type": "string" },
+            "organization_id": { "type": "string" },
+            "project_id": { "type": "string" },
+            "mission_id": { "type": "string" },
+            "task_id": { "type": "string" },
+            "session_id": { "type": "string" },
+            "work_shape": { "type": "string" },
+            "customer_stance": { "type": "string" },
+            "viewer_principal": { "type": "string" },
+            "nhi_id": { "type": "string" }
+          }
+        },
+        "target_kind": {
+          "type": "string",
+          "enum": [
+            "system",
+            "tenant",
+            "organization",
+            "project",
+            "mission",
+            "task",
+            "surface",
+            "channel",
+            "personal"
+          ]
+        },
+        "requested_by": { "type": "string", "minLength": 1 },
+        "nhi_id": { "type": "string" },
+        "risk": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "before_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "desired_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approval_ref": { "type": "string" },
+        "probe_refs": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "rollback_ref": { "type": "string" }
+      }
+    }
+  }
+}

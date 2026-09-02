@@ -2411,6 +2411,10 @@
       "types": "./dist/campaign-suite.d.ts",
       "default": "./dist/campaign-suite.js"
     },
+    "./config-mission": {
+      "types": "./dist/config-mission.d.ts",
+      "default": "./dist/config-mission.js"
+    },
     "./customer-conversation-modes": {
       "types": "./dist/customer-conversation-modes.d.ts",
       "default": "./dist/customer-conversation-modes.js"

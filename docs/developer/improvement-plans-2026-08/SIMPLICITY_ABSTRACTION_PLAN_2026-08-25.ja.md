@@ -13307,6 +13307,12 @@ SX-03／SX-04／SX-08 のmission alignment briefを再監査し、renderer／app
 
 検証: mission brief／alignment gate **5 files / 22 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema index／integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 508
+
+SX-03／SX-04 のconfig-mission CLI／Concierge readerを再監査し、preset／persisted briefをそれぞれ局所型アサーションまたはUI専用parserだけで扱っていた残存を修正した。coreにconfig-mission preset／briefのcanonical loaderを追加し、既存preset schemaと新設brief schema、config change envelope、tenant／change identity bindingを共有境界へ集約した。CLIのcreate／request-approval／status／applyとConciergeのpreset／recent brief readを検証済みloaderへ統合し、未知フィールド、malformed nested input、brief tenant／change ID不一致は表示・承認・applyへ進まないfail-closed契約にした。既存のdraft-only、approval、tenant scope、pipeline execution semanticsは変更していない。
+
+検証: config-mission／Concierge **4 files / 7 tests passed**、Concierge production build（既存Turbopack NFT tracing warningsのみ）、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。schema integrity manifestも生成同期した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

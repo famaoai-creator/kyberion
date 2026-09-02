@@ -36,7 +36,13 @@ import {
   loadApprovalRequest,
   recordApprovalApplyResult,
 } from '@agent/core/approval-store';
-import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import {
+  loadConfigMissionBriefAtPath,
+  loadConfigMissionPresetAtPath,
+  type ConfigMissionBrief,
+  type ConfigMissionPreset,
+} from '@agent/core/config-mission';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
 import * as pathResolver from '@agent/core/path-resolver';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -44,41 +50,6 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface PresetInput {
-  type: 'string' | 'enum' | 'boolean' | 'secret';
-  description: string;
-  required?: boolean;
-  values?: string[];
-  default?: unknown;
-}
-
-interface ConfigMissionPreset {
-  preset_id: string;
-  type: 'config_mission';
-  category: string;
-  description: string;
-  inputs: Record<string, PresetInput>;
-  pipeline: string;
-  write_targets: string[];
-  authority_role: string;
-  target_kind?: import('@agent/core/config-change').ConfigChangeTargetKind;
-  scope_kind?: 'system' | 'tenant' | 'organization' | 'project' | 'mission' | 'task';
-  tier?: 'public' | 'confidential' | 'personal';
-  notes?: string;
-}
-
-interface ConfigMissionBrief {
-  instance_id: string;
-  preset_id: string;
-  tenant: string;
-  inputs: Record<string, string>;
-  status: 'draft' | 'applying' | 'applied' | 'failed';
-  created_at: string;
-  applied_at?: string;
-  error?: string;
-  change: import('@agent/core/config-change').ConfigChangeEnvelope;
-}
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -141,7 +112,7 @@ function loadPreset(presetId: string): ConfigMissionPreset {
   if (!safeLstat(p).isFile()) {
     throw new Error(`[config-mission] preset must be a regular file: ${p}`);
   }
-  return readJson<ConfigMissionPreset>(p);
+  return loadConfigMissionPresetAtPath(p);
 }
 
 function requireBriefFile(filePath: string): string {
@@ -413,7 +384,7 @@ function cmdRequestApproval(argv: string[]): void {
   if (!id) throw new Error('--id is required');
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
-  const brief = readJson<ConfigMissionBrief>(requireBriefFile(bPath));
+  const brief = loadConfigMissionBriefAtPath(requireBriefFile(bPath));
   const existing = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)
     : null;
@@ -482,7 +453,7 @@ function cmdStatus(argv: string[]): void {
 
   for (const entry of targets) {
     try {
-      const brief = readJson<ConfigMissionBrief>(requireBriefFile(briefPath(tenant, entry)));
+      const brief = loadConfigMissionBriefAtPath(requireBriefFile(briefPath(tenant, entry)));
       const instanceCol = brief.instance_id.padEnd(26);
       const presetCol = brief.preset_id.padEnd(32);
       const statusCol = brief.status.padEnd(10);
@@ -503,7 +474,7 @@ async function cmdApply(argv: string[]): Promise<void> {
   const bPath = briefPath(tenant, id);
   if (!safeExistsSync(bPath)) throw new Error(`Config mission not found: ${bPath}`);
 
-  const brief = readJson<ConfigMissionBrief>(requireBriefFile(bPath));
+  const brief = loadConfigMissionBriefAtPath(requireBriefFile(bPath));
 
   const approval = brief.change.approval_ref
     ? loadApprovalRequest('config-mission', brief.change.approval_ref)

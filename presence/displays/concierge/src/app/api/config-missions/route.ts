@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { buildExecutionEnv, withExecutionContext } from '@agent/core/authority';
-import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
+import {
+  loadConfigMissionBriefAtPath,
+  loadConfigMissionPresetAtPath,
+} from '@agent/core/config-mission';
 import { listTenantProfileSlugs } from '@agent/core/tenant-registry';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -9,7 +12,6 @@ import {
   safeExecResult,
   safeExistsSync,
   safeLstat,
-  safeReadFile,
   safeReaddir,
 } from '@agent/core/secure-io';
 import * as secureIo from '@agent/core/secure-io';
@@ -37,8 +39,8 @@ export const dynamic = 'force-dynamic';
  *
  * GET is a pure read: presets are plain JSON under
  * knowledge/product/config-missions/ and briefs are plain JSON under
- * knowledge/confidential/{tenant}/config-missions/ — both are read directly
- * via secure-io instead of spawning the CLI's print-formatted subcommands.
+ * knowledge/confidential/{tenant}/config-missions/ — both use the shared core
+ * schema loaders instead of spawning the CLI's print-formatted subcommands.
  */
 
 const PRESET_DIR_RELATIVE = 'knowledge/product/config-missions';
@@ -75,10 +77,7 @@ function readPresets(): PresetSummary[] {
         allowMissingLeaf: true,
       });
       if (!safeExistsSync(presetPath) || !safeLstat(presetPath).isFile()) continue;
-      const raw = safeReadFile(presetPath, { encoding: 'utf8' }) as string;
-      const parsed = parseConfigMissionPreset(
-        parseSafeJsonInput(raw, `config mission preset ${name}`)
-      );
+      const parsed = parseConfigMissionPreset(loadConfigMissionPresetAtPath(presetPath));
       if (!parsed) continue;
       presets.push({
         ...parsed,
@@ -102,7 +101,7 @@ function readBrief(tenant: string, instanceId: string): ConfigMissionBrief | nul
       { allowMissingLeaf: true }
     );
     if (!safeExistsSync(briefPath) || !safeLstat(briefPath).isFile()) return null;
-    return parseConfigMissionBrief(readJson<unknown>(briefPath));
+    return parseConfigMissionBrief(loadConfigMissionBriefAtPath(briefPath));
   } catch {
     return null;
   }
