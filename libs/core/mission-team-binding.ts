@@ -1,6 +1,7 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
 import * as path from 'node:path';
 import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
 import type { MissionTeamAssignment, MissionTeamPlan } from './mission-team-plan-composer.js';
@@ -463,24 +464,17 @@ function resolveMissionLedgerScope(
   missionId: string,
   missionPath: string
 ): EventScope {
-  let state: Record<string, unknown> = {};
   const statePath = path.join(missionPath, 'mission-state.json');
   const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-  if (safeExistsSync(safeStatePath)) {
-    try {
-      state = readJson<Record<string, unknown>>(safeStatePath);
-    } catch {
-      state = {};
-    }
-  }
+  const state = safeExistsSync(safeStatePath) ? loadMissionStateAtPath(safeStatePath) : null;
   const candidate: EventScopeInput = {
-    tier: (state.tier_scope || state.tier || 'public') as EventScope['tier'],
+    tier: state?.tier || 'public',
     mission_id: missionId,
-    ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-    ...(typeof state.organization_id === 'string'
-      ? { organization_id: state.organization_id }
+    ...(state?.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+    ...(state?.organization_id ? { organization_id: state.organization_id } : {}),
+    ...(state?.relationships?.project?.project_id
+      ? { project_id: state.relationships.project.project_id }
       : {}),
-    ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
   };
   let authority: EventScope;
   try {

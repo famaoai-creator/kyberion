@@ -5,7 +5,6 @@
 
 import * as path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson, readJsonIfPresent } from './foundation/json.js';
 import * as pathResolver from './path-resolver.js';
 import {
@@ -28,6 +27,7 @@ import { resolveActiveProfileRoot } from './profile-root.js';
 import { hasAuthority } from './governance.js';
 import { type MissionState, type MissionRelationships, ACTIVE_TIERS } from './mission-types.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 let missionStateValidate: ReturnType<typeof compileSchema> | undefined;
 
 function getMissionStateValidator() {
@@ -45,14 +45,6 @@ function assertMissionStateSchema(state: MissionState): void {
         .join('; ')
     : 'unknown schema error';
   throw new Error(`[MISSION_STATE_SCHEMA] Invalid mission state: ${errors}`);
-}
-
-function missionStateCatalog(filePath: string) {
-  return defineCatalog<MissionState>({
-    id: 'mission-state',
-    path: filePath,
-    schema: pathResolver.rootResolve('knowledge/product/schemas/mission-state.schema.json'),
-  });
 }
 
 export function assertCanGrantMissionAuthority(): void {
@@ -278,20 +270,12 @@ export function loadState(
 ): MissionState | null {
   const statePath = resolveMissionStatePath(id, options);
   if (!statePath) return null;
-  try {
-    return missionStateCatalog(statePath).load();
-  } catch (_) {
-    return null;
-  }
+  return loadMissionStateAtPath(statePath);
 }
 
 /** Load a mission state from an already resolved repository path. */
 export function loadStateAtPath(statePath: string): MissionState | null {
-  try {
-    return missionStateCatalog(statePath).load();
-  } catch (_) {
-    return null;
-  }
+  return loadMissionStateAtPath(statePath);
 }
 
 /**
