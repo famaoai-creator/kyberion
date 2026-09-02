@@ -12270,6 +12270,17 @@ SX-04 の各domain専用schema loader統合後も、media actuatorに利用者�
 root lint、PR scope、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、および
 各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 338
+
+tenant の `tenant-override.json` が core の tenant resolver と media actuator で raw JSON reader に分岐していた残存を修正した。
+専用 `tenant-design-override.schema.json` と共有 `loadTenantDesignOverride` を追加し、brand／matcher／design reference の既知 field shape を
+共通境界で検証してから各 resolver へ渡すようにした。customer overlay と confidential tenant overlay の allowed root、tenant registry の
+scope 判定、malformed input の default／候補除外 semantics は維持した。
+
+検証: tenant resolver／media catalog loader **2 files / 16 tests passed**、media actuator build、root typecheck、root lint、PR scope
+**69/69 gates passed**、knowledge index、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、
+および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

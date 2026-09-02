@@ -3,7 +3,11 @@ import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
-import { loadTenantDesignOverrideIndex, resolveTenantDesign } from './tenant-design-resolver.js';
+import {
+  loadTenantDesignOverride,
+  loadTenantDesignOverrideIndex,
+  resolveTenantDesign,
+} from './tenant-design-resolver.js';
 
 describe('tenant-design-resolver', () => {
   const rootDir = pathResolver.shared('tmp/tenant-design-resolver-fixture');
@@ -130,6 +134,19 @@ describe('tenant-design-resolver', () => {
       path.join(rootDir, 'knowledge/confidential/client-a/design/assets/logo.png')
     );
     expect(result.themePack).toEqual(expect.objectContaining({ theme_id: 'client-a' }));
+  });
+
+  it('fails closed when a tenant override violates the shared shape contract', () => {
+    const designDir = path.join(rootDir, 'knowledge/confidential/client-a/design');
+    const overridePath = path.join(designDir, 'tenant-override.json');
+    safeMkdir(designDir, { recursive: true });
+    safeWriteFile(
+      overridePath,
+      JSON.stringify({ brand_name: 'Aster Bank', matchers: ['valid', 42] })
+    );
+
+    expect(loadTenantDesignOverride(rootDir, overridePath, designDir)).toBeNull();
+    expect(resolveTenantDesign({ rootDir, brandName: 'Aster Bank' }).source).toBe('default');
   });
 
   it('falls back to default when no tenant override matches', () => {

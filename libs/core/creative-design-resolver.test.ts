@@ -8,13 +8,18 @@ let rootDir: string;
 vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     knowledge: (sub = '') => path.join(rootDir, 'knowledge', sub),
-    rootResolve: (sub = '') => path.join(rootDir, sub),
+    rootResolve: (sub = '') =>
+      sub === 'knowledge/product/schemas/tenant-design-override.schema.json'
+        ? path.join(process.cwd(), sub)
+        : path.join(rootDir, sub),
     rootDir: () => rootDir,
   },
 }));
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
+  const foundation =
+    await vi.importActual<typeof import('./foundation/io.js')>('./foundation/io.js');
   const assertSafeRepositoryPath = (
     filePath: string,
     options: { allowMissingLeaf?: boolean; rootDir?: string } = {}
@@ -42,6 +47,22 @@ vi.mock('./secure-io.js', async () => {
     }
     return resolved;
   };
+  foundation.registerFoundationIo({
+    loadJson: <T>(p: string) => JSON.parse(actual.readFileSync(p, 'utf8')) as T,
+    loadJsonIfPresent: <T>(p: string) => {
+      if (!actual.existsSync(p)) return null;
+      try {
+        return JSON.parse(actual.readFileSync(p, 'utf8')) as T;
+      } catch {
+        return null;
+      }
+    },
+    appendFile: (p: string, content: string) => actual.appendFileSync(p, content),
+    exists: (p: string) => actual.existsSync(p),
+    readFile: (p: string) => actual.readFileSync(p, 'utf8'),
+    stat: (p: string) => actual.statSync(p),
+    writeFile: (p: string, content: string) => actual.writeFileSync(p, content),
+  });
   return {
     assertSafeRepositoryPath,
     safeExistsSync: (p: string) => actual.existsSync(p),
