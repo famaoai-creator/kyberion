@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { pathResolver, safeReadFile } from '@agent/core';
-import { checkCliManifest, loadCliManifest, MAX_PACKAGE_SCRIPTS } from './check_cli_manifest.js';
+import {
+  checkCliManifest,
+  loadCliManifest,
+  MAX_PACKAGE_SCRIPTS,
+  resolveCliModulePath,
+} from './check_cli_manifest.js';
 
 describe('CLI manifest', () => {
   it('accepts the repository command map', () => {
@@ -197,6 +202,15 @@ describe('CLI manifest', () => {
 
     expect(failures).toContain(
       `package scripts exceed the SX-05 ratchet: ${MAX_PACKAGE_SCRIPTS + 1} > ${MAX_PACKAGE_SCRIPTS}`
+    );
+  });
+
+  it('rejects CLI modules outside the repository root', () => {
+    expect(() => resolveCliModulePath('../outside.ts')).toThrow(
+      '[RESOURCE_PATH_SCOPE] resource path is outside the repository root'
+    );
+    expect(() => resolveCliModulePath('/tmp/outside.ts')).toThrow(
+      '[RESOURCE_PATH_SCOPE] resource path is outside the repository root'
     );
   });
 });

@@ -1,5 +1,5 @@
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeExistsSync } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { defineCatalog, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -52,6 +52,10 @@ export interface CliManifestCheckOptions {
 
 export const MAX_PACKAGE_SCRIPTS = 120;
 
+export function resolveCliModulePath(module: string, allowMissingLeaf = false): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(module), { allowMissingLeaf });
+}
+
 function loadPackageScriptNames(): Set<string> {
   const packageJson = readJson<{ scripts?: Record<string, string> }>(
     pathResolver.rootResolve('package.json')
@@ -93,8 +97,17 @@ function checkScriptCommands(
     if (command.script) {
       scripts.add(command.script);
     }
-    if (command.module && !safeExistsSync(pathResolver.rootResolve(command.module))) {
-      failures.push(`script command module does not exist: ${command.module}`);
+    if (command.module) {
+      try {
+        const modulePath = resolveCliModulePath(command.module, true);
+        if (!safeExistsSync(modulePath)) {
+          failures.push(`script command module does not exist: ${command.module}`);
+        }
+      } catch (error) {
+        failures.push(
+          `script command module path is invalid: ${command.module} (${error instanceof Error ? error.message : String(error)})`
+        );
+      }
     }
     if (command.args && !Array.isArray(command.args)) {
       failures.push(`script command args must be an array: ${command.id || '<missing>'}`);
@@ -164,8 +177,19 @@ export function checkCliManifest(
       failures.push(`entrypoint id must be unique: ${entrypoint.id || '<missing>'}`);
     }
     ids.add(entrypoint.id);
-    if (!entrypoint.module || !safeExistsSync(pathResolver.rootResolve(entrypoint.module))) {
+    if (!entrypoint.module) {
       failures.push(`${entrypoint.id}: module does not exist: ${entrypoint.module}`);
+    } else {
+      try {
+        const modulePath = resolveCliModulePath(entrypoint.module, true);
+        if (!safeExistsSync(modulePath)) {
+          failures.push(`${entrypoint.id}: module does not exist: ${entrypoint.module}`);
+        }
+      } catch (error) {
+        failures.push(
+          `${entrypoint.id}: module path is invalid: ${entrypoint.module} (${error instanceof Error ? error.message : String(error)})`
+        );
+      }
     }
     if (!Array.isArray(entrypoint.commands) || entrypoint.commands.length === 0) {
       failures.push(`${entrypoint.id}: commands must be a non-empty array`);

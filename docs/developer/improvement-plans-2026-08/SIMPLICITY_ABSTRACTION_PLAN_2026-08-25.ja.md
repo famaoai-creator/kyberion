@@ -11760,6 +11760,15 @@ local composite action の checkout 前参照、または個別 workflow への 
 root lint、`git diff --check`。残る SX-07 は reusable workflow のさらなる整理と、外部依存 gate の sandbox-independent
 実行である。
 
+## 2026-09-02 再レビュー修正 288
+
+CLI manifest の entrypoint／script command module 検査と runtime dispatch に repository-bound path 検証を追加した。
+絶対パス、`..` による repository 外 module の登録・実行を `assertSafeRepositoryPath` で拒否し、存在確認だけを通る
+抜け道を閉じた。既存の module-backed command、package script dispatch、command registry の挙動は変更していない。
+
+検証: CLI manifest **9 tests passed**、PR scope、root typecheck、root lint、Prettier、`git diff --check`。
+残る SX-05 は doctor／pipeline／organization の旧入口整理と、runner／script 命名のさらなる縮約である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
