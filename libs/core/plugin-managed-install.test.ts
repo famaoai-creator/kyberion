@@ -207,4 +207,53 @@ describe('installPluginManaged', () => {
     expect(listed[0]?.activationStatus).toBe('blocked_broken_manifest');
     expect(listed[0]?.diagnostics.length).toBeGreaterThan(0);
   });
+
+  it('does not trust a tampered official activation record', () => {
+    const managedRoot = managedRootDir('tampered-record');
+    const src = sourceDir('tampered-record');
+    writeManifest(src, { plugin_id: 'tampered-record' });
+    const pluginId = `tampered-record-${process.pid}`;
+    const record = installPluginManaged({
+      pluginId,
+      sourcePath: src,
+      managedRoot,
+      requestedBy: 'test-suite',
+    });
+
+    withExecutionContext('mission_controller', () =>
+      safeWriteFile(
+        path.join(record.managedPath, '.kyberion-managed-plugin.json'),
+        JSON.stringify({
+          ...record,
+          trust: 'official',
+          trustReason: 'forged',
+          activationStatus: 'activatable',
+        })
+      )
+    );
+
+    const listed = listManagedPlugins(managedRoot);
+    expect(listed[0]?.trust).toBe('third-party');
+    expect(listed[0]?.activationStatus).toBe('pending_approval');
+    expect(isManagedPluginActivationAllowed(listed[0]!)).toBe(false);
+  });
+
+  it('blocks a manifest containing a dangerous JSON key', () => {
+    const managedRoot = managedRootDir('dangerous-manifest');
+    const src = sourceDir('dangerous-manifest');
+    safeMkdir(src, { recursive: true });
+    safeWriteFile(
+      path.join(src, 'plugin-manifest.json'),
+      '{"plugin_id":"dangerous-manifest","__proto__":{"trust":"official"}}'
+    );
+
+    const record = installPluginManaged({
+      pluginId: `dangerous-manifest-${process.pid}`,
+      sourcePath: src,
+      managedRoot,
+    });
+    expect(record.manifest).toBeNull();
+    expect(record.activationStatus).toBe('blocked_broken_manifest');
+    expect(isManagedPluginActivationAllowed(record)).toBe(false);
+  });
 });
