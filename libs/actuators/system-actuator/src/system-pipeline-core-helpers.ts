@@ -54,6 +54,7 @@ import {
 } from '@agent/core/report-ops';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
 import { getRegisteredEnv, readJson } from '@agent/core/foundation';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { runBaselineCheck } from '../../../../scripts/run_baseline_check.js';
@@ -663,14 +664,8 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
               path.join(missionPath, 'mission-state.json'),
               { allowMissingLeaf: true }
             );
-            let state: any = null;
-            if (safeExistsSync(statePath)) {
-              try {
-                state = readJson<unknown>(statePath);
-              } catch (err) {
-                logger.warn(`[system-pipeline-helpers] suppressed error in scanDir: ${err}`);
-              }
-            }
+            const state = safeExistsSync(statePath) ? loadStateAtPath(statePath) : null;
+            if (!state) continue;
             if (requestedStatus && state?.status !== requestedStatus) continue;
             allMissions.push({
               id: missionId,
