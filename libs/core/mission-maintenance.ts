@@ -7,6 +7,7 @@ import { appendJsonLine, readJson, readJsonLines } from './foundation/json.js';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { logger } from './core.js';
@@ -235,7 +236,7 @@ async function recordCheckpointForMission(
       currentState.git.checkpoints.push({
         task_id: taskId,
         commit_hash: hash,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
       await saveState(activeMissionId, currentState, { alreadyLocked: true });
       traceCtx.addEvent('checkpoint.recorded', {
@@ -317,7 +318,7 @@ export async function approveScopeChange(args: {
     throw new Error('A non-empty goal summary is required to approve a scope change.');
   }
   const successCondition = String(args.successCondition || goalSummary).trim();
-  const approvedAt = new Date().toISOString();
+  const approvedAt = nowIso();
   const approvedBy = resolveApprovalActor(args.approvedBy);
 
   await withLock(`mission-${missionId}`, async () => {
@@ -563,7 +564,7 @@ export async function recordTask(
     flightRecorderPath,
     JSON.stringify(
       {
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         description,
         details,
       },
@@ -654,7 +655,7 @@ export async function recordTask(
     }
     state.context = context as NonNullable<typeof state.context>;
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'RECORD_TASK',
       note: description,
     });
@@ -729,7 +730,7 @@ export async function recordEvidence(args: {
     const currentState = loadState(upperId)!;
     currentState.git.latest_commit = hash;
     currentState.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'EVIDENCE',
       note: `${args.taskId}: ${args.note}`,
     });
@@ -926,7 +927,7 @@ export async function recordArtifactReview(args: {
     const currentState = loadState(upperId)!;
     currentState.git.latest_commit = hash;
     currentState.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'ARTIFACT_REVIEW',
       note: `${args.reviewTaskId}: ${receipt.verdict} (${evaluation.ready ? 'ready' : 'blocked'})`,
     });
@@ -1056,7 +1057,7 @@ function appendMissionPurgeAudit(record: Record<string, unknown>): void {
   try {
     const auditPath = pathResolver.sharedLogsAudit('mission-purge.jsonl');
     safeMkdir(path.dirname(auditPath), { recursive: true });
-    appendJsonLine(auditPath, { ts: new Date().toISOString(), ...record });
+    appendJsonLine(auditPath, { ts: nowIso(), ...record });
   } catch (err) {
     logger.warn(
       `Failed to record mission purge audit entry for ${String(record.mission)}: ${err instanceof Error ? err.message : String(err)}`
