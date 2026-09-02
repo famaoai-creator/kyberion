@@ -4,6 +4,7 @@ import { resolveTenant } from './tenant-registry.js';
 import { loadOrganizationOperationalState } from './organization-operating-model.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { revokeGrantsForTenantBestEffort } from './task-scoped-grants.js';
 import { isRecord } from './foundation/text.js';
@@ -310,7 +311,7 @@ export function loadTenantActivation(
 
 export function resolveTenantActivation(input: TenantActivationInput): TenantActivationResolution {
   const rootDir = input.rootDir || pathResolver.rootDir();
-  const now = new Date().toISOString();
+  const now = nowIso();
   const previous = loadTenantActivation(input, rootDir);
   const nhiIds = (input.nhiIds || previous?.nhi_ids || []).map((id) => id.trim()).filter(Boolean);
   const { checks, probeRefs, blockers } = buildChecks(input, nhiIds);
@@ -372,11 +373,12 @@ export function applyTenantActivation(
   }
   const filePath = resolved.activation_path;
   safeMkdir(path.dirname(filePath), { recursive: true });
+  const activatedAt = nowIso();
   const record: TenantActivationRecord = {
     ...resolved.record,
     status: 'active',
-    activated_at: resolved.record.activated_at || new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    activated_at: resolved.record.activated_at || activatedAt,
+    updated_at: activatedAt,
   };
   safeWriteFile(filePath, `${JSON.stringify(record, null, 2)}\n`, { encoding: 'utf8' });
   return record;
@@ -429,7 +431,7 @@ export function rollbackTenantActivation(input: {
       ...current,
       status: 'draft',
       blockers: [...new Set([...current.blockers, `rollback: ${input.reason}`])],
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
       activated_at: undefined,
     },
     rootDir
@@ -463,7 +465,7 @@ export function suspendTenantActivation(input: {
       status: 'suspended',
       blockers: [...new Set([...current.blockers, `suspended: ${input.reason}`])],
       revoked_task_grants: revokedTaskGrants,
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     },
     rootDir
   );
