@@ -31,6 +31,18 @@ const secureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: secureIo.loadJson,
+    loadJsonIfPresent: secureIo.loadJsonIfPresent,
+    appendFile: () => undefined,
+    exists: secureIo.safeExistsSync,
+    readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: secureIo.safeWriteFile,
+  }),
+  registerFoundationIo: () => undefined,
+}));
 
 describe('reasoning-degradation marker (LC-08)', () => {
   let tmpRoot: string;

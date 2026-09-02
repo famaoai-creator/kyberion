@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeMkdir, safeUnlink, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
@@ -28,7 +29,7 @@ export function markReasoningDegraded(mode: string, reason: string): void {
   try {
     const markerPath = reasoningDegradedMarkerPath();
     safeMkdir(path.dirname(markerPath), { recursive: true });
-    const marker: ReasoningDegradedMarker = { mode, reason, at: new Date().toISOString() };
+    const marker: ReasoningDegradedMarker = { mode, reason, at: nowIso() };
     safeWriteFile(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
