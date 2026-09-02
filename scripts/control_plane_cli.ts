@@ -23,7 +23,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
@@ -52,6 +52,28 @@ const DESIGN_MD_THEME_PATH = pathResolver.knowledge(
 const DESIGN_MD_SYSTEM_PATH = pathResolver.knowledge(
   'public/design-patterns/media-templates/media-design-systems/design-md-imports.json'
 );
+const DESIGN_MD_INDEX_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/imported-design-md-index.schema.json'
+);
+
+interface ImportedDesignMdSummary {
+  design_system_id: string;
+  theme_id: string;
+  slug: string;
+  name: string;
+  category: string;
+  description: string;
+  source_path: string;
+  keywords: string[];
+}
+
+interface ImportedDesignMdIndex {
+  generated_at: string;
+  source_repo: string;
+  source_dir: string;
+  count: number;
+  systems: ImportedDesignMdSummary[];
+}
 
 function loadCatalogJson<T = any>(filePath: string): T {
   const safePath = assertSafeRepositoryPath(filePath);
@@ -65,8 +87,12 @@ function loadArtifactLibraryIndex(): any {
   return loadCatalogJson(ARTIFACT_LIBRARY_INDEX_PATH);
 }
 
-function loadDesignMdIndex(): any {
-  return loadCatalogJson(DESIGN_MD_INDEX_PATH);
+function loadDesignMdIndex(): ImportedDesignMdIndex {
+  return defineCatalog<ImportedDesignMdIndex>({
+    id: 'control-plane-imported-design-md-index',
+    path: DESIGN_MD_INDEX_PATH,
+    schema: DESIGN_MD_INDEX_SCHEMA_PATH,
+  }).load();
 }
 
 function loadDesignMdThemes(): any {
@@ -125,10 +151,10 @@ function resolveArtifactLibraryProfile(profileId: string): any {
   return null;
 }
 
-function searchImportedDesignSystems(query?: string): any[] {
+function searchImportedDesignSystems(query?: string): ImportedDesignMdSummary[] {
   const index = loadDesignMdIndex();
   const normalized = normalizeCatalogQuery(query);
-  const items = asArray(index.systems);
+  const items = index.systems;
   if (!normalized) return items;
   return items.filter((item) => {
     const haystack = [
