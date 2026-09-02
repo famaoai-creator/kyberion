@@ -48,6 +48,30 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
     ).rejects.toThrow('Unsupported action: invalid');
   });
 
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    const strategyPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-strategy-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(strategyPath), { recursive: true });
+    safeWriteFile(
+      strategyPath,
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    try {
+      const { performReconcile } = await import('./modeling-pipeline-helpers.js');
+      await expect(
+        performReconcile({
+          action: 'reconcile',
+          strategy_path: path.relative(ROOT, strategyPath),
+        })
+      ).rejects.toThrow('modeling strategy.strategies[0].pipeline[0].params must be a JSON object');
+    } finally {
+      safeRmSync(strategyPath, { force: true });
+    }
+  });
+
   it('rejects a context path outside the repository root', async () => {
     await expect(
       handleAction({
