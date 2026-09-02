@@ -25,6 +25,7 @@ import { loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
 import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 
 const WISDOM_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
 const WISDOM_POLICY_SCHEMA_PATH = pathResolver.knowledge(
@@ -160,7 +161,7 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
 
 export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
   const distillPolicy = resolveMissionDistillMarkdownPolicy();
-  const now = new Date().toISOString().slice(0, 10);
+  const now = nowIso().slice(0, 10);
   const tags = (wisdom.tags || []).map((t: string) => `"${t}"`).join(', ');
   const sections = wisdom.sections || {};
 
@@ -289,7 +290,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     );
   }
 
-  const dateSlug = new Date().toISOString().slice(0, 10).replace(/-/g, '_');
+  const dateSlug = nowIso().slice(0, 10).replace(/-/g, '_');
   const wisdomFileName = `distill_${upperId.toLowerCase()}_${dateSlug}.md`;
   const wisdomFilePath = resolveWisdomOutputPath(outputDir, wisdomFileName);
   const wisdomDirPath = path.dirname(wisdomFilePath);
@@ -300,7 +301,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   safeWriteFile(wisdomFilePath, wisdomMd);
   logger.info(`📝 Wisdom written to ${path.relative(rootDir, wisdomFilePath)}`);
 
-  const completedAt = new Date().toISOString();
+  const completedAt = nowIso();
   state.status = transitionStatus(state.status, 'completed');
   state.completed_at = completedAt;
   state.distillation = {
@@ -316,7 +317,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     distill_output_dir: outputDir,
   } as any;
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'DISTILL',
     note: `Knowledge distillation completed. Output: ${wisdomFileName}`,
   });
@@ -345,7 +346,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
       sensitivity_tier: tier,
       ratification_required: tier !== 'public',
       status: 'queued',
-      queued_at: new Date().toISOString(),
+      queued_at: nowIso(),
     });
   } catch (err) {
     logger.warn(
