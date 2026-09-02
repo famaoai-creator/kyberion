@@ -11881,6 +11881,14 @@ ISO 形式を維持し、onboarding の状態遷移・tenant binding・provider 
 検証: onboarding 関連 **5 test files / 19 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。残る
 SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
 
+## 2026-09-02 再レビュー修正 300
+
+単一 CLI の operator home／operator CLI／vital readiness 経路に残っていた単純 timestamp 3 箇所を foundation の
+`nowIso()` へ統一した。受信イベント、承認レビュー、readiness report の UTC ISO 形式と表示内容は変更していない。
+
+検証: CLI／home／vital 関連 **4 test files / 45 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。
+残る SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
