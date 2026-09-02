@@ -13001,6 +13001,12 @@ SX-03／SX-04 のpersisted strategy loader残存を再監査し、orchestrator�
 
 検証: foundation／orchestrator／system **3 files / 134 tests passed**、対象7ファイルのPrettier、root typecheck、`git diff --check`。canonical full gate実行後、SX-03 のdomain-specific helper、SX-04 の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 457
+
+SX-03／SX-08／SX-09 のChronos intelligence persisted reader残存を再監査し、`NEXT_TASKS.json` の配列要素を `recordField` で無条件に空レコード化していた経路を、`parseNextTaskRecords` の型付き fail-closed parserへ移行した。通常のactive mission projectionとmission progress projectionの双方で、非object task／不正status／危険JSON keyを件数や次アクションへ流さず、既存のstatus集計 semanticsとtenant／tier／path境界は変更していない。
+
+検証: Chronos intelligence resource boundary **1 file / 4 tests passed**、対象3ファイルのESLint／Prettier、root typecheck、`git diff --check`。canonical full gate実行後、SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

@@ -46,6 +46,7 @@ import {
 import {
   extractMissionDependencies,
   normalizeMissionAssets,
+  parseNextTaskRecords,
   parseTaskBoard,
   summarizeNextTasks,
 } from '../../../lib/mission-progress';
@@ -114,7 +115,6 @@ import {
 import { listWorkItems } from '@agent/core/work-coordination';
 import { getProjectManagementView } from '@agent/core/project-management';
 import { listMissionsInSearchDirs, loadState, loadStateAtPath } from '@agent/core/mission-state';
-import { optionalStringField, recordField } from '../../../lib/json-record';
 
 export interface RuntimeTopologySurfaceInput {
   id: string;
@@ -918,11 +918,7 @@ export function collectActiveMissions(): MissionSummary[] {
         const status = state?.status;
         if (!status || !['active', 'planned', 'paused', 'failed'].includes(status)) continue;
         const rawNextTasks = readJson<unknown>(path.join(missionPath, 'NEXT_TASKS.json'));
-        const nextTaskRecords = Array.isArray(rawNextTasks)
-          ? rawNextTasks.map((task) => ({
-              status: optionalStringField(recordField(task), 'status'),
-            }))
-          : [];
+        const nextTaskRecords = parseNextTaskRecords(rawNextTasks) || [];
         const planPath = safeMissionResourcePath(path.join(missionPath, 'PLAN.md'));
         const planReady = Boolean(
           planPath && safeExistsSync(planPath) && safeLstat(planPath).isFile()
@@ -992,7 +988,7 @@ export function collectMissionProgress(activeMissions: MissionSummary[]): Missio
         ? String(safeReadFile(taskBoardPath, { encoding: 'utf8' }) || '')
         : '';
     const nextTasks = nextTasksPath
-      ? readJson<Array<{ status?: string }>>(nextTasksPath) || []
+      ? parseNextTaskRecords(readJson<unknown>(nextTasksPath)) || []
       : [];
     const missionState = statePath ? loadStateAtPath(statePath) : null;
     const board = parseTaskBoard(taskBoard);

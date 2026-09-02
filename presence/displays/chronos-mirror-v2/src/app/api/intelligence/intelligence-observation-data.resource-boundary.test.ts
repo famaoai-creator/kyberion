@@ -85,4 +85,39 @@ describe('chronos intelligence JSON resource boundaries', () => {
       );
     });
   });
+
+  it('fails closed when NEXT_TASKS contains a non-record or invalid status', () => {
+    withExecutionContext('mission_controller', () => {
+      safeMkdir(malformedMissionDir, { recursive: true });
+      safeWriteFile(
+        path.join(malformedMissionDir, 'mission-state.json'),
+        JSON.stringify({
+          mission_id: malformedMissionId,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'operator',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+          history: [],
+        })
+      );
+      safeWriteFile(
+        path.join(malformedMissionDir, 'NEXT_TASKS.json'),
+        JSON.stringify([{ status: 'planned' }, { status: 42 }])
+      );
+
+      const mission = collectActiveMissions().find((item) => item.missionId === malformedMissionId);
+      expect(mission).toMatchObject({ nextTaskCount: 0 });
+      expect(collectMissionProgress(mission ? [mission] : [])).toMatchObject([
+        {
+          missionId: malformedMissionId,
+          nextTasksTotal: 0,
+          nextTasksPending: 0,
+          nextTasksCompleted: 0,
+        },
+      ]);
+    });
+  });
 });
