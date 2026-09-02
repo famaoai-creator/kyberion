@@ -1,8 +1,7 @@
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleSystemAction } from './system-action-helpers.js';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 export { describeOps };
@@ -38,10 +37,7 @@ const main = async () => {
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/system-actuator/src/index.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;

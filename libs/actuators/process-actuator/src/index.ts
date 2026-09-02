@@ -1,8 +1,7 @@
 import { runActuatorCli } from '@agent/core/cli-utils';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { readJson } from '@agent/core/foundation';
 import * as pathResolver from '@agent/core/path-resolver';
-import { fileURLToPath } from 'node:url';
-import * as path from 'node:path';
 import { handleAction } from './process-actuator-helpers.js';
 import { parseProcessAction } from './process-action-input.js';
 
@@ -26,10 +25,7 @@ export const actuator = defineCatalogBackedActuator({
 
 export { handleAction, parseProcessAction };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/index.ts')) {
   main().catch((err) => {
     console.error(`[process-actuator] ${err?.message || err}`);
     process.exitCode = 1;

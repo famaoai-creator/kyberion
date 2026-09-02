@@ -1,6 +1,5 @@
 #!/usr/bin/env node
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { StubAudioBus } from '@agent/core/audio-bus';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
@@ -158,8 +157,11 @@ async function main() {
   }
 }
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-if (entrypoint && modulePath === entrypoint) {
+if (
+  isDirectEntry(
+    import.meta.url,
+    'libs/actuators/meeting-browser-driver/scripts/playwright-meet-join.mjs'
+  )
+) {
   await main();
 }

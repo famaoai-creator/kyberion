@@ -33,7 +33,7 @@ import {
 } from '@agent/core/execution-bounds';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isDirectEntry } from '@agent/core/direct-entry';
 
 const FILE_MANIFEST_PATH = pathResolver.rootResolve('libs/actuators/file-actuator/manifest.json');
 const DEFAULT_FILE_RETRY = {
@@ -449,10 +449,7 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/file-actuator/src/file-pipeline-helpers.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;
