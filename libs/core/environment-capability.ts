@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -240,7 +241,7 @@ function stableHostFingerprint(): string {
 }
 
 function addMinutes(isoTimestamp: string, minutes: number): string {
-  return new Date(new Date(isoTimestamp).getTime() + minutes * 60_000).toISOString();
+  return nowIso(new Date(new Date(isoTimestamp).getTime() + minutes * 60_000));
 }
 
 function parseIsoDate(value: unknown): { ok: true; ms: number } | { ok: false } {
@@ -489,13 +490,14 @@ export async function bootstrapManifest(
     }
   }
 
+  const generatedAt = nowIso();
   const receipt: SetupReceipt = {
     manifest_id: manifest.manifest_id,
     manifest_version: manifest.version,
     manifest_fingerprint: stableManifestFingerprint(manifest),
     host_fingerprint: stableHostFingerprint(),
-    generated_at: new Date().toISOString(),
-    expires_at: addMinutes(new Date().toISOString(), DEFAULT_RECEIPT_TTL_MINUTES),
+    generated_at: generatedAt,
+    expires_at: addMinutes(generatedAt, DEFAULT_RECEIPT_TTL_MINUTES),
     host_platform: process.platform,
     satisfied,
     unsatisfied,
@@ -525,12 +527,13 @@ export function verifyReady(
   manifest: EnvironmentManifest,
   opts: { mission_id?: string; max_age_minutes?: number } = {}
 ): ReadinessReport {
+  const checkedAt = nowIso();
   const receipt = readReceipt(manifest.manifest_id, opts.mission_id);
   if (!receipt) {
     return {
       ready: false,
       manifest_id: manifest.manifest_id,
-      generated_at: new Date().toISOString(),
+      generated_at: checkedAt,
       receipt_expires_at: null,
       missing: manifest.capabilities.map((c) => ({
         capability_id: c.capability_id,
@@ -631,7 +634,7 @@ export function verifyReady(
   return {
     ready: blocking.length === 0,
     manifest_id: manifest.manifest_id,
-    generated_at: generatedAt.ok ? receipt.generated_at : new Date().toISOString(),
+    generated_at: generatedAt.ok ? receipt.generated_at : checkedAt,
     receipt_expires_at: receiptExpiresAt,
     missing: blocking,
     receipt_age_minutes: generatedAt.ok ? ageMin : null,
