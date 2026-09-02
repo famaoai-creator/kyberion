@@ -12527,6 +12527,12 @@ SX-03 の残存監査として、core の tool runtime registry／agent runtime 
 
 検証: runtime registry／supervisor／evidence **5 files / 41 tests passed**、root typecheck、対象3 production filesの単純timestamp **0件**、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 378
+
+SX-03 の残存監査として、Cloudflare OS control-plane の承認・適用・権限・観測レコードに残っていた単純な `new Date().toISOString()` 10 箇所を foundation `nowIso()` へ統合した。submitted／decided／applied／granted／revoked／observed の永続時刻 semantics と既存の expiry 判定は維持し、期限比較に必要な `Date.now()` とID生成は変更していない。
+
+検証: Cloudflare OS control-plane **3 files / 40 tests passed**、対象control-planeの単純timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
