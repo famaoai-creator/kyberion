@@ -2,12 +2,13 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
-import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
+import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
@@ -129,6 +130,15 @@ const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
   'product/governance/service-runtime-registry.json'
 );
 const STATE_VERSION = '1.0.0';
+const SERVICE_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-runtime-state.schema.json'
+);
+
+const serviceRuntimeStateCatalog = defineCatalog<ServiceRuntimeState>({
+  id: 'service-runtime-state',
+  path: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+  schema: SERVICE_RUNTIME_STATE_SCHEMA_PATH,
+});
 
 const FALLBACK_REGISTRY: ServiceRuntimeRegistry = {
   version: 'fallback',
@@ -239,52 +249,17 @@ function resolveStatePath(record: ServiceRuntimeRecord): string {
   return path.join(resolveManagedServicePath(record), 'state.json');
 }
 
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim() !== '';
-}
-
-function isValidTimestamp(value: unknown): value is string {
-  return isNonEmptyString(value) && !Number.isNaN(new Date(value).getTime());
-}
-
 function parseServiceRuntimeState(
   value: unknown,
   statePath: string,
   serviceId: string
 ): ServiceRuntimeState {
-  const record = parseSafeJsonObjectValue(value, 'service runtime state');
-  const allowed = new Set([
-    'version',
-    'service_id',
-    'status',
-    'base_url',
-    'managed_service_path',
-    'installed_at',
-    'pinned_at',
-    'provenance',
-  ]);
-  if (Object.keys(record).some((key) => !allowed.has(key))) {
-    throw new Error('service runtime state contains unknown fields');
-  }
-  if (!isNonEmptyString(record.version) || record.version !== STATE_VERSION) {
+  const record = serviceRuntimeStateCatalog.validate(value, statePath);
+  if (record.version !== STATE_VERSION) {
     throw new Error('service runtime state version is invalid');
   }
-  if (!isNonEmptyString(record.service_id) || record.service_id !== serviceId) {
+  if (record.service_id !== serviceId) {
     throw new Error('service runtime state service scope mismatch');
-  }
-  if (
-    record.status !== 'trial' &&
-    record.status !== 'approved_install' &&
-    record.status !== 'installed' &&
-    record.status !== 'pinned'
-  ) {
-    throw new Error('service runtime state status is invalid');
-  }
-  if (record.base_url !== undefined && typeof record.base_url !== 'string') {
-    throw new Error('service runtime state base_url is invalid');
-  }
-  if (!isNonEmptyString(record.managed_service_path)) {
-    throw new Error('service runtime state managed path is invalid');
   }
   const expectedManagedPath = path.dirname(path.resolve(statePath));
   const managedPath = assertSafeRepositoryPath(record.managed_service_path, {
@@ -293,43 +268,13 @@ function parseServiceRuntimeState(
   if (path.resolve(managedPath) !== expectedManagedPath) {
     throw new Error('service runtime state managed path mismatch');
   }
-  for (const field of ['installed_at', 'pinned_at'] as const) {
-    if (record[field] !== undefined && !isValidTimestamp(record[field])) {
-      throw new Error(`service runtime state ${field} is invalid`);
-    }
-  }
-
   let provenance: ServiceRuntimeState['provenance'];
   if (record.provenance !== undefined) {
-    const parsedProvenance = parseSafeJsonObjectValue(
-      record.provenance,
-      'service runtime state provenance'
-    );
-    const provenanceAllowed = new Set(['action', 'command', 'args', 'notes']);
-    if (Object.keys(parsedProvenance).some((key) => !provenanceAllowed.has(key))) {
-      throw new Error('service runtime state provenance contains unknown fields');
-    }
-    if (!isNonEmptyString(parsedProvenance.action)) {
-      throw new Error('service runtime state provenance action is invalid');
-    }
-    if (parsedProvenance.command !== undefined && typeof parsedProvenance.command !== 'string') {
-      throw new Error('service runtime state provenance command is invalid');
-    }
-    if (parsedProvenance.notes !== undefined && typeof parsedProvenance.notes !== 'string') {
-      throw new Error('service runtime state provenance notes are invalid');
-    }
-    if (
-      parsedProvenance.args !== undefined &&
-      (!Array.isArray(parsedProvenance.args) ||
-        parsedProvenance.args.some((argument) => typeof argument !== 'string'))
-    ) {
-      throw new Error('service runtime state provenance args are invalid');
-    }
-    const command = parsedProvenance.command;
-    const args = parsedProvenance.args;
-    const notes = parsedProvenance.notes;
+    const command = record.provenance.command;
+    const args = record.provenance.args;
+    const notes = record.provenance.notes;
     provenance = {
-      action: parsedProvenance.action,
+      action: record.provenance.action,
       ...(typeof command === 'string' ? { command } : {}),
       ...(Array.isArray(args) ? { args: args as string[] } : {}),
       ...(typeof notes === 'string' ? { notes } : {}),
@@ -352,10 +297,22 @@ function parseServiceRuntimeState(
   };
 }
 
+/** Load a service runtime state through schema, regular-file, and service binding checks. */
+export function loadServiceRuntimeStateAtPath(
+  statePath: string,
+  serviceId: string
+): ServiceRuntimeState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[SERVICE_RUNTIME_STATE] state must be a regular file: ${statePath}`);
+  }
+  return parseServiceRuntimeState(readJson<unknown>(safeStatePath), safeStatePath, serviceId);
+}
+
 function loadStateFromPath(statePath: string, serviceId: string): ServiceRuntimeState | null {
   if (!safeExistsSync(statePath)) return null;
   try {
-    return parseServiceRuntimeState(readJson<unknown>(statePath), statePath, serviceId);
+    return loadServiceRuntimeStateAtPath(statePath, serviceId);
   } catch {
     return null;
   }
@@ -377,9 +334,10 @@ function writeState(
     provenance: state.provenance,
   };
   const statePath = resolveStatePath(record);
+  const validated = parseServiceRuntimeState(resolvedState, statePath, record.service_id);
   safeMkdir(path.dirname(statePath), { recursive: true });
-  safeWriteFile(statePath, JSON.stringify(resolvedState, null, 2));
-  return resolvedState;
+  safeWriteFile(statePath, JSON.stringify(validated, null, 2));
+  return validated;
 }
 
 function resolveBaseUrl(record: ServiceRuntimeRecord, state: ServiceRuntimeState | null): string {
