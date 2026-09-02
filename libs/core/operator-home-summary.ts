@@ -7,6 +7,7 @@ import { listInboxEntries, type DeliverableInboxEntry } from './deliverable-inbo
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionStaffingAssignments } from './mission-team-binding.js';
 import { buildNhiLedgerReport } from './nhi-lifecycle-governance.js';
 import { loadMissionManagementConfig } from './mission-management-config.js';
@@ -259,27 +260,8 @@ function collectMissionStates(scope?: OperatorHomeScopeFilter): OperatorHomeMiss
         if (!statePath) continue;
         if (!safeExistsSync(statePath)) continue;
         try {
-          const state = readJson<{
-            mission_id: string;
-            status: string;
-            tier: 'personal' | 'confidential' | 'public';
-            mission_type?: string;
-            tenant_id?: string;
-            tenant_slug?: string;
-            organization_id?: string;
-            project_id?: string;
-            assigned_persona?: string;
-            relationships?: {
-              organization?: { organization_id?: string };
-              project?: { project_id?: string };
-              track?: { track_id?: string; track_name?: string };
-            };
-            history?: Array<{ ts: string; event: string }>;
-            intent?: {
-              goal_summary?: string;
-              success_condition?: string;
-            };
-          }>(statePath);
+          const state = loadMissionStateAtPath(statePath) as
+            (ReturnType<typeof loadMissionStateAtPath> & { project_id?: string }) | null;
           if (!state?.mission_id) continue;
           const organizationId =
             state.organization_id || state.relationships?.organization?.organization_id;

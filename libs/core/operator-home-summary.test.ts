@@ -56,6 +56,24 @@ const secureIo = vi.hoisted(() => ({
 }));
 
 vi.mock('./secure-io.js', () => secureIo);
+vi.mock('./foundation/io.js', () => ({
+  getFoundationIo: () => ({
+    loadJson: secureIo.loadJson,
+    loadJsonIfPresent: <T>(filePath: string) => {
+      if (!fs.existsSync(filePath)) return null;
+      try {
+        return secureIo.loadJson<T>(filePath);
+      } catch {
+        return null;
+      }
+    },
+    appendFile: secureIo.safeAppendFileSync,
+    exists: secureIo.safeExistsSync,
+    readFile: (filePath: string) => String(secureIo.safeReadFile(filePath)),
+    stat: (filePath: string) => fs.statSync(filePath),
+    writeFile: (filePath: string, content: string) => secureIo.safeWriteFile(filePath, content),
+  }),
+}));
 vi.mock('./foundation/json.js', () => ({
   readJson: secureIo.loadJson,
   readJsonLines: <T>(
@@ -89,6 +107,12 @@ describe('operator home summary', () => {
     tmpRoot = path.join(os.tmpdir(), `kyberion-home-${randomUUID()}`);
     fs.mkdirSync(tmpRoot, { recursive: true });
     fs.writeFileSync(path.join(tmpRoot, 'package.json'), '{}');
+    const schemaPath = path.join(tmpRoot, 'knowledge/product/schemas/mission-state.schema.json');
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true });
+    fs.copyFileSync(
+      path.resolve(process.cwd(), 'knowledge/product/schemas/mission-state.schema.json'),
+      schemaPath
+    );
     process.env.KYBERION_ROOT = tmpRoot;
   });
 
@@ -113,6 +137,15 @@ describe('operator home summary', () => {
           mission_type: 'delivery',
           tenant_slug: 'tenant-a',
           assigned_persona: 'operator',
+          execution_mode: 'local',
+          priority: 1,
+          confidence_score: 1,
+          git: {
+            branch: 'operator-home-test',
+            start_commit: 'abc123',
+            latest_commit: 'abc123',
+            checkpoints: [],
+          },
           history: [{ ts: '2026-07-06T00:00:00.000Z', event: 'START', note: 'started' }],
           intent: {
             goal_summary: 'Ship the report',
@@ -131,9 +164,25 @@ describe('operator home summary', () => {
         mission_id: 'MSN-LINKED',
         status: 'active',
         tier: 'public',
+        execution_mode: 'local',
+        priority: 1,
+        assigned_persona: 'operator',
+        confidence_score: 1,
+        git: {
+          branch: 'operator-home-test-linked',
+          start_commit: 'abc123',
+          latest_commit: 'abc123',
+          checkpoints: [],
+        },
+        history: [],
       })
     );
     fs.symlinkSync(externalMission, path.join(tmpRoot, 'active/missions/public/MSN-LINKED'));
+    fs.mkdirSync(path.join(tmpRoot, 'active/missions/public/MSN-INVALID'), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpRoot, 'active/missions/public/MSN-INVALID/mission-state.json'),
+      JSON.stringify({ mission_id: 'MSN-INVALID', status: 'active', tier: 'public' })
+    );
     addInboxEntry({
       missionId: 'MSN-1',
       title: 'Deliverable ready',
