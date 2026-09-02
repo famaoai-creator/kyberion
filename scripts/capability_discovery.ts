@@ -1,7 +1,10 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
-import { loadActuatorManifest } from '@agent/core/src/actuator-manifest-index';
+import {
+  loadActuatorManifest,
+  type ActuatorManifestCapability,
+} from '@agent/core/src/actuator-manifest-index';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -13,15 +16,6 @@ import chalk from 'chalk';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const ROOT_DIR = pathResolver.rootDir();
-
-interface Capability {
-  op: string;
-  platforms: string[];
-  requirements?: {
-    bin?: string[];
-    lib?: string[];
-  };
-}
 
 export interface CapabilityDiscoveryCapability {
   op: string;
@@ -53,7 +47,7 @@ export interface CapabilityDiscoveryOptions {
 }
 
 export function evaluateCapability(
-  capability: Capability,
+  capability: ActuatorManifestCapability,
   platform: NodeJS.Platform,
   binaryAvailable: (bin: string) => boolean
 ): CapabilityDiscoveryCapability {
@@ -109,15 +103,9 @@ export function discoverCapabilities(
         actuatorId: manifest.actuator_id,
         version: manifest.version,
         description: manifest.description || 'No description available.',
-        capabilities: (manifest.capabilities || []).flatMap((cap) => {
-          if (!cap.op || !cap.platforms) return [];
-          const capability: Capability = {
-            op: cap.op,
-            platforms: cap.platforms,
-            requirements: cap.requirements,
-          };
-          return [evaluateCapability(capability, currentPlatform, binaryAvailable)];
-        }),
+        capabilities: (manifest.capabilities || []).map((capability) =>
+          evaluateCapability(capability, currentPlatform, binaryAvailable)
+        ),
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

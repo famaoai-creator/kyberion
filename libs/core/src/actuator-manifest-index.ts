@@ -19,11 +19,11 @@ export interface ActuatorManifestCapabilityPrerequisites {
 }
 
 export interface ActuatorManifestCapability {
-  op?: string;
+  op: string;
   description?: string;
   timeout_ms?: number;
   schema_ref?: string;
-  platforms?: string[];
+  platforms: string[];
   requirements?: ActuatorManifestCapabilityRequirements;
   prerequisites?: ActuatorManifestCapabilityPrerequisites;
   implemented?: boolean;
@@ -86,9 +86,7 @@ export function loadActuatorManifest(manifestPath: string): ActuatorManifestFile
 
 function listOps(manifest: ActuatorManifestFile): string[] {
   return Array.from(
-    new Set(
-      (manifest.capabilities || []).map((capability) => String(capability.op || '')).filter(Boolean)
-    )
+    new Set((manifest.capabilities || []).map((capability) => capability.op))
   ).sort();
 }
 
