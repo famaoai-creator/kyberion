@@ -43,6 +43,7 @@ describe('run_a2a', () => {
         msg_id: 'msg-1',
         conversation_id: 'conversation-1',
         sender: 'agent:sender',
+        performative: 'request',
       },
       payload: { task: 'demo' },
     };
@@ -71,7 +72,7 @@ describe('run_a2a', () => {
 
     const { main } = await import('./run_a2a.js');
     await expect(main(['--input', 'active/shared/tmp/a2a-message.json'], vi.fn())).rejects.toThrow(
-      /Missing header or payload/
+      /Invalid catalog a2a-envelope/
     );
   });
 });

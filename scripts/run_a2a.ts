@@ -3,6 +3,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { validateA2AEnvelope } from '@agent/core/a2a-envelope';
 import * as superNerve from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import type { A2AMessage } from '../libs/actuators/orchestrator-actuator/src/super-nerve/index.js';
 import { nowIso, readJson } from '@agent/core/foundation';
@@ -25,11 +26,7 @@ export async function main(args: string[] = [], print: (value: unknown) => void 
   if (!safeLstat(resolvedInput).isFile()) {
     throw new Error(`A2A input must be a regular file: ${inputPath}`);
   }
-  const a2aMsg = readJson<A2AMessage>(resolvedInput);
-
-  if (!a2aMsg.header || !a2aMsg.payload) {
-    throw new Error('Invalid A2A Message: Missing header or payload.');
-  }
+  const a2aMsg = validateA2AEnvelope(readJson<unknown>(resolvedInput), resolvedInput);
 
   logger.info(
     `🚀 [A2A_GATEWAY] Receiving A2A message [ID: ${a2aMsg.header.msg_id}] from ${a2aMsg.header.sender}`

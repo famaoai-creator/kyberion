@@ -43,6 +43,10 @@
       "types": "./dist/a2a-bridge.d.ts",
       "default": "./dist/a2a-bridge.js"
     },
+    "./a2a-envelope": {
+      "types": "./dist/a2a-envelope.d.ts",
+      "default": "./dist/a2a-envelope.js"
+    },
     "./agent-adapter": {
       "types": "./dist/agent-adapter.d.ts",
       "default": "./dist/agent-adapter.js"
