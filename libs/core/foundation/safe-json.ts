@@ -48,6 +48,81 @@ export function parseSafeJsonObjectValue(value: unknown, label: string): Record<
   return value as Record<string, unknown>;
 }
 
+export type PersistedPipelineStep = {
+  type: 'capture' | 'transform' | 'apply' | 'control';
+  op: string;
+  params: Record<string, unknown>;
+};
+
+export type PersistedPipelineStrategyConfig = {
+  strategies: Array<{
+    pipeline: PersistedPipelineStep[];
+    params?: Record<string, unknown>;
+  }>;
+};
+
+function parsePersistedPipelineStep(value: unknown, label: string): PersistedPipelineStep {
+  const step = parseSafeJsonObjectValue(value, label);
+  if (
+    (step.type !== 'capture' &&
+      step.type !== 'transform' &&
+      step.type !== 'apply' &&
+      step.type !== 'control') ||
+    typeof step.op !== 'string' ||
+    step.op.trim() === ''
+  ) {
+    throw new Error(`${label} must declare a valid type and non-empty op`);
+  }
+
+  const params = parseSafeJsonObjectValue(step.params, `${label}.params`);
+  for (const nestedKey of ['then', 'else', 'pipeline'] as const) {
+    const nested = params[nestedKey];
+    if (nested === undefined) continue;
+    if (!Array.isArray(nested)) {
+      throw new Error(`${label}.params.${nestedKey} must be an array of pipeline steps`);
+    }
+    nested.forEach((candidate, index) =>
+      parsePersistedPipelineStep(candidate, `${label}.params.${nestedKey}[${index}]`)
+    );
+  }
+
+  return {
+    type: step.type,
+    op: step.op,
+    params,
+  };
+}
+
+/** Validate a persisted reconcile strategy before any pipeline step executes. */
+export function parsePersistedPipelineStrategy(
+  value: unknown,
+  label = 'persisted pipeline strategy'
+): PersistedPipelineStrategyConfig {
+  const root = parseSafeJsonObjectValue(value, label);
+  if (!Array.isArray(root.strategies)) {
+    throw new Error(`${label}.strategies must be an array`);
+  }
+
+  return {
+    strategies: root.strategies.map((candidate, index) => {
+      const strategy = parseSafeJsonObjectValue(candidate, `${label}.strategies[${index}]`);
+      if (!Array.isArray(strategy.pipeline)) {
+        throw new Error(`${label}.strategies[${index}].pipeline must be an array`);
+      }
+      const params =
+        strategy.params === undefined
+          ? undefined
+          : parseSafeJsonObjectValue(strategy.params, `${label}.strategies[${index}].params`);
+      return {
+        pipeline: strategy.pipeline.map((step, stepIndex) =>
+          parsePersistedPipelineStep(step, `${label}.strategies[${index}].pipeline[${stepIndex}]`)
+        ),
+        ...(params ? { params } : {}),
+      };
+    }),
+  };
+}
+
 export type JsonObjectRequest = {
   json: () => Promise<unknown>;
 };

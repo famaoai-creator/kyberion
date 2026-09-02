@@ -7,9 +7,12 @@ export {
   parseSafeJsonInput,
   parseSafeJsonObjectInput,
   parseSafeJsonObjectValue,
+  parsePersistedPipelineStrategy,
   readJsonObjectRequest,
   type JsonObjectRequest,
   type JsonObjectRequestResult,
+  type PersistedPipelineStep,
+  type PersistedPipelineStrategyConfig,
 } from './safe-json.js';
 import { parseSafeJsonInput } from './safe-json.js';
 
