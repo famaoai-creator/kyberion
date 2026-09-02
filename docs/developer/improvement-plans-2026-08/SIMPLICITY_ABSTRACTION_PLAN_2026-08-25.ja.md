@@ -13079,6 +13079,12 @@ SX-03／SX-04／SX-08 のpeer runtime recovery manifestを再監査し、quarant
 
 検証: peer runtime recovery **1 file / 5 tests passed**、root typecheck、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 470
+
+SX-03／SX-04／SX-08 のmanaged plugin persistenceを再監査し、plugin manifestとmanaged recordを型アサーションのままplugin activation判定へ渡していた残存を修正した。manifest root／identifier／表示フィールド／dangerous JSON key、managed recordの全フィールド・path境界・approval bindingをstrict検証し、保存されたofficial trustはsource provenanceと再照合、非official activationはapprovalのcorrelation／payload hash／effect bindingを再検証してから再計算するようにした。managed rootのrepository boundary、plugin codeを実行しないlisting、既存のinstall／approval／activation semanticsは維持している。
+
+検証: plugin managed install／skill loader **2 files / 24 tests passed**、root typecheck、core package build、対象lint／Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03 の追加domain reader、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
