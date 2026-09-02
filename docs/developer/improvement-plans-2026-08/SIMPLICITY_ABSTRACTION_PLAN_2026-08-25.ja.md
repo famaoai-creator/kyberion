@@ -12833,6 +12833,12 @@ SX-03 の残存監査として、mission creation／activation のテンプレ�
 
 検証: mission creation／lifecycle／template／process planning **4 files / 45 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象5ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 429
+
+SX-03 の残存監査として、organization operating model の pause／resume／archive lifecycle に残っていた timestamp 生成 **2 箇所**を foundation `nowIso()` へ統合した。1回の lifecycle transition で `updated_at` と `archived_at` が同じ基準時刻を共有し、organization／tenant scope、認可、状態遷移、監査記録は変更していない。
+
+検証: organization lifecycle／operating model／foundation adoption **3 files / 18 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象4ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

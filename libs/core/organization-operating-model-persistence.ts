@@ -10,6 +10,7 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -632,13 +633,14 @@ export function transitionOrganizationLifecycle(input: {
       `Cannot archive organization with active projects: ${current.active_project_ids!.join(', ')}`
     );
   }
+  const now = nowIso();
   const next: OrganizationOperationalState = {
     ...current,
     status: input.verb === 'pause' ? 'paused' : input.verb === 'resume' ? 'active' : 'archived',
-    updated_at: new Date().toISOString(),
+    updated_at: now,
     metadata: {
       ...(current.metadata || {}),
-      ...(input.verb === 'archive' ? { archived_at: new Date().toISOString() } : {}),
+      ...(input.verb === 'archive' ? { archived_at: now } : {}),
       ...(input.reason ? { lifecycle_reason: input.reason } : {}),
     },
   };
