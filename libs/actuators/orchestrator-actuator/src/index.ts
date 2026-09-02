@@ -1,7 +1,7 @@
 import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertProjectTrustApproval } from '@agent/core/project-trust';
 import {
@@ -29,10 +29,6 @@ interface OrchestratorAction {
     max_steps?: number;
     timeout_ms?: number;
   };
-}
-
-interface StrategyConfig {
-  strategies: Array<{ pipeline: PipelineStep[]; params?: Record<string, unknown> }>;
 }
 
 function resolveStrategyPath(strategyPath: string | undefined): {
@@ -119,7 +115,10 @@ async function performReconcile(input: OrchestratorAction) {
   assertStrategyTrust(input, resolved.relative);
   if (!safeExistsSync(resolved.absolute))
     throw new Error(`Strategy not found: ${resolved.absolute}`);
-  const config = readJson<StrategyConfig>(resolved.absolute);
+  const config = parsePersistedPipelineStrategy(
+    readJson<unknown>(resolved.absolute),
+    'orchestrator strategy'
+  );
   for (const strategy of config.strategies) {
     await executePipeline(strategy.pipeline, strategy.params || {}, input.options);
   }

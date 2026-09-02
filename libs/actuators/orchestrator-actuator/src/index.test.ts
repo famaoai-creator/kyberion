@@ -839,6 +839,21 @@ describe('orchestrator-actuator', () => {
     ).rejects.toThrow('Strategy not found');
   });
 
+  it('rejects a malformed persisted reconcile strategy before executing a step', async () => {
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.safeReadFile.mockReturnValue(
+      JSON.stringify({ strategies: [{ pipeline: [{ type: 'apply', op: 'log', params: [] }] }] })
+    );
+
+    const { handleAction } = await import('./index.js');
+    await expect(
+      handleAction({ action: 'reconcile', strategy_path: 'strategy.json' })
+    ).rejects.toThrow(
+      'orchestrator strategy.strategies[0].pipeline[0].params must be a JSON object'
+    );
+    expect(mocks.safeExec).not.toHaveBeenCalled();
+  });
+
   it('handles max_steps limit', async () => {
     const { handleAction } = await import('./index.js');
     const steps = Array.from({ length: 3 }, (_, i) => ({
