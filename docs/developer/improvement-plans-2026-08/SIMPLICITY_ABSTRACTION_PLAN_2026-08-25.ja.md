@@ -12509,6 +12509,12 @@ SX-03 の残存監査として、Chronos Mirror の agent API route に残って
 
 検証: agent API route **2 files / 11 tests passed**、対象 route の simple timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 375
+
+SX-03 の残存監査として、Chronos Mirror の quick-action helper に残っていた単純な `new Date().toISOString()` 3 箇所を foundation `nowIso()` へ統合した。command／schedule quick action の生成時刻と成功・失敗応答の timestamp semantics は変更していない。
+
+検証: quick-action／agent API **3 files / 13 tests passed**、root typecheck、対象 helper の simple timestamp **0件**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
