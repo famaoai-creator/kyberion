@@ -1,8 +1,7 @@
 /** WebAuthn virtual passkey runtime isolated from browser pipeline orchestration. */
 
-import { isRecord, nowIso, readJson } from '@agent/core/foundation';
+import { defineCatalog, isRecord, nowIso } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
 import { type CDPSession, type Page } from '@playwright/test';
@@ -20,6 +19,13 @@ export interface PasskeyProviderCatalog {
   default_provider?: string;
   providers: Record<string, PasskeyProviderPreset>;
 }
+
+const PASSKEY_PROVIDER_CATALOG_PATH = pathResolver.knowledge(
+  'product/orchestration/browser-passkey-providers.json'
+);
+const PASSKEY_PROVIDER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/browser-passkey-providers.schema.json'
+);
 
 function isSafeProviderKey(key: string): boolean {
   return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
@@ -96,6 +102,14 @@ function defaultPasskeyProviderCatalog(): PasskeyProviderCatalog {
   };
 }
 
+const passkeyProviderCatalog = defineCatalog<PasskeyProviderCatalog>({
+  id: 'browser-passkey-providers',
+  path: PASSKEY_PROVIDER_CATALOG_PATH,
+  schema: PASSKEY_PROVIDER_SCHEMA_PATH,
+  fallback: defaultPasskeyProviderCatalog,
+  fallbackOnInvalid: true,
+});
+
 function getPasskeyPreset(provider?: string) {
   const catalog = loadPasskeyProviderCatalog();
   const presetKey = provider || catalog.default_provider || 'webauthn.io';
@@ -107,22 +121,13 @@ function getPasskeyPreset(provider?: string) {
 }
 
 function loadPasskeyProviderCatalog(): PasskeyProviderCatalog {
-  const passkeyProviderCatalogPath = assertSafeRepositoryPath(
-    pathResolver.knowledge('product/orchestration/browser-passkey-providers.json'),
-    { allowMissingLeaf: true }
-  );
-  if (
-    safeExistsSync(passkeyProviderCatalogPath) &&
-    safeLstat(passkeyProviderCatalogPath).isFile()
-  ) {
-    try {
-      const parsed = parsePasskeyProviderCatalog(readJson<unknown>(passkeyProviderCatalogPath));
-      if (parsed) return parsed;
-    } catch (err) {
-      logger.warn(
-        `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
-      );
-    }
+  try {
+    const parsed = parsePasskeyProviderCatalog(passkeyProviderCatalog.load());
+    if (parsed) return parsed;
+  } catch (err) {
+    logger.warn(
+      `[browser-pipeline-helpers] suppressed error in loadPasskeyProviderCatalog: ${err}`
+    );
   }
 
   return defaultPasskeyProviderCatalog();
