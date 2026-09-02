@@ -9,6 +9,15 @@ interface SmokeRule {
   required: string[];
 }
 
+const FIRST_WIN_DOCUMENTS = ['README.md', 'docs/QUICKSTART.md', 'docs/INITIALIZATION.md'] as const;
+const CANONICAL_FIRST_WIN_COMMANDS = [
+  'pnpm install',
+  'pnpm build',
+  'pnpm env:bootstrap --manifest kyberion-toolchain',
+  'pnpm doctor',
+  'pnpm pipeline --input pipelines/verify-session.json',
+] as const;
+
 const RULES: SmokeRule[] = [
   {
     file: 'README.md',
@@ -179,8 +188,59 @@ export function validateFirstWinLifecyclePipeline(pipeline: unknown): string[] {
   return violations;
 }
 
+export function extractCanonicalFirstWinCommands(source: string): string[] | null {
+  const markerIndex = source.indexOf('# kyberion-first-win');
+  if (markerIndex < 0) return null;
+  const afterMarker = source.slice(markerIndex + '# kyberion-first-win'.length);
+  const block = afterMarker.match(/```bash\r?\n([\s\S]*?)\r?\n```/u)?.[1];
+  if (!block) return null;
+  return block
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith('#'));
+}
+
+export function validateCanonicalFirstWinDocumentation(
+  documents: ReadonlyArray<{ file: string; source: string }> = FIRST_WIN_DOCUMENTS.map((file) => ({
+    file,
+    source: String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }) || ''),
+  }))
+): string[] {
+  const violations: string[] = [];
+  let canonical: string[] | null = null;
+
+  for (const document of documents) {
+    const commands = extractCanonicalFirstWinCommands(document.source);
+    if (!commands) {
+      violations.push(`${document.file}: missing canonical # kyberion-first-win bash block`);
+      continue;
+    }
+    if (commands.length !== CANONICAL_FIRST_WIN_COMMANDS.length) {
+      violations.push(
+        `${document.file}: canonical first-win block must contain exactly ${CANONICAL_FIRST_WIN_COMMANDS.length} commands`
+      );
+      continue;
+    }
+    for (const [index, expected] of CANONICAL_FIRST_WIN_COMMANDS.entries()) {
+      if (commands[index] !== expected) {
+        violations.push(
+          `${document.file}: canonical first-win command ${index + 1} must be "${expected}"`
+        );
+      }
+    }
+    if (!canonical) canonical = commands;
+    else if (JSON.stringify(commands) !== JSON.stringify(canonical)) {
+      violations.push(
+        `${document.file}: canonical first-win commands differ from the first document`
+      );
+    }
+  }
+  return violations;
+}
+
 export function checkFirstWinSmoke(): string[] {
   const violations: string[] = [];
+  violations.push(...validateCanonicalFirstWinDocumentation());
   for (const rule of RULES) {
     const abs = pathResolver.rootResolve(rule.file);
     if (!safeExistsSync(abs)) {
