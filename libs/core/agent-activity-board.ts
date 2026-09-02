@@ -14,6 +14,7 @@ import {
   type WorkVisibilityViewer,
 } from './work-visibility.js';
 import { loadState } from './mission-state.js';
+import { nowIso } from './foundation/time.js';
 
 export interface AgentActivityBlocker {
   kind: 'blocked' | 'dependency' | 'review_wait' | 'unassigned';
@@ -150,7 +151,7 @@ export function composeAgentActivityBoard(input: {
   }
 
   return {
-    generated_at: input.now || new Date().toISOString(),
+    generated_at: input.now || nowIso(),
     tenant: input.tenantFilter,
     entries,
     agents: [...byAgent.values()].sort((a, b) => b.active + b.blocked - (a.active + a.blocked)),
