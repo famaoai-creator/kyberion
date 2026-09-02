@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -77,7 +78,7 @@ export function appendReasoningFailoverEvent(
     const eventsPath = reasoningFailoverEventsPath();
     safeMkdir(path.dirname(eventsPath), { recursive: true });
     const record: ReasoningFailoverEvent = {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       ...event,
       error_summary: truncateErrorSummary(event.error_summary),
     };
@@ -93,7 +94,7 @@ export function markReasoningFailover(marker: Omit<ReasoningFailoverMarker, 'at'
   try {
     const markerPath = reasoningFailoverMarkerPath();
     safeMkdir(path.dirname(markerPath), { recursive: true });
-    const full: ReasoningFailoverMarker = { ...marker, at: new Date().toISOString() };
+    const full: ReasoningFailoverMarker = { ...marker, at: nowIso() };
     safeWriteFile(markerPath, `${JSON.stringify(full, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
