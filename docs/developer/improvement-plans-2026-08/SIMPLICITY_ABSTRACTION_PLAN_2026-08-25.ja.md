@@ -11872,6 +11872,15 @@ heartbeat、監査レポートの出力形式は維持し、`Date.now()` によ�
 検証: 関連 **10 test files / 91 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。残る SX-03 の
 時刻移行は、surface／actuator と、domain 固有の変換を含む script の個別判断である。
 
+## 2026-09-02 再レビュー修正 299
+
+初回導線の中心である `onboarding_wizard` に残っていた単純 timestamp 11 箇所を foundation の `nowIso()` へ移行した。
+wizard state の phase 更新、service candidate／tenant draft の capture、summary artifact の生成時刻は従来と同じ UTC
+ISO 形式を維持し、onboarding の状態遷移・tenant binding・provider 選択の挙動は変更していない。
+
+検証: onboarding 関連 **5 test files / 19 tests passed**、root typecheck、root lint、Prettier、`git diff --check`。残る
+SX-03 の時刻移行は surface／actuator と、domain 固有の変換を含む script の個別判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
