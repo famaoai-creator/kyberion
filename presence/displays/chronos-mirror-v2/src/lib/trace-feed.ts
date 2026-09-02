@@ -1,7 +1,8 @@
 import path from 'node:path';
 
 import { customerIsConfigured, customerRoot } from '@agent/core/customer-resolver';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -357,19 +358,12 @@ function resolveMissionScope(missionId?: string): {
   const statePath = path.join(missionPath, 'mission-state.json');
   try {
     if (!safeExistsSync(statePath) || !safeLstat(statePath).isFile()) return {};
-    const state = readJson<{
-      tenant_slug?: string;
-      tier?: unknown;
-      organization_id?: string;
-      relationships?: {
-        organization?: { organization_id?: string };
-        project?: { project_id?: string };
-      };
-    }>(statePath);
+    const state = loadStateAtPath(statePath);
+    if (!state) return {};
     return {
       tenantSlug: state.tenant_slug,
       ...(normalizeTraceTier(state.tier) ? { tier: normalizeTraceTier(state.tier) } : {}),
-      organizationId: state.organization_id || state.relationships?.organization?.organization_id,
+      organizationId: state.relationships?.organization?.organization_id,
       projectId: state.relationships?.project?.project_id,
     };
   } catch {
