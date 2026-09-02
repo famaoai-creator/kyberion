@@ -188,7 +188,6 @@ describe('marketing publication dry-run', () => {
     const approval = JSON.parse(
       safeReadFile(approvalPath, { encoding: 'utf8' }) as string
     ) as PublicationApproval;
-    approval.approval_decisions = [];
     approval.expires_at = '2020-01-01T00:00:00.000Z';
     safeWriteFile(approvalPath, JSON.stringify(approval));
     expect(() =>
@@ -198,6 +197,23 @@ describe('marketing publication dry-run', () => {
         sharedApprovalRequest,
       })
     ).toThrow('approval has expired');
+  });
+
+  it('rejects a schema-invalid persisted approval before publication gates', () => {
+    const { root, approvalPath, sharedApprovalRequest } = fixture();
+    const approval = JSON.parse(
+      safeReadFile(approvalPath, { encoding: 'utf8' }) as string
+    ) as PublicationApproval & { unexpected?: boolean };
+    approval.unexpected = true;
+    safeWriteFile(approvalPath, JSON.stringify(approval));
+
+    expect(() =>
+      runMarketingPublishDryRun({
+        approvalPath,
+        outputRoot: path.join(root, 'output'),
+        sharedApprovalRequest,
+      })
+    ).toThrow(/Invalid catalog publication-approval/);
   });
 
   it('rejects PII in approved publication text without logging the raw value', () => {
