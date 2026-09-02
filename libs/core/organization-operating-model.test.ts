@@ -36,6 +36,7 @@ import {
   saveOrganizationService,
   saveOrganizationServiceState,
   organizationRecordFiles,
+  organizationOperationalStatePath,
 } from './organization-operating-model-persistence.js';
 import {
   listOrganizationOperationRuns,
@@ -57,7 +58,7 @@ import {
 } from './organization-operating-model.js';
 import { t } from './t.js';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeSymlinkSync } from '@agent/core/secure-io';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 const organizationId = 'org-operating-model-test';
 const tenantSlug = 'tenant-acme';
@@ -209,6 +210,42 @@ describe('organization operating model', () => {
     expect(() =>
       loadOrganizationOperationalState(organizationId, { tier: 'confidential', tenantSlug })
     ).toThrow(/tenant|POLICY_VIOLATION/i);
+  });
+
+  it('rejects a non-regular organization state artifact before catalog loading', () => {
+    const statePath = organizationOperationalStatePath(organizationId, 'confidential', tenantSlug);
+    safeMkdir(statePath, { recursive: true });
+    try {
+      expect(() =>
+        loadOrganizationOperationalState(organizationId, {
+          tier: 'confidential',
+          tenantSlug,
+        })
+      ).toThrow('[ORGANIZATION_RECORD] organization operational state must be a regular file');
+    } finally {
+      safeRmSync(statePath, { recursive: true, force: true });
+    }
+  });
+
+  it('does not return a schema-valid state from another tenant scope', () => {
+    const state: OrganizationOperationalState = {
+      organization_id: organizationId,
+      name: 'Tenant Binding Organization',
+      tier: 'confidential',
+      tenant_slug: 'tenant-other',
+      status: 'active',
+      updated_at: '2026-08-03T00:00:00.000Z',
+    };
+    const statePath = organizationOperationalStatePath(organizationId, 'confidential', tenantSlug);
+    safeMkdir(path.dirname(statePath), { recursive: true });
+    safeWriteFile(statePath, JSON.stringify(state));
+    try {
+      expect(
+        loadOrganizationOperationalState(organizationId, { tier: 'confidential', tenantSlug })
+      ).toBeNull();
+    } finally {
+      safeRmSync(statePath, { force: true });
+    }
   });
 
   it('requires tenant scope when writing confidential organization state', () => {
