@@ -1,9 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeSymlinkSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 
-import { loadJsonValue, readJsonFilesRecursively } from './media-catalog-loaders.js';
+import {
+  loadJsonValue,
+  loadMediaDesignSystemsCatalog,
+  readJsonFilesRecursively,
+} from './media-catalog-loaders.js';
 
 const rootDir = pathResolver.sharedTmp('media-catalog-loaders-test');
 
@@ -30,5 +40,24 @@ describe('media catalog loaders', () => {
     safeSymlinkSync(target, link);
 
     expect(readJsonFilesRecursively(rootDir)).toEqual([{ source: 'target' }]);
+  });
+
+  it('validates the merged media design systems envelope through the catalog boundary', () => {
+    const source = String(
+      safeReadFile(
+        pathResolver.rootResolve('libs/actuators/media-actuator/src/media-catalog-loaders.ts'),
+        { encoding: 'utf8' }
+      )
+    );
+
+    expect(source).toContain("id: 'media-design-systems'");
+    expect(source).toContain(
+      "schema: path.resolve(rootDir, 'knowledge/product/schemas/media-design-systems.schema.json')"
+    );
+    expect(source).toContain('return catalog.validate(merged, directoryPath);');
+
+    const catalog = loadMediaDesignSystemsCatalog(pathResolver.rootDir());
+    expect(catalog.default_system).toBe('executive-standard');
+    expect(catalog.systems['executive-standard']).toBeDefined();
   });
 });

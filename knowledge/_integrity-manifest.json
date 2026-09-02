@@ -7483,6 +7483,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/media-design-systems.schema.json",
+      "tier": "public",
+      "size": 769,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/media-drawio-boundary-policy.schema.json",
       "tier": "public",
       "size": 1297,
