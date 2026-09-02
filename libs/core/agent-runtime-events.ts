@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
@@ -21,7 +22,7 @@ export function appendSupervisorEvent(event: Record<string, unknown>): void {
         allowMissingLeaf: true,
       }),
       {
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         ...event,
       }
     );

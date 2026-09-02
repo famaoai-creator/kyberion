@@ -1,4 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 /**
  * Worker event stream (KC-02).
@@ -165,7 +166,7 @@ export class WorkerEventStream {
         : undefined;
     const envelope = workerEventEnvelopeSchema.parse({
       type,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       seq: this.seq++,
       ...(mergedSource && Object.keys(mergedSource).length > 0 ? { source: mergedSource } : {}),
       payload,
@@ -240,7 +241,7 @@ function attachDefaultObservabilityRecorder(stream: WorkerEventStream): void {
       : undefined;
     if (!dir) return;
     safeMkdir(dir);
-    const day = new Date().toISOString().slice(0, 10);
+    const day = nowIso().slice(0, 10);
     stream.subscribe((event) => {
       const sharedEvent = {
         ...event,
