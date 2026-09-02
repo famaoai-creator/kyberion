@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import AjvModule from 'ajv';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -9,6 +10,7 @@ import {
   hashBrowserExtensionAction,
   issueBrowserExtensionLease,
   issueSegmentedLeases,
+  loadBrowserExtensionRecordingAtPath,
   persistBrowserExtensionReceipt,
   preflightBrowserExtensionSession,
   segmentRecording,
@@ -20,6 +22,7 @@ import { pathResolver } from './path-resolver.js';
 import * as secureIo from './secure-io.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
+const RECORDING_TEST_ROOT = pathResolver.sharedTmp('browser-recording-loader-test');
 
 function sha256(value: string) {
   return createHash('sha256').update(value).digest('hex');
@@ -94,6 +97,24 @@ describe('browser extension bridge contracts', () => {
     const parsed = validateBrowserExtensionRecording(recording());
     expect(parsed.valid).toBe(true);
     expect(buildBrowserExtensionPipelineCandidate(parsed.value!).requires_manual_review).toBe(true);
+  });
+
+  it('loads persisted recordings through the regular-file contract boundary', () => {
+    secureIo.safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    secureIo.safeMkdir(RECORDING_TEST_ROOT, { recursive: true });
+    const recordingPath = path.join(RECORDING_TEST_ROOT, 'recording.json');
+    secureIo.safeWriteFile(recordingPath, `${JSON.stringify(recording())}\n`);
+
+    expect(loadBrowserExtensionRecordingAtPath(recordingPath).recording_id).toBe('REC-1');
+  });
+
+  it('rejects a directory at the persisted recording path', () => {
+    secureIo.safeRmSync(RECORDING_TEST_ROOT, { recursive: true, force: true });
+    secureIo.safeMkdir(path.join(RECORDING_TEST_ROOT, 'recording.json'), { recursive: true });
+
+    expect(() =>
+      loadBrowserExtensionRecordingAtPath(path.join(RECORDING_TEST_ROOT, 'recording.json'))
+    ).toThrow('recording must be a regular file');
   });
 
   it('accepts and compiles conditional click actions for extension replay', () => {

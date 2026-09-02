@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { promoteBrowserProcedure } from './browser-procedure-promotion.js';
 import * as secureIo from './secure-io.js';
+import * as foundationJson from './foundation/json.js';
 
 const recording = {
   schema_version: 'browser-recording.v1',
@@ -57,6 +58,17 @@ describe('promoteBrowserProcedure', () => {
       if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
     });
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) return recording;
+      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
+    });
     const mkdir = vi.spyOn(secureIo, 'safeMkdir').mockImplementation(() => undefined as any);
     const write = vi.spyOn(secureIo, 'safeWriteFile').mockImplementation(() => undefined);
 
@@ -93,6 +105,19 @@ describe('promoteBrowserProcedure', () => {
         return { ...recording, review: { ...recording.review, status: 'pending' } };
       }
       return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    vi.spyOn(foundationJson, 'readJson').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
+        return { ...recording, review: { ...recording.review, status: 'pending' } };
+      }
+      return JSON.parse(String(actualRead(filePath, { encoding: 'utf8' })));
+    });
+    const actualLstat = secureIo.safeLstat;
+    vi.spyOn(secureIo, 'safeLstat').mockImplementation((filePath) => {
+      if (filePath.includes('browser-recordings/REC-personal-1.json')) {
+        return { isFile: () => true } as ReturnType<typeof secureIo.safeLstat>;
+      }
+      return actualLstat(filePath);
     });
     expect(() =>
       promoteBrowserProcedure({
