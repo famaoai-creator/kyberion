@@ -36,6 +36,7 @@ import {
 } from '@agent/core/service-connection-readiness';
 import { loadPersistedTrustLedger } from '@agent/core/trust-engine';
 import { loadSkillIndex } from '@agent/core/skill-index';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { readCanonicalWorkGraph } from '@agent/core/work-graph-projection';
 import {
   parseDashboardOrchestrationLine,
@@ -43,7 +44,7 @@ import {
 } from '@agent/core/dashboard-event-parser';
 import chalk from 'chalk';
 import { summarizeBackupStatus } from './backup.js';
-import { isRecord, readJson, readTextFile } from '@agent/core/foundation';
+import { readJson, readTextFile } from '@agent/core/foundation';
 import { activeCustomer } from '@agent/core/customer-resolver';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { parsePersonalSovereignIdentity } from '@agent/core/personal-identity-reader';
@@ -101,20 +102,16 @@ type DashboardMissionState = {
 
 export function readMissionDashboardState(statePath: string): DashboardMissionState | null {
   try {
-    const value = readJson<unknown>(statePath);
-    if (!isRecord(value) || value.status !== 'active' || typeof value.mission_id !== 'string') {
+    const state = loadStateAtPath(statePath);
+    if (!state || state.status !== 'active') {
       return null;
     }
-    const tier =
-      value.tier === 'personal' || value.tier === 'confidential' || value.tier === 'public'
-        ? value.tier
-        : undefined;
     return {
-      mission_id: value.mission_id,
+      mission_id: state.mission_id,
       status: 'active',
-      ...(tier ? { tier } : {}),
-      ...(typeof value.mission_type === 'string' ? { mission_type: value.mission_type } : {}),
-      ...(typeof value.tenant_slug === 'string' ? { tenant_slug: value.tenant_slug } : {}),
+      ...(state.tier ? { tier: state.tier } : {}),
+      ...(state.mission_type ? { mission_type: state.mission_type } : {}),
+      ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
     };
   } catch {
     return null;
