@@ -20,6 +20,7 @@ import {
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import { applyConsolidationActions, type ConsolidationAction } from './memory-notebook.js';
@@ -513,7 +514,7 @@ export function applyBackgroundReviewPipelinePatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
@@ -540,7 +541,7 @@ export function applyBackgroundReviewPipelinePatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });
@@ -696,7 +697,7 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
@@ -723,7 +724,7 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });
@@ -789,7 +790,7 @@ export function applyBackgroundReviewSkillPatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
     approval_ref: approvalRef,
-    backed_up_at: new Date().toISOString(),
+    backed_up_at: nowIso(),
     original_content: before,
   };
 
@@ -816,7 +817,7 @@ export function applyBackgroundReviewSkillPatch(
         backup_ref: backup,
         approved_by: approvedBy,
         approval_ref: approvalRef,
-        applied_at: new Date().toISOString(),
+        applied_at: nowIso(),
       },
     },
   });
