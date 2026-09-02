@@ -47,6 +47,7 @@ import { emitMissionLifecycleIntentSnapshot } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 
 const MISSION_TEMPLATES_PATH = pathResolver.knowledge('product/governance/mission-templates.json');
 const MISSION_TEMPLATES_SCHEMA_PATH = pathResolver.knowledge(
@@ -280,7 +281,7 @@ export async function createMission(args: {
 
   const gitBranch = getCurrentBranch(rootDir);
   const gitHash = getGitHash(rootDir);
-  const now = new Date().toISOString();
+  const now = nowIso();
   const owner = process.env.USER || 'famao';
   const resolvedVision = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
 
@@ -622,7 +623,7 @@ export async function startMission(args: {
       if (state) {
         state.status = transitionStatus(state.status, 'active');
         state.history.push({
-          ts: new Date().toISOString(),
+          ts: nowIso(),
           event: 'ACTIVATE',
           note: 'Mission activated.',
         });
@@ -688,7 +689,7 @@ export async function startMission(args: {
       }
       state.status = transitionStatus(state.status, 'active');
       state.history.push({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'RESUME',
         note: 'Mission resumed.',
       });
