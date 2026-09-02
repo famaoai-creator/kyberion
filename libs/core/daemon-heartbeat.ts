@@ -1,10 +1,12 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
   safeReaddir,
+  safeLstat,
   safeWriteFile,
 } from './secure-io.js';
 import * as pathResolver from './path-resolver.js';
@@ -32,6 +34,15 @@ export interface HeartbeatOptions {
 }
 
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
+const DAEMON_HEARTBEAT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/daemon-heartbeat.schema.json'
+);
+
+const daemonHeartbeatCatalog = defineCatalog<DaemonHeartbeat>({
+  id: 'daemon-heartbeat',
+  path: DAEMON_HEARTBEAT_SCHEMA_PATH,
+  schema: DAEMON_HEARTBEAT_SCHEMA_PATH,
+});
 
 function heartbeatRoot(rootDir?: string): string {
   return assertSafeRepositoryPath(rootDir ?? pathResolver.shared('runtime/heartbeats'), {
@@ -44,6 +55,24 @@ function heartbeatPath(daemonId: string, rootDir?: string): string {
   return assertSafeRepositoryPath(path.join(heartbeatRoot(rootDir), `${safeId}.json`), {
     allowMissingLeaf: true,
   });
+}
+
+/** Load one persisted heartbeat through the shared schema and daemon binding. */
+export function loadDaemonHeartbeatAtPath(
+  filePath: string,
+  expectedDaemonId: string
+): DaemonHeartbeat {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DAEMON_HEARTBEAT] heartbeat must be a regular file: ${filePath}`);
+  }
+  const heartbeat = daemonHeartbeatCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  if (heartbeat.daemon_id !== expectedDaemonId) {
+    throw new Error(
+      `[DAEMON_HEARTBEAT_SCOPE_MISMATCH] heartbeat belongs to ${heartbeat.daemon_id}, expected ${expectedDaemonId}`
+    );
+  }
+  return heartbeat;
 }
 
 export function recordDaemonHeartbeat(
@@ -60,10 +89,11 @@ export function recordDaemonHeartbeat(
     timestamp: (options.now ?? new Date()).toISOString(),
     ...(input.details ? { details: input.details } : {}),
   };
-  safeWriteFile(heartbeatPath(daemonId, root), `${JSON.stringify(heartbeat, null, 2)}\n`, {
+  const validated = daemonHeartbeatCatalog.validate(heartbeat, heartbeatPath(daemonId, root));
+  safeWriteFile(heartbeatPath(daemonId, root), `${JSON.stringify(validated, null, 2)}\n`, {
     encoding: 'utf8',
   });
-  return heartbeat;
+  return validated;
 }
 
 export function readDaemonHeartbeat(
@@ -75,14 +105,7 @@ export function readDaemonHeartbeat(
     return { daemon_id: daemonId, status: 'missing', reason: 'heartbeat file is missing' };
   }
   try {
-    const heartbeat = readJson<DaemonHeartbeat>(filePath);
-    if (
-      heartbeat.daemon_id !== daemonId ||
-      typeof heartbeat.timestamp !== 'string' ||
-      typeof heartbeat.pid !== 'number'
-    ) {
-      return { daemon_id: daemonId, status: 'malformed', reason: 'heartbeat shape is invalid' };
-    }
+    const heartbeat = loadDaemonHeartbeatAtPath(filePath, daemonId);
     const now = (options.now ?? new Date()).getTime();
     const timestamp = new Date(heartbeat.timestamp).getTime();
     if (!Number.isFinite(timestamp)) {
@@ -113,5 +136,16 @@ export function listDaemonHeartbeatStatuses(
   if (!safeExistsSync(root)) return [];
   return safeReaddir(root)
     .filter((name) => name.endsWith('.json'))
-    .map((name) => readDaemonHeartbeat(path.basename(name, '.json'), options));
+    .map((name) => {
+      const daemonId = path.basename(name, '.json');
+      try {
+        return readDaemonHeartbeat(daemonId, options);
+      } catch (error) {
+        return {
+          daemon_id: daemonId,
+          status: 'malformed' as const,
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
+    });
 }

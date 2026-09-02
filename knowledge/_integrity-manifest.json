@@ -6841,6 +6841,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/daemon-heartbeat.schema.json",
+      "tier": "public",
+      "size": 778,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/decision-rights.schema.json",
       "tier": "public",
       "size": 2098,
