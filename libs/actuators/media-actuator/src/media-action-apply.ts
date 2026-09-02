@@ -8,6 +8,7 @@ import {
   safeExec,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
 import { retry } from '@agent/core/async-utils';
 import {
   filterPptxSlides,
@@ -46,7 +47,6 @@ import {
 import {
   cloneJsonValue,
   buildRetryOptions,
-  loadJsonValue,
   loadLayoutTemplateCatalog,
 } from './media-layout-runtime.js';
 import { opCapture, PDF_PYPDF_OPS } from './media-action-capture.js';
@@ -549,7 +549,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: Function) {
       );
       let registry: any = { tenants: [] };
       try {
-        registry = loadJsonValue(registryPath);
+        registry = loadTenantDesignOverrideIndex(rootDir);
       } catch {
         /* create new */
       }
