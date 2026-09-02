@@ -10,6 +10,7 @@ import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { findMissionPath, missionDir } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { parseMissionNextTaskObjects } from './mission-next-task-reader.js';
 
 function safeMissionArtifactPath(missionId: string, relativePath: string): string {
   const missionPath = assertSafeRepositoryPath(
@@ -48,11 +49,10 @@ export function readProcessTemplateSeededTasks(
   }
   if (!safeExistsSync(safeNextTasksPath)) return [];
   try {
-    const parsed = readJson<unknown>(safeNextTasksPath);
-    if (!Array.isArray(parsed)) return [];
+    const parsed = parseMissionNextTaskObjects(readJson<unknown>(safeNextTasksPath));
+    if (!parsed) return [];
     return parsed.filter(
-      (task): task is Record<string, unknown> =>
-        Boolean(task) && typeof task === 'object' && task.origin === 'process_template'
+      (task): task is Record<string, unknown> => task.origin === 'process_template'
     );
   } catch {
     return [];
