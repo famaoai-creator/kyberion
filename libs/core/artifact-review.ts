@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeReadFile } from './secure-io.js';
 import type { DeliverableKind } from './deliverable-quality.js';
@@ -148,7 +149,7 @@ export function buildArtifactReviewReceipt(
     verdict: blocking ? 'changes_requested' : 'approved',
     findings,
     acceptance_criteria: [...input.acceptanceCriteria],
-    reviewed_at: input.reviewedAt || new Date().toISOString(),
+    reviewed_at: input.reviewedAt || nowIso(),
   };
 }
 

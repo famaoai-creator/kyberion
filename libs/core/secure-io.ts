@@ -17,6 +17,7 @@ import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensit
 import { assertSandboxNetworkAllowed } from './sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { policyEngine } from './policy-engine.js';
 import * as auditChainModule from './audit-chain.js';
@@ -927,7 +928,7 @@ export function writeArtifact(filePath: string, data: string | Buffer, format: s
     hash,
     format,
     size_bytes: data.length,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 

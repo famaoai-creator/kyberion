@@ -1,3 +1,5 @@
+import { nowIso } from './foundation/time.js';
+
 export type HandoffPacketKind = 'work_item' | 'mission';
 
 export interface HandoffPacket {
@@ -54,7 +56,7 @@ export function buildHandoffPacket(input: {
       'Not specified; use the outgoing summary as fallback context.',
     ...(input.sourceRef ? { source_ref: input.sourceRef } : {}),
     ...(input.targetRef ? { target_ref: input.targetRef } : {}),
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
   };
 }
 

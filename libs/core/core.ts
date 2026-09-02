@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import { createHash } from 'node:crypto';
 import * as v8 from 'node:v8';
 import * as readline from 'node:readline';
@@ -52,7 +53,7 @@ export const logger = {
   _log: (level: string, msg: string) => {
     if (isQuietProcess() && level !== 'error') return;
     if (process.env.NODE_ENV === 'test' && level !== 'error') return;
-    const ts = color('dim', new Date().toISOString());
+    const ts = color('dim', nowIso());
     const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
     const prefix =
       level === 'error'
@@ -73,7 +74,7 @@ export const logger = {
   error: (msg: string) => logger._log('error', msg),
   success: (msg: string) => {
     if (isQuietProcess()) return;
-    const ts = color('dim', new Date().toISOString());
+    const ts = color('dim', nowIso());
     const mid = process.env.MISSION_ID ? color('magenta', ' [' + process.env.MISSION_ID + ']') : '';
     console.log(ts + mid + color('green', ' [SUCCESS] ') + msg);
   },

@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Durable graph-run journal for mission follow-up dispatch (GE-05).
  *
@@ -85,7 +86,7 @@ function appendEvent(
     run_id: runId,
     mission_id: missionId.toUpperCase(),
     event,
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
     payload,
   };
   appendJsonLine(filePath, envelope);

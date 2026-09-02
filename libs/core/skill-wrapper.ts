@@ -7,6 +7,7 @@
 import type { SkillOutput } from './types.js';
 import { metrics } from './metrics.js';
 import { fileUtils } from './core.js';
+import { nowIso } from './foundation/time.js';
 import { safeWriteFile } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import chalk from 'chalk';
@@ -37,7 +38,7 @@ function buildOutput<T>(
     status,
     metadata: {
       duration_ms: durationMs,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       system_directive: fileUtils.getGoldenRule(),
     },
   };
