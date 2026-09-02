@@ -12046,12 +12046,13 @@ root lint、Prettier、`git diff --check`。残る SX-06 は actuator template�
 ## 2026-09-02 再レビュー修正 316
 
 SX-06 の actuator CLI entry guard と meeting browser utility の重複した `process.argv[1]`／`fileURLToPath` 判定を、core の
-`isDirectEntry` へ移行した。標準 actuator index、file／process／meeting helper、video meeting utility を含む **30** entrypoint
+`isDirectEntry` へ移行した。標準 actuator index、file／process／meeting helper、video meeting utility を含む **31** entrypoint
 で source／compiled path の判定を共通化し、scripts harness と server protocol で先行導入した helper を全実行層で再利用する。
-meeting helper の `index.js` 互換 alias は、既存の広い起動条件を変えないため個別 legacy boundary として残した。
+meeting helper に残っていた `entrypoint.endsWith('index.js')` の広い互換条件は、index import 時に helper の main を誤起動し得るため削除し、
+actual helper entry のみ起動する fail-closed な判定へ正規化した。
 
 検証: direct-entry／CLI／actuator **35 files / 593 tests passed / 11 skipped**、script-integrity、actuator build、typecheck、
-PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-06 はこの legacy alias の整理と全 generator 化である。
+PR scope **33/33 gates passed**、root lint、Prettier、`git diff --check`。残る SX-06 は全 generator 化と、他の独立した server／interactive script の整理である。
 
 ## 参照
 
