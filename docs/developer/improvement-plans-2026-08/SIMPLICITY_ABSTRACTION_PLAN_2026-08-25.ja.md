@@ -11697,6 +11697,15 @@ pipeline shell independence、op input contract coverage の各 gate が manifes
 contract-semver、root typecheck、`git diff --check`。残る SX-07 は validate／CI の全 check 集合統合と外部依存
 gate の sandbox-independent 実行である。
 
+## 2026-09-02 再レビュー修正 282
+
+`check:ci-gate-parity` が manifest と workflow の scope 接続だけを検査し、`package.json` の `validate` が
+canonical full runner を呼ぶ保証を持っていなかったため、scope command の抽出と `validate` の full scope 必須検査を
+追加した。これにより `pnpm validate` を別 checker の手書き連鎖へ戻す変更は parity gate で検出される。
+
+検証: ci-gate parity **5 test files / 35 tests passed**、PR scope **33/33 gates passed**、root lint、root typecheck、
+`git diff --check`。残る SX-07 は validate／CI の全 check 集合統合と外部依存 gate の sandbox-independent 実行である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
