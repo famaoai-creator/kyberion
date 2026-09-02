@@ -29,7 +29,7 @@ import {
   safeStat,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { withExecutionContext } from '@agent/core/governance';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -230,7 +230,7 @@ function buildReport(packages: PackageLicenseInfo[]): AuditReport {
   }
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     total_packages: packages.length,
     by_license: Object.fromEntries(Object.entries(byLicense).sort((a, b) => b[1] - a[1])),
     unknown_licenses: unknown,

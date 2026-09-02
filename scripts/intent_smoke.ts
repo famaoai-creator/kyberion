@@ -9,7 +9,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { logger } from '@agent/core/core';
 import { safeExec } from '@agent/core/secure-io';
-import { readTextFile } from '@agent/core/foundation';
+import { nowIso, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 const DEFAULT_INTENTS = [
@@ -113,7 +113,7 @@ export async function main(args: string[] = []): Promise<IntentSmokeRunResult> {
     summaryPath,
     JSON.stringify(
       {
-        generated_at: new Date().toISOString(),
+        generated_at: nowIso(),
         intents: report,
       },
       null,

@@ -6,7 +6,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
 import { withExecutionContext } from '@agent/core/governance';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import { resolveCiGateBaselinePath } from './lib/ci-gate-baseline.js';
 
 const ROOT = pathResolver.rootDir();
@@ -129,7 +129,7 @@ function scanCurrentCounts(scanRoots: string[]): RatchetBaseline {
 
   return {
     version: 1,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     counts: { src, test },
   };
 }
