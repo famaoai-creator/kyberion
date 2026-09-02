@@ -13457,6 +13457,12 @@ SX-03／SX-04／SX-09 のservice runtime stateを再監査し、managed service�
 
 検証: service runtime registry **1 file / 7 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 533
+
+SX-03／SX-04／SX-09 のcustomer deal stateを再監査し、`customer/{tenant}/deals/*.json`をraw `readJson<DealRecord>`の型アサーションだけで読み、保存時もdeal schema・regular-file・filename bindingを共通契約化していなかった残存を修正した。`deal-record.schema.json`と`loadDealAtPath`を追加し、get／list／open／stage transition／note appendをcanonical loader／validatorへ統合した。不正・directory・別tenant／別dealのrecordは商談継続・stage遷移・表示へ進まずfail-closedし、既存のtenant slug／deal ID path guard、forward-only stage、agreement snapshot、distill candidate、price-book fallback semanticsは維持している。
+
+検証: deal store **1 file / 6 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
