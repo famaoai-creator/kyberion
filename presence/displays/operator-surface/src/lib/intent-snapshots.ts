@@ -1,12 +1,8 @@
 import * as path from 'node:path';
-import {
-  isRecord,
-  clamp,
-  readJson as readFoundationJson,
-  readJsonLines as readFoundationJsonLines,
-} from '@agent/core/foundation';
+import { clamp, readJsonLines as readFoundationJsonLines, isRecord } from '@agent/core/foundation';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent-delta';
 import { isValidTenantSlug } from '@agent/core/entity-scope';
+import { loadStateAtPath } from '@agent/core/mission-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -31,16 +27,6 @@ interface MissionLocation {
   directory: string;
 }
 
-function readJson<T>(filePath: string): T | null {
-  try {
-    const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safePath) || !safeLstat(safePath).isFile()) return null;
-    return readFoundationJson<T>(safePath);
-  } catch {
-    return null;
-  }
-}
-
 function readJsonLines<T>(filePath: string): T[] {
   try {
     const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
@@ -51,7 +37,7 @@ function readJsonLines<T>(filePath: string): T[] {
   }
 }
 
-function detectTenantSlug(state: Record<string, unknown>, directory: string): string | undefined {
+function detectTenantSlug(state: { tenant_slug?: string }, directory: string): string | undefined {
   const stateTenant = state.tenant_slug;
   if (typeof stateTenant === 'string' && isValidTenantSlug(stateTenant)) return stateTenant;
   const segments = directory.split(path.sep);
@@ -91,7 +77,7 @@ function listMissionLocations(tier: 'public' | 'confidential'): MissionLocation[
       }
       if (!stat.isDirectory()) continue;
       const statePath = path.join(candidate, 'mission-state.json');
-      const state = readJson<Record<string, unknown>>(statePath);
+      const state = loadStateAtPath(statePath);
       if (state && typeof state.mission_id === 'string' && state.mission_id.trim()) {
         locations.push({
           mission_id: state.mission_id,
