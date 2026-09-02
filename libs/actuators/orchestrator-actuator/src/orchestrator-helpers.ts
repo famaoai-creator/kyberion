@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { loadJson, parseSafeJsonInput } from '@agent/core/foundation';
+import { readJson, parseSafeJsonInput } from '@agent/core/foundation';
 import {
   safeReadFile,
   safeWriteFile,
@@ -147,7 +147,7 @@ export async function executePipeline(
     ? resolveOrchestratorRepositoryPath(rootDir, initialCtx.context_path)
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = loadJson<Record<string, unknown>>(contextPath);
+    const saved = readJson<Record<string, unknown>>(contextPath);
     ctx = { ...ctx, ...saved };
   }
 
@@ -238,7 +238,7 @@ async function opCapture(op: string, params: any, ctx: any) {
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: loadJson<unknown>(
+        [params.export_as || 'last_capture_data']: readJson<unknown>(
           resolveOrchestratorRepositoryPath(rootDir, resolveVars(params.path, ctx))
         ),
       };

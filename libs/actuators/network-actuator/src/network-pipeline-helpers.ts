@@ -1,4 +1,4 @@
-import { loadJson } from '@agent/core/foundation';
+import { readJson } from '@agent/core/foundation';
 import { distillHttpResponse } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -121,7 +121,7 @@ async function executePipeline(steps: PipelineStep[], initialCtx: any = {}, opti
     ? resolveNetworkPath(String(initialCtx.context_path))
     : undefined;
   if (contextPath && safeExistsSync(contextPath)) {
-    const saved = loadJson<Record<string, unknown>>(contextPath);
+    const saved = readJson<Record<string, unknown>>(contextPath);
     ctx = { ...ctx, ...saved };
   }
 
