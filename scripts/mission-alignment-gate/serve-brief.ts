@@ -27,12 +27,13 @@ import { applySurfaceApprovalDecision } from '@agent/core/surface-approval-ui';
 import { findMissionPath } from '@agent/core/path-resolver';
 import { listApprovalRequests, type ApprovalRequestRecord } from '@agent/core/approval-store';
 import { normalizeRejectionReasonCategory } from '@agent/core/rejection-reason';
-import { readJson } from '@agent/core/foundation';
 import { t as catalogT } from '@agent/core/t';
 import { defineScript, isDirectScript, ScriptExitError } from '../lib/harness.js';
 import { parseSafeJsonObjectInput } from '../lib/json-input.js';
 
-import { renderMissionBriefHtml, type MissionBrief } from './render-brief.js';
+import { loadMissionBriefAtPath } from './mission-brief.js';
+import type { MissionBrief } from './mission-brief.js';
+import { renderMissionBriefHtml } from './render-brief.js';
 
 const ALIGNMENT_CHANNEL = 'brief';
 const MAX_BODY_BYTES = 256 * 1024;
@@ -76,7 +77,7 @@ async function main(args: string[] = []): Promise<void> {
     if (!safeLstat(briefPath).isFile()) {
       throw new Error(`alignment brief is not a regular file: ${briefPath}`);
     }
-    return readJson<MissionBrief>(briefPath);
+    return loadMissionBriefAtPath(briefPath);
   }
 
   /**
