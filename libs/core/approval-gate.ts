@@ -5,6 +5,7 @@
  */
 
 import { resolveApprovalPolicy } from './approval-policy.js';
+import { nowIso } from './foundation/time.js';
 import { summarizeApprovalGate } from './approval-gate-summary.js';
 import { evaluateDecisionRights, resolveDecisionRightsMatrix } from './decision-rights.js';
 import { resolveGoldenRulePriorityOrder, resolveVision } from './vision-resolver.js';
@@ -472,7 +473,7 @@ export function enforceApprovalGate(
 
   const record = createApprovalRequest(role, {
     channel,
-    threadTs: new Date().toISOString(),
+    threadTs: nowIso(),
     correlationId,
     requestedBy: agentId,
     draft,

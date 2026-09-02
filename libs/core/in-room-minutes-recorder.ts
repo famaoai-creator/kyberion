@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { checkMeetingParticipationConsent } from './meeting-participation-coordinator.js';
 import { startMicCapture, type MicCaptureOptions, type MicCaptureSession } from './mic-capture.js';
 import { missionEvidenceDir, rootResolve } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 import { wavHeader } from './pcm-wav.js';
 import { getSpeechToTextBridge } from './speech-to-text-bridge.js';
 import {
@@ -123,8 +124,7 @@ export async function startInRoomMinutesSession(
   if (!safeExistsSync(transcriptPath)) {
     safeWriteFile(
       transcriptPath,
-      `# Transcript — ${options.meetingTitle || missionId}\n\n` +
-        `録音開始: ${new Date().toISOString()}\n\n`
+      `# Transcript — ${options.meetingTitle || missionId}\n\n` + `録音開始: ${nowIso()}\n\n`
     );
   }
 

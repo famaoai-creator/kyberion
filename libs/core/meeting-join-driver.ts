@@ -18,6 +18,7 @@ import type {
   AudioChunk,
 } from './meeting-session-types.js';
 import { abortableAudioChunks } from './meeting-session-types.js';
+import { nowIso } from './foundation/time.js';
 import type { AudioBus } from './audio-bus.js';
 import { coreSeamCatalog, createSeam } from './seam.js';
 
@@ -205,7 +206,7 @@ export class StubMeetingJoinDriver implements MeetingJoinDriver {
       session_id: `stub-${Date.now()}`,
       platform: target.platform === 'auto' ? 'meet' : target.platform,
       status: 'in_meeting',
-      joined_at: new Date().toISOString(),
+      joined_at: nowIso(),
     };
     let leftSignaled = false;
     return {
@@ -225,7 +226,7 @@ export class StubMeetingJoinDriver implements MeetingJoinDriver {
       async leave(): Promise<void> {
         leftSignaled = true;
         state.status = 'ended';
-        state.left_at = new Date().toISOString();
+        state.left_at = nowIso();
         await bus.close();
       },
     };
