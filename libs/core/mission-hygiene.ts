@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import { loadStateAtPath } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 import { readJson as foundationReadJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { notifyOperator } from './operator-notifications.js';
@@ -233,7 +234,7 @@ export function collectMissionHygieneReport(
   const byAge = (a: PlannedMissionFinding, b: PlannedMissionFinding) =>
     (b.age_days ?? Number.MAX_SAFE_INTEGER) - (a.age_days ?? Number.MAX_SAFE_INTEGER);
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     planned_total: plannedTotal,
     stale: stale.sort(byAge),
     abandoned: abandoned.sort(byAge),
@@ -285,7 +286,7 @@ function enqueueMissionHygieneLearning(actionable: PlannedMissionFinding[]): voi
       });
   }
 
-  const generatedAt = new Date().toISOString();
+  const generatedAt = nowIso();
   const day = generatedAt.slice(0, 10);
   for (const group of groups.values()) {
     const scope = group.tenantSlug || 'shared';
@@ -340,6 +341,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
     (finding) =>
       `- ${finding.mission_id} (${finding.age_days ?? '?'}日, ${finding.reason}): ${finding.recommendation.replaceAll('<ID>', finding.mission_id)}`
   );
+  const notificationDay = nowIso().slice(0, 10);
   sendOpsAlert({
     severity:
       report.abandoned.length > 0 || (report.distilling_stale || []).length > 0
@@ -355,7 +357,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
       top: top.map((finding) => finding.mission_id),
     },
     recommendation: lines.join('\n'),
-    dedupe_key: `mission-hygiene:${new Date().toISOString().slice(0, 10)}`,
+    dedupe_key: `mission-hygiene:${notificationDay}`,
   });
   try {
     await notifyOperator('question', {
@@ -365,7 +367,7 @@ export async function notifyMissionHygiene(report: MissionHygieneReport): Promis
         '開始するか、不要なら cancel してください:',
         ...lines,
       ].join('\n'),
-      correlation_id: `mission-hygiene:${new Date().toISOString().slice(0, 10)}`,
+      correlation_id: `mission-hygiene:${notificationDay}`,
     });
   } catch (err) {
     logger.warn(
