@@ -12165,6 +12165,17 @@ theme payload内部はprovider／tenant固有拡張のためopen objectとして
 検証: theme catalog **1 test passed**、semantic／media catalog関連、typecheck、build、lint、catalog gate、Prettier、`git diff --check`。
 残るSX-04は他のdomain loaderと非catalog層の旧loader整理、未参照catalogの廃止判断である。
 
+## 2026-09-02 再レビュー修正 328
+
+SX-04 の media domain loader を継続監査し、外部 `awesome-design-md` の `design-md-catalog/index.json` が
+汎用 `loadJsonCatalog` で読み込まれていた残存を確認した。固定された generated metadata と `systems[]` entry の
+専用 `imported-design-md-index.schema.json` を追加し、directory merge 後の catalog を `defineCatalog` で検証するようにした。
+既存の DESIGN.md の候補検索・推薦・fallback semantics と、将来の index 再生成時に必要な entry fields は維持している。
+
+検証: imported DESIGN.md catalog **1 test passed**、media actuator build、root typecheck、root lint、catalog／governance-rules、
+knowledge index generator、Prettier、`git diff --check`。残るSX-04は非catalog層の旧loader整理、未参照catalogの廃止判断、
+artifact-library等の動的payloadを持つloaderの段階的な契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

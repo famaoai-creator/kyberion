@@ -7189,6 +7189,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/imported-design-md-index.schema.json",
+      "tier": "public",
+      "size": 1409,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/inbound-inquiry.example.json",
       "tier": "public",
       "size": 324,

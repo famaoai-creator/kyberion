@@ -264,12 +264,49 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
   return null;
 }
 
-function loadImportedDesignMdIndex(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/design-md-catalog',
-    filePath: 'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json',
-    fallback: { systems: [] },
+type ImportedDesignMdIndex = {
+  generated_at: string;
+  source_repo: string;
+  source_dir: string;
+  count: number;
+  systems: Array<{
+    design_system_id: string;
+    theme_id: string;
+    slug: string;
+    name: string;
+    category: string;
+    description: string;
+    source_path: string;
+    keywords: string[];
+  }>;
+};
+
+function loadImportedDesignMdIndex(rootDir: string): ImportedDesignMdIndex {
+  const fallback: ImportedDesignMdIndex = {
+    generated_at: '1970-01-01T00:00:00.000Z',
+    source_repo: 'unavailable',
+    source_dir: 'unavailable',
+    count: 0,
+    systems: [],
+  };
+  const catalog = defineCatalog<ImportedDesignMdIndex>({
+    id: 'imported-design-md-index',
+    path: path.resolve(
+      rootDir,
+      'knowledge/public/design-patterns/media-templates/design-md-catalog/index.json'
+    ),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/imported-design-md-index.schema.json'),
+    fallback,
+    fallbackOnInvalid: true,
   });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/design-md-catalog'
+  );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  return catalog.validate(merged, directoryPath);
 }
 
 function normalizeDesignLookupKey(input: any): string {
