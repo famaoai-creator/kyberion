@@ -2,6 +2,7 @@
 
 import * as zlib from 'zlib';
 import { createRequire } from 'node:module';
+import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync } from '../../secure-io.js';
 import { pathResolver } from '../../path-resolver.js';
 import { escapeXml } from '../../text-escaping.js';
@@ -193,7 +194,7 @@ export function buildXmp(meta: {
   producer?: string;
   creationDate?: string;
 }): string {
-  const now = new Date().toISOString().replace(/\.\d+Z$/, '+00:00');
+  const now = nowIso().replace(/\.\d+Z$/, '+00:00');
   const created = meta.creationDate || now;
   const producer = meta.producer || 'Kyberion Native PDF 2.0 Engine';
   const titleXml = meta.title
