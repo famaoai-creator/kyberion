@@ -64,6 +64,22 @@ afterEach(() => {
 });
 
 describe('mission task recovery', () => {
+  it('does not recover from a malformed NEXT_TASKS projection', () => {
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify([{ task_id: 'task-1', status: 'requested' }, { task_id: 42 }])
+    );
+
+    expect(recoverMissionRequestedTasks(missionId)).toMatchObject({
+      requested_count: 0,
+      waiting_count: 0,
+      reissued_count: 0,
+      skipped_count: 0,
+      recovered_task_ids: [],
+      records: [],
+    });
+  });
+
   it('waits for active leases and reissues only expired requested tasks', async () => {
     const state = makeMissionState();
     safeWriteFile(
