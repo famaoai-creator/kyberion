@@ -1,7 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadSurfaceState, readSurfaceLogTail, resolveSurfaceCwd, saveSurfaceState, surfaceStatePath } from '@agent/core/surface-runtime';
+import {
+  loadSurfaceState,
+  readSurfaceLogTail,
+  resolveSurfaceCwd,
+  saveSurfaceState,
+  surfaceStatePath,
+} from '@agent/core/surface-runtime';
 import { pathResolver } from '@agent/core';
 
 const testStatePath = path.join(process.cwd(), 'active/shared/tmp/runtime-surface-state.test.json');
@@ -38,6 +44,32 @@ describe('Runtime surface state helpers', () => {
     expect(loadSurfaceState(testStatePath)).toEqual(state);
   });
 
+  it('rejects malformed persisted surface state before it reaches runtime consumers', () => {
+    fs.mkdirSync(path.dirname(testStatePath), { recursive: true });
+    fs.writeFileSync(
+      testStatePath,
+      JSON.stringify({
+        version: 1,
+        surfaces: {
+          'slack-bridge': {
+            id: 'slack-bridge',
+            pid: '1234',
+            resourceId: 'surface:slack-bridge',
+            kind: 'gateway',
+            command: 'node',
+            args: [],
+            cwd: process.cwd(),
+            logPath: pathResolver.shared('logs/surfaces/slack-bridge.log'),
+            startedAt: '2026-08-09T00:00:00.000Z',
+            shutdownPolicy: 'detached',
+          },
+        },
+      })
+    );
+
+    expect(() => loadSurfaceState(testStatePath)).toThrow(/pid/);
+  });
+
   it('reads the tail of an existing log file', () => {
     const logPath = path.join(process.cwd(), 'active/shared/tmp/surface-runtime-test.log');
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
@@ -57,7 +89,7 @@ describe('Runtime surface state helpers', () => {
         kind: 'ui',
         description: 'Chronos',
         command: 'node',
-      }),
+      })
     ).toBe(pathResolver.rootDir());
 
     expect(
@@ -67,7 +99,7 @@ describe('Runtime surface state helpers', () => {
         description: 'Chronos',
         command: 'node',
         cwd: 'presence/displays/chronos-mirror-v2',
-      }),
+      })
     ).toBe(pathResolver.resolve('presence/displays/chronos-mirror-v2'));
   });
 });
