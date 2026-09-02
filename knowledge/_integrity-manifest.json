@@ -8497,6 +8497,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/peer-runtime-quarantine-manifest.schema.json",
+      "tier": "public",
+      "size": 637,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pending-intent.schema.json",
       "tier": "public",
       "size": 1291,
