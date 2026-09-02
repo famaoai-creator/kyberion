@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { nowIso } from './foundation/time.js';
 
 import {
   validatorFor,
@@ -430,7 +431,7 @@ export function saveOrganizationLearningCandidate(
 
 export function buildOrganizationLearningCandidate(
   input: QueueOrganizationLearningCandidateInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationLearningCandidate {
   const record: OrganizationLearningCandidate = {
     version: '1.0.0',
@@ -484,7 +485,7 @@ export interface OrganizationScaffold {
 
 export function buildOrganizationScaffold(
   input: BuildOrganizationScaffoldInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationScaffold {
   assertOrganizationId(input.organizationId);
   const existing = loadOrganizationOperationalState(input.organizationId, {
@@ -548,7 +549,7 @@ export interface BuildOrganizationPurposeInput {
 
 export function buildOrganizationPurposeRecord(
   input: BuildOrganizationPurposeInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationPurposeRecord {
   const existing = loadOrganizationPurpose(input.organizationId, {
     tier: input.tier,
@@ -591,7 +592,7 @@ export interface BuildOrganizationObjectiveInput {
 
 export function buildOrganizationObjectiveAddition(
   input: BuildOrganizationObjectiveInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationPurposeRecord {
   const existing = loadOrganizationPurpose(input.organizationId, {
     tier: input.tier,
@@ -635,7 +636,7 @@ export interface BuildOrganizationDomainInput {
 
 export function buildOrganizationDomainRecord(
   input: BuildOrganizationDomainInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationDomainRecord {
   const record: OrganizationDomainRecord = {
     version: '1.0.0',
@@ -684,7 +685,7 @@ export interface OrganizationServiceAddition {
 
 export function buildOrganizationServiceAddition(
   input: BuildOrganizationServiceInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationServiceAddition {
   if (!input.consumers.length) {
     throw new Error('At least one --consumer is required for service add.');
@@ -778,7 +779,7 @@ export interface BuildOrganizationServiceStateInput {
  */
 export function buildOrganizationServiceState(
   input: BuildOrganizationServiceStateInput,
-  now = new Date().toISOString()
+  now = nowIso()
 ): OrganizationServiceState {
   const service = loadOrganizationService(input.serviceId, {
     organizationId: input.organizationId,
