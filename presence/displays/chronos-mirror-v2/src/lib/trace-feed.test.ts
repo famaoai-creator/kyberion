@@ -136,6 +136,7 @@ describe('trace-feed', () => {
         JSON.stringify({
           mission_id: missionId,
           tenant_slug: 'tenant-a',
+          organization_id: 'org-a',
           tier: 'public',
           status: 'active',
           execution_mode: 'local',
@@ -172,7 +173,12 @@ describe('trace-feed', () => {
     );
 
     expect(collectTraceFeed({ dir: TEST_DIR, tenantSlugs: ['tenant-a'] })).toMatchObject([
-      { traceId: 'trace-scope', tenantSlug: 'tenant-a', tier: 'public' },
+      {
+        traceId: 'trace-scope',
+        tenantSlug: 'tenant-a',
+        tier: 'public',
+        organizationId: 'org-a',
+      },
     ]);
     expect(collectTraceFeed({ dir: TEST_DIR, tenantSlugs: ['tenant-b'] })).toEqual([]);
   });

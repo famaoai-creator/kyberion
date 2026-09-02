@@ -363,7 +363,7 @@ function resolveMissionScope(missionId?: string): {
     return {
       tenantSlug: state.tenant_slug,
       ...(normalizeTraceTier(state.tier) ? { tier: normalizeTraceTier(state.tier) } : {}),
-      organizationId: state.relationships?.organization?.organization_id,
+      organizationId: state.organization_id || state.relationships?.organization?.organization_id,
       projectId: state.relationships?.project?.project_id,
     };
   } catch {
