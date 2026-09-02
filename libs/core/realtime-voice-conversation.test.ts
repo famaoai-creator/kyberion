@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
@@ -16,6 +17,7 @@ import { resetVoiceProfileRegistryCache } from './voice-profile-registry.js';
 import {
   ensureRealtimeVoiceConversationSession,
   buildRealtimeVoiceGenerationPayload,
+  loadRealtimeVoiceConversationSessionAtPath,
   normalizeRealtimeVoiceReply,
   runRealtimeVoiceConversationTurn,
   streamRealtimeAssistantReply,
@@ -120,6 +122,30 @@ describe('realtime voice conversation', () => {
         personalVoiceMode: 'allow_fallback',
       })
     ).toThrow(/requestTag must be a single path segment/u);
+  });
+
+  it('rejects schema-invalid and filename-mismatched persisted sessions', () => {
+    const sessionDir = pathResolver.shared('runtime/realtime-voice-conversations');
+    safeMkdir(sessionDir, { recursive: true });
+    const filePath = path.join(sessionDir, 'rtc-scope.json');
+    const session = {
+      session_id: 'rtc-scope',
+      created_at: '2026-07-11T12:00:00.000Z',
+      updated_at: '2026-07-11T12:00:00.000Z',
+      assistant_name: 'Kyberion',
+      profile_id: 'me-ja',
+      language: 'ja',
+      transcript: [],
+    };
+    safeWriteFile(filePath, JSON.stringify({ ...session, session_id: 'rtc-other' }));
+    expect(() => loadRealtimeVoiceConversationSessionAtPath(filePath, 'rtc-scope')).toThrow(
+      '[REALTIME_VOICE_SESSION_SCOPE_MISMATCH]'
+    );
+
+    safeWriteFile(filePath, JSON.stringify({ ...session, transcript: null }));
+    expect(() => loadRealtimeVoiceConversationSessionAtPath(filePath, 'rtc-scope')).toThrow(
+      /Invalid catalog realtime-voice-conversation-session/
+    );
   });
 
   it('creates a session and runs a turn using active personal voice profile', async () => {
