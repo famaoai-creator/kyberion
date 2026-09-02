@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nowIso } from './foundation/time.js';
 import { runGrokCliQuery, type GrokCliBackendOptions } from './grok-cli-backend.js';
 import type {
   OneOnOneSessionInput,
@@ -77,7 +78,7 @@ export class GrokCliVoiceBridge implements VoiceBridge {
     return {
       written_to: input.outputPath,
       person_slug: personSlug,
-      visited_at: new Date().toISOString(),
+      visited_at: nowIso(),
       transcript: result.transcript,
       stance: result.stance,
       conditions: result.conditions,

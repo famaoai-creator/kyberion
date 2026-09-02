@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nowIso } from './foundation/time.js';
 import { runGeminiCliQuery, type GeminiCliBackendOptions } from './gemini-cli-backend.js';
 import type {
   OneOnOneSessionInput,
@@ -77,7 +78,7 @@ export class GeminiCliVoiceBridge implements VoiceBridge {
     return {
       written_to: input.outputPath,
       person_slug: personSlug,
-      visited_at: new Date().toISOString(),
+      visited_at: nowIso(),
       transcript: result.transcript,
       stance: result.stance,
       conditions: result.conditions,

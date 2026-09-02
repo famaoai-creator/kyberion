@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { nowIso } from './foundation/time.js';
 import { runCodexCliQuery, type CodexCliQueryOptions } from './codex-cli-query.js';
 import type {
   OneOnOneSessionInput,
@@ -79,7 +80,7 @@ export class CodexCliVoiceBridge implements VoiceBridge {
     return {
       written_to: input.outputPath,
       person_slug: personSlug,
-      visited_at: new Date().toISOString(),
+      visited_at: nowIso(),
       transcript: result.transcript,
       stance: result.stance,
       conditions: result.conditions,
