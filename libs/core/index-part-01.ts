@@ -172,6 +172,8 @@ export * from './creative-design-resolver.js';
 
 export * from './campaign-suite.js';
 
+export * from './config-mission.js';
+
 export * from './marketing-workload.js';
 
 export * from './artifact-review.js';
