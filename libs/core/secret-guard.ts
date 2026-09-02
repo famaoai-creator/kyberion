@@ -12,6 +12,7 @@ import {
 } from './secret-encryption.js';
 import { requireRiskyApproval } from './risky-op-approval-port.js';
 import { RISKY_OPS } from './risky-op-ids.js';
+import { readJson } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 
 /**
@@ -30,6 +31,8 @@ const safeReadFile = (...args: Parameters<typeof secureIo.safeReadFile>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeReadFile(...args));
 const safeWriteFile = (...args: Parameters<typeof secureIo.safeWriteFile>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeWriteFile(...args));
+const readSensitiveJson = <T>(filePath: string): T =>
+  secureIo.withSensitivePathMediation(() => readJson<T>(filePath));
 const safeReaddir = (...args: Parameters<typeof secureIo.safeReaddir>) =>
   secureIo.withSensitivePathMediation(() => secureIo.safeReaddir(...args));
 const safeLstat = (...args: Parameters<typeof secureIo.safeLstat>) =>
@@ -84,14 +87,12 @@ const _loadPersonalSecrets = () => {
         for (const subFile of subFiles) {
           const subPath = safeSecretPath(path.join(fullPath, subFile), false);
           if (!safeLstat(subPath).isFile()) continue;
-          const content = secureIo.withSensitivePathMediation(() =>
-            secureIo.loadJson<unknown>(subPath)
-          );
+          const content = readSensitiveJson<unknown>(subPath);
           _mapContentToSecrets(serviceName, content);
         }
       } else if (stat.isFile() && item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
-        let content = secureIo.loadJson<unknown>(fullPath);
+        let content = readSensitiveJson<unknown>(fullPath);
         if (isEncryptedConnectionEnvelope(content)) {
           // Startup scan runs at module import — an undecryptable file must
           // degrade to a warning here, not crash every importer.
@@ -145,7 +146,7 @@ function _loadConnectionDocument(serviceId: string): Record<string, any> {
   if (!safeExistsSync(fullPath)) return {};
   let parsed: unknown;
   try {
-    parsed = secureIo.loadJson<unknown>(fullPath);
+    parsed = readSensitiveJson<unknown>(fullPath);
   } catch (_) {
     return {};
   }
@@ -298,7 +299,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   if (!value) value = _cachedPersonalSecrets.get(key);
   if (!value) {
     try {
-      const secrets = secureIo.loadJson<unknown>(safeSecretPath(SECRETS_FILE));
+      const secrets = readSensitiveJson<unknown>(safeSecretPath(SECRETS_FILE));
       value = secrets[key];
     } catch (_) {
       /* secrets file absent or corrupt: fall back to env-only resolution */

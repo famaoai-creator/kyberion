@@ -12,10 +12,10 @@ import {
 } from '@agent/core/headless-surface-contract';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -235,8 +235,8 @@ app.get('/api/identity', (req, res) => {
       const safeIdPath = resolveExistingIdentityFile(idPath);
       const safeAgentPath = resolveExistingIdentityFile(agentPath);
       const safeVisionPath = resolveExistingIdentityFile(visionPath);
-      const sovereign = safeIdPath ? loadJson<unknown>(safeIdPath) : null;
-      const agent = safeAgentPath ? loadJson<unknown>(safeAgentPath) : null;
+      const sovereign = safeIdPath ? readJson<unknown>(safeIdPath) : null;
+      const agent = safeAgentPath ? readJson<unknown>(safeAgentPath) : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
         : null;

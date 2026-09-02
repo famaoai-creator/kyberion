@@ -11582,6 +11582,17 @@ foundation adoption、Prettier、`git diff --check`。残る改善計画は追�
 ADF／surface contract の未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／
 provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 272
+
+SX-03 の direct JSON reader adoption を bridge／surface／secret guard へ継続し、nexus daemon、terminal bridge、
+computer surface、secret guard に残っていた secure-io の `loadJson` 直接利用を foundation の `readJson` へ
+移行した。secret guard では `withSensitivePathMediation` を通る機密 reader wrapper を設け、repository path
+guard、機密パス制御、tenant／surface projection、nexus／terminal の既存 validation は変更していない。
+
+検証: bridge／computer surface／secret guard **6 test files / 24 tests passed**、root typecheck、foundation
+adoption、`git diff --check`。残る改善計画は media の domain reader、catalog／script／ADF／surface contract の
+未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
