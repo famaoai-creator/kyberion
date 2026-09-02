@@ -2,8 +2,9 @@ import path from 'node:path';
 import { listArtifactRecords, type ArtifactRecord } from '@agent/core/artifact-record';
 import { listInboxEntries, type DeliverableInboxEntry } from '@agent/core/deliverable-inbox';
 import type { OsKnowledgeTier } from '@agent/core/cloudflare-os-control-plane';
-import { clamp, readJson } from '@agent/core/foundation';
-import { findMissionPath, pathResolver } from '@agent/core/path-resolver';
+import { clamp } from '@agent/core/foundation';
+import { loadState } from '@agent/core/mission-state';
+import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { loadDeliverableReviewState } from './deliverable-review';
 
@@ -59,14 +60,8 @@ export interface DeliverableInboxQuery {
 
 function readMissionStatus(missionId?: string): string | undefined {
   if (!missionId) return undefined;
-  const missionPath = findMissionPath(missionId.toUpperCase());
-  if (!missionPath) return undefined;
-  const statePath = path.join(missionPath, 'mission-state.json');
   try {
-    const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return undefined;
-    const parsed = readJson<{ status?: string }>(safeStatePath);
-    return typeof parsed.status === 'string' ? parsed.status : undefined;
+    return loadState(missionId.toUpperCase())?.status;
   } catch {
     return undefined;
   }
@@ -80,21 +75,9 @@ function readMissionContext(missionId?: string): {
   trackName?: string;
 } {
   if (!missionId) return {};
-  const missionPath = findMissionPath(missionId.toUpperCase());
-  if (!missionPath) return {};
-  const statePath = path.join(missionPath, 'mission-state.json');
   try {
-    const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
-    if (!safeExistsSync(safeStatePath) || !safeLstat(safeStatePath).isFile()) return {};
-    const state = readJson<{
-      tenant_slug?: string;
-      tenant_id?: string;
-      tier?: unknown;
-      relationships?: {
-        project?: { project_id?: string };
-        track?: { track_id?: string; track_name?: string };
-      };
-    }>(safeStatePath);
+    const state = loadState(missionId.toUpperCase());
+    if (!state) return {};
     const tier = normalizeDeliverableTier(state.tier);
     return {
       tenantSlug: state.tenant_slug || state.tenant_id,
