@@ -34,7 +34,10 @@ import {
   normalizeXlsxDesignProtocol,
 } from './media-spreadsheet-pipeline-helpers.js';
 import { buildPptxSlideFromPattern as runtimeBuildPptxSlideFromPattern } from './media-layout-runtime.js';
-import { loadJsonValue, resolveConfidentialTenantOverride } from './media-catalog-loaders.js';
+import {
+  loadConfidentialThemePack,
+  resolveConfidentialTenantOverride,
+} from './media-catalog-loaders.js';
 import * as path from 'node:path';
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
@@ -204,14 +207,14 @@ function loadConfidentialThemePackEntries(
       const themePackPath = path.join(confidentialDir, tenantName, 'design', 'theme.json');
       if (!safeExistsSync(themePackPath)) continue;
       try {
-        const pack = loadJsonValue(themePackPath);
+        const pack = loadConfidentialThemePack(rootDir, themePackPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
         if (!themeId) continue;
         entries.push({
           theme_id: themeId,
-          theme_name: pack?.theme?.name,
+          theme_name: typeof pack.theme?.name === 'string' ? pack.theme.name : undefined,
           pack_path: `knowledge/confidential/${tenantName}/design/theme.json`,
         });
       } catch (err: any) {
@@ -247,7 +250,7 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
     const directPath = path.join(rootDir, 'knowledge/confidential', slug, 'design/theme.json');
     if (safeExistsSync(directPath)) {
       try {
-        const pack = loadJsonValue(directPath);
+        const pack = loadConfidentialThemePack(rootDir, directPath);
         const themeId = String(
           pack?.theme_id || pack?.theme?.theme_id || pack?.theme?.name || ''
         ).trim();
@@ -278,7 +281,7 @@ function resolveConfidentialThemePack(rootDir: string, themeName: string): any {
       const packPath = assertSafeRepositoryPath(path.resolve(rootDir, entry.pack_path), {
         allowMissingLeaf: true,
       });
-      return loadJsonValue(packPath);
+      return loadConfidentialThemePack(rootDir, packPath);
     } catch {
       continue;
     }

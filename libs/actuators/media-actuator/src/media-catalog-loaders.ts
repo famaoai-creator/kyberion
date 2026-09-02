@@ -77,6 +77,42 @@ export function loadJsonValue(filePath: string): ReturnType<JSON['parse']> {
   return readJson(assertSafeRepositoryPath(filePath));
 }
 
+export interface ConfidentialThemePack {
+  kind: 'pptx-theme-pack' | 'web-theme-pack';
+  theme_id?: string;
+  theme?: {
+    theme_id?: unknown;
+    name?: unknown;
+  };
+  [key: string]: unknown;
+}
+
+export function loadConfidentialThemePack(
+  rootDir: string,
+  filePath: string
+): ConfidentialThemePack {
+  const safePath = assertSafeRepositoryPath(filePath);
+  const raw = readJson<unknown>(safePath);
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`Confidential theme pack must be an object: ${safePath}`);
+  }
+  const kind = (raw as Record<string, unknown>).kind;
+  const schemaFile =
+    kind === 'pptx-theme-pack'
+      ? 'knowledge/product/schemas/pptx-theme-pack.schema.json'
+      : kind === 'web-theme-pack'
+        ? 'knowledge/product/schemas/web-theme-pack.schema.json'
+        : undefined;
+  if (!schemaFile) {
+    throw new Error(`Unsupported confidential theme pack kind at ${safePath}`);
+  }
+  return defineCatalog<ConfidentialThemePack>({
+    id: `confidential-${kind}`,
+    path: safePath,
+    schema: path.resolve(rootDir, schemaFile),
+  }).validate(raw, safePath);
+}
+
 export function loadDesignPattern(rootDir: string, filePath: string): any {
   return defineCatalog({
     id: 'design-pattern',
