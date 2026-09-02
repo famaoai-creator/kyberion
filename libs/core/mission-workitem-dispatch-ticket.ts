@@ -5,6 +5,7 @@
 
 import * as nodePath from 'node:path';
 import { type ArtifactReviewReceipt } from './artifact-review.js';
+import { nowIso } from './foundation/time.js';
 import { executeServicePreset } from './service-engine.js';
 import { safeExistsSync } from './secure-io.js';
 import { type WorkItem } from './work-coordination.js';
@@ -383,7 +384,7 @@ export async function reflectTicketOutcome(input: {
     response_excerpt: input.responseExcerpt,
     notes,
     body: reflectionBody,
-    reflected_at: new Date().toISOString(),
+    reflected_at: nowIso(),
   };
   writeDispatchArtifact(reflectionPath, reflectionPayload, {
     missionId: input.missionId,
@@ -398,7 +399,7 @@ export async function reflectTicketOutcome(input: {
       record.reflection_status = ticketState;
       record.reflection_path = reflectionPath;
       record.reflection_excerpt = input.responseExcerpt;
-      record.reflected_at = new Date().toISOString();
+      record.reflected_at = nowIso();
       record.ticket_state_after = state;
       record.notes = Array.from(
         new Set([...(Array.isArray(record.notes) ? (record.notes as string[]) : []), ...notes])
@@ -412,7 +413,7 @@ export async function reflectTicketOutcome(input: {
     input.missionId,
     taskId,
     {
-      reflected_at: new Date().toISOString(),
+      reflected_at: nowIso(),
       ticket_state: ticketState,
       ticket_reply_path: reflectionPath,
       response_path: input.responsePath,
@@ -470,13 +471,13 @@ export async function reflectTicketOutcome(input: {
       githubIssue.state_reason = ticketState === 'done' ? 'completed' : 'reopened';
       githubIssue.comments = appendComment(githubIssue.comments, {
         body: reflectionBody,
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         state: ticketState,
         source: 'workitem-dispatch',
       });
       githubIssue.last_reflection = {
         ticket_state: ticketState,
-        reflected_at: new Date().toISOString(),
+        reflected_at: nowIso(),
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
         cognitive_route: cognitiveRouteSummary,
@@ -538,13 +539,13 @@ export async function reflectTicketOutcome(input: {
       jiraIssue.fields = fields;
       jiraIssue.comments = appendComment(jiraIssue.comments, {
         body: reflectionBody,
-        created_at: new Date().toISOString(),
+        created_at: nowIso(),
         state: ticketState,
         source: 'workitem-dispatch',
       });
       jiraIssue.last_reflection = {
         ticket_state: ticketState,
-        reflected_at: new Date().toISOString(),
+        reflected_at: nowIso(),
         response_path: input.responsePath,
         response_excerpt: input.responseExcerpt,
         cognitive_route: cognitiveRouteSummary,
