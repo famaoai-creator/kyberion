@@ -11841,6 +11841,15 @@ reader の責務を foundation に一本化した。governance directory の dis
 検証: 関連 **4 test files / 6 tests passed**、install-script-allowlist、governance-rules、root typecheck、
 Prettier、`git diff --check`。対象 3 checker の private `readJson` 定義は **0 件**となった。
 
+## 2026-09-02 再レビュー修正 296
+
+`check_catalog_integrity` に残っていた foundation reader の alias 呼び出しも `readJson` へ統一した。これにより
+catalog integrity の全 schema／metadata／theme／governance contract 読み取りが、薄い checker-local wrapper や旧 alias
+なしで同じ foundation JSON 境界を利用する。catalog discovery、generic schema 再導入 ratchet、validation semantics
+は変更していない。
+
+検証: catalog integrity **17 tests passed**、catalogs、root typecheck、Prettier。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
