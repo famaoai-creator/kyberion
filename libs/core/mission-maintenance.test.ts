@@ -3,6 +3,7 @@ import * as pathResolver from './path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   ensureRecoveryScaffold,
+  loadMissionFlightRecorderAtPath,
   recordTask,
   shouldSkipResumeEntry,
   RESUME_IDEMPOTENCY_WINDOW_MS,
@@ -164,6 +165,41 @@ describe('shouldSkipResumeEntry (Phase B-3 idempotency)', () => {
       'attempts=1; repeat=0; stop=no; attention=no'
     );
     expect(state.history.at(-1)?.event).toBe('RECORD_TASK');
+  });
+
+  it('loads a flight recorder through the canonical schema and regular-file boundary', () => {
+    const recorderPath = pathResolver.rootResolve(
+      `active/shared/tmp/mission-flight-recorder-${process.pid}.json`
+    );
+    const record = {
+      ts: '2026-06-22T00:00:00.000Z',
+      description: 'Continue the verified mission task',
+      details: { next_step: 'run the focused check' },
+    };
+    safeWriteFile(recorderPath, JSON.stringify(record));
+    try {
+      expect(loadMissionFlightRecorderAtPath(recorderPath)).toEqual(record);
+      safeWriteFile(recorderPath, JSON.stringify({ ...record, unexpected: true }));
+      expect(() => loadMissionFlightRecorderAtPath(recorderPath)).toThrow(
+        'Invalid catalog mission-flight-recorder'
+      );
+    } finally {
+      safeRmSync(recorderPath, { force: true });
+    }
+  });
+
+  it('rejects a directory at the flight recorder path', () => {
+    const recorderPath = pathResolver.rootResolve(
+      `active/shared/tmp/mission-flight-recorder-directory-${process.pid}`
+    );
+    safeMkdir(recorderPath, { recursive: true });
+    try {
+      expect(() => loadMissionFlightRecorderAtPath(recorderPath)).toThrow(
+        'record must be a regular file'
+      );
+    } finally {
+      safeRmSync(recorderPath, { recursive: true, force: true });
+    }
   });
 
   it('creates a reconcile-work scaffold for interrupted artifact recovery', () => {

@@ -16,6 +16,7 @@ import {
   safeExec,
   safeExistsSync,
   safeMkdir,
+  safeLstat,
   safeRmSync,
   safeStat,
   safeWriteFile,
@@ -72,6 +73,30 @@ function safeMissionArtifactPath(missionDir: string, relativePath: string): stri
   return assertSafeRepositoryPath(path.join(safeMissionRoot(missionDir), relativePath), {
     allowMissingLeaf: true,
   });
+}
+
+interface MissionFlightRecorder {
+  ts: string;
+  description: string;
+  details: Record<string, unknown>;
+}
+
+const MISSION_FLIGHT_RECORDER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-flight-recorder.schema.json'
+);
+const missionFlightRecorderCatalog = defineCatalog<MissionFlightRecorder>({
+  id: 'mission-flight-recorder',
+  path: MISSION_FLIGHT_RECORDER_SCHEMA_PATH,
+  schema: MISSION_FLIGHT_RECORDER_SCHEMA_PATH,
+});
+
+/** Load the human-facing flight recorder through schema and regular-file checks. */
+export function loadMissionFlightRecorderAtPath(filePath: string): MissionFlightRecorder {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[MISSION_FLIGHT_RECORDER] record must be a regular file: ${filePath}`);
+  }
+  return missionFlightRecorderCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
 }
 
 function isPathInside(parent: string, candidate: string): boolean {
@@ -493,7 +518,7 @@ export async function resumeMission(
 
   const flightRecorderPath = safeMissionArtifactPath(missionPath, 'LATEST_TASK.json');
   if (safeExistsSync(flightRecorderPath)) {
-    const task = readJson<{ description?: string }>(flightRecorderPath);
+    const task = loadMissionFlightRecorderAtPath(flightRecorderPath);
     logger.warn(`📍 FLIGHT RECORDER DETECTED: Last intended task was: ${task.description}`);
     logger.info('Please verify the physical state and continue from this point.');
   }
@@ -560,18 +585,15 @@ export async function recordTask(
 
   const safeMissionDir = safeMissionRoot(missionDir);
   const flightRecorderPath = safeMissionArtifactPath(safeMissionDir, 'LATEST_TASK.json');
-  safeWriteFile(
-    flightRecorderPath,
-    JSON.stringify(
-      {
-        ts: nowIso(),
-        description,
-        details,
-      },
-      null,
-      2
-    )
+  const flightRecorder = missionFlightRecorderCatalog.validate(
+    {
+      ts: nowIso(),
+      description,
+      details: detailRecord,
+    },
+    flightRecorderPath
   );
+  safeWriteFile(flightRecorderPath, JSON.stringify(flightRecorder, null, 2));
 
   await withLock(`mission-${upperId}`, async () => {
     const state = loadState(upperId);
