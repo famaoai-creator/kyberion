@@ -12013,6 +12013,17 @@ fallback 実装を除去した。
 検証: modeling actuator **4 files / 19 tests passed**、typecheck、対象 lint、Prettier、`git diff --check`。残る SX-04 は
 他の domain loader の完全統合、非catalog層の旧loader整理、未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 313
+
+actuator example catalog の loader を core の共有 `defineCatalog` 境界へ統合し、専用
+`actuator-example-catalog.schema.json` で必須項目・型・追加キーを検証するようにした。`scripts/example_discovery`
+と `scripts/cli` の重複 JSON reader を除去し、欠損・不正 catalog の既存の空表示 semantics は維持した。また、
+video-composition の配列形状だった catalog を他 actuator と同じ `{ actuator, examples }` envelope に正規化し、package
+exports と全7 catalog の実ロード契約を追加した。
+
+検証: actuator example catalog **2 files / 4 tests passed**、source 実行 probe、build、typecheck、root lint、PR scope
+**33/33 gates passed**、Prettier、`git diff --check`。残る SX-04 は非catalog層の旧loader整理と未参照 catalog の廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

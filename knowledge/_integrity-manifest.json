@@ -6313,6 +6313,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/actuator-example-catalog.schema.json",
+      "tier": "public",
+      "size": 1045,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/actuator-execution-brief.schema.json",
       "tier": "public",
       "size": 3357,
