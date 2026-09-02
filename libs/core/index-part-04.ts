@@ -39,6 +39,8 @@ export * from './service-runtime-policy.js';
 
 export * from './service-runtime-registry.js';
 
+export * from './service-pid-registry.js';
+
 export * from './voice-tts-config.js';
 
 export * from './voice-runtime-policy.js';

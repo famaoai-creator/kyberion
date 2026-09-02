@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadSurfaceManifest, loadSurfaceState } from './surface-runtime.js';
+import { parseServicePidRegistry } from './service-pid-registry.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
@@ -302,7 +303,7 @@ function recordTaskSessionCompletionLearning(session: TaskSession): void {
 }
 
 function isRunningPid(pid: unknown): pid is number {
-  if (typeof pid !== 'number' || !Number.isFinite(pid)) return false;
+  if (typeof pid !== 'number' || !Number.isSafeInteger(pid) || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -315,7 +316,8 @@ function loadRunningServiceIds(): string[] {
   try {
     const safePidFile = assertSafeRepositoryPath(SERVICE_PID_FILE);
     if (!safeExistsSync(safePidFile)) return [];
-    const parsed = readJson<Record<string, unknown>>(safePidFile);
+    const parsed = parseServicePidRegistry(readJson<unknown>(safePidFile));
+    if (!parsed) return [];
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)

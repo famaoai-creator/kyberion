@@ -52,12 +52,12 @@ import {
   type ContextSecurityScope,
 } from '@agent/core/context-security-scope';
 import { capabilityEntry } from '@agent/core/path-resolver';
+import { parseServicePidRegistry, type ServicePidRegistry } from '@agent/core/service-pid-registry';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { secureFetch } from '@agent/core/network';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { parseServicePidRegistry, type ServicePidRegistry } from './service-pid-registry.js';
 
 export interface ServiceAction {
   service_id: string;
