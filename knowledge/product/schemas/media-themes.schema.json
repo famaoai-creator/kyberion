@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Themes Catalog",
+  "type": "object",
+  "required": ["version", "default_theme", "themes"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "default_theme": { "type": "string", "minLength": 1 },
+    "themes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}
