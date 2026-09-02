@@ -45,7 +45,17 @@ describe('chronos intelligence JSON resource boundaries', () => {
       safeMkdir(path.join(missionDir, 'deliverables'), { recursive: true });
       safeWriteFile(
         path.join(missionDir, 'mission-state.json'),
-        JSON.stringify({ mission_id: missionId, status: 'active', tier: 'public' })
+        JSON.stringify({
+          mission_id: missionId,
+          tier: 'public',
+          status: 'active',
+          execution_mode: 'local',
+          priority: 1,
+          assigned_persona: 'operator',
+          confidence_score: 1,
+          git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+          history: [],
+        })
       );
       safeWriteFile(taskBoardTarget, '- [x] linked task\n');
       safeWriteFile(assetTarget, 'linked asset\n');
