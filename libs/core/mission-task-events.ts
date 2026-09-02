@@ -1,8 +1,8 @@
 import { appendJsonLine } from './foundation/json.js';
-import { readJsonIfPresent } from './foundation/json.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { resolveSharedObservabilityDir } from './observability-gate.js';
 import {
   assertSafeRepositoryPath,
@@ -200,15 +200,15 @@ function resolveTaskEventScope(input: MissionTaskEventInput): EventScope {
     const statePath = assertSafeRepositoryPath(`${missionPath}/mission-state.json`, {
       allowMissingLeaf: true,
     });
-    const state = readJsonIfPresent<Record<string, unknown>>(statePath) ?? {};
+    const state = loadMissionStateAtPath(statePath);
     authority = normalizeEventScope({
       mission_id: input.mission_id,
-      tier: (state.tier_scope || state.tier || 'public') as 'personal' | 'confidential' | 'public',
-      ...(typeof state.tenant_slug === 'string' ? { tenant_slug: state.tenant_slug } : {}),
-      ...(typeof state.organization_id === 'string'
-        ? { organization_id: state.organization_id }
+      tier: state?.tier || 'public',
+      ...(state?.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
+      ...(state?.organization_id ? { organization_id: state.organization_id } : {}),
+      ...(state?.relationships?.project?.project_id
+        ? { project_id: state.relationships.project.project_id }
         : {}),
-      ...(typeof state.project_id === 'string' ? { project_id: state.project_id } : {}),
     });
   } catch {
     authority = normalizeEventScope({ mission_id: input.mission_id, tier: 'public' });

@@ -10,6 +10,7 @@ import { findMissionPath, missionDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 
 function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
   const missionPath = assertSafeRepositoryPath(
@@ -46,12 +47,7 @@ export interface PhaseExitGateOutcome {
 export function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
   const statePath = safeMissionPath(missionId, 'mission-state.json');
   if (!safeExistsSync(statePath)) return null;
-  try {
-    const parsed = readJson<unknown>(statePath);
-    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
-  } catch {
-    return null;
-  }
+  return loadMissionStateAtPath(statePath) as unknown as Record<string, unknown> | null;
 }
 
 export function missionClassOf(missionId: string): string | undefined {
