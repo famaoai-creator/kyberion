@@ -3,6 +3,14 @@ import { describe, expect, it, vi } from 'vitest';
 const files: Record<string, string> = {
   '/repo/active/missions/public/MSN-PUBLIC/mission-state.json': JSON.stringify({
     mission_id: 'MSN-PUBLIC',
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'operator',
+    confidence_score: 1,
+    git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+    history: [],
   }),
   '/repo/active/missions/public/MSN-PUBLIC/evidence/intent-snapshots.jsonl': JSON.stringify({
     snapshot_id: 'public-1',
@@ -16,6 +24,14 @@ const files: Record<string, string> = {
   '/repo/active/missions/confidential/tenant-a/MSN-A/mission-state.json': JSON.stringify({
     mission_id: 'MSN-A',
     tenant_slug: 'tenant-a',
+    tier: 'confidential',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 1,
+    assigned_persona: 'operator',
+    confidence_score: 1,
+    git: { branch: 'main', start_commit: 'a', latest_commit: 'b', checkpoints: [] },
+    history: [],
   }),
   '/repo/active/missions/confidential/tenant-a/MSN-A/evidence/intent-snapshots.jsonl': [
     JSON.stringify({
@@ -56,12 +72,17 @@ vi.mock('@agent/core/foundation', () => ({
   isRecord: (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value),
   loadJson: <T>(value: string) => JSON.parse(files[value]) as T,
-  readJson: <T>(value: string) => JSON.parse(files[value]) as T,
   readJsonLines: <T>(value: string) =>
     String(files[value] ?? '')
       .split(/\r?\n/u)
       .filter(Boolean)
       .map((line) => JSON.parse(line) as T),
+}));
+vi.mock('@agent/core/mission-state', () => ({
+  loadStateAtPath: <T>(value: string) => {
+    const raw = files[value];
+    return raw ? (JSON.parse(raw) as T) : null;
+  },
 }));
 vi.mock('@agent/core/secure-io', () => ({
   assertSafeRepositoryPath: (value: string) => value,
