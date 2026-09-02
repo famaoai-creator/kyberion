@@ -6,6 +6,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -470,7 +471,7 @@ export function createTaskSession(input: {
   workLoop?: OrganizationWorkLoopSummary;
   outcomeContract?: OutcomeContract;
 }): TaskSession {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const correlationId = input.correlationId;
   const baseRequirements = input.requirements || { missing: [], collected: {} };
   const basePayload = input.intentId
@@ -1316,13 +1317,13 @@ export function reopenTaskSession(
       ...(session.payload || {}),
       ...(input.payload || {}),
       reopened_from_session_id: session.session_id,
-      reopened_at: new Date().toISOString(),
+      reopened_at: nowIso(),
       reopen_reason: input.reason,
     },
   });
   if (!reopened) return null;
   recordTaskSessionHistory(sessionId, {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     type: 'control',
     text: `Session reopened: ${input.reason}`,
   });
@@ -1339,7 +1340,7 @@ export function updateTaskSession(
     ...session,
     ...patch,
     session_id: session.session_id,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   saveTaskSession(next);
   return next;
@@ -1352,7 +1353,7 @@ export function recordTaskSessionHistory(
   const session = loadTaskSession(sessionId);
   if (!session) return null;
   session.history = [...session.history, entry].slice(-50);
-  session.updated_at = new Date().toISOString();
+  session.updated_at = nowIso();
   saveTaskSession(session);
   return session;
 }
