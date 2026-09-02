@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
 import { registerAgentRuntimeEnsurer } from './agent-runtime-port.js';
@@ -18,7 +18,7 @@ import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
 import { metrics, resolveCostRates } from './metrics.js';
-import type { EventScope, EventScopeInput } from './event-scope.js';
+import { parseEventScopeInput, type EventScope, type EventScopeInput } from './event-scope.js';
 import {
   assertRuntimeNhiScope,
   assertRuntimeScopeCompatible,
@@ -73,6 +73,68 @@ function safeQueuePath(filePath: string, queueDir: string): string {
     throw new Error(`[AGENT_RUNTIME_QUEUE_SCOPE] path is outside the queue directory: ${filePath}`);
   }
   return resolved;
+}
+
+type ParsedAgentRuntimeEnsureRequest = Omit<AgentRuntimeEnsureRequest, 'scope'> & {
+  scope: EventScopeInput;
+};
+
+function requiredRequestString(
+  record: Record<string, unknown>,
+  key: keyof AgentRuntimeEnsureRequest
+): string {
+  const value = record[key];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`[AGENT_RUNTIME_REQUEST_INVALID] ${String(key)} must be a non-empty string`);
+  }
+  return value;
+}
+
+function parseAgentRuntimeEnsureRequest(
+  value: unknown,
+  expectedRequestId: string
+): ParsedAgentRuntimeEnsureRequest {
+  const record = parseSafeJsonObjectValue(value, 'agent runtime request');
+  const requestId = requiredRequestString(record, 'request_id');
+  if (requestId !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_REQUEST_INVALID] request_id '${requestId}' does not match queue file '${expectedRequestId}'`
+    );
+  }
+  const missionId = requiredRequestString(record, 'mission_id');
+  const requestedBy = requiredRequestString(record, 'requested_by');
+  const createdAt = requiredRequestString(record, 'created_at');
+  const scope = parseEventScopeInput(record.scope);
+  const teamRolesValue = record.team_roles;
+  let teamRoles: string[] | undefined;
+  if (teamRolesValue !== undefined) {
+    if (!Array.isArray(teamRolesValue)) {
+      throw new Error(
+        '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+      );
+    }
+    teamRoles = teamRolesValue.map((role) => {
+      if (typeof role !== 'string' || role.trim() === '') {
+        throw new Error(
+          '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+        );
+      }
+      return role;
+    });
+  }
+  const reason = record.reason;
+  if (reason !== undefined && typeof reason !== 'string') {
+    throw new Error('[AGENT_RUNTIME_REQUEST_INVALID] reason must be a string');
+  }
+  return {
+    request_id: requestId,
+    mission_id: missionId,
+    scope,
+    ...(teamRoles ? { team_roles: teamRoles } : {}),
+    requested_by: requestedBy,
+    ...(typeof reason === 'string' ? { reason } : {}),
+    created_at: createdAt,
+  };
 }
 
 function estimateRuntimeTokens(chars: unknown): number {
@@ -163,7 +225,11 @@ export function enqueueMissionTeamPrewarmRequest(input: {
 }
 
 export function loadMissionTeamPrewarmRequest(requestPath: string): AgentRuntimeEnsureRequest {
-  const request = readJson<AgentRuntimeEnsureRequest>(safeQueuePath(requestPath, REQUESTS_DIR));
+  const safePath = safeQueuePath(requestPath, REQUESTS_DIR);
+  const request = parseAgentRuntimeEnsureRequest(
+    readJson<unknown>(safePath),
+    path.basename(safePath, path.extname(safePath))
+  );
   return {
     ...request,
     mission_id: request.mission_id.toUpperCase(),

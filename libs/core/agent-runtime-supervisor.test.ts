@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
+import { safeRmSync, safeWriteFile } from './secure-io.js';
 
 const mocks = vi.hoisted(() => {
   const ensureMissionTeamRuntime = vi.fn();
@@ -59,6 +60,30 @@ describe('agent-runtime-supervisor', () => {
     const { loadMissionTeamPrewarmRequest } = await import('./agent-runtime-supervisor.js');
     const outsidePath = pathResolver.shared('coordination/agent-runtime/other/request.json');
     expect(() => loadMissionTeamPrewarmRequest(outsidePath)).toThrow('[AGENT_RUNTIME_QUEUE_SCOPE]');
+  });
+
+  it('rejects malformed persisted requests before runtime orchestration', async () => {
+    const { getAgentRuntimeEnsureRequestPath, loadMissionTeamPrewarmRequest } =
+      await import('./agent-runtime-supervisor.js');
+    const requestPath = getAgentRuntimeEnsureRequestPath(`AR-MALFORMED-${process.pid}`);
+    safeWriteFile(
+      requestPath,
+      JSON.stringify({
+        request_id: path.basename(requestPath, '.json'),
+        mission_id: 'MSN-PREWARM',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+        team_roles: ['planner', 42],
+        requested_by: 'test',
+        created_at: '2026-09-03T00:00:00.000Z',
+      })
+    );
+    try {
+      expect(() => loadMissionTeamPrewarmRequest(requestPath)).toThrow(
+        '[AGENT_RUNTIME_REQUEST_INVALID] team_roles must be an array of non-empty strings'
+      );
+    } finally {
+      safeRmSync(requestPath, { force: true });
+    }
   });
 
   it('processes a queued request and writes a result artifact', async () => {
