@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "active-services.schema.json",
+  "title": "Deprecated active services compatibility note",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "_note": { "type": "string", "minLength": 1 }
+  },
+  "required": ["$schema", "documentation_only", "_note"]
+}

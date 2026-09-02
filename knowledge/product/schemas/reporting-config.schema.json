@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "reporting-config.schema.json",
+  "title": "Documentation-only reporting configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "documentation_only": { "const": true },
+    "action": { "const": "report" },
+    "reports": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "minLength": 1 },
+          "output_file": { "type": "string", "minLength": 1 }
+        },
+        "required": ["type"]
+      }
+    }
+  },
+  "required": ["$schema", "documentation_only", "action", "reports"]
+}
