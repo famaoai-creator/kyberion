@@ -883,6 +883,10 @@
       "types": "./dist/mission-orchestration-events.d.ts",
       "default": "./dist/mission-orchestration-events.js"
     },
+    "./mission-next-task-reader": {
+      "types": "./dist/mission-next-task-reader.d.ts",
+      "default": "./dist/mission-next-task-reader.js"
+    },
     "./mission-orchestration-worker": {
       "types": "./dist/mission-orchestration-worker.d.ts",
       "default": "./dist/mission-orchestration-worker.js"

@@ -11,6 +11,10 @@ import { readJson } from './foundation/json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from './secure-io.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import {
+  parseMissionNextTaskRecords,
+  type MissionNextTaskRecord,
+} from './mission-next-task-reader.js';
 
 function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
   const missionPath = assertSafeRepositoryPath(
@@ -146,10 +150,10 @@ function enrichGateWithTaskOutcomes(
   gate: MissionGateDefinition
 ): MissionGateDefinition {
   const nextTasksPath = safeMissionPath(missionId, 'NEXT_TASKS.json');
-  let tasks: Array<Record<string, unknown>> = [];
+  let tasks: MissionNextTaskRecord[] = [];
   try {
     const parsed = readJson<unknown>(nextTasksPath);
-    if (Array.isArray(parsed)) tasks = parsed as Array<Record<string, unknown>>;
+    tasks = parseMissionNextTaskRecords(parsed) || [];
   } catch {
     /* no task board — checks keep their declared params */
   }
