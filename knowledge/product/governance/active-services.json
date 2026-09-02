@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/governance-catalog.schema.json",
+  "$schema": "../schemas/active-services.schema.json",
   "documentation_only": true,
   "_note": "Deprecated compatibility artifact. Managed runtime services and UI surfaces are declared in knowledge/product/governance/surfaces/*.json, with knowledge/product/governance/active-surfaces.json as the generated compatibility snapshot controlled via scripts/surface_runtime.ts."
 }
