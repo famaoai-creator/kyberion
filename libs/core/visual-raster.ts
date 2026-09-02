@@ -1,6 +1,5 @@
 import * as path from 'node:path';
-import { readJson } from './foundation/json.js';
-import { isRecord } from './foundation/text.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -205,13 +204,11 @@ export function assertVisualReviewPathScope(input: {
         const statePath = path.join(missionPath, 'mission-state.json');
         if (safeExistsSync(statePath)) {
           try {
-            const state = readJson<unknown>(statePath);
-            const stateRecord = isRecord(state) ? state : {};
-            const context = isRecord(stateRecord.context) ? stateRecord.context : {};
+            const state = loadMissionStateAtPath(statePath);
             const recordedTenant = firstNonEmptyString(
-              context.tenant_slug,
-              stateRecord.tenant_slug,
-              stateRecord.tenant_id
+              (state?.context as Record<string, unknown> | undefined)?.tenant_slug,
+              state?.tenant_slug,
+              state?.tenant_id
             );
             if (recordedTenant && recordedTenant !== input.tenantSlug) {
               throw new Error(

@@ -119,6 +119,9 @@ describe('mission process planning', () => {
     safeWriteFile(
       `${confidentialMissionPath}/mission-state.json`,
       JSON.stringify({
+        ...makeMissionState(),
+        mission_id: confidentialMissionId,
+        tier: 'confidential',
         process_template: { workflow_id: 'confidential-workflow', phases: ['plan'] },
       })
     );

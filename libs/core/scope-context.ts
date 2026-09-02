@@ -1,7 +1,7 @@
 import type { TierLevel } from './types.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { loadMissionStateAtPath } from './mission-state-reader.js';
 import {
   assertScopeContext,
   normalizeScopeContext,
@@ -102,27 +102,13 @@ function readMissionScope(missionId: string): ScopeContextInput {
     const statePath = assertSafeRepositoryPath(
       pathResolver.rootResolve(`${pathResolver.toRepoRelative(missionPath)}/mission-state.json`)
     );
-    const state = readJson<{
-      tier?: unknown;
-      tenant_slug?: unknown;
-      tenant_id?: unknown;
-      organization_id?: unknown;
-      relationships?: { project?: { project_id?: unknown } };
-    }>(statePath);
+    const state = loadMissionStateAtPath(statePath);
+    if (!state) return {};
     return {
-      tier: state.tier as TierLevel | undefined,
-      tenant_slug:
-        typeof state.tenant_slug === 'string'
-          ? state.tenant_slug
-          : typeof state.tenant_id === 'string'
-            ? state.tenant_id
-            : undefined,
-      organization_id:
-        typeof state.organization_id === 'string' ? state.organization_id : undefined,
-      project_id:
-        typeof state.relationships?.project?.project_id === 'string'
-          ? state.relationships.project.project_id
-          : undefined,
+      tier: state.tier,
+      tenant_slug: state.tenant_slug || state.tenant_id,
+      organization_id: state.organization_id,
+      project_id: state.relationships?.project?.project_id,
     };
   } catch {
     return {};
