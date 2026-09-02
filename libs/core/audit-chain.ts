@@ -5,6 +5,7 @@ import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import { rootDir } from './path-resolver.js';
 import { withLockSync } from './src/lock-utils.js';
 export { registerLockIo } from './src/lock-utils.js';
@@ -292,7 +293,7 @@ class AuditChainImpl {
       this.seedFromDisk();
       this.entryCount++;
       const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
-      const timestamp = new Date().toISOString();
+      const timestamp = nowIso();
 
       const requestedTenantSlug =
         entry.tenantSlug ?? entry.scope?.tenant_slug ?? resolveCurrentTenantSlug();
@@ -649,7 +650,7 @@ class AuditChainImpl {
       if (!auditIo.exists(this.auditDir)) {
         auditIo.mkdir(this.auditDir);
       }
-      auditIo.append(this.getFilePath(), `${JSON.stringify(entry)}\n`);
+      auditIo.append(this.getFilePath(entry.timestamp), `${JSON.stringify(entry)}\n`);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -676,7 +677,7 @@ class AuditChainImpl {
         if (!auditIo.exists(safeTenantAuditDir)) {
           auditIo.mkdir(safeTenantAuditDir);
         }
-        const date = new Date().toISOString().slice(0, 10);
+        const date = entry.timestamp.slice(0, 10);
         const mirrorFile = safeAuditPath(path.join(safeTenantAuditDir, `audit-${date}.jsonl`), {
           allowMissingLeaf: true,
         });
@@ -688,8 +689,8 @@ class AuditChainImpl {
     }
   }
 
-  private getFilePath(): string {
-    const date = new Date().toISOString().slice(0, 10);
+  private getFilePath(timestamp: string): string {
+    const date = timestamp.slice(0, 10);
     return path.join(this.auditDir, `audit-${date}.jsonl`);
   }
 }

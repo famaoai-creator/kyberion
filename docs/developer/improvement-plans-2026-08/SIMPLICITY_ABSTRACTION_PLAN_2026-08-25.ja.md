@@ -12839,6 +12839,12 @@ SX-03 の残存監査として、organization operating model の pause／resume
 
 検証: organization lifecycle／operating model／foundation adoption **3 files / 18 tests passed**、対象production fileの単純 timestamp **0件**、root typecheck、対象4ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 430
+
+SX-03／SX-08／SX-09 の残存監査として、audit chain の記録・master chain・tenant mirror に残っていた時刻生成 **3 箇所**を整理した。新規 audit entry の timestamp を foundation `nowIso()` から一度だけ生成し、master／tenant mirror のファイル日付にも同じ timestamp を再利用することで、UTC日跨ぎによる記録と格納先の不一致を防止した。hash chain、tenant mirror の存在確認、tier／scope境界は変更していない。
+
+検証: audit chain／parser／forwarder／approval audit **4 files / 34 tests passed**、master／tenant mirror の日付共有回帰テストを追加、対象production fileの直接 timestamp **0件**、対象5ファイルの ESLint、`git diff --check`。canonical full gate 実行後、残る SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
