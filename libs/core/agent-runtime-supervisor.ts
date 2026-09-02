@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver, rootDir } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue, readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { appendSupervisorEvent } from './agent-runtime-events.js';
@@ -13,7 +14,13 @@ import {
 } from './mission-team-orchestrator.js';
 import { agentLifecycle, type AgentHandle, type AgentRuntimeSnapshot } from './agent-lifecycle.js';
 import type { TaskModelHint } from './reasoning-model-routing.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { runtimeSupervisor } from './runtime-supervisor.js';
 import { logger } from './core.js';
@@ -60,6 +67,15 @@ interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeam
 
 const REQUESTS_DIR = pathResolver.shared('coordination/agent-runtime/requests');
 const RESULTS_DIR = pathResolver.shared('coordination/agent-runtime/results');
+const AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/agent-runtime-ensure-result.schema.json'
+);
+
+const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
+  id: 'agent-runtime-ensure-result',
+  path: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+  schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
+});
 
 function safeQueuePath(filePath: string, queueDir: string): string {
   const resolved = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
@@ -263,9 +279,13 @@ export async function processMissionTeamPrewarmRequest(
     organization_profile: runtime_plan.organization_profile,
     runtime_plan,
   };
+  const validatedResult = agentRuntimeEnsureResultCatalog.validate(
+    result,
+    getAgentRuntimeEnsureResultPath(request.request_id)
+  );
   safeWriteFile(
     getAgentRuntimeEnsureResultPath(request.request_id),
-    JSON.stringify(result, null, 2)
+    JSON.stringify(validatedResult, null, 2)
   );
   appendSupervisorEvent({
     decision: 'agent_runtime_prewarm_completed',
@@ -275,7 +295,7 @@ export async function processMissionTeamPrewarmRequest(
     requested_by: request.requested_by,
     assignment_count: runtime_plan.assignments.length,
   });
-  return result;
+  return validatedResult;
 }
 
 export function startAgentRuntimeSupervisorForRequest(request: AgentRuntimeEnsureRequest): string {
@@ -314,7 +334,7 @@ export async function waitForMissionTeamPrewarmResult(
 
   while (Date.now() < deadline) {
     if (safeExistsSync(resultPath)) {
-      return readJson<AgentRuntimeEnsureResult>(resultPath);
+      return loadMissionTeamPrewarmResultAtPath(resultPath, requestId);
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
@@ -324,6 +344,40 @@ export async function waitForMissionTeamPrewarmResult(
     request_id: requestId,
   });
   throw new Error(`Timed out waiting for agent runtime prewarm result: ${requestId}`);
+}
+
+/** Load one persisted prewarm result through the shared schema and request binding. */
+export function loadMissionTeamPrewarmResultAtPath(
+  resultPath: string,
+  expectedRequestId: string
+): AgentRuntimeEnsureResult {
+  const safeResultPath = safeQueuePath(resultPath, RESULTS_DIR);
+  if (!safeLstat(safeResultPath).isFile()) {
+    throw new Error(`[AGENT_RUNTIME_RESULT] result must be a regular file: ${resultPath}`);
+  }
+  const result = agentRuntimeEnsureResultCatalog.validate(
+    readJson<unknown>(safeResultPath),
+    safeResultPath
+  );
+  if (result.request_id !== expectedRequestId) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] result belongs to ${result.request_id}, expected ${expectedRequestId}`
+    );
+  }
+  if (result.runtime_plan.mission_id.toUpperCase() !== result.mission_id.toUpperCase()) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] runtime plan belongs to ${result.runtime_plan.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  if (
+    result.scope.mission_id &&
+    result.scope.mission_id.toUpperCase() !== result.mission_id.toUpperCase()
+  ) {
+    throw new Error(
+      `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] scope belongs to ${result.scope.mission_id}, expected ${result.mission_id}`
+    );
+  }
+  return result;
 }
 
 export async function ensureMissionTeamRuntimeViaSupervisor(
