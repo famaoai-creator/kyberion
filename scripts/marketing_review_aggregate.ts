@@ -1,10 +1,11 @@
 import {
   aggregateMarketingReviews,
+  loadMarketingReviewAtPath,
+  loadMarketingReviewPackageAtPath,
   requiredMarketingControls,
   sha256,
   type ArtifactBinding,
-  type MarketingReview,
-  type MarketingRiskLevel,
+  type MarketingReviewPackage,
 } from '@agent/core/marketing-workload';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -14,7 +15,6 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -35,22 +35,17 @@ function requireRegularMarketingInput(filePath: string, label: string): string {
   return filePath;
 }
 
-interface ReviewPackage {
-  run_id: string;
-  risk_level: MarketingRiskLevel;
-  artifacts: Array<{ name: string; path: string; sha256: string }>;
-}
-
 export function runMarketingReviewAggregation(input: {
   reviewPackagePath: string;
   reviewPaths: string[];
   outputPath: string;
 }): { ready_for_approval: boolean; output_path: string } {
-  const reviewPackagePath = requireRegularMarketingInput(
-    resolveMarketingReviewPath(input.reviewPackagePath, 'review package path'),
+  const reviewPackagePath = resolveMarketingReviewPath(
+    input.reviewPackagePath,
     'review package path'
   );
-  const reviewPackage = readJson<ReviewPackage>(reviewPackagePath);
+  const reviewPackage: MarketingReviewPackage = loadMarketingReviewPackageAtPath(reviewPackagePath);
+  const packageHashMismatches: string[] = [];
   const artifacts: Record<string, ArtifactBinding> = Object.fromEntries(
     reviewPackage.artifacts
       .filter((artifact) => artifact.name !== 'completion-evidence.json')
@@ -62,18 +57,16 @@ export function runMarketingReviewAggregation(input: {
         if (!safeExistsSync(artifactPath))
           throw new Error(`Review artifact is missing: ${artifact.name}`);
         requireRegularMarketingInput(artifactPath, `review artifact ${artifact.name}`);
-        return [
-          artifact.name,
-          { path: artifact.path, sha256: sha256(safeReadFile(artifactPath) as Buffer) },
-        ];
+        const actualSha256 = sha256(safeReadFile(artifactPath) as Buffer);
+        if (artifact.sha256 !== actualSha256) {
+          packageHashMismatches.push(artifact.name);
+        }
+        return [artifact.name, { path: artifact.path, sha256: actualSha256 }];
       })
   );
   const reviews = input.reviewPaths.map((reviewPath) => {
-    const resolvedReviewPath = requireRegularMarketingInput(
-      resolveMarketingReviewPath(reviewPath, 'review path'),
-      'review path'
-    );
-    return readJson<MarketingReview>(resolvedReviewPath);
+    const resolvedReviewPath = resolveMarketingReviewPath(reviewPath, 'review path');
+    return loadMarketingReviewAtPath(resolvedReviewPath);
   });
   const controls = requiredMarketingControls(reviewPackage.risk_level);
   const gate = aggregateMarketingReviews({
@@ -81,6 +74,12 @@ export function runMarketingReviewAggregation(input: {
     reviews,
     requiredReviewerRoles: controls.required_reviewers,
   });
+  if (packageHashMismatches.length > 0) {
+    gate.status = 'failed';
+    gate.reasons.push(
+      ...packageHashMismatches.map((name) => `review package artifact hash mismatch: ${name}`)
+    );
+  }
   const outputPath = resolveMarketingReviewPath(input.outputPath, 'output path', true);
   const result = {
     run_id: reviewPackage.run_id,

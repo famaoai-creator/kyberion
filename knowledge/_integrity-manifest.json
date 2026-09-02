@@ -7513,6 +7513,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/marketing-review-package.schema.json",
+      "tier": "public",
+      "size": 836,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/marketing-review.schema.json",
+      "tier": "public",
+      "size": 1300,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/marketing-risk-policy.schema.json",
       "tier": "public",
       "size": 1556,
