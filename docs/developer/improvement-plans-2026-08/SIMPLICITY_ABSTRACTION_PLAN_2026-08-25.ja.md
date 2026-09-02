@@ -13187,6 +13187,12 @@ PR CIの実ビルド失敗を再現し、SX-03／SX-04／SX-08 のChronos identi
 
 検証: Chronos Next.js production build、関連 **2 files / 10 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。PR CIの失敗原因は解消済みだが、push後のGitHub Actionsは再実行待ちである。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 488
+
+SX-04／SX-08 のcontrol-plane catalog readerを再監査し、DESIGN.md indexを汎用`readJson<any>`で読む残存を、既存の`imported-design-md-index.schema.json`に結び付いた`defineCatalog`へ移行した。indexの必須メタデータ、system summary、keywords、未知フィールドをcontrol-plane CLIの検索・推薦へ入る前に検証し、既存のquery／score／出力形式は変更していない。対応schemaのないthemes／systems importは今回の境界へ混在させず、別契約として残した。
+
+検証: control-plane CLI **1 file / 12 tests passed**、catalog実CLIのdesign-system検索、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
