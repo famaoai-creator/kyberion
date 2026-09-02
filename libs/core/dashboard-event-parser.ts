@@ -1,5 +1,6 @@
 import { isRecord } from './foundation/text.js';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 
 export interface DashboardOrchestrationEvent {
   ts: string;
@@ -37,7 +38,7 @@ export function parseDashboardJsonRecord(line: string): Record<string, unknown> 
 
 export function parseDashboardOrchestrationEvent(
   value: unknown,
-  fallbackTimestamp = new Date().toISOString()
+  fallbackTimestamp = nowIso()
 ): DashboardOrchestrationEvent | undefined {
   if (!isRecord(value)) return undefined;
   const ts = value.ts === undefined ? fallbackTimestamp : parseTimestamp(value.ts);

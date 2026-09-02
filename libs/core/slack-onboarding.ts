@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { parseSafeJsonObjectInput } from './foundation/safe-json.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withExecutionContext } from './authority.js';
 import { writeGovernedArtifactJson } from './artifact-store.js';
@@ -296,7 +297,7 @@ function persistOnboardingIdentity(state: OnboardingState): void {
   const primaryDomain = state.answers.primary_domain || 'General';
   const vision = state.answers.vision || 'Build a high-fidelity Kyberion environment.';
   const agentId = (state.answers.agent_id || 'KYBERION-PRIME').trim().toUpperCase();
-  const now = new Date().toISOString();
+  const now = nowIso();
   withExecutionContext('sovereign_concierge', () => {
     const root = profileRoot();
     safeMkdir(root, { recursive: true });
@@ -350,7 +351,7 @@ export function handleSlackOnboardingTurn(params: {
       currentField: 'name',
       answers: {},
       completed: false,
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso(),
     };
     saveOnboardingState(state);
     return {
@@ -366,7 +367,7 @@ export function handleSlackOnboardingTurn(params: {
   if (!state.completed) {
     state.answers[state.currentField] = normalizeOnboardingAnswer(state.currentField, params.text);
     const nextField = nextOnboardingField(state.currentField);
-    state.updatedAt = new Date().toISOString();
+    state.updatedAt = nowIso();
     if (!nextField) {
       state.completed = true;
       saveOnboardingState(state);

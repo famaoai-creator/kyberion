@@ -80,6 +80,7 @@
  */
 
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { Semaphore } from './semaphore.js';
 import { logger } from './core.js';
@@ -393,7 +394,7 @@ export function getRecordedDelegationTimeouts(): DelegationTimeoutRecord[] {
 }
 
 function recordDelegationTimeout(provider: string, budgetMs: number, id: string): void {
-  recordedTimeouts.push({ id, provider, budgetMs, at: new Date().toISOString() });
+  recordedTimeouts.push({ id, provider, budgetMs, at: nowIso() });
   logger.warn(
     `[delegation-concurrency] provider='${provider}' delegation id=${id} exceeded wall-clock budget of ${budgetMs}ms`
   );

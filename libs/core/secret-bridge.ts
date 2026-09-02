@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import {
   safeChmodSync,
@@ -43,7 +44,7 @@ export function registryAdd(service: string, account: string): void {
   const existing = registry.entries.findIndex(
     (e) => e.service === service && e.account === account
   );
-  const entry: RegistryEntry = { service, account, addedAt: new Date().toISOString() };
+  const entry: RegistryEntry = { service, account, addedAt: nowIso() };
   if (existing >= 0) {
     registry.entries[existing] = entry;
   } else {

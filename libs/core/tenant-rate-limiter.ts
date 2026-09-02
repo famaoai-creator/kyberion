@@ -21,6 +21,7 @@
 import * as path from 'node:path';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import {
@@ -179,7 +180,7 @@ function withTenantRateLimitLock<T>(fn: () => T): T {
         lockAbs,
         JSON.stringify({
           pid: process.pid,
-          created_at: new Date().toISOString(),
+          created_at: nowIso(),
           resource: 'tenant-rate-limit-state',
         })
       );

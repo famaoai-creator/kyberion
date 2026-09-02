@@ -1,4 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Intent Snapshot Store — append-only per-mission snapshot persistence
  * plus drift-gate helpers for origin-baseline management.
@@ -108,7 +109,7 @@ export function emitIntentSnapshot(
     mission_id: params.missionId,
     stage: params.stage,
     kind: params.kind || (latestSnapshot(params.missionId) ? 'current' : 'origin'),
-    created_at: new Date().toISOString(),
+    created_at: nowIso(),
     source: params.source,
     intent: params.intent,
     ...(params.traceRef ? { trace_ref: params.traceRef } : {}),
@@ -150,7 +151,7 @@ export function recordApprovedIntentScopeChange(input: {
   const previousOrigin =
     [...listSnapshots(input.missionId)].reverse().find((snapshot) => snapshot.kind === 'origin') ||
     null;
-  const approvedAt = input.approvedAt || new Date().toISOString();
+  const approvedAt = input.approvedAt || nowIso();
   const { snapshot, delta } = emitIntentSnapshot({
     missionId: input.missionId,
     stage: input.stage || 'scope_change',
