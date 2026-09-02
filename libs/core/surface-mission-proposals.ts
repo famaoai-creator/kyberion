@@ -16,6 +16,7 @@ import {
 } from './mission-orchestration-events.js';
 import { appendGovernedArtifactJsonl, writeGovernedArtifactJson } from './artifact-store.js';
 import type { AgentRoutingDecision } from './intent-contract.js';
+import { nowIso } from './foundation/time.js';
 
 import { getSurfaceCoordinationRole } from './surface-coordination-role-map.js';
 
@@ -46,7 +47,7 @@ function emitSlackMissionEvent(event: Record<string, unknown>): string {
     'slack_bridge',
     'active/shared/observability/channels/slack/missions.jsonl',
     {
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event_id: randomUUID(),
       channel: 'slack',
       ...event,
@@ -56,7 +57,7 @@ function emitSlackMissionEvent(event: Record<string, unknown>): string {
 
 function emitChronosMissionEvent(event: Record<string, unknown>): string {
   return appendJsonlAs('chronos_gateway', 'active/shared/observability/chronos/missions.jsonl', {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: randomUUID(),
     channel: 'chronos',
     ...event,
@@ -98,7 +99,7 @@ export function saveMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies SurfaceMissionProposalState
   );
 }
@@ -188,7 +189,7 @@ export function saveSlackMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies SlackMissionProposalState
   );
 }
@@ -228,7 +229,7 @@ export function saveChronosMissionProposalState(params: {
       proposal: params.proposal,
       sourceText: params.sourceText,
       routingDecision: params.routingDecision,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso(),
     } satisfies ChronosMissionProposalState
   );
 }
