@@ -12034,6 +12034,15 @@ schema validation の後に、従来の profile resource path existence 検証�
 検証: app profile loader／validator **2 files / 16 tests passed**、CLI の examples／mobile-profiles／web-profiles source probe、
 core build、typecheck。残る SX-04 は非catalog層の旧loader整理と未参照 catalog の廃止判断である。
 
+## 2026-09-02 再レビュー修正 315
+
+SX-06 の server protocol entry guard に残っていた Discord／Slack／Telegram／iMessage bridge の重複した
+`process.argv`＋`pathToFileURL` 判定を core の `isDirectEntry` へ集約した。source／compiled `.js` 対応と import 時の非起動、
+VITEST 抑制を従来どおり維持し、scripts harness も同じ helper を利用するようにして direct-entry 判定の正本を一本化した。
+
+検証: direct-entry／CLI／4 bridge **6 files / 67 tests passed**、core build、typecheck、PR scope **33/33 gates passed**、
+root lint、Prettier、`git diff --check`。残る SX-06 は actuator template／refactor utility と全 generator 化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

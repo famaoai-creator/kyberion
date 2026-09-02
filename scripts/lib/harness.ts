@@ -1,7 +1,6 @@
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { safeExistsSync, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { isDirectEntry } from '@agent/core/direct-entry';
 
 export interface ScriptFlags {
   json: boolean;
@@ -187,9 +186,5 @@ export function defineGenerator(options: {
 }
 
 export function isDirectScript(importMetaUrl: string, expectedFile: string): boolean {
-  const actual = path.resolve(process.argv[1] || '');
-  const modulePath = path.resolve(fileURLToPath(importMetaUrl));
-  const expected = expectedFile.replaceAll('\\', '/').replace(/^\.\//u, '');
-  const candidates = [expected, expected.replace(/\.ts$/u, '.js')];
-  return actual === modulePath && candidates.some((candidate) => actual.endsWith(candidate));
+  return isDirectEntry(importMetaUrl, expectedFile);
 }
