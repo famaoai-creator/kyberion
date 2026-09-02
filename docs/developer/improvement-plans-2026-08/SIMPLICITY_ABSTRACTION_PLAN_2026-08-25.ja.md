@@ -12341,6 +12341,12 @@ SX-04 の Chronos tenant visibility reader に残っていた mission-state の 
 
 検証: Chronos knowledge scope／agent activity board **2 files / 5 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
 
+## 2026-09-02 再レビュー修正 347
+
+SX-04 の Chronos deliverable inbox に残っていた mission-state の raw reader を、canonical `loadState` へ統合した。status／tenant／tier／project／track context の全取得で `mission-state.schema.json` と secure path／symlink 境界を再利用し、mission state 不在・不正時は従来どおり空の projection として扱う fail-closed semantics を維持した。
+
+検証: Chronos deliverable inbox／mission asset／deliverable preview **4 files / 15 tests passed**、root typecheck、root lint、Prettier、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-04 は非catalog層の旧loader整理、未参照catalogの廃止判断、および各domainの入力／state reader契約化である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
