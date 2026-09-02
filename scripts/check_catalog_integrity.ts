@@ -30,7 +30,10 @@ type GovernanceCatalogContracts = {
 type GovernanceCatalogMetadata = {
   fileName: string;
   documentationOnly: boolean;
+  schemaRef?: string;
 };
+
+const GENERIC_GOVERNANCE_SCHEMA_REF = '../schemas/governance-catalog.schema.json';
 
 const CHECKS: CatalogCheck[] = [
   {
@@ -789,6 +792,15 @@ export function findUnreferencedGovernanceCatalogs(input: {
     .sort();
 }
 
+export function findGenericGovernanceCatalogs(
+  catalogs: readonly GovernanceCatalogMetadata[]
+): string[] {
+  return catalogs
+    .filter((catalog) => catalog.schemaRef === GENERIC_GOVERNANCE_SCHEMA_REF)
+    .map((catalog) => catalog.fileName)
+    .sort();
+}
+
 function collectGovernanceRuntimeSourceFiles(): Record<string, string> {
   const sourceFiles: Record<string, string> = {};
   for (const rootName of ['libs', 'scripts', 'presence', 'satellites']) {
@@ -830,7 +842,6 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     'knowledge/product/governance/governance-catalog-contracts.json'
   );
   const contracts = readFoundationJson<GovernanceCatalogContracts>(contractsPath);
-  const genericSchemaRef = '../schemas/governance-catalog.schema.json';
   const backedCatalogs = new Set<string>();
   const catalogs: GovernanceCatalogMetadata[] = [];
   for (const fileName of safeReaddir(root)
@@ -848,7 +859,11 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
       continue;
     }
 
-    catalogs.push({ fileName, documentationOnly: payload.documentation_only === true });
+    catalogs.push({
+      fileName,
+      documentationOnly: payload.documentation_only === true,
+      schemaRef: typeof payload.$schema === 'string' ? payload.$schema.trim() : undefined,
+    });
 
     const schemaRef = payload.$schema;
     if (typeof schemaRef !== 'string' || schemaRef.trim() === '') {
@@ -861,7 +876,7 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
     }
 
     if (/^https?:\/\//u.test(schemaRef)) continue;
-    if (schemaRef === genericSchemaRef) {
+    if (schemaRef === GENERIC_GOVERNANCE_SCHEMA_REF) {
       backedCatalogs.add(fileName);
       const requiredKeys = contracts.catalogs[fileName];
       if (!requiredKeys) {
@@ -896,6 +911,11 @@ function validateGovernanceCatalogMetadata(violations: string[]) {
         }
       }
     }
+  }
+  for (const fileName of findGenericGovernanceCatalogs(catalogs)) {
+    violations.push(
+      `governance-catalog: ${relativeRoot}/${fileName} must use a dedicated schema; generic envelope is retired`
+    );
   }
   for (const fileName of Object.keys(contracts.catalogs)) {
     if (!backedCatalogs.has(fileName)) {
