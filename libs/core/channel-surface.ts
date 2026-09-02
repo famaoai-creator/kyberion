@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { processUntrustedContent } from './untrusted-content.js';
+import { nowIso } from './foundation/time.js';
 export {
   emitChannelSurfaceEvent,
   recordChronosDelegationSummary,
@@ -111,7 +112,7 @@ export type {
 } from './channel-surface-types.js';
 
 export function prepareSlackSurfaceArtifact(input: SlackSurfaceInput): SlackSurfaceArtifact {
-  const ts = new Date().toISOString();
+  const ts = nowIso();
   const correlationId = randomUUID();
   const stimulusId = correlationId;
   const threadTs = input.threadTs || input.ts || ts;

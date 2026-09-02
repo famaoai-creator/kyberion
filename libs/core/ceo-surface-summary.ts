@@ -15,6 +15,7 @@ import {
 } from './operator-home-summary.js';
 import { listSurfaceNotificationsAcrossChannels } from './surface-ux.js';
 import { t, type VocabularyKey } from './t.js';
+import { nowIso } from './foundation/time.js';
 
 export interface CeoIntentItem {
   mission_id: string;
@@ -234,7 +235,7 @@ export function composeCeoSurfaceSummary(input: {
     : t('home.briefing_clear', undefined, 'ja');
 
   return {
-    generated_at: input.now || new Date().toISOString(),
+    generated_at: input.now || nowIso(),
     briefing: {
       sentence_ja: sentence,
       counts: {

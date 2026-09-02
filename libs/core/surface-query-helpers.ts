@@ -25,6 +25,7 @@ import { safeExec } from './secure-io.js';
 import { logger } from './core.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 import type {
   SurfaceConversationResult,
   SurfaceDelegationResult,
@@ -327,7 +328,7 @@ function formatExecutionReceipt(params: {
   return JSON.stringify(
     {
       kind: 'execution-receipt',
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       intent_id: params.intentId || 'unknown',
       execution_shape: params.shape || 'unknown',
       command: params.command || '',
