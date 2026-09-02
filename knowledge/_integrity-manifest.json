@@ -9205,6 +9205,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-design-override.schema.json",
+      "tier": "public",
+      "size": 1021,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/tenant-group.schema.json",
       "tier": "public",
       "size": 1371,

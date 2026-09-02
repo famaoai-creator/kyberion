@@ -5,6 +5,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { loadTenantDesignOverrideIndex } from '@agent/core/tenant-design-resolver';
+import { loadTenantDesignOverride } from '@agent/core/tenant-design-override';
 import { defineCatalog, readJson } from '@agent/core/foundation';
 import * as path from 'node:path';
 
@@ -152,11 +153,15 @@ export function resolveConfidentialTenantOverride(
     const key = brandName.toLowerCase();
     for (const entry of cachedTenantRegistry.entries) {
       try {
-        const override = loadJsonValue(
-          assertSafeRepositoryPath(path.resolve(rootDir, entry.override_path), {
-            allowMissingLeaf: true,
-          })
+        const overridePath = assertSafeRepositoryPath(path.resolve(rootDir, entry.override_path), {
+          allowMissingLeaf: true,
+        });
+        const override = loadTenantDesignOverride(
+          rootDir,
+          overridePath,
+          path.dirname(overridePath)
         );
+        if (!override) continue;
         if (
           designSystemId &&
           override.design_system_id &&
