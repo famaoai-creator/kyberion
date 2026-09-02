@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { logger } from '@agent/core/core';
+import { loadChannelRegistry, type ChannelRegistry } from '@agent/core/channel-registry';
 import {
   assertSafeRepositoryPath,
   safeAppendFile,
@@ -9,13 +10,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import * as pathResolver from '@agent/core/path-resolver';
-import {
-  isRecord,
-  nowIso,
-  parseSafeJsonInput,
-  readJson,
-  readTextFile,
-} from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -30,16 +25,6 @@ interface Stimulus {
   status: 'PENDING' | 'INJECTED' | 'PROCESSED';
   metadata?: Record<string, unknown>;
   [key: string]: unknown;
-}
-
-interface Channel {
-  id: string;
-  name: string;
-  priority: number;
-}
-
-interface ChannelRegistry {
-  channels: Channel[];
 }
 
 export function parsePresenceStimulus(value: unknown): Stimulus | undefined {
@@ -98,7 +83,7 @@ export function perceive(): Stimulus[] {
       .map(parsePresenceStimulusLine)
       .filter((s): s is Stimulus => s?.status === 'PENDING' || s?.status === 'INJECTED');
 
-    const registry: ChannelRegistry = readJson(REGISTRY_PATH);
+    const registry: ChannelRegistry = loadChannelRegistry();
     const priorityMap = new Map(registry.channels.map((c) => [c.id, c.priority]));
 
     return stimuli.sort((a, b) => {
@@ -118,7 +103,7 @@ export function getSensoryContext(): string | null {
   const pending = perceive();
   if (pending.length === 0 || !REGISTRY_PATH) return null;
 
-  const registry: ChannelRegistry = readJson(REGISTRY_PATH);
+  const registry: ChannelRegistry = loadChannelRegistry();
 
   const formatted = pending.map((s) => {
     const channel = registry.channels.find((c) => c.id === s.source_channel) || {
