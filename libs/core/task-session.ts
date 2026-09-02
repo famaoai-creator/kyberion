@@ -5,9 +5,9 @@ import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { logger } from './core.js';
 import { compileSchema } from './foundation/ajv.js';
+import { readJson } from './foundation/json.js';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -316,7 +316,7 @@ function loadRunningServiceIds(): string[] {
   try {
     const safePidFile = assertSafeRepositoryPath(SERVICE_PID_FILE);
     if (!safeExistsSync(safePidFile)) return [];
-    const parsed = loadJson<Record<string, unknown>>(safePidFile);
+    const parsed = readJson<Record<string, unknown>>(safePidFile);
     return Object.entries(parsed)
       .filter(([, pid]) => isRunningPid(pid))
       .map(([serviceId]) => serviceId)
@@ -339,7 +339,7 @@ function loadSurfaceStateRunningIds(): Set<string> {
   try {
     const safeStatePath = assertSafeRepositoryPath(SURFACE_STATE_PATH);
     if (!safeExistsSync(safeStatePath)) return new Set();
-    const parsed = loadJson<{
+    const parsed = readJson<{
       surfaces?: Record<string, { pid?: unknown }>;
     }>(safeStatePath);
     return new Set(
@@ -365,7 +365,7 @@ function loadStartableServiceChoices(): SurfaceStartableChoice[] {
       try {
         const manifestPath = assertSafeRepositoryPath(path.join(safeManifestDir, entry));
         if (!safeLstat(manifestPath).isFile()) return [];
-        const manifest = loadJson<{ surfaces?: Array<Record<string, unknown>> }>(manifestPath);
+        const manifest = readJson<{ surfaces?: Array<Record<string, unknown>> }>(manifestPath);
         return (manifest.surfaces || [])
           .filter((surface) => surface && surface.enabled !== false)
           .map((surface) => {

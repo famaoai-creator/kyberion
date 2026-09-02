@@ -9,7 +9,6 @@ import {
   safeChmodSync,
   safeExistsSync,
   safeLstat,
-  loadJson,
   safeWriteFile,
   safeMkdir,
   safeExecResult,
@@ -242,7 +241,7 @@ export class FileSecretProvider implements SecretProvider {
     if (!safeExistsSync(this.secretsPath)) return {};
     this.assertNotSymlink(this.secretsPath, 'secret file');
     try {
-      return loadJson<Record<string, Record<string, string>>>(this.secretsPath);
+      return readJson<Record<string, Record<string, string>>>(this.secretsPath);
     } catch {
       return {};
     }

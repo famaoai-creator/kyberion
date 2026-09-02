@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { readJson } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
-  loadJson,
   safeExistsSync,
   safeLstat,
   safeMkdir,
@@ -115,7 +115,7 @@ export function loadDistillCandidateRecord(candidateId: string): DistillCandidat
   try {
     const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     if (!safeExistsSync(safeFilePath)) return null;
-    return distillCandidateRecordCatalog.validate(loadJson<unknown>(safeFilePath), safeFilePath);
+    return distillCandidateRecordCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Invalid catalog ')) return null;
     throw error;

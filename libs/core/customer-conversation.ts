@@ -1,11 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  loadJsonIfPresent as loadOptionalJson,
-  safeExistsSync,
-  safeReadFile,
-} from './secure-io.js';
+import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeReadFile } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -102,7 +98,7 @@ export interface CustomerConversationResult {
 }
 
 function readJsonIfPresent(filePath: string): Record<string, unknown> | null {
-  return loadOptionalJson<Record<string, unknown>>(filePath);
+  return readFoundationJsonIfPresent<Record<string, unknown>>(filePath);
 }
 
 function loadGroundingSources(tenantSlug: string): {

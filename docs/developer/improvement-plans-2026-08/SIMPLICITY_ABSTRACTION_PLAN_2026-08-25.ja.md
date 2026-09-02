@@ -11557,6 +11557,18 @@ review／approval、tier filtering、knowledge idempotency、cookie／wisdom の
 `git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
 未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
 
+## 2026-09-02 再レビュー修正 270
+
+SX-03 の optional JSON reader adoption を core の secret／distill candidate／task session／financial model／
+mission retrospective／customer conversation／tenant design 経路へ継続した。foundation の
+`readJson`／`readJsonIfPresent` へ移行し、secure-io 直 reader を減らした。移行時に露出した foundation import
+の取り違え、tenant design の安全な追加 root 引数、ローカル optional reader の alias 衝突を修正し、秘密情報、
+tenant／tier isolation、mission artifact、catalog fallback、performance index の既存 semantics を維持した。
+
+検証: core **7 test files / 56 tests passed**、root typecheck、foundation adoption、Prettier、
+`git diff --check`。残る改善計画は追加の direct reader caller、catalog／script／ADF／surface contract の
+未完了項目、全surfaceの実ブラウザ・外部provider実機確認、および voice provider／provider CLI の実環境依存である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
