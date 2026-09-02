@@ -8983,6 +8983,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/service-runtime-state.schema.json",
+      "tier": "public",
+      "size": 1127,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/shared-tmp-allowlist.schema.json",
       "tier": "public",
       "size": 1074,

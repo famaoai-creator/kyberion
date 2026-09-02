@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   getServiceRuntimeRecord,
   getServiceRuntimeRegistry,
   getServiceRuntimeState,
+  loadServiceRuntimeStateAtPath,
   listServiceRuntimeInventory,
   probeServiceRuntime,
   _resetServiceRuntimeRegistryCacheForTests,
@@ -186,5 +187,17 @@ describe('service-runtime-registry', () => {
       status: 'installed',
       managed_service_path: STATE_TEST_MANAGED_PATH,
     });
+  });
+
+  it('rejects a directory at the persisted service runtime state path', () => {
+    const directoryPath = `${STATE_TEST_MANAGED_PATH}/directory-state.json`;
+    safeMkdir(directoryPath, { recursive: true });
+    try {
+      expect(() => loadServiceRuntimeStateAtPath(directoryPath, 'state-test')).toThrow(
+        'state must be a regular file'
+      );
+    } finally {
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
   });
 });
