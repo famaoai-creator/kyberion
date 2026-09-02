@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media Semantic Render Tokens Catalog",
+  "type": "object",
+  "required": ["version", "defaults", "semantics", "signal_tones"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "defaults": { "type": "object", "minProperties": 1, "additionalProperties": true },
+    "semantics": { "type": "object", "minProperties": 1, "additionalProperties": true },
+    "signal_tones": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  },
+  "additionalProperties": false
+}
