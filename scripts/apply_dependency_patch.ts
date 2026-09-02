@@ -33,7 +33,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
-import { appendJsonLine } from '@agent/core/foundation';
+import { appendJsonLine, nowIso } from '@agent/core/foundation';
 import { runDegradationWatch, type DegradationReport } from '@agent/core/health-degradation';
 import { withExecutionContext } from '@agent/core/governance';
 
@@ -191,7 +191,7 @@ export function applyDependencyPatch(options: DependencyPatchOptions): Dependenc
   const runner = options.runner || defaultRunner;
   const gates = options.gates || defaultGates();
   const packageJsonPath = path.join(rootDir, 'package.json');
-  const timestamp = new Date().toISOString();
+  const timestamp = nowIso();
 
   const pkg = safeJsonParse<RootPackageJson>(
     safeReadFile(packageJsonPath, { encoding: 'utf8' }) as string,

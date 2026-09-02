@@ -8,7 +8,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { isRecord, readJson } from '@agent/core/foundation';
+import { isRecord, nowIso, readJson } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export function normalizeIdentityRecord(value: unknown): Record<string, unknown> | null {
@@ -92,7 +92,7 @@ function main(argv: string[]) {
     console.warn(`Identity file not found at ${identityJsonPath}. Creating a default one...`);
     const defaultIdentity = {
       ...identityBase,
-      created_at: new Date().toISOString(),
+      created_at: nowIso(),
       status: 'active',
       version: '1.0.0',
     };
@@ -112,7 +112,7 @@ function main(argv: string[]) {
       if (args.language) identity.language = language;
       if (args['interaction-style']) identity.interaction_style = interactionStyle;
       identity.avatar_path = avatarPath;
-      identity.updated_at = new Date().toISOString();
+      identity.updated_at = nowIso();
 
       console.log('Updating identity file to register avatar...');
       safeWriteFile(identityJsonPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });

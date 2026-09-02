@@ -53,7 +53,7 @@ import {
   safeLstat,
   assertSafeRepositoryPath,
 } from '@agent/core/secure-io';
-import { parseSafeJsonInput } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { normalizePersistedAuditEntry, type AuditEntry } from '@agent/core/audit-chain';
 
@@ -201,7 +201,7 @@ function exportBundle(missionId: string, outputBaseDir: string): string {
 
   const manifest: BundleManifest = {
     mission_id: upperId,
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     bundle_layout_version: '1.0.0',
     files: [],
     notes: [],

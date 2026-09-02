@@ -31,7 +31,7 @@ import { auditChain } from '@agent/core/audit-chain';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
 import { getProtocolServiceRegistryEntry } from '@agent/core/protocol-service-registry';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
-import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
 
 type SurfaceAction =
@@ -365,7 +365,7 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
     args: normalized.args || [],
     cwd,
     logPath,
-    startedAt: new Date().toISOString(),
+    startedAt: nowIso(),
     shutdownPolicy: normalized.shutdownPolicy || 'detached',
     metadata: {
       manifestPath,
