@@ -12,7 +12,16 @@ export interface ActuatorManifestFile {
   entrypoint?: string;
   resilience_tier?: string;
   recovery_policy?: Record<string, unknown>;
-  capabilities?: Array<{ op?: string; timeout_ms?: number }>;
+  capabilities?: Array<{
+    op?: string;
+    description?: string;
+    timeout_ms?: number;
+    schema_ref?: string;
+    platforms?: string[];
+    requirements?: { bin?: string[]; lib?: string[]; env?: string[] };
+    prerequisites?: Record<string, unknown>;
+    implemented?: boolean;
+  }>;
 }
 
 export interface ActuatorCatalogEntry {
@@ -52,6 +61,11 @@ function readManifest(manifestPath: string): ActuatorManifestFile {
     manifestCatalogCache.set(safeManifestPath, catalog);
   }
   return catalog.load();
+}
+
+/** Load one governed actuator manifest for consumers that need its raw capabilities. */
+export function loadActuatorManifest(manifestPath: string): ActuatorManifestFile {
+  return readManifest(manifestPath);
 }
 
 function listOps(manifest: ActuatorManifestFile): string[] {

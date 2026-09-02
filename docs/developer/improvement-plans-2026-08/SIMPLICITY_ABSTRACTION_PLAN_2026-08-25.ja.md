@@ -13169,6 +13169,12 @@ SX-03／SX-04／SX-08 のsource-analysis engineering artifact readerを再監査
 
 検証: source-analysis **1 file / 7 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 485
+
+SX-03／SX-04／SX-10 のactuator manifest readerを再監査し、capability discoveryとactuator playgroundがそれぞれ`readJson<T>`で同じ`manifest.json`を読む二重経路を修正した。coreの既存governed manifest loaderを`loadActuatorManifest`として公開し、schema検証・repository path境界・manifest capability要件の読込を両consumerへ統合した。description省略時の表示、platform／binary probe、playgroundのactuator選択 semanticsは維持している。
+
+検証: actuator manifest／capability discovery **3 files / 23 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
