@@ -45,10 +45,6 @@ const FINANCIAL_MODEL_SCHEMA_PATH = pathResolver.knowledge(
 );
 const financialModelCatalogs = new Map<string, GovernedCatalog<FinancialModel>>();
 
-function loadJsonIfPresent<T>(filePath: string): T | null {
-  return readJsonIfPresent<T>(filePath);
-}
-
 function loadFinancialModelCatalog(filePath: string, rootDir: string): FinancialModel | null {
   const safeFilePath = assertSafeRepositoryPath(filePath, {
     allowMissingLeaf: true,
@@ -105,7 +101,7 @@ function loadLegacyCustomerFinancials(
   customerPath: string,
   tenantSlug: string
 ): FinancialModel | null {
-  const customer = loadJsonIfPresent<Record<string, unknown>>(customerPath);
+  const customer = readJsonIfPresent<Record<string, unknown>>(customerPath);
   if (!customer) return null;
   const legacy = customer.financials_prev_fy;
   if (!legacy || typeof legacy !== 'object') return null;
