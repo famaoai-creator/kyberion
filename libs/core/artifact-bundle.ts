@@ -224,7 +224,7 @@ export function listArtifactBundlesForMission(
   missionId: string,
   missionPath?: string
 ): ArtifactBundle[] {
-  const dir = bundleDir(missionId, missionPath);
+  const dir = bundleDir(missionId, missionPath, { createIfMissing: true });
   if (!dir || !safeExistsSync(dir)) return [];
   const bundles = safeReaddir(dir)
     .filter((entry) => entry.endsWith('.json'))
