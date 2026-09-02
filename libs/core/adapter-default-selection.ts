@@ -13,6 +13,7 @@ import {
   type AdapterDefaultPreferences,
 } from './adapter-default-preferences.js';
 import { readJsonIfPresent } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { assertSafeRepositoryPath, safeWriteFile } from './secure-io.js';
 import { getServiceRuntimeRegistry } from './service-runtime-registry.js';
@@ -295,7 +296,7 @@ export function saveAdapterDefaultPreferences(
   const preferences: AdapterDefaultPreferences = {
     version: '1.0.0',
     defaults: nextDefaults,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
   setAdapterDefaultPreferences(preferences);
   safeWriteFile(selectionPath(), JSON.stringify(preferences, null, 2) + '\n', {
