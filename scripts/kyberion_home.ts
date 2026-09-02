@@ -47,6 +47,7 @@ import {
 import { redactScreenVideoFrame } from '@agent/core/screen-frame-redaction';
 import { validateBrowserExtensionRecording } from '@agent/core/browser-extension-bridge';
 import { loadServiceRecordingAtPath } from '@agent/core/service-recording';
+import { loadDesktopRecordingAtPath } from '@agent/core/desktop-recording';
 import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runSurfaceMessageConversation } from '@agent/core/surface-runtime-orchestrator';
@@ -471,6 +472,17 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
       };
     }
   }
+  if (entry.substrate === 'desktop') {
+    try {
+      return { value: loadDesktopRecordingAtPath(recordingPath) };
+    } catch (error) {
+      return {
+        error: ui('recorder:recorder_recording_read_failed', {
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      };
+    }
+  }
   let raw: unknown;
   try {
     raw = readJson<unknown>(recordingPath);
@@ -484,9 +496,7 @@ function loadProcedureRecording(entry: ReturnType<typeof loadProcedures>[number]
   const validation =
     entry.substrate === 'browser'
       ? validateBrowserExtensionRecording(raw)
-      : entry.substrate === 'desktop'
-        ? validateDesktopRecording(raw)
-        : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
+      : { value: undefined, errors: [ui('recorder:recorder_unsupported_substrate')] };
   if (!validation.value) return { error: validation.errors.join('; ') };
   return { value: validation.value };
 }
@@ -676,9 +686,8 @@ function loadDesktopRecording(ref: string): {
     return { error: 'recording path must be an existing regular file' };
   }
   try {
-    const raw = readJson<unknown>(recordingPath);
-    const validation = validateDesktopRecording(raw);
-    return validation.value ? { value: validation.value } : { error: validation.errors.join('; ') };
+    const recording = loadDesktopRecordingAtPath(recordingPath);
+    return { value: recording };
   } catch (error) {
     return {
       error: ui('recorder:recorder_recording_read_failed', {
