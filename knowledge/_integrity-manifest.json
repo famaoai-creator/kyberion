@@ -8413,6 +8413,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/pending-intent.schema.json",
+      "tier": "public",
+      "size": 1291,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/permission-presets.schema.json",
       "tier": "public",
       "size": 796,
