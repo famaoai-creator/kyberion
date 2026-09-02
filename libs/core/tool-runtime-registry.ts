@@ -9,6 +9,7 @@ import {
   assertSafeRepositoryPath,
   safeExecResult,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeRmSync,
   safeWriteFile,
@@ -128,6 +129,9 @@ const DEFAULT_REGISTRY_PATH = pathResolver.knowledge(
 );
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/tool-runtime-registry.schema.json'
+);
+const TOOL_RUNTIME_STATE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/tool-runtime-state.schema.json'
 );
 const STATE_VERSION = '1.0.0';
 
@@ -625,16 +629,11 @@ const toolRuntimeRegistryCatalog = defineCatalog<ToolRuntimeRegistry>({
   },
 });
 
-function readJsonWithLabel<T>(filePath: string, label: string): T {
-  try {
-    return readJson<T>(filePath);
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new Error(`Invalid ${label}: ${error.message}`);
-    }
-    throw error;
-  }
-}
+const toolRuntimeStateCatalog = defineCatalog<ToolRuntimeState>({
+  id: 'tool-runtime-state',
+  path: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+  schema: TOOL_RUNTIME_STATE_SCHEMA_PATH,
+});
 
 function isSupportedPlatform(record: ToolRuntimeRecord, platform: NodeJS.Platform): boolean {
   return (
@@ -744,13 +743,66 @@ export function getToolRuntimeStatePath(toolId?: string): string {
   return statePathForTool(getToolRuntimeRecord(toolId));
 }
 
+function parseToolRuntimeState(
+  value: unknown,
+  statePath: string,
+  toolId: string
+): ToolRuntimeState {
+  const record = toolRuntimeStateCatalog.validate(value, statePath);
+  if (record.version !== STATE_VERSION) {
+    throw new Error('tool runtime state version is invalid');
+  }
+  if (record.tool_id !== toolId) {
+    throw new Error('tool runtime state tool scope mismatch');
+  }
+  const expectedManagedPath = path.dirname(path.resolve(statePath));
+  const managedPath = assertSafeRepositoryPath(record.managed_env_path, {
+    allowMissingLeaf: true,
+  });
+  if (path.resolve(managedPath) !== expectedManagedPath) {
+    throw new Error('tool runtime state managed path mismatch');
+  }
+  return {
+    version: record.version,
+    tool_id: record.tool_id,
+    status: record.status,
+    backend_kind: record.backend_kind,
+    command: record.command,
+    args: [...record.args],
+    managed_env_path: managedPath,
+    ...(record.installed_at ? { installed_at: record.installed_at } : {}),
+    ...(record.pinned_at ? { pinned_at: record.pinned_at } : {}),
+    ...(record.provenance
+      ? {
+          provenance: {
+            ...record.provenance,
+            args: record.provenance.args ? [...record.provenance.args] : undefined,
+          },
+        }
+      : {}),
+  };
+}
+
+/** Load tool runtime state through schema, regular-file, and tool/path binding checks. */
+export function loadToolRuntimeStateAtPath(statePath: string, toolId: string): ToolRuntimeState {
+  const safeStatePath = assertSafeRepositoryPath(statePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeStatePath).isFile()) {
+    throw new Error(`[TOOL_RUNTIME_STATE] state must be a regular file: ${statePath}`);
+  }
+  return parseToolRuntimeState(readJson<unknown>(safeStatePath), safeStatePath, toolId);
+}
+
 export function readToolRuntimeState(toolId?: string): ToolRuntimeState | null {
   const statePath = getToolRuntimeStatePath(toolId);
   if (!safeExistsSync(statePath)) return null;
   try {
-    return readJsonWithLabel<ToolRuntimeState>(statePath, 'tool runtime state');
-  } catch (error: any) {
-    logger.warn(`[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${error.message}`);
+    return loadToolRuntimeStateAtPath(statePath, getToolRuntimeRecord(toolId).tool_id);
+  } catch (error: unknown) {
+    logger.warn(
+      `[TOOL_RUNTIME_REGISTRY] Failed to read state at ${statePath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
     return null;
   }
 }
@@ -759,7 +811,8 @@ function writeToolRuntimeStateFile(state: ToolRuntimeState): void {
   const statePath = getToolRuntimeStatePath(state.tool_id);
   const dir = path.dirname(statePath);
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  safeWriteFile(statePath, JSON.stringify(state, null, 2), { encoding: 'utf8' });
+  const validated = parseToolRuntimeState(state, statePath, state.tool_id);
+  safeWriteFile(statePath, JSON.stringify(validated, null, 2), { encoding: 'utf8' });
 }
 
 export function markToolRuntimeInstalled(

@@ -1,13 +1,14 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from './path-resolver.js';
-import { safeMkdir, safeReadFile, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   clearToolRuntimeState,
   getToolRuntimeRecord,
   getToolRuntimeInventoryItem,
   getToolRuntimeRegistry,
   getToolRuntimeStatePath,
+  loadToolRuntimeStateAtPath,
   markToolRuntimeInstalled,
   listToolRuntimeInventory,
   probeToolRuntime,
@@ -408,6 +409,43 @@ describe('tool runtime registry', () => {
     _resetToolRuntimeRegistryCacheForTests();
 
     expect(getToolRuntimeRegistry().version).toBe('fallback');
+  });
+
+  it('loads a valid tool runtime state through the canonical schema and path binding', () => {
+    const state = markToolRuntimeInstalled('mflux', {
+      action: 'install',
+      command: 'uv',
+      args: ['tool', 'install', 'mflux'],
+    });
+
+    expect(loadToolRuntimeStateAtPath(getToolRuntimeStatePath('mflux'), 'mflux')).toEqual(state);
+  });
+
+  it('rejects a schema-invalid tool runtime state before inventory use', () => {
+    const statePath = getToolRuntimeStatePath('mflux');
+    const state = markToolRuntimeInstalled('mflux');
+    safeWriteFile(statePath, JSON.stringify({ ...state, unexpected: true }), {
+      encoding: 'utf8',
+    });
+
+    expect(() => loadToolRuntimeStateAtPath(statePath, 'mflux')).toThrow(
+      'Invalid catalog tool-runtime-state'
+    );
+    expect(probeToolRuntime('mflux', 'installed', 'darwin').state).toBeNull();
+  });
+
+  it('rejects a directory at the persisted tool runtime state path', () => {
+    const statePath = getToolRuntimeStatePath('mflux');
+    markToolRuntimeInstalled('mflux');
+    safeRmSync(statePath, { force: true });
+    safeMkdir(statePath, { recursive: true });
+    try {
+      expect(() => loadToolRuntimeStateAtPath(statePath, 'mflux')).toThrow(
+        'state must be a regular file'
+      );
+    } finally {
+      safeRmSync(statePath, { recursive: true, force: true });
+    }
   });
 
   it('lists inventory items with lifecycle stages', () => {
