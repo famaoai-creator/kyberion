@@ -1,4 +1,5 @@
 import { appendJsonLine } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import * as nodePath from 'node:path';
 import { findMissionPath, missionDir, pathResolver } from './path-resolver.js';
@@ -148,7 +149,7 @@ function ensureTaskEventDirs(
 export function emitMissionTaskEvent(input: MissionTaskEventInput): void {
   const scope = resolveTaskEventScope(input);
   const event = {
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event_id: randomUUID(),
     ...input,
     scope,

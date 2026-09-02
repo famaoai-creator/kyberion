@@ -5,6 +5,7 @@ import { emitChannelSurfaceEvent } from './surface-artifact-store.js';
 import { emitMissionOrchestrationObservation } from './mission-orchestration-events.js';
 import { missionDir, rootDir } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { reportProviderTemporarilyUnhealthy } from './provider-health-registry.js';
 import { agentRegistry } from './agent-registry.js';
 import {
@@ -148,7 +149,7 @@ async function requestPlanningReviewText(
       sender: 'kyberion:mission-orchestrator',
       receiver: reviewerAgentId,
       performative: 'request',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     },
     payload: {
       intent: 'mission_kickoff_plan_review',
@@ -239,7 +240,7 @@ async function requestPlanningPacketText(
       sender: 'kyberion:mission-orchestrator',
       receiver: plannerAgentId,
       performative: 'request',
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     },
     payload: {
       intent: 'mission_kickoff_planning',

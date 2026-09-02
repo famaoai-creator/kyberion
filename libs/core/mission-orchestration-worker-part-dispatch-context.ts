@@ -18,6 +18,7 @@ import { provisionTaskKnowledge } from './task-knowledge-provisioning.js';
 import { type DeliveredKnowledgeRef } from './src/knowledge-feedback-loop.js';
 import { TraceContext } from './src/trace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath } from './secure-io.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import {
@@ -136,6 +137,7 @@ export async function buildTaskDispatchContext(input: {
     typeof (missionState as Record<string, unknown>).tenant_slug === 'string'
       ? String((missionState as Record<string, unknown>).tenant_slug)
       : undefined;
+  const workItemTimestamp = nowIso();
   const provisionedContext = await provisionTaskKnowledge({
     form: 'pack',
     missionPath: resolvedMissionDir(input.missionId, missionTier, missionTenantSlug),
@@ -164,8 +166,8 @@ export async function buildTaskDispatchContext(input: {
         ? (input.task as any).dependencies
         : [],
       version: 1,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: workItemTimestamp,
+      updated_at: workItemTimestamp,
       metadata: {
         deliverable: input.task.deliverable,
         target_path: input.task.target_path,
