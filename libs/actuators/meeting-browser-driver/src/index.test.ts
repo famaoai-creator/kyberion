@@ -56,7 +56,7 @@ vi.mock('@agent/core/foundation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/foundation')>();
   return {
     ...actual,
-    loadJson: vi.fn(() => []),
+    readJson: vi.fn(() => []),
   };
 });
 
@@ -262,10 +262,10 @@ describe('cookie-store', () => {
 
   it('readCookies returns parsed cookies when file exists', async () => {
     const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
-    const { loadJson } = await import('@agent/core/foundation');
+    const { readJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify([{ name: 'session', value: 'abc' }]));
-    vi.mocked(loadJson).mockReturnValue([{ name: 'session', value: 'abc' }]);
+    vi.mocked(readJson).mockReturnValue([{ name: 'session', value: 'abc' }]);
 
     const { readCookies } = await import('./cookie-store.js');
     const cookies = readCookies('test-account');
@@ -274,10 +274,10 @@ describe('cookie-store', () => {
 
   it('readCookies returns empty array when file contains invalid JSON', async () => {
     const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
-    const { loadJson } = await import('@agent/core/foundation');
+    const { readJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue('not-valid-json');
-    vi.mocked(loadJson).mockImplementation(() => {
+    vi.mocked(readJson).mockImplementation(() => {
       throw new SyntaxError('invalid JSON');
     });
 
@@ -288,10 +288,10 @@ describe('cookie-store', () => {
 
   it('readCookies returns empty array when file contains non-array JSON', async () => {
     const { safeExistsSync, safeReadFile } = await import('@agent/core/secure-io');
-    const { loadJson } = await import('@agent/core/foundation');
+    const { readJson } = await import('@agent/core/foundation');
     vi.mocked(safeExistsSync).mockReturnValue(true);
     vi.mocked(safeReadFile).mockReturnValue(JSON.stringify({ not: 'an array' }));
-    vi.mocked(loadJson).mockReturnValue({ not: 'an array' });
+    vi.mocked(readJson).mockReturnValue({ not: 'an array' });
 
     const { readCookies } = await import('./cookie-store.js');
     const cookies = readCookies('test-account');
