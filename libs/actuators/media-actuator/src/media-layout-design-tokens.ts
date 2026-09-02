@@ -6,7 +6,7 @@ import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
 import { loadJsonCatalog, loadMediaDesignSystemsCatalog } from './media-catalog-loaders.js';
 
-function loadSemanticRenderTokenCatalog(rootDir: string): any {
+export function loadSemanticRenderTokenCatalog(rootDir: string): any {
   const fallback = {
     version: '1.0.0',
     defaults: { content: {} },
