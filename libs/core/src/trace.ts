@@ -1,4 +1,5 @@
 import { appendJsonLine } from '../foundation/json.js';
+import { nowIso } from '../foundation/time.js';
 /**
  * Kyberion Trace Model
  * OpenTelemetry-inspired tracing with artifact and knowledge references.
@@ -87,7 +88,7 @@ export class TraceContext {
     const rootSpan: TraceSpan = {
       spanId: randomUUID(),
       name,
-      startTime: new Date().toISOString(),
+      startTime: nowIso(),
       status: 'in_progress',
       events: [],
       artifacts: [],
@@ -131,7 +132,7 @@ export class TraceContext {
     const span: TraceSpan = {
       spanId: randomUUID(),
       name,
-      startTime: new Date().toISOString(),
+      startTime: nowIso(),
       status: 'in_progress',
       attributes: {
         ...(attributes || {}),
@@ -151,7 +152,7 @@ export class TraceContext {
   endSpan(status: 'ok' | 'error' = 'ok', error?: string): void {
     if (this.spanStack.length <= 1) return; // don't pop root
     const span = this.spanStack.pop()!;
-    span.endTime = new Date().toISOString();
+    span.endTime = nowIso();
     span.status = status;
     if (error) span.error = error;
   }
@@ -161,7 +162,7 @@ export class TraceContext {
     const correlationId = this.trace.metadata.correlationId;
     this.currentSpan.events.push({
       name,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
       attributes: {
         ...(attributes || {}),
         ...(correlationId ? { correlationId } : {}),
@@ -175,7 +176,7 @@ export class TraceContext {
       type,
       path,
       description,
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   }
 
@@ -202,7 +203,7 @@ export class TraceContext {
     while (this.spanStack.length > 1) {
       this.endSpan('error', 'span not explicitly closed');
     }
-    this.trace.rootSpan.endTime = new Date().toISOString();
+    this.trace.rootSpan.endTime = nowIso();
     this.trace.rootSpan.status = this.trace.rootSpan.children.some((c) => c.status === 'error')
       ? 'error'
       : 'ok';
@@ -267,10 +268,10 @@ export function persistTrace(trace: Trace, opts?: { dir?: string }): string {
   }
   const dir = opts?.dir ?? traceLogDir();
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
-  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const day = nowIso().slice(0, 10); // YYYY-MM-DD
   const file = path.join(dir, `traces-${day}.jsonl`);
   const safeTrace = sanitizeTraceForPersistence(trace);
-  const record = { ...safeTrace, _persistedAt: new Date().toISOString() };
+  const record = { ...safeTrace, _persistedAt: nowIso() };
   appendJsonLine(file, record);
   // OTLP is explicitly opt-in. Local JSONL persistence remains synchronous
   // and authoritative; exporter failure must never change pipeline outcome.
@@ -283,7 +284,7 @@ function otlpId(value: string, length: number): string {
 }
 
 function unixNano(iso: string | undefined): string {
-  const ms = Date.parse(iso || new Date().toISOString());
+  const ms = Date.parse(iso || nowIso());
   return (BigInt(Math.max(0, Math.floor(ms))) * 1_000_000n).toString();
 }
 

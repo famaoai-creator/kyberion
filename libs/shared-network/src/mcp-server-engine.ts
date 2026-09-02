@@ -43,7 +43,7 @@ import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-re
 import { normalizeEventScope } from '@agent/core/event-scope';
 import { recordProtocolServiceLifecycle } from '@agent/core/protocol-service-lifecycle';
 import { logger } from '@agent/core/core';
-import { isRecord } from '@agent/core/foundation';
+import { defineCatalog, getRegisteredEnvText, isRecord, nowIso } from '@agent/core/foundation';
 import {
   computeApprovalPayloadHash,
   createApprovalRequest,
@@ -64,7 +64,6 @@ import {
   recordAuditExportRequest,
 } from '@agent/core/approval-cowork-adapter.js';
 import { runCoworkKnowledgeSync } from '@agent/core/cowork-knowledge-bridge.js';
-import { defineCatalog, getRegisteredEnvText } from '@agent/core/foundation';
 import type { EventScope } from '@agent/core/event-scope';
 import type { McpRequestContext } from '@agent/core/mcp-request-context';
 import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
@@ -459,7 +458,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     job_id: jobId,
     input,
     status: 'running',
-    started_at: new Date().toISOString(),
+    started_at: nowIso(),
     output_tail: '',
   };
   pipelineJobs.set(jobId, job);
@@ -485,7 +484,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
   const timeout = setTimeout(() => {
     if (job.status === 'running') {
       job.status = 'timed_out';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
       stopManagedProcess(resourceId, child);
     }
   }, PIPELINE_JOB_TIMEOUT_MS);
@@ -495,7 +494,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     clearTimeout(timeout);
     if (job.status === 'running') {
       job.status = 'failed';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
       appendOutput(`\n[job] spawn error: ${err}`);
     }
     stopManagedProcess(resourceId, null);
@@ -505,7 +504,7 @@ function startPipelineJob(input: string, absInput: string, extraArgs: string[]):
     if (job.status === 'running') {
       job.exit_code = code;
       job.status = code === 0 ? 'succeeded' : 'failed';
-      job.finished_at = new Date().toISOString();
+      job.finished_at = nowIso();
     }
     stopManagedProcess(resourceId, null);
   });

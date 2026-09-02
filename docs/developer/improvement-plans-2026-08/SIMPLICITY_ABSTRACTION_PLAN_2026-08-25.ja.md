@@ -11928,6 +11928,18 @@ script の単純 `new Date().toISOString()` を 0 件へ移行した状態が再
 検証: foundation-adoption **3 tests passed**、対象 production `scripts/` の単純 timestamp **0 件**、root typecheck、
 root lint、Prettier、`git diff --check`。これにより SX-03 の script timestamp 集約を CI で継続監視する。
 
+## 2026-09-02 再レビュー修正 305
+
+foundation adoption の残差から、共有 core の trace／deliverable inbox、MCP server job に残っていた
+意味固有の変換を持たない `new Date().toISOString()` を foundation の `nowIso()` へ移行した。trace の日次ファイル
+分割、OTLP fallback、deliverable の状態遷移、MCP job の timeout／exit lifecycle は維持し、
+経過時間・deadline・一意 ID の `Date.now()` は対象外とした。併せて script の JSON reader foundation wrapper 残存を
+`org`／`register_workflow` から除去し、repository-bound path 解決と安全 I/O の責務を保持した。
+
+検証: trace／deliverable inbox／MCP server **3 files / 48 tests passed**、root typecheck、
+root lint、PR scope **33/33 gates passed**、Prettier、`git diff --check`。残る SX-03 は surface／actuator／domain-specific
+loader の追加 adoption と、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
