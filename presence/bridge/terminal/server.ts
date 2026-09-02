@@ -4,6 +4,7 @@ import {
   getRegisteredEnvBool,
   getRegisteredEnvText,
   parseSafeJsonInput,
+  readJson,
 } from '@agent/core/foundation';
 import { installProcessGuards } from '@agent/core/process-guards';
 import { createServer } from 'node:http';
@@ -19,7 +20,6 @@ import { runtimeSupervisor } from '@agent/core/runtime-supervisor';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
-  loadJson,
   safeWriteFile,
   safeMkdir,
   safeRmSync,
@@ -278,7 +278,7 @@ async function setupSessionWatcher(session: Session) {
             { allowMissingLeaf: true }
           );
           if (safeExistsSync(registryPath) && safeLstat(registryPath).isFile()) {
-            const registry = loadJson<{
+            const registry = readJson<{
               default_profile: string;
               profiles: Record<string, { cmd: string; args: string[] }>;
             }>(registryPath);
