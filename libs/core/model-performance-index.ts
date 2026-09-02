@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { nowIso } from './foundation/time.js';
 
 /**
  * Model×role performance feedback used by future team staffing.
@@ -162,7 +163,7 @@ export function recordModelRoleFeedback(input: {
     ...(input.taskId?.trim() ? { task_id: input.taskId.trim() } : {}),
     ...(input.comment?.trim() ? { comment: input.comment.trim() } : {}),
     source: input.source || 'user',
-    recorded_at: new Date().toISOString(),
+    recorded_at: nowIso(),
   };
   appendJsonl(modelRoleFeedbackPath(), [feedback]);
   rebuildModelPerformanceIndex();
