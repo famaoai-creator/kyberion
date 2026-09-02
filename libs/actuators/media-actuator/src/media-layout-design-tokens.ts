@@ -4,7 +4,12 @@ import {
 } from '@agent/core/media-theme-role-policy';
 import { defineCatalog } from '@agent/core/foundation';
 import * as path from 'node:path';
-import { loadJsonCatalog, loadMediaDesignSystemsCatalog } from './media-catalog-loaders.js';
+import {
+  cloneJsonValue,
+  deepMergeCatalog,
+  loadMediaDesignSystemsCatalog,
+  readJsonFilesRecursively,
+} from './media-catalog-loaders.js';
 
 export function loadSemanticRenderTokenCatalog(rootDir: string): any {
   const fallback = {
@@ -13,12 +18,7 @@ export function loadSemanticRenderTokenCatalog(rootDir: string): any {
     semantics: {},
     signal_tones: {},
   };
-  const catalog = loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
-    filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
-    fallback,
-  });
-  return defineCatalog({
+  const catalog = defineCatalog({
     id: 'semantic-render-tokens',
     path: path.resolve(
       rootDir,
@@ -27,10 +27,15 @@ export function loadSemanticRenderTokenCatalog(rootDir: string): any {
     schema: path.resolve(rootDir, 'knowledge/product/schemas/semantic-render-tokens.schema.json'),
     fallback,
     fallbackOnInvalid: true,
-  }).validate(
-    catalog,
-    path.resolve(rootDir, 'knowledge/public/design-patterns/media-templates/semantic-render-tokens')
+  });
+  const directoryPath = path.resolve(
+    rootDir,
+    'knowledge/public/design-patterns/media-templates/semantic-render-tokens'
   );
+  const docs = readJsonFilesRecursively(directoryPath);
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => deepMergeCatalog(acc, doc), cloneJsonValue(fallback));
+  return catalog.validate(merged, directoryPath);
 }
 
 export function resolveSemanticRenderTokens(
