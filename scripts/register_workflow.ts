@@ -97,10 +97,6 @@ function abs(rel: string): string {
   });
 }
 
-function readJson(rel: string): Json {
-  return readFoundationJson<Json>(abs(rel));
-}
-
 function loadRegistrationRequest(filePath: string): RegistrationRequest {
   return defineCatalog<RegistrationRequest>({
     id: 'workflow-registration-request',
@@ -260,7 +256,7 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
   const touched: string[] = [];
 
   // 1) mission-workflow-catalog: insert before the default template so it stays last.
-  const catalog = readJson(CATALOG_REL);
+  const catalog = readFoundationJson<Json>(abs(CATALOG_REL));
   const templates = (catalog.templates as unknown[]) ?? [];
   const withoutMine = templates.filter((t) => (t as Json)?.id !== req.workflow_id);
   const defaultIdx = withoutMine.findIndex((t) => (t as Json)?.id === DEFAULT_WORKFLOW);
@@ -272,13 +268,13 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
   touched.push(CATALOG_REL);
 
   // 2) standard-intents
-  const intents = readJson(INTENTS_REL);
+  const intents = readFoundationJson<Json>(abs(INTENTS_REL));
   intents.intents = upsertById((intents.intents as unknown[]) ?? [], 'id', buildIntent(req));
   writeJson(INTENTS_REL, intents);
   touched.push(INTENTS_REL);
 
   // 3) intent-domain-ontology
-  const ontology = readJson(ONTOLOGY_REL);
+  const ontology = readFoundationJson<Json>(abs(ONTOLOGY_REL));
   ontology.intents = upsertById(
     (ontology.intents as unknown[]) ?? [],
     'intent_id',
@@ -289,7 +285,7 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
 
   // 4) routing (track policy map) — optional
   if (req.track && req.track.track_type) {
-    const routing = readJson(ROUTING_REL);
+    const routing = readFoundationJson<Json>(abs(ROUTING_REL));
     const map = (routing.track_intent_policy_map as Json) ?? {};
     map[req.workflow_id] = {
       track_type: req.track.track_type,
@@ -303,7 +299,7 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
 
   // 5) gate-profile gates — optional
   if (req.gate_profile_gates && req.gate_profile_gates.gates.length > 0) {
-    const reg = readJson(GATE_PROFILES_REL);
+    const reg = readFoundationJson<Json>(abs(GATE_PROFILES_REL));
     const profiles = (reg.profiles as Json) ?? {};
     const profile = (profiles[req.gate_profile_gates.profile] as Json) ?? {
       domain: 'delivery',
@@ -325,7 +321,7 @@ function applyToGovernedCatalogs(req: RegistrationRequest): string[] {
 
   // 6) governance bodies — optional
   if (req.governance_bodies && req.governance_bodies.length > 0) {
-    const reg = readJson(GOV_BODY_REL);
+    const reg = readFoundationJson<Json>(abs(GOV_BODY_REL));
     let bodies = (reg.bodies as unknown[]) ?? [];
     for (const b of req.governance_bodies) bodies = upsertById(bodies, 'id', b as Json);
     reg.bodies = bodies;

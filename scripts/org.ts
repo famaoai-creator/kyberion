@@ -350,12 +350,8 @@ function unique(values: string[]): string[] {
   );
 }
 
-function readJson<T>(filePath: string): T {
-  return readFoundationJson<T>(filePath);
-}
-
 function readJsonIfExists<T>(filePath: string): T | null {
-  return safeExistsSync(filePath) ? readJson<T>(filePath) : null;
+  return safeExistsSync(filePath) ? readFoundationJson<T>(filePath) : null;
 }
 
 function roleAuthorityMapCatalog(filePath: string): GovernedCatalog<RoleAuthorityMap> {

@@ -14,5 +14,6 @@ describe('register_workflow request boundary', () => {
       'return assertSafeRepositoryPath(path.join(pathResolver.rootDir(), rel),'
     );
     expect(source).not.toContain('createAjv()');
+    expect(source).not.toMatch(/function readJson\(/u);
   });
 });

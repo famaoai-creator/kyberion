@@ -8,5 +8,6 @@ describe('org role loader boundary', () => {
     );
     expect(source).toContain('loadGovernedAuthorityRoleIndex(rootDir)');
     expect(source).toContain('loadGovernedTeamRoleIndex(rootDir)');
+    expect(source).not.toMatch(/function readJson<.*>\(/u);
   });
 });
