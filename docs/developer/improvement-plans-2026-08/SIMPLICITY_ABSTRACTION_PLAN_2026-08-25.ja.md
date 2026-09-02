@@ -13397,6 +13397,12 @@ SX-03／SX-04／SX-09／SX-10 のgeneration scheduleを再監査し、media-gene
 
 検証: generation scheduler／tick／CLI／scope-offboarding **4 files / 56 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 523
+
+SX-03／SX-04／SX-09 のdaemon heartbeatを再監査し、watchdog／baseline checkへ渡すpersisted JSONをraw `readJson<DaemonHeartbeat>`の型アサーションと部分的な手動検査だけで扱っていた残存を修正した。`daemon-heartbeat.schema.json`と`loadDaemonHeartbeatAtPath`を追加し、daemon ID binding、status／pid／timestamp、未知フィールド、regular-file境界を共有loaderへ集約した。record／read／listの全経路を検証済みheartbeatへ統合し、不正・directory・scope mismatchはhealthy判定へ進まずmalformedとして監視・alertへ流れるfail-closed契約にした。既存のstale／missing判定、heartbeat filename補完、watchdog recovery semanticsは維持している。
+
+検証: daemon heartbeat／watchdog **2 files / 9 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。supervisor関連テストは長時間無出力となったため中断し、今回変更の直接経路は独立テストで検証した。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
