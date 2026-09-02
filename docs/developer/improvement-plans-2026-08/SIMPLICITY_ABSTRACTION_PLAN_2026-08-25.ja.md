@@ -12146,6 +12146,15 @@ JSON readへ戻る経路を除去した。
 検証: media layout **1 file / 1 test passed**、body-zone／layout acceptanceを含む関連47 tests、typecheck、lint、catalog gate、Prettier、
 `git diff --check`。残るSX-04は他のdomain loaderと非catalog層の旧loader整理、未参照catalogの廃止判断である。
 
+## 2026-09-02 再レビュー修正 326
+
+semantic render token の検証済みloaderが `media-layout-design-tokens` と `media-design-protocol` に二重化し、後者だけが
+汎用 `loadJsonCatalog` を直接利用していた残存を確認した。schema validationを担うloaderと、design-system overrideを含む解決処理を
+`media-layout-design-tokens` から再利用し、protocol側は互換wrapperだけに整理した。spreadsheet／report／PPTXの既存解決結果は維持した。
+
+検証: semantic／media layout **4 files / 57 tests passed**、catalog、typecheck、build、lint、Prettier、`git diff --check`。
+残るSX-04は他のdomain loaderと非catalog層の旧loader整理、未参照catalogの廃止判断である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

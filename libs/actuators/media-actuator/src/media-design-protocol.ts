@@ -38,6 +38,10 @@ import { loadJsonValue, resolveConfidentialTenantOverride } from './media-catalo
 import * as path from 'node:path';
 import { resolveEastAsianFontFamily } from '@agent/core/design-fonts';
 import {
+  loadSemanticRenderTokenCatalog as loadValidatedSemanticRenderTokenCatalog,
+  resolveSemanticRenderTokens as resolveValidatedSemanticRenderTokens,
+} from './media-layout-design-tokens.js';
+import {
   cloneJsonValue,
   deepMergeCatalog,
   readJsonFilesRecursively,
@@ -532,11 +536,7 @@ function resolveMediaDesignSystem(
 }
 
 function loadSemanticRenderTokenCatalog(rootDir: string): any {
-  return loadJsonCatalog(rootDir, {
-    directoryPath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens',
-    filePath: 'knowledge/public/design-patterns/media-templates/semantic-render-tokens.json',
-    fallback: { defaults: { content: {} }, semantics: {}, signal_tones: {} },
-  });
+  return loadValidatedSemanticRenderTokenCatalog(rootDir);
 }
 
 function resolveSemanticRenderTokens(
@@ -544,17 +544,7 @@ function resolveSemanticRenderTokens(
   semanticType?: string,
   designSystemId?: string
 ): any {
-  const catalog = loadSemanticRenderTokenCatalog(rootDir);
-  const key = String(semanticType || 'content').trim() || 'content';
-  const designSystems = loadMediaDesignSystemsCatalog(rootDir);
-  const systemOverrides = designSystemId
-    ? designSystems.systems?.[designSystemId]?.semantic_overrides?.[key] || {}
-    : {};
-  return {
-    ...(catalog.defaults?.content || {}),
-    ...(catalog.semantics?.[key] || {}),
-    ...systemOverrides,
-  };
+  return resolveValidatedSemanticRenderTokens(rootDir, semanticType, designSystemId);
 }
 
 function resolveSemanticComponentRule(
