@@ -1,4 +1,4 @@
-import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 /**
@@ -203,7 +203,11 @@ export function loadPluginPackRegistryAtPath(filePath: string): PluginPackRegist
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[PLUGIN_PACK_REGISTRY] registry must be a regular file: ${filePath}`);
   }
-  return pluginPackRegistryCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath);
+  return defineCatalog<PluginPackRegistry>({
+    id: 'plugin-pack-registry',
+    path: safeFilePath,
+    schema: PLUGIN_PACK_REGISTRY_SCHEMA_PATH,
+  }).load();
 }
 
 function saveRegistry(registry: PluginPackRegistry, override?: string): void {
@@ -342,7 +346,10 @@ function manifestPluginId(dir: string): string | undefined {
     const manifestPath = manifestPathFor(dir, name);
     if (!manifestPath) continue;
     try {
-      const parsed = readJson<unknown>(manifestPath);
+      const parsed = parseSafeJsonInput(
+        String(safeReadFile(manifestPath, { encoding: 'utf8' })),
+        `plugin manifest ${manifestPath}`
+      );
       if (!isRecord(parsed)) continue;
       const candidate =
         typeof parsed.plugin_id === 'string'
