@@ -6,6 +6,7 @@ import type { ServiceEndpointsCatalog } from '@agent/core/service-endpoint-regis
 import {
   loadAgentProfileDirectory,
   loadAgentProfileSnapshot,
+  loadAuthorityRoleIndex as loadGovernedAuthorityRoleIndex,
   loadTeamRoleDirectory,
   loadTeamRoleSnapshot,
 } from '@agent/core/mission-team-index';
@@ -241,39 +242,32 @@ export function validateAuthorityRoleDirectoryConsistency(violations: string[]) 
     return;
   }
 
-  const schemaPath = 'knowledge/product/schemas/authority-role.schema.json';
-  const validate = compileSchema(schemaPath);
   const snapshot = authorityRoleSnapshotCatalog.load();
   const snapshotRoles = snapshot.authority_roles || {};
+  let directoryRoles: ReturnType<typeof loadGovernedAuthorityRoleIndex>;
+  try {
+    directoryRoles = loadGovernedAuthorityRoleIndex();
+  } catch (error) {
+    violations.push(
+      `authority-role-index: canonical directory failed governed loading (${error instanceof Error ? error.message : String(error)})`
+    );
+    return;
+  }
   const seenRoleIds = new Set<string>();
 
   for (const file of files) {
-    const relativePath = `knowledge/product/governance/authority-roles/${file}`;
-    const data = readJson<Record<string, unknown>>(pathResolver.rootResolve(relativePath));
-    const ok = validate(data);
-    if (!ok) {
-      for (const error of validate.errors || []) {
-        violations.push(
-          `authority-role-index/${file}: ${error.instancePath || '/'} ${error.message || 'schema violation'}`
-        );
-      }
-    }
-
-    const role = String((data as { role?: string }).role || '');
-    if (!role) {
-      violations.push(`authority-role-index/${file}: role must not be empty`);
+    const role = file.replace(/\.json$/i, '');
+    const data = directoryRoles[role];
+    if (!data) {
+      violations.push(`authority-role-index/${file}: canonical loader did not return this role`);
       continue;
-    }
-    if (file.replace(/\.json$/i, '') !== role) {
-      violations.push(`authority-role-index/${file}: file name must match role id ${role}`);
     }
 
     const snapshotEntry = snapshotRoles[role];
     if (!snapshotEntry) {
       violations.push(`authority-role-index/${file}: snapshot is missing role ${role}`);
     } else {
-      const { role: _role, ...dirRecord } = data as { role?: string; [key: string]: unknown };
-      if (JSON.stringify(dirRecord) !== JSON.stringify(snapshotEntry)) {
+      if (JSON.stringify(data) !== JSON.stringify(snapshotEntry)) {
         violations.push(`authority-role-index/${file}: directory entry does not match snapshot`);
       }
     }
