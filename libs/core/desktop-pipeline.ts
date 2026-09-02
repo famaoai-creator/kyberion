@@ -1,13 +1,16 @@
 import type { ValidateFunction } from 'ajv';
 import path from 'node:path';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeLstat } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
 import { requiresProjectTrust } from './trust-requiring-resources.js';
 import type { DesktopRecordingStep } from './desktop-recording.js';
 
 let validator: ValidateFunction | null = null;
+const DESKTOP_PIPELINE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/desktop-pipeline.schema.json'
+);
 
 export interface DesktopPipelineStep {
   step_id: string;
@@ -37,9 +40,7 @@ export interface DesktopPipelineValidationResult {
 
 function getValidator(): ValidateFunction {
   if (!validator) {
-    validator = compileSchema(
-      pathResolver.knowledge('product/schemas/desktop-pipeline.schema.json')
-    );
+    validator = compileSchema(DESKTOP_PIPELINE_SCHEMA_PATH);
   }
   return validator;
 }
@@ -91,6 +92,23 @@ export function assertDesktopPipelineResourcePath(
   }
 }
 
+function desktopPipelineCatalogAtPath(filePath: string) {
+  return defineCatalog<DesktopPipeline>({
+    id: 'desktop-pipeline',
+    path: filePath,
+    schema: DESKTOP_PIPELINE_SCHEMA_PATH,
+  });
+}
+
+/** Load one persisted desktop pipeline through the canonical schema boundary. */
+export function loadDesktopPipelineAtPath(filePath: string): DesktopPipeline {
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: false });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DESKTOP_PIPELINE] pipeline must be a regular file: ${filePath}`);
+  }
+  return desktopPipelineCatalogAtPath(safeFilePath).load();
+}
+
 export function loadDesktopPipeline(
   ref: string | undefined,
   options: { trustResolved?: boolean } = {}
@@ -108,8 +126,7 @@ export function loadDesktopPipeline(
   }
   try {
     assertDesktopPipelineResourcePath(absolute);
-    const raw = readJson<unknown>(absolute);
-    return validateDesktopPipeline(raw);
+    return { valid: true, errors: [], value: loadDesktopPipelineAtPath(absolute) };
   } catch (error) {
     return {
       valid: false,
