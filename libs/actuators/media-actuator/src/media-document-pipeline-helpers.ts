@@ -1,10 +1,5 @@
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '@agent/core/secure-io';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { defineCatalog, nowIso } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { retry } from '@agent/core/async-utils';
 import { designDefaultsFromMediaTheme } from '@agent/core/src/native-pptx-engine/design-cascade';
@@ -21,6 +16,29 @@ import {
   type MediaBriefCategory,
   type ProtocolKind,
 } from './media-document-helpers.js';
+
+const DOCUMENT_LAYOUTS_PATH = pathResolver.rootResolve(
+  'knowledge/public/design-patterns/media-templates/document-layouts.json'
+);
+const DOCUMENT_LAYOUTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/document-layouts.schema.json'
+);
+
+interface DocumentLayoutCatalog {
+  documents: Record<
+    string,
+    {
+      default_template: string;
+      templates: Record<string, Record<string, unknown>>;
+    }
+  >;
+}
+
+const documentLayoutCatalog = defineCatalog<DocumentLayoutCatalog>({
+  id: 'document-layouts',
+  path: DOCUMENT_LAYOUTS_PATH,
+  schema: DOCUMENT_LAYOUTS_SCHEMA_PATH,
+});
 
 export interface MediaDocumentPipelineDeps {
   resolveNamedTheme: (rootDir: string, preferredTheme?: string) => any;
@@ -377,18 +395,15 @@ export function createMediaDocumentPipelineHelpers(deps: MediaDocumentPipelineDe
       ),
       { allowMissingLeaf: true }
     );
-    if (!safeExistsSync(catalogPath)) {
-      throw new Error(`Document layout catalog not found: ${catalogPath}`);
+    let catalog: DocumentLayoutCatalog;
+    try {
+      catalog = documentLayoutCatalog.load();
+    } catch (error) {
+      if (String(error).includes('Catalog document-layouts is missing:')) {
+        throw new Error(`Document layout catalog not found: ${catalogPath}`);
+      }
+      throw error;
     }
-    const catalog = readJson<{
-      documents: Record<
-        string,
-        {
-          default_template?: string;
-          templates?: Record<string, unknown>;
-        }
-      >;
-    }>(catalogPath);
     const documentType = brief.document_type || 'invoice';
     const documentCatalog = catalog.documents?.[documentType];
     if (!documentCatalog) {
