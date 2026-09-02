@@ -100,6 +100,11 @@ describe('software quality operations', () => {
   it('rejects array and dangerous-key reasoning inventory responses', () => {
     expect(parseReasoningItems('[{"items":[]}]')).toEqual([]);
     expect(parseReasoningItems('{"items":[],"meta":{"__proto__":{}}}')).toEqual([]);
+    expect(
+      parseReasoningItems(
+        '{"items":[{"item_id":"LLM-1","title":"Invalid","viewpoint_ids":["security"],"risk_level":"high","expected_result":"blocked","execution_mode":"safe_auto","unexpected":true}]}'
+      )
+    ).toEqual([]);
   });
 
   it('dispatches safe tests and separates approval, manual, and prohibited work', async () => {

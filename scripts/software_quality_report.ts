@@ -4,9 +4,9 @@ import * as path from 'node:path';
 import {
   buildSoftwareQualityReport,
   createDefectCandidates,
-  type SoftwareQualityContract,
-  type TestExecutionRecord,
-  type TestInventory,
+  parseSoftwareQualityContract,
+  parseTestExecutionRecord,
+  parseTestInventory,
 } from '@agent/core/software-quality';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -56,9 +56,18 @@ export function generateSoftwareQualityArtifacts(input: SoftwareQualityReportInp
   const inventoryPath = resolveQualityArtifactPath(input.inventoryPath);
   const executionPath = resolveQualityArtifactPath(input.executionPath);
   const outputPath = resolveQualityArtifactPath(input.outputPath, true);
-  const contract = readJson<SoftwareQualityContract>(requireQualityInput(contractPath, 'contract'));
-  const inventory = readJson<TestInventory>(requireQualityInput(inventoryPath, 'inventory'));
-  const execution = readJson<TestExecutionRecord>(requireQualityInput(executionPath, 'execution'));
+  const contract = parseSoftwareQualityContract(
+    readJson<unknown>(requireQualityInput(contractPath, 'contract'))
+  );
+  const inventory = parseTestInventory(
+    readJson<unknown>(requireQualityInput(inventoryPath, 'inventory'))
+  );
+  const execution = parseTestExecutionRecord(
+    readJson<unknown>(requireQualityInput(executionPath, 'execution'))
+  );
+  if (!contract) throw new Error('contract must match software-quality-contract schema');
+  if (!inventory) throw new Error('inventory must match test-inventory schema');
+  if (!execution) throw new Error('execution must match test-execution-record schema');
   const summary = buildSoftwareQualityReport({
     contract,
     inventory,

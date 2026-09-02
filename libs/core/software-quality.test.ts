@@ -12,6 +12,8 @@ import {
   evaluateQualityContract,
   evaluateTestTraceability,
   parseSoftwareQualityContract,
+  parseTestExecutionRecord,
+  parseTestInventoryItem,
   parseTestInventory,
   type SoftwareQualityContract,
   type TestInventory,
@@ -102,6 +104,12 @@ describe('software quality lifecycle', () => {
     ).toBeNull();
     expect(parseTestInventory({ ...inventory(), unexpected: true })).toBeNull();
     expect(
+      parseTestInventoryItem({
+        ...inventory().items[0],
+        unexpected: true,
+      })
+    ).toBeNull();
+    expect(
       parseTestInventory({
         ...inventory(),
         items: [
@@ -116,6 +124,24 @@ describe('software quality lifecycle', () => {
       parseTestInventory(
         JSON.parse('{"version":"1","project_id":"p","items":[{"__proto__":true}]}')
       )
+    ).toBeNull();
+    const execution = {
+      version: '1.0.0',
+      run_id: 'RUN-1',
+      project_id: 'project-1',
+      subject_ref: 'git:abc123',
+      environment: 'test',
+      executor: { resource_id: 'agent:tester', resource_type: 'ai_agent' },
+      started_at: '2026-07-12T00:00:00.000Z',
+      finished_at: '2026-07-12T00:01:00.000Z',
+      results: [{ item_id: 'TEST-1', status: 'passed', evidence_refs: ['trace:1'] }],
+    };
+    expect(parseTestExecutionRecord({ ...execution, unexpected: true })).toBeNull();
+    expect(
+      parseTestExecutionRecord({
+        ...execution,
+        results: [{ ...execution.results[0], status: 'unknown' }],
+      })
     ).toBeNull();
   });
 

@@ -41,6 +41,7 @@ import {
   parsePersistedPipelineStrategy,
   readJson,
 } from '@agent/core/foundation';
+import { parseSoftwareQualityContract } from '@agent/core/software-quality';
 import { getAllFiles } from '@agent/core/fs-utils';
 import * as path from 'node:path';
 import * as addFormatsModule from 'ajv-formats';
@@ -56,7 +57,6 @@ import {
   extractRequirements,
   extractTestPlan,
 } from './sdlc-ops.js';
-import type { SoftwareQualityContract } from '@agent/core/software-quality';
 
 const MODEL_MANIFEST_PATH = pathResolver.rootResolve(
   'libs/actuators/modeling-actuator/manifest.json'
@@ -987,17 +987,18 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
             allowMissingLeaf: true,
           })
         : undefined;
-      const contract =
+      const contractValue =
         params.contract ??
         ctx[params.contract_from || 'quality_contract'] ??
         (contractFilePath && safeExistsSync(contractFilePath)
-          ? readJson<SoftwareQualityContract>(contractFilePath)
+          ? readJson<unknown>(contractFilePath)
           : null);
-      if (!contract) throw new Error('[derive_test_inventory] quality contract not found');
+      const contract = parseSoftwareQualityContract(contractValue);
+      if (!contract) throw new Error('[derive_test_inventory] quality contract is invalid');
       const systemTags = params.system_tags ?? ctx[params.system_tags_from || 'system_tags'];
       const riskRefs = params.risk_refs ?? ctx[params.risk_refs_from || 'risk_refs'];
       const result = await deriveTestInventory({
-        contract: contract as SoftwareQualityContract,
+        contract,
         system_tags: Array.isArray(systemTags) ? systemTags.map(String) : [],
         risk_refs: Array.isArray(riskRefs) ? riskRefs.map(String) : [],
         additional_context: resolve(params.additional_context),
