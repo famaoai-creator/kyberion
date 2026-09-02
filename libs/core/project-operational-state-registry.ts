@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { loadProjectRecord } from './project-registry.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -216,7 +217,7 @@ function normalizeProjectOperationalState(
     sources: record.sources || [],
     distill_targets: record.distill_targets || [],
     knowledge_refs: record.knowledge_refs || [],
-    updated_at: record.updated_at || new Date().toISOString(),
+    updated_at: record.updated_at || nowIso(),
   };
 }
 
@@ -473,7 +474,7 @@ export function syncProjectOperationalStateFromMission(
       sources: [],
       distill_targets: [`knowledge/product/evolution/projects/${projectId}/project-state.md`],
       knowledge_refs: [],
-      updated_at: new Date().toISOString(),
+      updated_at: nowIso(),
     } satisfies ProjectOperationalState);
 
   const missionLinkPath = saveProjectMissionLink({
@@ -580,7 +581,7 @@ export function syncProjectOperationalStateFromMission(
           input.outcome_contract?.requested_result ||
           input.mission_type ||
           'mission',
-        captured_at: new Date().toISOString(),
+        captured_at: nowIso(),
       },
       ...(trackId
         ? [
@@ -591,7 +592,7 @@ export function syncProjectOperationalStateFromMission(
                 input.relationships?.track?.note ||
                 input.relationships?.track?.track_name ||
                 trackId,
-              captured_at: new Date().toISOString(),
+              captured_at: nowIso(),
             },
           ]
         : []),
@@ -601,7 +602,7 @@ export function syncProjectOperationalStateFromMission(
               kind: 'artifact' as const,
               ref: `knowledge:${input.context.distill_output_path}`,
               summary: 'Distilled knowledge output',
-              captured_at: new Date().toISOString(),
+              captured_at: nowIso(),
             },
           ]
         : []),
@@ -610,9 +611,9 @@ export function syncProjectOperationalStateFromMission(
     knowledge_refs: [...knowledgeRefs].sort(),
     last_distilled_at:
       input.status === 'completed' || input.status === 'archived'
-        ? new Date().toISOString()
+        ? nowIso()
         : projectState.last_distilled_at,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     metadata: {
       ...(projectState.metadata || {}),
       mission_link_path: missionLinkPath,
