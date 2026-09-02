@@ -6391,6 +6391,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/agent-runtime-ensure-result.schema.json",
+      "tier": "public",
+      "size": 7887,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/agent-trust-scores.schema.json",
       "tier": "public",
       "size": 1577,

@@ -95,6 +95,12 @@ describe('agent-runtime-supervisor', () => {
           required: true,
           status: 'assigned',
           agent_id: 'nerve-agent',
+          authority_role: null,
+          delegation_contract: null,
+          provider: 'stub',
+          modelId: null,
+          required_capabilities: [],
+          notes: '',
           runtime_status: 'spawned',
         },
       ],
@@ -131,6 +137,86 @@ describe('agent-runtime-supervisor', () => {
     expect(safeExistsSync(resultPath)).toBe(true);
     const stored = JSON.parse(safeReadFile(resultPath, { encoding: 'utf8' }) as string);
     expect(stored.request_id).toBe(request.request_id);
+  });
+
+  it('rejects result artifacts with unknown fields', async () => {
+    const { getAgentRuntimeEnsureResultPath, loadMissionTeamPrewarmResultAtPath } =
+      await import('./agent-runtime-supervisor.js');
+    const { safeRmSync, safeWriteFile } = await import('./secure-io.js');
+    const resultPath = getAgentRuntimeEnsureResultPath(`AR-RESULT-${process.pid}`);
+    safeWriteFile(
+      resultPath,
+      JSON.stringify({
+        request_id: 'AR-OTHER',
+        mission_id: 'MSN-PREWARM',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+        requested_by: 'test',
+        created_at: '2026-09-03T00:00:00.000Z',
+        completed_at: '2026-09-03T00:00:01.000Z',
+        runtime_plan: { mission_id: 'MSN-PREWARM', assignments: [] },
+        unexpected: true,
+      })
+    );
+    try {
+      expect(() => loadMissionTeamPrewarmResultAtPath(resultPath, 'AR-RESULT-123')).toThrow(
+        'Invalid catalog agent-runtime-ensure-result'
+      );
+    } finally {
+      safeRmSync(resultPath, { force: true });
+    }
+  });
+
+  it('rejects a result whose request id does not match the result filename', async () => {
+    const { getAgentRuntimeEnsureResultPath, loadMissionTeamPrewarmResultAtPath } =
+      await import('./agent-runtime-supervisor.js');
+    const { safeRmSync, safeWriteFile } = await import('./secure-io.js');
+    const resultPath = getAgentRuntimeEnsureResultPath(`AR-RESULT-BINDING-${process.pid}`);
+    safeWriteFile(
+      resultPath,
+      JSON.stringify({
+        request_id: 'AR-OTHER',
+        mission_id: 'MSN-PREWARM',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+        requested_by: 'test',
+        created_at: '2026-09-03T00:00:00.000Z',
+        completed_at: '2026-09-03T00:00:01.000Z',
+        runtime_plan: { mission_id: 'MSN-PREWARM', assignments: [] },
+      })
+    );
+    try {
+      expect(() => loadMissionTeamPrewarmResultAtPath(resultPath, 'AR-RESULT-BINDING-123')).toThrow(
+        '[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH]'
+      );
+    } finally {
+      safeRmSync(resultPath, { force: true });
+    }
+  });
+
+  it('rejects a result whose runtime plan crosses the mission binding', async () => {
+    const { getAgentRuntimeEnsureResultPath, loadMissionTeamPrewarmResultAtPath } =
+      await import('./agent-runtime-supervisor.js');
+    const { safeRmSync, safeWriteFile } = await import('./secure-io.js');
+    const requestId = `AR-RESULT-SCOPE-${process.pid}`;
+    const resultPath = getAgentRuntimeEnsureResultPath(requestId);
+    safeWriteFile(
+      resultPath,
+      JSON.stringify({
+        request_id: requestId,
+        mission_id: 'MSN-PREWARM',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+        requested_by: 'test',
+        created_at: '2026-09-03T00:00:00.000Z',
+        completed_at: '2026-09-03T00:00:01.000Z',
+        runtime_plan: { mission_id: 'MSN-OTHER', assignments: [] },
+      })
+    );
+    try {
+      expect(() => loadMissionTeamPrewarmResultAtPath(resultPath, requestId)).toThrow(
+        '[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH]'
+      );
+    } finally {
+      safeRmSync(resultPath, { force: true });
+    }
   });
 
   it('starts a detached supervisor process for a queued request', async () => {
