@@ -25,7 +25,8 @@ import {
   safeReadFile,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { getRegisteredEnvText, readJson, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { loadOrganizationProfileAtPath } from '@agent/core/organization-profile';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 const SLUG_PATTERN = /^[a-z][a-z0-9-]{1,30}$/;
@@ -125,9 +126,7 @@ export function bootstrapCompany(input: BootstrapCompanyInput): BootstrapCompany
   if (!safeLstat(profileTarget).isFile()) {
     throw new Error('[company-bootstrap] materialized organization profile must be a regular file');
   }
-  const profile = readJson<{ team_defaults?: { team_template_catalog_id?: string } }>(
-    profileTarget
-  );
+  const profile = loadOrganizationProfileAtPath(profileTarget);
   const catalogId = profile.team_defaults?.team_template_catalog_id ?? 'default';
   if (!/^[a-z][a-z0-9-]{1,63}$/.test(catalogId)) {
     throw new Error(`[company-bootstrap] invalid team template catalog id '${catalogId}'`);
