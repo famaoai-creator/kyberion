@@ -4,6 +4,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withLockSync } from './src/lock-utils.js';
 
@@ -229,10 +230,7 @@ function writeUsage(
         tenant_slug: tenantSlug,
         date,
         units: usage.units,
-        updated_at:
-          options.now === undefined
-            ? new Date().toISOString()
-            : new Date(options.now).toISOString(),
+        updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
       },
       null,
       2

@@ -29,6 +29,7 @@ import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
@@ -312,10 +313,7 @@ export function recordIngestUsage(
         tenant_slug: tenantSlug,
         date: ingestQuotaDateKey(options.now),
         ...next,
-        updated_at:
-          options.now === undefined
-            ? new Date().toISOString()
-            : new Date(options.now).toISOString(),
+        updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
       },
       null,
       2

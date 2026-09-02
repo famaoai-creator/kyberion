@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJsonIfPresent } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 
 import { resolveActiveProfileRoot } from './profile-root.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
@@ -292,7 +293,7 @@ export function saveVoiceSelectionPreferences(input: {
         version: '1.0.0',
         tts_engine_id: nextTts,
         stt_backend: nextStt,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
       },
       null,
       2
