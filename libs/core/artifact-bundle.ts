@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { findMissionPath, pathResolver } from './path-resolver.js';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -151,7 +152,7 @@ export function createArtifactBundle(input: {
   requiredArtifactKinds?: string[];
   items?: ArtifactBundleItem[];
 }): ArtifactBundle {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     bundle_id: `BND-${Date.now().toString(36).toUpperCase()}-${randomUUID().slice(0, 8).toUpperCase()}`,
     mission_id: input.missionId,
@@ -193,7 +194,7 @@ export function saveArtifactBundle(bundle: ArtifactBundle, missionPath?: string)
   const filePath = bundleFilePath(dir, bundle.bundle_id);
   safeWriteFile(
     filePath,
-    JSON.stringify({ ...bundle, updated_at: new Date().toISOString() }, null, 2)
+    JSON.stringify({ ...bundle, updated_at: nowIso() }, null, 2)
   );
   return filePath;
 }
@@ -250,19 +251,19 @@ export function addItemToArtifactBundle(
   return {
     ...bundle,
     items: [...bundle.items.filter((i) => i.artifact_id !== item.artifact_id), item],
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
   };
 }
 
 export function transitionBundleToReview(bundle: ArtifactBundle): ArtifactBundle {
-  return { ...bundle, status: 'pending_review', updated_at: new Date().toISOString() };
+  return { ...bundle, status: 'pending_review', updated_at: nowIso() };
 }
 
 export function applyBundleApproval(
   bundle: ArtifactBundle,
   decision: { verdict: 'approved' | 'rejected'; reviewer?: string; note?: string }
 ): ArtifactBundle {
-  const now = new Date().toISOString();
+  const now = nowIso();
   return {
     ...bundle,
     status: decision.verdict === 'approved' ? 'approved' : 'rejected',
