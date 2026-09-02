@@ -1,4 +1,5 @@
 import { appendJsonLine, readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * scripts/refactor/mission-governance.ts
  * Governance, trust, and observability helpers for mission orchestration.
@@ -455,5 +456,5 @@ export function recordAgentRuntimeEvent(
   const safeEventPath = assertSafeRepositoryPath(agentRuntimeEventPath, { allowMissingLeaf: true });
   const dir = assertSafeRepositoryPath(path.dirname(safeEventPath), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeWriteFile(safeEventPath, '');
-  appendJsonLine(safeEventPath, { ts: new Date().toISOString(), ...event });
+  appendJsonLine(safeEventPath, { ts: nowIso(), ...event });
 }

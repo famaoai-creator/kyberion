@@ -12947,6 +12947,12 @@ SX-03／SX-08／SX-09／SX-10／SX-14 のmission／operation残存監査とし�
 
 検証: 関連 **9 files / 42 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象12 production／test filesの ESLint、calendarを除く対象11 filesの Prettier、`git diff --check`。calendarは既存の未整形部分を差分へ取り込まず維持した。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
 
+## 2026-09-02 再レビュー修正 448
+
+SX-03／SX-08／SX-09／SX-10／SX-11 のmission／coordination残存監査として、pending intent、mission governance、context rewind、delegation chain、semantic degradation、terminal bridge、review re-entry、A2A bridge／conversation、organization operating model の **10 production files / 12 箇所**に残っていた直接時刻生成を foundation `nowIso()` へ統合した。pending intent／OAuth同様の期限計算は基準時刻を共有し、review re-entryのfixtureにはsecure foundation I/Oとpath boundaryのmockを補完した。delegation／A2Aのattenuation、mission／organization governance、tenant／approval境界は変更していない。
+
+検証: 関連 **10 files / 83 tests passed**、対象10ファイルの直接 timestamp **0件**、root typecheck、対象12 production／test filesの ESLint、対象11 filesの Prettier、`git diff --check`。canonical full gate 実行後、SX-03 の domain-specific helper、SX-04 の非catalog loader／未参照 catalog、SX-05〜SX-14 は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

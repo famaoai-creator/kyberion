@@ -1,5 +1,6 @@
 import { logger } from './core.js';
 import { getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { agentRegistry, AgentProvider } from './agent-registry.js';
 import {
   canonicalA2AEnvelopeContent,
@@ -568,7 +569,7 @@ class A2ABridgeImpl {
         conversation_id: envelope.header.conversation_id,
         correlation_id: correlationId,
         performative: 'result',
-        timestamp: new Date().toISOString(),
+        timestamp: nowIso(),
       },
       payload: {
         text: responseText,
