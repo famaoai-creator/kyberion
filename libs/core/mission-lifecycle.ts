@@ -10,6 +10,7 @@ import { runMissionRetrospective } from './mission-retrospective.js';
 import * as pathResolver from './path-resolver.js';
 import { findMissionPath } from './path-resolver.js';
 import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js';
+import { nowIso } from './foundation/time.js';
 import { createActuatorTrace, finalizeActuatorTrace } from './actuator-trace.js';
 import { buildCompletionNextAction, type CompletionReconciliation } from './next-action.js';
 import {
@@ -201,7 +202,7 @@ function recordMissionFinishGateFailure(input: {
   repairStrategy?: 'task' | 'operator' | 'existing_tasks' | 'artifact_review';
   actionTaskIds?: string[];
 }): string {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const context = input.state.context || {};
   const failureCount = Number(context.mission_finish_gate_failure_count || 0) + 1;
   const requiresOperator = input.repairStrategy === 'operator';
@@ -304,7 +305,7 @@ function reopenArtifactReviewTasks(input: {
   const taskIds = new Set(input.taskIds);
   const tasks = readMissionNextTasks(input.missionDir);
   const reopened: string[] = [];
-  const invalidatedAt = new Date().toISOString();
+  const invalidatedAt = nowIso();
   for (const task of tasks) {
     const taskId = String(task.task_id || '');
     if (!taskIds.has(taskId)) continue;
@@ -328,7 +329,7 @@ function recordMissionIntentDriftGateFailure(input: {
   reason: string;
   agentRuntimeEventPath: string;
 }): string {
-  const now = new Date().toISOString();
+  const now = nowIso();
   const context = input.state.context || {};
   const failureCount = Number(context.intent_drift_gate_failure_count || 0) + 1;
   const nextStatus =
@@ -488,7 +489,7 @@ export async function verifyMission(
       evidenceDir: path.join(missionDir, 'gates'),
       payload: {
         verdict: 'pass',
-        checked_at: new Date().toISOString(),
+        checked_at: nowIso(),
         reason: driftGate.reason || 'intent drift gate passed',
         review_summary: driftReview,
       },
@@ -505,12 +506,12 @@ export async function verifyMission(
 
   state.verification = {
     status: result,
-    verified_at: new Date().toISOString(),
+    verified_at: nowIso(),
     note,
   };
 
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'VERIFY',
     note: `Verification ${result}: ${note}`,
   });
@@ -600,7 +601,7 @@ export async function finishMission(
         mission_finish_recovered_commit: missionHead,
       };
       preState.history.push({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'FINISH_RECOVER',
         note: `Recovered interrupted finish commit ${missionHead.slice(0, 8)} before resuming gates.`,
       });
@@ -631,7 +632,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: driftSummary?.message || 'intent drift gate passed',
     },
   });
@@ -662,7 +663,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: 'No pending tasks remain',
     },
   });
@@ -702,7 +703,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: 'Mission quality validation passed',
     },
   });
@@ -797,7 +798,7 @@ export async function finishMission(
       };
       state.status = 'active';
       state.history.push({
-        ts: new Date().toISOString(),
+        ts: nowIso(),
         event: 'GOAL_GAP_REALIGN',
         note: `Goal not yet satisfied (round ${nextRound}/${goalLoopMaxRounds}). Gap tasks dispatched: ${gapTaskIds.join(', ')} — ${gapSummary}`,
       });
@@ -807,7 +808,7 @@ export async function finishMission(
         evidenceDir: path.join(missionDir, 'gates'),
         payload: {
           verdict: 'fail',
-          checked_at: new Date().toISOString(),
+          checked_at: nowIso(),
           reason: `goal gaps remain (round ${nextRound}/${goalLoopMaxRounds}): ${gapSummary}`,
         },
       });
@@ -846,7 +847,7 @@ export async function finishMission(
     evidenceDir: path.join(missionDir, 'gates'),
     payload: {
       verdict: 'pass',
-      checked_at: new Date().toISOString(),
+      checked_at: nowIso(),
       reason: completionReconciliation.satisfied
         ? `goal satisfied (confidence=${completionReconciliation.confidence})`
         : 'goal loop disabled or no actionable gaps — completing with reported next action',
@@ -882,7 +883,7 @@ export async function finishMission(
     }
     state.status = args.transitionStatus(state.status, 'completed');
     state.history.push({
-      ts: new Date().toISOString(),
+      ts: nowIso(),
       event: 'FINISH',
       note: 'Mission completed.',
     });
@@ -1068,7 +1069,7 @@ export async function finishMission(
 
   state.status = args.transitionStatus(state.status, 'archived');
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'ARCHIVE',
     note: `Mission archived to ${archivePath}.`,
   });
@@ -1159,7 +1160,7 @@ export async function reenterMissionFromReview(
     review_reentry_last_gaps: gaps.slice(0, 5),
   };
   state.history.push({
-    ts: new Date().toISOString(),
+    ts: nowIso(),
     event: 'REVIEW_GAP_REALIGN',
     note: `Human review re-entry (${pending.length} request(s), was ${previousStatus}). Rework tasks: ${gapTaskIds.join(', ')}`,
   });
