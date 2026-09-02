@@ -10,6 +10,7 @@ describe('governance directory consistency loader boundary', () => {
     );
     expect(source).toContain('loadAgentProfileDirectory()');
     expect(source).toContain('loadAgentProfileSnapshot()');
+    expect(source).toContain('loadGovernedAuthorityRoleIndex()');
     expect(source).toContain('loadTeamRoleDirectory()');
     expect(source).toContain('loadTeamRoleSnapshot()');
     expect(source).toContain('serviceEndpointsSnapshotCatalog.load()');
