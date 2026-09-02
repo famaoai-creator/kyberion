@@ -3,6 +3,7 @@ import { logger } from './core.js';
 import { pathResolver } from './path-resolver.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
@@ -556,7 +557,7 @@ export function markServiceRuntimeInstalled(
   const state = writeState(record, {
     status: 'installed',
     base_url: baseUrl,
-    installed_at: new Date().toISOString(),
+    installed_at: nowIso(),
     provenance: {
       action: 'install',
       notes,
@@ -577,7 +578,7 @@ export function markServiceRuntimePinned(
   const state = writeState(record, {
     status: 'pinned',
     base_url: baseUrl,
-    pinned_at: new Date().toISOString(),
+    pinned_at: nowIso(),
     provenance: {
       action: 'pin',
       notes,

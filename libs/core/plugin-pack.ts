@@ -1,5 +1,6 @@
 import { appendJsonLine, parseSafeJsonInput, readJson } from './foundation/json.js';
 import { isRecord } from './foundation/text.js';
+import { nowIso } from './foundation/time.js';
 /**
  * Plugin packs — git-imported plugin collections (QM-07, ported from qm's
  * skill-pack store).
@@ -401,7 +402,7 @@ export function importPluginPack(params: ImportPluginPackParams): ImportPluginPa
   }
   const beforeFingerprint = packFingerprint(before);
 
-  const now = new Date().toISOString();
+  const now = nowIso();
   const importRecord: PackImportRecord = {
     pack_id: packId,
     at: now,

@@ -1,5 +1,6 @@
 import { pathResolver } from './path-resolver.js';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import { safeWriteFile, safeExistsSync } from './secure-io.js';
 import * as path from 'node:path';
 import * as nodePath from 'node:path';
@@ -62,7 +63,7 @@ export function recordConfigFallback(opts: {
 }): void {
   try {
     const { knowledgePath, error, defaults } = opts;
-    const now = new Date().toISOString();
+    const now = nowIso();
     const reason = classifyError(error);
     const errorMsg = String(error instanceof Error ? error.message : error).slice(0, 500);
 
@@ -106,10 +107,11 @@ export function markResolved(knowledgePaths: string[]): void {
   try {
     const registry = readRegistry();
     const pathSet = new Set(knowledgePaths);
+    const resolvedAt = nowIso();
     for (const entry of registry.entries) {
       if (pathSet.has(entry.knowledge_path)) {
         entry.resolved = true;
-        entry.resolved_at = new Date().toISOString();
+        entry.resolved_at = resolvedAt;
       }
     }
     writeRegistry(registry);
