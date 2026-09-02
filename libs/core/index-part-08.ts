@@ -88,6 +88,8 @@ export type { LocalizedOnboardingText } from './onboarding-flow-policy.js';
 
 export * from './onboarding-context.js';
 
+export * from './onboarding-state.js';
+
 export {
   loadMissionDistillMarkdownPolicyCatalog,
   resolveMissionDistillMarkdownPolicy,

@@ -17,6 +17,10 @@ import {
   parseProviderCapabilitySnapshot,
   type ProviderCapabilitySnapshot,
 } from '@agent/core/provider-capability-overview';
+import {
+  loadOnboardingStateAtPath,
+  type OnboardingProfileState as OnboardingState,
+} from '@agent/core/onboarding-state';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -57,9 +61,7 @@ type DashboardLog = (...values: unknown[]) => void;
 let dashboardLog: DashboardLog = (...values) => console.log(...values);
 
 function resolveDashboardTenantSlug(): string | null {
-  const onboardingState = readJsonIfExists<{
-    tenants?: { entries?: Array<{ tenant_slug: string }> };
-  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
+  const onboardingState = readDashboardOnboardingState();
   const onboardingTenant = onboardingState?.tenants?.entries?.[0]?.tenant_slug?.trim();
   return onboardingTenant || activeCustomer() || null;
 }
@@ -323,6 +325,16 @@ export function readProviderCapabilitySnapshot(
   }
 }
 
+export function readDashboardOnboardingState(): OnboardingState | null {
+  try {
+    return loadOnboardingStateAtPath(
+      path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json')
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function listJsonFiles(dir: string): string[] {
   try {
     const safeDir = assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
@@ -401,12 +413,7 @@ function readConnectionReview() {
 function drawTenantContext() {
   dashboardLog(chalk.bold.cyan(' 🧩 TENANT CONTEXT'));
 
-  const onboardingState = readJsonIfExists<{
-    identity?: { name?: string };
-    tenants?: {
-      entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }>;
-    };
-  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
+  const onboardingState = readDashboardOnboardingState();
   const tenants = onboardingState?.tenants?.entries || [];
 
   if (tenants.length === 0) {
@@ -487,11 +494,7 @@ function drawConnectionReview() {
 function drawStarterMissionSuggestion() {
   dashboardLog(chalk.bold.yellow(' 🎯 STARTER MISSION'));
 
-  const onboardingState = readJsonIfExists<{
-    status?: string;
-    tutorial?: { mode?: string };
-    tenants?: { entries?: Array<{ tenant_slug: string; display_name?: string }> };
-  }>(path.join(resolveActiveProfileRoot(), 'onboarding/onboarding-state.json'));
+  const onboardingState = readDashboardOnboardingState();
 
   const connectionReview = readConnectionReview();
   const readyServices = connectionReview.services
@@ -644,29 +647,7 @@ function drawSkillLandscape() {
 function drawOnboardingHome() {
   dashboardLog(chalk.bold.green(' 🏠 ONBOARDING HOME'));
 
-  const onboardingStatePath = path.join(
-    resolveActiveProfileRoot(),
-    'onboarding/onboarding-state.json'
-  );
-  const onboardingState = readJsonIfExists<{
-    status?: string;
-    current_phase?: string;
-    completed_phases?: string[];
-    identity?: {
-      name?: string;
-      agent_id?: string;
-      language?: string;
-      interaction_style?: string;
-      primary_domain?: string;
-    };
-    services?: {
-      candidates?: Array<{ service_id: string; status?: string; connection_kind?: string }>;
-    };
-    tenants?: {
-      entries?: Array<{ tenant_slug: string; display_name?: string; assigned_role?: string }>;
-    };
-    tutorial?: { mode?: string; summary?: string };
-  }>(onboardingStatePath);
+  const onboardingState = readDashboardOnboardingState();
 
   const connectionDir = path.join(resolveActiveProfileRoot(), 'connections');
   const tenantDir = path.join(resolveActiveProfileRoot(), 'tenants');

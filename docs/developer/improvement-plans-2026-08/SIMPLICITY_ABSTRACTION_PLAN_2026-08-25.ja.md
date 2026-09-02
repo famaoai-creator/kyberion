@@ -13223,6 +13223,12 @@ SX-03／SX-04／SX-08 のprovider capability snapshotを再監査し、scan側�
 
 検証: provider capability overview／sovereign dashboard **2 files / 7 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 494
+
+SX-03／SX-08 のprofile onboarding stateを再監査し、onboarding wizardとsovereign dashboardが`onboarding-state.json`をそれぞれ局所型アサーションで読む二重経路を修正した。`onboarding-state.schema.json`に結び付くcore loaderへ型、root／nested追加フィールド、timestamp、enum、dangerous JSON keyの検証を集約し、旧stateのpersona欠落だけは従来どおり`sovereign`へ補完する。wizardのresumeとdashboardのtenant／tutorial／identity表示は検証済みstateのみを使い、不正stateはnull／初期導線へfail-closedする。
+
+検証: onboarding state／wizard／dashboard **3 files / 17 tests passed**、5 package build、repo build、root typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
