@@ -37,7 +37,7 @@ import type { MobileAppProfileIndex } from '@agent/core/app-profiles';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import chalk from 'chalk';
-import { parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonInput, readJson, readTextFile } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import {
   handleCalendarWorkflowCommand,
@@ -796,7 +796,7 @@ export function classifyNextActionExecutionOutcome(
           llm_consult_prompt: `Classify the outcome of next action "${action.id}" and propose the safest follow-up. Deterministic classification suggested "${recommended}". Output observed: ${output.slice(0, 1200)}`,
         }
       : {}),
-    timestamp: new Date().toISOString(),
+    timestamp: nowIso(),
   };
 }
 

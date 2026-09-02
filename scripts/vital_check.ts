@@ -4,6 +4,7 @@ import { buildAgentCollaborationProjection } from '@agent/core/agent-collaborati
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
 import { safeExistsSync, safeReadFile, safeReaddir, safeStat } from '@agent/core/secure-io';
+import { nowIso } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 interface CheckResult {
@@ -125,7 +126,7 @@ export function buildVitalReport() {
   };
 
   return {
-    generated_at: new Date().toISOString(),
+    generated_at: nowIso(),
     overall: summary.missing === 0 && summary.error === 0 ? 'healthy' : 'attention',
     summary,
     checks,

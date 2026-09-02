@@ -8,7 +8,7 @@
  * every other surface uses.
  */
 import { resolveOperatorDisplayName } from '@agent/core/operator-identity';
-import { parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectInput, readJson } from '@agent/core/foundation';
 import {
   acceptInboxEntryWithHumanReceipt,
   listInboxEntries,
@@ -285,7 +285,7 @@ async function handleAskSubcommand(
     channel: 'kyberion-home',
     threadTs: correlationId,
     correlationId,
-    receivedAt: new Date().toISOString(),
+    receivedAt: nowIso(),
     actorId: 'operator',
     senderAgentId: 'kyberion:home-cli',
     agentId: 'cli-surface-agent',
@@ -799,7 +799,7 @@ async function handleRecordingSubcommand(
           review: {
             status: argv.approve ? 'approved' : 'rejected',
             reviewer,
-            reviewed_at: new Date().toISOString(),
+            reviewed_at: nowIso(),
             ...(argv.note ? { note: argv.note } : {}),
           },
         } as const)
