@@ -13439,6 +13439,12 @@ SX-03／SX-04／SX-09 のdesktop promotion transactionを再監査し、crash-re
 
 検証: desktop promotion transaction **1 file / 23 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 530
+
+SX-03／SX-04／SX-09 のprocedure self-repair deltaを再監査し、shared runtimeのpersisted deltaをraw `readJson<ProcedureDelta>`の型アサーションだけで読み、schema／regular-file／procedure identityを共有契約化していなかった残存を修正した。既存の`procedure-delta.schema.json`を`defineCatalog`ベースのcanonical loaderへ接続し、save／load／browser bridgeのdelta applyをstrict validation、regular-file境界、要求procedure ID bindingへ統合した。不正・directory・別procedureのdeltaは修復適用へ進まずfail-closedし、既存のdelta root allowlist、anchor splice、再review要求、storage retention semanticsは維持している。
+
+検証: procedure self-repair **1 file / 24 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
