@@ -13391,6 +13391,12 @@ SX-03／SX-04／SX-08 のmission phase gate実行記録を再監査し、`gates/
 
 検証: phase-gate **12 tests passed**、gate engine／lifecycle **37 tests passed**、orchestration worker **29 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 522
+
+SX-03／SX-04／SX-09／SX-10 のgeneration scheduleを再監査し、media-generation scheduleのpersisted JSONをraw `readJson<GenerationSchedule>`の型アサーションでlist／tick／run-lockへ渡していた残存を修正した。既存の`generation-schedule.schema.json`を実際のruntime shapeへstrict化し、`run_lock`を契約へ追加したうえで、kind補完を含むwrite/read canonical validation、symlink-aware regular-file境界をscheduleの全読込経路へ集約した。不正schedule・directory・symlinkは登録・list・tickへ進まず、既存のtenant namespace／delivery path／quota／run-lock／dependency semanticsは維持している。
+
+検証: generation scheduler／tick／CLI／scope-offboarding **4 files / 56 tests passed**、5 package build、repo build、root typecheck、knowledge manifest同期、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照 catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

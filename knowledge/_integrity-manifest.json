@@ -7089,7 +7089,7 @@
     {
       "path": "product/schemas/generation-schedule.schema.json",
       "tier": "public",
-      "size": 3589,
+      "size": 3913,
       "type": "json"
     },
     {

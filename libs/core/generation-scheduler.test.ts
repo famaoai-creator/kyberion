@@ -3,13 +3,16 @@ import { describe, expect, it } from 'vitest';
 import AjvModule from 'ajv';
 import * as addFormatsModule from 'ajv-formats';
 import { compileSchemaFromPath } from './schema-loader.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   generationSchedulePath,
   isGenerationScheduleDue,
   assertGenerationScheduleTenantRegistered,
+  readGenerationSchedule,
   resolveGenerationScheduleDeliveryPaths,
   runGenerationScheduleAction,
 } from './generation-scheduler.js';
+import { pathResolver } from './path-resolver.js';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
@@ -127,6 +130,37 @@ describe('generation scheduler', () => {
 
   it('rejects schedule ids that could escape the shared registry path', () => {
     expect(() => generationSchedulePath('../escape')).toThrow(/GENERATION_SCHEDULE_ID_INVALID/);
+  });
+
+  it('rejects invalid persisted schedules and directories at the read boundary', () => {
+    const invalidPath = generationSchedulePath('invalid-persisted-schedule');
+    const directoryPath = pathResolver.sharedTmp('generation-scheduler-directory.json');
+    try {
+      safeWriteFile(
+        invalidPath,
+        JSON.stringify({
+          kind: 'generation-schedule',
+          schedule_id: 'invalid-persisted-schedule',
+          enabled: true,
+          trigger: { type: 'interval', interval_ms: 1000 },
+          job_template: { action: 'generate_music', params: {} },
+          execution_policy: { concurrency: 'skip_if_running' },
+          created_at: '2026-03-01T00:00:00.000Z',
+          unexpected: true,
+        })
+      );
+      expect(() => readGenerationSchedule(invalidPath)).toThrow(
+        'Invalid catalog generation-schedule'
+      );
+
+      safeMkdir(directoryPath, { recursive: true });
+      expect(() => readGenerationSchedule(directoryPath)).toThrow(
+        'schedule must be a regular file'
+      );
+    } finally {
+      safeRmSync(invalidPath, { force: true });
+      safeRmSync(directoryPath, { recursive: true, force: true });
+    }
   });
 
   it('rejects external delivery paths for system schedules', () => {
