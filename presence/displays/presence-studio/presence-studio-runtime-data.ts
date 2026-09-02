@@ -1,6 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
-import { nowIso, readJson } from '@agent/core/foundation';
+import { nowIso, parseSafeJsonObjectValue, readJson } from '@agent/core/foundation';
 import { type VocabularyKey } from '@agent/core/t';
 import { CloudflareOsSurface } from '@agent/core/cloudflare-os-surface';
 import {
@@ -207,6 +207,117 @@ export interface BrowserSnapshotSummary {
 export interface PresenceBrowserRuntimeDataOptions {
   browserSessionDir?: string;
   browserSnapshotDir?: string;
+}
+
+function optionalBrowserText(
+  record: Record<string, unknown>,
+  key: string
+): string | undefined | null {
+  const value = record[key];
+  if (value === undefined) return undefined;
+  return typeof value === 'string' ? value : null;
+}
+
+function parseBrowserRuntimeSessionSummary(value: unknown): BrowserRuntimeSessionSummary | null {
+  let record: Record<string, unknown>;
+  try {
+    record = parseSafeJsonObjectValue(value, 'browser runtime session');
+  } catch {
+    return null;
+  }
+
+  const sessionId = record.session_id;
+  if (typeof sessionId !== 'string' || !sessionId.trim()) return null;
+  const activeTabId = optionalBrowserText(record, 'active_tab_id');
+  const cdpUrl = optionalBrowserText(record, 'cdp_url');
+  const updatedAt = optionalBrowserText(record, 'updated_at');
+  const leaseStatus = optionalBrowserText(record, 'lease_status');
+  const leaseExpiresAt = optionalBrowserText(record, 'lease_expires_at');
+  if (
+    activeTabId === null ||
+    cdpUrl === null ||
+    updatedAt === null ||
+    leaseStatus === null ||
+    leaseExpiresAt === null
+  ) {
+    return null;
+  }
+  const retained =
+    record.retained === undefined
+      ? undefined
+      : typeof record.retained === 'boolean'
+        ? record.retained
+        : null;
+  if (retained === null) return null;
+
+  let tabs: BrowserRuntimeSessionSummary['tabs'];
+  if (record.tabs !== undefined) {
+    if (!Array.isArray(record.tabs)) return null;
+    tabs = [];
+    for (const candidate of record.tabs) {
+      let tab: Record<string, unknown>;
+      try {
+        tab = parseSafeJsonObjectValue(candidate, 'browser runtime session tab');
+      } catch {
+        return null;
+      }
+      if (typeof tab.tab_id !== 'string' || !tab.tab_id.trim()) return null;
+      const url = optionalBrowserText(tab, 'url');
+      const title = optionalBrowserText(tab, 'title');
+      if (url === null || title === null) return null;
+      const active =
+        tab.active === undefined ? undefined : typeof tab.active === 'boolean' ? tab.active : null;
+      if (active === null) return null;
+      tabs.push({
+        tab_id: tab.tab_id,
+        ...(url === undefined ? {} : { url }),
+        ...(title === undefined ? {} : { title }),
+        ...(active === undefined ? {} : { active }),
+      });
+    }
+  }
+
+  return {
+    session_id: sessionId,
+    ...(activeTabId === undefined ? {} : { active_tab_id: activeTabId }),
+    ...(cdpUrl === undefined ? {} : { cdp_url: cdpUrl }),
+    ...(tabs === undefined ? {} : { tabs }),
+    ...(updatedAt === undefined ? {} : { updated_at: updatedAt }),
+    ...(leaseStatus === undefined ? {} : { lease_status: leaseStatus }),
+    ...(leaseExpiresAt === undefined ? {} : { lease_expires_at: leaseExpiresAt }),
+    ...(retained === undefined ? {} : { retained }),
+  };
+}
+
+function parseBrowserSnapshotSummary(value: unknown): BrowserSnapshotSummary | null {
+  let record: Record<string, unknown>;
+  try {
+    record = parseSafeJsonObjectValue(value, 'browser snapshot');
+  } catch {
+    return null;
+  }
+
+  if (typeof record.session_id !== 'string' || !record.session_id.trim()) return null;
+  const tabId = optionalBrowserText(record, 'tab_id');
+  const url = optionalBrowserText(record, 'url');
+  const title = optionalBrowserText(record, 'title');
+  if (tabId === null || url === null || title === null) return null;
+  const elementCount =
+    record.element_count === undefined
+      ? undefined
+      : typeof record.element_count === 'number' &&
+          Number.isInteger(record.element_count) &&
+          record.element_count >= 0
+        ? record.element_count
+        : null;
+  if (elementCount === null) return null;
+  return {
+    session_id: record.session_id,
+    ...(tabId === undefined ? {} : { tab_id: tabId }),
+    ...(url === undefined ? {} : { url }),
+    ...(title === undefined ? {} : { title }),
+    ...(elementCount === undefined ? {} : { element_count: elementCount }),
+  };
 }
 
 export interface PresenceLocationContext {
@@ -798,7 +909,8 @@ export function listBrowserRuntimeSessions(
         try {
           const filePath = assertSafeRepositoryPath(path.join(safeDir, entry));
           if (!safeLstat(filePath).isFile()) return [];
-          return [readJson<BrowserRuntimeSessionSummary>(filePath)];
+          const session = parseBrowserRuntimeSessionSummary(readJson<unknown>(filePath));
+          return session ? [session] : [];
         } catch {
           return [];
         }
@@ -818,7 +930,7 @@ export function loadBrowserSnapshotSummary(
     const dir = options.browserSnapshotDir || pathResolver.shared('runtime/browser/snapshots');
     const filePath = assertSafeRepositoryPath(path.join(dir, `${sessionId}.json`));
     if (!safeLstat(filePath).isFile()) return null;
-    return readJson<BrowserSnapshotSummary>(filePath);
+    return parseBrowserSnapshotSummary(readJson<unknown>(filePath));
   } catch {
     return null;
   }
