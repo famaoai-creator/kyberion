@@ -7,6 +7,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeWriteFile,
@@ -73,6 +74,14 @@ export interface DealRecord {
   updated_at: string;
 }
 
+const DEAL_SCHEMA_PATH = pathResolver.knowledge('product/schemas/deal-record.schema.json');
+
+const dealCatalog = defineCatalog<DealRecord>({
+  id: 'deal-record',
+  path: DEAL_SCHEMA_PATH,
+  schema: DEAL_SCHEMA_PATH,
+});
+
 function dealsDir(tenantSlug: string): string {
   if (!isValidTenantSlug(tenantSlug)) {
     throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${tenantSlug}`);
@@ -111,8 +120,37 @@ function appendDealLog(tenantSlug: string, event: Record<string, unknown>): void
 }
 
 function writeDeal(deal: DealRecord): DealRecord {
+  const filePath = dealPath(deal.tenant_slug, deal.deal_id);
+  const validated = validateDealRecord(dealCatalog.validate(deal, filePath));
   safeMkdir(dealsDir(deal.tenant_slug), { recursive: true });
-  safeWriteFile(dealPath(deal.tenant_slug, deal.deal_id), JSON.stringify(deal, null, 2));
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2));
+  return validated;
+}
+
+function validateDealRecord(deal: DealRecord): DealRecord {
+  if (!isValidTenantSlug(deal.tenant_slug)) {
+    throw new Error(`[DEAL_SCOPE] invalid tenant slug: ${deal.tenant_slug}`);
+  }
+  requireSafeDealId(deal.deal_id);
+  return deal;
+}
+
+/** Load a deal through schema, regular-file, tenant, and filename bindings. */
+export function loadDealAtPath(filePath: string, tenantSlug: string, dealId: string): DealRecord {
+  const expectedPath = dealPath(tenantSlug, dealId);
+  const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  if (!safeLstat(safeFilePath).isFile()) {
+    throw new Error(`[DEAL_SCOPE] deal must be a regular file: ${filePath}`);
+  }
+  if (path.resolve(safeFilePath) !== path.resolve(expectedPath)) {
+    throw new Error(`[DEAL_SCOPE] deal path does not match tenant/deal binding: ${filePath}`);
+  }
+  const deal = validateDealRecord(
+    dealCatalog.validate(readJson<unknown>(safeFilePath), safeFilePath)
+  );
+  if (deal.tenant_slug !== tenantSlug || deal.deal_id !== dealId) {
+    throw new Error(`[DEAL_SCOPE] deal record binding mismatch: expected ${tenantSlug}/${dealId}`);
+  }
   return deal;
 }
 
@@ -120,7 +158,7 @@ export function getDeal(tenantSlug: string, dealId: string): DealRecord | null {
   const filePath = dealPath(tenantSlug, dealId);
   try {
     if (!safeExistsSync(filePath)) return null;
-    return readJson<DealRecord>(filePath);
+    return loadDealAtPath(filePath, tenantSlug, dealId);
   } catch {
     return null;
   }
