@@ -12533,6 +12533,12 @@ SX-03 の残存監査として、Cloudflare OS control-plane の承認・適用�
 
 検証: Cloudflare OS control-plane **3 files / 40 tests passed**、対象control-planeの単純timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
 
+## 2026-09-02 再レビュー修正 379
+
+SX-03 の残存監査として、mission maintenance の checkpoint／approval／evidence／artifact review／purge audit と prompt visibility ledger に残っていた生成時刻8箇所を foundation `nowIso()` へ統合した。prompt visibility の `input.now` 注入、mission state の履歴・監査イベント・承認時刻の既存 semantics、lock／save／recovery境界は変更していない。
+
+検証: mission maintenance／prompt visibility **4 files / 31 tests passed**、対象production filesの単純timestamp **0件**、root typecheck、root lint、canonical full gate **69/69 gates passed**、`git diff --check`。残る SX-03 は他 surface／actuator の単純 timestamp と domain-specific helper の adopt-or-delete、SX-04〜SX-14 の未完了項目である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
