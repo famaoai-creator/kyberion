@@ -141,6 +141,44 @@ describe('Cloudflare OS adoption control plane', () => {
     }
   });
 
+  it('rejects malformed persisted authority records without partial restore', () => {
+    const statePath = pathResolver.sharedTmp('cloudflare-os-malformed-state-test.json');
+    try {
+      safeWriteFile(
+        statePath,
+        JSON.stringify({
+          version: 1,
+          held: [{ id: 'malformed-held', status: 'approved' }],
+          introductions: [],
+          observations: [
+            {
+              id: 'observation-that-must-not-restore',
+              missionId: 'mission-malformed',
+              service: 'knowledge',
+              resourceRef: 'secret',
+              tier: 'personal',
+              purpose: 'test',
+              summary: 'test',
+              observedAt: new Date().toISOString(),
+            },
+          ],
+          autoRules: [],
+          capabilities: [],
+          threadCapabilities: {},
+          blueprints: [],
+          network: [],
+          gadgets: [],
+        })
+      );
+      const plane = new CloudflareOsControlPlane({ statePath, auditRestoreFailures: false });
+
+      expect(plane.getHeldAction('malformed-held')).toBeUndefined();
+      expect(plane.listObservations()).toEqual([]);
+    } finally {
+      safeUnlinkSync(statePath);
+    }
+  });
+
   it('OS-02 simulates provisional results and blocks unfinished missions', async () => {
     const plane = createPlane();
     const record = plane.submitHeldAction(
