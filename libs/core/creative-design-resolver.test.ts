@@ -9,7 +9,7 @@ vi.mock('./path-resolver.js', () => ({
   pathResolver: {
     knowledge: (sub = '') => path.join(rootDir, 'knowledge', sub),
     rootResolve: (sub = '') =>
-      sub === 'knowledge/product/schemas/tenant-design-override.schema.json'
+      sub.startsWith('knowledge/product/schemas/')
         ? path.join(process.cwd(), sub)
         : path.join(rootDir, sub),
     rootDir: () => rootDir,

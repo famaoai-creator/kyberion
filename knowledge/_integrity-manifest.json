@@ -9211,6 +9211,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/tenant-design-theme-overlay.schema.json",
+      "tier": "public",
+      "size": 1161,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/tenant-group.schema.json",
       "tier": "public",
       "size": 1371,
