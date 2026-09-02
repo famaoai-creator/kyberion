@@ -4,6 +4,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJsonIfPresent as readFoundationJsonIfPresent } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
 import { safeExistsSync, safeLstat, safeReaddir, safeStat } from './secure-io.js';
+import { loadTenantDesignOverride } from './tenant-design-override.js';
 
 export interface ResolveTenantDesignInput {
   rootDir?: string;
@@ -31,6 +32,8 @@ export interface TenantDesignOverrideIndex {
   tenants: TenantDesignOverrideIndexEntry[];
 }
 
+export { loadTenantDesignOverride, type TenantDesignOverride } from './tenant-design-override.js';
+
 export function loadTenantDesignOverrideIndex(
   rootDir = pathResolver.rootDir()
 ): TenantDesignOverrideIndex {
@@ -46,6 +49,11 @@ export function loadTenantDesignOverrideIndex(
   return catalog.load();
 }
 
+/**
+ * Load one tenant override through the shared schema boundary.
+ * Scope checks remain the caller's responsibility because customer overlays
+ * and confidential tenant overlays use different allowed roots.
+ */
 function isSafeTenantSegment(value: unknown): value is string {
   return (
     typeof value === 'string' &&
@@ -310,7 +318,7 @@ export function resolveTenantDesign(input: ResolveTenantDesignInput): TenantDesi
   const overridePaths = collectTenantOverridePaths(rootDir, input.customerId);
 
   for (const candidate of overridePaths) {
-    const override = readJsonIfPresent(candidate, rootDir);
+    const override = loadTenantDesignOverride(rootDir, candidate, path.dirname(candidate));
     if (!override) continue;
     if (!matchesOverride(override, input.brandName, input.designSystemId)) continue;
     const themePackPath = deriveThemePackPath(candidate, override);

@@ -5,6 +5,7 @@ import { assertSafeRepositoryPath } from './secure-io.js';
 import { DEFAULT_CHRONOS_WEB_THEME_PACK, type WebThemePack } from './web-design-system.js';
 import { deriveAccentPalette, type CeAccentPalette } from './ce-adoption.js';
 import { isValidTenantSlug } from './entity-scope.js';
+import { loadTenantDesignOverride } from './tenant-design-override.js';
 
 /**
  * E2E-02: the single entry point for creative design resolution.
@@ -441,7 +442,11 @@ function loadTenantDesign(tenantSlug: string): TenantDesignData | null {
       const overridePath = assertSafeRepositoryPath(path.join(dir, 'tenant-override.json'), {
         allowMissingLeaf: true,
       });
-      const override = readJsonIfPresent(overridePath);
+      const override = loadTenantDesignOverride(
+        pathResolver.rootDir(),
+        overridePath,
+        path.dirname(overridePath)
+      );
       if (!override) continue;
       const themePath = assertSafeRepositoryPath(path.join(dir, 'theme.json'), {
         allowMissingLeaf: true,
