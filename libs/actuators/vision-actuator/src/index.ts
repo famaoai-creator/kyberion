@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { retry } from '@agent/core/async-utils';
 import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import {
@@ -15,7 +16,6 @@ import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runActuatorPipeline } from '../../../core/actuator-sdk.js';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { runActuatorCli } from '@agent/core/cli-utils';
 
 /**
@@ -197,10 +197,7 @@ const main = async () => {
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/vision-actuator/src/index.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;

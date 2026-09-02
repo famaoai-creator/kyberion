@@ -1,8 +1,7 @@
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { handleAction } from './media-generation-action-helpers.js';
 import { runActuatorCli } from '@agent/core/cli-utils';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 const main = async () => {
   await runActuatorCli({
@@ -12,10 +11,7 @@ const main = async () => {
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/media-generation-actuator/src/index.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;

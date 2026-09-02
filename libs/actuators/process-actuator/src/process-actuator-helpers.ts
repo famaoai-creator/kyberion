@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { readJson } from '@agent/core/foundation';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
@@ -10,8 +11,6 @@ import { createGovernedRetryOptionsBuilder } from '@agent/core/recovery-policy';
 import { retry } from '@agent/core/async-utils';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { parseProcessAction, type ProcessAction } from './process-action-input.js';
 
 const PROCESS_MANIFEST_PATH = pathResolver.rootResolve(
@@ -187,10 +186,9 @@ const main = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (
+  isDirectEntry(import.meta.url, 'libs/actuators/process-actuator/src/process-actuator-helpers.ts')
+) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;

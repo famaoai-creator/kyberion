@@ -1,4 +1,5 @@
 import { logger } from '@agent/core/core';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
@@ -10,7 +11,6 @@ import {
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { executePipeline, type PipelineStep } from './orchestrator-helpers.js';
 import { runActuatorCli } from '@agent/core/cli-utils';
 
@@ -134,10 +134,7 @@ const main = async () => {
   });
 };
 
-const entrypoint = process.argv[1] ? path.resolve(process.argv[1]) : '';
-const modulePath = fileURLToPath(import.meta.url);
-
-if (entrypoint && modulePath === entrypoint) {
+if (isDirectEntry(import.meta.url, 'libs/actuators/orchestrator-actuator/src/index.ts')) {
   main().catch((err) => {
     logger.error(err.message);
     process.exitCode = 1;
