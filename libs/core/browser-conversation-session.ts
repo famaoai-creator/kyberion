@@ -2,7 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import { compileSchema } from './foundation/ajv.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readJson } from './foundation/json.js';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { parseSafeJsonInput, parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
 import { randomUUID } from 'node:crypto';
 import { logger } from './core.js';
@@ -357,10 +357,166 @@ interface BrowserRuntimeSessionRecord {
   }>;
 }
 
+function assertStringField(record: Record<string, unknown>, field: string, label: string): string {
+  const value = record[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(`${label}.${field} must be a non-empty string`);
+  }
+  return value;
+}
+
+function assertOptionalStringField(
+  record: Record<string, unknown>,
+  field: string,
+  label: string
+): string | undefined {
+  const value = record[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string') throw new Error(`${label}.${field} must be a string`);
+  return value;
+}
+
+function assertAllowedFields(
+  record: Record<string, unknown>,
+  fields: readonly string[],
+  label: string
+): void {
+  const allowed = new Set(fields);
+  if (Object.keys(record).some((key) => !allowed.has(key))) {
+    throw new Error(`${label} contains unknown fields`);
+  }
+}
+
+function parseBrowserSnapshotRecord(value: unknown, sessionId: string): BrowserSnapshotRecord {
+  const label = 'browser snapshot';
+  const record = parseSafeJsonObjectValue(value, label);
+  assertAllowedFields(
+    record,
+    ['session_id', 'tab_id', 'url', 'title', 'captured_at', 'element_count', 'elements'],
+    label
+  );
+  const parsedSessionId = assertStringField(record, 'session_id', label);
+  if (parsedSessionId !== sessionId)
+    throw new Error(`${label}.session_id does not match requested session`);
+  const tabId = assertStringField(record, 'tab_id', label);
+  const url = assertStringField(record, 'url', label);
+  const title = assertStringField(record, 'title', label);
+  const capturedAt = assertStringField(record, 'captured_at', label);
+  const rawElementCount = record.element_count;
+  let elementCount: number | undefined;
+  if (rawElementCount !== undefined) {
+    if (
+      typeof rawElementCount !== 'number' ||
+      !Number.isInteger(rawElementCount) ||
+      rawElementCount < 0
+    ) {
+      throw new Error(`${label}.element_count must be a non-negative integer`);
+    }
+    elementCount = rawElementCount;
+  }
+  if (!Array.isArray(record.elements)) throw new Error(`${label}.elements must be an array`);
+  const elements = record.elements.map((candidate, index) => {
+    const elementLabel = `${label}.elements[${index}]`;
+    const element = parseSafeJsonObjectValue(candidate, elementLabel);
+    assertAllowedFields(element, ['ref', 'role', 'text', 'name'], elementLabel);
+    const ref = assertStringField(element, 'ref', elementLabel);
+    const role = element.role;
+    if (role !== undefined && role !== null && typeof role !== 'string') {
+      throw new Error(`${elementLabel}.role must be a string or null`);
+    }
+    const text = assertOptionalStringField(element, 'text', elementLabel);
+    const name = assertOptionalStringField(element, 'name', elementLabel);
+    return {
+      ref,
+      ...(role !== undefined ? { role: role as string | null } : {}),
+      ...(text !== undefined ? { text } : {}),
+      ...(name !== undefined ? { name } : {}),
+    };
+  });
+  return {
+    session_id: parsedSessionId,
+    tab_id: tabId,
+    url,
+    title,
+    captured_at: capturedAt,
+    ...(elementCount !== undefined ? { element_count: elementCount } : {}),
+    elements,
+  };
+}
+
+function parseBrowserRuntimeSessionRecord(
+  value: unknown,
+  sessionId: string
+): BrowserRuntimeSessionRecord {
+  const label = 'browser runtime session';
+  const record = parseSafeJsonObjectValue(value, label);
+  assertAllowedFields(
+    record,
+    ['session_id', 'active_tab_id', 'lease_status', 'cdp_url', 'cdp_port', 'tabs'],
+    label
+  );
+  const parsedSessionId = assertStringField(record, 'session_id', label);
+  if (parsedSessionId !== sessionId)
+    throw new Error(`${label}.session_id does not match requested session`);
+  const activeTabId = assertOptionalStringField(record, 'active_tab_id', label);
+  const leaseStatus = assertOptionalStringField(record, 'lease_status', label);
+  const cdpUrl = assertOptionalStringField(record, 'cdp_url', label);
+  const rawCdpPort = record.cdp_port;
+  let cdpPort: number | undefined;
+  if (rawCdpPort !== undefined) {
+    if (
+      typeof rawCdpPort !== 'number' ||
+      !Number.isInteger(rawCdpPort) ||
+      rawCdpPort < 1 ||
+      rawCdpPort > 65535
+    ) {
+      throw new Error(`${label}.cdp_port must be a valid TCP port`);
+    }
+    cdpPort = rawCdpPort;
+  }
+  let tabs: BrowserRuntimeSessionRecord['tabs'];
+  if (record.tabs !== undefined) {
+    if (!Array.isArray(record.tabs)) throw new Error(`${label}.tabs must be an array`);
+    tabs = record.tabs.map((candidate, index) => {
+      const tabLabel = `${label}.tabs[${index}]`;
+      const tab = parseSafeJsonObjectValue(candidate, tabLabel);
+      assertAllowedFields(tab, ['tab_id', 'url', 'title', 'active'], tabLabel);
+      const tabId = assertStringField(tab, 'tab_id', tabLabel);
+      const url = assertOptionalStringField(tab, 'url', tabLabel);
+      const title = assertOptionalStringField(tab, 'title', tabLabel);
+      if (tab.active !== undefined && typeof tab.active !== 'boolean') {
+        throw new Error(`${tabLabel}.active must be a boolean`);
+      }
+      const active = tab.active;
+      return {
+        tab_id: tabId,
+        ...(url !== undefined ? { url } : {}),
+        ...(title !== undefined ? { title } : {}),
+        ...(typeof active === 'boolean' ? { active } : {}),
+      };
+    });
+  }
+  return {
+    session_id: parsedSessionId,
+    ...(activeTabId !== undefined ? { active_tab_id: activeTabId } : {}),
+    ...(leaseStatus !== undefined ? { lease_status: leaseStatus } : {}),
+    ...(cdpUrl !== undefined ? { cdp_url: cdpUrl } : {}),
+    ...(cdpPort !== undefined ? { cdp_port: cdpPort } : {}),
+    ...(tabs !== undefined ? { tabs } : {}),
+  };
+}
+
 function loadBrowserSnapshot(sessionId: string): BrowserSnapshotRecord | null {
   const filePath = browserSnapshotPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  return readJson<BrowserSnapshotRecord>(filePath);
+  try {
+    return parseBrowserSnapshotRecord(readJson<unknown>(filePath), sessionId);
+  } catch (error) {
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid snapshot ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
 }
 
 function loadBrowserSnapshotForConversationSession(
@@ -439,7 +595,14 @@ function refreshBrowserSnapshotForConversationSession(
 function loadBrowserRuntimeSession(sessionId: string): BrowserRuntimeSessionRecord | null {
   const filePath = browserRuntimeSessionPath(sessionId);
   if (!safeExistsSync(filePath)) return null;
-  return readJson<BrowserRuntimeSessionRecord>(filePath);
+  try {
+    return parseBrowserRuntimeSessionRecord(readJson<unknown>(filePath), sessionId);
+  } catch (error) {
+    logger.warn(
+      `[BROWSER_CONVERSATION_SESSION] Invalid runtime session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return null;
+  }
 }
 
 function normalizeRegionHint(text?: string): string | undefined {
