@@ -13,6 +13,7 @@ import {
 } from '@agent/core/artifact-record';
 import type { GovernedArtifactRole } from '@agent/core/artifacts';
 import type { RejectionReasonCategory } from '@agent/core/rejection-reason';
+import { nowIso } from '@agent/core/foundation';
 
 const REVIEW_DIR = 'active/shared/coordination/deliverable-reviews';
 const REVIEW_LOG = `${REVIEW_DIR}/reviews.jsonl`;
@@ -128,7 +129,7 @@ export function reviewDeliverable(input: DeliverableReviewInput): {
     comment: input.comment,
     reason_category: input.reasonCategory,
     reviewer: input.reviewer,
-    reviewed_at: new Date().toISOString(),
+    reviewed_at: nowIso(),
   };
 
   if (input.verdict === 'request-changes') {

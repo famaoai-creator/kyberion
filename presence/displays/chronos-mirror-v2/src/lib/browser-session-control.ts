@@ -7,6 +7,7 @@ import {
   safeWriteFile,
 } from './intelligence-primitives';
 import { parseBrowserSessionSummary } from './intelligence-observations';
+import { nowIso } from '@agent/core/foundation';
 
 type BrowserSessionControlAction = 'close_browser_session' | 'restart_browser_session';
 
@@ -59,7 +60,7 @@ export function applyBrowserSessionControl(
   const nextStatus = action === 'restart_browser_session' ? 'expired' : 'released';
   const nextRecord: BrowserSessionRecord = {
     ...record,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso(),
     lease_status: nextStatus,
     retained: false,
     lease_expires_at: undefined,
