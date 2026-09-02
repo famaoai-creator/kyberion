@@ -1,5 +1,6 @@
 import express from 'express';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { readJson } from '@agent/core/foundation';
 import { resolveOperatorLocale } from '@agent/core/operator-identity';
 import { t } from '@agent/core/t';
@@ -54,7 +55,6 @@ import {
   sendBlueBubblesText,
   verifyBlueBubblesWebhookSecret,
 } from '@agent/core/bluebubbles-adapter';
-import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('imessage-bridge');
@@ -649,9 +649,7 @@ async function main() {
 // starts the bridge, so importing this module in a test cannot start the HTTP
 // listener or the poll loop — and a leaked VITEST env cannot silently no-op a
 // real start.
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
+const directEntry = isDirectEntry(import.meta.url, 'satellites/imessage-bridge/src/index.ts');
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));

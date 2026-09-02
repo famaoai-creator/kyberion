@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   appendJsonLine,
   nowIso,
@@ -48,7 +49,6 @@ import {
 } from '@agent/core/channel-surface';
 import { evaluateSurfaceActorAccess } from '@agent/core/surface-access-policy';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('telegram-bridge');
@@ -925,9 +925,7 @@ async function main(): Promise<void> {
   void runTelegramOutbox(drainOutbox);
 }
 
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
+const directEntry = isDirectEntry(import.meta.url, 'satellites/telegram-bridge/src/index.ts');
 if (directEntry && !process.env.VITEST) {
   main().catch((error) => {
     logger.error(error instanceof Error ? error.message : String(error));

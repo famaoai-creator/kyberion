@@ -1,7 +1,7 @@
 import { App, LogLevel } from '@slack/bolt';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { isDirectEntry } from '@agent/core/direct-entry';
 import { appendJsonLine } from '@agent/core/foundation';
-import { pathToFileURL } from 'node:url';
 
 // IP-08 Task 6: record unhandled rejections/exceptions in this long-lived process.
 installProcessGuards('slack-bridge');
@@ -1191,9 +1191,7 @@ async function start() {
 // Same guard as the Telegram bridge: only a direct `node index.js` invocation
 // starts the bridge, so importing this module in a test cannot open a Socket
 // Mode connection — and a leaked VITEST env cannot silently no-op a real start.
-const directEntry = process.argv[1]
-  ? pathToFileURL(process.argv[1]).href === import.meta.url
-  : false;
+const directEntry = isDirectEntry(import.meta.url, 'satellites/slack-bridge/src/index.ts');
 if (directEntry && !process.env.VITEST) {
   start().catch((err) => {
     logger.error(`SlackBridge crashed: ${err.message}`);
