@@ -56,20 +56,42 @@ function ensureParentDir(targetPath: string): void {
   }
 }
 
-function loadArtifactLibraryCatalog(rootDir: string): any {
+type ArtifactLibraryCatalog = {
+  profiles: Record<
+    string,
+    {
+      artifact_family: string;
+      document_type: string;
+      description?: string;
+      sections: Array<{
+        section_id: string;
+        title: string;
+        layout_key: string;
+      }>;
+    }
+  >;
+};
+
+function loadArtifactLibraryCatalog(rootDir: string): ArtifactLibraryCatalog {
   const dirPath = path.resolve(
     rootDir,
     'knowledge/public/design-patterns/media-templates/artifact-library'
   );
   const docs = readJsonFilesRecursively(dirPath);
-  const fallback = { profiles: {} };
-  if (docs.length === 0) {
-    return fallback;
-  }
-  return docs.reduce((acc, doc) => {
+  const fallback: ArtifactLibraryCatalog = { profiles: {} };
+  const catalog = defineCatalog<ArtifactLibraryCatalog>({
+    id: 'artifact-library',
+    path: path.join(dirPath, 'index.json'),
+    schema: path.resolve(rootDir, 'knowledge/product/schemas/artifact-library.schema.json'),
+    fallback,
+    fallbackOnInvalid: true,
+  });
+  if (docs.length === 0) return catalog.load();
+  const merged = docs.reduce((acc, doc) => {
     if (!doc || typeof doc !== 'object') return acc;
     return deepMergeCatalog(acc, { profiles: doc.profiles || {} });
   }, cloneJsonValue(fallback));
+  return catalog.validate(merged, dirPath);
 }
 
 function loadDocumentCompositionCatalog(rootDir: string): any {
