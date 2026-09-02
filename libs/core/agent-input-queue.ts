@@ -1,4 +1,5 @@
 import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 /**
  * PI-15: governed input queues for an agent operation.
  *
@@ -131,10 +132,6 @@ export async function enqueueSurfaceAgentInput(
     },
     ...(input.scope ? { scope: input.scope } : {}),
   });
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 function validateDelivery(delivery: string): AgentInputDelivery {
@@ -305,7 +302,7 @@ export class AgentInputQueue {
       mission_id: this.missionId,
       delivery: validateDelivery(input.delivery),
       text,
-      enqueued_at: now(),
+      enqueued_at: nowIso(),
       ...(input.metadata ? { metadata: validateMetadata(input.metadata) } : {}),
       ...(input.scope ? { scope: validateScope(input.scope) } : {}),
     };
@@ -318,7 +315,7 @@ export class AgentInputQueue {
       appendJsonLine(this.queuePath, {
         kind: 'enqueued',
         entry,
-        recorded_at: now(),
+        recorded_at: nowIso(),
       } satisfies AgentInputQueueRecord);
     });
     // A durable next_run survives process restart. When a matching worker is
@@ -355,7 +352,7 @@ export class AgentInputQueue {
         appendJsonLine(this.queuePath, {
           kind: 'consumed',
           entry_id: entry.id,
-          recorded_at: now(),
+          recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
       }
       return entries;
@@ -419,7 +416,7 @@ export class AgentInputQueue {
         appendJsonLine(this.queuePath, {
           kind: 'cancelled',
           entry_id: id,
-          recorded_at: now(),
+          recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
         return 'cancelled';
       }

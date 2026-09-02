@@ -17,7 +17,7 @@ import {
   safeWriteFile,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { readJson } from '@agent/core/foundation';
+import { nowIso, readJson } from '@agent/core/foundation';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import {
@@ -76,12 +76,8 @@ export const actuator = defineCatalogBackedActuator({
 
 const SCHEMA_REF = '../../../knowledge/product/schemas/volatile-knowledge.schema.json';
 
-function isoNow(): string {
-  return new Date().toISOString();
-}
-
 function isoDate(): string {
-  return new Date().toISOString().slice(0, 10);
+  return nowIso().slice(0, 10);
 }
 
 /**
@@ -169,7 +165,7 @@ function saveSidecar(mdPath: string, sidecar: VolatileSidecar): void {
 
 function touchSidecar(mdPath: string, patch: Partial<VolatileSidecar>): VolatileSidecar {
   const existing = loadSidecar(mdPath);
-  const now = isoNow();
+  const now = nowIso();
   const merged = { ...existing, ...patch, updated_at: now } as VolatileSidecar;
   if (!merged.created_at) merged.created_at = now;
   saveSidecar(mdPath, merged);
@@ -310,7 +306,7 @@ function opNote(params: Record<string, unknown>): unknown {
     // first-ever touch (no sidecar yet) still gets the full shape so GC and
     // the index never see a bare {updated_at} sidecar.
     const sidecarUnchanged = loadSidecar(mdPath)
-      ? touchSidecar(mdPath, { updated_at: isoNow() })
+      ? touchSidecar(mdPath, { updated_at: nowIso() })
       : touchSidecar(mdPath, fullSidecarPatch);
     return {
       path: mdPath,
@@ -353,7 +349,7 @@ function opSetNow(params: Record<string, unknown>): unknown {
   const text = [
     '# NOW',
     '',
-    `> Updated: ${isoNow()}`,
+    `> Updated: ${nowIso()}`,
     '',
     '## Current Focus',
     '',
@@ -410,7 +406,7 @@ function opAddActionItem(params: Record<string, unknown>): unknown {
     updated = existing.trimEnd() + `\n\n## Action Items\n\n- [ ] ${item}\n`;
   }
   safeWriteFile(mdPath, updated);
-  touchSidecar(mdPath, { updated_at: isoNow(), status: 'active' });
+  touchSidecar(mdPath, { updated_at: nowIso(), status: 'active' });
   return { path: mdPath };
 }
 
@@ -431,7 +427,7 @@ function opCompleteActionItem(params: Record<string, unknown>): unknown {
     return { path: mdPath, found: false };
   const updated = existing.replace(new RegExp(`^(- \\[ \\] ${escaped})$`, 'gm'), `- [x] ${item}`);
   safeWriteFile(mdPath, updated);
-  touchSidecar(mdPath, { updated_at: isoNow() });
+  touchSidecar(mdPath, { updated_at: nowIso() });
   return { path: mdPath, found: true };
 }
 
@@ -500,7 +496,7 @@ function opTodoAdd(params: Record<string, unknown>): unknown {
     ? (safeReadFile(result.todoPath, { encoding: 'utf8' }) as string)
     : '';
   safeWriteFile(result.todoPath, existing.trimEnd() + `\n- [ ] ${item}\n`);
-  touchSidecar(result.todoPath, { updated_at: isoNow() });
+  touchSidecar(result.todoPath, { updated_at: nowIso() });
   return { path: result.todoPath };
 }
 
@@ -533,7 +529,7 @@ function opTodoDone(params: Record<string, unknown>): unknown {
       safeWriteFile(journalPath, j.slice(0, ins) + `\n- [x] ${item}\n` + j.slice(ins));
     }
   }
-  touchSidecar(todoPath, { updated_at: isoNow() });
+  touchSidecar(todoPath, { updated_at: nowIso() });
   return { path: todoPath, found: true };
 }
 
@@ -575,7 +571,7 @@ function opTodoRollover(params: Record<string, unknown>): unknown {
   nextDay.setUTCDate(nextDay.getUTCDate() + 1);
   const nextDayStr = nextDay.toISOString().slice(0, 10);
   safeWriteFile(todoPath, todoTemplate(nextDayStr) + pendingLines.join('\n') + '\n');
-  touchSidecar(todoPath, { status: 'rolled-over', period_key: nextDayStr, updated_at: isoNow() });
+  touchSidecar(todoPath, { status: 'rolled-over', period_key: nextDayStr, updated_at: nowIso() });
 
   return {
     rolledOver: pendingLines.length,
@@ -708,7 +704,7 @@ function opList(params: Record<string, unknown>): unknown {
  */
 function opRunGc(params: Record<string, unknown>): unknown {
   const activeRoot = pr.active();
-  const now = isoNow();
+  const now = nowIso();
   const results = { expired: 0, rolledOver: 0, warnings: [] as string[] };
 
   function scanDir(dir: string): void {
