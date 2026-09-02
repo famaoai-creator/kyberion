@@ -97,6 +97,27 @@ describe('audit-chain — tenant mirror', () => {
     expect(files[0]).toMatch(/audit-\d{4}-\d{2}-\d{2}\.jsonl/);
   });
 
+  it('uses the recorded timestamp date for master and tenant mirror files', async () => {
+    const { auditChain } = await loadFreshAuditChain(new Date('2026-07-01T23:59:59.999Z'));
+    const recorded = auditChain.record({
+      agentId: 'agent-1',
+      action: 'date-boundary',
+      operation: 'audit',
+      result: 'completed',
+      tenantSlug: 'sbiss',
+    });
+    const date = recorded.timestamp.slice(0, 10);
+
+    expect(
+      fs.existsSync(path.join(testRoot, 'active', 'shared', 'logs', 'audit', `audit-${date}.jsonl`))
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit', `audit-${date}.jsonl`)
+      )
+    ).toBe(true);
+  });
+
   it('publishes through the optional forwarder seam without importing its implementation', async () => {
     const { auditChain, registerAuditForwarderPublisher } = await import('./audit-chain.js');
     const entries: string[] = [];
