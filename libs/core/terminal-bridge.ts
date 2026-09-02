@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import { readJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -123,7 +124,7 @@ const STRATEGIES: Record<string, any> = {
           JSON.stringify(
             {
               id: requestId,
-              ts: new Date().toISOString(),
+              ts: nowIso(),
               text,
             },
             null,

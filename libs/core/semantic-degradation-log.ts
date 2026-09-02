@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { nowIso } from './foundation/time.js';
 import { safeMkdir, safeWriteFile } from './secure-io.js';
 import { logger } from './core.js';
 
@@ -53,10 +54,9 @@ export function appendSemanticDegradationRun(
     const filePath = logPath();
     safeMkdir(path.dirname(filePath), { recursive: true });
     const runs = readRuns();
-    const nextRuns = [
-      ...runs,
-      { at: new Date().toISOString(), pipeline_id: pipelineId, counts, total },
-    ].slice(-MAX_RUNS);
+    const nextRuns = [...runs, { at: nowIso(), pipeline_id: pipelineId, counts, total }].slice(
+      -MAX_RUNS
+    );
     degradationLogCatalog.validate(nextRuns, filePath);
     safeWriteFile(filePath, `${JSON.stringify(nextRuns, null, 2)}\n`);
   } catch (err) {
