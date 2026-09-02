@@ -12,6 +12,10 @@ import {
 } from '@agent/core/headless-surface-contract';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import { parseIntentResolutionContract } from '@agent/core/intent-resolution-contract';
+import {
+  parsePersonalAgentIdentity,
+  parsePersonalSovereignIdentity,
+} from '@agent/core/personal-identity-reader';
 import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -235,8 +239,12 @@ app.get('/api/identity', (req, res) => {
       const safeIdPath = resolveExistingIdentityFile(idPath);
       const safeAgentPath = resolveExistingIdentityFile(agentPath);
       const safeVisionPath = resolveExistingIdentityFile(visionPath);
-      const sovereign = safeIdPath ? readJson<unknown>(safeIdPath) : null;
-      const agent = safeAgentPath ? readJson<unknown>(safeAgentPath) : null;
+      const sovereign = safeIdPath
+        ? parsePersonalSovereignIdentity(readJson<unknown>(safeIdPath))
+        : null;
+      const agent = safeAgentPath
+        ? parsePersonalAgentIdentity(readJson<unknown>(safeAgentPath))
+        : null;
       const visionRaw = safeVisionPath
         ? (safeReadFile(safeVisionPath, { encoding: 'utf8' }) as string)
         : null;

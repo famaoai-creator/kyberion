@@ -11,6 +11,10 @@ import {
 } from '@agent/core/surface-mutation-guard';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import type { SurfaceAuthorizationContext } from '@agent/core/surface-authorization';
+export {
+  parsePersonalAgentIdentity as parsePresenceStudioAgentIdentity,
+  parsePersonalSovereignIdentity as parsePresenceStudioSovereignIdentity,
+} from '@agent/core/personal-identity-reader';
 
 const LOCALHOST_NAMES = new Set([
   'localhost',
@@ -541,31 +545,6 @@ export const presenceStudioApprovalDecisionSchema = z
     decision: z.enum(['approved', 'rejected']),
   })
   .strict();
-
-const presenceStudioSovereignIdentitySchema = z
-  .object({ name: z.string().trim().max(200).optional() })
-  .passthrough();
-
-const presenceStudioAgentIdentitySchema = z
-  .object({
-    agent_id: z.string().trim().max(200).optional(),
-    trust_tier: z.string().trim().max(100).optional(),
-  })
-  .passthrough();
-
-export function parsePresenceStudioSovereignIdentity(value: unknown): { name?: string } | null {
-  const parsed = presenceStudioSovereignIdentitySchema.safeParse(value);
-  return parsed.success ? { name: parsed.data.name } : null;
-}
-
-export function parsePresenceStudioAgentIdentity(
-  value: unknown
-): { agent_id?: string; trust_tier?: string } | null {
-  const parsed = presenceStudioAgentIdentitySchema.safeParse(value);
-  return parsed.success
-    ? { agent_id: parsed.data.agent_id, trust_tier: parsed.data.trust_tier }
-    : null;
-}
 
 export function summarizePresenceStudioIdentity(payload: {
   sovereign?: { name?: unknown } | null;
