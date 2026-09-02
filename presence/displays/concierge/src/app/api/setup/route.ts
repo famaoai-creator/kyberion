@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import { getRegisteredEnvText, readJson } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, readJson } from '@agent/core/foundation';
 import {
   applyBrowserOnboarding,
   getBrowserOnboardingState,
@@ -324,7 +324,7 @@ export async function POST(req: NextRequest) {
               : { name: 'user', language: 'ja', interaction_style: 'Concierge' };
             identity.avatar_path = 'avatar.png';
             identity.avatar_source = avatarSource === 'camera' ? 'camera' : 'upload';
-            identity.updated_at = new Date().toISOString();
+            identity.updated_at = nowIso();
             safeWriteFile(identityPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
           })
         );
@@ -421,13 +421,14 @@ export async function POST(req: NextRequest) {
               statusInput === 'suspended' || statusInput === 'archived' ? statusInput : 'active',
           });
           const vision = (visionInput ?? String(currentIdentity.vision || '')).trim();
+          const updatedAt = nowIso();
           const identity = {
             ...currentIdentity,
             ...(nameInput ? { name: nameInput.trim() } : {}),
             ...(primaryDomainInput ? { primary_domain: primaryDomainInput.trim() } : {}),
             tenant_slug: tenant.tenant_slug,
             vision,
-            updated_at: new Date().toISOString(),
+            updated_at: updatedAt,
           };
           safeMkdir(profileRoot, { recursive: true });
           safeWriteFile(identityPath, JSON.stringify(identity, null, 2), { encoding: 'utf8' });
@@ -445,7 +446,7 @@ export async function POST(req: NextRequest) {
                   (providerInput || String(currentAgent.provider || '')).trim() || undefined,
                 model_id: (modelIdInput || String(currentAgent.model_id || '')).trim() || undefined,
                 owner: String(identity.name || currentAgent.owner || 'user'),
-                updated_at: new Date().toISOString(),
+                updated_at: updatedAt,
               },
               null,
               2

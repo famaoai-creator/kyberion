@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { nowIso } from '@agent/core/foundation';
 import {
   getChronosAccessRoleOrThrow,
   guardRequest,
@@ -428,7 +429,7 @@ export async function GET(req: NextRequest) {
         handoffs: a2aHandoffs,
         messages: agentMessages,
       }),
-      timestamp: new Date().toISOString(),
+      timestamp: nowIso(),
     });
   } catch (err: any) {
     return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
@@ -691,7 +692,7 @@ export async function POST(req: NextRequest) {
             sensitivity_tier: candidate.sensitivity_tier,
             source_ref: candidate.source_ref,
           })),
-          ts: new Date().toISOString(),
+          ts: nowIso(),
         });
       }
 
@@ -743,7 +744,7 @@ export async function POST(req: NextRequest) {
         autopromote: personalAutopromote,
         promoted,
         failed,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -775,7 +776,7 @@ export async function POST(req: NextRequest) {
         operation,
         outcome,
         target,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -808,7 +809,7 @@ export async function POST(req: NextRequest) {
         status: 'ok',
         action,
         sessionId,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -890,7 +891,7 @@ export async function POST(req: NextRequest) {
         track_id: seed.track_id,
         track_name: seed.track_name,
         work_loop: seed.work_loop,
-        updated_at: new Date().toISOString(),
+        updated_at: nowIso(),
         metadata: {
           ...(seed.metadata || {}),
           start_output: startOutput,
@@ -953,7 +954,7 @@ export async function POST(req: NextRequest) {
         action,
         seedId,
         missionId,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1000,7 +1001,7 @@ export async function POST(req: NextRequest) {
         proposal,
       });
       const existing = loadMissionSeedRecord(proposal.seed_id);
-      const now = new Date().toISOString();
+      const now = nowIso();
       const seed = existing || {
         seed_id: proposal.seed_id,
         project_id: project.project_id,
@@ -1040,7 +1041,7 @@ export async function POST(req: NextRequest) {
         status: 'ok',
         action,
         seed,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1087,7 +1088,7 @@ export async function POST(req: NextRequest) {
         missionId,
         operation,
         eventId: event.event_id,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1119,7 +1120,7 @@ export async function POST(req: NextRequest) {
         action,
         missionId,
         response,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1155,7 +1156,7 @@ export async function POST(req: NextRequest) {
         surfaceId,
         operation,
         eventId: event.event_id,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1211,7 +1212,7 @@ export async function POST(req: NextRequest) {
         action,
         surface,
         messageId,
-        ts: new Date().toISOString(),
+        ts: nowIso(),
       });
     }
 
@@ -1254,7 +1255,7 @@ export async function POST(req: NextRequest) {
       status: 'ok',
       action,
       agentId,
-      ts: new Date().toISOString(),
+      ts: nowIso(),
     });
   } catch (err: any) {
     return viewerErrorResponse(err, err instanceof ViewerContextError ? err.status : 500);
