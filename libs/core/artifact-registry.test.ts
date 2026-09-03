@@ -66,6 +66,25 @@ describe('artifact-registry', () => {
     expect(rows[1]?.artifact_id).toBe('ART-TEST-TWO');
   });
 
+  it('appends the canonical ownership payload returned by the catalog', () => {
+    appendArtifactOwnershipRecord(
+      createArtifactOwnershipRecord({
+        artifact_id: 'ART-TEST-CANONICAL',
+        project_id: 'PRJ-TEST',
+        kind: 'report',
+        storage_class: 'artifact_store',
+        path: 'active/shared/exports/canonical.md',
+        $schema: 'governance-metadata',
+      } as unknown as Parameters<typeof createArtifactOwnershipRecord>[0])
+    );
+
+    const persisted = JSON.parse(
+      String(safeReadFile(registryPath, { encoding: 'utf8' })).trim()
+    ) as Record<string, unknown>;
+    expect(persisted).not.toHaveProperty('$schema');
+    expect(persisted.artifact_id).toBe('ART-TEST-CANONICAL');
+  });
+
   it('rejects records without ownership metadata', () => {
     const record = createArtifactOwnershipRecord({
       artifact_id: 'ART-TEST-NO-OWNER',
