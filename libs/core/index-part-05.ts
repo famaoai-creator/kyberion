@@ -287,6 +287,7 @@ export { MissionEvidenceDoc } from './mission-evidence-doc.js';
 export {
   grantVoiceConsent,
   isVoiceConsentRecord,
+  loadVoiceConsentAtPath,
   readVoiceConsent,
   revokeVoiceConsent,
 } from './voice-consent.js';
