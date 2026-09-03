@@ -2,8 +2,10 @@ import { appendJsonLine, readJsonLines } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { assertModuleInvariant } from './invariants.js';
-import { assertSafeRepositoryPath, safeMkdir } from './secure-io.js';
+import { pathResolver } from './path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 
 export const PROMPT_VISIBILITY_LEDGER_VERSION = 1 as const;
 
@@ -34,6 +36,10 @@ export interface AppendPromptVisibilityRecordInput {
   now?: string;
 }
 
+const PROMPT_VISIBILITY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/prompt-visibility-record.schema.json'
+);
+
 function required(label: string, value: string): string {
   const normalized = value.trim();
   if (!normalized) throw new Error(`[PROMPT_VISIBILITY_INVALID] ${label} is required`);
@@ -52,6 +58,20 @@ function ledgerFile(input: AppendPromptVisibilityRecordInput): string {
 
 function assertRecordShape(record: PromptVisibilityRecord): void {
   assertModuleInvariant('prompt-visibility-ledger', 'record-shape', record);
+}
+
+function promptVisibilityCatalog(filePath: string): GovernedCatalog<PromptVisibilityRecord> {
+  return defineCatalog<PromptVisibilityRecord>({
+    id: 'prompt-visibility-record',
+    path: filePath,
+    schema: PROMPT_VISIBILITY_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularLedgerFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[PROMPT_VISIBILITY_INVALID] ledger must be a regular file: ${filePath}`);
+  }
 }
 
 export function appendPromptVisibilityRecord(
@@ -78,20 +98,23 @@ export function appendPromptVisibilityRecord(
   };
   assertRecordShape(record);
   safeMkdir(path.dirname(file), { recursive: true });
-  appendJsonLine(file, record);
+  ensureRegularLedgerFile(file);
+  appendJsonLine(file, promptVisibilityCatalog(file).validate(record, file));
   return record;
 }
 
 export function loadPromptVisibilityLedger(ledgerPath: string): PromptVisibilityRecord[] {
   const safeLedgerPath = assertSafeRepositoryPath(ledgerPath, { allowMissingLeaf: true });
+  ensureRegularLedgerFile(safeLedgerPath);
+  const catalog = promptVisibilityCatalog(safeLedgerPath);
   return readJsonLines<PromptVisibilityRecord>(safeLedgerPath, {
     onMalformed: (error, lineNumber) => {
       throw new Error(
         `MISSION_LOG_CORRUPT:prompt_visibility_record:${lineNumber}${error instanceof Error ? `:${error.message}` : ''}`
       );
     },
-    map: (value) => {
-      const parsed = value as PromptVisibilityRecord;
+    map: (value, lineNumber) => {
+      const parsed = catalog.validate(value, `${safeLedgerPath}:${lineNumber}`);
       assertRecordShape(parsed);
       return parsed;
     },

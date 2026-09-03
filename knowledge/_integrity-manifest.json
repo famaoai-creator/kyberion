@@ -8917,6 +8917,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/prompt-visibility-record.schema.json",
+      "tier": "public",
+      "size": 1048,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/proposal-brief.schema.json",
       "tier": "public",
       "size": 1708,
