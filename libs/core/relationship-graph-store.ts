@@ -12,13 +12,16 @@
  */
 
 import * as path from 'node:path';
-import { rootResolve } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
+import { pathResolver, rootResolve } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeWriteFile } from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 
 const RELATIONSHIPS_ROOT = 'knowledge/confidential/relationships';
+const RELATIONSHIP_NODE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/relationship-node.schema.json'
+);
 const HISTORY_MAX = 20;
 const ALLOWED_SOURCES = ['presence-actuator', 'voice-actuator', 'manual'] as const;
 export type RelationshipSource = (typeof ALLOWED_SOURCES)[number];
@@ -115,6 +118,14 @@ const NODE_FIELDS = [
   'pending_suggestions',
   'updated_at',
 ] as const;
+
+function relationshipNodeCatalog(filePath: string) {
+  return defineCatalog<RelationshipNode>({
+    id: 'relationship-node',
+    path: filePath,
+    schema: RELATIONSHIP_NODE_SCHEMA_PATH,
+  });
+}
 
 function recordFields(record: Record<string, unknown>, fields: readonly string[], label: string) {
   const allowed = new Set(fields);
@@ -444,7 +455,11 @@ function parseRelationshipNode(value: unknown, org: string, personSlug: string):
 export function readNode(org: string, personSlug: string): RelationshipNode | null {
   const file = nodePath(org, personSlug);
   if (!safeExistsSync(file)) return null;
-  return parseRelationshipNode(readJson<unknown>(file), org, personSlug);
+  const safeFile = assertSafeRepositoryPath(file, { allowMissingLeaf: false });
+  if (!safeLstat(safeFile).isFile()) {
+    throw new Error('[relationship-graph] relationship node must be a regular file');
+  }
+  return parseRelationshipNode(relationshipNodeCatalog(safeFile).load(), org, personSlug);
 }
 
 function writeNode(org: string, personSlug: string, node: RelationshipNode): void {
