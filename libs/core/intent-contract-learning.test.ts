@@ -63,9 +63,14 @@ describe('intent-contract-learning memory snapshot', () => {
           last_seen: new Date().toISOString(),
         },
       ],
+      $schema: 'https://example.test/schema.json',
     };
 
     saveIntentContractMemory(nextMemory);
+
+    expect(JSON.parse(String(safeReadFile(runtimePath, { encoding: 'utf8' })))).not.toHaveProperty(
+      '$schema'
+    );
 
     const stale = loadIntentContractMemorySnapshot();
     expect(stale).toBe(baseline);
