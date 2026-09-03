@@ -1,8 +1,14 @@
 import * as path from 'node:path';
 import { auditChain } from './audit-chain.js';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import { discoverProviders, type ProviderInfo } from './provider-discovery.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { nowIso } from './foundation/time.js';
@@ -58,6 +64,9 @@ interface PinFile {
 }
 
 const PIN_FILE_VERSION = '1.0';
+const PROVIDER_PINS_SCHEMA_PATH = pathResolver.rootResolve(
+  'knowledge/product/schemas/provider-pins.schema.json'
+);
 
 function actorId(): string {
   return (
@@ -97,12 +106,17 @@ function pinFilePath(): string {
   );
 }
 
+const providerPinsCatalog = defineCatalog<PinFile>({
+  id: 'provider-pins',
+  path: pinFilePath,
+  schema: PROVIDER_PINS_SCHEMA_PATH,
+});
+
 function readPinFile(): PinFile {
   try {
     const filePath = pinFilePath();
-    if (!safeExistsSync(filePath)) return { version: PIN_FILE_VERSION, pins: {} };
-    const parsed = readJson<PinFile>(filePath);
-    if (parsed && typeof parsed.pins === 'object' && parsed.pins !== null) return parsed;
+    if (!safeLstat(filePath).isFile()) return { version: PIN_FILE_VERSION, pins: {} };
+    return providerPinsCatalog.load();
   } catch {
     /* treat as empty */
   }
