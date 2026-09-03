@@ -255,6 +255,10 @@
       "types": "./dist/knowledge-usage-aggregate.d.ts",
       "default": "./dist/knowledge-usage-aggregate.js"
     },
+    "./knowledge-index-cache": {
+      "types": "./dist/knowledge-index-cache.d.ts",
+      "default": "./dist/knowledge-index-cache.js"
+    },
     "./ranking-signals": {
       "types": "./dist/ranking-signals.d.ts",
       "default": "./dist/ranking-signals.js"
