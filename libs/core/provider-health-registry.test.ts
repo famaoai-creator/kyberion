@@ -20,7 +20,13 @@ import {
 } from './provider-health-registry.js';
 import type { ProviderInfo } from './provider-discovery.js';
 import * as pathResolver from './path-resolver.js';
-import { safeRmSync, safeSymlinkSync, safeUnlinkSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeRmSync,
+  safeSymlinkSync,
+  safeUnlinkSync,
+  safeWriteFile,
+} from './secure-io.js';
 
 function provider(
   providerId: string,
@@ -153,6 +159,15 @@ describe('provider-health-registry', () => {
       );
       reloadProviderHealthFromDisk(T0 + 1000);
       expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(false);
+    });
+
+    it('does not persist a schema-invalid demotion state', () => {
+      reportProviderRateLimited('', { retryAfterMs: 5000, now: T0 });
+      expect(
+        safeExistsSync(
+          pathResolver.rootResolve(String(process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH))
+        )
+      ).toBe(false);
     });
 
     it('rejects a state path outside the repository before persistence', () => {

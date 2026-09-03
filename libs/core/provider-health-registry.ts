@@ -112,10 +112,11 @@ function persist(): void {
   const filePath = stateFilePath();
   try {
     safeMkdir(path.dirname(filePath), { recursive: true });
-    safeWriteFile(
-      filePath,
-      JSON.stringify({ version: '1.0', demotions: [...demotions.values()] }, null, 2)
+    const validated = providerHealthStateCatalog.validate(
+      { version: '1.0', demotions: [...demotions.values()] },
+      filePath
     );
+    safeWriteFile(filePath, JSON.stringify(validated, null, 2));
   } catch (err) {
     // Best-effort: in-memory failover keeps working even if persistence fails.
     logger.warn(`[provider-health] failed to persist state: ${err}`);
