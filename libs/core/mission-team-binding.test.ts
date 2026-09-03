@@ -298,4 +298,17 @@ describe('mission-team-binding', () => {
       /^kyberion:\/\/agent\/[a-z][a-z0-9-]*\/legacy-agent$/
     );
   });
+
+  it('rejects schema-invalid staffing artifacts before normalization', () => {
+    const paths = initializeMissionTeamBindings(TEST_MISSION_DIR, SAMPLE_PLAN);
+    const persisted = JSON.parse(
+      String(safeReadFile(paths.staffingAssignmentsPath, { encoding: 'utf8' }))
+    ) as Record<string, unknown>;
+    persisted.unexpected = true;
+    safeWriteFile(paths.staffingAssignmentsPath, JSON.stringify(persisted));
+
+    expect(() => loadMissionStaffingAssignments(MISSION_ID, TEST_MISSION_DIR)).toThrow(
+      'Invalid catalog mission-staffing-assignments'
+    );
+  });
 });

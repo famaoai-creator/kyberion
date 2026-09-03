@@ -1,7 +1,8 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
-import { assertMissionIdArgument, findMissionPath, missionDir } from './path-resolver.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import * as pathResolver from './path-resolver.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { deriveAgentNhiId, ensureAgentIdentityBestEffort, parseNhiId } from './agent-identity.js';
 import { parseDelegationChain, type DelegationChain } from './delegation-chain.js';
@@ -133,6 +134,18 @@ interface MissionBindingPaths {
   executionLedgerPath: string;
 }
 
+const STAFFING_ASSIGNMENTS_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/mission-staffing-assignments.schema.json'
+);
+
+function staffingAssignmentsCatalog(filePath: string) {
+  return defineCatalog<MissionStaffingAssignments>({
+    id: 'mission-staffing-assignments',
+    path: filePath,
+    schema: STAFFING_ASSIGNMENTS_SCHEMA_PATH,
+  });
+}
+
 function normalizeMissionId(missionId: string): string {
   return missionId.trim().toUpperCase();
 }
@@ -142,11 +155,11 @@ function resolveMissionBindingPaths(
   missionPathHint?: string
 ): MissionBindingPaths {
   const normalizedMissionId = normalizeMissionId(missionId);
-  assertMissionIdArgument(normalizedMissionId);
+  pathResolver.assertMissionIdArgument(normalizedMissionId);
   const missionPath =
     missionPathHint ||
-    findMissionPath(normalizedMissionId) ||
-    missionDir(normalizedMissionId, 'public');
+    pathResolver.findMissionPath(normalizedMissionId) ||
+    pathResolver.missionDir(normalizedMissionId, 'public');
   const safeMissionPath = assertSafeRepositoryPath(missionPath, { allowMissingLeaf: true });
   return {
     missionPath: safeMissionPath,
@@ -355,7 +368,12 @@ export function initializeMissionTeamBindings(
       .split(path.sep)
       .join('/'),
     missionPathHint: paths.missionPath,
-    provisioned: provisionMissionEntry(staffingAssignments),
+    provisioned: provisionMissionEntry(
+      staffingAssignmentsCatalog(paths.staffingAssignmentsPath).validate(
+        staffingAssignments,
+        paths.staffingAssignmentsPath
+      )
+    ),
   });
   if (!safeExistsSync(paths.executionLedgerPath)) {
     writeProvisionedText({
@@ -378,11 +396,12 @@ export function loadMissionStaffingAssignments(
 ): MissionStaffingAssignments | null {
   const paths = resolveMissionBindingPaths(missionId, missionPathHint);
   if (!safeExistsSync(paths.staffingAssignmentsPath)) return null;
-  const parsed = readJson<
-    Omit<MissionStaffingAssignments, 'assignments'> & {
-      assignments?: Array<Partial<MissionStaffingAssignment>>;
-    }
-  >(paths.staffingAssignmentsPath);
+  const parsed = staffingAssignmentsCatalog(paths.staffingAssignmentsPath).load() as Omit<
+    MissionStaffingAssignments,
+    'assignments'
+  > & {
+    assignments?: Array<Partial<MissionStaffingAssignment>>;
+  };
   const assignments = (parsed.assignments || []).flatMap((assignment) => {
     const actorId = String(assignment.actor_id || '').trim();
     if (!actorId) return [];

@@ -8323,6 +8323,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-staffing-assignments.schema.json",
+      "tier": "public",
+      "size": 4004,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mission-state.schema.json",
       "tier": "public",
       "size": 5934,
