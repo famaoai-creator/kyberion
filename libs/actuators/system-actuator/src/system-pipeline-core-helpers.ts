@@ -53,7 +53,11 @@ import {
   runTaskModelRoutingSummary,
 } from '@agent/core/report-ops';
 import { macosAutomationBridge } from '@agent/core/macos-automation-bridge';
-import { getRegisteredEnv, readJson } from '@agent/core/foundation';
+import {
+  getRegisteredEnv,
+  parseSafeJsonInput,
+  parseSafeJsonObjectValue,
+} from '@agent/core/foundation';
 import { loadStateAtPath } from '@agent/core/mission-state';
 import { handleAction as handleFileAction } from '../../file-actuator/src/file-pipeline-helpers.js';
 import { getAllFiles } from '@agent/core/fs-utils';
@@ -80,6 +84,22 @@ import { randomUUID } from 'node:crypto';
 
 function resolveSystemPath(ref: string, allowMissingLeaf = true): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readSystemJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
 }
 
 export const ALLOW_UNSAFE_SHELL =
@@ -472,8 +492,9 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
     case 'read_json':
       return {
         ...ctx,
-        [params.export_as || 'last_capture_data']: readJson<unknown>(
-          resolveSystemPath(String(resolve(params.path)))
+        [params.export_as || 'last_capture_data']: readSystemJson(
+          resolveSystemPath(String(resolve(params.path))),
+          'system read_json input'
         ),
       };
     case 'probe': {
@@ -697,11 +718,10 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
           const pkgPath = path.join(actuatorPath, 'package.json');
           if (safeLstat(actuatorPath).isDirectory() && safeExistsSync(pkgPath)) {
             try {
-              const pkg = readJson<{
-                name?: unknown;
-                description?: unknown;
-                version?: unknown;
-              }>(assertSafeRepositoryPath(pkgPath));
+              const pkg = parseSafeJsonObjectValue(
+                readSystemJson(assertSafeRepositoryPath(pkgPath), 'system capability metadata'),
+                'system capability metadata'
+              );
               capabilities.push({
                 id: entry,
                 name: pkg.name,
@@ -909,7 +929,7 @@ export async function opCapture(op: string, params: any, ctx: any, resolve: (val
       const sampled = allTraces.sort(() => 0.5 - Math.random()).slice(0, count);
       const results = sampled.map((s) => ({
         missionId: s.missionId,
-        trace: readJson<unknown>(assertSafeRepositoryPath(s.path)),
+        trace: readSystemJson(assertSafeRepositoryPath(s.path), 'system mission trace'),
       }));
       return { ...ctx, [params.export_as || 'sampled_traces']: results };
     }
