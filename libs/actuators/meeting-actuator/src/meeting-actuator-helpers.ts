@@ -46,7 +46,11 @@ import { resolveVars } from '@agent/core/src/logic-utils';
 import { runOpPreflight } from '@agent/core/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  createStandardYargs,
+  currentProcessArgv,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import {
   auditSpeakerFairnessOp,
@@ -675,7 +679,7 @@ export async function handleAction(
 }
 
 const main = async () => {
-  const argv = await createStandardYargs(process.argv)
+  const argv = await createStandardYargs(currentProcessArgv())
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
 
@@ -690,8 +694,5 @@ const main = async () => {
 if (
   isDirectEntry(import.meta.url, 'libs/actuators/meeting-actuator/src/meeting-actuator-helpers.ts')
 ) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'meeting-actuator');
 }

@@ -1,5 +1,4 @@
 import { readJson, parseSafeJsonInput, parseSafeJsonObjectValue } from '@agent/core/foundation';
-import { logger } from '@agent/core/core';
 import {
   assertSafeRepositoryPath,
   safeReadFile,
@@ -31,7 +30,11 @@ import {
   DEFAULT_MAX_PIPELINE_STEPS,
   DEFAULT_PIPELINE_TIMEOUT_MS,
 } from '@agent/core/execution-bounds';
-import { createStandardYargs } from '@agent/core/cli-utils';
+import {
+  createStandardYargs,
+  currentProcessArgv,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import * as path from 'node:path';
 import { isDirectEntry } from '@agent/core/direct-entry';
 
@@ -434,7 +437,7 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
 }
 
 const main = async () => {
-  const argv = await createStandardYargs(process.argv)
+  const argv = await createStandardYargs(currentProcessArgv())
     .option('input', { alias: 'i', type: 'string', required: true })
     .parseSync();
   const inputContent = safeReadFile(resolveFilePath(String(argv.input)), {
@@ -450,8 +453,5 @@ const main = async () => {
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/file-actuator/src/file-pipeline-helpers.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'file-actuator');
 }
