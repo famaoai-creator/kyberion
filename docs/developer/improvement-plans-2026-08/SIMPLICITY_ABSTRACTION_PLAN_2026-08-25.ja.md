@@ -14964,6 +14964,19 @@ artifact referenceの既存shape、meeting delivery summary、customer deliverab
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 753
+
+SX-03／SX-04／SX-08 のrelationship graphを再監査し、read側は専用schemaとorg／person path、fieldの
+追加検証を通過している一方、interaction／pending suggestion更新のwriteだけが同じ境界を迂回してraw
+`safeWriteFile`していたため修正した。既存`relationship-node.schema.json`とpathに紐づくcatalog validation、
+relationship固有のtimestamp／scope／field検証をpersist直前にも適用し、無効なinteractionがconfidential
+relationship memoryへ残らないようにする。history上限、trusted actuatorのappend、manual review用
+pending_suggestions、symlink／path boundaryの既存semanticsは維持している。
+
+検証: relationship graph **1 file / 13 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
