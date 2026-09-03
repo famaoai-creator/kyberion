@@ -7663,6 +7663,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-curation-archive-history.schema.json",
+      "tier": "public",
+      "size": 995,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-curation-slo.schema.json",
       "tier": "public",
       "size": 1280,
