@@ -7261,6 +7261,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/frontmatter-exclusions.schema.json",
+      "tier": "public",
+      "size": 647,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/gate-profile.schema.json",
       "tier": "public",
       "size": 2961,
