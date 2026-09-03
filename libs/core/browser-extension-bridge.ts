@@ -1,5 +1,6 @@
-import { appendJsonLine, readJson } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
 import type { ValidateFunction } from 'ajv';
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
@@ -378,7 +379,12 @@ export function loadBrowserExtensionRecordingAtPath(filePath: string): BrowserEx
   if (!safeLstat(safeFilePath).isFile()) {
     throw new Error(`[BROWSER_RECORDING] recording must be a regular file: ${filePath}`);
   }
-  const validation = validateBrowserExtensionRecording(readJson<unknown>(safeFilePath));
+  const recording = defineCatalog<BrowserExtensionRecording>({
+    id: 'browser-recording',
+    path: safeFilePath,
+    schema: RECORDING_SCHEMA_PATH,
+  }).load();
+  const validation = validateBrowserExtensionRecording(recording);
   if (!validation.value) {
     throw new Error(
       `[BROWSER_RECORDING] invalid recording at ${filePath}: ${validation.errors.join('; ')}`
