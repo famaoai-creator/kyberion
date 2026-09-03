@@ -213,8 +213,8 @@ function appendClosureAudit(record: Record<string, unknown>): string | undefined
     const auditPath = pathResolver.sharedLogsAudit(MISSION_CLOSURE_AUDIT_FILENAME);
     safeMkdir(path.dirname(auditPath), { recursive: true });
     ensureRegularClosureAuditFile(auditPath);
-    closureAuditCatalog(auditPath).validate(record, auditPath);
-    appendJsonLine(auditPath, record);
+    const validated = closureAuditCatalog(auditPath).validate(record, auditPath);
+    appendJsonLine(auditPath, validated);
     return auditPath;
   } catch (err) {
     logger.warn(
