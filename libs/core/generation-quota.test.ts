@@ -100,6 +100,51 @@ describe('generation quota', () => {
     safeRmSync(ROOT, { recursive: true, force: true });
   });
 
+  it('fails closed for schema-invalid, cross-tenant, and non-file counters', () => {
+    safeRmSync(ROOT, { recursive: true, force: true });
+    const options = { rootDir: ROOT, policy: POLICY, now: '2026-08-16T00:00:00.000Z' };
+    const counterPath = generationQuotaCounterPath('client-a', options);
+    safeMkdir(path.dirname(counterPath), { recursive: true });
+    const updatedAt = new Date(options.now).toISOString();
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'client-a',
+        date: '2026-08-16',
+        units: 1,
+        updated_at: updatedAt,
+        unexpected: true,
+      })
+    );
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+
+    safeWriteFile(
+      counterPath,
+      JSON.stringify({
+        tenant_slug: 'other-tenant',
+        date: '2026-08-16',
+        units: 1,
+        updated_at: updatedAt,
+      })
+    );
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+
+    safeRmSync(counterPath, { force: true });
+    safeMkdir(counterPath, { recursive: true });
+    expect(reserveGenerationQuota(SCOPE, 'generate_image', options)).toMatchObject({
+      allowed: false,
+      reason: expect.stringContaining('counter is invalid'),
+    });
+    safeRmSync(ROOT, { recursive: true, force: true });
+  });
+
   it('rejects a tenant counter path outside the governed fixture root', () => {
     expect(() => generationQuotaCounterPath('client-a', { rootDir: '/tmp' })).toThrow(
       /outside the repository/
