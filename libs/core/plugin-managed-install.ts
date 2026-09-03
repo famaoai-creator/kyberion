@@ -328,7 +328,13 @@ function resolveActivationStatus(params: {
 }
 
 function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): void {
-  safeWriteFile(path.join(managedDir, MANAGED_RECORD_FILENAME), JSON.stringify(record, null, 2));
+  const recordPath = path.join(managedDir, MANAGED_RECORD_FILENAME);
+  const validated = defineCatalog<ManagedPluginRecord>({
+    id: 'managed-plugin-record',
+    path: recordPath,
+    schema: MANAGED_RECORD_SCHEMA_PATH,
+  }).validate(record, recordPath);
+  safeWriteFile(recordPath, JSON.stringify(validated, null, 2));
 }
 
 function isNonEmptyString(value: unknown): value is string {
