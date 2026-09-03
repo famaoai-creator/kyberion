@@ -7699,6 +7699,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/knowledge-index-usage.schema.json",
+      "tier": "public",
+      "size": 300,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/knowledge-package.schema.json",
       "tier": "public",
       "size": 2752,

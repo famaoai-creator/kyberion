@@ -75,6 +75,8 @@ export * from './knowledge-index-cache.js';
 
 export * from './analysis-config.js';
 
+export * from './knowledge-index-usage.js';
+
 export * from './knowledge-taxonomy.js';
 export * from './volatile-knowledge.js';
 
