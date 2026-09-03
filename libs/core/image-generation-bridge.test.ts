@@ -371,6 +371,28 @@ describe('LlmApiImageGenerationProvider', () => {
       })
     ).rejects.toThrow('Gemini Imagen API returned no image bytes');
   });
+
+  it('fails closed when the DALL-E response shape or image bytes are malformed', async () => {
+    process.env.OPENAI_API_KEY = 'mock-dalle-key';
+    for (const payload of [
+      [],
+      { data: [{ b64_json: 'invalid!' }] },
+      { data: [{ b64_json: 'bW9jay1ieXRlcw==', constructor: {} }] },
+      { data: ['bW9jay1ieXRlcw=='] },
+    ]) {
+      vi.mocked(global.fetch).mockResolvedValue({
+        ok: true,
+        json: async () => payload,
+      } as Response);
+
+      await expect(
+        new LlmApiImageGenerationProvider().generate({
+          prompt: 'malformed DALL-E response',
+          providerPreference: ['openai'],
+        })
+      ).rejects.toThrow('OpenAI DALL-E API returned no image bytes');
+    }
+  });
 });
 
 describe('LocalFluxImageGenerationProvider', () => {

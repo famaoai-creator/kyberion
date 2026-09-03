@@ -43,20 +43,7 @@ function isAppleSiliconMac(): boolean {
 }
 
 function imageBytesFromResponse(value: unknown): string | undefined {
-  const normalize = (candidate: unknown): string | undefined => {
-    if (typeof candidate !== 'string') return undefined;
-    const normalized = candidate.trim();
-    if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]+=*$/u.test(normalized)) {
-      return undefined;
-    }
-    const decoded = Buffer.from(normalized, 'base64');
-    if (decoded.length === 0) return undefined;
-    const withoutPadding = normalized.replace(/=+$/u, '');
-    if (decoded.toString('base64').replace(/=+$/u, '') !== withoutPadding) return undefined;
-    return normalized;
-  };
-
-  if (typeof value === 'string') return normalize(value);
+  if (typeof value === 'string') return normalizeImageBytes(value);
   if (!isRecord(value)) return undefined;
   let safeValue: Record<string, unknown>;
   try {
@@ -64,17 +51,40 @@ function imageBytesFromResponse(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
-  const direct = normalize(safeValue.imageBytes);
+  const direct = normalizeImageBytes(safeValue.imageBytes);
   if (direct) return direct;
   if (Array.isArray(safeValue.generatedImages)) {
     const first = safeValue.generatedImages[0];
     if (isRecord(first) && isRecord(first.image)) {
-      const nested = normalize(first.image.imageBytes);
+      const nested = normalizeImageBytes(first.image.imageBytes);
       if (nested) return nested;
     }
   }
-  if (isRecord(safeValue.result)) return normalize(safeValue.result.imageBytes);
+  if (isRecord(safeValue.result)) return normalizeImageBytes(safeValue.result.imageBytes);
   return undefined;
+}
+
+function normalizeImageBytes(candidate: unknown): string | undefined {
+  if (typeof candidate !== 'string') return undefined;
+  const normalized = candidate.trim();
+  if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]+=*$/u.test(normalized)) {
+    return undefined;
+  }
+  const decoded = Buffer.from(normalized, 'base64');
+  if (decoded.length === 0) return undefined;
+  const withoutPadding = normalized.replace(/=+$/u, '');
+  if (decoded.toString('base64').replace(/=+$/u, '') !== withoutPadding) return undefined;
+  return normalized;
+}
+
+function dallEImageBytesFromResponse(value: unknown): string | undefined {
+  try {
+    const safeValue = parseSafeJsonObjectValue(value, 'OpenAI DALL-E response');
+    if (!Array.isArray(safeValue.data) || !isRecord(safeValue.data[0])) return undefined;
+    return normalizeImageBytes(safeValue.data[0].b64_json);
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveLocalFluxDimensions(request: ImageGenerationRequest): {
@@ -409,13 +419,8 @@ export class LlmApiImageGenerationProvider implements ImageGenerationProvider {
       throw new Error(`OpenAI DALL-E API error: ${res.statusText} (${res.status})`);
     }
 
-    const data = (await res.json()) as unknown;
-    const base64Bytes =
-      isRecord(data) && Array.isArray(data.data) && isRecord(data.data[0])
-        ? typeof data.data[0].b64_json === 'string'
-          ? data.data[0].b64_json
-          : undefined
-        : undefined;
+    const data = await res.json();
+    const base64Bytes = dallEImageBytesFromResponse(data);
     if (!base64Bytes) {
       throw new Error('OpenAI DALL-E API returned no image bytes');
     }
