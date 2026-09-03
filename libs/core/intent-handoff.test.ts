@@ -72,6 +72,7 @@ describe('intent-handoff', () => {
 
     const handoffPath = writeIntentGoalHandoff('MSN-TEST', payload);
     expect(fs.existsSync(handoffPath)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(handoffPath, 'utf8')).$schema).toBeUndefined();
 
     const consumed = consumeIntentGoalHandoff(handoffPath);
     expect(consumed).toEqual(payload);

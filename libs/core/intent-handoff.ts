@@ -158,7 +158,12 @@ export function writeIntentGoalHandoff(missionId: string, payload: IntentGoalHan
   });
   const parsedPayload = parseIntentGoalHandoff(payload);
   if (!parsedPayload) throw new Error('Invalid intent goal handoff payload');
-  safeWriteFile(handoffPath, JSON.stringify(parsedPayload, null, 2));
+  const canonicalPayload = defineCatalog<IntentGoalHandoff>({
+    id: 'intent-goal-handoff',
+    path: handoffPath,
+    schema: HANDOFF_SCHEMA_PATH,
+  }).validate(parsedPayload, handoffPath);
+  safeWriteFile(handoffPath, JSON.stringify(canonicalPayload, null, 2));
   return handoffPath;
 }
 
