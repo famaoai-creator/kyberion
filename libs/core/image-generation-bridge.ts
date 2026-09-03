@@ -16,6 +16,7 @@ import { resolveServiceBinding } from './service-binding.js';
 import { resolveLocalFluxGenerationPolicy } from './image-generation-policy.js';
 import { probeToolRuntime } from './tool-runtime-registry.js';
 import { probeServiceRuntime } from './service-runtime-registry.js';
+import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import {
   generateImageLocallyWithApplePlayground,
   probeAppleImageGeneration,
@@ -42,18 +43,37 @@ function isAppleSiliconMac(): boolean {
 }
 
 function imageBytesFromResponse(value: unknown): string | undefined {
-  if (typeof value === 'string') return value;
+  const normalize = (candidate: unknown): string | undefined => {
+    if (typeof candidate !== 'string') return undefined;
+    const normalized = candidate.trim();
+    if (!normalized || normalized.length % 4 === 1 || !/^[A-Za-z0-9+/]+=*$/u.test(normalized)) {
+      return undefined;
+    }
+    const decoded = Buffer.from(normalized, 'base64');
+    if (decoded.length === 0) return undefined;
+    const withoutPadding = normalized.replace(/=+$/u, '');
+    if (decoded.toString('base64').replace(/=+$/u, '') !== withoutPadding) return undefined;
+    return normalized;
+  };
+
+  if (typeof value === 'string') return normalize(value);
   if (!isRecord(value)) return undefined;
-  if (typeof value.imageBytes === 'string') return value.imageBytes;
-  if (Array.isArray(value.generatedImages)) {
-    const first = value.generatedImages[0];
-    if (isRecord(first) && isRecord(first.image) && typeof first.image.imageBytes === 'string') {
-      return first.image.imageBytes;
+  let safeValue: Record<string, unknown>;
+  try {
+    safeValue = parseSafeJsonObjectValue(value, 'image generation response');
+  } catch {
+    return undefined;
+  }
+  const direct = normalize(safeValue.imageBytes);
+  if (direct) return direct;
+  if (Array.isArray(safeValue.generatedImages)) {
+    const first = safeValue.generatedImages[0];
+    if (isRecord(first) && isRecord(first.image)) {
+      const nested = normalize(first.image.imageBytes);
+      if (nested) return nested;
     }
   }
-  if (isRecord(value.result) && typeof value.result.imageBytes === 'string') {
-    return value.result.imageBytes;
-  }
+  if (isRecord(safeValue.result)) return normalize(safeValue.result.imageBytes);
   return undefined;
 }
 
