@@ -1,8 +1,11 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { handleSystemAction } from './system-action-helpers.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 export { describeOps };
 export {
@@ -32,16 +35,13 @@ export {
 const main = async () => {
   await runActuatorCli({
     name: 'system-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction: handleSystemAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/system-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'system-actuator');
 }
 
 export { handleSystemAction as handleAction };

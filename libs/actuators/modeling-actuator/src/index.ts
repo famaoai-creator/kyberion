@@ -1,4 +1,3 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { ensureDefaultOpPreflight } from '@agent/core/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/op-preflight';
@@ -8,7 +7,11 @@ import {
   performReconcile,
   type ModelingAction,
 } from './modeling-pipeline-helpers.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 /**
@@ -42,16 +45,13 @@ export async function handleAction(input: ModelingAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'modeling-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/modeling-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'modeling-actuator');
 }
 
 export const actuator = defineCatalogBackedActuator({

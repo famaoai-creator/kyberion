@@ -1,4 +1,3 @@
-import { logger } from '@agent/core/core';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import {
   buildRetryOptions,
@@ -7,7 +6,11 @@ import {
   type IOSAction,
   type PipelineStep,
 } from './ios-runtime-helpers.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 
 async function handleAction(input: IOSAction) {
   if (input.action !== 'pipeline') {
@@ -19,16 +22,13 @@ async function handleAction(input: IOSAction) {
 const main = async () => {
   await runActuatorCli({
     name: 'ios-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/ios-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'ios-actuator');
 }
 
 export { handleAction, buildRetryOptions, DEFAULT_IOS_RETRY };

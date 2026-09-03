@@ -15715,6 +15715,16 @@ review scope を先に検証し、dry-run／check は `listening: false` の起�
 
 検証: report-review server／stamp **2 files / 5 tests passed**、実機 `pnpm exec tsx scripts/report-review/server.ts presence/displays/presence-studio/static/onboarding.html --dry-run --json`（`ok: true`、`listening: false`）、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 817
+
+SX-06 の actuator entrypoint を再監査し、27本の `src/index.ts` が同じ `process.argv` 直読と `main().catch` を個別に持つ
+残存を修正した。全 entrypoint を `currentProcessArgv()` と `runActuatorCliEntryPoint()` の共有境界へ移行し、handler／catalog／
+actuator ABI と direct-entry 判定は維持した。これにより actuator index 内の直接 `process.argv` と `main().catch` は **0件**となり、
+CLI失敗時のstderr／exit code処理も同じ実装へ収束した。terminal の既存module mockには、entrypoint import整理で露呈した
+`pathResolver.knowledge` の named exportを補い、実運用テストを壊さない境界にした。
+
+検証: actuator index entrypoint **27 files**、actuator index test **31 files / 602 tests passed / 11 skipped**、対象ESLint、root typecheck、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。SX-03 の追加script／state loader、SX-04 の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

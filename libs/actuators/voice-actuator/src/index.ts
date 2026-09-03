@@ -60,7 +60,11 @@ import {
   loadVoiceRepairSessionAtPath,
   validateVoiceRepairSessionAtPath,
 } from './voice-repair-session.js';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { extractActionParams } from './voice-loopback-helpers.js';
 import {
   listAudioRoutes,
@@ -1437,16 +1441,13 @@ async function transcribeVoiceSample(input: {
 const main = async () => {
   await runActuatorCli({
     name: 'voice-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/voice-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'voice-actuator');
 }
 import { defineCatalogBackedActuator } from '../../../core/actuator-sdk.js';
 import { describeOps } from './op-catalog.js';

@@ -1,4 +1,3 @@
-import { logger } from '@agent/core/core';
 import { emitComputerSurfacePatch } from '@agent/core/computer-surface';
 import {
   buildBrowserExtensionPipelineCandidate,
@@ -15,7 +14,11 @@ import {
 import { executePipeline as executeBrowserPipeline } from './browser-pipeline-helpers.js';
 import { isDirectEntry } from '@agent/core/direct-entry';
 import { Page } from '@playwright/test';
-import { runActuatorCli } from '@agent/core/cli-utils';
+import {
+  currentProcessArgv,
+  runActuatorCli,
+  runActuatorCliEntryPoint,
+} from '@agent/core/cli-utils';
 import { describeOps } from './op-catalog.js';
 
 /**
@@ -191,16 +194,13 @@ async function buildSnapshot(
 const main = async () => {
   await runActuatorCli({
     name: 'browser-actuator',
-    args: process.argv,
+    args: currentProcessArgv(),
     handleAction,
   });
 };
 
 if (isDirectEntry(import.meta.url, 'libs/actuators/browser-actuator/src/index.ts')) {
-  main().catch((err) => {
-    logger.error(err.message);
-    process.exitCode = 1;
-  });
+  void runActuatorCliEntryPoint(main, 'browser-actuator');
 }
 
 export {
