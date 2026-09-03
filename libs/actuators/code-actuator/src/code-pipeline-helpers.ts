@@ -1,6 +1,5 @@
 import {
   nowIso,
-  readJson,
   parsePersistedPipelineStrategy,
   getRegisteredEnv,
   parseSafeJsonInput,
@@ -52,6 +51,22 @@ function resolveCodeRepositoryPath(rootDir: string, value: unknown, label: strin
   return assertSafeRepositoryPath(path.resolve(rootDir, requested), {
     allowMissingLeaf: true,
   });
+}
+
+function isExistingRegularFile(filePath: string): boolean {
+  if (!safeExistsSync(filePath)) return false;
+  try {
+    return safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+function readCodeJson(filePath: string, label: string): unknown {
+  if (!isExistingRegularFile(filePath)) {
+    throw new Error(`${label} must be an existing regular file: ${filePath}`);
+  }
+  return parseSafeJsonInput(String(safeReadFile(filePath, { encoding: 'utf8' }) || ''), label);
 }
 
 export const buildRetryOptions = createGovernedRetryOptionsBuilder({
@@ -195,7 +210,8 @@ export async function executePipeline(
 
   if (contextPath && safeExistsSync(contextPath)) {
     const saved = await retry(
-      async () => readJson<Record<string, unknown>>(contextPath),
+      async () =>
+        parseSafeJsonObjectValue(readCodeJson(contextPath, 'code context'), 'code context'),
       buildRetryOptions()
     );
     ctx = { ...ctx, ...saved };
@@ -670,9 +686,10 @@ async function performReconcile(input: CodeAction) {
     input.strategy_path || 'knowledge/product/governance/code-strategy.json',
     'reconcile'
   );
-  if (!safeExistsSync(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
+  if (!isExistingRegularFile(strategyPath)) throw new Error(`Strategy not found: ${strategyPath}`);
   const config = await retry(
-    async () => parsePersistedPipelineStrategy(readJson<unknown>(strategyPath), 'code strategy'),
+    async () =>
+      parsePersistedPipelineStrategy(readCodeJson(strategyPath, 'code strategy'), 'code strategy'),
     buildRetryOptions()
   );
   for (const strategy of config.strategies) {
