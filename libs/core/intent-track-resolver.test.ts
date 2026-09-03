@@ -46,6 +46,14 @@ describe('intent-track-resolver', () => {
     expect(policy.override_paths).toEqual([OVERRIDE_PATH]);
   });
 
+  it('rejects schema-invalid override records before merging them', async () => {
+    safeWriteFile(OVERRIDE_PATH, JSON.stringify({ unexpected: true }));
+
+    await expect(
+      resolveIntentToTrackPolicy('request-feature-development', 'tenant/a', [OVERRIDE_PATH])
+    ).rejects.toThrow('Invalid catalog track-policy-override');
+  });
+
   it('requires escalation below the policy confidence threshold', async () => {
     const result = await resolveIntentTrackGate({
       intentId: 'request-feature-development',

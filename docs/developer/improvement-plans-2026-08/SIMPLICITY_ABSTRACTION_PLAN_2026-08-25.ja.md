@@ -14495,6 +14495,12 @@ SX-03／SX-04 のgeneration scheduler読込を再監査し、既に同一の`gen
 
 検証: generation scheduler **11 tests passed**、generation scheduler tick **17 tests passed**（共有fixtureのためファイル単位実行）、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 706
+
+SX-03／SX-04 のintent track policy override読込を再監査し、既存`track-policy-override.schema.json`とglobal policy validatorがあるにもかかわらず、追加overrideだけがraw JSON reader後に局所validatorを通る分岐として残っていたため修正した。override専用のcanonical catalog loaderへ統合し、repository／regular-file／schema boundaryをmerge前に共有化した。tenant／tier overrideの収集、deep merge、global／effective policy検証、invalid path拒否の既存semanticsは維持している。
+
+検証: intent track resolver **7 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

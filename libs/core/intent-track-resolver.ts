@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import type { ValidateFunction } from 'ajv';
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { safeExistsSync, safeLstat } from './secure-io.js';
 import { saveProjectTrackRecord, type ProjectTrackRecord } from './project-track-registry.js';
@@ -93,6 +92,9 @@ const TRACK_CREATION_POLICY_PATH = pathResolver.knowledge(
 const TRACK_CREATION_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/track-creation-policy.schema.json'
 );
+const TRACK_POLICY_OVERRIDE_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/track-policy-override.schema.json'
+);
 const trackCreationPolicyCatalog = defineCatalog<JsonObject>({
   id: 'track-creation-policy',
   path: TRACK_CREATION_POLICY_PATH,
@@ -133,9 +135,7 @@ function isSafeOverridePath(filePath: string): boolean {
 
 function ensureOverrideValidator(): ValidateFunction {
   if (overrideValidator) return overrideValidator;
-  overrideValidator = compileSchema(
-    pathResolver.rootResolve('knowledge/product/schemas/track-policy-override.schema.json')
-  );
+  overrideValidator = compileSchema(TRACK_POLICY_OVERRIDE_SCHEMA_PATH);
   return overrideValidator;
 }
 
@@ -145,6 +145,14 @@ function assertTrackPolicyShape(value: unknown, source: string): asserts value i
     const detail = JSON.stringify(validate.errors || []);
     throw new Error(`Invalid track policy override at ${source}: ${detail}`);
   }
+}
+
+function loadTrackPolicyOverrideAtPath(filePath: string): JsonObject {
+  return defineCatalog<JsonObject>({
+    id: 'track-policy-override',
+    path: filePath,
+    schema: TRACK_POLICY_OVERRIDE_SCHEMA_PATH,
+  }).load();
 }
 
 function mergeJson(base: unknown, override: unknown): unknown {
@@ -264,8 +272,7 @@ export async function resolveIntentToTrackPolicy(
   const appliedOverridePaths: string[] = [];
   for (const candidate of collectOverridePaths(tenantId, targetTier, overridePaths)) {
     if (!isSafeOverridePath(candidate)) continue;
-    const override = readJson<JsonObject>(candidate);
-    assertTrackPolicyShape(override, candidate);
+    const override = loadTrackPolicyOverrideAtPath(candidate);
     effectivePolicy = mergeJson(effectivePolicy, override) as JsonObject;
     appliedOverridePaths.push(candidate);
   }
