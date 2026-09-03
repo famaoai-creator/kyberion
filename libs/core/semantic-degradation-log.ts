@@ -57,8 +57,8 @@ export function appendSemanticDegradationRun(
     const nextRuns = [...runs, { at: nowIso(), pipeline_id: pipelineId, counts, total }].slice(
       -MAX_RUNS
     );
-    degradationLogCatalog.validate(nextRuns, filePath);
-    safeWriteFile(filePath, `${JSON.stringify(nextRuns, null, 2)}\n`);
+    const validated = degradationLogCatalog.validate(nextRuns, filePath);
+    safeWriteFile(filePath, `${JSON.stringify(validated, null, 2)}\n`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.warn(`[semantic-degradation-log] append failed: ${detail}`);
