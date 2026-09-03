@@ -14471,6 +14471,12 @@ SX-03／SX-04 のmission context pack fast-lane seedを再監査し、既存のd
 
 検証: mission context pack **26 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 702
+
+SX-03／SX-04 のcontext ranker設定読込を再監査し、既存`analysis-config.schema.json`があるにもかかわらず、`context_ranker.ts`だけがregular-file検査後にraw JSON readerと局所fallbackへ分岐していた残存を修正した。coreの`analysis-config` canonical loaderを追加し、欠如・schema-invalid時の安全側fallback、repository path、schema boundaryを共有化してからranking weightsを投影するようにした。context rankerの既存weight merge、tenant別knowledge weights、ranking semanticsは維持している。
+
+検証: analysis config／context ranker **5 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`。canonical full gate はこの追記後に実行する。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
