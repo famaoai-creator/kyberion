@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/project-operational-track-state.schema.json",
+  "title": "Project Operational Track State",
+  "type": "object",
+  "required": [
+    "project_id",
+    "tier",
+    "track_id",
+    "name",
+    "summary",
+    "status",
+    "active_mission_ids",
+    "updated_at"
+  ],
+  "properties": {
+    "project_id": { "type": "string", "minLength": 1 },
+    "tier": { "type": "string", "enum": ["personal", "confidential", "public"] },
+    "tenant_slug": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+    },
+    "track_id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "lifecycle_model": { "type": "string" },
+    "required_artifacts": { "type": "array", "items": { "type": "string" } },
+    "active_mission_ids": { "type": "array", "items": { "type": "string" } },
+    "updated_at": { "type": "string", "minLength": 1 }
+  },
+  "additionalProperties": false
+}

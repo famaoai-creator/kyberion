@@ -15396,6 +15396,17 @@ design／QA／task readiness gate、test planの既存保存形式は維持し�
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
 Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 789
+
+SX-03／SX-04／SX-08 のproject operational mission link／track stateを再監査し、project state本体とは別の補助
+artifactがschemaなしのraw writerとして残っていたため修正した。既存のproject／tier／tenant partition、mission／track
+path normalization、state syncのsource semanticsを維持し、専用 schema と path-bound catalog を追加して検証済みcanonical
+payloadを保存するよう統合した。catalog metadataが補助runtime artifactへ残らない回帰を追加した。
+
+検証: project operational state／state sync **2 files / 7 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、
+Ajv／env／private helperの全体整理、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
