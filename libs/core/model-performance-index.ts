@@ -1,5 +1,5 @@
 import { appendJsonLine, parseSafeJsonObjectValue, readJsonLines } from './foundation/json.js';
-import { defineCatalog } from './foundation/governed-catalog.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from './path-resolver.js';
@@ -62,12 +62,34 @@ const INDEX_PATH = 'observability/retrospectives/model-performance.json';
 const INDEX_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/model-performance-index.schema.json'
 );
+const OUTCOME_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-role-outcome.schema.json'
+);
+const FEEDBACK_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/model-role-feedback.schema.json'
+);
 
 function performanceIndexCatalog(filePath: string) {
   return defineCatalog<ModelPerformanceIndex>({
     id: 'model-performance-index',
     path: filePath,
     schema: INDEX_SCHEMA_PATH,
+  });
+}
+
+function modelRoleOutcomeCatalog(filePath: string): GovernedCatalog<ModelRoleOutcome> {
+  return defineCatalog<ModelRoleOutcome>({
+    id: 'model-role-outcome',
+    path: filePath,
+    schema: OUTCOME_SCHEMA_PATH,
+  });
+}
+
+function modelRoleFeedbackCatalog(filePath: string): GovernedCatalog<ModelRoleFeedback> {
+  return defineCatalog<ModelRoleFeedback>({
+    id: 'model-role-feedback',
+    path: filePath,
+    schema: FEEDBACK_SCHEMA_PATH,
   });
 }
 
@@ -200,23 +222,35 @@ export function parseModelPerformanceIndex(value: unknown): ModelPerformanceInde
   return { by_model_role: parsed };
 }
 
-function readJsonl<T>(filePath: string): T[] {
-  return readJsonLines<T>(filePath, { onMalformed: 'skip' });
+function readJsonl<T>(filePath: string, catalog: GovernedCatalog<T>): T[] {
+  if (!safeExistsSync(filePath)) return [];
+  if (!safeLstat(filePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] record log must be a regular file: ${filePath}`);
+  }
+  return readJsonLines<T>(filePath, {
+    onMalformed: 'skip',
+    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+  });
 }
 
-function appendJsonl(filePath: string, records: unknown[]): void {
+function appendJsonl<T>(filePath: string, records: T[], catalog: GovernedCatalog<T>): void {
   if (records.length === 0) return;
   safeMkdir(path.dirname(filePath), { recursive: true });
-  for (const record of records) appendJsonLine(filePath, record);
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[MODEL_PERFORMANCE] record log must be a regular file: ${filePath}`);
+  }
+  for (const record of records) appendJsonLine(filePath, catalog.validate(record, filePath));
 }
 
 export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
   const valid = outcomes.filter((outcome) => outcome.model_id?.trim() && outcome.team_role?.trim());
   if (valid.length === 0) return;
   const outcomesPath = modelRoleOutcomesPath();
-  const existing = readJsonl<ModelRoleOutcome>(outcomesPath);
+  const catalog = modelRoleOutcomeCatalog(outcomesPath);
+  const validated = valid.map((outcome) => catalog.validate(outcome, outcomesPath));
+  const existing = readJsonl<ModelRoleOutcome>(outcomesPath, catalog);
   const latestByOutcome = new Map(existing.map((outcome) => [outcomeKey(outcome), outcome]));
-  const append = valid.filter((outcome) => {
+  const append = validated.filter((outcome) => {
     const key = outcomeKey(outcome);
     const previous = latestByOutcome.get(key);
     latestByOutcome.set(key, outcome);
@@ -226,8 +260,8 @@ export function recordModelRoleOutcomes(outcomes: ModelRoleOutcome[]): void {
       previous.provider !== outcome.provider
     );
   });
-  appendJsonl(outcomesPath, append);
-  if (valid.length > 0) rebuildModelPerformanceIndex();
+  appendJsonl(outcomesPath, append, catalog);
+  if (validated.length > 0) rebuildModelPerformanceIndex();
 }
 
 export function recordModelRoleFeedback(input: {
@@ -271,7 +305,8 @@ export function recordModelRoleFeedback(input: {
     source: input.source || 'user',
     recorded_at: nowIso(),
   };
-  appendJsonl(modelRoleFeedbackPath(), [feedback]);
+  const feedbackPath = modelRoleFeedbackPath();
+  appendJsonl(feedbackPath, [feedback], modelRoleFeedbackCatalog(feedbackPath));
   rebuildModelPerformanceIndex();
   return feedback;
 }
@@ -279,7 +314,11 @@ export function recordModelRoleFeedback(input: {
 export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerformance> {
   const byKey: Record<string, ModelRolePerformance> = {};
   const latestOutcomes = new Map<string, ModelRoleOutcome>();
-  for (const outcome of readJsonl<ModelRoleOutcome>(modelRoleOutcomesPath())) {
+  const outcomesPath = modelRoleOutcomesPath();
+  for (const outcome of readJsonl<ModelRoleOutcome>(
+    outcomesPath,
+    modelRoleOutcomeCatalog(outcomesPath)
+  )) {
     if (!outcome.model_id || !outcome.team_role) continue;
     latestOutcomes.set(outcomeKey(outcome), outcome);
   }
@@ -301,7 +340,11 @@ export function rebuildModelPerformanceIndex(): Record<string, ModelRolePerforma
     bucket.blocked += scored.blocked;
   }
 
-  for (const feedback of readJsonl<ModelRoleFeedback>(modelRoleFeedbackPath())) {
+  const feedbackPath = modelRoleFeedbackPath();
+  for (const feedback of readJsonl<ModelRoleFeedback>(
+    feedbackPath,
+    modelRoleFeedbackCatalog(feedbackPath)
+  )) {
     if (!feedback.model_id || !feedback.team_role) continue;
     const bucket = (byKey[keyFor(feedback.model_id, feedback.team_role)] ||= {
       samples: 0,

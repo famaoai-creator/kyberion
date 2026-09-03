@@ -27,10 +27,14 @@ describe('model performance index', () => {
     const { registerFoundationIo } = await import('./foundation/io.js');
     registerFoundationIo({
       loadJson: <T>(filePath: string): T => {
-        if (filePath.includes('model-performance-index.schema.json')) {
+        if (
+          filePath.includes('model-performance-index.schema.json') ||
+          filePath.includes('model-role-outcome.schema.json') ||
+          filePath.includes('model-role-feedback.schema.json')
+        ) {
           return JSON.parse(
             fs.readFileSync(
-              path.resolve('knowledge/product/schemas/model-performance-index.schema.json'),
+              path.resolve('knowledge/product/schemas', path.basename(filePath)),
               'utf8'
             )
           ) as T;
@@ -174,5 +178,41 @@ describe('model performance index', () => {
 
     mockLstatIsFile.mockReturnValue(false);
     expect(() => mod.loadModelPerformanceIndexAtPath(indexPath)).toThrow('regular file');
+  });
+
+  it('skips schema-invalid outcome and feedback rows during rebuild', () => {
+    const outcomesPath = mod.modelRoleOutcomesPath();
+    const feedbackPath = mod.modelRoleFeedbackPath();
+    mockFiles.set(
+      outcomesPath,
+      `${JSON.stringify({
+        mission_id: 'MSN-BROKEN',
+        task_id: 'T-1',
+        team_role: 'planner',
+        model_id: 'openai:gpt-5.6-luna',
+        final_status: 'done',
+        recorded_at: 'not-a-date',
+      })}\n`
+    );
+    mockFiles.set(
+      feedbackPath,
+      `${JSON.stringify({
+        feedback_id: 'MFB-BROKEN',
+        model_id: 'openai:gpt-5.6-luna',
+        team_role: 'planner',
+        rating: 9,
+        source: 'user',
+        recorded_at: '2026-09-03T00:00:00.000Z',
+      })}\n`
+    );
+
+    expect(mod.rebuildModelPerformanceIndex()).toEqual({});
+  });
+
+  it('rejects outcome and feedback directories before rebuilding', () => {
+    mockFiles.set(mod.modelRoleOutcomesPath(), 'directory');
+    mockLstatIsFile.mockReturnValue(false);
+
+    expect(() => mod.rebuildModelPerformanceIndex()).toThrow('record log must be a regular file');
   });
 });
