@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "browser-runtime-session.schema.json",
+  "title": "Persisted browser runtime session metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "session_id": { "type": "string", "minLength": 1 },
+    "user_data_dir": { "type": "string" },
+    "active_tab_id": { "type": "string" },
+    "tab_count": { "type": "integer", "minimum": 0 },
+    "tabs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tab_id", "url", "title", "active"],
+        "properties": {
+          "tab_id": { "type": "string", "minLength": 1 },
+          "url": { "type": "string" },
+          "title": { "type": "string" },
+          "active": { "type": "boolean" }
+        }
+      }
+    },
+    "updated_at": { "type": "string", "minLength": 1 },
+    "last_trace_path": { "type": "string" },
+    "last_video_paths": { "type": "array", "items": { "type": "string" } },
+    "video_output_dir": { "type": "string" },
+    "video_recording_pending": { "type": "boolean" },
+    "lease_expires_at": { "type": "string" },
+    "lease_status": { "type": "string", "enum": ["active", "released", "expired"] },
+    "retained": { "type": "boolean" },
+    "cdp_url": { "type": "string" },
+    "cdp_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "action_trail_count": { "type": "integer", "minimum": 0 },
+    "action_trail_path": { "type": "string" },
+    "recent_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "kind", "ts"],
+        "properties": {
+          "op": { "type": "string" },
+          "kind": { "type": "string", "enum": ["control", "capture", "apply"] },
+          "tab_id": { "type": "string" },
+          "ref": { "type": "string" },
+          "selector": { "type": "string" },
+          "ts": { "type": "string" }
+        }
+      }
+    }
+  },
+  "required": ["session_id"]
+}

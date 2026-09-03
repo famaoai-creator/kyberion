@@ -7,6 +7,8 @@ import {
   createBrowserConversationCommand,
   createBrowserConversationSession,
   getActiveBrowserConversationSession,
+  loadBrowserRuntimeSessionAtPath,
+  loadBrowserSnapshotAtPath,
   listBrowserConversationSessions,
   loadBrowserConversationSession,
   normalizeBrowserActuatorResult,
@@ -132,6 +134,60 @@ describe('browser conversation session helpers', () => {
     expect(
       loadBrowserConversationSession('BRS-TEST-MALFORMED-SNAPSHOT')?.candidate_targets
     ).toEqual([]);
+  });
+
+  it('loads the actuator snapshot shape through the governed snapshot loader', () => {
+    safeMkdir(snapshotDir, { recursive: true });
+    const snapshotPath = `${snapshotDir}/BRS-TEST-FULL-SNAPSHOT.json`;
+    safeWriteFile(
+      snapshotPath,
+      JSON.stringify({
+        session_id: 'BRS-TEST-FULL-SNAPSHOT',
+        tab_id: 'tab-1',
+        url: 'https://example.com',
+        title: 'Approval Console',
+        captured_at: new Date().toISOString(),
+        element_count: 1,
+        viewport: { width: 1280, height: 720, scale: 1 },
+        focused_ref: '@e1',
+        ready_state: 'complete',
+        elements: [
+          {
+            ref: '@e1',
+            tag: 'button',
+            role: 'button',
+            text: '承認',
+            name: '承認',
+            type: null,
+            placeholder: null,
+            href: null,
+            value: null,
+            visible: true,
+            editable: false,
+            focused: true,
+            value_redacted: false,
+            selector: 'button',
+          },
+        ],
+      })
+    );
+
+    expect(loadBrowserSnapshotAtPath(snapshotPath)).toMatchObject({
+      session_id: 'BRS-TEST-FULL-SNAPSHOT',
+      element_count: 1,
+    });
+  });
+
+  it('rejects a directory at the persisted browser artifact paths', () => {
+    safeMkdir(`${snapshotDir}/directory.json`, { recursive: true });
+    safeMkdir(`${runtimeDir}/directory.json`, { recursive: true });
+
+    expect(() => loadBrowserSnapshotAtPath(`${snapshotDir}/directory.json`)).toThrow(
+      'snapshot must be a regular file'
+    );
+    expect(() => loadBrowserRuntimeSessionAtPath(`${runtimeDir}/directory.json`)).toThrow(
+      'runtime session must be a regular file'
+    );
   });
 
   it('rejects a malformed browser runtime session before bootstrap', () => {

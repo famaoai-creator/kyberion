@@ -6667,6 +6667,18 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/browser-runtime-session.schema.json",
+      "tier": "public",
+      "size": 2037,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/browser-session-snapshot.schema.json",
+      "tier": "public",
+      "size": 1862,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/build-pipeline.schema.json",
       "tier": "public",
       "size": 1483,
