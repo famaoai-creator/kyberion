@@ -9531,7 +9531,7 @@
     {
       "path": "product/schemas/service-manifest.schema.json",
       "tier": "public",
-      "size": 808,
+      "size": 1047,
       "type": "json"
     },
     {
