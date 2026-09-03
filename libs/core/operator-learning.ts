@@ -288,6 +288,9 @@ const DEFAULT_PERSONAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.k
 const DEFAULT_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH = pathResolver.knowledge(
   'confidential/governance/operator-learning-dispatch-registry.json'
 );
+const OPERATOR_LEARNING_PROMOTION_RECORD_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/operator-learning-promotion-record.schema.json'
+);
 
 const FALLBACK_OPERATOR_LEARNING_DISPATCH_REGISTRY: OperatorLearningDispatchRegistry = {
   version: 'fallback',
@@ -1141,9 +1144,15 @@ export function promoteOperatorLearningProposal(input: {
     candidate_updates: input.proposal.candidate_updates,
   };
 
+  const canonicalRecord = defineCatalog<OperatorLearningPromotionRecord>({
+    id: 'operator-learning-promotion-record',
+    path: safeTargetPath,
+    schema: OPERATOR_LEARNING_PROMOTION_RECORD_SCHEMA_PATH,
+  }).validate(record, safeTargetPath);
+
   if (!input.dryRun) {
-    safeWriteFile(safeTargetPath, `${JSON.stringify(record, null, 2)}\n`);
+    safeWriteFile(safeTargetPath, `${JSON.stringify(canonicalRecord, null, 2)}\n`);
   }
 
-  return record;
+  return canonicalRecord;
 }

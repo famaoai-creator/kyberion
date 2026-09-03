@@ -8707,6 +8707,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/operator-learning-promotion-record.schema.json",
+      "tier": "public",
+      "size": 3414,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/operator-learning-scenario-pack.schema.json",
       "tier": "public",
       "size": 2137,
