@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { guardRequest } from '../../../lib/api-guard';
 import * as customerResolver from '@agent/core/customer-resolver';
-import { readJson as readFoundationJson } from '@agent/core/foundation';
 import {
+  loadPersonalAgentIdentityAtPath,
+  loadPersonalIdentityAtPath,
   parsePersonalAgentIdentitySummary,
   parsePersonalSovereignIdentitySummary,
 } from '@agent/core/personal-identity-reader';
@@ -18,18 +19,6 @@ import {
 } from '../../../lib/viewer-context';
 
 export const runtime = 'nodejs';
-
-function readJson<T>(fileName: string): T | null {
-  try {
-    const full = assertSafeRepositoryPath(customerResolver.resolveOverlay(fileName), {
-      allowMissingLeaf: true,
-    });
-    if (!safeExistsSync(full) || !safeLstat(full).isFile()) return null;
-    return readFoundationJson<T>(full);
-  } catch {
-    return null;
-  }
-}
 
 function readText(fileName: string): string | null {
   try {
@@ -54,10 +43,12 @@ export async function GET(req: NextRequest) {
     // over knowledge/personal/, matching operator-identity.ts's resolution
     // order, so vital-check and FirstRunBanner don't misreport identity as
     // missing under a tenant overlay.
-    const sovereignRaw = readJson<unknown>('my-identity.json');
-    const agentRaw = readJson<unknown>('agent-identity.json');
-    const sovereign = sovereignRaw ? parsePersonalSovereignIdentitySummary(sovereignRaw) : null;
-    const agent = agentRaw ? parsePersonalAgentIdentitySummary(agentRaw) : null;
+    const sovereign = parsePersonalSovereignIdentitySummary(
+      loadPersonalIdentityAtPath(customerResolver.resolveOverlay('my-identity.json'))
+    );
+    const agent = parsePersonalAgentIdentitySummary(
+      loadPersonalAgentIdentityAtPath(customerResolver.resolveOverlay('agent-identity.json'))
+    );
     const visionRaw = readText('my-vision.md');
     const vision = visionRaw
       ? visionRaw
