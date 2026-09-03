@@ -3,11 +3,12 @@ import { getRegisteredEnvText } from './foundation/env.js';
 import { readJson } from './foundation/json.js';
 import { loadVocabularyCatalog } from './vocabulary-catalog.js';
 import { resolveActiveProfileRoot } from './profile-root.js';
-import { assertSafeRepositoryPath, safeExistsSync } from './secure-io.js';
+import { safeExistsSync } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
 import { logger } from './core.js';
 import { normalizeLocale, nextSupportedLocale, type SupportedLocale } from './locale-normalize.js';
 import { assertScopeContext, type ScopeContext } from './scope-context.js';
+import { loadPersonalIdentityAtPath } from './personal-identity-state.js';
 
 /**
  * I18N-01: single source of truth for locale *resolution*.
@@ -60,12 +61,10 @@ export function resolveDefaultLocale(): SupportedLocale {
 
 function resolveIdentityLocale(identityPathOverride?: string): SupportedLocale | null {
   try {
-    const identityPath = assertSafeRepositoryPath(
-      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json'),
-      { allowMissingLeaf: true }
+    const parsed = loadPersonalIdentityAtPath(
+      identityPathOverride ?? path.join(resolveActiveProfileRoot(), 'my-identity.json')
     );
-    if (!safeExistsSync(identityPath)) return null;
-    const parsed = readJson<Record<string, unknown>>(identityPath);
+    if (!parsed) return null;
     const language = String(parsed?.language || '')
       .trim()
       .toLowerCase();
