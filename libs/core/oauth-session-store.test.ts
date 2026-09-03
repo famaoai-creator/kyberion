@@ -103,6 +103,7 @@ describe('oauth session hygiene', () => {
       'const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));'
     );
     expect(source).toContain('if (!safeLstat(filePath).isFile()) return null;');
+    expect(source).toContain('oauthSessionCatalogAtPath(filePath).validate(session, filePath)');
   });
 
   it('ignores a directory in the session directory instead of reading it as JSON', () => {

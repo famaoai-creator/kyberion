@@ -191,7 +191,8 @@ export function savePendingOAuthSession(session: PendingOAuthSession): void {
     safeMkdir(dir, { recursive: true });
   }
   const filePath = serviceSessionPath(session.serviceId, session.state);
-  safeWriteFile(filePath, JSON.stringify(session, null, 2) + '\n');
+  const validated = oauthSessionCatalogAtPath(filePath).validate(session, filePath);
+  safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n');
   try {
     safeFsyncFile(filePath);
   } catch (err) {
