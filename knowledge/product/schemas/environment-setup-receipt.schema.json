@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "environment-setup-receipt.schema.json",
+  "title": "Environment setup receipt",
+  "description": "Governed envelope for a capability bootstrap receipt. Readiness semantics validate field values after this boundary.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "manifest_id": { "type": "string" },
+    "manifest_version": { "type": "string" },
+    "manifest_fingerprint": { "type": "string" },
+    "host_fingerprint": { "type": "string" },
+    "generated_at": { "type": "string" },
+    "expires_at": { "type": "string" },
+    "host_platform": { "type": "string" },
+    "satisfied": {},
+    "unsatisfied": {},
+    "installs_performed": {}
+  }
+}

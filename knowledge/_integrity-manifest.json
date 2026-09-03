@@ -7231,6 +7231,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/environment-setup-receipt.schema.json",
+      "tier": "public",
+      "size": 780,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/error-classifier-rules.schema.json",
       "tier": "public",
       "size": 1710,
