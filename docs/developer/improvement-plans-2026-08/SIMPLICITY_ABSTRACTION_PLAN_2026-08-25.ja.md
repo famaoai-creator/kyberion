@@ -15303,6 +15303,17 @@ schedule登録、runtime state／run lock保持、repo-relative pipeline path、
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 781
+
+SX-03／SX-04／SX-06／SX-08 のsurface runtime stateを再監査し、stateの意味的なparserでroot／record／scopeを
+正規化した後、専用catalog validationを実行していたものの、その戻り値を捨ててparser結果をraw writeしていた
+ため修正した。surface stateのpath boundary、surface id／resource id整合性、pid／kind／shutdown policy検査、
+manifest／reconcileの既存semanticsは維持し、最終保存値をcatalogのcanonical payloadに統一する。
+
+検証: surface runtime **1 file / 6 tests passed**、root typecheck、対象lint、Prettier、`git diff --check`。
+canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
+state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

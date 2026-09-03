@@ -384,8 +384,8 @@ export function saveSurfaceState(state: SurfaceRuntimeState, statePath = surface
   });
   ensureParentDir(safeStatePath);
   const validated = parsePersistedSurfaceState(state);
-  surfaceStateCatalog(safeStatePath).validate(validated, safeStatePath);
-  safeWriteFile(safeStatePath, JSON.stringify(validated, null, 2));
+  const canonical = surfaceStateCatalog(safeStatePath).validate(validated, safeStatePath);
+  safeWriteFile(safeStatePath, JSON.stringify(canonical, null, 2));
 }
 
 export function resolveSurfaceCwd(definition: SurfaceRuntimeDefinition): string {
