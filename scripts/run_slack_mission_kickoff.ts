@@ -3,7 +3,8 @@ import {
   startMissionOrchestrationWorker,
 } from '@agent/core/mission-orchestration-events';
 import { logger } from '@agent/core/core';
-import { readJson } from '@agent/core/foundation';
+import { defineCatalog } from '@agent/core/foundation/governed-catalog';
+import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeLstat } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -14,6 +15,10 @@ interface LegacySlackKickoffInput {
   sourceText?: string;
   proposal?: Record<string, unknown>;
 }
+
+const SLACK_MISSION_KICKOFF_INPUT_SCHEMA = pathResolver.knowledge(
+  'product/schemas/slack-mission-kickoff-input.schema.json'
+);
 
 function printUsage(): void {
   logger.info('Usage: run_slack_mission_kickoff <job-path>');
@@ -27,6 +32,15 @@ export function resolveSlackMissionKickoffInputPath(inputPath: string): string {
   return resolved;
 }
 
+export function loadSlackMissionKickoffInputAtPath(inputPath: string): LegacySlackKickoffInput {
+  const resolved = resolveSlackMissionKickoffInputPath(inputPath);
+  return defineCatalog<LegacySlackKickoffInput>({
+    id: 'slack-mission-kickoff-input',
+    path: resolved,
+    schema: SLACK_MISSION_KICKOFF_INPUT_SCHEMA,
+  }).load();
+}
+
 async function main(argv: string[]) {
   const jobPath = argv[0];
   if (!jobPath || jobPath === '--help' || jobPath === '-h') {
@@ -34,7 +48,7 @@ async function main(argv: string[]) {
     throw new ScriptExitError(jobPath ? 0 : 2);
   }
 
-  const input = readJson<LegacySlackKickoffInput>(resolveSlackMissionKickoffInputPath(jobPath));
+  const input = loadSlackMissionKickoffInputAtPath(jobPath);
   const event = enqueueMissionOrchestrationEvent({
     eventType: 'mission_team_prewarm_requested',
     missionId: input.missionId,
