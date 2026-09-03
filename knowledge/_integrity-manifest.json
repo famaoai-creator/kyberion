@@ -9403,6 +9403,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/surface-async-request.schema.json",
+      "tier": "public",
+      "size": 2365,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/surface-coordination-role-map.schema.json",
       "tier": "public",
       "size": 703,
@@ -9412,6 +9418,12 @@
       "path": "product/schemas/surface-mission-proposal-state.schema.json",
       "tier": "public",
       "size": 1280,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/surface-notification.schema.json",
+      "tier": "public",
+      "size": 2018,
       "type": "json"
     },
     {
