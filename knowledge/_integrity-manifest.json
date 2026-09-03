@@ -10135,6 +10135,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/test-plan.schema.json",
+      "tier": "public",
+      "size": 1777,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/tier-hygiene-policy.schema.json",
       "tier": "public",
       "size": 1288,
