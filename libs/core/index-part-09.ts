@@ -106,6 +106,12 @@ export {
 
 export * from './cowork-knowledge-bridge.js';
 
+export {
+  delegationChildrenRegistryPath,
+  loadDelegationChildrenRegistryAtPath,
+  writeDelegationChildrenRegistryAtPath,
+} from './delegation-child-registry.js';
+
 export * from './cowork-health-check.js';
 
 export * from './surface-runtime-router.js';
