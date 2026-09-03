@@ -464,7 +464,12 @@ export function readNode(org: string, personSlug: string): RelationshipNode | nu
 
 function writeNode(org: string, personSlug: string, node: RelationshipNode): void {
   const file = nodePath(org, personSlug);
-  safeWriteFile(file, `${JSON.stringify(node, null, 2)}\n`, { encoding: 'utf8', mkdir: true });
+  const schemaValidated = relationshipNodeCatalog(file).validate(node, file);
+  const validated = parseRelationshipNode(schemaValidated, org, personSlug);
+  safeWriteFile(file, `${JSON.stringify(validated, null, 2)}\n`, {
+    encoding: 'utf8',
+    mkdir: true,
+  });
 }
 
 function initialNode(identity: RelationshipIdentity): RelationshipNode {
