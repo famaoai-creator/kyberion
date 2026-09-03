@@ -14339,6 +14339,12 @@ SX-03／SX-04 のsoak restart E2E state reader／writerを再監査し、再起�
 
 検証: soak restart E2E **3 tests passed**。root typecheck、core build、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 680
+
+SX-03／SX-04 のmeeting orchestrator attendees inputを再監査し、inline／`@file`とも配列かどうかだけを見て参加者オブジェクトをそのままbriefへ渡していた残存を修正した。専用schemaとcoreの共通validator／repository-bound loaderを追加し、`name`、識別子、role_hint、unknown fieldを同一契約で検証してからfacilitationへ渡すようにした。既存のmeeting resource path境界、空配列フォールバック、meeting brief生成 semanticsは維持している。
+
+検証: meeting orchestrator **11 tests passed**、root typecheck、core build、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

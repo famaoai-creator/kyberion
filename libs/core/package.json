@@ -2175,6 +2175,10 @@
       "types": "./dist/meeting-operations-profile.d.ts",
       "default": "./dist/meeting-operations-profile.js"
     },
+    "./meeting-attendees": {
+      "types": "./dist/meeting-attendees.d.ts",
+      "default": "./dist/meeting-attendees.js"
+    },
     "./restricted-action-policy": {
       "types": "./dist/restricted-action-policy.d.ts",
       "default": "./dist/restricted-action-policy.js"

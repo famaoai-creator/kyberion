@@ -148,6 +148,8 @@ export * from './narrated-video-upload-package.js';
 
 export * from './meeting-operations-profile.js';
 
+export * from './meeting-attendees.js';
+
 export * from './mission-seed-assessment.js';
 
 export * from './mission-assessment.js';

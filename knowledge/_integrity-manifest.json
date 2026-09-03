@@ -7939,6 +7939,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/meeting-attendees.schema.json",
+      "tier": "public",
+      "size": 710,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/meeting-environment-policy.example.json",
       "tier": "public",
       "size": 5541,

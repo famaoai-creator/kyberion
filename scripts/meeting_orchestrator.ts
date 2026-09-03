@@ -30,6 +30,11 @@ import {
   loadMeetingOperationsProfileAtPath,
 } from '@agent/core/meeting-operations-profile';
 import {
+  loadMeetingAttendeesAtPath,
+  validateMeetingAttendees,
+  type MeetingAttendee,
+} from '@agent/core/meeting-attendees';
+import {
   listOperatorSelfPending,
   listOthersPending,
   listActionItems,
@@ -47,7 +52,7 @@ import {
 } from '@agent/core/secure-io';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { parseSafeJsonInput, readJson } from '@agent/core/foundation';
+import { parseSafeJsonInput } from '@agent/core/foundation';
 
 interface OrchestratorOptions {
   mission: string;
@@ -60,7 +65,7 @@ interface OrchestratorOptions {
   purpose: string;
   agentId: string;
   agenda: string[];
-  attendees: Array<{ name: string; person_slug?: string; channel_handle?: string }>;
+  attendees: MeetingAttendee[];
   listenSec: number;
   language: string;
   skipFacilitate: boolean;
@@ -68,8 +73,8 @@ interface OrchestratorOptions {
   skipTracking: boolean;
 }
 
-export function parseMeetingAttendeesJson(value: string): unknown {
-  return parseSafeJsonInput(value, '--attendees');
+export function parseMeetingAttendeesJson(value: string): MeetingAttendee[] {
+  return validateMeetingAttendees(parseSafeJsonInput(value, '--attendees'));
 }
 
 function runPipeline(name: string, context: Record<string, unknown>): void {
@@ -186,9 +191,11 @@ async function main(args: string[] = []): Promise<void> {
   if (argv.attendees) {
     try {
       const a = (argv.attendees as string).startsWith('@')
-        ? readJson(resolveMeetingResourcePath((argv.attendees as string).slice(1)))
+        ? loadMeetingAttendeesAtPath(
+            resolveMeetingResourcePath((argv.attendees as string).slice(1))
+          )
         : parseMeetingAttendeesJson(argv.attendees as string);
-      attendees = Array.isArray(a) ? a : [];
+      attendees = a;
     } catch (err: any) {
       logger.warn(
         `[orchestrator] failed to parse --attendees: ${err?.message ?? err}; proceeding with []`
