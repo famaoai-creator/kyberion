@@ -14952,6 +14952,18 @@ completion／repair taskの既存semanticsは維持している。
 `git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
 SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 752
+
+SX-03／SX-04／SX-10 のmeeting delivery packを再監査し、artifact copyとcustomer scopeは既存の安全境界を
+通過していた一方、customer deliverablesへ生成する`delivery-pack.json`だけが既存
+`delivery-pack.schema.json`を通らずraw `safeWriteFile`されていたため修正した。pack／artifacts_by_role／
+artifact referenceの既存shape、meeting delivery summary、customer deliverables path、finish semanticsは
+維持し、persist直前のschema境界を追加した。
+
+検証: mission lifecycle／task reader **2 files / 35 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
