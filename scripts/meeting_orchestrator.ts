@@ -27,6 +27,7 @@ import * as path from 'node:path';
 import {
   buildMeetingOperationsBrief,
   getMeetingBriefQuestions,
+  loadMeetingOperationsProfileAtPath,
 } from '@agent/core/meeting-operations-profile';
 import {
   listOperatorSelfPending,
@@ -148,7 +149,7 @@ export function resolveMeetingResourcePath(resourcePath: string): string {
 }
 
 function loadOperationsProfile(profilePath: string): any {
-  return readJson(resolveMeetingResourcePath(profilePath));
+  return loadMeetingOperationsProfileAtPath(resolveMeetingResourcePath(profilePath));
 }
 
 async function main(args: string[] = []): Promise<void> {
