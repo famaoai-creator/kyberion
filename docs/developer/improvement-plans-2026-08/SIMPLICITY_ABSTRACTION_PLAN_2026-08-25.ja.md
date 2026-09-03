@@ -14099,6 +14099,12 @@ SX-03／SX-04 のworker event streamを再監査し、emit側のzod契約はあ�
 
 検証: worker event stream **1 file / 8 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 640
+
+SX-03／SX-04 のruntime health historyを再監査し、RSS／restart trendの監視対象である永続sampleが型キャストだけで再利用され、schema・regular-file境界を持たない残存を修正した。runtime health sample専用schemaとpath-bound canonical catalogを追加し、sample append／window load双方を同じ契約へ統合した。malformed／schema-invalid lineのskip、best-effort health recording、history pruning、RSS／restart trendおよびdegradation verdictの既存semanticsは維持している。
+
+検証: runtime health history **1 file / 6 tests passed**、knowledge index生成、対象lint、typecheck、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加domain reader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
