@@ -3,8 +3,10 @@
   "title": "Service Manifest",
   "description": "Definition of background services that should be active in the system.",
   "type": "object",
+  "additionalProperties": false,
   "patternProperties": {
     "^[a-zA-Z0-9_-]+$": {
+      "additionalProperties": true,
       "type": "object",
       "properties": {
         "path": {
@@ -15,13 +17,18 @@
           "type": "string",
           "description": "Description of the service's purpose."
         },
+        "preset_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional governed service preset used when reconciling the service."
+        },
         "env": {
           "type": "object",
           "additionalProperties": { "type": "string" },
           "description": "Optional environment variables for the service."
         }
       },
-      "required": ["path", "description"]
+      "required": ["path"]
     }
   }
 }

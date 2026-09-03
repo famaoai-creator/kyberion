@@ -1,9 +1,10 @@
 import {
-  readJson,
   appendJsonLine,
+  defineCatalog,
   getRegisteredEnv,
   isRecord,
   parseSafeJsonInput,
+  type GovernedCatalog,
 } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import {
@@ -110,7 +111,23 @@ const DEFAULT_PIPELINE_RETRY: Required<RetryPolicy> = {
 };
 const PID_FILE = pathResolver.shared('services-pids.json');
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
+const SERVICE_MANIFEST_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/service-manifest.schema.json'
+);
+const serviceManifestCatalogs = new Map<string, GovernedCatalog<ServiceManifest>>();
 const cloudflareOsControlPlane = new CloudflareOsControlPlane();
+
+function serviceManifestCatalogAtPath(manifestPath: string): GovernedCatalog<ServiceManifest> {
+  const existing = serviceManifestCatalogs.get(manifestPath);
+  if (existing) return existing;
+  const catalog = defineCatalog<ServiceManifest>({
+    id: 'service-manifest',
+    path: manifestPath,
+    schema: SERVICE_MANIFEST_SCHEMA_PATH,
+  });
+  serviceManifestCatalogs.set(manifestPath, catalog);
+  return catalog;
+}
 
 function resolveServiceRepositoryPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
@@ -690,7 +707,14 @@ function recordServiceObservation(observation: PreparedObservation | null, _resu
 
 async function reconcileServices(input: ServiceAction) {
   const manifestPath = resolveServiceRepositoryPath(input.params.manifest_path);
-  const manifest = parseServiceManifest(readJson<unknown>(manifestPath));
+  let manifest: ServiceManifest | null;
+  try {
+    const catalog = serviceManifestCatalogAtPath(manifestPath);
+    catalog.reset();
+    manifest = parseServiceManifest(catalog.load());
+  } catch {
+    manifest = null;
+  }
   if (!manifest) {
     throw new Error(`Service manifest has an invalid shape: ${manifestPath}`);
   }
