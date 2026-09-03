@@ -28,9 +28,14 @@ import { logger } from './core.js';
 import { isValidTenantSlug } from './entity-scope.js';
 import * as pathResolver from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 
 /** Governance policy file (same directory + override shape as spend-policy.json). */
 export const INGEST_QUOTA_POLICY_REPO_PATH =
@@ -64,6 +69,17 @@ export const DEFAULT_INGEST_QUOTA_POLICY: IngestQuotaPolicy = Object.freeze({
 const INGEST_QUOTA_POLICY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/ingest-quota-policy.schema.json'
 );
+const INGEST_QUOTA_COUNTER_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/ingest-quota-counter.schema.json'
+);
+
+interface IngestQuotaCounterRecord {
+  tenant_slug: string;
+  date: string;
+  files: number;
+  bytes: number;
+  updated_at: string;
+}
 
 function createIngestQuotaPolicyCatalog(rootDir: string) {
   return defineCatalog<IngestQuotaPolicy>({
@@ -214,16 +230,29 @@ export function resolveIngestQuotaForTenant(
   };
 }
 
-function readUsage(counterPath: string): IngestQuotaUsage {
+function readUsage(
+  counterPath: string,
+  expectedTenantSlug?: string,
+  expectedDate?: string
+): IngestQuotaUsage {
   if (!safeExistsSync(counterPath)) return { files: 0, bytes: 0 };
   try {
-    const parsed = readJson<{
-      files?: unknown;
-      bytes?: unknown;
-    }>(counterPath);
+    const safeCounterPath = assertSafeRepositoryPath(counterPath, { allowMissingLeaf: true });
+    if (!safeLstat(safeCounterPath).isFile()) return { files: 0, bytes: 0 };
+    const parsed = defineCatalog<IngestQuotaCounterRecord>({
+      id: 'ingest-quota-counter',
+      path: safeCounterPath,
+      schema: INGEST_QUOTA_COUNTER_SCHEMA_PATH,
+    }).load();
+    if (
+      (expectedTenantSlug !== undefined && parsed.tenant_slug !== expectedTenantSlug) ||
+      (expectedDate !== undefined && parsed.date !== expectedDate)
+    ) {
+      return { files: 0, bytes: 0 };
+    }
     return {
-      files: isPositive(parsed.files) ? Math.floor(parsed.files as number) : 0,
-      bytes: isPositive(parsed.bytes) ? Math.floor(parsed.bytes as number) : 0,
+      files: isPositive(parsed.files) ? Math.floor(parsed.files) : 0,
+      bytes: isPositive(parsed.bytes) ? Math.floor(parsed.bytes) : 0,
     };
   } catch {
     // A corrupt counter must not open the gate wide OR wedge it shut: treat
@@ -249,7 +278,7 @@ export function checkIngestQuota(
   const policy = options.policy ?? loadIngestQuotaPolicy(options);
   const { limits, warn_ratio: warnRatio } = resolveIngestQuotaForTenant(policy, tenantSlug);
   const date = ingestQuotaDateKey(options.now);
-  const usage = readUsage(ingestQuotaCounterPath(tenantSlug, options));
+  const usage = readUsage(ingestQuotaCounterPath(tenantSlug, options), tenantSlug, date);
   const projected: IngestQuotaUsage = {
     files: usage.files + incomingFiles,
     bytes: usage.bytes + incomingBytes,
@@ -300,25 +329,27 @@ export function recordIngestUsage(
 ): IngestQuotaUsage {
   assertTenantSlug(tenantSlug);
   const counterPath = ingestQuotaCounterPath(tenantSlug, options);
-  const usage = readUsage(counterPath);
+  const date = ingestQuotaDateKey(options.now);
+  const usage = readUsage(counterPath, tenantSlug, date);
   const next: IngestQuotaUsage = {
     files: usage.files + Math.max(0, Math.floor(Number(files) || 0)),
     bytes: usage.bytes + Math.max(0, Math.floor(Number(bytes) || 0)),
   };
   safeMkdir(path.dirname(counterPath), { recursive: true });
-  safeWriteFile(
-    counterPath,
-    JSON.stringify(
-      {
-        tenant_slug: tenantSlug,
-        date: ingestQuotaDateKey(options.now),
-        ...next,
-        updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
-      },
-      null,
-      2
-    )
+  const validated = defineCatalog<IngestQuotaCounterRecord>({
+    id: 'ingest-quota-counter',
+    path: counterPath,
+    schema: INGEST_QUOTA_COUNTER_SCHEMA_PATH,
+  }).validate(
+    {
+      tenant_slug: tenantSlug,
+      date,
+      ...next,
+      updated_at: options.now === undefined ? nowIso() : nowIso(new Date(options.now)),
+    },
+    counterPath
   );
+  safeWriteFile(counterPath, JSON.stringify(validated, null, 2));
   return next;
 }
 

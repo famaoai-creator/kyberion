@@ -7315,6 +7315,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/ingest-quota-counter.schema.json",
+      "tier": "public",
+      "size": 688,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/ingest-quota-policy.schema.json",
       "tier": "public",
       "size": 917,
