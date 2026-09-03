@@ -348,6 +348,51 @@ describe('openai-compatible-backend', () => {
     expect(bodyJson.stream).toBe(true);
   });
 
+  it('ignores malformed streaming deltas before yielding text', async () => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":42}}]}\n\n'));
+        controller.enqueue(encoder.encode('data: []\n\n'));
+        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"ok"}}]}\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
+        )
+    );
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+    });
+
+    const deltas: string[] = [];
+    for await (const delta of backend.streamPrompt('malformed stream')) deltas.push(delta);
+    expect(deltas).toEqual(['ok']);
+  });
+
+  it('rejects non-object tool arguments before any tool side effect', async () => {
+    const backend = new OpenAiCompatibleBackend({
+      baseURL: 'http://127.0.0.1:11434/v1',
+      apiKey: 'not-needed',
+      model: 'qwen2.5',
+      toolsEnabled: true,
+      allowedTools: ['shell_exec'],
+    });
+    const result = await (
+      backend as unknown as {
+        handleToolCall(name: string, args: string): Promise<string>;
+      }
+    ).handleToolCall('shell_exec', '[]');
+    expect(result).toContain('arguments must be a JSON object');
+  });
+
   it('does not advertise tools unless the route explicitly enables an allowlist', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(okTextResponse());
     vi.stubGlobal('fetch', fetchMock);
