@@ -15101,6 +15101,19 @@ override、invalid policy時のfallback、tool runtime選択の既存semantics�
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 764
+
+SX-03／SX-04／SX-06／SX-08 のbrowser onboarding service connection proposalを再監査し、service
+connection readは専用 `service-connection-document.schema.json` に接続済みである一方、proposal writeだけが
+汎用 `writeJson` 経由でschemaなし保存されていたため修正した。service_id／status／credential_refを含む
+拡張可能なconnection documentを保存直前に同じcatalogで検証し、非object proposalをprofileへ残さない。
+既存のservice proposalがOAuth／secret setup前の未承認候補であること、service path boundaryとfallback readの
+既存semanticsは維持している。
+
+検証: service connection helper **1 file / 8 tests passed**、root typecheck、対象lint、Prettier、
+`git diff --check`。canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、
+SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

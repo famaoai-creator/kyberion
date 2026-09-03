@@ -6,6 +6,7 @@ import {
   loadConnectionWithFallback,
   loadServiceConnectionAtPath,
   resolveTemplateValue,
+  writeServiceConnectionAtPath,
 } from './service-engine-helpers.js';
 
 const serviceConnectionPath = pathResolver.sharedTmp(
@@ -29,6 +30,27 @@ describe('service-engine-helpers template path tokens', () => {
     safeWriteFile(serviceConnectionPath, JSON.stringify([]));
 
     expect(() => loadServiceConnectionAtPath(serviceConnectionPath)).toThrow(/Invalid catalog/);
+  });
+
+  it('writes a service connection through the schema-bound catalog', () => {
+    expect(
+      writeServiceConnectionAtPath(serviceConnectionPath, {
+        service_id: 'github',
+        status: 'proposed',
+        credential_ref: null,
+      })
+    ).toBe(serviceConnectionPath);
+
+    expect(loadServiceConnectionAtPath(serviceConnectionPath)).toMatchObject({
+      service_id: 'github',
+      status: 'proposed',
+    });
+  });
+
+  it('rejects a non-object service connection before persisting it', () => {
+    expect(() =>
+      writeServiceConnectionAtPath(serviceConnectionPath, [] as unknown as Record<string, unknown>)
+    ).toThrow(/Invalid catalog service-connection-document/);
   });
 
   it('resolves whole-string path tokens inside template values', () => {
