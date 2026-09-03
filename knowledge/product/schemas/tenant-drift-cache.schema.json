@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tenant-drift-cache.schema.json",
+  "title": "Tenant drift baseline cache",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["computed_at", "ttl_ms", "value"],
+  "properties": {
+    "computed_at": { "type": "string", "format": "date-time" },
+    "ttl_ms": { "type": "integer", "minimum": 0 },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["timestamp", "scanned_paths", "findings"],
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "scanned_paths": { "type": "integer", "minimum": 0 },
+        "findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/finding" }
+        },
+        "audit_error": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "expected_tenant", "declared_tenant", "reason"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "expected_tenant": { "type": "string", "minLength": 1 },
+        "declared_tenant": { "type": ["string", "null"] },
+        "mission_id": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

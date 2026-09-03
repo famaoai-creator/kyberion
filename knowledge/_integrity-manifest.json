@@ -6943,6 +6943,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/cowork-health-cache.schema.json",
+      "tier": "public",
+      "size": 1234,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/cowork-sync-policy.schema.json",
       "tier": "public",
       "size": 5412,
@@ -9760,6 +9766,12 @@
       "path": "product/schemas/tenant-design-theme-overlay.schema.json",
       "tier": "public",
       "size": 1161,
+      "type": "json"
+    },
+    {
+      "path": "product/schemas/tenant-drift-cache.schema.json",
+      "tier": "public",
+      "size": 1341,
       "type": "json"
     },
     {
