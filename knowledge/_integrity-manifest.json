@@ -9271,6 +9271,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/publication-verification.schema.json",
+      "tier": "public",
+      "size": 2341,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/qa-contract.schema.json",
       "tier": "public",
       "size": 750,

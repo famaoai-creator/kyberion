@@ -115,6 +115,16 @@ export interface GateResult {
   evidence: string[];
 }
 
+export interface PublicationVerification extends GateResult {
+  approval_id: string;
+  shared_approval_request_id: string;
+  artifact_hashes: Record<string, ArtifactBinding>;
+  sensitive_data_scan: SensitiveDataScanResult;
+  rendered_artifact: string;
+  network_access: false;
+  counts_as_publication: false;
+}
+
 export interface SensitiveDataScanResult {
   pii_findings: Array<{ category: string; location: string }>;
   secret_findings: Array<{ category: string; location: string }>;
@@ -148,6 +158,9 @@ const MARKETING_REVIEW_SCHEMA_PATH = pathResolver.knowledge(
 );
 const MARKETING_REVIEW_PACKAGE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/marketing-review-package.schema.json'
+);
+const PUBLICATION_VERIFICATION_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/publication-verification.schema.json'
 );
 
 function marketingReviewCatalogAtPath(filePath: string) {
@@ -188,6 +201,18 @@ export function loadMarketingCompletionEvidenceAtPath(
     path: filePath,
     schema: MARKETING_COMPLETION_EVIDENCE_SCHEMA_PATH,
   }).load();
+}
+
+/** Validate the persisted verification artifact produced by the local dry-run. */
+export function validatePublicationVerification(
+  value: unknown,
+  sourcePath = 'publication-verification'
+): PublicationVerification {
+  return defineCatalog<PublicationVerification>({
+    id: 'publication-verification',
+    path: sourcePath,
+    schema: PUBLICATION_VERIFICATION_SCHEMA_PATH,
+  }).validate(value, sourcePath);
 }
 
 function requireRegularMarketingFile(filePath: string, label: string): string {

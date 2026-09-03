@@ -14843,6 +14843,20 @@ tier path、adapter profile reference、registry generationの既存semanticsと
 canonical full gateはこの追記後に実行する。ServiceValidatorの既存secure mock境界6件、SX-03の追加script／
 state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-04 再レビュー修正 743
+
+SX-03／SX-04／E2E-02 のmarketing publication dry-run verification artifactを再監査し、approval／
+completion evidenceはschema-boundである一方、`publication-verification.json`だけがG6 resultと局所型を
+raw `safeWriteFile`していた残存を修正した。専用`publication-verification.schema.json`とcore validatorを
+追加し、G6 status、artifact hash、sensitive-data scan、rendered artifact、`network_access=false`、
+`counts_as_publication=false`をpersist前に検証する。approval gate、PII／secret scan、CTA／caption／thumbnail
+判定、local dry-runの非公開 semanticsは維持している。
+
+検証: marketing workload **1 file / 25 tests passed**、marketing dry-run **1 file / 9 tests passed**、core build、
+root typecheck、対象lint、Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+ServiceValidatorの既存secure mock境界6件、SX-03の追加script／state loader、Ajv／env／private helperの
+全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`
