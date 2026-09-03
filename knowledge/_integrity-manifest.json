@@ -8755,6 +8755,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/pipeline-run-journal-event.schema.json",
+      "tier": "public",
+      "size": 799,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/pipeline-schedule-registry.schema.json",
       "tier": "public",
       "size": 2964,

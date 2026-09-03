@@ -8,14 +8,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { parseSafeJsonInput } from './foundation/json.js';
+import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeReaddir,
 } from './secure-io.js';
-import { findMissionPath, rootDir, shared } from './path-resolver.js';
+import { findMissionPath, knowledge, rootDir, shared } from './path-resolver.js';
 import {
   appendValidatedJournalEvent,
   EventSourcingKernel,
@@ -82,6 +84,24 @@ export interface PipelineRunJournalHandle {
   readonly path: string;
   append(event: PipelineRunEventType, payload: Record<string, unknown>): PipelineRunJournalEvent;
   state(): PipelineRunJournalState;
+}
+
+const PIPELINE_JOURNAL_SCHEMA_PATH = knowledge(
+  'product/schemas/pipeline-run-journal-event.schema.json'
+);
+
+function pipelineJournalCatalog(filePath: string): GovernedCatalog<PipelineRunJournalEvent> {
+  return defineCatalog<PipelineRunJournalEvent>({
+    id: 'pipeline-run-journal-event',
+    path: filePath,
+    schema: PIPELINE_JOURNAL_SCHEMA_PATH,
+  });
+}
+
+function ensureRegularPipelineJournalFile(filePath: string): void {
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[PIPELINE_JOURNAL] journal must be a regular file: ${filePath}`);
+  }
 }
 
 interface PipelineJournalProjection {
@@ -169,20 +189,25 @@ function appendPipelineJournalEvent(
   payload: Record<string, unknown>
 ): PipelineRunJournalEvent {
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  ensureRegularPipelineJournalFile(safeFilePath);
   return appendValidatedJournalEvent({
     kernel: pipelineJournalKernel,
     opName: `pipeline.${event}`,
     payload,
     journalPath: safeFilePath,
     seq: sequence,
-    buildEnvelope: ({ seq, ts, payload: validated }) => ({
-      version: PIPELINE_RUN_JOURNAL_VERSION,
-      sequence: seq,
-      run_id: runId,
-      event,
-      timestamp: ts,
-      payload: validated as Record<string, unknown>,
-    }),
+    buildEnvelope: ({ seq, ts, payload: validated }) =>
+      pipelineJournalCatalog(safeFilePath).validate(
+        {
+          version: PIPELINE_RUN_JOURNAL_VERSION,
+          sequence: seq,
+          run_id: runId,
+          event,
+          timestamp: ts,
+          payload: validated as Record<string, unknown>,
+        },
+        safeFilePath
+      ),
   });
 }
 
@@ -300,19 +325,35 @@ export function readPipelineRunJournal(filePath: string): PipelineRunJournalStat
   const safeFilePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
   if (!safeExistsSync(safeFilePath))
     throw new Error(`[PIPELINE_JOURNAL] not found: ${safeFilePath}`);
+  ensureRegularPipelineJournalFile(safeFilePath);
   const lines = String(safeReadFile(safeFilePath, { encoding: 'utf8' }))
     .split('\n')
     .filter((line) => line.trim().length > 0);
   const events: PipelineRunJournalEvent[] = [];
   let previousSequence = 0;
-  for (const line of lines) {
+  const catalog = pipelineJournalCatalog(safeFilePath);
+  for (const [index, line] of lines.entries()) {
     let parsed: unknown;
     try {
       parsed = parseSafeJsonInput(line, 'pipeline journal event');
     } catch {
       throw new Error('[PIPELINE_JOURNAL] corrupt JSONL journal; refusing to resume');
     }
-    const event = migrateEvent(parsed);
+    const source = `${safeFilePath}:${index + 1}`;
+    const originalVersion =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? Number(
+            (parsed as Record<string, unknown>).version ?? (parsed as Record<string, unknown>).v
+          )
+        : Number.NaN;
+    const migrated = migrateEvent(parsed);
+    // Version 3 has a closed envelope. Validate the raw record before
+    // migration so an unknown top-level key cannot be silently discarded by
+    // the legacy normalizer.
+    if (originalVersion === PIPELINE_RUN_JOURNAL_VERSION) {
+      catalog.validate(parsed, source);
+    }
+    const event = catalog.validate(migrated, source);
     if (events.length > 0 && event.sequence <= previousSequence) {
       throw new Error('[PIPELINE_JOURNAL] non-monotonic event sequence; refusing to resume');
     }
