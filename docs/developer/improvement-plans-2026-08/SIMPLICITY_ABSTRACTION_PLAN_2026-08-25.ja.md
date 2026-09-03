@@ -15927,7 +15927,7 @@ status、message、continue file、timestamp、timeoutを検証し、session mis
 完了時は検証済みの既知フィールドだけを再構成するため、未知フィールドの再流入を防ぐ。既存のpending／approved／expired／rejected
 semanticsとoperator continuation経路は維持し、dangerous key、型不正、timestamp不正、未知フィールド除去、完了書き込みの回帰を追加した。
 
-検証: browser approval parser **1 file / 3 tests passed**、browser actuator completion regression **1 test passed**、resource boundary **1 file / 5 tests passed**、root typecheck、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
+検証: browser approval parser／completion **1 file / 4 tests passed**、browser actuator contract regression **1 test passed**、resource boundary **1 file / 5 tests passed**、root typecheck、type-ratchet、対象Prettier、`git diff --check`。canonical full gateはこの追記後に実行する。
 SX-03の追加script／state loader、SX-04の他の非catalog loader／未参照catalog、SX-05〜SX-14は未完了である。
 
 ## 参照
