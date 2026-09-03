@@ -116,7 +116,7 @@
           "minimum": 1
         },
         "backoff_seconds": {
-          "type": "integer",
+          "type": "number",
           "minimum": 0
         }
       },
