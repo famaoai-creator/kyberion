@@ -1,6 +1,12 @@
 import { pathResolver } from './path-resolver.js';
-import { readJson } from './foundation/json.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeWriteFile } from './secure-io.js';
+import { defineCatalog } from './foundation/governed-catalog.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeWriteFile,
+} from './secure-io.js';
 import type { ScopeContext } from './scope-context.js';
 import { physicalScopedPath } from './physical-namespace.js';
 import { getRegisteredEnvText } from './foundation/env.js';
@@ -24,6 +30,10 @@ export interface ContextualIntentMemory {
     last_seen_utterance?: string;
   };
 }
+
+const CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH = pathResolver.knowledge(
+  'product/schemas/contextual-intent-memory.schema.json'
+);
 
 function memoryPath(scope?: ScopeContext): string {
   const configuredPath = getRegisteredEnvText('KYBERION_CONTEXTUAL_INTENT_MEMORY_PATH')?.trim();
@@ -49,10 +59,13 @@ function defaultMemory(): ContextualIntentMemory {
 
 export function loadContextualIntentMemory(scope?: ScopeContext): ContextualIntentMemory {
   const filePath = memoryPath(scope);
-  if (!safeExistsSync(filePath)) return defaultMemory();
   try {
-    const parsed = readJson<ContextualIntentMemory>(filePath);
-    return parsed && typeof parsed === 'object' ? parsed : defaultMemory();
+    if (!safeLstat(filePath).isFile()) return defaultMemory();
+    return defineCatalog<ContextualIntentMemory>({
+      id: 'contextual-intent-memory',
+      path: filePath,
+      schema: CONTEXTUAL_INTENT_MEMORY_SCHEMA_PATH,
+    }).load();
   } catch {
     return defaultMemory();
   }
