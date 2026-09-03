@@ -108,6 +108,33 @@ describe('modeling-actuator terraform_to_architecture_adf', () => {
     );
   });
 
+  it('validates an explicitly supplied quality contract through the canonical loader', async () => {
+    const contractPath = path.join(
+      ROOT,
+      `active/shared/tmp/modeling-actuator-tests/malformed-quality-contract-${process.pid}.json`
+    );
+    safeMkdir(path.dirname(contractPath), { recursive: true });
+    safeWriteFile(contractPath, JSON.stringify({ version: '1.0.0', project_id: 'project-1' }));
+
+    try {
+      const result = await handleAction({
+        action: 'pipeline',
+        context: {},
+        steps: [
+          {
+            type: 'apply',
+            op: 'derive_test_inventory',
+            params: { contract_path: path.relative(ROOT, contractPath) },
+          },
+        ],
+      });
+      expect(result.status).toBe('failed');
+      expect(result.results[0]?.error).toContain('Invalid catalog software-quality-contract');
+    } finally {
+      safeRmSync(contractPath, { force: true });
+    }
+  });
+
   it('rejects a context path outside the repository root', async () => {
     await expect(
       handleAction({
