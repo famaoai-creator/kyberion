@@ -14465,6 +14465,12 @@ SX-03／SX-04 のplanning packet gate evidenceをschema-bound loaderへ接続し
 
 検証: mission orchestration worker **29 tests passed**（schema不整合2件を修正後に再実行）、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
 
+## 2026-09-03 再レビュー修正 701
+
+SX-03／SX-04 のmission context pack fast-lane seedを再監査し、既存のdispatch manifestだけがschema-boundでも、`response_path`先の`task_result`投影はraw JSON readerと局所型キャストに残っていた残存を修正した。dispatch responseの広い永続envelopeを壊さない専用schemaとcore canonical loaderを追加し、summary／artifactのlegacy-compatible projectionを検証してからseedへ渡すようにした。artifact hintもrepository境界を通過した値だけを投影し、外部相対pathの混入を拒否する。既存のmalformed response best-effort fallback、prior responseのseed表示、task summary／artifactの互換semanticsは維持している。
+
+検証: mission context pack **26 tests passed**、core build、root typecheck、対象lint、Prettier、`git diff --check`、canonical full gate **69/69 passed**。SX-03の追加script／state loader、Ajv／env／private helperの全体整理、SX-04〜SX-14は未完了である。
+
 ## 参照
 
 - 監査で参照した主要ファイル: `libs/core/index.ts`, `libs/core/schema-loader.ts`, `libs/core/secure-io.ts:187`, `libs/core/env-validator.ts:120`, `libs/core/scoped-registry.ts`, `libs/core/config-fallback-registry.ts`, `scripts/cli.ts:137`, `scripts/run_pipeline.ts:616-882`, `scripts/create_actuator.ts:116-195`, `libs/core/adf-repair-agent.ts:48`, `satellites/voice-hub/server.ts`(`generateReply`), `libs/core/surface-runtime-orchestrator.ts:2345,2680`, `libs/core/ceo-surface-summary.ts:228`, `eslint.config.js:151-249`, `.github/workflows/ci.yml`, `docs/INITIALIZATION.md:46-123`

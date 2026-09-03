@@ -999,6 +999,49 @@ describe('mission-context-pack', () => {
     ).toBe(false);
   });
 
+  it('does not project external artifact hints from a prior response', () => {
+    seedPriorWorkItemDispatchManifest();
+    const responsePath = `${missionPath}/evidence/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`;
+    safeWriteFile(
+      responsePath,
+      JSON.stringify({
+        task_result: {
+          summary: 'valid summary',
+          artifacts: [
+            { path: '../external-artifact.md', kind: 'markdown' },
+            { path: 'knowledge/product/architecture/valid-artifact.md', kind: 'markdown' },
+          ],
+        },
+      })
+    );
+
+    const pack = makePack();
+    expect(pack.task_guidance?.seed).toContain('Prior task summary: valid summary');
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('external-artifact'))).toBe(
+      false
+    );
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('valid-artifact'))).toBe(true);
+  });
+
+  it('ignores a schema-invalid prior response projection', () => {
+    seedPriorWorkItemDispatchManifest();
+    const responsePath = `${missionPath}/evidence/workitem-dispatch-WIT-CONTEXT-PACK-PRIOR-001.json`;
+    safeWriteFile(
+      responsePath,
+      JSON.stringify({
+        task_result: {
+          summary: 'must not be projected',
+          unexpected: true,
+        },
+      })
+    );
+
+    const pack = makePack();
+    expect(pack.task_guidance?.seed?.some((entry) => entry.includes('must not be projected'))).toBe(
+      false
+    );
+  });
+
   it('prefers higher quality reusable artifacts over newer lower quality ones', () => {
     seedContextPackArtifacts('PRJ-CONTEXT-PACK-QUALITY');
     appendArtifactOwnershipRecord(

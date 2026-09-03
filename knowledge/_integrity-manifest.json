@@ -8323,6 +8323,12 @@
       "type": "json"
     },
     {
+      "path": "product/schemas/mission-workitem-dispatch-response.schema.json",
+      "tier": "public",
+      "size": 981,
+      "type": "json"
+    },
+    {
       "path": "product/schemas/mobile-app-profile-index.example.json",
       "tier": "public",
       "size": 462,

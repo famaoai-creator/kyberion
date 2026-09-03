@@ -197,6 +197,12 @@ export {
 } from './structured-output-contracts.js';
 
 export {
+  loadMissionWorkItemDispatchResponseSeedAtPath,
+  type MissionWorkItemDispatchResponseArtifact,
+  type MissionWorkItemDispatchResponseSeed,
+} from './mission-workitem-dispatch-response.js';
+
+export {
   getVoiceBridge,
   registerVoiceBridge,
   resetVoiceBridge,

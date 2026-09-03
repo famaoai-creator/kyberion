@@ -2,7 +2,6 @@ import type { ValidateFunction } from 'ajv';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { compileSchema } from './foundation/ajv.js';
-import { readJson } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from './secure-io.js';
 import {
@@ -48,6 +47,7 @@ import {
 } from './mission-context-pack-knowledge.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
+import { loadMissionWorkItemDispatchResponseSeedAtPath } from './mission-workitem-dispatch-response.js';
 import type {
   BuildMissionContextPackInput,
   MissionContextPack,
@@ -290,24 +290,16 @@ function buildTaskGuidance(input: {
             );
           if (safeExistsSync(safeResponsePath)) {
             try {
-              const responsePayload = readJson<{
-                task_result?: {
-                  artifacts?: Array<{ path?: string; kind?: string }>;
-                  summary?: string;
-                };
-              }>(safeResponsePath);
-              const artifacts = Array.isArray(responsePayload.task_result?.artifacts)
-                ? responsePayload.task_result.artifacts
-                : [];
-              for (const artifact of artifacts.slice(0, 3)) {
-                const artifactPath = String(artifact.path || '').trim();
-                if (artifactPath) {
+              const taskResult = loadMissionWorkItemDispatchResponseSeedAtPath(safeResponsePath);
+              for (const artifact of (taskResult?.artifacts || []).slice(0, 3)) {
+                const artifactPath = artifact.path.trim();
+                if (safeOptionalRepositoryPath(artifactPath)) {
                   seed.push(
                     `Prior artifact: ${artifactPath}${artifact.kind ? ` (${artifact.kind})` : ''}`
                   );
                 }
               }
-              const summary = String(responsePayload.task_result?.summary || '').trim();
+              const summary = taskResult?.summary?.trim() || '';
               if (summary) {
                 seed.push(`Prior task summary: ${summarizeText(summary, 180) || summary}`);
               }
